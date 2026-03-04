@@ -91,6 +91,7 @@ We're looking for people who work in clinical operations, build for regulated in
 | **[Vision](docs/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
 | **[Architecture](docs/architecture.md)** | How we're thinking about processes, steps, agents, and compliance |
 | **[How We Work](docs/how-we-work.md)** | Our approach — building bottom-up, in public, with real processes |
+| **[AI Development Process](docs/ai-development-process.md)** | How we use AI coding agents to build Mediforce — specs, skills, and conventions |
 
 ## License
 
