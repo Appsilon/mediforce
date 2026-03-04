@@ -26,16 +26,7 @@ CLAUDE.md (root)              ← Auto-loaded. Points to AGENTS.md
 
 ### The Agent Delegation Model
 
-The main AI thread acts as a **Tech Lead**:
-
-1. **Receive task** from the developer
-2. **Route** via Task Router — read all matching guides
-3. **Break down** into subtasks
-4. **Dispatch subagents** for research, coding, and analysis in parallel
-5. **Review** subagent output critically
-6. **Report back** with a concise summary
-
-This keeps the main context window clean for decision-making while subagents handle the heavy lifting.
+The main AI thread acts as a **Tech Lead** — it delegates execution to subagents and focuses on architecture, coherence, and review. See `AGENTS.md` for the full model.
 
 ### The Spec-First Workflow
 
