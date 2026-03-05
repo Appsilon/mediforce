@@ -1,0 +1,15 @@
+{
+  "//": "Emulator-only config for E2E tests. Hosting config lives in packages/platform-ui/firebase.json.",
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    }
+  }
+}

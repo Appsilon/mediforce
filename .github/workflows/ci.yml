@@ -73,7 +73,6 @@ jobs:
 
       - name: Start Firebase Emulators
         run: |
-          cd packages/platform-ui
           firebase emulators:start --project demo-mediforce --only auth,firestore &
           sleep 10
           curl --retry 5 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
