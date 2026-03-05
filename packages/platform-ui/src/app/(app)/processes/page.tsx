@@ -2,25 +2,17 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { GitBranch, Plus, Layers, Zap, Github, ExternalLink, Archive, ArchiveRestore } from 'lucide-react';
+import { GitBranch, Plus, Layers, Zap, Github, ExternalLink, Archive } from 'lucide-react';
 import { useProcessDefinitions } from '@/hooks/use-process-definitions';
-import { setProcessArchived } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 
 export default function ProcessCatalogPage() {
   const { definitions, loading } = useProcessDefinitions();
   const [showArchived, setShowArchived] = React.useState(false);
-  const [pendingAction, setPendingAction] = React.useState<string | null>(null);
 
   const activeDefinitions = definitions.filter((d) => !d.archived);
   const archivedDefinitions = definitions.filter((d) => d.archived);
   const visibleDefinitions = showArchived ? definitions : activeDefinitions;
-
-  async function handleArchiveToggle(name: string, archived: boolean) {
-    setPendingAction(name);
-    await setProcessArchived(name, archived);
-    setPendingAction(null);
-  }
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -146,23 +138,10 @@ export default function ProcessCatalogPage() {
                   <Zap className="h-3 w-3" />
                   {def.versions.length} {def.versions.length === 1 ? 'version' : 'versions'}
                 </span>
-                <CatalogRepoIcon repo={def.repo} />
-                <CatalogAppIcon url={def.url} hasRepo={!!def.repo} />
-                <button
-                  onClick={() => handleArchiveToggle(def.name, !def.archived)}
-                  disabled={pendingAction === def.name}
-                  className={cn(
-                    'inline-flex items-center gap-1 hover:text-foreground transition-colors ml-auto',
-                    pendingAction === def.name && 'opacity-50 pointer-events-none',
-                  )}
-                  title={def.archived ? 'Unarchive' : 'Archive'}
-                >
-                  {def.archived ? (
-                    <ArchiveRestore className="h-3 w-3" />
-                  ) : (
-                    <Archive className="h-3 w-3" />
-                  )}
-                </button>
+                <span className="flex items-center gap-3 ml-auto">
+                  <CatalogRepoIcon repo={def.repo} />
+                  <CatalogAppIcon url={def.url} />
+                </span>
               </div>
             </div>
           ))}
@@ -194,12 +173,12 @@ function CatalogRepoIcon({ repo }: { repo?: { url: string; branch?: string; dire
   );
 }
 
-function CatalogAppIcon({ url, hasRepo }: { url?: string; hasRepo: boolean }) {
+function CatalogAppIcon({ url }: { url?: string }) {
   if (!url) return null;
   return (
     <button
       type="button"
-      className={cn('inline-flex items-center gap-1 hover:text-foreground transition-colors', !hasRepo && 'ml-auto')}
+      className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
