@@ -44,13 +44,13 @@ test.describe('Config Editor', () => {
   test('[RENDER] Config view page loads with accordion cards', async ({
     page,
   }) => {
-    await page.goto('/configs/Supply%20Chain%20Review/all-human/v1');
+    await page.goto('/configs/Supply%20Chain%20Review/all-human/1');
 
     // Page heading shows config name and version
     await expect(
       page.getByRole('heading', { name: /all-human/i }),
     ).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('v1')).toBeVisible({
+    await expect(page.getByText('v1', { exact: true })).toBeVisible({
       timeout: 10_000,
     });
 

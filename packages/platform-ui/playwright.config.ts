@@ -45,7 +45,7 @@ export default defineConfig({
   projects,
   webServer: {
     command: useEmulators
-      ? 'NEXT_PUBLIC_USE_EMULATORS=true pnpm dev'
+      ? 'NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce pnpm dev'
       : 'pnpm dev',
     port: 9003,
     reuseExistingServer: true,
