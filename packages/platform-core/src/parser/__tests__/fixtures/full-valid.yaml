@@ -1,0 +1,46 @@
+name: supply-chain-review
+version: "1.0"
+description: Review supplier compliance and quality signals
+metadata:
+  department: supply-operations
+  classification: critical
+steps:
+  - id: collect-data
+    name: Collect Supplier Data
+    type: creation
+    description: Automated data collection from sources
+    metadata:
+      estimatedDuration: 300
+  - id: review
+    name: Compliance Review
+    type: review
+    verdicts:
+      approve:
+        target: complete
+      revise:
+        target: collect-data
+      reject:
+        target: closed
+  - id: complete
+    name: Complete
+    type: terminal
+  - id: closed
+    name: Closed
+    type: terminal
+transitions:
+  - from: collect-data
+    to: review
+    gate: data-complete
+  - from: review
+    to: complete
+  - from: review
+    to: collect-data
+  - from: review
+    to: closed
+triggers:
+  - type: manual
+    name: Start Supply Chain Review
+  - type: webhook
+    name: Auto-trigger on Discrepancy
+    config:
+      endpoint: /webhooks/supply-discrepancy

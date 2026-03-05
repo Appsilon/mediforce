@@ -1,0 +1,39 @@
+import type { AgentEvent, ProcessConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+
+export type AutonomyLevel = 'L0' | 'L1' | 'L2' | 'L3' | 'L4';
+
+export interface LlmMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface LlmResponse {
+  content: string;
+  model: string;
+  usage: { promptTokens: number; completionTokens: number };
+}
+
+export interface LlmClient {
+  complete(messages: LlmMessage[], model?: string): Promise<LlmResponse>;
+}
+
+export interface AgentContext {
+  stepId: string;
+  processInstanceId: string;
+  definitionVersion: string;
+  stepInput: Record<string, unknown>;
+  autonomyLevel: AutonomyLevel;
+  config: ProcessConfig;
+  llm: LlmClient;
+  getPreviousStepOutputs: () => Promise<Record<string, unknown>>;
+}
+
+// EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp
+export type EmitPayload = Omit<AgentEvent, 'id' | 'sequence' | 'processInstanceId' | 'stepId'>;
+export type EmitFn = (event: EmitPayload) => Promise<void>;
+
+export interface AgentPlugin {
+  metadata?: PluginCapabilityMetadata;
+  initialize(context: AgentContext): Promise<void>;
+  run(emit: EmitFn): Promise<void>;
+}

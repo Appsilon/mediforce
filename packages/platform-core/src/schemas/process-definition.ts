@@ -1,0 +1,51 @@
+import { z } from 'zod';
+
+export const VerdictSchema = z.object({
+  target: z.string(),
+});
+
+export const StepSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  type: z.enum(['creation', 'review', 'decision', 'terminal']).default('creation'),
+  description: z.string().optional(),
+  verdicts: z.record(z.string(), VerdictSchema).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const TransitionSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  gate: z.string().optional(),
+});
+
+export const TriggerSchema = z.object({
+  type: z.enum(['manual', 'webhook', 'event']),
+  name: z.string().min(1),
+  config: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const RepoSchema = z.object({
+  url: z.string().url(),
+  branch: z.string().optional(),
+  directory: z.string().optional(),
+});
+
+export const ProcessDefinitionSchema = z.object({
+  name: z.string().min(1),
+  version: z.string(),
+  description: z.string().optional(),
+  repo: RepoSchema.optional(),
+  url: z.string().url().optional(),
+  steps: z.array(StepSchema).min(1),
+  transitions: z.array(TransitionSchema),
+  triggers: z.array(TriggerSchema).min(1),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  archived: z.boolean().optional(),
+});
+
+export type Verdict = z.infer<typeof VerdictSchema>;
+export type Step = z.infer<typeof StepSchema>;
+export type Transition = z.infer<typeof TransitionSchema>;
+export type Trigger = z.infer<typeof TriggerSchema>;
+export type ProcessDefinition = z.infer<typeof ProcessDefinitionSchema>;

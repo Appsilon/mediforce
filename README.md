@@ -64,6 +64,8 @@ This is early. We're building in public because we believe the standard for huma
 
 We have a working proof of concept that validates the core ideas against a real pharma process. Everything else — the platform abstractions, the developer experience, the process template ecosystem — is being actively figured out.
 
+The codebase is a working proof of concept — experimental by design. We're using it to explore and validate architectural patterns for human-agent collaboration in regulated environments. The code prioritizes learning and iteration speed over production readiness. As the architecture stabilizes, we'll harden and evolve what works.
+
 We're not pretending to have all the answers. We're experimenting, iterating, and building toward a vision. If you work in pharma and this resonates, we want to hear from you.
 
 ## Why Open Source
@@ -84,6 +86,27 @@ We're looking for people who work in clinical operations, build for regulated in
 - **Star this repo** — helps others find us
 - **Open an issue** — tell us what processes you'd want to see
 
+## Development
+
+This is a pnpm monorepo. Quick start:
+
+```bash
+pnpm install
+cp packages/platform-ui/.env.local.example packages/platform-ui/.env.local
+# fill in Firebase config values
+cd packages/platform-ui && pnpm dev
+```
+
+Run tests:
+
+```bash
+pnpm typecheck      # type checking
+pnpm test           # unit + integration
+cd packages/platform-ui && pnpm test:e2e  # E2E (Playwright)
+```
+
+> Full guide: **[docs/development.md](docs/development.md)**
+
 ## Deep Dives
 
 | | |
@@ -91,6 +114,7 @@ We're looking for people who work in clinical operations, build for regulated in
 | **[Vision](docs/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
 | **[Architecture](docs/architecture.md)** | How we're thinking about processes, steps, agents, and compliance |
 | **[How We Work](docs/how-we-work.md)** | Our approach — building bottom-up, in public, with real processes |
+| **[Development](docs/development.md)** | Setup, monorepo structure, testing, deployment |
 
 ## License
 

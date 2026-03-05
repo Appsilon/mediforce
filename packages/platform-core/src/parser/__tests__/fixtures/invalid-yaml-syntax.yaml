@@ -1,0 +1,8 @@
+name: broken
+steps:
+  - id: start
+    name: Start
+    type: human
+    metadata:
+      bad_indent:
+    extra: [unclosed bracket

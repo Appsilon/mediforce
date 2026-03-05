@@ -1,0 +1,24 @@
+name: supply-intelligence-analysis
+version: "1.0.0"
+description: "Supply chain risk analysis — driver narratives and issue detection"
+url: ${NEXT_PUBLIC_PLATFORM_URL}
+triggers:
+  - type: manual
+    name: start-analysis
+steps:
+  - id: supply-intelligence/driver-agent
+    name: Risk Narrative Generation
+    type: agent
+    plugin: supply-intelligence/driver-agent
+  - id: supply-intelligence/risk-detection
+    name: Risk Detection & Issue Creation
+    type: agent
+    plugin: supply-intelligence/risk-detection
+  - id: analysis-complete
+    name: Analysis Complete
+    type: terminal
+transitions:
+  - from: supply-intelligence/driver-agent
+    to: supply-intelligence/risk-detection
+  - from: supply-intelligence/risk-detection
+    to: analysis-complete

@@ -1,0 +1,38 @@
+name: review-process
+version: "1.0"
+description: Review loop pattern with intentional cycle
+steps:
+  - id: draft
+    name: Draft
+    type: creation
+  - id: review
+    name: Review
+    type: review
+    verdicts:
+      approve:
+        target: approved
+      revise:
+        target: draft
+      reject:
+        target: rejected
+  - id: approved
+    name: Approved
+    type: terminal
+  - id: rejected
+    name: Rejected
+    type: terminal
+transitions:
+  - from: draft
+    to: review
+  - from: review
+    to: approved
+    gate: review-gate
+  - from: review
+    to: draft
+    gate: review-gate
+  - from: review
+    to: rejected
+    gate: review-gate
+triggers:
+  - type: manual
+    name: Start Review

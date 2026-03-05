@@ -1,0 +1,21 @@
+name: linear-process
+version: "1.0"
+description: Simple 3-step linear process
+steps:
+  - id: start
+    name: Start
+    type: creation
+  - id: process
+    name: Process
+    type: creation
+  - id: done
+    name: Done
+    type: terminal
+transitions:
+  - from: start
+    to: process
+  - from: process
+    to: done
+triggers:
+  - type: manual
+    name: Start Process

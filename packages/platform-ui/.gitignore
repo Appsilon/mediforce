@@ -1,0 +1,22 @@
+# Next.js
+.next/
+out/
+
+# dependencies
+node_modules/
+
+# env
+.env.local
+.env*.local
+
+# Playwright
+e2e/.auth/
+playwright-report/
+test-results/
+e2e/.emulator-data/
+
+# Firebase
+.firebase/
+
+# misc
+.DS_Store

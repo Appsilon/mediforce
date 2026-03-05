@@ -1,0 +1,104 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: admin check via custom claim
+    function isAdmin() {
+      return request.auth != null && request.auth.token.role == 'admin';
+    }
+
+    // Helper: role-scoped read on processInstances (top-level doc has assignedRoles array)
+    function hasProcessRole() {
+      return request.auth != null
+        && request.auth.token.roles is list
+        && request.auth.token.roles.hasAny(resource.data.assignedRoles);
+    }
+
+    // Helper: subcollection access — must read parent's assignedRoles via get()
+    function hasParentProcessRole(instanceId) {
+      return request.auth != null
+        && get(/databases/$(database)/documents/processInstances/$(instanceId))
+           .data.assignedRoles.hasAny([request.auth.token.role]);
+    }
+
+    // Audit events: append-only, any authenticated read (BUG-04 fix — role-gated read deferred to Phase 6)
+    match /auditEvents/{eventId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['actorId', 'action', 'timestamp', 'entityType', 'entityId', 'inputSnapshot', 'outputSnapshot', 'basis']);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Process definitions: read by authenticated, write by admin
+    match /processDefinitions/{defId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'process-author'];
+      allow delete: if false;
+    }
+
+    // Process configs: read by authenticated, write by admin
+    match /processConfigs/{configId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'process-author'];
+      allow delete: if false;
+    }
+
+    match /humanTasks/{taskId} {
+      // Read: user with matching role can see the task queue
+      allow read: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles
+           .hasAny([resource.data.assignedRole]);
+      // Create: engine creates tasks (any authenticated user acting as system)
+      allow create: if request.auth != null;
+      // Update: claim, complete, cancel operations
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    match /handoffEntities/{entityId} {
+      // Read: user with matching role can see the handoff
+      allow read: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles
+           .hasAny([resource.data.assignedRole]);
+      // Create: agent runtime creates handoffs
+      allow create: if request.auth != null;
+      // Update: only the user who claimed it (assignedUserId) can acknowledge/resolve
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.assignedUserId;
+      allow delete: if false;
+    }
+
+    // Agent runs: read and write by any authenticated user (BUG-02 fix — client SDK writes from FirestoreAgentRunRepository)
+    match /agentRuns/{runId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // Process instances: any authenticated read (BUG-03 fix — role-scoped read deferred to Phase 6)
+    // Authenticated writes: platform-ui API routes use client SDK to create/update instances
+    match /processInstances/{instanceId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;  // platform-ui API routes use client SDK
+      allow delete: if false;
+
+      // Step executions: any authenticated read/write (platform-ui API routes use client SDK)
+      match /stepExecutions/{execId} {
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null;
+        allow delete: if false;
+      }
+
+      // Agent events: any authenticated read/write (platform-ui API routes use client SDK)
+      match /agentEvents/{eventId} {
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null;
+        allow delete: if false;
+      }
+    }
+  }
+}

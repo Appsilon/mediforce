@@ -1,0 +1,6 @@
+name: missing-fields
+version: "1.0"
+steps:
+  - id: start
+    type: unknown_type
+transitions: []

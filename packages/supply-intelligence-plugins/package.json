@@ -1,0 +1,33 @@
+{
+  "name": "@mediforce/supply-intelligence-plugins",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "@mediforce/source": "./src/index.ts",
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mediforce/agent-runtime": "workspace:*",
+    "@mediforce/platform-core": "workspace:*",
+    "@mediforce/supply-intelligence": "workspace:*",
+    "date-fns": "^3.6.0",
+    "firebase": "^11.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.0"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@mediforce/platform-infra",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "@mediforce/source": "./src/index.ts",
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "dependencies": {
+    "@mediforce/platform-core": "workspace:*",
+    "@sendgrid/mail": "^8.1.6",
+    "firebase": "^11.0.0",
+    "firebase-admin": "^13.6.1"
+  }
+}

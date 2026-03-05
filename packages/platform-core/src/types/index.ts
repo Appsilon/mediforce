@@ -1,0 +1,45 @@
+// Re-export all schema-inferred types for convenience.
+// Consumers can import types from '@mediforce/platform-core' without
+// knowing schema internals.
+
+export type {
+  Verdict,
+  Step,
+  Transition,
+  Trigger,
+  ProcessDefinition,
+} from '../schemas/process-definition.js';
+
+export type {
+  ReviewConstraints,
+  StepConfig,
+  ProcessConfig,
+} from '../schemas/process-config.js';
+
+export type { AuditEvent } from '../schemas/audit-event.js';
+
+export type { StepInput, StepOutput } from '../schemas/step-contract.js';
+
+export type {
+  InstanceStatus,
+  ProcessInstance,
+} from '../schemas/process-instance.js';
+
+export type {
+  StepExecutionStatus,
+  GateResult,
+  ReviewVerdict,
+  StepExecution,
+} from '../schemas/step-execution.js';
+
+export type {
+  Annotation,
+  AgentOutputEnvelope,
+} from '../schemas/agent-output-envelope.js';
+
+export type { AgentEvent } from '../schemas/agent-event.js';
+
+export type {
+  AgentRunStatus,
+  AgentRun,
+} from '../schemas/agent-run.js';

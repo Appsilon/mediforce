@@ -1,6 +1,30 @@
+# dependencies
 node_modules/
+
+# build output
 dist/
-.env
-.env.local
-.DS_Store
+.next/
 *.tsbuildinfo
+
+# misc
+.DS_Store
+*.pem
+
+# claude
+.claude/settings.local.json
+memory/
+
+# env
+.env.local
+.env*.local
+
+# firebase
+firebase-debug.log
+firestore-debug.log
+
+# playwright
+playwright-report/
+test-results/
+blob-report/
+
+coverage/

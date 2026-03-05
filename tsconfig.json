@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "composite": true,
+    "incremental": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "customConditions": ["@mediforce/source"]
+  },
+  "include": [],
+  "references": [
+    { "path": "packages/platform-core" },
+    { "path": "packages/platform-infra" },
+    { "path": "packages/workflow-engine" },
+    { "path": "packages/agent-runtime" },
+    { "path": "packages/platform-ui" },
+    { "path": "packages/supply-intelligence" }
+  ]
+}
