@@ -7,6 +7,7 @@ const packagesDir = path.resolve(__dirname, '..');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  outputFileTracingRoot: path.resolve(__dirname, '../..'),
   transpilePackages: [
     '@mediforce/platform-core',
     '@mediforce/platform-infra',

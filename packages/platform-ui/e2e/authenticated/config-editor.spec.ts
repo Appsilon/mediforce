@@ -50,7 +50,7 @@ test.describe('Config Editor', () => {
     await expect(
       page.getByRole('heading', { name: /all-human/i }),
     ).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('v1')).toBeVisible({
+    await expect(page.getByText('v1', { exact: true })).toBeVisible({
       timeout: 10_000,
     });
 
