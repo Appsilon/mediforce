@@ -32,6 +32,8 @@ Match the task to the table below. A single task may match multiple rows — rea
 | Writing or reviewing specs | `.ai/specs/AGENTS.md` |
 | Reviewing code / PRs | `.ai/skills/code-review/SKILL.md` |
 | Writing specs from scratch | `.ai/skills/spec-writing/SKILL.md` |
+| Implementing a spec (or phases of a spec) | `.ai/skills/implement-spec/SKILL.md` |
+| Creating or rewriting AGENTS.md files | `.ai/skills/create-agents-md/SKILL.md` |
 
 > As the codebase grows, add rows here pointing to package/module-level AGENTS.md files.
 

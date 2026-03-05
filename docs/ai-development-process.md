@@ -55,7 +55,9 @@ Skills are reusable instruction sets invoked on demand:
 | Skill | Invoke with | Purpose |
 |-------|-------------|---------|
 | `spec-writing` | `/spec-writing` | Write or review a specification |
+| `implement-spec` | `/implement-spec` | Implement a spec end-to-end with subagents, tests, and self-review |
 | `code-review` | `/code-review` | Review code changes against checklist |
+| `create-agents-md` | `/create-agents-md` | Create or rewrite AGENTS.md files with correct tone and structure |
 
 Each skill has a `SKILL.md` with step-by-step workflow and optional `references/` with templates and checklists.
 
