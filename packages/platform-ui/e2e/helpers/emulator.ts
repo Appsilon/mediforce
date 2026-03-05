@@ -18,7 +18,7 @@ export async function createTestUser(
   password: string,
   displayName: string,
 ): Promise<string> {
-  const res = await fetch(
+  const signUpRes = await fetch(
     `${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`,
     {
       method: 'POST',
@@ -26,8 +26,23 @@ export async function createTestUser(
       body: JSON.stringify({ email, password, displayName, returnSecureToken: true }),
     },
   );
-  if (!res.ok) throw new Error(`Failed to create user: ${await res.text()}`);
-  const data = await res.json();
+
+  if (signUpRes.ok) {
+    const data = await signUpRes.json();
+    return data.localId as string;
+  }
+
+  // User may already exist if emulator state persisted — sign in instead
+  const signInRes = await fetch(
+    `${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    },
+  );
+  if (!signInRes.ok) throw new Error(`Failed to create or sign in user: ${await signInRes.text()}`);
+  const data = await signInRes.json();
   return data.localId as string;
 }
 
@@ -68,8 +83,9 @@ export async function seedCollection(
 ) {
   const basePath = `${FIRESTORE_EMULATOR}/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
   for (const [docId, docData] of Object.entries(documents)) {
-    const res = await fetch(`${basePath}/${collection}?documentId=${encodeURIComponent(docId)}`, {
-      method: 'POST',
+    // Use PATCH to upsert — avoids errors if document already exists from a previous run
+    const res = await fetch(`${basePath}/${collection}/${encodeURIComponent(docId)}`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields: toFirestoreFields(docData) }),
     });
@@ -87,10 +103,11 @@ export async function seedSubcollection(
 ) {
   const basePath = `${FIRESTORE_EMULATOR}/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
   for (const [docId, docData] of Object.entries(documents)) {
+    // Use PATCH to upsert — avoids errors if document already exists from a previous run
     const res = await fetch(
-      `${basePath}/${parentCollection}/${parentId}/${subcollection}?documentId=${docId}`,
+      `${basePath}/${parentCollection}/${parentId}/${subcollection}/${docId}`,
       {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields: toFirestoreFields(docData) }),
       },
