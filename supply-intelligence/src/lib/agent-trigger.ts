@@ -33,7 +33,9 @@ export async function triggerAnalysis(): Promise<string> {
       },
       body: JSON.stringify({
         definitionName: 'supply-intelligence-analysis',
-        version: '1.0.0',
+        version: '1.0.4',
+        configName: 'all-human',
+        configVersion: '1',
         triggerName: 'start-analysis',
         triggeredBy: 'supply-intelligence-app',
         payload: {},

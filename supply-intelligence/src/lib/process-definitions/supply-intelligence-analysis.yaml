@@ -1,19 +1,19 @@
 name: supply-intelligence-analysis
-version: "1.0.0"
+version: "1.0.4"
 description: "Supply chain risk analysis — driver narratives and issue detection"
-url: ${NEXT_PUBLIC_PLATFORM_URL}
+url: https://supply-intelligence--mediforce-1c761.us-east4.hosted.app
 triggers:
   - type: manual
     name: start-analysis
 steps:
   - id: supply-intelligence/driver-agent
     name: Risk Narrative Generation
-    type: agent
-    plugin: supply-intelligence/driver-agent
+    type: creation
+    description: "Generate risk narratives for supply chain drivers based on latest data"
   - id: supply-intelligence/risk-detection
     name: Risk Detection & Issue Creation
-    type: agent
-    plugin: supply-intelligence/risk-detection
+    type: creation
+    description: "Detect risks from narratives and create actionable issues"
   - id: analysis-complete
     name: Analysis Complete
     type: terminal
