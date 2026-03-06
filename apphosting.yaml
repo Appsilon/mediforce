@@ -3,21 +3,17 @@ runConfig:
 
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    secret: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyDTdfm-1wQgUfmZGC2ExSinK-fUd8YYT-s
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    secret: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: mediforce-1c761.firebaseapp.com
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    secret: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: mediforce-1c761
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: mediforce-1c761.firebasestorage.app
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    secret: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "1044281777485"
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    secret: NEXT_PUBLIC_FIREBASE_APP_ID
-  - variable: NEXT_PUBLIC_PLATFORM_URL
-    secret: NEXT_PUBLIC_PLATFORM_URL
-  - variable: NEXT_PUBLIC_PLATFORM_API_KEY
-    secret: PLATFORM_API_KEY
+    value: "1:1044281777485:web:848f62c06d9376c75f6b04"
   - variable: PLATFORM_API_KEY
     secret: PLATFORM_API_KEY
   - variable: OPENROUTER_API_KEY
