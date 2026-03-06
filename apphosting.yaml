@@ -14,6 +14,10 @@ env:
     value: "1044281777485"
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
     value: "1:1044281777485:web:848f62c06d9376c75f6b04"
+  - variable: NEXT_PUBLIC_PLATFORM_URL
+    value: https://mediforce-platform--mediforce-1c761.us-east4.hosted.app
+  - variable: NEXT_PUBLIC_PLATFORM_API_KEY
+    secret: PLATFORM_API_KEY
   - variable: PLATFORM_API_KEY
     secret: PLATFORM_API_KEY
   - variable: OPENROUTER_API_KEY
