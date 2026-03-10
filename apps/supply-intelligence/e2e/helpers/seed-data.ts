@@ -5,7 +5,7 @@ import {
   DEMAND_FORECASTS,
   INBOUND_SHIPMENTS,
   DEFAULT_RISK_CONFIG,
-} from '../../../packages/supply-intelligence/src/seed/seed-data';
+} from '../../../../packages/supply-intelligence/src/seed/seed-data';
 
 export function buildSupplySeedData() {
   const collections: Record<string, Record<string, Record<string, unknown>>> = {};

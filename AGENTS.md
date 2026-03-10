@@ -3,6 +3,8 @@
 ## Repository structure
 
 ```
+apps/
+  supply-intelligence/ # Standalone supply intelligence Next.js app
 packages/
   platform-core/       # Shared types, domain models, test factories
   platform-ui/         # Next.js UI — the main web application
@@ -12,7 +14,6 @@ packages/
   example-agent/       # Reference agent implementation
   supply-intelligence/ # Supply intelligence domain package
   supply-intelligence-plugins/  # Agent plugins for supply intelligence
-supply-intelligence/   # Standalone supply intelligence Next.js app
 docs/                  # Product vision, architecture, strategy
 ```
 

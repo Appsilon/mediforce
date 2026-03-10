@@ -20,7 +20,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@mediforce/supply-intelligence": ["../packages/supply-intelligence/src/index.ts"]
+      "@mediforce/supply-intelligence": ["../../packages/supply-intelligence/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
