@@ -34,6 +34,9 @@ Proposal for Demonstration Use Case: Clinical Data Quality Check: A discussion o
 Need for Realistic Sample Data: To build a working demo for the clinical data quality use case, the team noted the crucial need for a realistic, anonymized data set that mirrors formats sent from CROs to sponsors, such as MSSQL database exports or flat files. Eric Nantz mentioned that the R Consortium’s new Pilot 7 initiative is working to generate more realistic clinical data in SDTM and ADAM formats, which could potentially be a future resource. Pilot 7 is welcoming contribution.
 
 ## 📌 Action Items
+
 **Action:** Create a tutorial for a first process or agent created on the platform.	
+
 **Action:** Look for realistic sample data (e.g., synthetic data sets) for building the clinical data quality check demo application.
+
 **Action:** Think about leveraging Philip Toss's repository for skills and agent definitions.
