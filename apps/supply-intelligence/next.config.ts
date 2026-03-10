@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 import path from 'path';
 
-const packagesDir = path.resolve(__dirname, '..', 'packages');
+const packagesDir = path.resolve(__dirname, '..', '..', 'packages');
 
 const nextConfig: NextConfig = {
   output: 'standalone',

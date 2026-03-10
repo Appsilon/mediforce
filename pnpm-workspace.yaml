@@ -1,7 +1,7 @@
 packages:
   - 'packages/*'
   - 'packages/supply-intelligence'
-  - 'supply-intelligence'
+  - 'apps/*'
 
 # @firebase/rules-unit-testing@5 declares peer firebase@^12, but we use firebase@11 in platform-ui.
 # The package works fine at runtime — the peer declaration is overly strict.

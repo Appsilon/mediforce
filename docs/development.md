@@ -36,6 +36,8 @@ Fill in your Firebase project values. Get them from: Firebase Console > Project 
 ## Monorepo structure
 
 ```
+apps/
+  supply-intelligence/ # Standalone supply intelligence Next.js app
 packages/
   platform-core/       # Shared types, domain models, test factories
   platform-ui/         # Next.js UI — the main web application
@@ -45,7 +47,6 @@ packages/
   example-agent/       # Reference agent implementation
   supply-intelligence/ # Supply intelligence domain package
   supply-intelligence-plugins/  # Agent plugins for supply intelligence
-supply-intelligence/   # Standalone supply intelligence Next.js app
 ```
 
 ## Running the app
@@ -55,7 +56,7 @@ supply-intelligence/   # Standalone supply intelligence Next.js app
 cd packages/platform-ui && pnpm dev
 
 # Supply Intelligence app
-cd supply-intelligence && pnpm dev
+cd apps/supply-intelligence && pnpm dev
 ```
 
 ## Testing
