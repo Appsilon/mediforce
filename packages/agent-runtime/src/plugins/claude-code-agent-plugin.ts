@@ -2,9 +2,24 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
-import type { AgentConfig, StepConfig } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 
 export class ClaudeCodeAgentPlugin implements AgentPlugin {
+  readonly metadata: PluginCapabilityMetadata = {
+    name: 'Claude Code Agent',
+    description:
+      'General-purpose AI agent powered by Claude Code CLI. ' +
+      'Executes configurable skills — from document extraction to code generation — ' +
+      'driven by SKILL.md prompts and structured input data.',
+    inputDescription:
+      'Any structured JSON context: file paths, previous step outputs, domain data. ' +
+      'Adapts to the configured skill.',
+    outputDescription:
+      'Skill-dependent structured JSON with confidence scoring. ' +
+      'Examples: extracted metadata, generated code, analysis reports.',
+    roles: ['executor'],
+  };
+
   private context!: AgentContext;
   private agentConfig!: AgentConfig;
 

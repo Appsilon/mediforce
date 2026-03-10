@@ -11,6 +11,7 @@ import { StepHistoryTabs } from './step-history-tabs';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { cancelProcessRun } from '@/app/actions/processes';
+import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 
 type AuditEventWithId = AuditEvent & { id: string };
 
@@ -47,6 +48,10 @@ export function ProcessDetail({
   backLabel?: string;
   stepConfigMap?: Map<string, { autonomyLevel?: string; executorType?: string }>;
 }) {
+  const { task: blockingTask } = useActiveTaskForInstance(
+    instance.pauseReason === 'waiting_for_human' ? instance.id : null,
+  );
+
   // Controlled tab state for graph-to-history interaction
   const [activeTab, setActiveTab] = React.useState('history');
 
@@ -107,7 +112,21 @@ export function ProcessDetail({
         </div>
         {instance.pauseReason && (
           <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-            Paused: {instance.pauseReason}
+            <span>Paused: {instance.pauseReason}</span>
+            {blockingTask && (
+              <span className="ml-2">
+                — waiting on{' '}
+                <Link
+                  href={`/tasks/${blockingTask.id}`}
+                  className="font-medium underline hover:text-amber-900 dark:hover:text-amber-200"
+                >
+                  {blockingTask.stepId}
+                </Link>
+                {blockingTask.status === 'claimed' && blockingTask.assignedUserId && (
+                  <span className="ml-1 text-amber-600 dark:text-amber-400">(claimed)</span>
+                )}
+              </span>
+            )}
           </div>
         )}
         {instance.error && (

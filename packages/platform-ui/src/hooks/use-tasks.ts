@@ -61,3 +61,23 @@ export function useAllTasks() {
   const constraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
   return useCollection<HumanTask>('humanTasks', constraints);
 }
+
+export function useActiveTaskForInstance(processInstanceId: string | null) {
+  const constraints = useMemo(
+    () =>
+      processInstanceId
+        ? [
+            where('processInstanceId', '==', processInstanceId),
+            where('status', 'in', ['pending', 'claimed']),
+          ]
+        : [],
+    [processInstanceId],
+  );
+
+  const { data, loading } = useCollection<HumanTask>(
+    processInstanceId ? 'humanTasks' : '',
+    constraints,
+  );
+
+  return { task: data[0] ?? null, loading };
+}
