@@ -1,0 +1,44 @@
+name: protocol-to-tfl
+version: "1"
+description: >
+  Transform clinical trial protocol documents into production-ready
+  Tables, Figures, and Listings (TFLs).
+
+triggers:
+  - name: manual
+    type: manual
+
+steps:
+  - id: upload-documents
+    name: Upload Documents
+    type: creation
+    description: Upload protocol PDF and SAP document
+    ui:
+      component: file-upload
+      config:
+        acceptedTypes:
+          - application/pdf
+        minFiles: 1
+        maxFiles: 5
+
+  - id: extract-metadata
+    name: Extract Metadata
+    type: creation
+    description: Extract trial metadata from protocol and SAP documents
+
+  - id: review-metadata
+    name: Review Metadata
+    type: review
+    description: Review and approve extracted trial metadata
+
+  - id: done
+    name: Done
+    type: terminal
+
+transitions:
+  - from: upload-documents
+    to: extract-metadata
+  - from: extract-metadata
+    to: review-metadata
+  - from: review-metadata
+    to: done

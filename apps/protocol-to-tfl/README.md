@@ -27,9 +27,14 @@ The pipeline consists of 5 skills, each handling a discrete step:
 ## Project Structure
 
 ```
-plugins/protocol-to-tfl/skills/   # Skill definitions and reference docs
-test-docs/                         # Trial protocol/SAP documents and SDTM data
-outputs/                           # Generated ADaM datasets, TLGs, and teal apps
+src/
+  process-definition.yaml  # Workflow definition (steps, transitions, triggers)
+  __tests__/               # Process definition validation tests
+plugins/
+  protocol-to-tfl/skills/  # Skill definitions and reference docs
+data/
+  test-docs/               # Trial protocol/SAP documents and SDTM data
+  outputs/                 # Generated ADaM datasets, TLGs, and teal apps
 ```
 
 ## Usage
