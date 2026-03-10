@@ -14,10 +14,21 @@ export function useMyTasks(assignedRole: string | null) {
             where('status', 'in', ['pending', 'claimed']),
             orderBy('createdAt', 'asc'),
           ]
-        : [],
+        : [orderBy('createdAt', 'asc')],
     [assignedRole],
   );
-  return useCollection<HumanTask>('humanTasks', constraints);
+
+  const { data, loading, error } = useCollection<HumanTask>('humanTasks', constraints);
+
+  const filtered = useMemo(
+    () =>
+      assignedRole
+        ? data
+        : data.filter((task) => task.status !== 'completed'),
+    [data, assignedRole],
+  );
+
+  return { data: filtered, loading, error };
 }
 
 export function useCompletedTasks(assignedRole: string | null) {
@@ -29,10 +40,21 @@ export function useCompletedTasks(assignedRole: string | null) {
             where('status', '==', 'completed'),
             orderBy('completedAt', 'desc'),
           ]
-        : [],
+        : [orderBy('createdAt', 'desc')],
     [assignedRole],
   );
-  return useCollection<HumanTask>('humanTasks', constraints);
+
+  const { data, loading, error } = useCollection<HumanTask>('humanTasks', constraints);
+
+  const filtered = useMemo(
+    () =>
+      assignedRole
+        ? data
+        : data.filter((task) => task.status === 'completed'),
+    [data, assignedRole],
+  );
+
+  return { data: filtered, loading, error };
 }
 
 export function useAllTasks() {
