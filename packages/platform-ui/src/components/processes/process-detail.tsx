@@ -10,6 +10,7 @@ import { ProcessStatusBadge } from './process-status-badge';
 import { StepHistoryTabs } from './step-history-tabs';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
+import { AgentLogViewer } from './agent-log-viewer';
 import { cancelProcessRun } from '@/app/actions/processes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 
@@ -51,6 +52,17 @@ export function ProcessDetail({
   const { task: blockingTask } = useActiveTaskForInstance(
     instance.pauseReason === 'waiting_for_human' ? instance.id : null,
   );
+
+  // Extract debug log filename from agent status events
+  const agentLogFile = React.useMemo(() => {
+    const logEvent = agentEvents.find(
+      (e) => e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:'),
+    );
+    if (!logEvent) return null;
+    const fullPath = (logEvent.payload as string).replace('agent activity log: ', '');
+    // Extract just the filename (basename) for the API
+    return fullPath.split('/').pop() ?? null;
+  }, [agentEvents]);
 
   // Controlled tab state for graph-to-history interaction
   const [activeTab, setActiveTab] = React.useState('history');
@@ -191,6 +203,7 @@ export function ProcessDetail({
           {[
             { value: 'history', label: 'Step History' },
             { value: 'audit', label: 'Audit Log' },
+            ...(agentLogFile ? [{ value: 'agent-log', label: 'Agent Log' }] : []),
           ].map(({ value, label }) => (
             <Tabs.Trigger
               key={value}
@@ -209,6 +222,12 @@ export function ProcessDetail({
         <Tabs.Content value="audit">
           <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
         </Tabs.Content>
+
+        {agentLogFile && (
+          <Tabs.Content value="agent-log">
+            <AgentLogViewer logFile={agentLogFile} />
+          </Tabs.Content>
+        )}
       </Tabs.Root>
     </div>
   );

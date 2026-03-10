@@ -250,7 +250,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.run(emit);
 
       const [, options] = spawnSpy.mock.calls[0];
-      expect(options).toEqual({ model: 'sonnet' });
+      expect(options).toMatchObject({ model: 'sonnet' });
     });
 
     it('[DATA] emits result with valid AgentOutputEnvelope', async () => {

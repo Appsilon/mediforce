@@ -1,8 +1,124 @@
-import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { readFile, mkdtemp, writeFile, rm, mkdir, appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+
+/** Strip YAML frontmatter (--- ... ---) from markdown content. */
+function stripFrontmatter(content: string): string {
+  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+  return match ? content.slice(match[0].length) : content;
+}
+
+interface FileEntry {
+  name: string;
+  downloadUrl: string;
+  localPath?: string;
+  [key: string]: unknown;
+}
+
+interface SpawnCliOptions {
+  model?: string;
+  addDirs?: string[];
+  logFile?: string;
+}
+
+interface StreamEvent {
+  type: string;
+  subtype?: string;
+  message?: {
+    role?: string;
+    content?: Array<{ type: string; name?: string; input?: unknown; text?: string }>;
+  };
+  result?: string;
+  tool_name?: string;
+  tool_input?: unknown;
+  [key: string]: unknown;
+}
+
+function hasFiles(input: Record<string, unknown>): input is Record<string, unknown> & { files: FileEntry[] } {
+  return Array.isArray(input.files) &&
+    input.files.length > 0 &&
+    typeof input.files[0].downloadUrl === 'string';
+}
+
+/** Download remote files to a temp directory and return updated input with localPath fields. */
+async function downloadFilesToLocal(
+  stepInput: Record<string, unknown>,
+): Promise<{ updatedInput: Record<string, unknown>; tempDir: string | null }> {
+  if (!hasFiles(stepInput)) {
+    return { updatedInput: stepInput, tempDir: null };
+  }
+
+  const tempDir = await mkdtemp(join(tmpdir(), 'mediforce-agent-'));
+  const updatedFiles: FileEntry[] = [];
+
+  for (const file of stepInput.files) {
+    const localPath = join(tempDir, file.name);
+    const response = await fetch(file.downloadUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download '${file.name}': HTTP ${response.status}`);
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await writeFile(localPath, buffer);
+    updatedFiles.push({ ...file, localPath });
+  }
+
+  return {
+    updatedInput: { ...stepInput, files: updatedFiles },
+    tempDir,
+  };
+}
+
+/** Clean up temp directory, swallowing errors. */
+async function cleanupTempDir(tempDir: string | null): Promise<void> {
+  if (tempDir) {
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+interface LogEntry {
+  ts: string;
+  kind: 'tool_call' | 'assistant' | 'result';
+  tool?: string;
+  input?: Record<string, unknown>;
+  text?: string;
+  subtype?: string;
+}
+
+/** Extract log entries from a stream-json event. Returns JSONL strings. */
+function formatLogEntries(event: StreamEvent): string[] {
+  const ts = new Date().toISOString();
+  const entries: LogEntry[] = [];
+
+  if (event.type === 'assistant' && event.message?.content) {
+    for (const block of event.message.content) {
+      if (block.type === 'tool_use' && block.name) {
+        entries.push({
+          ts,
+          kind: 'tool_call',
+          tool: block.name,
+          input: block.input as Record<string, unknown> | undefined,
+        });
+      }
+      if (block.type === 'text' && block.text) {
+        entries.push({ ts, kind: 'assistant', text: block.text });
+      }
+    }
+  }
+
+  if (event.type === 'result') {
+    entries.push({
+      ts,
+      kind: 'result',
+      subtype: event.subtype,
+      text: typeof event.result === 'string' ? event.result.slice(0, 500) : undefined,
+    });
+  }
+
+  return entries.map((entry) => JSON.stringify(entry));
+}
 
 export class ClaudeCodeAgentPlugin implements AgentPlugin {
   readonly metadata: PluginCapabilityMetadata = {
@@ -55,9 +171,41 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
       timestamp: new Date().toISOString(),
     });
 
+    let tempDir: string | null = null;
+
     try {
-      const prompt = await this.buildPrompt();
-      const options = this.agentConfig.model ? { model: this.agentConfig.model } : undefined;
+      // Download remote files to local temp dir so the CLI can read them directly
+      const { updatedInput, tempDir: downloadedTempDir } = await downloadFilesToLocal(
+        this.context.stepInput,
+      );
+      tempDir = downloadedTempDir;
+
+      if (tempDir) {
+        await emit({
+          type: 'status',
+          payload: `downloaded ${(updatedInput as Record<string, unknown> & { files: FileEntry[] }).files.length} file(s) to local temp directory`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const prompt = await this.buildPrompt(updatedInput);
+      const options: SpawnCliOptions = {};
+      if (this.agentConfig.model) options.model = this.agentConfig.model;
+      if (tempDir) options.addDirs = [tempDir];
+
+      // Create activity log file for observability
+      const logsDir = join(tmpdir(), 'mediforce-agent-logs');
+      await mkdir(logsDir, { recursive: true });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const logFile = join(logsDir, `${this.context.processInstanceId}_${this.context.stepId}_${timestamp}.log`);
+      options.logFile = logFile;
+
+      await emit({
+        type: 'status',
+        payload: `agent activity log: ${logFile}`,
+        timestamp: new Date().toISOString(),
+      });
+
       const cliOutput = await this.spawnClaudeCli(prompt, options);
       const duration_ms = Date.now() - startTime;
 
@@ -80,6 +228,7 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
           reasoning_chain: [
             `Invoked skill: ${skillName}`,
             `Input keys: ${Object.keys(this.context.stepInput).join(', ')}`,
+            tempDir ? `Downloaded files to temp dir` : 'No file downloads needed',
             'CLI execution completed',
           ],
           annotations: [],
@@ -109,11 +258,14 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
         },
         timestamp: new Date().toISOString(),
       });
+    } finally {
+      await cleanupTempDir(tempDir);
     }
   }
 
-  private async buildPrompt(): Promise<string> {
+  private async buildPrompt(stepInput?: Record<string, unknown>): Promise<string> {
     const parts: string[] = [];
+    const input = stepInput ?? this.context.stepInput;
 
     // 1. Skill prompt from SKILL.md
     if (this.agentConfig.skill && this.agentConfig.skillsDir) {
@@ -131,12 +283,12 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
 
     // 3. Input context
     const previousOutputs = await this.context.getPreviousStepOutputs();
-    const hasPreivousOutputs = Object.keys(previousOutputs).length > 0;
+    const hasPreviousOutputs = Object.keys(previousOutputs).length > 0;
 
     parts.push('## Input Data');
-    parts.push(JSON.stringify(this.context.stepInput, null, 2));
+    parts.push(JSON.stringify(input, null, 2));
 
-    if (hasPreivousOutputs) {
+    if (hasPreviousOutputs) {
       parts.push('## Previous Step Outputs');
       parts.push(JSON.stringify(previousOutputs, null, 2));
     }
@@ -146,29 +298,113 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
 
   protected async readSkillFile(skillsDir: string, skill: string): Promise<string> {
     const skillPath = join(skillsDir, skill, 'SKILL.md');
-    return readFile(skillPath, 'utf-8');
+    const raw = await readFile(skillPath, 'utf-8');
+    return stripFrontmatter(raw);
   }
 
-  protected async spawnClaudeCli(prompt: string, options?: { model?: string }): Promise<string> {
-    const args = ['-p', prompt, '--output-format', 'json'];
+  protected async spawnClaudeCli(prompt: string, options?: SpawnCliOptions): Promise<string> {
+    // Use stream-json to capture agent activity for observability.
+    // The final "result" event contains the same output as --output-format json.
+    const args = ['-p', '--verbose', '--output-format', 'stream-json'];
 
     if (options?.model) {
       args.push('--model', options.model);
     }
+    if (options?.addDirs) {
+      for (const dir of options.addDirs) {
+        args.push('--add-dir', dir);
+      }
+    }
+
+    const logFile = options?.logFile ?? null;
 
     return new Promise((resolve, reject) => {
-      execFile(
-        'claude',
-        args,
-        { timeout: 10 * 60_000, maxBuffer: 10 * 1024 * 1024 },
-        (error, stdout, stderr) => {
-          if (error) {
-            reject(new Error(`CLI process failed: ${stderr || error.message}`));
-            return;
+      const child = spawn('claude', args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 10 * 60_000,
+      });
+
+      let finalResult = '';
+      let buffer = '';
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        buffer += chunk.toString('utf-8');
+
+        // Process complete lines (newline-delimited JSON)
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? ''; // keep incomplete last line
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          try {
+            const event = JSON.parse(trimmed) as StreamEvent;
+
+            // Capture the final result
+            if (event.type === 'result') {
+              finalResult = trimmed;
+            }
+
+            // Write human-readable activity to log file
+            if (logFile) {
+              const logLines = formatLogEntries(event);
+              if (logLines.length > 0) {
+                appendFile(logFile, logLines.join('\n') + '\n').catch(() => {});
+              }
+            }
+          } catch {
+            // Skip malformed lines
           }
-          resolve(stdout.trim());
-        },
-      );
+        }
+      });
+
+      const stderrChunks: Buffer[] = [];
+      child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
+
+      child.on('error', (error) => {
+        reject(new Error(`CLI process failed: ${error.message}`));
+      });
+
+      child.on('close', (code, signal) => {
+        // Process any remaining buffer
+        if (buffer.trim()) {
+          try {
+            const event = JSON.parse(buffer.trim()) as StreamEvent;
+            if (event.type === 'result') {
+              finalResult = buffer.trim();
+            }
+            if (logFile) {
+              const logLines = formatLogEntries(event);
+              if (logLines.length > 0) {
+                appendFile(logFile, logLines.join('\n') + '\n').catch(() => {});
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
+
+        if (code !== 0) {
+          const exitInfo = signal
+            ? `killed by ${signal}${signal === 'SIGTERM' ? ' (likely timeout — 10 min limit)' : ''}`
+            : `exit code ${code}`;
+          reject(new Error(`CLI process failed (${exitInfo}): ${stderr || 'no stderr output'}`));
+          return;
+        }
+
+        if (!finalResult) {
+          reject(new Error('CLI produced no result event'));
+          return;
+        }
+
+        resolve(finalResult);
+      });
+
+      child.stdin.write(prompt);
+      child.stdin.end();
     });
   }
 }

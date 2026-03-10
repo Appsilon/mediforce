@@ -15,10 +15,49 @@
 // Each app provides its own context, e.g. { studyId: '...' } or { supplierId: '...', ... }.
 // Plugins read what they need from AgentContext.stepInput (which is set to appContext).
 
+import { existsSync } from 'node:fs';
+import { resolve, isAbsolute, dirname, join } from 'node:path';
 import { getPlatformServices } from './platform-services';
 import type { AgentContext, AgentPlugin, ReviewPlugin, AgentRunResult } from '@mediforce/agent-runtime';
-import type { StepConfig, AgentOutputEnvelope, ProcessInstance } from '@mediforce/platform-core';
+import type { StepConfig, AgentOutputEnvelope, ProcessInstance, ProcessConfig } from '@mediforce/platform-core';
 import type { PlatformServices } from './platform-services';
+
+/** Walk up from cwd to find the monorepo root (contains pnpm-workspace.yaml). */
+function findWorkspaceRoot(): string {
+  let dir = process.cwd();
+  while (dir !== dirname(dir)) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) {
+      return dir;
+    }
+    dir = dirname(dir);
+  }
+  return process.cwd(); // fallback
+}
+
+/** Resolve relative skillsDir paths in stepConfigs to absolute paths anchored at workspace root. */
+function resolveSkillPaths(config: ProcessConfig): ProcessConfig {
+  const needsResolve = config.stepConfigs.some(
+    (sc) => sc.agentConfig?.skillsDir && !isAbsolute(sc.agentConfig.skillsDir),
+  );
+  if (!needsResolve) return config;
+
+  const root = findWorkspaceRoot();
+  return {
+    ...config,
+    stepConfigs: config.stepConfigs.map((sc) => {
+      if (sc.agentConfig?.skillsDir && !isAbsolute(sc.agentConfig.skillsDir)) {
+        return {
+          ...sc,
+          agentConfig: {
+            ...sc.agentConfig,
+            skillsDir: resolve(root, sc.agentConfig.skillsDir),
+          },
+        };
+      }
+      return sc;
+    }),
+  };
+}
 
 export interface AgentStepResult {
   instanceId: string;
@@ -52,8 +91,11 @@ export async function executeAgentStep(
     );
   }
 
+  // Resolve relative skillsDir paths to absolute (Next.js cwd != workspace root)
+  const resolvedConfig = resolveSkillPaths(processConfig);
+
   // Find StepConfig for this step
-  const stepConfig = processConfig.stepConfigs.find((sc) => sc.stepId === stepId);
+  const stepConfig = resolvedConfig.stepConfigs.find((sc) => sc.stepId === stepId);
   if (!stepConfig) {
     throw new Error(
       `StepConfig not found for step '${stepId}' in ProcessConfig '${instance.definitionName}'`,
@@ -67,13 +109,33 @@ export async function executeAgentStep(
   // Resolve autonomy level from config (not from caller)
   const autonomyLevel = stepConfig.autonomyLevel ?? 'L2';
 
+  // Emit audit event so the UI shows agent step has started
+  await auditRepo.append({
+    actorId: `agent:${pluginId}`,
+    actorType: 'agent',
+    actorRole: autonomyLevel,
+    action: 'agent.step.started',
+    description: `Agent step '${stepId}' started (plugin: ${pluginId}, autonomy: ${autonomyLevel})`,
+    timestamp: new Date().toISOString(),
+    inputSnapshot: { stepId, pluginId, autonomyLevel, ...appContext },
+    outputSnapshot: {},
+    basis: `Triggered by ${triggeredBy}`,
+    entityType: 'processInstance',
+    entityId: instanceId,
+    processInstanceId: instanceId,
+    stepId,
+    processDefinitionVersion: instance.definitionVersion,
+    executorType: 'agent',
+    reviewerType: 'none',
+  });
+
   const agentContext: AgentContext = {
     stepId,
     processInstanceId: instanceId,
     definitionVersion: instance.definitionVersion,
     stepInput: appContext,
     autonomyLevel,
-    config: processConfig,
+    config: resolvedConfig,
     llm: llmClient,
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
