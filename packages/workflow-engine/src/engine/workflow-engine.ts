@@ -348,6 +348,7 @@ export class WorkflowEngine {
             updatedAt: now,
             completedAt: null,
             completionData: null,
+            ...(nextStep.ui ? { ui: nextStep.ui } : {}),
           };
           await this.humanTaskRepository.create(task);
         }

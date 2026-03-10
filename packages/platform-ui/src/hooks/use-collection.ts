@@ -44,6 +44,10 @@ export function useCollection<T extends { id: string }>(
   });
 
   useEffect(() => {
+    if (!collectionPath) {
+      setState({ data: [], loading: false, error: null });
+      return;
+    }
     setState((prev) => ({ ...prev, loading: true }));
     const colRef = collection(db, collectionPath);
     const q: Query<DocumentData> =

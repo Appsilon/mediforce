@@ -137,15 +137,25 @@ export async function POST(
         break;
       }
 
-      // Human executor — create HumanTask, pause
+      // Human executor — create HumanTask, pause (do NOT advanceStep — the human hasn't acted yet)
       if (stepConfig.executorType === 'human') {
-        const { engine } = getPlatformServices();
-        await engine.advanceStep(
-          instanceId,
-          { reason: 'human_step_reached' },
-          { id: triggeredBy ?? 'auto-runner', role: 'agent' },
-          stepConfig,
-        );
+        const { humanTaskRepo } = getPlatformServices();
+        const now = new Date().toISOString();
+
+        await humanTaskRepo.create({
+          id: crypto.randomUUID(),
+          processInstanceId: instanceId,
+          stepId: instance.currentStepId,
+          assignedRole: stepConfig.allowedRoles?.[0] ?? 'unassigned',
+          assignedUserId: null,
+          status: 'pending',
+          deadline: null,
+          createdAt: now,
+          updatedAt: now,
+          completedAt: null,
+          completionData: null,
+          ...(currentStep.ui ? { ui: currentStep.ui } : {}),
+        });
 
         await instanceRepo.update(instanceId, {
           status: 'paused',
