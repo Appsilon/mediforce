@@ -217,6 +217,26 @@ describe('StepConfigSchema', () => {
     }
   });
 
+  it('[DATA] should accept agentConfig with prompt, model, and skillsDir', () => {
+    const result = StepConfigSchema.safeParse({
+      stepId: 'step-1',
+      executorType: 'agent',
+      plugin: 'claude-code-agent',
+      agentConfig: {
+        skill: 'trial-metadata-extractor',
+        prompt: 'Extract metadata from the uploaded protocol PDF',
+        model: 'sonnet',
+        skillsDir: 'apps/protocol-to-tfl/plugins/protocol-to-tfl/skills',
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agentConfig?.prompt).toBe('Extract metadata from the uploaded protocol PDF');
+      expect(result.data.agentConfig?.model).toBe('sonnet');
+      expect(result.data.agentConfig?.skillsDir).toBe('apps/protocol-to-tfl/plugins/protocol-to-tfl/skills');
+    }
+  });
+
   it('[DATA] should accept agentConfig without skill (optional)', () => {
     const result = StepConfigSchema.safeParse({
       stepId: 'step-1',

@@ -20,6 +20,7 @@ import {
   PluginRegistry,
   OpenRouterLlmClient,
   FirestoreAgentEventLog,
+  ClaudeCodeAgentPlugin,
 } from '@mediforce/agent-runtime';
 import { NoOpGateErrorNotifier } from '@mediforce/platform-core';
 import { registerSupplyIntelligencePlugins } from '@mediforce/supply-intelligence-plugins';
@@ -76,6 +77,9 @@ export function getPlatformServices(): PlatformServices {
 
   // Register supply intelligence plugins from @mediforce/supply-intelligence-plugins.
   registerSupplyIntelligencePlugins(pluginRegistry);
+
+  // Register Claude Code agent plugin for protocol-to-tfl and other Claude-driven workflows.
+  pluginRegistry.register('claude-code-agent', new ClaudeCodeAgentPlugin());
 
   const llmClient = new OpenRouterLlmClient(
     process.env.OPENROUTER_API_KEY ?? '',
