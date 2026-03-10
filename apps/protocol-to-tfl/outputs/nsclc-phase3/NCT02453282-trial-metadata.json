@@ -1,0 +1,627 @@
+{
+  "schema_version": "1.0",
+  "extraction_date": "2026-03-06",
+  "source_documents": [
+    {
+      "type": "protocol",
+      "filename": "NCT02453282_Prot_015.pdf",
+      "version": "Version 08 (incorporates Amendments through v8)",
+      "date": "2018-01-09"
+    },
+    {
+      "type": "sap",
+      "filename": "NCT02453282_SAP_000.pdf",
+      "version": "Edition 5",
+      "date": "2017-06-20",
+      "_notes": "SAP PDF has embedded font encoding issues causing heavily garbled pdftotext output (~91,000 lines of corrupted text). Statistical details extracted primarily from Protocol Section 8 (Statistical Methods). Key analysis details confirmed in protocol synopsis. Full SAP detail for ADaM specs and TLG list not accessible from the posted file."
+    }
+  ],
+
+  "study_identification": {
+    "study_id": "D419AC00001",
+    "nct_number": "NCT02453282",
+    "study_title": "A Phase III Randomized, Open-Label, Multi-Center, Global Study of MEDI4736 (Durvalumab) in Combination with Tremelimumab Therapy or MEDI4736 Monotherapy Versus Standard of Care Platinum-Based Chemotherapy in First-Line Treatment of Patients with Advanced or Metastatic Non-Small-Cell Lung Cancer (NSCLC) (MYSTIC)",
+    "short_title": "MYSTIC — Durvalumab+Tremelimumab or Durvalumab monotherapy vs SoC chemo in 1L advanced/metastatic NSCLC",
+    "sponsor": "AstraZeneca AB",
+    "phase": "Phase III",
+    "indication": "First-line treatment of advanced or metastatic (Stage IV) NSCLC, EGFR and ALK wild-type, histologically or cytologically documented",
+    "therapeutic_area": "Oncology",
+    "compound_name": "Durvalumab (MEDI4736); Tremelimumab",
+    "compound_class": "monoclonal antibody (anti-PD-L1; anti-CTLA-4)",
+    "regulatory_status": "IND",
+    "eudract_number": "2015-001279-39",
+    "_source": "Protocol title page, synopsis"
+  },
+
+  "study_design": {
+    "type": "Phase III, randomised, open-label, multi-centre, global, 3-arm parallel-group; biomarker-stratified (PD-L1 expression)",
+    "randomized": true,
+    "blinding": "open-label",
+    "control_type": "active",
+    "adaptive": false,
+    "adaptive_details": null,
+
+    "treatment_arms": [
+      {
+        "arm_id": "ARM_DT",
+        "arm_name": "Durvalumab + Tremelimumab (Combination)",
+        "arm_type": "experimental",
+        "dose": "Durvalumab 20 mg/kg IV q4w + Tremelimumab 1 mg/kg IV q4w (x4 doses combination); then Durvalumab 20 mg/kg IV q4w monotherapy",
+        "route": "IV",
+        "regimen": "MEDI4736 20 mg/kg via IV infusion q4w starting Week 0 for up to 4 doses/cycles, then continue MEDI4736 20 mg/kg q4w from Week 16 onwards; Tremelimumab 1 mg/kg via IV infusion q4w starting Week 0 for up to 4 doses/cycles. Retreatment with D+T allowed after completing 4 combination cycles with clinical benefit if subsequent PD occurs during MEDI4736 monotherapy.",
+        "planned_n": 364
+      },
+      {
+        "arm_id": "ARM_D",
+        "arm_name": "Durvalumab Monotherapy",
+        "arm_type": "experimental",
+        "dose": "Durvalumab (MEDI4736) 20 mg/kg IV q4w",
+        "route": "IV",
+        "regimen": "MEDI4736 20 mg/kg via IV infusion q4w starting Week 0. Continue until disease progression.",
+        "planned_n": 364
+      },
+      {
+        "arm_id": "ARM_SOC",
+        "arm_name": "Standard of Care (Platinum-based Chemotherapy)",
+        "arm_type": "active_comparator",
+        "dose": "Per chosen SoC regimen",
+        "route": "IV",
+        "regimen": "Investigator selects one of: (1) Paclitaxel 200 mg/m² + Carboplatin AUC5-6 IV Day 1 q21d x4-6 cycles; (2) Gemcitabine 1000-1250 mg/m² D1,8 + Cisplatin 75-80 mg/m² D1 q21d x4-6 cycles (squamous only); (3) Gemcitabine 1000-1250 mg/m² D1,8 + Carboplatin AUC5-6 D1 q21d x4-6 cycles (squamous only); (4) Pemetrexed 500 mg/m² + Cisplatin 75 mg/m² D1 q21d x4-6 cycles + pemetrexed maintenance eligible (non-squamous only); (5) Pemetrexed 500 mg/m² + Carboplatin AUC5-6 D1 q21d x4-6 cycles + pemetrexed maintenance eligible (non-squamous only).",
+        "planned_n": 364
+      }
+    ],
+    "total_planned_n": 1092,
+    "randomization_ratio": "1:1:1",
+    "stratification_factors": [
+      "PD-L1 tumour expression status (PD-L1 positive≥25% vs PD-L1 low/negative <25%)",
+      "Histology (squamous vs non-squamous)"
+    ],
+
+    "study_periods": [
+      {
+        "period_name": "Screening",
+        "duration": "Day -28 to Day -1 (28 days)",
+        "description": "Eligibility assessment. Tumour tissue sample for PD-L1 IHC at enrollment. EGFR/ALK testing. Baseline RECIST CT/MRI (within 28 days before randomisation). Baseline labs, ECG, vital signs, PRO."
+      },
+      {
+        "period_name": "Treatment Period",
+        "duration": "Until disease progression (all arms) or unacceptable toxicity",
+        "description": "Immunotherapy arms q4w cycles; SoC q21d cycles x4-6. Tumour assessments every 6 weeks ±1w for first 48 weeks, then every 8 weeks ±1w. Progression requires RECIST 1.1 confirmation (confirmatory scan ≥4 weeks after initial PD, preferably at next scheduled visit)."
+      },
+      {
+        "period_name": "Follow-up",
+        "duration": "30, 60, 90 days post last dose; then survival q2 months ±2w",
+        "description": "Safety follow-up visits at 30, 60, 90 days post last dose. Survival status collected every 2 months ±2 weeks until death or final DCO. PFS2 and subsequent anti-cancer therapy tracked q4w first 8w then q8w."
+      }
+    ],
+
+    "cohorts": null,
+    "_source": "Protocol synopsis, Section 3 (Treatment Arms), Schedule of Assessments"
+  },
+
+  "populations": {
+    "intent_to_treat": {
+      "abbreviation": "ITT / FAS",
+      "definition": "Full analysis set (ITT): All randomised patients. Efficacy data will be summarised and analysed on an intent-to-treat (ITT) basis with treatment groups compared on the basis of randomised treatment, regardless of the treatment actually received. Patients who were randomised but did not subsequently receive study treatment are included in the ITT population.",
+      "is_primary_efficacy_population": true,
+      "_source": "Protocol Section 8 (Statistical Methods, synopsis)"
+    },
+    "modified_itt": {
+      "abbreviation": null,
+      "definition": null,
+      "is_primary_efficacy_population": false
+    },
+    "per_protocol": {
+      "abbreviation": null,
+      "definition": null,
+      "is_primary_efficacy_population": false,
+      "_notes": "No per-protocol population explicitly defined in extracted text."
+    },
+    "safety": {
+      "abbreviation": "Safety",
+      "definition": "All patients who received at least one dose of randomised study treatment.",
+      "is_primary_safety_population": true,
+      "_source": "Protocol Section 8.3 (Analysis Set definitions)"
+    },
+    "pk_population": {
+      "abbreviation": "PK",
+      "definition": "Pharmacokinetic analysis set: patients who received at least one dose of MEDI4736 or tremelimumab per protocol with post-dose PK data available.",
+      "_source": "Protocol Section 8.3"
+    },
+    "other_populations": [
+      {
+        "name": "PD-L1 positive≥25% analysis set",
+        "abbreviation": "PD-L1≥25%",
+        "definition": "Patients with ≥25% PD-L1 membrane expression in tumoral tissue (proprietary IHC assay). Primary analysis population.",
+        "purpose": "Co-primary endpoints (PFS D+T vs SoC; OS D+T vs SoC; OS D vs SoC) and key secondary analyses"
+      },
+      {
+        "name": "PD-L1 positive≥1% analysis set",
+        "abbreviation": "PD-L1≥1%",
+        "definition": "Patients with ≥1% PD-L1 membrane expression in tumoral tissue.",
+        "purpose": "Secondary efficacy analyses (PFS, OS, ORR, DoR, APF12, PFS2 for D+T vs SoC)"
+      },
+      {
+        "name": "PD-L1 low/negative analysis set",
+        "abbreviation": "PD-L1<25%",
+        "definition": "Patients with <25% PD-L1 membrane expression in tumoral tissue.",
+        "purpose": "Secondary efficacy analyses"
+      },
+      {
+        "name": "PD-L1 negative analysis set",
+        "abbreviation": "PD-L1<1%",
+        "definition": "Patients with <1% PD-L1 membrane expression in tumoral tissue.",
+        "purpose": "Subgroup/secondary analyses"
+      }
+    ],
+    "_source": "Protocol Section 8.3, synopsis"
+  },
+
+  "endpoints": {
+    "primary": [
+      {
+        "endpoint_id": "PE01",
+        "name": "PFS (BICR, RECIST 1.1) — D+T vs SoC in PD-L1≥25%",
+        "description": "Progression-free survival per RECIST 1.1 using Blinded Independent Central Review (BICR) tumour assessments. Defined as time from date of randomisation until date of objective disease progression or death (by any cause in the absence of progression), regardless of whether the patient withdraws from randomised therapy or receives another anti-cancer therapy prior to progression.",
+        "type": "efficacy",
+        "measurement": "BICR RECIST 1.1 tumour assessments every 6 weeks (first 48w) then every 8 weeks. Confirmation of progression required (no earlier than 4 weeks after initial PD).",
+        "timepoint": "Triggered by ~231 BICR PFS events in D+T + SoC arms in PD-L1≥25% population",
+        "variable_type": "time-to-event",
+        "direction_of_benefit": "higher_is_better",
+        "clinically_meaningful_difference": null,
+        "related_adam_dataset": "ADTTE",
+        "_source": "Protocol synopsis, Section 8.4.1.1"
+      },
+      {
+        "endpoint_id": "PE02",
+        "name": "OS — D+T vs SoC in PD-L1≥25%",
+        "description": "Overall survival defined as time from date of randomisation until death due to any cause.",
+        "type": "efficacy",
+        "measurement": "All-cause death. Survival status collected every 2 months after treatment discontinuation.",
+        "timepoint": "Triggered by ~225 OS events in D+T + SoC arms in PD-L1≥25% population",
+        "variable_type": "time-to-event",
+        "direction_of_benefit": "higher_is_better",
+        "clinically_meaningful_difference": null,
+        "related_adam_dataset": "ADTTE",
+        "_source": "Protocol synopsis, Section 8.4.1.2"
+      },
+      {
+        "endpoint_id": "PE03",
+        "name": "OS — D monotherapy vs SoC in PD-L1≥25%",
+        "description": "Overall survival (time from randomisation to death) comparing Durvalumab monotherapy vs SoC in PD-L1≥25% patients.",
+        "type": "efficacy",
+        "measurement": "All-cause death.",
+        "timepoint": "Triggered by ~225 OS events in D + SoC arms in PD-L1≥25% population",
+        "variable_type": "time-to-event",
+        "direction_of_benefit": "higher_is_better",
+        "clinically_meaningful_difference": null,
+        "related_adam_dataset": "ADTTE",
+        "_source": "Protocol synopsis, Section 8.4.1.2"
+      }
+    ],
+    "secondary": [
+      {
+        "endpoint_id": "SE01",
+        "name": "OS — D+T vs SoC in PD-L1≥1% patients and all patients",
+        "description": "OS comparison of D+T vs SoC in PD-L1≥1% and all-randomised subpopulations.",
+        "type": "efficacy",
+        "measurement": "Time from randomisation to death",
+        "timepoint": "At primary analysis data cut",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE02",
+        "name": "PFS (BICR, RECIST 1.1) — D+T vs SoC in PD-L1≥1% and all patients",
+        "description": "PFS per BICR RECIST 1.1 of D+T vs SoC in PD-L1≥1% and all-randomised populations.",
+        "type": "efficacy",
+        "measurement": "As for PE01",
+        "timepoint": "At primary analysis data cut",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE03",
+        "name": "PFS (BICR, RECIST 1.1) — D monotherapy vs SoC in PD-L1≥25%",
+        "description": "PFS per BICR RECIST 1.1 of Durvalumab monotherapy vs SoC in PD-L1≥25% patients.",
+        "type": "efficacy",
+        "measurement": "As for PE01",
+        "timepoint": "At primary analysis data cut",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE04",
+        "name": "ORR, DoR, APF12 — D+T vs SoC across PD-L1 subgroups and all patients (BICR)",
+        "description": "Objective response rate (CR+PR), duration of response, and proportion alive and progression-free at 12 months per BICR RECIST 1.1. Assessed in PD-L1≥25%, PD-L1≥1%, and all-randomised populations.",
+        "type": "efficacy",
+        "measurement": "ORR: binary; DoR: time-to-event; APF12: KM estimate at 12 months",
+        "timepoint": "Best response during treatment; 12 months from randomisation",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADRS, ADTTE"
+      },
+      {
+        "endpoint_id": "SE05",
+        "name": "PFS2 — D+T vs SoC across PD-L1 subgroups and all patients",
+        "description": "Time from randomisation to earliest of second progression or death, based on investigator tumour assessments per local standard clinical practice.",
+        "type": "efficacy",
+        "measurement": "Time-to-event. PFS2 assessed every 4 weeks first 8 weeks post-discontinuation, then every 8 weeks.",
+        "timepoint": "Second progression or death",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE06",
+        "name": "PFS and OS — D+T vs D monotherapy (contribution of components / head-to-head) across PD-L1 subgroups",
+        "description": "PFS (BICR RECIST 1.1) and OS comparison of D+T vs D monotherapy in PD-L1≥25%, PD-L1≥1%, and all-randomised populations.",
+        "type": "efficacy",
+        "measurement": "As for PE01, PE02",
+        "timepoint": "At primary analysis data cut",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE07",
+        "name": "EORTC QLQ-C30 and QLQ-LC13 — Disease-related symptoms and HRQoL",
+        "description": "Health-related quality of life as assessed by EORTC QLQ-C30 v3 and QLQ-LC13 module. Time to symptom/function deterioration. WHO/ECOG performance status changes.",
+        "type": "PRO",
+        "measurement": "EORTC QLQ-C30 and QLQ-LC13 questionnaires at scheduled visits. Clinical meaningfulness threshold described in SAP.",
+        "timepoint": "Per visit schedule",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADQS"
+      },
+      {
+        "endpoint_id": "SE08",
+        "name": "PK of MEDI4736 and tremelimumab",
+        "description": "Serum concentration of MEDI4736 and tremelimumab; non-compartmental PK parameters (peak concentration, trough) from sparse sampling.",
+        "type": "pharmacokinetic",
+        "measurement": "Serum PK samples at Cycle 1, 2, 4, 5; and post-treatment",
+        "timepoint": "Per PK sampling schedule",
+        "variable_type": "continuous",
+        "related_adam_dataset": "ADPC"
+      },
+      {
+        "endpoint_id": "SE09",
+        "name": "Immunogenicity (ADA)",
+        "description": "Anti-drug antibody (ADA) incidence, titres, and neutralising antibodies for MEDI4736 and tremelimumab.",
+        "type": "pharmacokinetic",
+        "measurement": "ADA positive/negative; titres",
+        "timepoint": "Per sampling schedule",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADPC"
+      }
+    ],
+    "exploratory": [
+      {
+        "endpoint_id": "EE01",
+        "name": "Exploratory objectives (CCI-redacted)",
+        "description": "Exploratory objectives are marked as confidential commercial information (CCI) in the posted protocol and are not disclosed. Likely includes biomarker analyses (PD-L1, tumour mutation burden), PK/PD relationships.",
+        "type": "other",
+        "variable_type": null,
+        "_notes": "CCI redacted throughout protocol and SAP."
+      }
+    ],
+    "safety_endpoints": [
+      {
+        "endpoint_id": "SAF01",
+        "name": "Adverse Events (TEAEs, SAEs, AESIs)",
+        "description": "All TEAEs graded by CTCAE. Immune-mediated AEs (imAEs) tracked separately. AEs of special interest including immune-mediated: colitis, pneumonitis, hepatitis/hepatotoxicity, neuropathy, endocrinopathy, dermatitis, nephritis, pancreatitis, myocarditis, pericarditis, uveitis. Grade ≥3 events, SAEs, and events leading to discontinuation listed by subject.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF02",
+        "name": "Laboratory parameters",
+        "description": "Clinical chemistry (including LFTs/Hy's Law), haematology, urinalysis. CTCAE grade shifts. TSH/thyroid panel (free T3/T4 if TSH abnormal).",
+        "type": "lab shift"
+      },
+      {
+        "endpoint_id": "SAF03",
+        "name": "Vital signs",
+        "description": "Blood pressure (systolic/diastolic), pulse, temperature, respiratory rate. Clinically significant abnormalities.",
+        "type": "vital signs"
+      },
+      {
+        "endpoint_id": "SAF04",
+        "name": "ECG",
+        "description": "12-lead ECG. Clinically significant abnormalities (QTcF). Confirmatory ECG required if abnormality detected.",
+        "type": "ECG"
+      },
+      {
+        "endpoint_id": "SAF05",
+        "name": "Treatment exposure and dose modifications",
+        "description": "Number of cycles/doses, cumulative dose, relative dose intensity, dose delays and modifications.",
+        "type": "AE incidence"
+      }
+    ],
+    "_source": "Protocol synopsis (objectives section), Section 8.4"
+  },
+
+  "statistical_analyses": {
+    "primary_analysis": [
+      {
+        "analysis_id": "PA01_PFS_DT_SoC",
+        "endpoint_id": "PE01",
+        "description": "PFS comparison (D+T vs SoC) in PD-L1≥25% patients using stratified log-rank test on BICR RECIST 1.1 PFS. HR and 95% CI from stratified Cox model. KM curves. Triggered by ~231 BICR PFS events in D+T + SoC arms in PD-L1≥25% population.",
+        "population": "PD-L1≥25% analysis set (ITT within biomarker-positive subgroup)",
+        "statistical_method": "Stratified log-rank test + stratified Cox proportional hazards model + Kaplan-Meier",
+        "model_details": {
+          "response_variable": "PFS (BICR RECIST 1.1)",
+          "covariates": ["PD-L1 expression status (IVRS)", "Histology (IVRS)"],
+          "factors": ["Treatment arm (D+T vs SoC)"],
+          "interaction_terms": [null],
+          "other_details": "BICR-based PFS. Investigator assessment used for sensitivity analysis."
+        },
+        "hypothesis": {
+          "null_hypothesis": "No PFS difference between D+T and SoC in PD-L1≥25% NSCLC",
+          "alternative": "two-sided",
+          "alpha": 0.005,
+          "alpha_adjustment": "Alpha 0.005 for PFS within the 3-primary-endpoint multiplicity structure (total alpha 0.05)"
+        },
+        "multiplicity_strategy": "Three co-primary endpoints share overall alpha=0.05 with allocation: 0.005 for PFS (D+T vs SoC), 0.015 for OS (D+T vs SoC), 0.03 for OS (D monotherapy vs SoC). Study positive if any one is significant.",
+        "sensitivity_analyses": [],
+        "_source": "Protocol synopsis, Section 8.5.1"
+      },
+      {
+        "analysis_id": "PA02_OS_DT_SoC",
+        "endpoint_id": "PE02",
+        "description": "OS comparison (D+T vs SoC) in PD-L1≥25% patients. Stratified log-rank test + stratified Cox model. Triggered by ~225 OS events in D+T + SoC arms in PD-L1≥25%.",
+        "population": "PD-L1≥25% analysis set",
+        "statistical_method": "Stratified log-rank test + stratified Cox model + Kaplan-Meier",
+        "model_details": {
+          "response_variable": "Overall Survival",
+          "covariates": ["PD-L1 status (IVRS)", "Histology (IVRS)"],
+          "factors": ["Treatment arm"],
+          "interaction_terms": [null],
+          "other_details": null
+        },
+        "hypothesis": {
+          "null_hypothesis": "No OS difference between D+T and SoC in PD-L1≥25% NSCLC",
+          "alternative": "two-sided",
+          "alpha": 0.015,
+          "alpha_adjustment": "Alpha 0.015 for OS (D+T vs SoC) within total alpha=0.05 multiplicity structure"
+        },
+        "multiplicity_strategy": "See PA01_PFS_DT_SoC",
+        "sensitivity_analyses": [],
+        "_source": "Protocol synopsis, Section 8.5.2"
+      },
+      {
+        "analysis_id": "PA03_OS_D_SoC",
+        "endpoint_id": "PE03",
+        "description": "OS comparison (D monotherapy vs SoC) in PD-L1≥25% patients. Stratified log-rank + Cox. Triggered by ~225 OS events in D + SoC arms in PD-L1≥25%.",
+        "population": "PD-L1≥25% analysis set",
+        "statistical_method": "Stratified log-rank test + stratified Cox model + Kaplan-Meier",
+        "model_details": {
+          "response_variable": "Overall Survival",
+          "covariates": ["PD-L1 status (IVRS)", "Histology (IVRS)"],
+          "factors": ["Treatment arm (D monotherapy vs SoC)"],
+          "interaction_terms": [null],
+          "other_details": null
+        },
+        "hypothesis": {
+          "null_hypothesis": "No OS difference between D monotherapy and SoC in PD-L1≥25% NSCLC",
+          "alternative": "two-sided",
+          "alpha": 0.03,
+          "alpha_adjustment": "Alpha 0.03 for OS (D monotherapy vs SoC) within total alpha=0.05 multiplicity structure"
+        },
+        "multiplicity_strategy": "See PA01_PFS_DT_SoC",
+        "sensitivity_analyses": [],
+        "_source": "Protocol synopsis, Section 8.5.2"
+      }
+    ],
+    "secondary_analyses": [
+      {
+        "analysis_id": "SA01",
+        "endpoint_id": "SE01, SE02",
+        "description": "OS and PFS (BICR) for D+T vs SoC in PD-L1≥1% and all-randomised populations. Stratified log-rank + Cox + KM. Secondary; no formal multiplicity adjustment.",
+        "population": "PD-L1≥1% analysis set and All Randomised (ITT/FAS)",
+        "statistical_method": "Stratified log-rank + Cox + Kaplan-Meier",
+        "multiplicity_handling": "Secondary; nominal alpha=0.05"
+      },
+      {
+        "analysis_id": "SA02",
+        "endpoint_id": "SE03",
+        "description": "PFS (BICR) for D monotherapy vs SoC in PD-L1≥25% population.",
+        "population": "PD-L1≥25% analysis set",
+        "statistical_method": "Stratified log-rank + Cox + KM",
+        "multiplicity_handling": "Secondary; nominal alpha=0.05"
+      },
+      {
+        "analysis_id": "SA03",
+        "endpoint_id": "SE04",
+        "description": "ORR (logistic regression), DoR (KM), APF12 (KM point estimate) for D+T and D vs SoC across PD-L1 subgroups and all patients.",
+        "population": "PD-L1≥25%, PD-L1≥1%, all-randomised subsets",
+        "statistical_method": "Logistic regression (ORR); Kaplan-Meier (DoR, APF12)",
+        "multiplicity_handling": "Secondary; nominal alpha=0.05"
+      },
+      {
+        "analysis_id": "SA04",
+        "endpoint_id": "SE06",
+        "description": "D+T vs D monotherapy head-to-head for PFS (BICR) and OS across PD-L1 subgroups and all patients.",
+        "population": "PD-L1≥25%, PD-L1≥1%, all-randomised",
+        "statistical_method": "Stratified log-rank + Cox + KM",
+        "multiplicity_handling": "Secondary; nominal alpha=0.05"
+      }
+    ],
+    "subgroup_analyses": [
+      {
+        "subgroup_variable": "PD-L1 expression (≥25%, ≥1%, <25%, <1%)",
+        "endpoints_analyzed": ["PE01", "PE02", "PE03"],
+        "method": "Pre-specified subpopulations with separate analyses; forest plot presentation"
+      },
+      {
+        "subgroup_variable": "Histology (squamous vs non-squamous)",
+        "endpoints_analyzed": ["PE01", "PE02", "PE03"],
+        "method": "Cox model subgroup; forest plot"
+      }
+    ],
+    "interim_analyses": [
+      {
+        "timing": "Not specified as formal interim efficacy analysis in extracted text; IDMC reviews safety and PFS at interim",
+        "purpose": "safety",
+        "spending_function": null,
+        "stopping_rules": "IDMC convened to review safety. Details in IDMC charter.",
+        "_notes": "Protocol does not describe a formal efficacy interim analysis with alpha spending in the extracted synopsis text. The PFS and OS analyses have separate event triggers but are not described as interim analyses per se."
+      }
+    ],
+    "_source": "Protocol synopsis (Statistical Methods), Section 8.5"
+  },
+
+  "missing_data": {
+    "primary_strategy": "Time-to-event endpoints: administrative censoring. Patients without progression/death censored at last evaluable tumour assessment (PFS) or last known alive date (OS).",
+    "imputation_methods": [
+      {
+        "method_name": "Administrative censoring (OS)",
+        "applied_to": "PE02, PE03 and secondary OS endpoints",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Patients not yet dead censored at date last known alive."
+      },
+      {
+        "method_name": "Administrative censoring (PFS)",
+        "applied_to": "PE01 and secondary PFS endpoints",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Patients without progression/death censored at date of last evaluable BICR tumour assessment. Patients with no post-baseline BICR assessment censored at date of randomisation."
+      }
+    ],
+    "estimand_framework": {
+      "used": false,
+      "intercurrent_events": [],
+      "_notes": "Protocol dated 2018; ICH E9(R1) estimand framework not formally described. Treatment through progression allowed (treatment policy approach implicit for immunotherapy arms). SoC arm patients cannot continue after confirmed PD."
+    },
+    "_source": "Protocol Sections 8.4.1.1, 8.4.1.2"
+  },
+
+  "baseline_definition": {
+    "general_rule": "Baseline is the most recent assessment prior to dosing with study treatment/randomisation. Baseline RECIST scan must be within 28 days before date of randomisation.",
+    "exceptions": [
+      {
+        "domain": "Tumour assessments (RECIST)",
+        "rule": "Baseline RECIST assessments must be performed no more than 28 days before date of randomisation, ideally as close as possible to start of treatment."
+      },
+      {
+        "domain": "Laboratory assessments",
+        "rule": "If screening labs are performed within 3 days prior to Day 1 (first infusion day), they do not need to be repeated at Day 1."
+      }
+    ],
+    "_source": "Protocol Schedule of Assessments footnotes"
+  },
+
+  "visit_schedule": {
+    "visits": [
+      {
+        "visit_name": "Screening",
+        "visit_number": null,
+        "target_day": -1,
+        "window_lower": -28,
+        "window_upper": 0,
+        "assessments": ["Informed consent", "Eligibility", "Tumour biopsy/PD-L1 IHC", "EGFR/ALK testing", "Baseline RECIST CT/MRI", "Labs (CBC, chemistry, TSH)", "ECG", "Vital signs", "PRO questionnaires", "Pregnancy test (WOCBP)"]
+      },
+      {
+        "visit_name": "Cycle 1 / Day 1",
+        "visit_number": 1,
+        "target_day": 1,
+        "window_lower": 0,
+        "window_upper": 3,
+        "assessments": ["Drug administration (D+T, D, or SoC)", "Safety labs", "Vital signs", "PK sample (D arms)", "PRO questionnaires", "Pregnancy test (WOCBP)"]
+      },
+      {
+        "visit_name": "Subsequent treatment cycles (q4w D/D+T arms; q3w SoC arms)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": ["Drug administration", "Safety labs", "Vital signs", "PK samples (selected cycles)", "PRO questionnaires", "ECOG PS"]
+      },
+      {
+        "visit_name": "Tumour assessment visits (Q6W first 48w, then Q8W)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -7,
+        "window_upper": 7,
+        "assessments": ["CT/MRI chest and abdomen (BICR RECIST 1.1 and investigator assessment)"]
+      },
+      {
+        "visit_name": "End of treatment / 30-day follow-up",
+        "visit_number": null,
+        "target_day": 30,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": ["Safety labs", "AE assessment", "PRO questionnaires", "PK/ADA samples", "sPD-L1"]
+      },
+      {
+        "visit_name": "60-day and 90-day follow-up",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -7,
+        "window_upper": 7,
+        "assessments": ["Safety labs", "AE assessment", "Survival status", "Subsequent anti-cancer therapy"]
+      },
+      {
+        "visit_name": "Long-term follow-up (survival)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -14,
+        "window_upper": 14,
+        "assessments": ["Survival status every 2 months ±2 weeks", "PFS2 assessment (every 4w first 8w then q8w after treatment discontinuation)"]
+      }
+    ],
+    "windowing_rules": "Immunotherapy cycle window: +3 days (Cycle 1), ±3 days (subsequent). SoC cycle window: ±3 days. Tumour assessments every 6 weeks ±1 week for first 48 weeks relative to randomisation date, then every 8 weeks ±1 week.",
+    "_source": "Protocol Tables 2, 3, 4 (Schedules of Assessments)"
+  },
+
+  "sample_size": {
+    "total_planned": 1092,
+    "per_arm": {
+      "ARM_DT": 364,
+      "ARM_D": 364,
+      "ARM_SOC": 364
+    },
+    "power": null,
+    "alpha": 0.05,
+    "assumptions": "Total alpha=0.05 allocated across three co-primary endpoints (PFS D+T vs SoC: alpha=0.005; OS D+T vs SoC: alpha=0.015; OS D vs SoC: alpha=0.03). ~1850 screened to randomize ~1092 (360 per arm including ~160/arm PD-L1≥25%). PD-L1≥25% prevalence assumed ~30% of all screened.",
+    "dropout_rate_assumed": null,
+    "method": "Log-rank test (stratified)",
+    "events_required": {
+      "PFS_DT_SoC_PDL1pos25": "~231 BICR PFS events in D+T + SoC arms in PD-L1≥25%",
+      "OS_DT_SoC_PDL1pos25": "~225 OS events in D+T + SoC arms in PD-L1≥25%",
+      "OS_D_SoC_PDL1pos25": "~225 OS events in D + SoC arms in PD-L1≥25%"
+    },
+    "_notes": "Sample size for each sub-population specified to ensure adequate events in the PD-L1≥25% subgroup for all three primary endpoints.",
+    "_source": "Protocol synopsis (Statistical Methods), Section 8.2"
+  },
+
+  "planned_tlg_list": {
+    "_notes": "No TLG appendix in the posted protocol or SAP. SAP has encoding issues preventing content extraction. TLGs should be derived from the analysis structure. Expected: OS KM + tables, PFS KM + tables (by PD-L1 subgroup and all), ORR tables, DoR, APF12, PFS2, safety (TEAEs, imAEs, labs, vitals, ECG by arm), PK summaries, PRO (QLQ-C30, LC13) — all stratified by treatment arm and PD-L1 subgroup.",
+    "tables": null,
+    "listings": null,
+    "figures": null
+  },
+
+  "validation_summary": {
+    "completeness_score": "Medium",
+    "fields_missing": [
+      "Full SAP content (SAP PDF has severe font encoding issues — content unreadable by pdftotext; all statistical details extracted from protocol Section 8)",
+      "Detailed analysis methods for secondary endpoints (censoring rules, CIs, specific test statistics beyond what is in the protocol synopsis)",
+      "ADaM variable derivation rules",
+      "Complete TLG listing",
+      "Exploratory objectives (CCI-redacted throughout)",
+      "Power calculations beyond the alpha allocation description",
+      "Detailed PRO analysis methods (clinical meaningfulness thresholds referenced as 'in SAP')"
+    ],
+    "inconsistencies_found": [
+      "Protocol version history shows multiple changes to primary endpoint structure across amendments (Amendments 5–7 each modified the primary/secondary endpoint classification). The current (v8) primary endpoints are 3 co-primary endpoints, consistent throughout the extracted synopsis.",
+      "SAP PDF (NCT02453282_SAP_000.pdf) has severe garbled text extraction (91k lines of corrupted characters) — SAP content could not be verified against protocol. Full SAP review recommended before proceeding to TLG generation."
+    ],
+    "reviewer_attention_items": [
+      "CRITICAL: SAP PDF is unreadable by automated text extraction — review of original SAP PDF file is required",
+      "Three co-primary endpoints each tested at different alpha levels (0.005, 0.015, 0.03) — confirm alpha allocation and any multiplicity adjustment between the three in the full SAP",
+      "PFS primary endpoint uses BICR assessment; secondary uses investigator assessment — ensure separate ADaM datasets and TLG shells for each",
+      "PD-L1 subpopulation analyses generate a large number of analysis population × endpoint combinations — TLG shell count will be substantially higher than a standard 2-arm trial"
+    ],
+    "recommendations": [
+      "Obtain readable version of SAP (Edition 5, 20 June 2017) to verify all statistical details before TLG generation",
+      "Plan TLG shells in sets: (1) PD-L1≥25% population [primary]; (2) PD-L1≥1%; (3) All-randomised [ITT] — each with OS, PFS, ORR, DoR, APF12, PFS2 tables and figures",
+      "Generate separate KM curves for each of the 3 treatment comparisons (D+T vs SoC, D vs SoC, D+T vs D) within each PD-L1 subgroup",
+      "BICR and investigator PFS should be presented in separate TLG shells (primary and sensitivity, respectively)"
+    ]
+  }
+}

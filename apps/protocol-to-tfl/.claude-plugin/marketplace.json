@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "protocol-to-tfl",
+  "description": "Local skills for Protocol-to-TLG clinical trial automation (NSCLC focus)",
+  "owner": {
+    "name": "vedha"
+  },
+  "plugins": [
+    {
+      "name": "protocol-to-tfl",
+      "description": "Skills for extracting structured metadata from clinical trial Protocol and SAP documents, and generating mock TLG shells",
+      "version": "0.1.0",
+      "author": {
+        "name": "vedha"
+      },
+      "source": "./plugins/protocol-to-tfl",
+      "category": "clinical-research"
+    }
+  ]
+}

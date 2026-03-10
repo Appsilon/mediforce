@@ -1,0 +1,641 @@
+{
+  "schema_version": "1.0",
+  "extraction_date": "2026-03-06",
+  "source_documents": [
+    {
+      "type": "protocol",
+      "filename": "NCT02454933_Prot_000.pdf",
+      "version": "2.0 (02-Mar-2017)",
+      "date": "2017-03-02",
+      "_notes": "Protocol PDF has embedded font encoding issues causing garbled pdftotext output for most sections. Key facts extracted via targeted grep on readable lines. Protocol version 2.0 reflects amendments post early termination."
+    },
+    {
+      "type": "sap",
+      "filename": "NCT02454933_SAP_001.pdf",
+      "version": "2.0 final",
+      "date": "2017-08-21",
+      "_notes": "Full standalone SAP (Edition 2.0 final, 21 August 2017). Readable. Amended to reflect Protocol Version 2.0. Study was terminated early; SAP updated accordingly."
+    }
+  ],
+
+  "study_identification": {
+    "study_id": "D5165C00001 / CAURAL",
+    "study_title": "A Phase III, Multi-Centre, Open Label, Randomized Study to Assess the Efficacy and Safety of AZD9291 in Combination with MEDI4736 versus AZD9291 Monotherapy in Patients with Locally Advanced or Metastatic Epidermal Growth Factor Receptor T790M mutation-positive Non-Small Cell Lung Cancer who have received Prior Epidermal Growth Factor Receptor Tyrosine Kinase Inhibitor Therapy (CAURAL)",
+    "short_title": "CAURAL",
+    "sponsor": "AstraZeneca AB",
+    "phase": "Phase III",
+    "indication": "Locally advanced or metastatic EGFR T790M mutation-positive NSCLC (Stage IIIB-IV), post prior EGFR TKI therapy",
+    "therapeutic_area": "Oncology",
+    "compound_name": "AZD9291 (osimertinib) + MEDI4736 (durvalumab)",
+    "compound_class": "small molecule (EGFR TKI) + monoclonal antibody (anti-PD-L1)",
+    "regulatory_status": null,
+    "_notes": "Study was terminated early after only 29 patients randomized (vs planned 350), due to higher-than-anticipated incidence of ILD-like events in the AZD9291+MEDI4736 combination arm, based on signals from separate Phase Ib study TATTON (D5160C00006). Primary objective was amended from efficacy to safety and tolerability assessment."
+  },
+
+  "study_design": {
+    "type": "Phase III, multi-centre, open-label, randomized; terminated early",
+    "randomized": true,
+    "blinding": "open-label",
+    "control_type": "active",
+    "adaptive": false,
+    "adaptive_details": null,
+
+    "treatment_arms": [
+      {
+        "arm_id": "COMBO",
+        "arm_name": "AZD9291 + MEDI4736",
+        "arm_type": "experimental",
+        "dose": "AZD9291 80 mg QD (oral) + MEDI4736 10 mg/kg q2w (IV infusion)",
+        "route": "oral + IV",
+        "regimen": "AZD9291 80 mg once daily orally; MEDI4736 10 mg/kg IV infusion every 2 weeks",
+        "planned_n": 175
+      },
+      {
+        "arm_id": "MONO",
+        "arm_name": "AZD9291 monotherapy",
+        "arm_type": "active_comparator",
+        "dose": "AZD9291 80 mg QD (oral)",
+        "route": "oral",
+        "regimen": "AZD9291 80 mg once daily orally",
+        "planned_n": 175
+      }
+    ],
+    "total_planned_n": 350,
+    "_actual_n": 29,
+    "_actual_n_notes": "Recruitment stopped after 29 patients randomized. Study terminated early. 29 patients are not sufficient for statistical comparison; all reporting uses summaries and listings only.",
+    "randomization_ratio": "1:1",
+    "stratification_factors": [
+      "Current line of treatment (2nd line vs 3rd line plus)",
+      "Ethnicity (Asian vs non-Asian)"
+    ],
+    "_stratification_notes": "Stratification factors were used in IVRS randomization. Due to small numbers (N=29), summaries will not be grouped by stratification factors.",
+
+    "study_periods": [
+      {
+        "period_name": "Screening",
+        "duration": "Up to 28 days before first dose",
+        "description": "Baseline tumour assessment within 28 days before start of study treatment; mandatory biopsy for central T790M testing"
+      },
+      {
+        "period_name": "Treatment",
+        "duration": "Until disease progression or discontinuation criterion",
+        "description": "AZD9291 ± MEDI4736. Group A (AZD9291 monotherapy or post-MEDI4736 discontinuation): continue until clinical benefit lost. Group B (receiving MEDI4736): continue until progression or discontinuation."
+      },
+      {
+        "period_name": "Follow-up",
+        "duration": "3 months post-discontinuation (Group B safety follow-up)",
+        "description": "Patients discontinuing treatment for non-progression reasons undergo 3-month follow-up. Group A: sparse data collection only (SAE, pregnancy outcomes, drug accountability) per Protocol v2.0"
+      }
+    ],
+
+    "cohorts": null,
+    "_patient_groups_post_amendment": {
+      "Group_A": "Patients on AZD9291 monotherapy: either randomized to monotherapy, or randomized to combination but discontinued MEDI4736 and completed 90-day safety follow-up. Follow normal clinical practice (no pre-scheduled visits except drug accountability); only SAE, pregnancy, and drug dispensing data collected per CSP v2.0.",
+      "Group_B": "Patients randomized to receive MEDI4736 and still receiving MEDI4736 (either in combination with AZD9291 or as monotherapy). Full schedule/assessments per CSP."
+    }
+  },
+
+  "populations": {
+    "intent_to_treat": {
+      "abbreviation": "FAS",
+      "definition": "The Full Analysis Set (FAS) will include all randomized subjects. The FAS will be used for all efficacy summaries and treatment groups will be presented on the basis of randomized treatment, regardless of the treatment actually received.",
+      "is_primary_efficacy_population": true
+    },
+    "modified_itt": {
+      "abbreviation": null,
+      "definition": null,
+      "is_primary_efficacy_population": false
+    },
+    "per_protocol": {
+      "abbreviation": null,
+      "definition": null,
+      "is_primary_efficacy_population": false
+    },
+    "safety": {
+      "abbreviation": "Safety",
+      "definition": "The Safety Analysis Set will consist of all subjects who received at least one dose of randomized treatment. Safety data will be summarized using the Safety Analysis Set, according to the treatment that patients received in their first cycle. Patients who received at least one dose of MEDI4736 in the first treatment cycle (15 +/-3 days) will be regarded as being in the combination treatment.",
+      "is_primary_safety_population": true
+    },
+    "pk_population": {
+      "abbreviation": "PK",
+      "definition": "Patients in the FAS who have at least one measurable PK concentration, supported by the relevant date and time of this sample, and for each time a PK sample was taken the dosing data for that day, and for samples taken after multiple dosing the dosing data for the 2 days prior to the sample day as well as the sample day. For any individual sample to be included in the PK Analysis Set the full sample data and dosing data needs to be present for that sample.",
+      "is_primary_pk_population": true
+    },
+    "other_populations": []
+  },
+
+  "endpoints": {
+    "_context": "Study was terminated early. Primary objective was amended from efficacy (PFS comparison) to safety and tolerability of AZD9291+MEDI4736 combination. All efficacy endpoints are now exploratory (descriptive only; no statistical comparisons due to N=29).",
+
+    "primary": [
+      {
+        "endpoint_id": "PE01",
+        "name": "Safety and tolerability of AZD9291 in combination with MEDI4736",
+        "description": "To investigate the safety and tolerability profile of AZD9291 in combination with MEDI4736. Outcome measures: Adverse events graded by CTCAE v4; clinical chemistry, haematology and urinalysis; vital signs (pulse and blood pressure); physical examination; weight; digital ECG; echocardiogram/MUGA scan (for LVEF); WHO Performance Status.",
+        "type": "safety",
+        "measurement": "AE incidence, severity, and causality per CTCAE v4; laboratory shifts; vital sign changes; ECG/LVEF assessments; WHO PS",
+        "timepoint": "Throughout treatment and follow-up",
+        "variable_type": "categorical",
+        "direction_of_benefit": null,
+        "clinically_meaningful_difference": null,
+        "related_adam_dataset": null,
+        "_notes": "This became the primary objective following Protocol v2.0 amendment after early termination due to ILD safety signal. Original primary was PFS."
+      }
+    ],
+
+    "secondary": [],
+    "_secondary_notes": "No formal secondary endpoints in the amended protocol. All efficacy endpoints are exploratory.",
+
+    "exploratory": [
+      {
+        "endpoint_id": "EE01",
+        "name": "Safety and tolerability of AZD9291 monotherapy",
+        "description": "To assess the safety and tolerability of AZD9291 as a single agent. Outcome measures: AEs (CTCAE v4), clinical chemistry/haematology/urinalysis, vital signs, physical examination, ECG, LVEF, WHO PS, SAEs.",
+        "type": "safety",
+        "variable_type": "categorical"
+      },
+      {
+        "endpoint_id": "EE02",
+        "name": "Progression-Free Survival (PFS) landmark summary",
+        "description": "Landmark summary of PFS at 6 and 12 months using Investigator assessments according to RECIST 1.1 (without confirmation of progression as primary; with confirmation as sensitivity). PFS defined as time from randomization to first date of objective disease progression or death (by any cause in the absence of progression).",
+        "type": "efficacy",
+        "variable_type": "time-to-event",
+        "_notes": "Descriptive only; no statistical comparison between arms due to small N. Confirmation of progression using ≥20% increase in sum of TL diameters and ≥5mm absolute increase, confirmed at subsequent visit ≥28 days later."
+      },
+      {
+        "endpoint_id": "EE03",
+        "name": "Objective Response Rate (ORR)",
+        "description": "Proportion of subjects with confirmed complete response (CR) or partial response (PR) per RECIST 1.1 investigator assessment.",
+        "type": "efficacy",
+        "variable_type": "binary"
+      },
+      {
+        "endpoint_id": "EE04",
+        "name": "Duration of Response (DoR)",
+        "description": "Time from date of first documented response (CR or PR) until date of documented progression or death per RECIST 1.1.",
+        "type": "efficacy",
+        "variable_type": "time-to-event"
+      },
+      {
+        "endpoint_id": "EE05",
+        "name": "Disease Control Rate (DCR)",
+        "description": "Proportion of subjects with CR, PR, or stable disease (SD) per RECIST 1.1.",
+        "type": "efficacy",
+        "variable_type": "binary"
+      },
+      {
+        "endpoint_id": "EE06",
+        "name": "Best Overall Response",
+        "description": "Best overall response (CR, PR, SD, PD, or NE) per RECIST 1.1 investigator assessment.",
+        "type": "efficacy",
+        "variable_type": "categorical"
+      },
+      {
+        "endpoint_id": "EE07",
+        "name": "Tumour shrinkage",
+        "description": "Percentage change from baseline in sum of longest diameters of target lesions. Includes waterfall plot of best percentage change from baseline.",
+        "type": "efficacy",
+        "variable_type": "continuous"
+      },
+      {
+        "endpoint_id": "EE08",
+        "name": "Overall Survival (OS) landmark summary",
+        "description": "Landmark summary of OS at 12 months. OS defined as time from randomization to death due to any cause.",
+        "type": "efficacy",
+        "variable_type": "time-to-event"
+      },
+      {
+        "endpoint_id": "EE09",
+        "name": "Pharmacokinetics of AZD9291",
+        "description": "Plasma concentrations of AZD9291 and metabolites AZ5104 and AZ7550 as a single agent and in combination with MEDI4736.",
+        "type": "pharmacokinetic",
+        "variable_type": "continuous"
+      },
+      {
+        "endpoint_id": "EE10",
+        "name": "Pharmacokinetics of MEDI4736",
+        "description": "Serum concentrations of MEDI4736 to characterize PK after single and multiple dosing in combination with AZD9291.",
+        "type": "pharmacokinetic",
+        "variable_type": "continuous"
+      },
+      {
+        "endpoint_id": "EE11",
+        "name": "Immunogenicity (ADA)",
+        "description": "Blood samples for anti-drug antibodies (ADA) to characterize immunogenicity of MEDI4736.",
+        "type": "biomarker",
+        "variable_type": "binary"
+      }
+    ],
+
+    "safety_endpoints": [
+      {
+        "endpoint_id": "SAF01",
+        "name": "Adverse Events (AEs)",
+        "description": "All treatment-emergent AEs, serious AEs (SAEs), and AEs leading to discontinuation, graded by CTCAE v4. Other significant adverse events (OAEs) also collected.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF02",
+        "name": "Laboratory data",
+        "description": "Clinical chemistry, haematology, and urinalysis — absolute values, change from baseline, and NCI CTCAE v4 grade shifts.",
+        "type": "lab shift"
+      },
+      {
+        "endpoint_id": "SAF03",
+        "name": "Vital signs",
+        "description": "Blood pressure and pulse; absolute values and change from baseline.",
+        "type": "vital signs"
+      },
+      {
+        "endpoint_id": "SAF04",
+        "name": "ECG",
+        "description": "Digital ECG parameters; absolute values and change from baseline.",
+        "type": "ECG"
+      },
+      {
+        "endpoint_id": "SAF05",
+        "name": "Left Ventricular Ejection Fraction (LVEF)",
+        "description": "LVEF assessed by echocardiogram or MUGA scan.",
+        "type": "cardiac function"
+      },
+      {
+        "endpoint_id": "SAF06",
+        "name": "WHO Performance Status",
+        "description": "WHO Performance Status assessments over time.",
+        "type": "functional status"
+      },
+      {
+        "endpoint_id": "SAF07",
+        "name": "Exposure / Dose intensity",
+        "description": "Duration of exposure, relative dose intensity (RDI), dose modifications (interruptions, reductions).",
+        "type": "exposure"
+      }
+    ]
+  },
+
+  "statistical_analyses": {
+    "_context": "Study terminated early with N=29; no formal statistical hypothesis testing. All analyses are descriptive summaries and listings. No inferential comparisons between arms are pre-specified.",
+
+    "primary_analysis": [
+      {
+        "analysis_id": "PA01",
+        "endpoint_id": "PE01",
+        "description": "Descriptive summary of safety and tolerability of AZD9291 + MEDI4736 combination. All safety data summarized by the Safety Analysis Set according to treatment received in first cycle.",
+        "population": "Safety Analysis Set",
+        "statistical_method": "Descriptive statistics; frequency tables for categorical data; summary statistics for continuous data",
+        "model_details": {
+          "response_variable": "AEs, laboratory values, vital signs, ECG, LVEF, WHO PS",
+          "covariates": [],
+          "factors": ["Treatment group (randomized or by first-cycle receipt)"],
+          "interaction_terms": [],
+          "other_details": "Due to small N=29, no stratification grouping in summaries. AE incidence by preferred term (PT) and system organ class (SOC) per MedDRA. CTCAE v4 grading."
+        },
+        "hypothesis": {
+          "null_hypothesis": null,
+          "alternative": null,
+          "alpha": null,
+          "alpha_adjustment": null
+        },
+        "multiplicity_strategy": "Not applicable — descriptive only",
+        "sensitivity_analyses": [
+          {
+            "name": "Confirmation-required sensitivity for PFS",
+            "description": "PFS calculated requiring confirmed progression (≥28 days after initial progression scan), vs primary which uses unconfirmed RECIST 1.1 progression.",
+            "method": "Kaplan-Meier landmark summary with confirmation requirement"
+          }
+        ]
+      }
+    ],
+
+    "secondary_analyses": [],
+
+    "subgroup_analyses": [
+      {
+        "subgroup_variable": "Stratification factors (line of treatment, ethnicity)",
+        "endpoints_analyzed": [],
+        "method": "Not reported by subgroup due to small sample size (N=29). Summaries will not be grouped by stratification factors.",
+        "_notes": "SAP explicitly states: 'Due to the small numbers of patients, summaries will not be grouped by the stratification factors involved in the randomization.'"
+      }
+    ],
+
+    "interim_analyses": []
+  },
+
+  "missing_data": {
+    "primary_strategy": "No imputation for efficacy endpoints; descriptive summaries only. For PFS/survival, subjects without event are censored.",
+    "imputation_methods": [
+      {
+        "method_name": "Partial date imputation",
+        "applied_to": "Dates with missing day or month components",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Imputation rules for partial dates specified in SAP Section 4.1.5. Specific rules for event dates vs censoring dates."
+      },
+      {
+        "method_name": "LLOQ imputation for lab values",
+        "applied_to": "Laboratory values outside quantification range",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Imputation rules for lab values below lower limit of quantification (LLoQ) specified in SAP Section 4.1.6."
+      },
+      {
+        "method_name": "Missing TL data handling",
+        "applied_to": "RECIST target lesion assessments",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Visit response of PD assigned if any new lesion recorded, NTL visit response of PD recorded, or sum of TLs sufficiently increased ≥20%+5mm from nadir even assuming non-recorded TLs disappeared. Nadir can only be taken from visits where all TLs have LD recorded."
+      }
+    ],
+    "estimand_framework": {
+      "used": false,
+      "intercurrent_events": []
+    }
+  },
+
+  "baseline_definition": {
+    "general_rule": "For efficacy endpoints: the last observed measurement prior to randomization will be used as baseline. Baseline tumour assessment performed within 28 days before start of study treatment.",
+    "exceptions": [
+      {
+        "domain": "Laboratory / safety",
+        "rule": "Last pre-dose value on or before first dose date used as baseline."
+      },
+      {
+        "domain": "Tumour assessment (RECIST)",
+        "rule": "Baseline tumour assessment performed within 28 days before start of study treatment. If more than one baseline scan, measurements from the one closest to randomization used to define baseline sum of TL diameters."
+      }
+    ]
+  },
+
+  "visit_schedule": {
+    "_notes": "Visit schedule differs between Group A (AZD9291 monotherapy, sparse) and Group B (receiving MEDI4736, full schedule). Following Protocol v2.0, Group A only collects SAE, pregnancy outcomes, and drug dispensing data. Tumour assessments only for Group B.",
+    "visits": [
+      {
+        "visit_name": "Screening",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -28,
+        "window_upper": 0,
+        "assessments": ["Informed consent", "T790M biopsy (mandatory, central testing)", "Baseline tumour assessment (RECIST 1.1)", "Eligibility assessment", "Demographics", "Medical history", "ECG", "LVEF (echo/MUGA)", "Laboratory tests", "Vital signs", "WHO PS"]
+      },
+      {
+        "visit_name": "Day 1 (First dose)",
+        "visit_number": 1,
+        "target_day": 1,
+        "window_lower": 0,
+        "window_upper": 0,
+        "assessments": ["First dose of AZD9291 ± MEDI4736", "Pre-dose PK sample", "Laboratory tests", "Vital signs"]
+      },
+      {
+        "visit_name": "On-treatment assessments (Group B)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["Tumour assessment every 8 weeks for first 48 weeks, then every 12 weeks (RECIST 1.1 investigator)", "PK sampling", "Laboratory tests", "Vital signs", "ECG", "LVEF", "AE assessment", "WHO PS", "ADA sampling (MEDI4736)"]
+      },
+      {
+        "visit_name": "End of Treatment",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["Final safety assessments", "PK sample", "Tumour assessment if not performed within 4 weeks"]
+      },
+      {
+        "visit_name": "Safety Follow-up (Group B, post-MEDI4736)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": 90,
+        "assessments": ["SAE collection", "90-day safety follow-up period after MEDI4736 discontinuation"]
+      }
+    ],
+    "windowing_rules": "Visit windows defined in SAP Section 4.1.3. Study day for events on or after randomization: (date of visit - date of randomization + 1). Study day for events prior to randomization: (date of visit - date of randomization). No Study Day 0."
+  },
+
+  "sample_size": {
+    "total_planned": 350,
+    "per_arm": {
+      "COMBO": 175,
+      "MONO": 175
+    },
+    "power": null,
+    "alpha": null,
+    "assumptions": "Original plan for 350 subjects (1:1 ratio), stratified by line of treatment and ethnicity. Study terminated early after 29 patients randomized due to ILD safety signal. 29 patients are insufficient for statistical comparison of treatment groups.",
+    "dropout_rate_assumed": null,
+    "method": null,
+    "_actual_enrolled": 29,
+    "_termination_reason": "Higher-than-anticipated incidence of ILD-like events with AZD9291+MEDI4736 combination observed in TATTON study (D5160C00006). Safety signal led to early termination of enrolment."
+  },
+
+  "planned_tlg_list": {
+    "_notes": "SAP does not include a formal numbered TLG list appendix. TLGs are described within the SAP body. Given N=29 and descriptive-only analyses, the TLG package is minimal — listings and summary tables, no formal inferential outputs.",
+    "tables": [
+      {
+        "tlg_id": null,
+        "title": "Summary of outcome variables and analysis populations",
+        "population": "FAS / Safety / PK",
+        "description": "Table 1 in SAP — mapping of outcome variables to analysis populations"
+      },
+      {
+        "tlg_id": null,
+        "title": "Subject disposition and analysis sets",
+        "population": "All randomized",
+        "description": "Number of subjects randomized, treated, completed, discontinued, and included in each analysis set"
+      },
+      {
+        "tlg_id": null,
+        "title": "Protocol deviations",
+        "population": "All randomized",
+        "description": "Important protocol deviations by category and treatment group"
+      },
+      {
+        "tlg_id": null,
+        "title": "Demographic and baseline characteristics",
+        "population": "Safety Analysis Set",
+        "description": "Age, sex, race, ethnicity, ECOG PS, weight, tumour characteristics, prior therapies"
+      },
+      {
+        "tlg_id": null,
+        "title": "Medical history",
+        "population": "Safety Analysis Set",
+        "description": "Medical history by SOC and PT"
+      },
+      {
+        "tlg_id": null,
+        "title": "Prior and concomitant anti-cancer medications and radiotherapy",
+        "population": "Safety Analysis Set",
+        "description": "Prior EGFR-TKI therapy; concomitant anti-cancer therapy during study"
+      },
+      {
+        "tlg_id": null,
+        "title": "Exposure summary",
+        "population": "Safety Analysis Set",
+        "description": "Duration of exposure, dose modifications, relative dose intensity for AZD9291 and MEDI4736"
+      },
+      {
+        "tlg_id": null,
+        "title": "PFS landmark summary",
+        "population": "FAS",
+        "description": "Kaplan-Meier landmark estimates of PFS at 6 and 12 months by treatment group; 95% CI"
+      },
+      {
+        "tlg_id": null,
+        "title": "PFS sensitivity summary (confirmed progression)",
+        "population": "FAS",
+        "description": "PFS requiring confirmed progression (≥28 days)"
+      },
+      {
+        "tlg_id": null,
+        "title": "Objective Response Rate",
+        "population": "FAS",
+        "description": "n/N (%) with CR or PR per RECIST 1.1; 95% CI by Clopper-Pearson"
+      },
+      {
+        "tlg_id": null,
+        "title": "Duration of Response",
+        "population": "FAS (responders)",
+        "description": "KM summary of DoR"
+      },
+      {
+        "tlg_id": null,
+        "title": "Disease Control Rate",
+        "population": "FAS",
+        "description": "n/N (%) with CR, PR, or SD per RECIST 1.1"
+      },
+      {
+        "tlg_id": null,
+        "title": "Best Overall Response",
+        "population": "FAS",
+        "description": "Frequency table of best overall response categories"
+      },
+      {
+        "tlg_id": null,
+        "title": "OS landmark summary",
+        "population": "FAS",
+        "description": "Kaplan-Meier landmark estimate of OS at 12 months by treatment group; 95% CI"
+      },
+      {
+        "tlg_id": null,
+        "title": "Adverse events summary",
+        "population": "Safety Analysis Set",
+        "description": "All TEAEs, SAEs, AEs leading to discontinuation, AEs by CTCAE grade; by SOC and PT"
+      },
+      {
+        "tlg_id": null,
+        "title": "Laboratory data summary",
+        "population": "Safety Analysis Set",
+        "description": "Clinical chemistry and haematology — absolute values, change from baseline, CTCAE grade shifts"
+      },
+      {
+        "tlg_id": null,
+        "title": "Vital signs summary",
+        "population": "Safety Analysis Set",
+        "description": "Blood pressure and pulse — descriptive statistics at each visit"
+      },
+      {
+        "tlg_id": null,
+        "title": "ECG summary",
+        "population": "Safety Analysis Set",
+        "description": "ECG parameters — absolute values and change from baseline"
+      },
+      {
+        "tlg_id": null,
+        "title": "LVEF summary",
+        "population": "Safety Analysis Set",
+        "description": "LVEF — absolute values and change from baseline"
+      },
+      {
+        "tlg_id": null,
+        "title": "PK concentration summary — AZD9291 and metabolites",
+        "population": "PK Analysis Set",
+        "description": "Plasma concentrations of AZD9291, AZ5104, and AZ7550 by nominal sample window"
+      },
+      {
+        "tlg_id": null,
+        "title": "PK concentration summary — MEDI4736",
+        "population": "PK Analysis Set",
+        "description": "Serum concentrations of MEDI4736 by nominal sample window"
+      },
+      {
+        "tlg_id": null,
+        "title": "Immunogenicity (ADA) summary",
+        "population": "PK Analysis Set",
+        "description": "Anti-drug antibody (ADA) status for MEDI4736"
+      }
+    ],
+    "listings": [
+      {
+        "tlg_id": null,
+        "title": "Subject disposition listing",
+        "population": "All randomized",
+        "description": "Individual patient disposition by randomized treatment and actual treatment received"
+      },
+      {
+        "tlg_id": null,
+        "title": "Protocol deviations listing",
+        "population": "All randomized",
+        "description": "Individual important deviations"
+      },
+      {
+        "tlg_id": null,
+        "title": "Individual AE listing",
+        "population": "Safety Analysis Set",
+        "description": "All TEAEs and SAEs at patient level"
+      },
+      {
+        "tlg_id": null,
+        "title": "PK concentration listing",
+        "population": "PK Analysis Set",
+        "description": "Individual PK concentration data by subject and sample time"
+      }
+    ],
+    "figures": [
+      {
+        "tlg_id": null,
+        "title": "Kaplan-Meier curve — PFS",
+        "population": "FAS",
+        "description": "KM survival curve for PFS by treatment group with number at risk table"
+      },
+      {
+        "tlg_id": null,
+        "title": "Kaplan-Meier curve — OS",
+        "population": "FAS",
+        "description": "KM survival curve for OS by treatment group with number at risk table"
+      },
+      {
+        "tlg_id": null,
+        "title": "Waterfall plot — Best percentage change from baseline in tumour size",
+        "population": "FAS",
+        "description": "Waterfall plot of best percentage change from baseline in sum of target lesion diameters"
+      }
+    ]
+  },
+
+  "validation_summary": {
+    "completeness_score": "Medium",
+    "fields_missing": [
+      "Formal sample size calculation and power (not applicable — study terminated early; no inferential analyses planned)",
+      "Protocol version 1.0 design details (garbled PDF; key amended information extracted from SAP which reflects Protocol v2.0)",
+      "Full visit schedule with exact windows for Group A (sparse data only per Protocol v2.0)",
+      "Baseline definition details for specific laboratory domains (referenced in SAP but not fully extractable due to Protocol garbling)",
+      "Numbered TLG list (SAP does not include a formal appendix; TLGs derived from SAP body text)"
+    ],
+    "inconsistencies_found": [
+      "Protocol PDF (NCT02454933_Prot_000.pdf) has severe font encoding issues causing garbled pdftotext output; most protocol content extracted via SAP which summarizes Protocol v2.0 design",
+      "Original study was Phase III efficacy trial; post-amendment it is effectively a safety characterization study with exploratory efficacy summaries only — the JSON reflects the amended design",
+      "BICR (Blinded Independent Central Review) was planned in original protocol but removed in Protocol v2.0 — RECIST assessments are investigator-only",
+      "Group A patients (AZD9291 monotherapy) will have very sparse follow-up data per Protocol v2.0; this may result in incomplete efficacy summaries for that arm"
+    ],
+    "reviewer_attention_items": [
+      "Study was terminated early (N=29 of planned 350); all efficacy analyses are descriptive summaries only — no inferential comparisons should be generated",
+      "Protocol PDF encoding is garbled; the SAP (Edition 2.0 final) is the primary source for this extraction and reflects Protocol v2.0. Recommend cross-checking against a readable Protocol PDF if available.",
+      "Two planned summaries: Primary Summary (CSR-level; based on last country receiving Protocol v2.0 ethics approval) and Final Addendum Summary (after last MEDI4736 patient completes safety follow-up). TLG package differs between summaries.",
+      "If ≤3 patients included in Final Addendum Summary, only listings will be produced (no summary tables)",
+      "ILD-like events are the critical safety focus — ensure ILD events are captured and tabulated separately in AE outputs"
+    ],
+    "recommendations": [
+      "Obtain a readable copy of the Protocol (PDF without encoding issues) to confirm design details not fully accessible from the garbled file",
+      "Do not generate inferential TLG shells (confidence intervals on treatment differences, p-values for comparisons) — only descriptive summaries and listings are appropriate",
+      "Consider generating two separate TLG packages: Primary Summary and Final Addendum Summary, as the SAP specifies different output requirements for each",
+      "Flag ILD/pneumonitis as a specific AE of special interest (AESI) requiring dedicated tabulation given this was the termination driver"
+    ]
+  }
+}

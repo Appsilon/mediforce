@@ -7,6 +7,7 @@ import type {
   AuditEvent,
   ProcessConfig,
   AgentOutputEnvelope,
+  FileMetadata,
 } from '../index.js';
 
 // ---------------------------------------------------------------------------
@@ -227,6 +228,25 @@ export function buildAuditEvent(
     entityId: 'exec-0001',
     processInstanceId: 'inst-0001',
     stepId: 'step-intake',
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildFileMetadata
+// ---------------------------------------------------------------------------
+
+export function buildFileMetadata(
+  overrides?: Partial<FileMetadata>,
+): FileMetadata {
+  const id = nextId('file');
+  return {
+    id,
+    name: `document-${id}.pdf`,
+    size: 102400,
+    type: 'application/pdf',
+    storagePath: `uploads/test/${id}.pdf`,
+    uploadedAt: DEFAULT_TIMESTAMP,
     ...overrides,
   };
 }

@@ -8,6 +8,7 @@ import {
   buildAuditEvent,
   buildProcessConfig,
   buildAgentOutputEnvelope,
+  buildFileMetadata,
   resetFactorySequence,
 } from '../factories.js';
 import {
@@ -19,6 +20,7 @@ import {
   AuditEventSchema,
   ProcessConfigSchema,
   AgentOutputEnvelopeSchema,
+  FileMetadataSchema,
 } from '../../schemas/index.js';
 
 beforeEach(() => {
@@ -302,6 +304,38 @@ describe('buildProcessConfig', () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildFileMetadata
+// ---------------------------------------------------------------------------
+
+describe('buildFileMetadata', () => {
+  it('should produce a valid FileMetadata', () => {
+    const file = buildFileMetadata();
+    const result = FileMetadataSchema.safeParse(file);
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept overrides', () => {
+    const file = buildFileMetadata({
+      name: 'custom-protocol.pdf',
+      type: 'application/pdf',
+      size: 2048,
+    });
+    expect(file.name).toBe('custom-protocol.pdf');
+    expect(file.type).toBe('application/pdf');
+    expect(file.size).toBe(2048);
+    const result = FileMetadataSchema.safeParse(file);
+    expect(result.success).toBe(true);
+  });
+
+  it('should generate sequential deterministic IDs', () => {
+    const f1 = buildFileMetadata();
+    const f2 = buildFileMetadata();
+    expect(f1.id).toBe('file-0001');
+    expect(f2.id).toBe('file-0002');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // resetFactorySequence
 // ---------------------------------------------------------------------------
 
@@ -334,6 +368,7 @@ describe('all factories produce schema-valid defaults', () => {
     { name: 'AuditEvent', build: buildAuditEvent, schema: AuditEventSchema },
     { name: 'ProcessConfig', build: buildProcessConfig, schema: ProcessConfigSchema },
     { name: 'AgentOutputEnvelope', build: buildAgentOutputEnvelope, schema: AgentOutputEnvelopeSchema },
+    { name: 'FileMetadata', build: buildFileMetadata, schema: FileMetadataSchema },
   ];
 
   for (const { name, build, schema } of cases) {

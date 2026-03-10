@@ -1,14 +1,17 @@
 // Schemas (Zod schema objects + inferred types)
 export {
   VerdictSchema,
+  StepUiSchema,
   StepSchema,
   TransitionSchema,
   TriggerSchema,
   ProcessDefinitionSchema,
   ReviewConstraintsSchema,
+  AgentConfigSchema,
   StepConfigSchema,
   ProcessNotificationConfigSchema,
   ProcessConfigSchema,
+  FileMetadataSchema,
   AuditEventSchema,
   StepInputSchema,
   StepOutputSchema,
@@ -35,13 +38,16 @@ export {
 // Types (re-exported from schemas for convenience)
 export type {
   Verdict,
+  StepUi,
   Step,
   Transition,
   Trigger,
   ProcessDefinition,
   ReviewConstraints,
+  AgentConfig,
   StepConfig,
   ProcessConfig,
+  FileMetadata,
   AuditEvent,
   StepInput,
   StepOutput,
@@ -109,6 +115,7 @@ export {
   buildAuditEvent,
   buildProcessConfig,
   buildAgentOutputEnvelope,
+  buildFileMetadata,
   resetFactorySequence,
 } from './testing/index.js';
 

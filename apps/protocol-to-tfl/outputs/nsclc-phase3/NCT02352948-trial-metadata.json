@@ -1,0 +1,741 @@
+{
+  "schema_version": "1.0",
+  "extraction_date": "2026-03-06",
+  "source_documents": [
+    {
+      "type": "protocol",
+      "filename": "NCT02352948_Prot_001.pdf",
+      "version": "Edition 07.0 (incorporates Amendments 01–08 and Admin Changes 01–02)",
+      "date": "2018-01-08"
+    },
+    {
+      "type": "sap",
+      "filename": "NCT02352948_SAP_000.pdf",
+      "version": "Edition 3",
+      "date": "2018-01-24"
+    }
+  ],
+
+  "study_identification": {
+    "study_id": "D4191C00004",
+    "nct_number": "NCT02352948",
+    "study_title": "A Phase III, Open-label, Randomised, Multi-centre, International Study of MEDI4736 (Durvalumab), Given as Monotherapy or in Combination with Tremelimumab, Determined by PD-L1 Expression, Versus Standard of Care in Patients with Locally Advanced or Metastatic Non-Small Cell Lung Cancer (Stage IIIB-IV) who Have Received at Least Two Prior Systemic Treatment Regimens Including One Platinum-based Chemotherapy Regimen and Do Not Have Known EGFR TK Activating Mutations or ALK Rearrangements (ARCTIC)",
+    "short_title": "ARCTIC — Durvalumab ± Tremelimumab vs SoC in previously treated NSCLC (PD-L1 stratified)",
+    "sponsor": "AstraZeneca AB",
+    "phase": "Phase III",
+    "indication": "Locally advanced or metastatic NSCLC (Stage IIIB-IV), ≥2 prior systemic regimens including ≥1 platinum-based, no known EGFR TK activating mutations or ALK rearrangements",
+    "therapeutic_area": "Oncology",
+    "compound_name": "Durvalumab (MEDI4736); Tremelimumab",
+    "compound_class": "monoclonal antibody (anti-PD-L1; anti-CTLA-4)",
+    "regulatory_status": "IND",
+    "eudract_number": "2014-000338-46",
+    "_source": "Protocol title page, synopsis"
+  },
+
+  "study_design": {
+    "type": "Phase III, randomised, open-label, multi-centre, two-sub-study design stratified by PD-L1 expression (Sub-study A: PD-L1-positive, 1:1; Sub-study B: PD-L1-negative, 3:2:2:1)",
+    "randomized": true,
+    "blinding": "open-label",
+    "control_type": "active",
+    "adaptive": true,
+    "adaptive_details": "Sub-study B includes a contribution-of-components analysis (~158 PFS events in D+T and tremelimumab arms) with potential early discontinuation of an inferior monotherapy arm. Sub-study A closed early due to low accrual (126 vs planned 250 patients); analyses for Sub-study A are descriptive only.",
+
+    "treatment_arms": [
+      {
+        "arm_id": "SSA_MEDI4736",
+        "arm_name": "Sub-study A: Durvalumab Monotherapy",
+        "arm_type": "experimental",
+        "dose": "Durvalumab (MEDI4736) 10 mg/kg",
+        "route": "IV",
+        "regimen": "10 mg/kg Q2W IV for up to 12 months. Retreatment allowed for patients with disease control after 12 months who progress during follow-up.",
+        "planned_n": 60,
+        "_notes": "Sub-study A: PD-L1-positive patients (≥25% tumour cells with membrane staining)"
+      },
+      {
+        "arm_id": "SSA_SOC",
+        "arm_name": "Sub-study A: Standard of Care",
+        "arm_type": "active_comparator",
+        "dose": "Erlotinib 150 mg QD oral OR Gemcitabine 1000 mg/m² IV OR Vinorelbine 30 mg/m² IV",
+        "route": "Oral (erlotinib) or IV (gemcitabine, vinorelbine)",
+        "regimen": "Erlotinib 150 mg once daily oral; OR Gemcitabine 1000 mg/m² IV on Days 1, 8, 15 of a 28-day cycle; OR Vinorelbine 30 mg/m² IV on Days 1, 8, 15, 22 of a 28-day cycle. Continue until PD or unacceptable toxicity.",
+        "planned_n": 60,
+        "_notes": "SoC choice determined at randomisation; investigator selects 1 of 3 options"
+      },
+      {
+        "arm_id": "SSB_DURU_TREMI",
+        "arm_name": "Sub-study B: Durvalumab + Tremelimumab Combination",
+        "arm_type": "experimental",
+        "dose": "Durvalumab 20 mg/kg + Tremelimumab 1 mg/kg (combination phase); Durvalumab 10 mg/kg (monotherapy phase)",
+        "route": "IV",
+        "regimen": "Durvalumab 20 mg/kg + Tremelimumab 1 mg/kg Q4W IV for up to 12 weeks (4 doses), then Durvalumab 10 mg/kg Q2W IV starting at Week 16 for 34 weeks (18 doses). Retreatment with combination allowed after progression during MEDI4736 monotherapy portion or after 12 months.",
+        "planned_n": 180,
+        "_notes": "Sub-study B: PD-L1-negative patients (<25% tumour cells with membrane staining)"
+      },
+      {
+        "arm_id": "SSB_SOC",
+        "arm_name": "Sub-study B: Standard of Care",
+        "arm_type": "active_comparator",
+        "dose": "Erlotinib 150 mg QD oral OR Gemcitabine 1000 mg/m² IV OR Vinorelbine 30 mg/m² IV",
+        "route": "Oral or IV",
+        "regimen": "Same SoC options as Sub-study A. Continue until PD or unacceptable toxicity.",
+        "planned_n": 120
+      },
+      {
+        "arm_id": "SSB_MEDI4736",
+        "arm_name": "Sub-study B: Durvalumab Monotherapy",
+        "arm_type": "experimental",
+        "dose": "Durvalumab (MEDI4736) 10 mg/kg",
+        "route": "IV",
+        "regimen": "10 mg/kg Q2W IV for up to 12 months.",
+        "planned_n": 120,
+        "_notes": "Included for contribution-of-components analysis"
+      },
+      {
+        "arm_id": "SSB_TREMI",
+        "arm_name": "Sub-study B: Tremelimumab Monotherapy",
+        "arm_type": "experimental",
+        "dose": "Tremelimumab 10 mg/kg",
+        "route": "IV",
+        "regimen": "10 mg/kg Q4W IV for 24 weeks, then Q12W for 24 weeks.",
+        "planned_n": 60,
+        "_notes": "Included for contribution-of-components analysis"
+      }
+    ],
+    "total_planned_n": 610,
+    "randomization_ratio": "1:1 (Sub-study A); 3:2:2:1 (MEDI4736+tremelimumab:MEDI4736:SoC:tremelimumab) (Sub-study B)",
+    "stratification_factors": [
+      "Standard of Care treatment type (gemcitabine/vinorelbine vs. erlotinib)",
+      "Histology (squamous vs. all other)"
+    ],
+
+    "study_periods": [
+      {
+        "period_name": "Pre-screening",
+        "duration": "Day -42 to Day -1 (up to 42 days)",
+        "description": "PD-L1 status determination by IHC on archival or fresh tumour biopsy (Ventana proprietary assay). Assignment to Sub-study A (PD-L1 ≥25%) or Sub-study B (PD-L1 <25%)."
+      },
+      {
+        "period_name": "Screening",
+        "duration": "Day -28 to Day -1",
+        "description": "Eligibility confirmation, baseline assessments. Baseline RECIST scan must be within 28 days before start of treatment (42-day window allowed in SAP)."
+      },
+      {
+        "period_name": "Treatment Period",
+        "duration": "Up to 12 months for immunotherapy arms; until PD/unacceptable toxicity for SoC",
+        "description": "Sub-study A: MEDI4736 Q2W or SoC. Sub-study B: MEDI4736+tremelimumab combination (12w) then MEDI4736 monotherapy (34w), or SoC, or MEDI4736 monotherapy, or tremelimumab monotherapy. Tumour assessments Q8W for 48 weeks, then Q12W."
+      },
+      {
+        "period_name": "Follow-up",
+        "duration": "Until death, withdrawal of consent, or final DCO",
+        "description": "Patients enter follow-up after completing/discontinuing treatment. Retreatment with immunotherapy allowed for eligible patients. Survival status every 2 months. PFS2 assessment every 12 weeks."
+      }
+    ],
+
+    "cohorts": {
+      "sub_study_A": {
+        "description": "PD-L1-positive patients (≥25% tumour cell membrane staining). Randomized 1:1 to MEDI4736 monotherapy vs SoC. Planned N=250 but closed early at 126 due to low accrual. Analyses are descriptive only (not powered for hypothesis testing).",
+        "randomization_ratio": "1:1",
+        "planned_n": 126,
+        "pd_l1_threshold": "≥25% tumour cells with membrane staining"
+      },
+      "sub_study_B": {
+        "description": "PD-L1-negative patients (<25% tumour cell membrane staining). Randomized 3:2:2:1 to MEDI4736+tremelimumab:MEDI4736:SoC:tremelimumab. Powered for hypothesis testing.",
+        "randomization_ratio": "3:2:2:1",
+        "planned_n": 480,
+        "pd_l1_threshold": "<25% tumour cells with membrane staining"
+      }
+    },
+    "_source": "Protocol synopsis, SAP Sections 1.2, 2.1"
+  },
+
+  "populations": {
+    "intent_to_treat": {
+      "abbreviation": "FAS (ITT)",
+      "definition": "Full analysis set (FAS): All randomised patients with treatment groups assigned in accordance with the randomisation, regardless of the treatment actually received. Patients who were randomised but did not subsequently receive treatment are included in the FAS. All efficacy and HRQoL data will be summarised and analysed using the FAS on an ITT basis.",
+      "is_primary_efficacy_population": true,
+      "_source": "SAP Section 2.1"
+    },
+    "modified_itt": {
+      "abbreviation": null,
+      "definition": null,
+      "is_primary_efficacy_population": false,
+      "_notes": "No mITT population defined. FAS/ITT is the primary efficacy population."
+    },
+    "per_protocol": {
+      "abbreviation": "PP (deviation bias sensitivity)",
+      "definition": "A per-protocol sensitivity analysis excluding patients with significant protocol deviations may be performed (deviation bias analysis) if >10% of patients did not have the intended disease/indication or did not receive any randomised therapy. Not a formal pre-specified population — triggered only if needed.",
+      "is_primary_efficacy_population": false,
+      "_source": "SAP Section 2.2"
+    },
+    "safety": {
+      "abbreviation": "Safety",
+      "definition": "All patients who received at least one dose of randomised treatment (regardless of whether that was the randomised therapy intended or whether, in rare cases, they received therapy without being randomised) in each of the sub-studies. Erroneously treated patients accounted for in the actual treatment arm.",
+      "is_primary_safety_population": true,
+      "_source": "SAP Section 2.1"
+    },
+    "pk_population": {
+      "abbreviation": "PK",
+      "definition": "All patients who receive at least 1 dose of MEDI4736 (Sub-study A), or either MEDI4736+tremelimumab, MEDI4736 monotherapy or tremelimumab monotherapy (Sub-study B) per protocol, for whom any post-dose data are available. Population defined by Study Team Physician, Pharmacokineticist and Statistician prior to analyses.",
+      "_source": "SAP Section 2.1"
+    },
+    "other_populations": [],
+    "_source": "SAP Section 2.1"
+  },
+
+  "endpoints": {
+    "primary": [
+      {
+        "endpoint_id": "PE01",
+        "name": "Overall Survival (OS) — Co-primary",
+        "description": "Time from randomisation to date of death from any cause. Patients not yet dead at time of analysis are censored at the date they were last known to be alive.",
+        "type": "efficacy",
+        "measurement": "Time from randomisation to death from any cause. Survival status followed every 2 months after progression.",
+        "timepoint": "Sub-study A: when 82 deaths in 126 patients (65% maturity). Sub-study B: when ~205 deaths in D+T and SoC arms (68% maturity).",
+        "variable_type": "time-to-event",
+        "direction_of_benefit": "higher_is_better",
+        "clinically_meaningful_difference": "Sub-study B: average HR of 0.63 (corresponding to 4.4-month improvement in median OS from control median of 7 months; 12-month rates 30.5% SoC vs 48.5% D+T). Minimum detectable effect: average HR 0.75.",
+        "related_adam_dataset": "ADTTE",
+        "_source": "SAP Sections 1.1.1, 3.2.1.1, 4.2.2.1, 5.1"
+      },
+      {
+        "endpoint_id": "PE02",
+        "name": "Progression-Free Survival (PFS) — Co-primary (RECIST 1.1, investigator assessment)",
+        "description": "Time from randomisation to the date of objective tumour progression (per RECIST 1.1, investigator site assessment, programmatically derived) or death (by any cause) in the absence of progression. Patients who have not progressed or died are censored at the date of their last evaluable tumour assessment.",
+        "type": "efficacy",
+        "measurement": "Programmatically derived from investigator site RECIST 1.1 assessments. Tumour assessment Q8W for 48w then Q12W thereafter. Progression requires confirmation in monotherapy arms and during first 4 cycles of combination arm (confirmatory scan ≥4 weeks after initial PD, no earlier).",
+        "timepoint": "Sub-study B: when ~244 PFS events in D+T and SoC arms (81% maturity).",
+        "variable_type": "time-to-event",
+        "direction_of_benefit": "higher_is_better",
+        "clinically_meaningful_difference": "Sub-study B: average HR of 0.63 (1.3-month improvement in median PFS from control median of 3 months; 12-month PFS 6.3% SoC vs 23.3% D+T). Minimum detectable effect: average HR 0.72.",
+        "related_adam_dataset": "ADTTE",
+        "_source": "SAP Sections 1.1.1, 3.2.1.2, 4.2.2.2, 5.1"
+      }
+    ],
+    "secondary": [
+      {
+        "endpoint_id": "SE01",
+        "name": "OS12 — Proportion of patients alive at 12 months from randomisation",
+        "description": "Proportion of patients alive at 12 months from the date of randomisation.",
+        "type": "efficacy",
+        "measurement": "Binary (alive/dead at 12 months). Kaplan-Meier estimate of the survival function at Month 12.",
+        "timepoint": "12 months from randomisation",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADTTE",
+        "_source": "SAP Section 3.2.2"
+      },
+      {
+        "endpoint_id": "SE02",
+        "name": "Objective Response Rate (ORR) — RECIST 1.1 investigator assessment",
+        "description": "Proportion of patients with a confirmed complete response (CR) or partial response (PR) based on investigator assessment per RECIST 1.1. Evaluable patients are those with measurable disease at baseline.",
+        "type": "efficacy",
+        "measurement": "Binary (responder vs. non-responder). Logistic regression (unstratified, adjusting for stratification factors).",
+        "timepoint": "Best response observed from start of treatment",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADRS",
+        "_source": "SAP Section 3.2.3, 4.2.3"
+      },
+      {
+        "endpoint_id": "SE03",
+        "name": "Duration of Response (DoR) — RECIST 1.1 investigator assessment",
+        "description": "Time from the date of first documented CR or PR (whichever occurs first) to the date of first documented disease progression or death. Evaluable patients are those who responded in the ORR analysis.",
+        "type": "efficacy",
+        "measurement": "Time-to-event. Kaplan-Meier estimates.",
+        "timepoint": "From first confirmed response to progression or death",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE",
+        "_source": "SAP Section 3.2.4"
+      },
+      {
+        "endpoint_id": "SE04",
+        "name": "APF6 — Proportion of patients alive and progression-free at 6 months",
+        "description": "Proportion of patients alive and progression-free at 6 months from date of randomisation (per RECIST 1.1 investigator assessment).",
+        "type": "efficacy",
+        "measurement": "Binary. Kaplan-Meier estimate of PFS function at 6 months.",
+        "timepoint": "6 months from randomisation",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADTTE",
+        "_source": "SAP Section 3.2.5"
+      },
+      {
+        "endpoint_id": "SE05",
+        "name": "APF12 — Proportion of patients alive and progression-free at 12 months",
+        "description": "Proportion of patients alive and progression-free at 12 months from date of randomisation (per RECIST 1.1 investigator assessment).",
+        "type": "efficacy",
+        "measurement": "Binary. Kaplan-Meier estimate of PFS function at 12 months.",
+        "timepoint": "12 months from randomisation",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADTTE",
+        "_source": "SAP Section 3.2.6"
+      },
+      {
+        "endpoint_id": "SE06",
+        "name": "PFS2 — Time from randomisation to second progression or death (Sub-study B only)",
+        "description": "Time from randomisation to second progression (defined by local standard clinical practice: objective radiological, symptomatic progression, or death) or death. A missed visit is defined as two consecutive missing scheduled visits.",
+        "type": "efficacy",
+        "measurement": "Time-to-event. Assessed every 12 weeks. Kaplan-Meier.",
+        "timepoint": "Second progression/death; assessed Q12W",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE",
+        "_notes": "Sub-study B only",
+        "_source": "SAP Section 3.2.7"
+      },
+      {
+        "endpoint_id": "SE07",
+        "name": "EORTC QLQ-C30 — Time to symptom/HRQoL deterioration",
+        "description": "Time to deterioration in each of: fatigue, pain, nausea/vomiting, dyspnoea, loss of appetite, insomnia, constipation, diarrhoea (symptoms); physical function, role function, emotional function, cognitive function, social function, global health status/QoL (HRQoL/function). Deterioration defined as pre-specified threshold change.",
+        "type": "PRO",
+        "measurement": "Time from randomisation to first deterioration that is not followed by improvement above threshold. EORTC QLQ-C30 v3.",
+        "timepoint": "Assessed per visit schedule",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADQS",
+        "_source": "SAP Sections 3.3.1, 4.2.9.1"
+      },
+      {
+        "endpoint_id": "SE08",
+        "name": "EORTC QLQ-LC13 — Time to symptom deterioration",
+        "description": "Time to deterioration in LC13 symptoms: dyspnoea, cough, haemoptysis, chest pain, arm/shoulder pain, other pain.",
+        "type": "PRO",
+        "measurement": "Time from randomisation to first deterioration. LC13 13-item questionnaire.",
+        "timepoint": "Assessed per visit schedule",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADQS",
+        "_source": "SAP Sections 3.3.2, 4.2.9.2"
+      },
+      {
+        "endpoint_id": "SE09",
+        "name": "Contribution-of-components analysis: PFS in D+T vs D monotherapy and vs T monotherapy (Sub-study B)",
+        "description": "PFS comparison of MEDI4736+tremelimumab arm versus each of MEDI4736 monotherapy and tremelimumab monotherapy arms. Conducted when ~158 PFS events in D+T and tremelimumab arms; or at time of final PFS analysis if close. Alpha=0.05 (not included in primary multiplicity procedure).",
+        "type": "efficacy",
+        "measurement": "PFS per RECIST 1.1. Log-rank test, Cox model.",
+        "timepoint": "~158 PFS events in D+T and tremelimumab arms",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE",
+        "_notes": "Secondary objective; alpha=0.05 without multiplicity adjustment",
+        "_source": "SAP Sections 1.1.2, 4.2.1"
+      }
+    ],
+    "exploratory": [
+      {
+        "endpoint_id": "EE01",
+        "name": "Exploratory objectives (CCI)",
+        "description": "Exploratory objectives are marked as confidential commercial information (CCI) in the publicly posted documents and are not fully disclosed.",
+        "type": "other",
+        "variable_type": null,
+        "_notes": "CCI redacted in both protocol and SAP. May include biomarker analyses, PD-L1 subgroup analyses (<1%, ≥1% to <25%), PK/PD relationships, and other analyses.",
+        "_source": "SAP Section 1.1.3"
+      },
+      {
+        "endpoint_id": "EE02",
+        "name": "Best Objective Response (BoR)",
+        "description": "Best objective response (CR, PR, SD, PD, NE) per RECIST 1.1 investigator assessment.",
+        "type": "efficacy",
+        "variable_type": "categorical",
+        "_source": "SAP Section 3.2.9"
+      },
+      {
+        "endpoint_id": "EE03",
+        "name": "Change in tumour size",
+        "description": "Percentage change from baseline in sum of longest diameters of target lesions. Presented as waterfall plot.",
+        "type": "efficacy",
+        "variable_type": "continuous",
+        "_source": "SAP Section 3.2.10, 4.2.8"
+      },
+      {
+        "endpoint_id": "EE04",
+        "name": "EQ-5D-5L",
+        "description": "EuroQoL 5-dimension 5-level health state utility index.",
+        "type": "PRO",
+        "variable_type": "continuous",
+        "_source": "SAP Sections 3.3.3, 4.2.9.3"
+      }
+    ],
+    "safety_endpoints": [
+      {
+        "endpoint_id": "SAF01",
+        "name": "Treatment-Emergent Adverse Events (TEAEs)",
+        "description": "All TEAEs graded by CTCAE (version not explicitly stated but CTCAE is referenced). Grade ≥3 TEAEs summarised separately. All AEs listed by subject.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF02",
+        "name": "Adverse Events of Special Interest (AESI)",
+        "description": "AESIs including immune-mediated events and infusion-related reactions. Thyrotoxicity events summarised separately.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF03",
+        "name": "Serious Adverse Events (SAEs)",
+        "description": "All SAEs tabulated by system organ class and preferred term.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF04",
+        "name": "Treatment exposure, dose intensity",
+        "description": "Number of doses, cumulative dose, relative dose intensity (RDI). Dose delay and dose modifications summarised.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF05",
+        "name": "Laboratory parameters",
+        "description": "Clinical chemistry, haematology, urinalysis. Hy's Law categories presented. CTCAE grade shifts.",
+        "type": "lab shift"
+      },
+      {
+        "endpoint_id": "SAF06",
+        "name": "Vital signs",
+        "description": "Systolic and diastolic blood pressure, pulse. Abnormal values flagged.",
+        "type": "vital signs"
+      },
+      {
+        "endpoint_id": "SAF07",
+        "name": "ECG",
+        "description": "QTcF intervals (Fridericia correction). Clinically significant changes listed.",
+        "type": "ECG"
+      },
+      {
+        "endpoint_id": "SAF08",
+        "name": "Immunogenicity (ADA)",
+        "description": "Anti-drug antibody (ADA) incidence, titres, and neutralising antibody status for MEDI4736 and tremelimumab.",
+        "type": "AE incidence"
+      }
+    ],
+    "_source": "SAP Sections 1.1.1–1.1.3, 3.2–3.4"
+  },
+
+  "statistical_analyses": {
+    "primary_analysis": [
+      {
+        "analysis_id": "PA01_SSA",
+        "endpoint_id": "PE01, PE02",
+        "description": "Sub-study A analyses are descriptive only (study closed early at 126 patients vs planned 250; analyses no longer powered for hypothesis testing). KM estimates of OS and PFS presented with 95% CIs.",
+        "population": "FAS (ITT) — Sub-study A patients",
+        "statistical_method": "Kaplan-Meier (descriptive; no formal hypothesis test)",
+        "model_details": {
+          "response_variable": "OS and PFS",
+          "covariates": [],
+          "factors": [],
+          "interaction_terms": [],
+          "other_details": "Descriptive presentation. 95% CIs using complementary log-log method."
+        },
+        "hypothesis": {
+          "null_hypothesis": null,
+          "alternative": "two-sided",
+          "alpha": null,
+          "alpha_adjustment": "Not applicable — analyses are descriptive"
+        },
+        "multiplicity_strategy": "Not applicable (Sub-study A is descriptive only)",
+        "sensitivity_analyses": [],
+        "_source": "SAP Section 1.2, amendment history"
+      },
+      {
+        "analysis_id": "PA01_SSB_OS",
+        "endpoint_id": "PE01",
+        "description": "Sub-study B: OS comparison of MEDI4736+tremelimumab versus Standard of Care using stratified log-rank test. HR and 95% CI from Cox model stratified by SoC type and histology. KM estimates. Analysis at ~205 deaths (68% maturity) in D+T and SoC arms. An interim OS analysis may also be performed.",
+        "population": "FAS (ITT) — Sub-study B (MEDI4736+tremelimumab vs SoC)",
+        "statistical_method": "Stratified log-rank test + stratified Cox proportional hazards model + Kaplan-Meier",
+        "model_details": {
+          "response_variable": "Overall Survival (time from randomisation to death)",
+          "covariates": ["SoC treatment type (IVRS)", "Histology (IVRS)"],
+          "factors": ["Treatment arm"],
+          "interaction_terms": [null],
+          "other_details": "Ties handled using Breslow method. When used as stratification factors, SoC type and histology come from IVRS values at randomisation. Subgroup analyses also presented."
+        },
+        "hypothesis": {
+          "null_hypothesis": "No difference in OS between MEDI4736+tremelimumab and Standard of Care in PD-L1-negative NSCLC",
+          "alternative": "two-sided",
+          "alpha": 0.04,
+          "alpha_adjustment": "O'Brien-Fleming-type spending function for one interim analysis (alpha split: 0.04 total for OS; effectively alpha ≈0.01 at interim and ≈0.04 at final depending on information fraction)"
+        },
+        "multiplicity_strategy": "Co-primary OS and PFS tested with alpha 0.04 (OS) and 0.01 (PFS) in Sub-study B. Study positive if either OS or PFS is statistically significant. See SAP Section 4.2.1 for multiplicity graph.",
+        "sensitivity_analyses": [
+          {
+            "name": "Treatment switching sensitivity analysis",
+            "description": "Exploratory analysis adjusting for subsequent immunotherapy use in SoC arm (treatment switching). May or may not be performed.",
+            "method": "Rank-preserving structural failure time (RPSFT) or similar; per SAP"
+          },
+          {
+            "name": "Deviation bias sensitivity",
+            "description": "If >10% of patients had important protocol deviations affecting efficacy, a per-protocol-like analysis excluding these patients may be performed.",
+            "method": "Stratified log-rank test / Cox in per-protocol subset"
+          }
+        ],
+        "_source": "SAP Sections 4.2.1, 4.2.2.1, 5.1"
+      },
+      {
+        "analysis_id": "PA01_SSB_PFS",
+        "endpoint_id": "PE02",
+        "description": "Sub-study B: PFS comparison (RECIST 1.1, investigator site assessment) of MEDI4736+tremelimumab versus Standard of Care. Stratified log-rank test. Analysis at ~244 PFS events (81% maturity) in D+T and SoC arms.",
+        "population": "FAS (ITT) — Sub-study B (MEDI4736+tremelimumab vs SoC)",
+        "statistical_method": "Stratified log-rank test + stratified Cox proportional hazards model + Kaplan-Meier",
+        "model_details": {
+          "response_variable": "PFS (programmatically derived from investigator RECIST 1.1 data)",
+          "covariates": ["SoC treatment type (IVRS)", "Histology (IVRS)"],
+          "factors": ["Treatment arm"],
+          "interaction_terms": [null],
+          "other_details": "Breslow method for ties. PFS censored at last evaluable tumour assessment for patients without progression or death."
+        },
+        "hypothesis": {
+          "null_hypothesis": "No difference in PFS between MEDI4736+tremelimumab and Standard of Care in PD-L1-negative NSCLC",
+          "alternative": "two-sided",
+          "alpha": 0.01,
+          "alpha_adjustment": "Fixed alpha 0.01 for PFS (no interim analysis for PFS)"
+        },
+        "multiplicity_strategy": "See PA01_SSB_OS for overall multiplicity framework",
+        "sensitivity_analyses": [
+          {
+            "name": "PFS sensitivity: un-confirmed progression",
+            "description": "Landmark analysis or modified censoring to handle patients who may have been treated through progression without confirmation.",
+            "method": "Per SAP Section 4.2.2.2"
+          }
+        ],
+        "_source": "SAP Sections 4.2.2.2, 5.1"
+      }
+    ],
+    "secondary_analyses": [
+      {
+        "analysis_id": "SA01",
+        "endpoint_id": "SE01",
+        "description": "OS12 estimated from KM curve at 12 months with 95% CI (Greenwood method). Both sub-studies.",
+        "population": "FAS (ITT)",
+        "statistical_method": "Kaplan-Meier point estimate at 12 months",
+        "multiplicity_handling": "Secondary; tested at nominal alpha=0.05 without formal multiplicity adjustment",
+        "_source": "SAP Section 3.2.2"
+      },
+      {
+        "analysis_id": "SA02",
+        "endpoint_id": "SE02",
+        "description": "ORR: proportion with CR or PR (confirmed). Compared between treatment arms using logistic regression (unstratified, adjusting for stratification factors). 95% CI by Clopper-Pearson method.",
+        "population": "FAS (ITT) — patients with measurable disease at baseline",
+        "statistical_method": "Logistic regression (unstratified, adjusting for histology and SoC type) + Clopper-Pearson CI",
+        "multiplicity_handling": "Secondary; nominal alpha=0.05",
+        "_source": "SAP Section 4.2.3"
+      },
+      {
+        "analysis_id": "SA03",
+        "endpoint_id": "SE03",
+        "description": "DoR estimated using Kaplan-Meier in responding patients.",
+        "population": "FAS (ITT) — confirmed responders",
+        "statistical_method": "Kaplan-Meier",
+        "multiplicity_handling": "Secondary; nominal alpha=0.05",
+        "_source": "SAP Section 4.2.4"
+      },
+      {
+        "analysis_id": "SA04",
+        "endpoint_id": "SE04, SE05",
+        "description": "APF6 and APF12: KM estimate at 6 and 12 months from PFS curve.",
+        "population": "FAS (ITT)",
+        "statistical_method": "Kaplan-Meier point estimates",
+        "multiplicity_handling": "Secondary; nominal alpha=0.05",
+        "_source": "SAP Sections 4.2.5, 4.2.6"
+      },
+      {
+        "analysis_id": "SA05",
+        "endpoint_id": "SE06",
+        "description": "PFS2 (Sub-study B): time from randomisation to second progression or death, estimated by KM.",
+        "population": "FAS (ITT) — Sub-study B",
+        "statistical_method": "Kaplan-Meier + log-rank test",
+        "multiplicity_handling": "Secondary; nominal alpha=0.05",
+        "_source": "SAP Section 4.2.7"
+      }
+    ],
+    "subgroup_analyses": [
+      {
+        "subgroup_variable": "PD-L1 expression (<1% vs ≥1% to <25%)",
+        "endpoints_analyzed": ["PE01", "PE02"],
+        "method": "Forest plot of HRs within each PD-L1 subgroup from stratified Cox model"
+      },
+      {
+        "subgroup_variable": "Histology (squamous vs all other)",
+        "endpoints_analyzed": ["PE01", "PE02"],
+        "method": "Stratified Cox model subgroup analysis; forest plot"
+      },
+      {
+        "subgroup_variable": "Standard of Care type (gemcitabine/vinorelbine vs erlotinib)",
+        "endpoints_analyzed": ["PE01", "PE02"],
+        "method": "Stratified Cox model subgroup analysis"
+      },
+      {
+        "subgroup_variable": "Age at randomisation (<65 vs ≥65 vs ≥75)",
+        "endpoints_analyzed": ["PE01", "PE02"],
+        "method": "Cox model subgroup analysis"
+      },
+      {
+        "subgroup_variable": "Disease stage (metastatic vs locally advanced)",
+        "endpoints_analyzed": ["PE01", "PE02"],
+        "method": "Cox model subgroup analysis (replaced 'Stage IIIB vs IV' in SAP amendment)"
+      }
+    ],
+    "interim_analyses": [
+      {
+        "timing": "Sub-study B OS interim: conducted at same time as final PFS analysis (or when ~126 deaths in D+T and SoC arms if before final PFS analysis)",
+        "purpose": "efficacy",
+        "spending_function": "O'Brien-Fleming-type alpha spending (overall OS alpha=0.04 two-sided, split between interim and final)",
+        "stopping_rules": "If interim OS analysis is significant at the interim alpha boundary, study may continue or IDMC makes recommendation. Full details in IDMC Charter.",
+        "_notes": "No interim analyses for Sub-study A. In practice, if interim and final analysis timing are closely aligned, a single OS analysis may be conducted using the full 0.04 alpha.",
+        "_source": "SAP Section 5.1"
+      }
+    ],
+    "_source": "SAP Sections 4.2, 5.1"
+  },
+
+  "missing_data": {
+    "primary_strategy": "For time-to-event endpoints: censoring at last evaluable tumour assessment (PFS) or last known alive date (OS). Missed visits handling: two consecutive missed scheduled visits results in censoring at last evaluable assessment.",
+    "imputation_methods": [
+      {
+        "method_name": "Administrative censoring (OS)",
+        "applied_to": "OS (PE01)",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Patients not dead at analysis censored at last known alive date."
+      },
+      {
+        "method_name": "Administrative censoring (PFS)",
+        "applied_to": "PFS (PE02)",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Patients without progression/death censored at date of last evaluable tumour assessment. Patients with no post-baseline assessments censored at date of randomisation."
+      },
+      {
+        "method_name": "Missed visit handling",
+        "applied_to": "PFS, PFS2",
+        "is_primary_or_sensitivity": "primary",
+        "details": "If a patient has two consecutive missed scheduled visits, PFS is censored at the last evaluable assessment before the first missed visit."
+      }
+    ],
+    "estimand_framework": {
+      "used": false,
+      "intercurrent_events": [],
+      "_notes": "ICH E9(R1) estimand framework not formally described. Protocol dated 2018 but SAP amendment history does not reference estimand framework updates. Treatment switching sensitivity analysis planned for OS in Sub-study B."
+    },
+    "_source": "SAP Sections 3.2.1, 3.2.2, 4.2.2.1"
+  },
+
+  "baseline_definition": {
+    "general_rule": "Baseline refers to the most recent assessment of any variable prior to dosing with study treatment/randomisation (as appropriate). Baseline RECIST scan must be within 28 days before start of treatment (42-day window applied in SAP for important deviations assessment).",
+    "exceptions": [
+      {
+        "domain": "Tumour assessments (RECIST)",
+        "rule": "Baseline assessment should be performed no more than 28 days before the start of study treatment and ideally as close as possible to the start of randomised treatment."
+      }
+    ],
+    "_source": "SAP Section 2 (abbreviations), 3.1, 2.2"
+  },
+
+  "visit_schedule": {
+    "visits": [
+      {
+        "visit_name": "Pre-screening",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -42,
+        "window_upper": -1,
+        "assessments": ["PD-L1 IHC testing (archival or fresh biopsy)", "Assignment to Sub-study A or B"]
+      },
+      {
+        "visit_name": "Screening",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -28,
+        "window_upper": -1,
+        "assessments": ["Eligibility confirmation", "Baseline RECIST CT/MRI", "Baseline labs", "Baseline PRO (EORTC QLQ-C30, LC13, EQ-5D-5L)"]
+      },
+      {
+        "visit_name": "Day 1 (Randomisation)",
+        "visit_number": 1,
+        "target_day": 1,
+        "window_lower": 0,
+        "window_upper": 0,
+        "assessments": ["Study drug administration", "Safety assessments"]
+      },
+      {
+        "visit_name": "Tumour assessment Q8W (Weeks 8, 16, 24, 32, 40, 48)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["CT/MRI tumour assessment per RECIST 1.1", "Safety labs", "PRO questionnaires"]
+      },
+      {
+        "visit_name": "Tumour assessment Q12W (after Week 48)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["CT/MRI tumour assessment per RECIST 1.1", "Safety labs"]
+      },
+      {
+        "visit_name": "Post-progression follow-up",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["Survival status every 2 months", "PFS2 assessment every 12 weeks"]
+      }
+    ],
+    "windowing_rules": "Tumour assessments per RECIST 1.1 every 8 weeks for first 48 weeks relative to date of randomisation, then every 12 weeks. Detailed visit windowing rules provided in SAP Section 4.1.",
+    "_source": "Protocol synopsis, SAP Sections 3.1, 4.1"
+  },
+
+  "sample_size": {
+    "total_planned": 610,
+    "per_arm": {
+      "SSA_MEDI4736": 63,
+      "SSA_SOC": 63,
+      "SSB_DURU_TREMI": 180,
+      "SSB_SOC": 120,
+      "SSB_MEDI4736": 120,
+      "SSB_TREMI": 60
+    },
+    "power": 0.90,
+    "alpha": 0.04,
+    "assumptions": "Sub-study B OS: average HR=0.63 (D+T vs SoC); median OS control=7 months; 15-month recruitment + 12-month minimum follow-up. Sub-study B PFS: average HR=0.63; median PFS control=3 months; 15-month recruitment + 7-month follow-up. Two-month delay in curve separation assumed. PD-L1-negative prevalence ~70% of all NSCLC patients screened.",
+    "dropout_rate_assumed": null,
+    "method": "Log-rank test (stratified); piecewise exponential/average HR framework",
+    "events_required": {
+      "SSB_OS_final": "~205 deaths in D+T + SoC arms",
+      "SSB_PFS_final": "~244 PFS events in D+T + SoC arms",
+      "SSA_OS": "82 deaths in 126 patients",
+      "contribution_of_components_PFS": "~158 PFS events in D+T + tremelimumab arms"
+    },
+    "_notes": "Sub-study A closed at 126/250 planned patients; now descriptive only. Recruitment: ~1300 screened, 610 randomised (~126 SSA + ~480 SSB). 30% of screened expected to be PD-L1 positive (Sub-study A).",
+    "_source": "SAP Sections 1.2, 5.1"
+  },
+
+  "planned_tlg_list": {
+    "_notes": "No explicit TLG appendix in the publicly posted SAP. A full TLG list should exist in the complete internal SAP. Table 7 in the SAP (Section 4.2) summarises planned formal statistical analyses — this can be used to derive TLG shells. The SAP is a full standalone document with detailed analysis specifications.",
+    "tables": null,
+    "listings": null,
+    "figures": [
+      {
+        "tlg_id": "F-multiplicity",
+        "title": "Multiple Testing Procedures for Controlling Type I Error Rate for Sub-study B",
+        "population": "FAS (ITT) Sub-study B",
+        "description": "Figure 2 in SAP: graphical representation of the multiplicity framework (OS alpha=0.04, PFS alpha=0.01)"
+      }
+    ]
+  },
+
+  "validation_summary": {
+    "completeness_score": "High",
+    "fields_missing": [
+      "Complete TLG appendix (not in posted SAP)",
+      "Full exploratory objectives (CCI-redacted in posted documents)",
+      "Detailed visit windowing table (referenced in SAP Section 4.1 but not fully reproduced here)",
+      "IVRS-based stratification factor source rules for subgroup vs covariate analyses — captured in SAP amendment history but not re-extracted in full detail"
+    ],
+    "inconsistencies_found": [
+      "Sub-study A was planned for 250 patients but closed at 126 due to low accrual — analyses changed from hypothesis-testing to descriptive (per Amendment 06). This is well-documented.",
+      "PFS2 is defined for Sub-study B only; protocol and SAP are consistent on this.",
+      "Contribution-of-components analysis (sub-study B secondary) uses alpha=0.05 outside the primary multiplicity framework — explicitly noted in SAP."
+    ],
+    "reviewer_attention_items": [
+      "Sub-study A analyses are entirely descriptive — no p-values will be generated for PE01/PE02 in this sub-study",
+      "Exploratory objectives are CCI-redacted; biomarker and PK/PD analyses will be needed for complete TLG planning",
+      "Multiplicity graph (Figure 2, SAP Section 4.2.1) should be reviewed to confirm alpha allocation between OS interim and final for Sub-study B",
+      "Confirm whether OS interim analysis for Sub-study B was actually conducted (SAP states 'if performed' in latest version)"
+    ],
+    "recommendations": [
+      "Sub-study A and Sub-study B should generate separate TLG shells — the analysis populations and statistical approaches differ fundamentally",
+      "TLG shells for Sub-study B should include: OS and PFS KM curves + tables, ORR tables, DoR, APF6/APF12, PFS2, subgroup forest plots, contribution-of-components analysis, EORTC QLQ-C30/LC13 tables, safety tables by arm",
+      "The SAP is a well-structured standalone document (Edition 3) — full TLG generation should be feasible from it"
+    ]
+  }
+}

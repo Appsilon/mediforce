@@ -163,6 +163,57 @@ describe('StepSchema', () => {
       expect(result.success).toBe(true);
     }
   });
+
+  it('[DATA] should accept step with ui component and config', () => {
+    const result = StepSchema.safeParse({
+      ...minimalStep,
+      ui: {
+        component: 'file-upload',
+        config: { acceptedTypes: ['application/pdf'], minFiles: 1, maxFiles: 5 },
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.ui?.component).toBe('file-upload');
+      expect(result.data.ui?.config?.acceptedTypes).toEqual(['application/pdf']);
+    }
+  });
+
+  it('[DATA] should accept step with ui component without config', () => {
+    const result = StepSchema.safeParse({
+      ...minimalStep,
+      ui: { component: 'metadata-viewer' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.ui?.component).toBe('metadata-viewer');
+      expect(result.data.ui?.config).toBeUndefined();
+    }
+  });
+
+  it('[DATA] should accept step without ui (optional)', () => {
+    const result = StepSchema.safeParse(minimalStep);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.ui).toBeUndefined();
+    }
+  });
+
+  it('[DATA] should reject ui without component (required)', () => {
+    const result = StepSchema.safeParse({
+      ...minimalStep,
+      ui: { config: { acceptedTypes: ['application/pdf'] } },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[DATA] should reject ui with empty component string', () => {
+    const result = StepSchema.safeParse({
+      ...minimalStep,
+      ui: { component: '' },
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('TransitionSchema', () => {

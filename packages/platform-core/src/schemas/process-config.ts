@@ -10,6 +10,10 @@ export const NotificationTargetSchema = z.object({
   address: z.string().min(1),
 });
 
+export const AgentConfigSchema = z.object({
+  skill: z.string().optional(),
+});
+
 export const StepConfigSchema = z.object({
   stepId: z.string(),
   executorType: z.enum(['human', 'agent']), // required: who executes this step
@@ -25,6 +29,7 @@ export const StepConfigSchema = z.object({
   allowedRoles: z.array(z.string()).optional(),  // RBAC: e.g. ['reviewer', 'approver']
   reviewerType: z.enum(['human', 'agent', 'none']).optional(), // who reviews; 'none' for L4 no-review
   reviewerPlugin: z.string().optional(), // required at runtime when reviewerType='agent'
+  agentConfig: AgentConfigSchema.optional(),
 });
 
 export const ProcessNotificationConfigSchema = z.object({
@@ -45,5 +50,6 @@ export const ProcessConfigSchema = z.object({
 
 export type ReviewConstraints = z.infer<typeof ReviewConstraintsSchema>;
 export type NotificationTarget = z.infer<typeof NotificationTargetSchema>;
+export type AgentConfig = z.infer<typeof AgentConfigSchema>;
 export type StepConfig = z.infer<typeof StepConfigSchema>;
 export type ProcessConfig = z.infer<typeof ProcessConfigSchema>;

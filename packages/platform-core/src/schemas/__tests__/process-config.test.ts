@@ -203,6 +203,42 @@ describe('StepConfigSchema', () => {
       expect(result.data.reviewerType).toBe('human');
     }
   });
+
+  it('[DATA] should accept agentConfig with skill', () => {
+    const result = StepConfigSchema.safeParse({
+      stepId: 'step-1',
+      executorType: 'agent',
+      plugin: 'claude-code',
+      agentConfig: { skill: 'trial-metadata-extractor' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agentConfig?.skill).toBe('trial-metadata-extractor');
+    }
+  });
+
+  it('[DATA] should accept agentConfig without skill (optional)', () => {
+    const result = StepConfigSchema.safeParse({
+      stepId: 'step-1',
+      executorType: 'agent',
+      agentConfig: {},
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agentConfig?.skill).toBeUndefined();
+    }
+  });
+
+  it('[DATA] should accept stepConfig without agentConfig (optional)', () => {
+    const result = StepConfigSchema.safeParse({
+      stepId: 'step-1',
+      executorType: 'human',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agentConfig).toBeUndefined();
+    }
+  });
 });
 
 describe('ProcessConfigSchema', () => {
