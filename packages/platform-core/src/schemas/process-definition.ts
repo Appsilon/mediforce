@@ -4,12 +4,18 @@ export const VerdictSchema = z.object({
   target: z.string(),
 });
 
+export const StepUiSchema = z.object({
+  component: z.string().min(1),
+  config: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const StepSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   type: z.enum(['creation', 'review', 'decision', 'terminal']).default('creation'),
   description: z.string().optional(),
   verdicts: z.record(z.string(), VerdictSchema).optional(),
+  ui: StepUiSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -45,6 +51,7 @@ export const ProcessDefinitionSchema = z.object({
 });
 
 export type Verdict = z.infer<typeof VerdictSchema>;
+export type StepUi = z.infer<typeof StepUiSchema>;
 export type Step = z.infer<typeof StepSchema>;
 export type Transition = z.infer<typeof TransitionSchema>;
 export type Trigger = z.infer<typeof TriggerSchema>;

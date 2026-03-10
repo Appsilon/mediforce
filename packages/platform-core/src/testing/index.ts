@@ -17,5 +17,6 @@ export {
   buildAuditEvent,
   buildProcessConfig,
   buildAgentOutputEnvelope,
+  buildFileMetadata,
   resetFactorySequence,
 } from './factories.js';

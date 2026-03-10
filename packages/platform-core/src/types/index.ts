@@ -4,6 +4,7 @@
 
 export type {
   Verdict,
+  StepUi,
   Step,
   Transition,
   Trigger,
@@ -12,9 +13,12 @@ export type {
 
 export type {
   ReviewConstraints,
+  AgentConfig,
   StepConfig,
   ProcessConfig,
 } from '../schemas/process-config.js';
+
+export type { FileMetadata } from '../schemas/file-metadata.js';
 
 export type { AuditEvent } from '../schemas/audit-event.js';
 

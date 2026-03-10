@@ -1,10 +1,12 @@
 export {
   VerdictSchema,
+  StepUiSchema,
   StepSchema,
   TransitionSchema,
   TriggerSchema,
   ProcessDefinitionSchema,
   type Verdict,
+  type StepUi,
   type Step,
   type Transition,
   type Trigger,
@@ -13,14 +15,21 @@ export {
 
 export {
   ReviewConstraintsSchema,
+  AgentConfigSchema,
   StepConfigSchema,
   ProcessNotificationConfigSchema,
   ProcessConfigSchema,
   type ReviewConstraints,
+  type AgentConfig,
   type StepConfig,
   type ProcessNotificationConfig,
   type ProcessConfig,
 } from './process-config.js';
+
+export {
+  FileMetadataSchema,
+  type FileMetadata,
+} from './file-metadata.js';
 
 export {
   AuditEventSchema,

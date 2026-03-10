@@ -1,0 +1,974 @@
+{
+  "schema_version": "1.0",
+  "extraction_date": "2026-03-06",
+  "source_documents": [
+    {
+      "type": "protocol",
+      "filename": "NCT02175017_Prot_000.pdf",
+      "version": null,
+      "date": null,
+      "_notes": "Protocol for ONO-4538-09. 19 pages (some content redacted/CCI). No version number or date explicitly stated on available pages."
+    },
+    {
+      "type": "sap",
+      "filename": "NCT02175017_SAP_001.pdf",
+      "version": "3.0",
+      "date": "2021-07-29",
+      "_notes": "SAP version 3.0 dated 29-Jul-2021. Version 2.0 was dated 24-Jun-2015. Original version 1.0 date not specified."
+    }
+  ],
+
+  "study_identification": {
+    "study_id": "ONO-4538-09",
+    "study_title": "A Multi-center, Open-label, Uncontrolled, Phase II Study of ONO-4538 in Patients with Stage IIIB/IV or Recurrent Non-small Cell Lung Cancer Unsuited to Radical Radiotherapy and Resistant to a Platinum-based Chemotherapeutic Regimen",
+    "short_title": "ONO-4538-09",
+    "sponsor": "Ono Pharmaceutical Co., Ltd.",
+    "phase": "Phase II",
+    "indication": "Stage IIIB/IV or recurrent non-small cell lung cancer (NSCLC) unsuited to radical radiotherapy and resistant to a platinum-based chemotherapeutic regimen",
+    "therapeutic_area": "Oncology",
+    "compound_name": "ONO-4538 (nivolumab / BMS-936558)",
+    "compound_class": "anti-PD-1 monoclonal antibody",
+    "regulatory_status": null,
+    "_notes": "Also known as BMS-936558, MDX-1106. ClinicalTrials.gov ID: NCT02175017. Japanese study."
+  },
+
+  "study_design": {
+    "type": "multicenter, open-label, uncontrolled, Phase II",
+    "randomized": false,
+    "blinding": "open-label",
+    "control_type": "none",
+    "adaptive": false,
+    "adaptive_details": null,
+
+    "treatment_arms": [
+      {
+        "arm_id": "ONO4538",
+        "arm_name": "ONO-4538 3 mg/kg IV Q2W",
+        "arm_type": "experimental",
+        "dose": "3 mg/kg",
+        "route": "IV",
+        "regimen": "Administered every 2 weeks, 3 times per 6-week cycle. IV infusion over approximately 60 minutes through a 0.20-1.20 um in-line filter. Cycles repeated until disease progression (RECIST v1.1) or discontinuation criteria met.",
+        "planned_n": 93
+      }
+    ],
+    "total_planned_n": 93,
+    "randomization_ratio": null,
+    "stratification_factors": [],
+
+    "study_periods": [
+      {
+        "period_name": "Screening",
+        "duration": "Up to 7 days before enrollment (Day -7 to -1)",
+        "description": "Patients satisfying all inclusion criteria and none of the exclusion criteria are enrolled."
+      },
+      {
+        "period_name": "Treatment",
+        "duration": "6-week cycles, repeated until discontinuation",
+        "description": "ONO-4538 administered every 2 weeks (Day 1, 15, 29 of each cycle), 3 doses per cycle. Diagnostic imaging at Week 6 of each cycle. Treatment continues until PD per RECIST v1.1 or meeting discontinuation criteria. Treatment beyond initial PD allowed per protocol if specific conditions met."
+      },
+      {
+        "period_name": "Follow-up",
+        "duration": "28 days after final dose, then every 6 months for survival",
+        "description": "Subjects discontinuing treatment proceed to follow-up. Those with CR/PR/SD at discontinuation undergo diagnostic imaging until subsequent therapy or PD. Survival follow-up every 6 months beginning 6 months after first dose of last enrolled subject."
+      }
+    ],
+
+    "cohorts": [
+      {
+        "cohort_name": "Squamous NSCLC",
+        "planned_n": 41,
+        "_notes": "Squamous cell carcinoma histology"
+      },
+      {
+        "cohort_name": "Non-squamous NSCLC",
+        "planned_n": 52,
+        "_notes": "Adenocarcinoma, large cell carcinoma, or other non-squamous histology"
+      }
+    ]
+  },
+
+  "populations": {
+    "intent_to_treat": {
+      "abbreviation": "FAS",
+      "definition": "Full Analysis Set: defined as a full group of subjects who are included in SAF (i.e., enrolled subjects who received at least one dose of the study drug).",
+      "is_primary_efficacy_population": true,
+      "_notes": "FAS serves as the ITT-equivalent in this single-arm study. Used for all efficacy analyses."
+    },
+    "modified_itt": {
+      "abbreviation": null,
+      "definition": null,
+      "is_primary_efficacy_population": false,
+      "_notes": "No modified ITT defined; FAS is the primary efficacy population."
+    },
+    "per_protocol": {
+      "abbreviation": null,
+      "definition": null,
+      "is_primary_efficacy_population": false,
+      "_notes": "No per-protocol population defined."
+    },
+    "safety": {
+      "abbreviation": "SAF",
+      "definition": "Safety Analysis Set: defined as group of subjects who are included in ENR and have received at least one dose of the study drug.",
+      "is_primary_safety_population": true
+    },
+    "pk_population": {
+      "abbreviation": null,
+      "definition": null,
+      "_notes": "PK (serum drug concentration) is analyzed but no separate PK population is defined; analyses performed in SAF."
+    },
+    "other_populations": [
+      {
+        "name": "Enrolled Set",
+        "abbreviation": "ENR",
+        "definition": "Group of subjects who have been enrolled.",
+        "purpose": "Subject disposition analysis (classification of subjects excluded from analysis set)"
+      },
+      {
+        "name": "Anti-drug Antibody Analysis Set",
+        "abbreviation": "ADAS",
+        "definition": "Group of subjects included in SAF and for whom the anti-ONO-4538 antibody level was determined once at baseline and at least once after the start of the study treatment.",
+        "purpose": "Anti-drug antibody (immunogenicity) analyses"
+      }
+    ]
+  },
+
+  "endpoints": {
+    "primary": [
+      {
+        "endpoint_id": "PE01",
+        "name": "Response rate (centrally assessed)",
+        "description": "The response rate is the percentage of subjects given a best overall response assessment of CR or PR by the central imaging analysis facility per RECIST guideline version 1.1. Best overall response determined from all overall response assessments made to the completion of the study using the hierarchy CR > PR > SD > PD > NE. CR requires assessment at least 2 consecutive times in intervals of 4 weeks (28 days) or longer. PR requires assessment of PR or greater at least 2 consecutive times in intervals of 4 weeks or longer. Subjects whose confirmed best overall response is missed will be defined as non-responders.",
+        "type": "efficacy",
+        "measurement": "Central imaging analysis facility assessment per RECIST v1.1. Diagnostic imaging (CT, MRI) performed at Week 6 of each cycle.",
+        "timepoint": "Best overall response from all assessments through study completion",
+        "variable_type": "binary",
+        "direction_of_benefit": "higher_is_better",
+        "clinically_meaningful_difference": "Expected response rate 23.1% (squamous) and 21.4% (non-squamous) vs threshold 8.8% (docetaxel comparator rate)",
+        "related_adam_dataset": "ADRS"
+      }
+    ],
+    "secondary": [
+      {
+        "endpoint_id": "SE01",
+        "name": "Response rate (investigator-assessed)",
+        "description": "The response rate (investigator-assessed) is defined as the number of subjects whose confirmed best overall response determined by the study site investigator is a CR or PR divided by the number of FAS, per RECIST guideline version 1.1.",
+        "type": "efficacy",
+        "measurement": "Investigator assessment per RECIST v1.1",
+        "timepoint": "Best overall response through study completion",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADRS"
+      },
+      {
+        "endpoint_id": "SE02",
+        "name": "Overall survival",
+        "description": "Overall survival (days) = (the date of death due to any cause) - (the first dose date of investigational product) + 1. A subject who has not died will be censored at last known date alive.",
+        "type": "efficacy",
+        "measurement": "Time from first dose to death from any cause",
+        "timepoint": "Rates at 6, 12, 18, and 24 months",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE03",
+        "name": "Progression-free survival (centrally assessed)",
+        "description": "Progression-free survival (days) = (the earlier date of the first documented PD or death due to any cause) - (the first dose date of investigational product) + 1. Clinical deterioration not included as event for centrally assessed PFS. Censoring rules per Table 9-1 of SAP.",
+        "type": "efficacy",
+        "measurement": "Central imaging assessment per RECIST v1.1",
+        "timepoint": "Rates at 3, 6, 9, and 12 months",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE04",
+        "name": "Progression-free survival (investigator-assessed)",
+        "description": "Same definition as centrally assessed PFS but based on investigator assessment. Clinical deterioration IS included as an event for investigator-assessed PFS.",
+        "type": "efficacy",
+        "measurement": "Investigator assessment per RECIST v1.1",
+        "timepoint": "Rates at 3, 6, 9, and 12 months",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE05",
+        "name": "Time to progression (centrally assessed)",
+        "description": "Time to progression (days) = (the date of the first documented PD) - (the first dose date of investigational product) + 1. Centrally assessed. Censoring rules per Table 9-2 of SAP.",
+        "type": "efficacy",
+        "measurement": "Central imaging assessment per RECIST v1.1",
+        "timepoint": null,
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE06",
+        "name": "Duration of response (centrally assessed)",
+        "description": "Duration of response (days) = (the date of the first documented PD or death due to any cause after response is confirmed) - (the date of the first confirmed CR or PR) + 1. Subjects without documented PD who did not die censored at last evaluable tumor assessment. Subjects not evaluated a confirmed CR or PR excluded.",
+        "type": "efficacy",
+        "measurement": "Central imaging assessment per RECIST v1.1",
+        "timepoint": "Rates at 6 and 12 months",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE07",
+        "name": "Time to response (centrally assessed)",
+        "description": "Time to response (days) = (the date of the first confirmed CR or PR) - (the first dose date of investigational product) + 1. Subjects who are not evaluated confirmed CR or PR excluded.",
+        "type": "efficacy",
+        "measurement": "Central imaging assessment per RECIST v1.1",
+        "timepoint": null,
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE08",
+        "name": "Best overall response (centrally assessed and investigator-assessed)",
+        "description": "Percentages of CR, PR, SD, PD, and NE calculated based on interpretation by both central imaging analysis laboratory and investigator. 95% confidence intervals (Wilson) calculated for CR, PR, and SD.",
+        "type": "efficacy",
+        "measurement": "RECIST v1.1 response categories",
+        "timepoint": "Best response through study completion",
+        "variable_type": "categorical",
+        "related_adam_dataset": "ADRS"
+      },
+      {
+        "endpoint_id": "SE09",
+        "name": "Percent change in tumor diameter of target lesion (investigator-assessed)",
+        "description": "Best percent change = (Smallest tumor diameter after first dose - Baseline tumor diameter) / Baseline tumor diameter x 100. Percent change at each time point also calculated. Excludes measurements after PD assessment, subsequent anti-cancer therapy, or end of outcome follow-up. Subjects without measurable lesion or without any tumor assessment after first dose excluded.",
+        "type": "efficacy",
+        "measurement": "Sum of longest diameters of target lesions per RECIST v1.1, investigator-assessed",
+        "timepoint": "Each imaging time point and best percent change",
+        "variable_type": "continuous",
+        "related_adam_dataset": "ADTR"
+      }
+    ],
+    "exploratory": [],
+    "safety_endpoints": [
+      {
+        "endpoint_id": "SAF01",
+        "name": "Treatment-emergent adverse events",
+        "description": "All adverse events coded by SOC and PT using MedDRA (current version). TEAEs are events that occur or worsen on or after the first dose of study treatment up until end of study treatment (28 days after final dose or start of subsequent anti-cancer therapy, whichever first). Severity graded by NCI-CTCAE version 4.0. Includes: overall AE/ADR incidence, AEs by SOC/PT/grade, serious AEs, AEs leading to death, AEs leading to discontinuation, AEs leading to interruption. Select adverse events analyzed by immune-related categories (Endocrine, Hypersensitivity/Infusion Reactions, GI, Hepatic, Pulmonary, Renal, Skin).",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF02",
+        "name": "Clinical laboratory evaluations",
+        "description": "Hematology, blood biochemistry, and urinalysis. Summary statistics and change from baseline for continuous parameters. Frequency of abnormal values at each time point. Grade shift tables (baseline to worst post-baseline) for key parameters. Liver function test criteria (Hy's law related).",
+        "type": "lab shift"
+      },
+      {
+        "endpoint_id": "SAF03",
+        "name": "Immunologic tests",
+        "description": "Rheumatoid factor (RA), C-reactive protein (CRP), antinuclear antibody (ANA), SP-D, and KL-6. Summary statistics and change from baseline. Frequency of abnormal values.",
+        "type": "lab values"
+      },
+      {
+        "endpoint_id": "SAF04",
+        "name": "Hormonal tests",
+        "description": "Thyroid-stimulating hormone (TSH), free triiodothyronine (free T3), and free thyroxine (free T4). Summary statistics and change from baseline. Thyroid function criteria analysis (10 categories of TSH/FT3/FT4 combinations).",
+        "type": "lab values"
+      },
+      {
+        "endpoint_id": "SAF05",
+        "name": "Vital signs",
+        "description": "Systolic blood pressure, diastolic blood pressure, pulse rate, temperature, weight, and percutaneous oxygen saturation (SpO2). Summary statistics by time of measurement.",
+        "type": "vital signs"
+      },
+      {
+        "endpoint_id": "SAF06",
+        "name": "12-lead ECG",
+        "description": "Heart rate, RR interval, QT interval, QTcF (Fridericia correction: QT/RR^(1/3)), PR interval, QRS width. Summary statistics and change from baseline. Frequency distributions for maximum values using clinical threshold categories.",
+        "type": "ECG"
+      },
+      {
+        "endpoint_id": "SAF07",
+        "name": "Performance status (ECOG)",
+        "description": "ECOG performance status assessed at scheduled visits.",
+        "type": "functional assessment"
+      },
+      {
+        "endpoint_id": "SAF08",
+        "name": "Anti-drug antibody (anti-ONO-4538 antibody)",
+        "description": "Presence of anti-ONO-4538 antibody analyzed in ADAS. Classification of samples and subjects: baseline positive, antibody-positive (persistent positive, only last sample positive, other positive, neutralizing positive), and antibody-negative. Proportions calculated by histology type.",
+        "type": "immunogenicity"
+      }
+    ]
+  },
+
+  "statistical_analyses": {
+    "primary_analysis": [
+      {
+        "analysis_id": "PA01",
+        "endpoint_id": "PE01",
+        "description": "Response rate (centrally assessed) and its 95% confidence interval (Wilson) will be calculated. Analysis results summarized by squamous NSCLC and non-squamous NSCLC separately and totality.",
+        "population": "FAS",
+        "statistical_method": "Wilson 95% confidence interval for binomial proportion (PROC FREQ with BINOMIAL(WILSON) option)",
+        "model_details": {
+          "response_variable": "Best overall response (CR or PR vs other)",
+          "covariates": [],
+          "factors": ["Histologic type (squamous / non-squamous)"],
+          "interaction_terms": [],
+          "other_details": "Analysis stratified by histologic type (squamous vs non-squamous NSCLC). Results presented separately for each histology and in total."
+        },
+        "hypothesis": {
+          "null_hypothesis": "Response rate <= 8.8% (threshold based on docetaxel comparator rate from Phase III studies CA209017, CA209057)",
+          "alternative": "one-sided",
+          "alpha": 0.025,
+          "alpha_adjustment": null,
+          "_notes": "Sample size was calculated using one-sided alpha=0.025 (two-sided 5.0%) and binomial test. However, Section 12.2 of the SAP states 'No significance level is defined because no tests will be performed.' The primary analysis is descriptive (CI-based) rather than formal hypothesis testing."
+        },
+        "multiplicity_strategy": null,
+        "sensitivity_analyses": []
+      }
+    ],
+    "secondary_analyses": [
+      {
+        "analysis_id": "SA01",
+        "endpoint_id": "SE01",
+        "description": "Response rate (investigator-assessed) and its 95% confidence interval (Wilson) calculated by histology and total.",
+        "population": "FAS",
+        "statistical_method": "Wilson 95% confidence interval",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA02",
+        "endpoint_id": "SE02",
+        "description": "Kaplan-Meier curve plotted. Median overall survival and 95% CI estimated. Overall survival rates at 6, 12, 18, and 24 months with 95% CI estimated by Kaplan-Meier method. 30.4375 days per month assumed for time calculations.",
+        "population": "FAS",
+        "statistical_method": "Kaplan-Meier method (PROC LIFETEST METHOD=KM CONFTYPE=LOGLOG, stratified by histologic type)",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA03",
+        "endpoint_id": "SE03",
+        "description": "Two Kaplan-Meier curves plotted (centrally assessed). Median PFS, 95% CI, and PFS rates at 3, 6, 9, and 12 months with 95% CI by Kaplan-Meier. Censoring per Table 9-1.",
+        "population": "FAS",
+        "statistical_method": "Kaplan-Meier method",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA04",
+        "endpoint_id": "SE04",
+        "description": "Kaplan-Meier curves for investigator-assessed PFS. Median PFS, 95% CI, and PFS rates at 3, 6, 9, and 12 months with 95% CI.",
+        "population": "FAS",
+        "statistical_method": "Kaplan-Meier method",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA05",
+        "endpoint_id": "SE05",
+        "description": "Kaplan-Meier analysis for time to progression (centrally assessed). Censoring per Table 9-2.",
+        "population": "FAS",
+        "statistical_method": "Kaplan-Meier method",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA06",
+        "endpoint_id": "SE06",
+        "description": "Summary statistics for duration of response. Median and 95% CI. Duration of response rates at 6 and 12 months with 95% CI by Kaplan-Meier.",
+        "population": "FAS",
+        "statistical_method": "Kaplan-Meier method",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA07",
+        "endpoint_id": "SE07",
+        "description": "Summary statistics for time to response. Median and 95% CI by Kaplan-Meier.",
+        "population": "FAS",
+        "statistical_method": "Kaplan-Meier method",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA08",
+        "endpoint_id": "SE08",
+        "description": "Percentages of CR, PR, SD, PD, and NE for both central and investigator assessment. Wilson 95% CI for CR, PR, and SD.",
+        "population": "FAS",
+        "statistical_method": "Wilson 95% confidence interval for each response category",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA09",
+        "endpoint_id": "SE09",
+        "description": "Waterfall plot for best percent change in tumor diameter of target lesion. Spider plot of individual subjects' percent change at individual time points.",
+        "population": "FAS",
+        "statistical_method": "Descriptive (waterfall plot, spider plot)",
+        "multiplicity_handling": null
+      }
+    ],
+    "subgroup_analyses": [
+      {
+        "subgroup_variable": "Age (<65, 65-<75, >=75)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Response rate (centrally assessed) with Wilson 95% CI"
+      },
+      {
+        "subgroup_variable": "Sex (Male, Female)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Response rate (centrally assessed) with Wilson 95% CI"
+      },
+      {
+        "subgroup_variable": "Performance Status ECOG (0, 1)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Response rate (centrally assessed) with Wilson 95% CI"
+      },
+      {
+        "subgroup_variable": "Brain metastasis (Yes, No)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Response rate (centrally assessed) with Wilson 95% CI"
+      },
+      {
+        "subgroup_variable": "Bone metastasis (Yes, No)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Response rate (centrally assessed) with Wilson 95% CI"
+      },
+      {
+        "subgroup_variable": "Stage (IIIB, IV, Recurrence, Unknown or other)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Response rate (centrally assessed) with Wilson 95% CI"
+      },
+      {
+        "subgroup_variable": "NSCLC treatment history - Surgery (Yes, No)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Response rate (centrally assessed) with Wilson 95% CI"
+      },
+      {
+        "subgroup_variable": "NSCLC treatment history - Radiotherapy (Yes, No)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Response rate (centrally assessed) with Wilson 95% CI"
+      },
+      {
+        "subgroup_variable": "NSCLC treatment history - Number of treatment regimens (1, 2)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Response rate (centrally assessed) with Wilson 95% CI"
+      },
+      {
+        "subgroup_variable": "Presence of anti-ONO-4538 antibody (Positive subtypes, Baseline positive, Negative)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Response rate (centrally assessed) with Wilson 95% CI"
+      }
+    ],
+    "interim_analyses": [],
+    "_notes": "Section 13 of SAP explicitly states: 'No interim analysis will be performed.'"
+  },
+
+  "missing_data": {
+    "primary_strategy": "Missing response treated as non-response (non-responder imputation for primary endpoint)",
+    "imputation_methods": [
+      {
+        "method_name": "Non-responder imputation",
+        "applied_to": "Response rate (primary and investigator-assessed)",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Subjects whose confirmed best overall response is missed will be defined as the non-responder."
+      },
+      {
+        "method_name": "No imputation (observed data)",
+        "applied_to": "Demographics, baseline characteristics, laboratory values, vital signs, ECG, immunologic tests, hormonal tests",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Data will be analyzed as observed without imputing missing data."
+      },
+      {
+        "method_name": "Impute at detection/quantification limit",
+        "applied_to": "Laboratory values, immunologic tests, hormonal tests",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Any values that fall below the detection or quantification limit will be imputed to be the detection or quantification limit."
+      }
+    ],
+    "estimand_framework": {
+      "used": false,
+      "intercurrent_events": []
+    }
+  },
+
+  "baseline_definition": {
+    "general_rule": "In Cycle 1, data obtained within seven days before enrollment (screening phase) will serve as baseline. For subsequent cycles, vital signs within 1 day before administration and other examinations within 7 days before administration.",
+    "exceptions": [
+      {
+        "domain": "Diagnostic imaging (CT, MRI)",
+        "rule": "Imaging performed within 14 days of enrollment"
+      },
+      {
+        "domain": "Virus tests",
+        "rule": "Tests performed within 1 year of enrollment"
+      },
+      {
+        "domain": "Serum drug concentration",
+        "rule": "Pre-dose value on Day 1 of Cycle 1 (before administration)"
+      }
+    ]
+  },
+
+  "visit_schedule": {
+    "visits": [
+      {
+        "visit_name": "Screening",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -7,
+        "window_upper": -1,
+        "assessments": ["Written informed consent", "Demographics", "Inclusion/exclusion criteria", "Virus tests", "Pregnancy test", "Performance status", "Vital signs", "Chest X-ray", "12-lead ECG", "Hematology/blood biochemistry/urinalysis", "Immunology/hormone tests", "Diagnostic imaging"]
+      },
+      {
+        "visit_name": "Cycle 1 Day 1 (V 1-1)",
+        "visit_number": 1,
+        "target_day": 1,
+        "window_lower": 0,
+        "window_upper": 0,
+        "assessments": ["Investigational product administration", "Pregnancy test", "Vital signs", "12-lead ECG", "Serum drug concentration", "Anti-ONO-4538 antibody"]
+      },
+      {
+        "visit_name": "Cycle 1 Day 8 (V 1-2)",
+        "visit_number": 2,
+        "target_day": 8,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": ["Vital signs", "12-lead ECG", "Serum drug concentration"]
+      },
+      {
+        "visit_name": "Cycle 1 Day 15 (V 1-3)",
+        "visit_number": 3,
+        "target_day": 15,
+        "window_lower": -3,
+        "window_upper": 7,
+        "assessments": ["Investigational product administration", "Performance status", "Vital signs", "Hematology/blood biochemistry/urinalysis", "Serum drug concentration", "Anti-ONO-4538 antibody"]
+      },
+      {
+        "visit_name": "Cycle 1 Day 29 (V 1-4)",
+        "visit_number": 4,
+        "target_day": 29,
+        "window_lower": -6,
+        "window_upper": 7,
+        "assessments": ["Investigational product administration", "Performance status", "Vital signs", "Serum drug concentration", "Anti-ONO-4538 antibody"]
+      },
+      {
+        "visit_name": "Cycle 1 Day 43 (V 1-5)",
+        "visit_number": 5,
+        "target_day": 43,
+        "window_lower": -6,
+        "window_upper": 7,
+        "assessments": ["Performance status", "Vital signs", "12-lead ECG", "Hematology/blood biochemistry/urinalysis", "Immunology/hormone tests", "Diagnostic imaging"]
+      },
+      {
+        "visit_name": "Cycle n Day 1 (V n-1, n>=2)",
+        "visit_number": null,
+        "target_day": 1,
+        "window_lower": 0,
+        "window_upper": 0,
+        "assessments": ["Investigational product administration", "Performance status", "Vital signs", "12-lead ECG", "Hematology/blood biochemistry/urinalysis", "Serum drug concentration", "Anti-ONO-4538 antibody"]
+      },
+      {
+        "visit_name": "Cycle n Day 15 (V n-2, n>=2)",
+        "visit_number": null,
+        "target_day": 15,
+        "window_lower": -3,
+        "window_upper": 7,
+        "assessments": ["Investigational product administration", "Vital signs", "Serum drug concentration"]
+      },
+      {
+        "visit_name": "Cycle n Day 29 (V n-3, n>=2)",
+        "visit_number": null,
+        "target_day": 29,
+        "window_lower": -6,
+        "window_upper": 7,
+        "assessments": ["Investigational product administration", "Vital signs", "Serum drug concentration", "Anti-ONO-4538 antibody"]
+      },
+      {
+        "visit_name": "Cycle n Day 43 (V n-4, n>=2)",
+        "visit_number": null,
+        "target_day": 43,
+        "window_lower": -6,
+        "window_upper": 7,
+        "assessments": ["Performance status", "Vital signs", "12-lead ECG", "Hematology/blood biochemistry/urinalysis", "Immunology/hormone tests", "Diagnostic imaging"]
+      },
+      {
+        "visit_name": "End of treatment (V f-0)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": ["Pregnancy test", "Performance status", "Vital signs", "Chest X-ray", "12-lead ECG", "Hematology/blood biochemistry/urinalysis", "Immunology/hormone tests", "Serum drug concentration", "Anti-ONO-4538 antibody", "Diagnostic imaging"]
+      },
+      {
+        "visit_name": "Follow-up 28 days (V f-1)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -7,
+        "window_upper": 7,
+        "assessments": ["Pregnancy test", "Performance status", "Vital signs", "Chest X-ray", "12-lead ECG", "Hematology/blood biochemistry/urinalysis", "Immunology/hormone tests", "Serum drug concentration", "Anti-ONO-4538 antibody", "Diagnostic imaging"]
+      },
+      {
+        "visit_name": "Follow-up (V f-n)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["Diagnostic imaging", "Survival status"]
+      }
+    ],
+    "windowing_rules": "To count days of the treatment period, the day of the start of each cycle is Day 1. If multiple data are present within the time window of a given time point, data nearest the specified timing of examination preferred. If multiple safety data equidistant before and after specified date, those obtained after preferred. Treatment period time windows: Day 1 = 1, Day 8 = 5-11, Day 15 = 12-22, Day 29 = 23-36, Day 43 = 37-50."
+  },
+
+  "sample_size": {
+    "total_planned": 93,
+    "per_arm": {
+      "squamous_NSCLC": 41,
+      "non_squamous_NSCLC": 52
+    },
+    "power": 0.80,
+    "alpha": 0.025,
+    "assumptions": "Threshold (null) response rate p0 = 8.8% based on docetaxel response rate in Phase III studies (CA209017, CA209057). Expected response rate p1 = 23.1% for squamous NSCLC (from CA209003 Phase I data: 22% at 3 mg/kg, 24% at 10 mg/kg). Expected response rate p1 = 21.4% for non-squamous NSCLC (from CA209003: 26% at 3 mg/kg, 19% at 10 mg/kg).",
+    "dropout_rate_assumed": null,
+    "method": "Binomial test (normal approximation). N = [(z_(1-alpha) * sqrt(p0*(1-p0)) + z_(1-beta) * sqrt(p1*(1-p1))) / (p1 - p0)]^2. One-sided alpha = 0.025 (two-sided 5.0%), power >= 80%.",
+    "_notes": "Sample size calculated separately for each histology cohort. Actual enrollment was 96 subjects as of Feb 27, 2015."
+  },
+
+  "planned_tlg_list": {
+    "_notes": "No explicit TLG list provided in the SAP. The following list is derived from the analysis descriptions in the SAP sections. All tables summarized by squamous NSCLC, non-squamous NSCLC, and totality.",
+    "tables": [
+      {
+        "tlg_id": "T-01",
+        "title": "Subject Disposition",
+        "population": "ENR/SAF",
+        "description": "Classification of subjects, reasons for exclusion from analysis set, reasons for treatment termination, reasons for study discontinuation/dropout, participants per institution"
+      },
+      {
+        "tlg_id": "T-02",
+        "title": "Protocol Deviations",
+        "population": "ENR",
+        "description": "Summary of protocol deviations"
+      },
+      {
+        "tlg_id": "T-03",
+        "title": "Study Drug Exposure Summary",
+        "population": "SAF",
+        "description": "Number of doses, number of cycles, duration of treatment, total dose, relative dose intensity - frequency distributions and summary statistics"
+      },
+      {
+        "tlg_id": "T-04",
+        "title": "Demographics and Baseline Characteristics",
+        "population": "SAF",
+        "description": "Sex, age, height, weight, BMI, time from diagnosis, ECOG PS, smoking/drinking history, histologic type, location of initial occurrence, TNM classification, metastatic lesions, stage, medical history, concurrent diseases, NSCLC treatment history, number of prior regimens"
+      },
+      {
+        "tlg_id": "T-05",
+        "title": "Prior NSCLC Treatment History (Medication)",
+        "population": "SAF",
+        "description": "Summary by generic name"
+      },
+      {
+        "tlg_id": "T-06",
+        "title": "Response Rate - Primary Endpoint (Centrally Assessed)",
+        "population": "FAS",
+        "description": "Response rate with 95% Wilson CI by histology and total"
+      },
+      {
+        "tlg_id": "T-07",
+        "title": "Response Rate (Investigator-Assessed)",
+        "population": "FAS",
+        "description": "Response rate with 95% Wilson CI by histology and total"
+      },
+      {
+        "tlg_id": "T-08",
+        "title": "Overall Survival Summary",
+        "population": "FAS",
+        "description": "Median OS, 95% CI, OS rates at 6, 12, 18, 24 months with 95% CI by Kaplan-Meier"
+      },
+      {
+        "tlg_id": "T-09",
+        "title": "Progression-Free Survival Summary (Centrally Assessed)",
+        "population": "FAS",
+        "description": "Median PFS, 95% CI, PFS rates at 3, 6, 9, 12 months with 95% CI"
+      },
+      {
+        "tlg_id": "T-10",
+        "title": "Progression-Free Survival Summary (Investigator-Assessed)",
+        "population": "FAS",
+        "description": "Median PFS, 95% CI, PFS rates at 3, 6, 9, 12 months with 95% CI"
+      },
+      {
+        "tlg_id": "T-11",
+        "title": "Time to Progression Summary (Centrally Assessed)",
+        "population": "FAS",
+        "description": "Kaplan-Meier estimates"
+      },
+      {
+        "tlg_id": "T-12",
+        "title": "Duration of Response Summary (Centrally Assessed)",
+        "population": "FAS",
+        "description": "Median, 95% CI, DOR rates at 6 and 12 months with 95% CI"
+      },
+      {
+        "tlg_id": "T-13",
+        "title": "Time to Response Summary (Centrally Assessed)",
+        "population": "FAS",
+        "description": "Median and 95% CI by Kaplan-Meier"
+      },
+      {
+        "tlg_id": "T-14",
+        "title": "Best Overall Response (Centrally Assessed)",
+        "population": "FAS",
+        "description": "Percentages of CR, PR, SD, PD, NE with Wilson 95% CI for CR, PR, SD"
+      },
+      {
+        "tlg_id": "T-15",
+        "title": "Best Overall Response (Investigator-Assessed)",
+        "population": "FAS",
+        "description": "Percentages of CR, PR, SD, PD, NE with Wilson 95% CI for CR, PR, SD"
+      },
+      {
+        "tlg_id": "T-16",
+        "title": "Subgroup Analysis of Response Rate (Centrally Assessed)",
+        "population": "FAS",
+        "description": "Response rate with Wilson 95% CI by each subgroup factor"
+      },
+      {
+        "tlg_id": "T-17",
+        "title": "Overall Summary of Adverse Events",
+        "population": "SAF",
+        "description": "Number of deaths, Grade 3+ AE/ADR, serious AE/ADR, discontinuations, AE/ADR leading to death"
+      },
+      {
+        "tlg_id": "T-18",
+        "title": "Adverse Events by SOC, PT, and CTCAE Grade",
+        "population": "SAF",
+        "description": "Incidence of TEAEs by SOC/PT and grade (1-5)"
+      },
+      {
+        "tlg_id": "T-19",
+        "title": "Adverse Drug Reactions by SOC, PT, and CTCAE Grade",
+        "population": "SAF",
+        "description": "Incidence of treatment-related AEs by SOC/PT and grade"
+      },
+      {
+        "tlg_id": "T-20",
+        "title": "Adverse Events by SOC and PT (Any Grade, Grade 3+, Grade 5)",
+        "population": "SAF",
+        "description": "Incidence summary at key grade thresholds"
+      },
+      {
+        "tlg_id": "T-21",
+        "title": "Adverse Events Leading to Death by SOC and PT",
+        "population": "SAF",
+        "description": "AEs and ADRs leading to death"
+      },
+      {
+        "tlg_id": "T-22",
+        "title": "Adverse Events Leading to Discontinuation by SOC, PT, and Grade",
+        "population": "SAF",
+        "description": "AEs and ADRs leading to treatment discontinuation"
+      },
+      {
+        "tlg_id": "T-23",
+        "title": "Adverse Events Leading to Interruption by SOC, PT, and Grade",
+        "population": "SAF",
+        "description": "AEs and ADRs leading to treatment interruption"
+      },
+      {
+        "tlg_id": "T-24",
+        "title": "Serious Adverse Events by SOC, PT, and Grade",
+        "population": "SAF",
+        "description": "Serious AEs and serious ADRs"
+      },
+      {
+        "tlg_id": "T-25",
+        "title": "Select Adverse Events by Category, PT, and Grade",
+        "population": "SAF",
+        "description": "Immune-related AEs: Endocrine, Hypersensitivity/Infusion, GI, Hepatic, Pulmonary, Renal, Skin"
+      },
+      {
+        "tlg_id": "T-26",
+        "title": "Select Adverse Events Leading to Discontinuation",
+        "population": "SAF",
+        "description": "Select AEs and ADRs leading to discontinuation by category, PT, and grade"
+      },
+      {
+        "tlg_id": "T-27",
+        "title": "Serious Select Adverse Events by Category, PT, and Grade",
+        "population": "SAF",
+        "description": "Serious select AEs by immune-related categories"
+      },
+      {
+        "tlg_id": "T-28",
+        "title": "Subgroup Analysis of Select Adverse Events",
+        "population": "SAF",
+        "description": "Select AE/ADR incidence by subgroup risk factors"
+      },
+      {
+        "tlg_id": "T-29",
+        "title": "Laboratory Values Summary Statistics",
+        "population": "SAF",
+        "description": "Hematology, blood biochemistry: summary statistics and change from baseline by time point"
+      },
+      {
+        "tlg_id": "T-30",
+        "title": "Laboratory Abnormal Values",
+        "population": "SAF",
+        "description": "Frequency of abnormal laboratory values at each time point"
+      },
+      {
+        "tlg_id": "T-31",
+        "title": "Laboratory Grade Shift Table",
+        "population": "SAF",
+        "description": "Baseline to worst post-baseline grade shift for key parameters (hemoglobin, platelet, WBC, neutrophil, lymphocyte, ALT, AST, ALP, total bilirubin, creatinine)"
+      },
+      {
+        "tlg_id": "T-32",
+        "title": "Liver Function Test Criteria",
+        "population": "SAF",
+        "description": "Frequency distribution for Hy's law-related criteria (ALT/AST > xULN with bilirubin)"
+      },
+      {
+        "tlg_id": "T-33",
+        "title": "Immunologic Test Summary Statistics",
+        "population": "SAF",
+        "description": "RA, CRP, ANA, SP-D, KL-6: summary statistics and abnormal values"
+      },
+      {
+        "tlg_id": "T-34",
+        "title": "Hormonal Test Summary Statistics",
+        "population": "SAF",
+        "description": "TSH, free T3, free T4: summary statistics and change from baseline"
+      },
+      {
+        "tlg_id": "T-35",
+        "title": "Thyroid Function Criteria",
+        "population": "SAF",
+        "description": "Frequency distribution for 10 categories of TSH/FT3/FT4 combinations"
+      },
+      {
+        "tlg_id": "T-36",
+        "title": "Vital Signs Summary Statistics",
+        "population": "SAF",
+        "description": "SBP, DBP, pulse rate, temperature, weight, SpO2 by time point"
+      },
+      {
+        "tlg_id": "T-37",
+        "title": "12-Lead ECG Summary Statistics",
+        "population": "SAF",
+        "description": "HR, RR, QT, QTcF, PR, QRS: summary statistics and change from baseline"
+      },
+      {
+        "tlg_id": "T-38",
+        "title": "12-Lead ECG Maximum Value Categories",
+        "population": "SAF",
+        "description": "Frequency distribution for maximum QTcF, deltaQTcF, and other ECG parameters using clinical thresholds"
+      },
+      {
+        "tlg_id": "T-39",
+        "title": "Anti-Drug Antibody Summary",
+        "population": "ADAS",
+        "description": "Proportions of baseline positive, antibody-positive (persistent, last sample, other, neutralizing), and antibody-negative subjects"
+      }
+    ],
+    "listings": [
+      {
+        "tlg_id": "L-01",
+        "title": "Listing of All Adverse Events",
+        "population": "SAF",
+        "description": "All AEs during treatment period and subsequent anti-cancer therapy follow-up"
+      },
+      {
+        "tlg_id": "L-02",
+        "title": "Listing of Serious Adverse Events",
+        "population": "SAF",
+        "description": "All serious adverse events"
+      },
+      {
+        "tlg_id": "L-03",
+        "title": "Listing of Adverse Events Leading to Death",
+        "population": "SAF",
+        "description": "All AEs with fatal outcome"
+      },
+      {
+        "tlg_id": "L-04",
+        "title": "Listing of Adverse Events Leading to Discontinuation",
+        "population": "SAF",
+        "description": "AEs leading to treatment discontinuation"
+      },
+      {
+        "tlg_id": "L-05",
+        "title": "Listing of Select Adverse Events",
+        "population": "SAF",
+        "description": "Immune-related AEs by category"
+      },
+      {
+        "tlg_id": "L-06",
+        "title": "Listing of Tumor Response Assessment",
+        "population": "FAS",
+        "description": "Individual subject tumor response assessments over time"
+      }
+    ],
+    "figures": [
+      {
+        "tlg_id": "F-01",
+        "title": "Kaplan-Meier Curve for Overall Survival",
+        "population": "FAS",
+        "description": "By histology type (squamous/non-squamous)"
+      },
+      {
+        "tlg_id": "F-02",
+        "title": "Kaplan-Meier Curve for PFS (Centrally Assessed)",
+        "population": "FAS",
+        "description": "By histology type"
+      },
+      {
+        "tlg_id": "F-03",
+        "title": "Kaplan-Meier Curve for PFS (Investigator-Assessed)",
+        "population": "FAS",
+        "description": "By histology type"
+      },
+      {
+        "tlg_id": "F-04",
+        "title": "Kaplan-Meier Curve for Time to Progression (Centrally Assessed)",
+        "population": "FAS",
+        "description": "By histology type"
+      },
+      {
+        "tlg_id": "F-05",
+        "title": "Waterfall Plot - Best Percent Change in Tumor Diameter",
+        "population": "FAS",
+        "description": "Investigator-assessed, by histology type"
+      },
+      {
+        "tlg_id": "F-06",
+        "title": "Spider Plot - Percent Change in Tumor Diameter Over Time",
+        "population": "FAS",
+        "description": "Individual subjects' percent change at each time point"
+      },
+      {
+        "tlg_id": "F-07",
+        "title": "Kaplan-Meier Curve for Time to Select Adverse Events",
+        "population": "SAF",
+        "description": "Time to onset of select AEs and ADRs by category"
+      },
+      {
+        "tlg_id": "F-08",
+        "title": "Kaplan-Meier Curve for Time to Grade 3+ Adverse Events",
+        "population": "SAF",
+        "description": "Time to onset of Grade 3 or higher AEs and ADRs"
+      }
+    ]
+  },
+
+  "validation_summary": {
+    "completeness_score": "High",
+    "fields_missing": [
+      "Protocol version number and date not available on extracted pages",
+      "Regulatory status (IND/NDA equivalent in Japan) not stated",
+      "No explicit planned TLG list in SAP - derived from analysis descriptions"
+    ],
+    "inconsistencies_found": [
+      "SAP Section 12.2 states 'No significance level is defined because no tests will be performed' but sample size was calculated using alpha=0.025 one-sided, implying a hypothesis testing framework. The primary analysis appears descriptive (CI-based) rather than a formal test.",
+      "Planned N=93 in protocol but SAP Section 14 notes analyses were performed on 96 subjects as of Feb 27, 2015, suggesting slight over-enrollment."
+    ],
+    "reviewer_attention_items": [
+      "Some protocol pages contain CCI-redacted content (black bars) - redacted information may include efficacy/safety details relevant to TLG planning",
+      "SAP version 3.0 added OS rates at 6/12/18/24 months, PFS rates at 3/6/9/12 months, and DOR rates at 6/12 months - verify these additions are captured in all relevant TLGs",
+      "Select adverse event categories defined in Addendum 1 are specific to anti-PD-1 immunotherapy (immune-related AEs) - full preferred term list spans multiple pages and should be verified against final MedDRA coding",
+      "Treatment beyond initial progression is allowed per protocol - this may complicate PFS and response analyses; censoring rules in Tables 9-1 and 9-2 should be carefully followed",
+      "Two cohorts (squamous and non-squamous) are analyzed separately with different expected response rates but same threshold rate of 8.8%"
+    ],
+    "recommendations": [
+      "Verify the complete list of select adverse event preferred terms from Addendum 1 (continues beyond page 68) before generating safety TLG shells",
+      "Confirm whether any additional protocol amendments exist that may affect study design or endpoints",
+      "The actual enrolled N=96 vs planned N=93 should be reflected in final TLG shells",
+      "Consider adding a data review section (Section 14) as an exploratory analysis in TLG planning - it includes investigator-assessed response rate and PFS as validation analyses"
+    ]
+  }
+}
