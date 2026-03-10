@@ -14,6 +14,9 @@ export type {
   ReviewVerdict,
 } from './interfaces/index.js';
 
+// Plugins
+export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin.js';
+
 // Runner
 export type { AgentEventLog } from './runner/agent-event-log.js';
 export { FirestoreAgentEventLog } from './runner/agent-event-log.js';

@@ -1,0 +1,29 @@
+{
+  "processName": "protocol-to-tfl",
+  "configName": "agent-extract",
+  "configVersion": "1",
+  "stepConfigs": [
+    {
+      "stepId": "upload-documents",
+      "executorType": "human"
+    },
+    {
+      "stepId": "extract-metadata",
+      "executorType": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 15,
+      "agentConfig": {
+        "skill": "trial-metadata-extractor",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet"
+      }
+    },
+    {
+      "stepId": "review-metadata",
+      "executorType": "human"
+    }
+  ]
+}
