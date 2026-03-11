@@ -182,9 +182,19 @@ export async function completeTask(
     });
 
     // 5. Advance to the next step in the workflow
+    // For L3 agent review tasks, include the agent output so downstream steps can access it
+    const stepOutput: Record<string, unknown> = { verdict, comment, taskId };
+    const agentReviewData = task.completionData as Record<string, unknown> | null;
+    if (agentReviewData?.reviewType === 'agent_output_review') {
+      const agentOutput = agentReviewData.agentOutput as Record<string, unknown> | undefined;
+      if (agentOutput?.result) {
+        stepOutput.agentOutput = agentOutput.result;
+      }
+    }
+
     await engine.advanceStep(
       task.processInstanceId,
-      { verdict, comment, taskId },
+      stepOutput,
       { id: task.assignedUserId ?? 'user', role: 'human' },
     );
 

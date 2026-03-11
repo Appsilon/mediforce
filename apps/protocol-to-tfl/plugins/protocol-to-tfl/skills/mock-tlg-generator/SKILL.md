@@ -11,18 +11,32 @@ This skill reads structured trial metadata JSON (produced by the `trial-metadata
 
 Mock shells are the bridge between the statistical analysis plan and actual programming. Each shell defines exactly what a table, listing, or figure should look like -- column headers, row stubs, footnotes, and statistical methods -- so that a programmer can implement it without ambiguity and a biostatistician can review it for completeness.
 
-## When to use
+## HARD STOP: Output Contract
 
-- User has a trial metadata JSON and wants to generate mock TLG shells
-- User asks to create the reporting package, output package, or display shells
-- User wants to plan what tables, listings, and figures are needed for a CSR
-- User has completed the metadata extraction step and wants the next step in the pipeline
+**This is a headless pipeline step. There is no human listening.**
+
+**CRITICAL WARNING**: The TLG shells markdown is very large (1000+ lines for a Phase 3 study). If you compose it in your head and try to output it as text, you WILL exceed the time limit and the entire run will be killed. You MUST use the Write tool to save the markdown to a file. Your final text response must be tiny.
+
+Your ONLY output as a final message must be a raw JSON object (no markdown fences, no preamble, no explanation):
+
+```
+{"output_file": "/absolute/path/to/written/file.md", "summary": "Generated X tables, Y listings, Z figures for {study_id} Phase {phase}"}
+```
+
+Rules:
+- **Use the Write tool** to save the TLG shells markdown to a file. Do NOT include the full content in your response text — it is too large and will cause a timeout.
+- Your final text response is ONLY the small contract JSON above (the one with `output_file` and `summary`). Nothing else.
+- Do NOT write conversational summaries, recommendations, or next step suggestions
+- Do NOT wrap anything in markdown code fences
+- Do NOT continue working after writing the output file and emitting the JSON response
 
 ## Workflow
 
 ### Step 1: Read and validate the input metadata
 
-Read the metadata JSON file the user provides. Validate it has the key sections needed for TLG generation:
+The input metadata JSON is provided in the "Previous Step Outputs" section below. It contains the extract-metadata step's output with an `agentOutput` field containing the actual result. The metadata file path is in `agentOutput.result` or may need to be read from the output directory.
+
+Validate it has the key sections needed for TLG generation:
 
 - `study_identification` (phase, indication, therapeutic area)
 - `study_design` (arms, randomization, blinding, cohorts)
@@ -31,13 +45,7 @@ Read the metadata JSON file the user provides. Validate it has the key sections 
 - `statistical_analyses` (methods, models, subgroups)
 - `planned_tlg_list` (may be populated or null)
 
-If critical sections are missing, inform the user what's needed before proceeding.
-
-Also read the upstream schema for reference:
-
-```
-../trial-metadata-extractor/references/output-schema.md
-```
+If critical sections are missing, report this in your summary and generate what you can with the available data.
 
 ### Step 2: Determine the TLG inventory
 
@@ -132,15 +140,15 @@ Section 15: Figures (or embedded within 14.x sections)
 
 If the metadata already has TLG IDs (from `planned_tlg_list`), preserve those IDs but also provide the ICH E3 mapping. If no IDs exist, assign them following this convention.
 
-### Step 5: Generate the output
+### Step 5: Write the output file
 
-Save the complete TLG shells package to:
+Use the **Write tool** to save the complete TLG shells package to:
 
 ```
-outputs/{study-folder}/{study_id}-mock-tlg-shells.md
+{output_directory}/{study_id}-mock-tlg-shells.md
 ```
 
-Where `{study-folder}` matches the folder structure used by the metadata extractor (e.g., `nsclc-phase3/`). If that's not determinable, use the study phase (e.g., `phase1/`, `phase2/`, `phase3/`).
+Where `{output_directory}` is the absolute path from the "Output Directory" section of the input.
 
 The output document structure should be:
 
@@ -173,14 +181,13 @@ The output document structure should be:
 [Each figure shell with description and axis labels]
 ```
 
-### Step 6: Present summary and offer review
+This is essential: call the Write tool with the complete markdown content. Do NOT try to output the markdown as text — it is too large and will cause the process to time out before you finish generating it.
 
-After generating, present the user with:
-
-- Total TLG count breakdown (tables, listings, figures)
-- Categorization by domain (demographics, efficacy, safety, PK, PRO)
-- Any gaps or recommendations (TLGs that might be missing)
-- Any items that need clarification from the SAP or protocol
+Then, as your **final message**, output ONLY the small contract JSON described in the "HARD STOP" section above:
+```
+{"output_file": "/absolute/path/to/file.md", "summary": "Generated X tables, Y listings, Z figures for {study_id}"}
+```
+Nothing else.
 
 ## Key domain knowledge
 
