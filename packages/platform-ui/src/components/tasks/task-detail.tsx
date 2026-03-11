@@ -203,6 +203,11 @@ export function TaskDetail({
         )}
       </div>
 
+      {/* Quick claim — visible at the top so users don't need to scroll */}
+      {isPending && (
+        <ClaimButton taskId={task.id} currentUserId={currentUserId} fullWidth />
+      )}
+
       {/* All tasks in this run */}
       {siblingTasks.length > 1 && (
         <div className="rounded-lg border p-4">

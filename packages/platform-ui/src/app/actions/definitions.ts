@@ -79,3 +79,32 @@ export async function setProcessArchived(
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
   }
 }
+
+export async function setConfigArchived(
+  processName: string,
+  configName: string,
+  configVersion: string,
+  archived: boolean,
+): Promise<ArchiveResult> {
+  const { processRepo } = getPlatformServices();
+  try {
+    await processRepo.setConfigArchived(processName, configName, configVersion, archived);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+export async function setDefinitionVersionArchived(
+  name: string,
+  version: string,
+  archived: boolean,
+): Promise<ArchiveResult> {
+  const { processRepo } = getPlatformServices();
+  try {
+    await processRepo.setDefinitionVersionArchived(name, version, archived);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}

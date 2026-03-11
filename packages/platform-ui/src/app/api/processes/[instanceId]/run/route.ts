@@ -144,7 +144,15 @@ export async function POST(
         (t) => t.stepId === instance.currentStepId && (t.status === 'pending' || t.status === 'claimed'),
       );
       if (hasPendingTask) {
-        console.log(`[auto-runner] Duplicate guard: pending task already exists for step '${instance.currentStepId}' on instance '${instanceId}' — skipping`);
+        console.log(`[auto-runner] Duplicate guard: pending task already exists for step '${instance.currentStepId}' on instance '${instanceId}' — pausing`);
+        // Ensure instance is paused so the UI shows the task correctly
+        if (instance.status === 'running') {
+          await instanceRepo.update(instanceId, {
+            status: 'paused',
+            pauseReason: 'waiting_for_human',
+            updatedAt: new Date().toISOString(),
+          });
+        }
         break;
       }
 
