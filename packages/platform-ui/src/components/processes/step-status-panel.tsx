@@ -58,8 +58,18 @@ function getEffectiveStatus(
   const exec = execs[0];
 
   if (exec) {
-    // Treat 'pending' execution status same as 'running' visually
-    if (exec.status === 'running' || exec.status === 'pending') return 'running';
+    if (exec.status === 'running' || exec.status === 'pending') {
+      // If instance is paused on this step, show 'waiting' instead of 'running'
+      // (e.g. L3 agent step paused for human review — execution record stays 'running')
+      if (
+        instance.currentStepId === step.id
+        && instance.status === 'paused'
+        && (instance.pauseReason === 'waiting_for_human' || instance.pauseReason === 'awaiting_agent_approval')
+      ) {
+        return 'waiting';
+      }
+      return 'running';
+    }
     if (exec.status === 'completed') return 'completed';
     if (exec.status === 'failed') return 'failed';
   }

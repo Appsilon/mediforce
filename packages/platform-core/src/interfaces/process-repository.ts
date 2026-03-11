@@ -15,4 +15,6 @@ export interface ProcessRepository {
   saveProcessConfig(config: ProcessConfig): Promise<void>;
   listProcessConfigs(processName: string): Promise<ProcessConfig[]>;
   setProcessArchived(name: string, archived: boolean): Promise<void>;
+  setConfigArchived(processName: string, configName: string, configVersion: string, archived: boolean): Promise<void>;
+  setDefinitionVersionArchived(name: string, version: string, archived: boolean): Promise<void>;
 }

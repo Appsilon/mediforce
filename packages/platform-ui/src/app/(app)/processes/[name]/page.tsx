@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, ChevronRight, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info } from 'lucide-react';
+import { ArrowLeft, Layers, ChevronRight, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Eye, EyeOff } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
@@ -12,7 +12,7 @@ import { YamlEditor } from '@/components/processes/yaml-editor';
 import { definitionToYaml } from '@/app/actions/definitions';
 import { ConfigList } from '@/components/configs/config-list';
 import { StartRunDialog } from '@/components/processes/start-run-dialog';
-import { setProcessArchived } from '@/app/actions/definitions';
+import { setProcessArchived, setDefinitionVersionArchived } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -29,6 +29,7 @@ export default function ProcessDefinitionPage() {
   const [archiving, setArchiving] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [startRunOpen, setStartRunOpen] = React.useState(false);
+  const [showArchivedVersions, setShowArchivedVersions] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -49,6 +50,10 @@ export default function ProcessDefinitionPage() {
   const activeVersion = selectedVersion
     ? versions.find((v) => v.version === selectedVersion) ?? latest
     : latest;
+
+  const activeVersions = versions.filter((v) => v.archived !== true);
+  const archivedVersionCount = versions.length - activeVersions.length;
+  const visibleVersions = showArchivedVersions ? versions : activeVersions;
 
   // Reconstruct YAML from stored definition when version is selected
   React.useEffect(() => {
@@ -269,17 +274,32 @@ export default function ProcessDefinitionPage() {
           <div className="max-w-3xl space-y-4">
             {versions.length > 1 && (
               <div className="space-y-2">
-                <h3 className="text-sm font-medium">Versions</h3>
-                <div className="space-y-2">
-                  {versions.map((v) => (
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium">Versions</h3>
+                  {archivedVersionCount > 0 && (
                     <button
+                      onClick={() => setShowArchivedVersions((prev) => !prev)}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
+                    >
+                      {showArchivedVersions ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                      {showArchivedVersions ? 'Hide' : 'Show'} archived ({archivedVersionCount})
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {visibleVersions.map((v) => (
+                    <div
                       key={v.version}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSelectedVersion(v.version)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedVersion(v.version); }}
                       className={cn(
-                        'flex items-center gap-3 w-full rounded-lg border px-4 py-2.5 text-left transition-colors',
+                        'flex items-center gap-3 w-full rounded-lg border px-4 py-2.5 text-left transition-colors cursor-pointer',
                         activeVersion?.version === v.version
                           ? 'border-primary bg-primary/5'
                           : 'bg-card hover:bg-muted/50',
+                        v.archived === true && 'opacity-60',
                       )}
                     >
                       <span className="font-mono text-sm font-medium">v{v.version}</span>
@@ -288,8 +308,21 @@ export default function ProcessDefinitionPage() {
                           latest
                         </span>
                       )}
+                      {v.archived === true && (
+                        <span className="text-xs text-muted-foreground">(archived)</span>
+                      )}
                       <span className="text-xs text-muted-foreground">{v.steps.length} steps</span>
-                    </button>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await setDefinitionVersionArchived(decodedName, v.version, v.archived !== true);
+                        }}
+                        className="ml-auto text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+                        title={v.archived ? 'Unarchive version' : 'Archive version'}
+                      >
+                        {v.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>

@@ -21,6 +21,7 @@ import {
   OpenRouterLlmClient,
   FirestoreAgentEventLog,
   ClaudeCodeAgentPlugin,
+  MockClaudeCodeAgentPlugin,
 } from '@mediforce/agent-runtime';
 import { NoOpGateErrorNotifier } from '@mediforce/platform-core';
 import { registerSupplyIntelligencePlugins } from '@mediforce/supply-intelligence-plugins';
@@ -79,7 +80,15 @@ export function getPlatformServices(): PlatformServices {
   registerSupplyIntelligencePlugins(pluginRegistry);
 
   // Register Claude Code agent plugin for protocol-to-tfl and other Claude-driven workflows.
-  pluginRegistry.register('claude-code-agent', new ClaudeCodeAgentPlugin());
+  // MOCK_AGENT=true → use mock plugin that returns fixture data instantly (for UAT)
+  const useMockAgent = process.env.MOCK_AGENT === 'true';
+  if (useMockAgent) {
+    console.log('[platform-services] MOCK_AGENT=true — using MockClaudeCodeAgentPlugin');
+  }
+  pluginRegistry.register(
+    'claude-code-agent',
+    useMockAgent ? new MockClaudeCodeAgentPlugin() : new ClaudeCodeAgentPlugin(),
+  );
 
   const llmClient = new OpenRouterLlmClient(
     process.env.OPENROUTER_API_KEY ?? '',

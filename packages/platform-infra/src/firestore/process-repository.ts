@@ -166,4 +166,28 @@ export class FirestoreProcessRepository implements ProcessRepository {
       await updateDoc(doc(this.db, this.definitionsCollection, d.id), { archived });
     }
   }
+
+  async setConfigArchived(
+    processName: string,
+    configName: string,
+    configVersion: string,
+    archived: boolean,
+  ): Promise<void> {
+    const configKey = `${processName}:${configName}:${configVersion}`;
+    const docRef = doc(this.db, this.configsCollection, configKey);
+    await updateDoc(docRef, { archived });
+  }
+
+  async setDefinitionVersionArchived(
+    name: string,
+    version: string,
+    archived: boolean,
+  ): Promise<void> {
+    const docRef = doc(
+      this.db,
+      this.definitionsCollection,
+      this.compositeKey(name, version),
+    );
+    await updateDoc(docRef, { archived });
+  }
 }

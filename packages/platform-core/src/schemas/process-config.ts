@@ -50,6 +50,7 @@ export const ProcessConfigSchema = z.object({
   stepConfigs: z.array(StepConfigSchema),
   notifications: z.array(ProcessNotificationConfigSchema).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  archived: z.boolean().optional(),
 });
 
 export type ReviewConstraints = z.infer<typeof ReviewConstraintsSchema>;

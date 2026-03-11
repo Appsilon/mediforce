@@ -16,6 +16,7 @@ export type {
 
 // Plugins
 export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin.js';
+export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin.js';
 
 // Runner
 export type { AgentEventLog } from './runner/agent-event-log.js';

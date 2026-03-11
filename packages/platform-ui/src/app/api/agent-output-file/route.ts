@@ -13,6 +13,9 @@ const ALLOWED_PREFIXES = [
   `${tmpdir()}/mediforce-agent-`,
   `/private/var/folders/`,
   `/var/folders/`,
+  // System temp (macOS: /tmp → /private/tmp)
+  `/tmp/`,
+  `/private/tmp/`,
   // Platform-UI tmp directory for generated outputs
   resolve(process.cwd(), 'tmp') + '/',
 ];

@@ -23,6 +23,7 @@ function mimeToLabel(mime: string): string {
     'image/png': 'PNG',
     'image/jpeg': 'JPEG',
     'text/csv': 'CSV',
+    'application/octet-stream': 'Binary files (XPT, SAS, etc.)',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
   };
   return map[mime] ?? mime;
@@ -45,10 +46,15 @@ export function FileUploadZone({
     setError(null);
     const newFiles = Array.from(incoming);
 
-    // Validate MIME types
-    const invalid = newFiles.filter(
-      (file) => !acceptedTypes.includes(file.type),
-    );
+    // Validate MIME types.
+    // When application/octet-stream is accepted, also allow files with empty type
+    // (browsers often leave .xpt, .sas7bdat, etc. untyped) and common data formats.
+    const acceptsOctetStream = acceptedTypes.includes('application/octet-stream');
+    const invalid = newFiles.filter((file) => {
+      if (acceptedTypes.includes(file.type)) return false;
+      if (acceptsOctetStream && (file.type === '' || file.type === 'application/json')) return false;
+      return true;
+    });
     if (invalid.length > 0) {
       const names = invalid.map((file) => file.name).join(', ');
       setError(`File type not accepted: ${names}. Accepted: ${typeLabels}`);
