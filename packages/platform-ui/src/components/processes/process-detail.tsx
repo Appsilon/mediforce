@@ -47,7 +47,7 @@ export function ProcessDetail({
   agentEvents?: AgentEventItem[];
   backHref?: string;
   backLabel?: string;
-  stepConfigMap?: Map<string, { autonomyLevel?: string; executorType?: string }>;
+  stepConfigMap?: Map<string, Record<string, unknown>>;
 }) {
   const { task: blockingTask } = useActiveTaskForInstance(
     instance.pauseReason === 'waiting_for_human' ? instance.id : null,
@@ -194,6 +194,7 @@ export function ProcessDetail({
           agentEvents={agentEvents}
           onStepClick={handleStepClick}
           stepConfigMap={stepConfigMap}
+          onAgentLogClick={agentLogFile ? () => setActiveTab('agent-log') : undefined}
         />
       )}
 

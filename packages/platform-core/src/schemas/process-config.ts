@@ -15,6 +15,7 @@ export const AgentConfigSchema = z.object({
   prompt: z.string().optional(),
   model: z.string().optional(),
   skillsDir: z.string().optional(),
+  timeoutMs: z.number().positive().optional(),
 });
 
 export const StepConfigSchema = z.object({

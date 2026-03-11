@@ -1,9 +1,11 @@
 import { spawn } from 'node:child_process';
-import { readFile, mkdtemp, writeFile, rm, mkdir, appendFile } from 'node:fs/promises';
+import { readFile, mkdtemp, writeFile, rm, mkdir, appendFile, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+
+const DEFAULT_TIMEOUT_MS = 20 * 60_000;
 
 /** Strip YAML frontmatter (--- ... ---) from markdown content. */
 function stripFrontmatter(content: string): string {
@@ -22,6 +24,8 @@ interface SpawnCliOptions {
   model?: string;
   addDirs?: string[];
   logFile?: string;
+  timeoutMs?: number;
+  outputDir?: string;
 }
 
 interface StreamEvent {
@@ -51,7 +55,9 @@ async function downloadFilesToLocal(
     return { updatedInput: stepInput, tempDir: null };
   }
 
-  const tempDir = await mkdtemp(join(tmpdir(), 'mediforce-agent-'));
+  // Resolve symlinks (macOS: /var -> /private/var) so --allowedTools patterns match
+  const rawTempDir = await mkdtemp(join(tmpdir(), 'mediforce-agent-'));
+  const tempDir = await realpath(rawTempDir);
   const updatedFiles: FileEntry[] = [];
 
   for (const file of stepInput.files) {
@@ -80,11 +86,12 @@ async function cleanupTempDir(tempDir: string | null): Promise<void> {
 
 interface LogEntry {
   ts: string;
-  kind: 'tool_call' | 'assistant' | 'result';
+  type: string;
+  subtype?: string;
   tool?: string;
   input?: Record<string, unknown>;
   text?: string;
-  subtype?: string;
+  [key: string]: unknown;
 }
 
 /** Extract log entries from a stream-json event. Returns JSONL strings. */
@@ -97,27 +104,76 @@ function formatLogEntries(event: StreamEvent): string[] {
       if (block.type === 'tool_use' && block.name) {
         entries.push({
           ts,
-          kind: 'tool_call',
+          type: 'assistant',
+          subtype: 'tool_call',
           tool: block.name,
           input: block.input as Record<string, unknown> | undefined,
         });
       }
       if (block.type === 'text' && block.text) {
-        entries.push({ ts, kind: 'assistant', text: block.text });
+        entries.push({ ts, type: 'assistant', subtype: 'text', text: block.text });
       }
+    }
+    return entries.map((entry) => JSON.stringify(entry));
+  }
+
+  if (event.type === 'tool_result') {
+    entries.push({
+      ts,
+      type: 'tool_result',
+      tool_name: event.tool_name as string | undefined,
+      subtype: event.subtype,
+      content: event.content,
+    });
+    return entries.map((entry) => JSON.stringify(entry));
+  }
+
+  // CLI stream-json sends tool results as `user` messages with tool_result content blocks
+  if (event.type === 'user' && event.message?.content) {
+    for (const block of event.message.content) {
+      if (block.type === 'tool_result') {
+        const resultContent = (block as Record<string, unknown>).content;
+        const preview = typeof resultContent === 'string'
+          ? resultContent.slice(0, 500)
+          : JSON.stringify(resultContent ?? '').slice(0, 500);
+        entries.push({
+          ts,
+          type: 'user',
+          subtype: 'tool_result',
+          tool_use_id: (block as Record<string, unknown>).tool_use_id as string | undefined,
+          content: preview,
+        });
+      }
+    }
+    if (entries.length > 0) {
+      return entries.map((entry) => JSON.stringify(entry));
     }
   }
 
   if (event.type === 'result') {
     entries.push({
       ts,
-      kind: 'result',
+      type: 'result',
       subtype: event.subtype,
       text: typeof event.result === 'string' ? event.result.slice(0, 500) : undefined,
     });
+    return entries.map((entry) => JSON.stringify(entry));
   }
 
+  // Generic fallback: capture any event type we don't explicitly handle
+  const { type, subtype, ...rest } = event;
+  entries.push({
+    ts,
+    type,
+    subtype,
+    ...rest,
+  });
   return entries.map((entry) => JSON.stringify(entry));
+}
+
+interface AgentOutputContract {
+  output_file?: string;
+  summary?: string;
 }
 
 export class ClaudeCodeAgentPlugin implements AgentPlugin {
@@ -164,6 +220,7 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
   async run(emit: EmitFn): Promise<void> {
     const startTime = Date.now();
     const skillName = this.agentConfig.skill ?? 'custom-prompt';
+    const timeoutMs = this.agentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
     await emit({
       type: 'status',
@@ -172,6 +229,7 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
     });
 
     let tempDir: string | null = null;
+    let succeeded = false;
 
     try {
       // Download remote files to local temp dir so the CLI can read them directly
@@ -188,10 +246,20 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
         });
       }
 
-      const prompt = await this.buildPrompt(updatedInput);
-      const options: SpawnCliOptions = {};
+      const prompt = await this.buildPrompt(updatedInput, timeoutMs, tempDir ?? undefined);
+
+      await emit({
+        type: 'prompt',
+        payload: prompt,
+        timestamp: new Date().toISOString(),
+      });
+
+      const options: SpawnCliOptions = { timeoutMs };
       if (this.agentConfig.model) options.model = this.agentConfig.model;
-      if (tempDir) options.addDirs = [tempDir];
+      if (tempDir) {
+        options.addDirs = [tempDir];
+        options.outputDir = tempDir;
+      }
 
       // Create activity log file for observability
       const logsDir = join(tmpdir(), 'mediforce-agent-logs');
@@ -209,12 +277,7 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
       const cliOutput = await this.spawnClaudeCli(prompt, options);
       const duration_ms = Date.now() - startTime;
 
-      let parsedResult: Record<string, unknown>;
-      try {
-        parsedResult = JSON.parse(cliOutput) as Record<string, unknown>;
-      } catch {
-        parsedResult = { raw: cliOutput };
-      }
+      const parsedResult = await this.extractResult(cliOutput);
 
       const confidence = typeof parsedResult.confidence === 'number'
         ? parsedResult.confidence
@@ -238,6 +301,8 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
         },
         timestamp: new Date().toISOString(),
       });
+
+      succeeded = true;
     } catch (error) {
       const duration_ms = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -255,15 +320,58 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
           model: this.agentConfig.model ?? 'claude-code-cli',
           duration_ms,
           result: null,
+          tempDir: tempDir ?? undefined,
         },
         timestamp: new Date().toISOString(),
       });
     } finally {
-      await cleanupTempDir(tempDir);
+      if (succeeded) {
+        await cleanupTempDir(tempDir);
+      }
     }
   }
 
-  private async buildPrompt(stepInput?: Record<string, unknown>): Promise<string> {
+  private async extractResult(cliOutput: string): Promise<Record<string, unknown>> {
+    let streamEvent: Record<string, unknown>;
+    try {
+      streamEvent = JSON.parse(cliOutput) as Record<string, unknown>;
+    } catch {
+      return { raw: cliOutput };
+    }
+
+    const agentText = typeof streamEvent.result === 'string' ? streamEvent.result : null;
+    if (!agentText) {
+      return streamEvent;
+    }
+
+    let contract: AgentOutputContract;
+    try {
+      contract = JSON.parse(agentText) as AgentOutputContract;
+    } catch {
+      return { raw: agentText };
+    }
+
+    if (contract.output_file) {
+      try {
+        const fileContents = await readFile(contract.output_file, 'utf-8');
+        const parsed = JSON.parse(fileContents) as Record<string, unknown>;
+        if (contract.summary) {
+          parsed.summary = contract.summary;
+        }
+        return parsed;
+      } catch {
+        return { raw: agentText, summary: contract.summary };
+      }
+    }
+
+    return contract as unknown as Record<string, unknown>;
+  }
+
+  private async buildPrompt(
+    stepInput?: Record<string, unknown>,
+    timeoutMs?: number,
+    outputDir?: string,
+  ): Promise<string> {
     const parts: string[] = [];
     const input = stepInput ?? this.context.stepInput;
 
@@ -281,7 +389,26 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
       parts.push(this.agentConfig.prompt);
     }
 
-    // 3. Input context
+    // 3. Time budget
+    const budgetMs = timeoutMs ?? this.agentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const budgetMinutes = Math.round(budgetMs / 60_000);
+    parts.push(
+      `## Time Budget\n` +
+      `You have approximately ${budgetMinutes} minutes to complete this task. ` +
+      `Budget your time accordingly — prioritize core extraction over validation if time is tight. ` +
+      `Do not offer conversational summaries or next steps.`,
+    );
+
+    // 4. Output directory — agent MUST use absolute paths when writing files
+    if (outputDir) {
+      parts.push(
+        `## Output Directory\n` +
+        `Write all output files to this absolute path: ${outputDir}\n` +
+        `You MUST use the full absolute path when calling Write. Relative paths will be rejected.`,
+      );
+    }
+
+    // 5. Input context
     const previousOutputs = await this.context.getPreviousStepOutputs();
     const hasPreviousOutputs = Object.keys(previousOutputs).length > 0;
 
@@ -315,13 +442,23 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
         args.push('--add-dir', dir);
       }
     }
+    // Headless pipeline: grant specific tool permissions so the agent never blocks on prompts.
+    // The agent is sandboxed: cwd set to temp dir, output read back by plugin.
+    // Note: path-scoped patterns (e.g. Write(/path/*)) don't work reliably in the CLI,
+    // so we grant tool-level access. The cwd and prompt constrain where the agent writes.
+    // Future: use --permission-prompt-tool for human-in-the-loop approval via platform UI.
+    args.push('--allowedTools', 'Read,Write,Edit,Glob,Grep');
 
     const logFile = options?.logFile ?? null;
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
     return new Promise((resolve, reject) => {
       const child = spawn('claude', args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 10 * 60_000,
+        timeout: timeoutMs,
+        // Set cwd to outputDir so relative paths resolve to the temp dir.
+        // This ensures Write("file.json") matches the --allowedTools pattern.
+        ...(options?.outputDir ? { cwd: options.outputDir } : {}),
       });
 
       let finalResult = '';
@@ -386,10 +523,11 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
         }
 
         const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
+        const timeoutMinutes = Math.round(timeoutMs / 60_000);
 
         if (code !== 0) {
           const exitInfo = signal
-            ? `killed by ${signal}${signal === 'SIGTERM' ? ' (likely timeout — 10 min limit)' : ''}`
+            ? `killed by ${signal}${signal === 'SIGTERM' ? ` (likely timeout — ${timeoutMinutes} min limit)` : ''}`
             : `exit code ${code}`;
           reject(new Error(`CLI process failed (${exitInfo}): ${stderr || 'no stderr output'}`));
           return;

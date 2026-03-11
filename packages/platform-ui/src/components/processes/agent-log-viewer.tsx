@@ -6,11 +6,16 @@ import { cn } from '@/lib/utils';
 
 interface LogEntry {
   ts: string;
-  kind: 'tool_call' | 'assistant' | 'result';
+  /** New format uses `type` + `subtype`, old format used `kind`. */
+  type?: string;
+  kind?: string;
+  subtype?: string;
   tool?: string;
+  tool_name?: string;
   input?: Record<string, unknown>;
   text?: string;
-  subtype?: string;
+  content?: unknown;
+  [key: string]: unknown;
 }
 
 interface AgentLogViewerProps {
@@ -18,6 +23,21 @@ interface AgentLogViewerProps {
 }
 
 import type { LucideIcon } from 'lucide-react';
+
+/** Classify a log entry into a display category. Handles both old (kind) and new (type+subtype) formats. */
+function classifyEntry(entry: LogEntry): 'tool_call' | 'tool_result' | 'assistant_text' | 'result' | 'skip' {
+  // New format
+  if (entry.type === 'assistant' && entry.subtype === 'tool_call') return 'tool_call';
+  if (entry.type === 'assistant' && entry.subtype === 'text' && entry.text?.trim()) return 'assistant_text';
+  if (entry.type === 'tool_result') return 'tool_result';
+  if (entry.type === 'user' && entry.subtype === 'tool_result') return 'tool_result';
+  if (entry.type === 'result') return 'result';
+  // Old format
+  if (entry.kind === 'tool_call') return 'tool_call';
+  if (entry.kind === 'assistant' && entry.text?.trim()) return 'assistant_text';
+  if (entry.kind === 'result') return 'result';
+  return 'skip';
+}
 
 const TOOL_ICONS: Record<string, LucideIcon> = {
   Read: FileText,
@@ -98,6 +118,33 @@ function AssistantEntry({ entry }: { entry: LogEntry }) {
         <Bot className="h-3 w-3 text-blue-600 dark:text-blue-400" />
       </div>
       <p className="text-xs text-foreground/80 italic">{text}</p>
+    </div>
+  );
+}
+
+function ToolResultEntry({ entry }: { entry: LogEntry }) {
+  const toolName = entry.tool_name ?? entry.tool ?? '';
+  const content = entry.content;
+  let summary = '';
+  if (typeof content === 'string') {
+    summary = content.slice(0, 300);
+  } else if (content !== null && content !== undefined) {
+    summary = JSON.stringify(content).slice(0, 300);
+  }
+
+  return (
+    <div className="flex items-start gap-2 py-1">
+      <div className="mt-0.5 shrink-0 w-5 h-5 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        <CheckCircle2 className="h-3 w-3 text-gray-500 dark:text-gray-400" />
+      </div>
+      <div className="min-w-0 flex-1">
+        {toolName && (
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{toolName} </span>
+        )}
+        {summary && (
+          <p className="text-xs text-muted-foreground font-mono whitespace-pre-wrap line-clamp-3">{cleanPath(summary)}</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -189,19 +236,22 @@ export function AgentLogViewer({ logFile }: AgentLogViewerProps) {
     );
   }
 
-  // Group consecutive tool_calls into parallel batches
-  const groups: Array<{ kind: 'batch'; entries: LogEntry[]; ts: string } | { kind: 'single'; entry: LogEntry }> = [];
+  // Group consecutive tool_calls into parallel batches, skip empty entries
+  const groups: Array<{ kind: 'batch'; entries: LogEntry[]; ts: string } | { kind: 'single'; entry: LogEntry; category: string }> = [];
   let currentBatch: LogEntry[] = [];
 
   for (const entry of entries) {
-    if (entry.kind === 'tool_call') {
+    const category = classifyEntry(entry);
+    if (category === 'skip') continue;
+
+    if (category === 'tool_call') {
       currentBatch.push(entry);
     } else {
       if (currentBatch.length > 0) {
         groups.push({ kind: 'batch', entries: currentBatch, ts: currentBatch[0].ts });
         currentBatch = [];
       }
-      groups.push({ kind: 'single', entry });
+      groups.push({ kind: 'single', entry, category });
     }
   }
   if (currentBatch.length > 0) {
@@ -276,9 +326,11 @@ export function AgentLogViewer({ logFile }: AgentLogViewerProps) {
                     <ToolCallEntry key={entryIndex} entry={entry} />
                   ))}
                 </div>
-              ) : group.entry.kind === 'assistant' ? (
+              ) : group.category === 'assistant_text' ? (
                 <AssistantEntry entry={group.entry} />
-              ) : group.entry.kind === 'result' ? (
+              ) : group.category === 'tool_result' ? (
+                <ToolResultEntry entry={group.entry} />
+              ) : group.category === 'result' ? (
                 <ResultEntry entry={group.entry} />
               ) : null}
             </div>

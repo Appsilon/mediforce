@@ -51,7 +51,17 @@ export default function RunDetailPage() {
     return new Map(
       processConfig.stepConfigs.map((sc) => [
         sc.stepId,
-        { autonomyLevel: sc.autonomyLevel, executorType: sc.executorType },
+        {
+          executorType: sc.executorType,
+          autonomyLevel: sc.autonomyLevel,
+          plugin: sc.plugin,
+          model: sc.model,
+          confidenceThreshold: sc.confidenceThreshold,
+          fallbackBehavior: sc.fallbackBehavior,
+          timeoutMinutes: sc.timeoutMinutes,
+          reviewerType: sc.reviewerType,
+          agentConfig: sc.agentConfig,
+        },
       ]),
     );
   }, [processConfig]);

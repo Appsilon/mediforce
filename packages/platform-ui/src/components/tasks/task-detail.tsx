@@ -12,8 +12,10 @@ import { ClaimButton, UnclaimButton } from './claim-button';
 import { TaskContextPanel } from './task-context-panel';
 import { FileUploadZone } from './file-upload-zone';
 import { VerdictForm, VerdictConfirmationReadOnly } from './verdict-form';
+import { NextStepCard } from './next-step-card';
 import { completeUploadTask } from '@/app/actions/upload-task';
 import { useCollection } from '@/hooks/use-collection';
+import { useProcessInstance } from '@/hooks/use-process-instances';
 import { storage } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +40,7 @@ export function TaskDetail({
   task: HumanTask;
   currentUserId: string;
 }) {
+  const { data: processInstance } = useProcessInstance(task.processInstanceId);
   const [hasStepContent, setHasStepContent] = React.useState(false);
   const [uploadComplete, setUploadComplete] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
@@ -141,14 +144,20 @@ export function TaskDetail({
       <div className="rounded-lg border p-4 grid grid-cols-2 gap-4 text-sm">
         <div>
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Process
+            Run
           </div>
-          <Link
-            href={`/processes/${task.processInstanceId}`}
-            className="text-primary hover:underline font-mono text-xs"
-          >
-            {task.processInstanceId.slice(0, 12)}&hellip;
-          </Link>
+          {processInstance ? (
+            <Link
+              href={`/processes/${encodeURIComponent(processInstance.definitionName)}/runs/${task.processInstanceId}`}
+              className="text-primary hover:underline font-mono text-xs"
+            >
+              {task.processInstanceId.slice(0, 12)}&hellip;
+            </Link>
+          ) : (
+            <span className="font-mono text-xs text-muted-foreground">
+              {task.processInstanceId.slice(0, 12)}&hellip;
+            </span>
+          )}
         </div>
         <div>
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
@@ -272,6 +281,13 @@ export function TaskDetail({
           <VerdictConfirmationReadOnly
             completionData={task.completionData}
             remainingTaskCount={remainingTaskCount}
+          />
+        )}
+
+        {isCompleted && (
+          <NextStepCard
+            processInstanceId={task.processInstanceId}
+            stepId={task.stepId}
           />
         )}
       </div>
