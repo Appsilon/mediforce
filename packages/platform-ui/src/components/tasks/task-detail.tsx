@@ -10,9 +10,11 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { HumanTask } from '@mediforce/platform-core';
 import { ClaimButton, UnclaimButton } from './claim-button';
 import { TaskContextPanel } from './task-context-panel';
+import { AgentOutputReviewPanel } from './agent-output-review-panel';
 import { FileUploadZone } from './file-upload-zone';
 import { VerdictForm, VerdictConfirmationReadOnly } from './verdict-form';
 import { NextStepCard } from './next-step-card';
+import { getTaskDisplayTitle, isAgentReviewTask, getAgentOutput } from './task-utils';
 import { completeUploadTask } from '@/app/actions/upload-task';
 import { useCollection } from '@/hooks/use-collection';
 import { useProcessInstance } from '@/hooks/use-process-instances';
@@ -25,13 +27,6 @@ const STATUS_STYLES: Record<string, string> = {
   completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
 };
-
-/** Format a stepId into a human-readable title. */
-function formatStepName(stepId: string): string {
-  return stepId
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 export function TaskDetail({
   task,
@@ -127,7 +122,7 @@ export function TaskDetail({
       <div className="space-y-2">
         <div className="flex items-start gap-3">
           <h1 className="text-2xl font-headline font-semibold flex-1">
-            {formatStepName(task.stepId)}
+            {getTaskDisplayTitle(task)}
           </h1>
           <span
             className={cn(
@@ -195,12 +190,22 @@ export function TaskDetail({
         )}
       </div>
 
-      {/* Previous step output (context panel) */}
-      <TaskContextPanel
-        processInstanceId={task.processInstanceId}
-        stepId={task.stepId}
-        onContentLoaded={onContentLoaded}
-      />
+      {/* Agent output review panel — primary content for review tasks */}
+      {isAgentReviewTask(task) && getAgentOutput(task) && (
+        <AgentOutputReviewPanel
+          agentOutput={getAgentOutput(task)!}
+          onContentLoaded={onContentLoaded}
+        />
+      )}
+
+      {/* Previous step output (context panel) — secondary for review tasks */}
+      {!isAgentReviewTask(task) && (
+        <TaskContextPanel
+          processInstanceId={task.processInstanceId}
+          stepId={task.stepId}
+          onContentLoaded={onContentLoaded}
+        />
+      )}
 
       {/* Action section — conditional on task status */}
       <div className="space-y-3">
