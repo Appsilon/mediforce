@@ -1,7 +1,7 @@
 {
   "processName": "protocol-to-tfl",
   "configName": "agent-extract",
-  "configVersion": "1",
+  "configVersion": "2",
   "stepConfigs": [
     {
       "stepId": "upload-documents",
@@ -14,7 +14,7 @@
       "autonomyLevel": "L3",
       "confidenceThreshold": 0.7,
       "fallbackBehavior": "escalate_to_human",
-      "timeoutMinutes": 15,
+      "timeoutMinutes": 20,
       "agentConfig": {
         "skill": "trial-metadata-extractor",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
@@ -22,8 +22,18 @@
       }
     },
     {
-      "stepId": "review-metadata",
-      "executorType": "human"
+      "stepId": "generate-tlg-shells",
+      "executorType": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 20,
+      "agentConfig": {
+        "skill": "mock-tlg-generator",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet"
+      }
     }
   ]
 }
