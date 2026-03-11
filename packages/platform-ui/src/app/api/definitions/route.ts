@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { parseProcessDefinition } from '@mediforce/platform-core';
 import type { ProcessConfig } from '@mediforce/platform-core';
-import { DefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
+import { DefinitionVersionAlreadyExistsError, ConfigVersionAlreadyExistsError } from '@mediforce/platform-infra';
 import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
 
 export async function PUT(request: Request): Promise<NextResponse> {
@@ -26,17 +26,24 @@ export async function PUT(request: Request): Promise<NextResponse> {
     await processRepo.saveProcessDefinition(definition);
 
     // Auto-create "all-human" default config if none exists
-    const existing = await processRepo.getProcessConfig(definition.name, 'all-human', 'v1');
+    const allHumanVersion = definition.version;
+    const existing = await processRepo.getProcessConfig(definition.name, 'all-human', allHumanVersion);
     if (!existing) {
       const allHumanConfig: ProcessConfig = {
         processName: definition.name,
         configName: 'all-human',
-        configVersion: '1',
+        configVersion: allHumanVersion,
         stepConfigs: definition.steps
           .filter((s) => s.type !== 'terminal')
           .map((s) => ({ stepId: s.id, executorType: 'human' as const })),
       };
-      await processRepo.saveProcessConfig(allHumanConfig);
+      try {
+        await processRepo.saveProcessConfig(allHumanConfig);
+      } catch (configErr) {
+        if (!(configErr instanceof ConfigVersionAlreadyExistsError)) {
+          throw configErr;
+        }
+      }
     }
 
     return NextResponse.json(
