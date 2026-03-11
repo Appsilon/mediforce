@@ -7,14 +7,14 @@ import { format } from 'date-fns';
 import { ArrowLeft, Lock, FileText, CheckCircle, Download, Loader2 } from 'lucide-react';
 import { where, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { HumanTask } from '@mediforce/platform-core';
+import type { HumanTask, ProcessInstance } from '@mediforce/platform-core';
 import { ClaimButton, UnclaimButton } from './claim-button';
 import { TaskContextPanel } from './task-context-panel';
 import { AgentOutputReviewPanel } from './agent-output-review-panel';
 import { FileUploadZone } from './file-upload-zone';
 import { VerdictForm, VerdictConfirmationReadOnly } from './verdict-form';
 import { NextStepCard } from './next-step-card';
-import { getTaskDisplayTitle, isAgentReviewTask, getAgentOutput } from './task-utils';
+import { getTaskDisplayTitle, isAgentReviewTask, getAgentOutput, getAgentOutputFromSiblings } from './task-utils';
 import { completeUploadTask } from '@/app/actions/upload-task';
 import { useCollection } from '@/hooks/use-collection';
 import { useProcessInstance } from '@/hooks/use-process-instances';
@@ -102,6 +102,19 @@ export function TaskDetail({
   );
   const remainingTaskCount = remainingTasks.filter((t) => t.id !== task.id).length;
 
+  // All tasks for the same process run
+  const siblingConstraints = useMemo(
+    () => [
+      where('processInstanceId', '==', task.processInstanceId),
+      orderBy('createdAt', 'asc'),
+    ],
+    [task.processInstanceId],
+  );
+  const { data: siblingTasks } = useCollection<HumanTask>(
+    'humanTasks',
+    siblingConstraints,
+  );
+
   const isClaimedByMe = task.status === 'claimed' && task.assignedUserId === currentUserId;
   const isClaimedByOther = task.status === 'claimed' && task.assignedUserId !== currentUserId;
   const isCompleted = task.status === 'completed';
@@ -122,7 +135,7 @@ export function TaskDetail({
       <div className="space-y-2">
         <div className="flex items-start gap-3">
           <h1 className="text-2xl font-headline font-semibold flex-1">
-            {getTaskDisplayTitle(task)}
+            {getTaskDisplayTitle(task, processInstance)}
           </h1>
           <span
             className={cn(
@@ -190,20 +203,64 @@ export function TaskDetail({
         )}
       </div>
 
-      {/* Agent output review panel — primary content for review tasks */}
-      {isAgentReviewTask(task) && getAgentOutput(task) && (
-        <AgentOutputReviewPanel
-          agentOutput={getAgentOutput(task)!}
-          onContentLoaded={onContentLoaded}
-        />
+      {/* All tasks in this run */}
+      {siblingTasks.length > 1 && (
+        <div className="rounded-lg border p-4">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            All Tasks in This Run
+          </div>
+          <div className="space-y-1.5">
+            {siblingTasks.map((sibling) => {
+              const isCurrent = sibling.id === task.id;
+              return (
+                <div
+                  key={sibling.id}
+                  className={cn(
+                    'flex items-center gap-2 text-sm rounded-md px-2 py-1.5',
+                    isCurrent && 'bg-primary/5 border border-primary/10',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize',
+                      STATUS_STYLES[sibling.status] ?? STATUS_STYLES.pending,
+                    )}
+                  >
+                    {sibling.status}
+                  </span>
+                  {isCurrent ? (
+                    <span className="font-medium truncate">
+                      {getTaskDisplayTitle(sibling, processInstance)}
+                    </span>
+                  ) : (
+                    <Link
+                      href={`/tasks/${sibling.id}`}
+                      className="text-primary hover:underline truncate"
+                    >
+                      {getTaskDisplayTitle(sibling, processInstance)}
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
-      {/* Previous step output (context panel) — secondary for review tasks */}
-      {!isAgentReviewTask(task) && (
+      {/* Agent output review panel — for L3 agent review tasks */}
+      <AgentOutputSection
+        task={task}
+        processInstance={processInstance}
+        siblingTasks={siblingTasks}
+        onContentLoaded={onContentLoaded}
+      />
+
+      {/* Previous step output — context for all non-file-upload tasks */}
+      {!isFileUploadTask && (
         <TaskContextPanel
           processInstanceId={task.processInstanceId}
           stepId={task.stepId}
-          onContentLoaded={onContentLoaded}
+          onContentLoaded={isAgentReviewTask(task, processInstance) ? undefined : onContentLoaded}
         />
       )}
 
@@ -297,6 +354,44 @@ export function TaskDetail({
         )}
       </div>
     </div>
+  );
+}
+
+// --- Agent output section — resolves agent output from task or siblings ---
+
+function AgentOutputSection({
+  task,
+  processInstance,
+  siblingTasks,
+  onContentLoaded,
+}: {
+  task: HumanTask;
+  processInstance: ProcessInstance | null;
+  siblingTasks: HumanTask[];
+  onContentLoaded: (has: boolean) => void;
+}) {
+  const isAgentReview = isAgentReviewTask(task, processInstance);
+  if (!isAgentReview) return null;
+
+  // Try this task's completionData first, then check sibling tasks
+  const agentOutput = getAgentOutput(task) ?? getAgentOutputFromSiblings(task, siblingTasks);
+
+  if (!agentOutput) {
+    return (
+      <div className="rounded-lg border border-dashed p-6 text-center">
+        <p className="text-sm text-muted-foreground">
+          Agent output pending — the agent completed but output data is not yet available on this task.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <AgentOutputReviewPanel
+      agentOutput={agentOutput}
+      stepId={task.stepId}
+      onContentLoaded={onContentLoaded}
+    />
   );
 }
 

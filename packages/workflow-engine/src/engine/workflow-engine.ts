@@ -313,7 +313,8 @@ export class WorkflowEngine {
       throw err;
     }
 
-    // HumanTask creation: detect if next step is human and create task
+    // HumanTask creation: only create task when next step's executor is 'human'.
+    // Agent steps handle their own task creation (e.g. L3 review tasks in executeAgentStep).
     if (this.humanTaskRepository) {
       const updatedInstance = await this.loadInstance(instanceId);
       if (updatedInstance.currentStepId !== null) {
@@ -321,36 +322,37 @@ export class WorkflowEngine {
           (s) => s.id === updatedInstance.currentStepId,
         );
         if (nextStep?.type === 'creation') {
-          // Resolve assignedRole: prefer caller-provided stepConfig, then self-lookup from ProcessConfig
-          let assignedRole = stepConfig?.allowedRoles?.[0];
-          if (!assignedRole) {
-            const config = await this.processRepository.getProcessConfig(
-              updatedInstance.definitionName,
-              updatedInstance.configName,
-              updatedInstance.configVersion,
-            );
-            const resolvedStepConfig = config?.stepConfigs.find(
-              (sc) => sc.stepId === nextStep.id,
-            );
-            assignedRole = resolvedStepConfig?.allowedRoles?.[0] ?? 'unassigned';
-          }
+          const config = await this.processRepository.getProcessConfig(
+            updatedInstance.definitionName,
+            updatedInstance.configName,
+            updatedInstance.configVersion,
+          );
+          const nextStepConfig = config?.stepConfigs.find(
+            (sc) => sc.stepId === nextStep.id,
+          );
 
-          const now = new Date().toISOString();
-          const task: HumanTask = {
-            id: crypto.randomUUID(),
-            processInstanceId: instanceId,
-            stepId: nextStep.id,
-            assignedRole,
-            assignedUserId: null,
-            status: 'pending',
-            deadline: null,
-            createdAt: now,
-            updatedAt: now,
-            completedAt: null,
-            completionData: null,
-            ...(nextStep.ui ? { ui: nextStep.ui } : {}),
-          };
-          await this.humanTaskRepository.create(task);
+          // Only create task for human executor steps — agent steps create their own tasks
+          if (!nextStepConfig || nextStepConfig.executorType === 'human') {
+            const assignedRole = nextStepConfig?.allowedRoles?.[0] ?? 'unassigned';
+
+            const now = new Date().toISOString();
+            const task: HumanTask = {
+              id: crypto.randomUUID(),
+              processInstanceId: instanceId,
+              stepId: nextStep.id,
+              assignedRole,
+              assignedUserId: null,
+              status: 'pending',
+              deadline: null,
+              createdAt: now,
+              updatedAt: now,
+              completedAt: null,
+              completionData: null,
+              creationReason: 'human_executor',
+              ...(nextStep.ui ? { ui: nextStep.ui } : {}),
+            };
+            await this.humanTaskRepository.create(task);
+          }
         }
       }
     }

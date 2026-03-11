@@ -2,24 +2,70 @@
 
 import * as React from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Bot, Code, FileText, Gauge } from 'lucide-react';
+import { Bot, Code, FileText, Gauge, Loader2 } from 'lucide-react';
 import type { AgentOutputData } from './task-utils';
+import { formatStepName } from './task-utils';
 import { cn } from '@/lib/utils';
 
 interface AgentOutputReviewPanelProps {
   agentOutput: AgentOutputData;
+  stepId?: string;
   onContentLoaded?: (hasContent: boolean) => void;
+}
+
+/** Try to extract an output_file path from the result's `raw` field. */
+function extractOutputFilePath(result: Record<string, unknown>): string | null {
+  const raw = result.raw;
+  if (typeof raw !== 'string') return null;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof parsed.output_file === 'string') return parsed.output_file;
+  } catch {
+    // not JSON
+  }
+  return null;
 }
 
 export function AgentOutputReviewPanel({
   agentOutput,
+  stepId,
   onContentLoaded,
 }: AgentOutputReviewPanelProps) {
   const hasContent = agentOutput.result !== null && Object.keys(agentOutput.result).length > 0;
 
+  const outputFilePath = React.useMemo(
+    () => (agentOutput.result ? extractOutputFilePath(agentOutput.result) : null),
+    [agentOutput.result],
+  );
+
+  const [fileContent, setFileContent] = React.useState<string | null>(null);
+  const [fileLoading, setFileLoading] = React.useState(false);
+  const [fileError, setFileError] = React.useState<string | null>(null);
+
   React.useEffect(() => {
-    onContentLoaded?.(hasContent);
-  }, [hasContent, onContentLoaded]);
+    if (!outputFilePath) return;
+    setFileLoading(true);
+    fetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}`)
+      .then((res) => res.json() as Promise<{ content?: string; error?: string }>)
+      .then((data) => {
+        if (data.error && !data.content) {
+          setFileError(data.error);
+        } else if (data.content) {
+          setFileContent(data.content);
+        }
+      })
+      .catch((err: unknown) => {
+        setFileError(err instanceof Error ? err.message : 'Failed to fetch file');
+      })
+      .finally(() => setFileLoading(false));
+  }, [outputFilePath]);
+
+  // Content is available if we have result metadata or file content
+  const contentReady = hasContent || fileContent !== null;
+
+  React.useEffect(() => {
+    onContentLoaded?.(contentReady);
+  }, [contentReady, onContentLoaded]);
 
   if (!hasContent) {
     return (
@@ -35,6 +81,9 @@ export function AgentOutputReviewPanel({
     ? Math.round(agentOutput.confidence * 100)
     : null;
 
+  const hasFileTab = fileContent !== null || fileLoading || outputFilePath !== null;
+  const defaultTab = hasFileTab ? 'content' : 'summary';
+
   return (
     <div className="rounded-lg border">
       {/* Header with agent metadata */}
@@ -44,6 +93,11 @@ export function AgentOutputReviewPanel({
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Agent Output for Review
           </span>
+          {stepId && (
+            <span className="text-xs font-medium text-foreground">
+              — {formatStepName(stepId)}
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mb-2">
           {confidencePct !== null && (
@@ -69,9 +123,10 @@ export function AgentOutputReviewPanel({
         )}
       </div>
 
-      <Tabs.Root defaultValue="summary">
+      <Tabs.Root defaultValue={defaultTab}>
         <Tabs.List className="flex gap-1 border-b px-4">
           {[
+            ...(hasFileTab ? [{ value: 'content', label: 'Content', icon: FileText }] : []),
             { value: 'summary', label: 'Extracted Data', icon: FileText },
             { value: 'full', label: 'Raw JSON', icon: Code },
           ].map(({ value, label, icon: Icon }) => (
@@ -91,6 +146,27 @@ export function AgentOutputReviewPanel({
           ))}
         </Tabs.List>
 
+        {hasFileTab && (
+          <Tabs.Content value="content" className="p-4">
+            {fileLoading && (
+              <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Loading content...</span>
+              </div>
+            )}
+            {fileError && (
+              <div className="text-sm text-amber-600 dark:text-amber-400 py-4">
+                {fileError}
+              </div>
+            )}
+            {fileContent && (
+              <div className="prose prose-sm dark:prose-invert max-w-none overflow-auto max-h-[600px]">
+                <MarkdownContent content={fileContent} />
+              </div>
+            )}
+          </Tabs.Content>
+        )}
+
         <Tabs.Content value="summary" className="p-4">
           <MetadataSummary result={agentOutput.result!} />
         </Tabs.Content>
@@ -101,6 +177,162 @@ export function AgentOutputReviewPanel({
           </pre>
         </Tabs.Content>
       </Tabs.Root>
+    </div>
+  );
+}
+
+/** Simple markdown renderer — renders headings, bold, lists, tables, and paragraphs. */
+function MarkdownContent({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+
+    // Headings
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const text = headingMatch[2];
+      const Tag = `h${level}` as keyof React.JSX.IntrinsicElements;
+      elements.push(<Tag key={index}>{text}</Tag>);
+      index++;
+      continue;
+    }
+
+    // Table: detect lines starting with |
+    if (line.trim().startsWith('|')) {
+      const tableLines: string[] = [];
+      while (index < lines.length && lines[index].trim().startsWith('|')) {
+        tableLines.push(lines[index]);
+        index++;
+      }
+      elements.push(<MarkdownTable key={index} lines={tableLines} />);
+      continue;
+    }
+
+    // Unordered list items
+    if (line.match(/^\s*[-*]\s+/)) {
+      const listItems: string[] = [];
+      while (index < lines.length && lines[index].match(/^\s*[-*]\s+/)) {
+        listItems.push(lines[index].replace(/^\s*[-*]\s+/, ''));
+        index++;
+      }
+      elements.push(
+        <ul key={index}>
+          {listItems.map((item, itemIndex) => (
+            <li key={itemIndex}><InlineMarkdown text={item} /></li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    // Ordered list items
+    if (line.match(/^\s*\d+\.\s+/)) {
+      const listItems: string[] = [];
+      while (index < lines.length && lines[index].match(/^\s*\d+\.\s+/)) {
+        listItems.push(lines[index].replace(/^\s*\d+\.\s+/, ''));
+        index++;
+      }
+      elements.push(
+        <ol key={index}>
+          {listItems.map((item, itemIndex) => (
+            <li key={itemIndex}><InlineMarkdown text={item} /></li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+
+    // Horizontal rule
+    if (line.match(/^---+$/)) {
+      elements.push(<hr key={index} />);
+      index++;
+      continue;
+    }
+
+    // Empty line
+    if (line.trim() === '') {
+      index++;
+      continue;
+    }
+
+    // Paragraph — collect consecutive non-empty, non-special lines
+    const paraLines: string[] = [];
+    while (
+      index < lines.length &&
+      lines[index].trim() !== '' &&
+      !lines[index].match(/^#{1,6}\s/) &&
+      !lines[index].trim().startsWith('|') &&
+      !lines[index].match(/^\s*[-*]\s+/) &&
+      !lines[index].match(/^\s*\d+\.\s+/) &&
+      !lines[index].match(/^---+$/)
+    ) {
+      paraLines.push(lines[index]);
+      index++;
+    }
+    if (paraLines.length > 0) {
+      elements.push(
+        <p key={index}>
+          <InlineMarkdown text={paraLines.join(' ')} />
+        </p>,
+      );
+    }
+  }
+
+  return <>{elements}</>;
+}
+
+function InlineMarkdown({ text }: { text: string }) {
+  // Bold: **text**
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, partIndex) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={partIndex}>{part.slice(2, -2)}</strong>;
+        }
+        return <React.Fragment key={partIndex}>{part}</React.Fragment>;
+      })}
+    </>
+  );
+}
+
+function MarkdownTable({ lines }: { lines: string[] }) {
+  if (lines.length < 2) return null;
+
+  const parseRow = (line: string): string[] =>
+    line.split('|').slice(1, -1).map((cell) => cell.trim());
+
+  const headers = parseRow(lines[0]);
+  // Skip separator line (index 1)
+  const bodyLines = lines.slice(2);
+
+  return (
+    <div className="overflow-x-auto">
+      <table>
+        <thead>
+          <tr>
+            {headers.map((header, headerIndex) => (
+              <th key={headerIndex}><InlineMarkdown text={header} /></th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {bodyLines.map((line, rowIndex) => {
+            const cells = parseRow(line);
+            return (
+              <tr key={rowIndex}>
+                {cells.map((cell, cellIndex) => (
+                  <td key={cellIndex}><InlineMarkdown text={cell} /></td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -130,6 +362,18 @@ function MetadataValue({ value }: { value: unknown }) {
   }
 
   if (typeof value === 'string') {
+    // Detect stringified JSON and render it structured
+    const trimmed = value.trim();
+    if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        if (typeof parsed === 'object' && parsed !== null) {
+          return <MetadataValue value={parsed} />;
+        }
+      } catch {
+        // Not valid JSON, fall through to plain string
+      }
+    }
     return <span className="whitespace-pre-wrap break-words">{value}</span>;
   }
 
@@ -159,22 +403,18 @@ function MetadataValue({ value }: { value: unknown }) {
         {value.map((item, index) => (
           <div key={index} className="rounded-md border bg-muted/30 p-3">
             {typeof item === 'object' && item !== null ? (
-              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+              <dl className="grid grid-cols-1 gap-y-2 text-xs">
                 {Object.entries(item as Record<string, unknown>).map(([subKey, subValue]) => (
-                  <React.Fragment key={subKey}>
-                    <dt className="text-muted-foreground font-medium">{formatKey(subKey)}</dt>
-                    <dd className="font-mono break-words">
-                      {subValue === null || subValue === undefined
-                        ? '-'
-                        : typeof subValue === 'object'
-                        ? JSON.stringify(subValue)
-                        : String(subValue)}
+                  <div key={subKey}>
+                    <dt className="text-muted-foreground font-medium mb-0.5">{formatKey(subKey)}</dt>
+                    <dd className="break-words">
+                      <MetadataValue value={subValue} />
                     </dd>
-                  </React.Fragment>
+                  </div>
                 ))}
               </dl>
             ) : (
-              <span className="text-xs">{JSON.stringify(item)}</span>
+              <span className="text-xs"><MetadataValue value={item} /></span>
             )}
           </div>
         ))}
@@ -185,18 +425,14 @@ function MetadataValue({ value }: { value: unknown }) {
   if (typeof value === 'object') {
     return (
       <div className="rounded-md border bg-muted/30 p-3">
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        <dl className="grid grid-cols-1 gap-y-2 text-xs">
           {Object.entries(value as Record<string, unknown>).map(([subKey, subValue]) => (
-            <React.Fragment key={subKey}>
-              <dt className="text-muted-foreground font-medium">{formatKey(subKey)}</dt>
-              <dd className="font-mono break-words">
-                {subValue === null || subValue === undefined
-                  ? '-'
-                  : typeof subValue === 'object'
-                  ? JSON.stringify(subValue)
-                  : String(subValue)}
+            <div key={subKey}>
+              <dt className="text-muted-foreground font-medium mb-0.5">{formatKey(subKey)}</dt>
+              <dd className="break-words">
+                <MetadataValue value={subValue} />
               </dd>
-            </React.Fragment>
+            </div>
           ))}
         </dl>
       </div>

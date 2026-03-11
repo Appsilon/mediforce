@@ -687,7 +687,7 @@ describe('WorkflowEngine', () => {
       ).rejects.toThrow('Firestore unavailable');
     });
 
-    it('sets assignedRole from stepConfig.allowedRoles[0]', async () => {
+    it('sets assignedRole from ProcessConfig for the next step', async () => {
       const humanTaskRepo = new InMemoryHumanTaskRepository();
       const engineWithHumanTasks = new WorkflowEngine(
         processRepo,
@@ -701,20 +701,31 @@ describe('WorkflowEngine', () => {
         humanTaskRepo,
       );
 
+      // Save a ProcessConfig with allowedRoles for the 'process' step (the next step after 'start')
+      await processRepo.saveProcessConfig({
+        processName: 'linear-process',
+        configName: 'with-roles',
+        configVersion: '1.0',
+        stepConfigs: [
+          { stepId: 'start', executorType: 'human' },
+          { stepId: 'process', executorType: 'human', allowedRoles: ['reviewer'] },
+        ],
+      });
+
       const instance = await engineWithHumanTasks.createInstance(
         'linear-process',
         '1.0',
         'user-1',
         'manual',
         {},
+        'with-roles',
+        '1.0',
       );
       await engineWithHumanTasks.startInstance(instance.id);
-      const stepConfig: StepConfig = { stepId: 'start', executorType: 'human', allowedRoles: ['reviewer'] };
       await engineWithHumanTasks.advanceStep(
         instance.id,
         {},
         { id: 'user-1', role: 'operator' },
-        stepConfig,
       );
 
       expect(humanTaskRepo.getAll()[0].assignedRole).toBe('reviewer');

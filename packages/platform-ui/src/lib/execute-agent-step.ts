@@ -165,16 +165,19 @@ export async function executeAgentStep(
     }
 
     // Human reviewer path (default): create HumanTask with agent output embedded
+    const reviewTaskId = crypto.randomUUID();
+    const reviewTaskNow = new Date().toISOString();
+
     await humanTaskRepo.create({
-      id: crypto.randomUUID(),
+      id: reviewTaskId,
       processInstanceId: instanceId,
       stepId,
       assignedRole: stepConfig.allowedRoles?.[0] ?? 'reviewer',
       assignedUserId: null,
       status: 'pending',
       deadline: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: reviewTaskNow,
+      updatedAt: reviewTaskNow,
       completedAt: null,
       completionData: {
         reviewType: 'agent_output_review',
@@ -188,6 +191,26 @@ export async function executeAgentStep(
         },
         iterationNumber: 0,
       },
+      creationReason: 'agent_review_l3',
+    });
+
+    await auditRepo.append({
+      actorId: `agent:${pluginId}`,
+      actorType: 'agent',
+      actorRole: autonomyLevel,
+      action: 'task.created',
+      description: `Human task created for step '${stepId}' (reason: agent_review_l3)`,
+      timestamp: reviewTaskNow,
+      inputSnapshot: { taskId: reviewTaskId, stepId, reason: 'agent_review_l3', assignedRole: stepConfig.allowedRoles?.[0] ?? 'reviewer' },
+      outputSnapshot: {},
+      basis: 'L3 agent step paused — human reviewer task created',
+      entityType: 'humanTask',
+      entityId: reviewTaskId,
+      processInstanceId: instanceId,
+      stepId,
+      processDefinitionVersion: instance.definitionVersion,
+      executorType: 'agent',
+      reviewerType: 'human',
     });
 
     const currentInstance = await instanceRepo.getById(instanceId);

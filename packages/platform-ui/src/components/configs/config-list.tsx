@@ -48,7 +48,11 @@ export function ConfigList({ processName }: ConfigListProps) {
         </div>
       ) : (
         <div className="space-y-2">
-          {configs.map((config) => {
+          {[...configs].sort((a, b) => {
+            const nameCompare = a.configName.localeCompare(b.configName);
+            if (nameCompare !== 0) return nameCompare;
+            return Number(b.configVersion) - Number(a.configVersion);
+          }).map((config) => {
             const stepCount = config.stepConfigs.length;
             const href = `/configs/${encodeURIComponent(processName)}/${encodeURIComponent(config.configName)}/${encodeURIComponent(config.configVersion)}`;
             const cloneHref = `/configs/new?process=${encodeURIComponent(processName)}&cloneConfig=${encodeURIComponent(config.configName)}&cloneVersion=${encodeURIComponent(config.configVersion)}`;

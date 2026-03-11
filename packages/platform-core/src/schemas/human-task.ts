@@ -8,6 +8,8 @@ export const HumanTaskStatusSchema = z.enum([
   'cancelled',  // withdrawn (e.g., process aborted)
 ]);
 
+export const CreationReasonSchema = z.enum(['human_executor', 'agent_review_l3']);
+
 export const HumanTaskSchema = z.object({
   id: z.string().min(1),
   processInstanceId: z.string().min(1),
@@ -21,6 +23,7 @@ export const HumanTaskSchema = z.object({
   completedAt: z.string().datetime().nullable(),
   completionData: z.record(z.string(), z.unknown()).nullable(),  // structured response on completion
   ui: StepUiSchema.optional(),  // copied from step definition — tells UI what form to render
+  creationReason: CreationReasonSchema.optional(),  // why this task was created
 });
 
 export type HumanTaskStatus = z.infer<typeof HumanTaskStatusSchema>;

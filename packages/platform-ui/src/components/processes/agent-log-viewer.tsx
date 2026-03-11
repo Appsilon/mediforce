@@ -18,8 +18,20 @@ interface LogEntry {
   [key: string]: unknown;
 }
 
+interface AgentLogFile {
+  stepId: string;
+  file: string;
+}
+
 interface AgentLogViewerProps {
-  logFile: string | null;
+  logFiles: AgentLogFile[];
+}
+
+interface AgentLogSection {
+  stepId: string;
+  entries: LogEntry[];
+  rawContent: string | null;
+  error: string | null;
 }
 
 import type { LucideIcon } from 'lucide-react';
@@ -176,68 +188,10 @@ function parseLogEntries(content: string): LogEntry[] {
   return entries;
 }
 
-export function AgentLogViewer({ logFile }: AgentLogViewerProps) {
-  const [entries, setEntries] = React.useState<LogEntry[]>([]);
-  const [rawContent, setRawContent] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [autoRefresh, setAutoRefresh] = React.useState(false);
-  const scrollRef = React.useRef<HTMLDivElement>(null);
+type LogGroup = { kind: 'batch'; entries: LogEntry[]; ts: string } | { kind: 'single'; entry: LogEntry; category: string };
 
-  const fetchLog = React.useCallback(async () => {
-    if (!logFile) return;
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/agent-logs?file=${encodeURIComponent(logFile)}`);
-      const data = await response.json() as { content: string; error?: string };
-      if (data.error && !data.content) {
-        setError(data.error);
-      } else {
-        setError(null);
-        const parsed = parseLogEntries(data.content);
-        if (parsed.length > 0) {
-          setEntries(parsed);
-          setRawContent(null);
-        } else if (data.content.trim()) {
-          // Fallback: plain-text log (old format)
-          setEntries([]);
-          setRawContent(data.content);
-        } else {
-          setEntries([]);
-          setRawContent(null);
-        }
-      }
-    } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : 'Failed to fetch log');
-    } finally {
-      setLoading(false);
-    }
-  }, [logFile]);
-
-  React.useEffect(() => { fetchLog(); }, [fetchLog]);
-
-  React.useEffect(() => {
-    if (!autoRefresh || !logFile) return;
-    const interval = setInterval(fetchLog, 3000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, logFile, fetchLog]);
-
-  React.useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [entries]);
-
-  if (!logFile) {
-    return (
-      <div className="text-sm text-muted-foreground py-8 text-center">
-        No agent log available for this run.
-      </div>
-    );
-  }
-
-  // Group consecutive tool_calls into parallel batches, skip empty entries
-  const groups: Array<{ kind: 'batch'; entries: LogEntry[]; ts: string } | { kind: 'single'; entry: LogEntry; category: string }> = [];
+function buildGroups(entries: LogEntry[]): LogGroup[] {
+  const groups: LogGroup[] = [];
   let currentBatch: LogEntry[] = [];
 
   for (const entry of entries) {
@@ -257,12 +211,120 @@ export function AgentLogViewer({ logFile }: AgentLogViewerProps) {
   if (currentBatch.length > 0) {
     groups.push({ kind: 'batch', entries: currentBatch, ts: currentBatch[0].ts });
   }
+  return groups;
+}
+
+function LogGroupList({ groups }: { groups: LogGroup[] }) {
+  return (
+    <>
+      {groups.map((group, groupIndex) => {
+        const prevTs = groupIndex > 0
+          ? (groups[groupIndex - 1].kind === 'batch'
+            ? (groups[groupIndex - 1] as { ts: string }).ts
+            : (groups[groupIndex - 1] as { entry: LogEntry }).entry.ts)
+          : null;
+        const currentTs = group.kind === 'batch' ? group.ts : group.entry.ts;
+
+        return (
+          <div key={groupIndex}>
+            <div className="flex items-center gap-1 mt-2 first:mt-0">
+              <span className="text-[10px] text-muted-foreground font-mono">{formatTime(currentTs)}</span>
+              <ElapsedBadge prevTs={prevTs} currentTs={currentTs} />
+            </div>
+
+            {group.kind === 'batch' ? (
+              <div className={cn('ml-2', group.entries.length > 1 && 'border-l-2 border-purple-200 dark:border-purple-800 pl-2')}>
+                {group.entries.length > 1 && (
+                  <span className="text-[10px] text-muted-foreground">{group.entries.length} parallel calls</span>
+                )}
+                {group.entries.map((entry, entryIndex) => (
+                  <ToolCallEntry key={entryIndex} entry={entry} />
+                ))}
+              </div>
+            ) : group.category === 'assistant_text' ? (
+              <AssistantEntry entry={group.entry} />
+            ) : group.category === 'tool_result' ? (
+              <ToolResultEntry entry={group.entry} />
+            ) : group.category === 'result' ? (
+              <ResultEntry entry={group.entry} />
+            ) : null}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
+  try {
+    const response = await fetch(`/api/agent-logs?file=${encodeURIComponent(file)}`);
+    const data = await response.json() as { content: string; error?: string };
+    if (data.error && !data.content) {
+      return { entries: [], rawContent: null, error: data.error };
+    }
+    const parsed = parseLogEntries(data.content);
+    if (parsed.length > 0) {
+      return { entries: parsed, rawContent: null, error: null };
+    } else if (data.content.trim()) {
+      return { entries: [], rawContent: data.content, error: null };
+    }
+    return { entries: [], rawContent: null, error: null };
+  } catch (fetchError) {
+    return { entries: [], rawContent: null, error: fetchError instanceof Error ? fetchError.message : 'Failed to fetch log' };
+  }
+}
+
+export function AgentLogViewer({ logFiles }: AgentLogViewerProps) {
+  const [sections, setSections] = React.useState<AgentLogSection[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [autoRefresh, setAutoRefresh] = React.useState(false);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  const fetchLogs = React.useCallback(async () => {
+    if (logFiles.length === 0) return;
+    setLoading(true);
+    try {
+      const results = await Promise.all(
+        logFiles.map(async (logFile) => {
+          const result = await fetchSingleLog(logFile.file);
+          return { stepId: logFile.stepId, ...result };
+        }),
+      );
+      setSections(results);
+    } finally {
+      setLoading(false);
+    }
+  }, [logFiles]);
+
+  React.useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  React.useEffect(() => {
+    if (!autoRefresh || logFiles.length === 0) return;
+    const interval = setInterval(fetchLogs, 3000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, logFiles, fetchLogs]);
+
+  React.useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [sections]);
+
+  if (logFiles.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground py-8 text-center">
+        No agent log available for this run.
+      </div>
+    );
+  }
+
+  const totalEvents = sections.reduce((sum, section) => sum + section.entries.length, 0);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="text-xs text-muted-foreground">
-          {entries.length > 0 && <span>{entries.length} events</span>}
+          {totalEvents > 0 && <span>{totalEvents} events across {sections.length} agent{sections.length > 1 ? 's' : ''}</span>}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
@@ -275,7 +337,7 @@ export function AgentLogViewer({ logFile }: AgentLogViewerProps) {
             Auto-refresh
           </label>
           <button
-            onClick={fetchLog}
+            onClick={fetchLogs}
             disabled={loading}
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
           >
@@ -285,54 +347,51 @@ export function AgentLogViewer({ logFile }: AgentLogViewerProps) {
         </div>
       </div>
 
-      {error && (
-        <div className="text-xs text-amber-600 dark:text-amber-400">{error}</div>
-      )}
-
       <div
         ref={scrollRef}
         className="border rounded-md p-3 overflow-auto max-h-[500px] space-y-0.5"
       >
-        {groups.length === 0 && !rawContent && (
+        {sections.length === 0 && (
           <p className="text-xs text-muted-foreground text-center py-4">
             {loading ? 'Loading...' : 'Waiting for agent activity...'}
           </p>
         )}
-        {rawContent && (
-          <pre className="text-xs font-mono whitespace-pre-wrap break-all">{rawContent}</pre>
-        )}
-        {groups.map((group, groupIndex) => {
-          const prevTs = groupIndex > 0
-            ? (groups[groupIndex - 1].kind === 'batch'
-              ? (groups[groupIndex - 1] as { ts: string }).ts
-              : (groups[groupIndex - 1] as { entry: LogEntry }).entry.ts)
-            : null;
-          const currentTs = group.kind === 'batch' ? group.ts : group.entry.ts;
+        {sections.map((section, sectionIndex) => {
+          const groups = buildGroups(section.entries);
+          const isEmpty = groups.length === 0 && !section.rawContent;
 
           return (
-            <div key={groupIndex}>
-              {/* Time + elapsed badge */}
-              <div className="flex items-center gap-1 mt-2 first:mt-0">
-                <span className="text-[10px] text-muted-foreground font-mono">{formatTime(currentTs)}</span>
-                <ElapsedBadge prevTs={prevTs} currentTs={currentTs} />
-              </div>
-
-              {group.kind === 'batch' ? (
-                <div className={cn('ml-2', group.entries.length > 1 && 'border-l-2 border-purple-200 dark:border-purple-800 pl-2')}>
-                  {group.entries.length > 1 && (
-                    <span className="text-[10px] text-muted-foreground">{group.entries.length} parallel calls</span>
+            <div key={sectionIndex}>
+              {/* Separator between agents */}
+              {sections.length > 1 && (
+                <div className={cn('flex items-center gap-2 py-2', sectionIndex > 0 && 'mt-4 border-t border-dashed border-border pt-4')}>
+                  <Bot className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                    {section.stepId}
+                  </span>
+                  {section.entries.length > 0 && (
+                    <span className="text-[10px] text-muted-foreground">
+                      ({section.entries.length} events)
+                    </span>
                   )}
-                  {group.entries.map((entry, entryIndex) => (
-                    <ToolCallEntry key={entryIndex} entry={entry} />
-                  ))}
                 </div>
-              ) : group.category === 'assistant_text' ? (
-                <AssistantEntry entry={group.entry} />
-              ) : group.category === 'tool_result' ? (
-                <ToolResultEntry entry={group.entry} />
-              ) : group.category === 'result' ? (
-                <ResultEntry entry={group.entry} />
-              ) : null}
+              )}
+
+              {section.error && (
+                <div className="text-xs text-amber-600 dark:text-amber-400 py-1">{section.error}</div>
+              )}
+
+              {isEmpty && !section.error && (
+                <p className="text-xs text-muted-foreground py-2">
+                  Waiting for agent activity...
+                </p>
+              )}
+
+              {section.rawContent && (
+                <pre className="text-xs font-mono whitespace-pre-wrap break-all">{section.rawContent}</pre>
+              )}
+
+              <LogGroupList groups={groups} />
             </div>
           );
         })}
