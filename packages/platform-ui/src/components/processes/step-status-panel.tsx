@@ -1,6 +1,7 @@
 'use client';
 
-import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog } from 'lucide-react';
+import * as React from 'react';
+import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-core';
 import { AutonomyBadge } from '../agents/autonomy-badge';
 import { cn } from '@/lib/utils';
@@ -11,6 +12,7 @@ interface AgentEventItem {
   type: string;
   payload: unknown;
   sequence: number;
+  timestamp?: string;
 }
 
 interface ProgressPayload {
@@ -19,13 +21,26 @@ interface ProgressPayload {
   label?: string;
 }
 
+interface StepConfigInfo {
+  executorType?: string;
+  autonomyLevel?: string;
+  plugin?: string;
+  model?: string;
+  confidenceThreshold?: number;
+  fallbackBehavior?: string;
+  timeoutMinutes?: number;
+  reviewerType?: string;
+  agentConfig?: { skill?: string; prompt?: string; model?: string; skillsDir?: string };
+}
+
 interface StepStatusPanelProps {
   instance: ProcessInstance;
   definitionSteps: Step[];
   stepExecutions: StepExecution[];
   agentEvents?: AgentEventItem[];
   onStepClick?: (stepId: string) => void;
-  stepConfigMap?: Map<string, { autonomyLevel?: string; executorType?: string }>;
+  stepConfigMap?: Map<string, StepConfigInfo>;
+  onAgentLogClick?: () => void;
 }
 
 type EffectiveStatus = 'pending' | 'running' | 'completed' | 'failed' | 'waiting';
@@ -140,8 +155,10 @@ function StepProgress({ stepId, agentEvents }: { stepId: string; agentEvents: Ag
     .filter((e) => e.stepId === stepId)
     .sort((a, b) => a.sequence - b.sequence);
 
-  // Latest status message (plain text)
-  const statusEvents = stepEvents.filter((e) => e.type === 'status');
+  // Latest status message (plain text) — filter out internal log paths
+  const statusEvents = stepEvents.filter(
+    (e) => e.type === 'status' && !String(e.payload).startsWith('agent activity log:'),
+  );
   const latestStatus = statusEvents.length > 0
     ? String((statusEvents[statusEvents.length - 1] as AgentEventItem).payload)
     : null;
@@ -181,6 +198,75 @@ function StepProgress({ stepId, agentEvents }: { stepId: string; agentEvents: Ag
   );
 }
 
+function StepConfigDetail({
+  config,
+  hasAgentLog,
+  onAgentLogClick,
+  assembledPrompt,
+}: {
+  config: StepConfigInfo;
+  hasAgentLog: boolean;
+  onAgentLogClick?: () => void;
+  assembledPrompt?: string;
+}) {
+  const entries: Array<{ label: string; value: string }> = [];
+
+  if (config.plugin) entries.push({ label: 'Plugin', value: config.plugin });
+  const model = config.agentConfig?.model ?? config.model;
+  if (model) entries.push({ label: 'Model', value: model });
+  if (config.agentConfig?.skill) entries.push({ label: 'Skill', value: config.agentConfig.skill });
+  if (config.confidenceThreshold !== undefined) entries.push({ label: 'Confidence threshold', value: `${config.confidenceThreshold}` });
+  if (config.fallbackBehavior) entries.push({ label: 'Fallback', value: config.fallbackBehavior.replace(/_/g, ' ') });
+  if (config.timeoutMinutes) entries.push({ label: 'Timeout', value: `${config.timeoutMinutes} min` });
+  if (config.reviewerType && config.reviewerType !== 'none') entries.push({ label: 'Reviewer', value: config.reviewerType });
+
+  if (entries.length === 0 && !assembledPrompt && !config.agentConfig?.prompt && !hasAgentLog) return null;
+
+  return (
+    <div className="mt-2 rounded-md bg-muted/50 border px-3 py-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+      {entries.length > 0 && (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+          {entries.map(({ label, value }) => (
+            <React.Fragment key={label}>
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd className="font-mono">{value}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      )}
+      {assembledPrompt && (
+        <details className="text-xs">
+          <summary className="text-muted-foreground cursor-pointer hover:text-foreground font-medium">
+            View Full Prompt
+          </summary>
+          <pre className="mt-1 rounded bg-muted p-2 whitespace-pre-wrap break-words max-h-96 overflow-auto text-xs leading-relaxed">
+            {assembledPrompt}
+          </pre>
+        </details>
+      )}
+      {!assembledPrompt && config.agentConfig?.prompt && (
+        <details className="text-xs">
+          <summary className="text-muted-foreground cursor-pointer hover:text-foreground">
+            Prompt
+          </summary>
+          <pre className="mt-1 rounded bg-muted p-2 whitespace-pre-wrap break-words max-h-40 overflow-auto text-xs">
+            {config.agentConfig.prompt}
+          </pre>
+        </details>
+      )}
+      {hasAgentLog && onAgentLogClick && (
+        <button
+          onClick={onAgentLogClick}
+          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+        >
+          <FileText className="h-3 w-3" />
+          View Agent Log
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Resolve a step ID to its name from the definition steps list. */
 function resolveStepName(stepId: string, allSteps: Step[]): string {
   const found = allSteps.find((s) => s.id === stepId);
@@ -206,7 +292,10 @@ export function StepStatusPanel({
   agentEvents = [],
   onStepClick,
   stepConfigMap,
+  onAgentLogClick,
 }: StepStatusPanelProps) {
+  const [expandedStepId, setExpandedStepId] = React.useState<string | null>(null);
+
   // Filter out terminal steps — they aren't meaningful to display
   const visibleSteps = definitionSteps.filter((s) => s.type !== 'terminal');
 
@@ -234,6 +323,17 @@ export function StepStatusPanel({
             (e) => e.stepId === step.id && e.status === 'completed' && e.verdict,
           )?.verdict;
 
+          const stepConfig = stepConfigMap?.get(step.id);
+          const isExpanded = expandedStepId === step.id;
+          const hasConfig = stepConfig && stepConfig.executorType === 'agent';
+          const hasAgentLog = agentEvents.some(
+            (e) => e.stepId === step.id && e.type === 'status' && String(e.payload).startsWith('agent activity log:'),
+          );
+          const promptEvent = agentEvents.find(
+            (e) => e.stepId === step.id && e.type === 'prompt',
+          );
+          const assembledPrompt = promptEvent ? String(promptEvent.payload) : undefined;
+
           return (
             <li
               key={step.id}
@@ -242,9 +342,15 @@ export function StepStatusPanel({
                 getLeftBorderClass(status),
                 status === 'completed' && 'opacity-60 hover:opacity-100 transition-opacity',
                 'hover:bg-muted/50',
-                onStepClick && 'cursor-pointer',
+                'cursor-pointer',
               )}
-              onClick={onStepClick ? () => onStepClick(step.id) : undefined}
+              onClick={() => {
+                if (hasConfig) {
+                  setExpandedStepId(isExpanded ? null : step.id);
+                } else if (onStepClick) {
+                  onStepClick(step.id);
+                }
+              }}
             >
               {/* Icon + connector line */}
               <div className="flex flex-col items-center">
@@ -268,6 +374,11 @@ export function StepStatusPanel({
                     <AutonomyBadge level={stepConfigMap.get(step.id)!.autonomyLevel!} />
                   )}
                   <StatusLabel status={status} />
+                  {hasConfig && (
+                    isExpanded
+                      ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  )}
                 </div>
                 <div className="text-xs font-mono text-muted-foreground mt-0.5">{step.id}</div>
                 {status === 'running' && stepConfigMap?.get(step.id)?.executorType === 'agent' && (
@@ -297,6 +408,16 @@ export function StepStatusPanel({
                       );
                     })}
                   </div>
+                )}
+
+                {/* Expandable step config detail */}
+                {isExpanded && stepConfig && (
+                  <StepConfigDetail
+                    config={stepConfig}
+                    hasAgentLog={hasAgentLog}
+                    onAgentLogClick={onAgentLogClick}
+                    assembledPrompt={assembledPrompt}
+                  />
                 )}
               </div>
             </li>

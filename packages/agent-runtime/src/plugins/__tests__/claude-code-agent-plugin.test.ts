@@ -3,7 +3,7 @@ import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-p
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin.js';
 
-type SpawnTarget = { spawnClaudeCli: (prompt: string, options?: { model?: string }) => Promise<string> };
+type SpawnTarget = { spawnClaudeCli: (prompt: string, options?: { model?: string; timeoutMs?: number }) => Promise<string> };
 type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };
 
 function mockSpawn(plugin: ClaudeCodeAgentPlugin) {

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, ChevronRight, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Layers, ChevronRight, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
@@ -11,6 +11,7 @@ import { ProcessStatusBadge } from '@/components/processes/process-status-badge'
 import { YamlEditor } from '@/components/processes/yaml-editor';
 import { definitionToYaml } from '@/app/actions/definitions';
 import { ConfigList } from '@/components/configs/config-list';
+import { StartRunDialog } from '@/components/processes/start-run-dialog';
 import { setProcessArchived } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -27,6 +28,7 @@ export default function ProcessDefinitionPage() {
   const [editorYaml, setEditorYaml] = React.useState('');
   const [archiving, setArchiving] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [startRunOpen, setStartRunOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -41,6 +43,9 @@ export default function ProcessDefinitionPage() {
   }, [menuOpen]);
 
   const latest = versions[0] ?? null;
+  const hasManualTrigger = latest?.triggers?.some(
+    (trigger: { type: string }) => trigger.type === 'manual',
+  ) ?? false;
   const activeVersion = selectedVersion
     ? versions.find((v) => v.version === selectedVersion) ?? latest
     : latest;
@@ -174,6 +179,31 @@ export default function ProcessDefinitionPage() {
 
         {/* Runs tab */}
         <Tabs.Content value="runs" className="flex-1 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div />
+            {hasManualTrigger ? (
+              <button
+                onClick={() => setStartRunOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <Play className="h-3.5 w-3.5" />
+                Start Run
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Info className="h-3.5 w-3.5" />
+                This process does not support manual start
+              </span>
+            )}
+          </div>
+
+          <StartRunDialog
+            processName={decodedName}
+            definitionVersion={latest?.version ?? ''}
+            open={startRunOpen}
+            onClose={() => setStartRunOpen(false)}
+          />
+
           {runsLoading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => <div key={i} className="h-10 rounded bg-muted animate-pulse" />)}

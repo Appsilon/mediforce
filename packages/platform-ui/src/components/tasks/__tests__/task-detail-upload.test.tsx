@@ -18,6 +18,7 @@ vi.mock('firebase/storage', () => ({
 }));
 
 vi.mock('firebase/firestore', () => ({
+  doc: vi.fn(),
   where: vi.fn(),
   orderBy: vi.fn(),
   collection: vi.fn(),
