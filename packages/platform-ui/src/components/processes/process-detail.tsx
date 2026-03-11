@@ -49,8 +49,10 @@ export function ProcessDetail({
   backLabel?: string;
   stepConfigMap?: Map<string, Record<string, unknown>>;
 }) {
+  const needsHumanAction = instance.pauseReason === 'waiting_for_human'
+    || instance.pauseReason === 'awaiting_agent_approval';
   const { task: blockingTask } = useActiveTaskForInstance(
-    instance.pauseReason === 'waiting_for_human' ? instance.id : null,
+    needsHumanAction ? instance.id : null,
   );
 
   // Extract debug log filename from agent status events

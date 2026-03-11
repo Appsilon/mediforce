@@ -1,5 +1,5 @@
 name: protocol-to-tfl
-version: "1"
+version: "2"
 description: >
   Transform clinical trial protocol documents into production-ready
   Tables, Figures, and Listings (TFLs).
@@ -26,10 +26,10 @@ steps:
     type: creation
     description: Extract trial metadata from protocol and SAP documents
 
-  - id: review-metadata
-    name: Review Metadata
-    type: review
-    description: Review and approve extracted trial metadata
+  - id: generate-tlg-shells
+    name: Generate TLG Shells
+    type: creation
+    description: Generate mock TLG shell specifications from extracted trial metadata
 
   - id: done
     name: Done
@@ -39,6 +39,6 @@ transitions:
   - from: upload-documents
     to: extract-metadata
   - from: extract-metadata
-    to: review-metadata
-  - from: review-metadata
+    to: generate-tlg-shells
+  - from: generate-tlg-shells
     to: done

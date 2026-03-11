@@ -66,7 +66,10 @@ function getEffectiveStatus(
 
   // No execution record yet — derive from instance state
   if (instance.currentStepId === step.id) {
-    if (instance.status === 'paused' && instance.pauseReason === 'waiting_for_human') {
+    if (instance.status === 'paused' && (
+      instance.pauseReason === 'waiting_for_human'
+      || instance.pauseReason === 'awaiting_agent_approval'
+    )) {
       return 'waiting';
     }
     if (instance.status === 'running') {

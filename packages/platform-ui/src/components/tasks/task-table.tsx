@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { Eye } from 'lucide-react';
 import type { HumanTask } from '@mediforce/platform-core';
 import { ClaimButton } from './claim-button';
 import { cn } from '@/lib/utils';
+import { isAgentReviewTask, getTaskDisplayTitle } from './task-utils';
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -68,8 +70,11 @@ export function TaskTable({
             : tasks.map((task) => (
               <tr key={task.id} className="hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3">
-                  <Link href={`/tasks/${task.id}`} className="font-medium hover:text-primary transition-colors">
-                    {task.stepId}
+                  <Link href={`/tasks/${task.id}`} className="font-medium hover:text-primary transition-colors inline-flex items-center gap-1.5">
+                    {isAgentReviewTask(task) && (
+                      <Eye className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                    )}
+                    {getTaskDisplayTitle(task)}
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{task.processInstanceId.slice(0, 8)}&hellip;</td>
