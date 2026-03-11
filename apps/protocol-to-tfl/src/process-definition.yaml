@@ -1,5 +1,5 @@
 name: protocol-to-tfl
-version: "2"
+version: "3"
 description: >
   Transform clinical trial protocol documents into production-ready
   Tables, Figures, and Listings (TFLs).
@@ -31,6 +31,29 @@ steps:
     type: creation
     description: Generate mock TLG shell specifications from extracted trial metadata
 
+  - id: upload-sdtm
+    name: Upload SDTM
+    type: creation
+    description: Upload SDTM dataset files for ADaM derivation
+    ui:
+      component: file-upload
+      config:
+        acceptedTypes:
+          - application/octet-stream
+          - text/csv
+        minFiles: 1
+        maxFiles: 50
+
+  - id: generate-adam
+    name: Generate ADaM
+    type: creation
+    description: Derive ADaM datasets and R code from SDTM data, trial metadata, and TLG shells
+
+  - id: generate-tlg
+    name: Generate TLG
+    type: creation
+    description: Create final Tables, Figures, and Listings from ADaM datasets and TLG shells
+
   - id: done
     name: Done
     type: terminal
@@ -41,4 +64,10 @@ transitions:
   - from: extract-metadata
     to: generate-tlg-shells
   - from: generate-tlg-shells
+    to: upload-sdtm
+  - from: upload-sdtm
+    to: generate-adam
+  - from: generate-adam
+    to: generate-tlg
+  - from: generate-tlg
     to: done
