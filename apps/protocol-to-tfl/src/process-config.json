@@ -1,7 +1,7 @@
 {
   "processName": "protocol-to-tfl",
   "configName": "agent-extract",
-  "configVersion": "2",
+  "configVersion": "3",
   "stepConfigs": [
     {
       "stepId": "upload-documents",
@@ -31,6 +31,38 @@
       "timeoutMinutes": 20,
       "agentConfig": {
         "skill": "mock-tlg-generator",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet"
+      }
+    },
+    {
+      "stepId": "upload-sdtm",
+      "executorType": "human"
+    },
+    {
+      "stepId": "generate-adam",
+      "executorType": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 30,
+      "agentConfig": {
+        "skill": "sdtm-to-adam",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet"
+      }
+    },
+    {
+      "stepId": "generate-tlg",
+      "executorType": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 30,
+      "agentConfig": {
+        "skill": "adam-to-tlg",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
         "model": "sonnet"
       }

@@ -81,6 +81,7 @@ export {
 } from './agent-run.js';
 
 export {
+  CreationReasonSchema,
   HumanTaskStatusSchema,
   HumanTaskSchema,
   type HumanTaskStatus,

@@ -178,13 +178,25 @@ function formatKey(key: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** Render a value — strings as-is, objects as collapsible JSON. */
+/** Render a value — strings as-is, arrays/objects as structured cards. */
 function ValueDisplay({ value }: { value: unknown }) {
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground italic">null</span>;
   }
 
   if (typeof value === 'string') {
+    // Detect stringified JSON and render it structured
+    const trimmed = value.trim();
+    if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        if (typeof parsed === 'object' && parsed !== null) {
+          return <ValueDisplay value={parsed} />;
+        }
+      } catch {
+        // Not valid JSON, fall through to plain string
+      }
+    }
     return <span className="whitespace-pre-wrap break-words">{value}</span>;
   }
 
@@ -194,18 +206,68 @@ function ValueDisplay({ value }: { value: unknown }) {
 
   if (Array.isArray(value)) {
     if (value.length === 0) return <span className="text-muted-foreground italic">[]</span>;
+
+    // Simple string/number arrays as pills
+    if (value.every((item) => typeof item === 'string' || typeof item === 'number')) {
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          {value.map((item, index) => (
+            <span key={index} className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-xs">
+              {String(item)}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    // Object arrays as cards
     return (
-      <pre className="rounded bg-muted p-2 text-xs overflow-auto max-h-32">
-        {JSON.stringify(value, null, 2)}
-      </pre>
+      <div className="space-y-2">
+        {value.map((item, index) => (
+          <div key={index} className="rounded-md border bg-muted/30 p-3">
+            {typeof item === 'object' && item !== null ? (
+              <dl className="grid grid-cols-1 gap-y-2 text-xs">
+                {Object.entries(item as Record<string, unknown>).map(([subKey, subValue]) => (
+                  <div key={subKey}>
+                    <dt className="text-muted-foreground font-medium mb-0.5">{formatKey(subKey)}</dt>
+                    <dd className="break-words">
+                      {subValue === null || subValue === undefined
+                        ? <span className="text-muted-foreground italic">-</span>
+                        : typeof subValue === 'object'
+                        ? <ValueDisplay value={subValue} />
+                        : <span className="whitespace-pre-wrap">{String(subValue)}</span>}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <span className="text-xs">{String(item)}</span>
+            )}
+          </div>
+        ))}
+      </div>
     );
   }
 
   if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>);
     return (
-      <pre className="rounded bg-muted p-2 text-xs overflow-auto max-h-32">
-        {JSON.stringify(value, null, 2)}
-      </pre>
+      <div className="rounded-md border bg-muted/30 p-3">
+        <dl className="grid grid-cols-1 gap-y-2 text-xs">
+          {entries.map(([subKey, subValue]) => (
+            <div key={subKey}>
+              <dt className="text-muted-foreground font-medium mb-0.5">{formatKey(subKey)}</dt>
+              <dd className="break-words">
+                {subValue === null || subValue === undefined
+                  ? <span className="text-muted-foreground italic">-</span>
+                  : typeof subValue === 'object'
+                  ? <ValueDisplay value={subValue} />
+                  : <span className="whitespace-pre-wrap">{String(subValue)}</span>}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     );
   }
 
