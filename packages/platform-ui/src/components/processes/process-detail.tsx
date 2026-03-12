@@ -11,6 +11,7 @@ import { StepHistoryTabs } from './step-history-tabs';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
+import { RunResultsPanel } from './run-results-panel';
 import { cancelProcessRun } from '@/app/actions/processes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 
@@ -202,6 +203,11 @@ export function ProcessDetail({
           stepConfigMap={stepConfigMap}
           onAgentLogClick={agentLogFiles.length > 0 ? () => setActiveTab('agent-log') : undefined}
         />
+      )}
+
+      {/* Results — shown for completed runs with agent output */}
+      {instance.status === 'completed' && (
+        <RunResultsPanel stepExecutions={stepExecutions} />
       )}
 
       {/* Tabs: Step History | Audit Log */}

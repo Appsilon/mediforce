@@ -209,7 +209,7 @@ describe('StepConfigSchema', () => {
       stepId: 'step-1',
       executorType: 'agent',
       plugin: 'claude-code',
-      agentConfig: { skill: 'trial-metadata-extractor' },
+      agentConfig: { skill: 'trial-metadata-extractor', image: 'mediforce-agent:base' },
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -227,6 +227,7 @@ describe('StepConfigSchema', () => {
         prompt: 'Extract metadata from the uploaded protocol PDF',
         model: 'sonnet',
         skillsDir: 'apps/protocol-to-tfl/plugins/protocol-to-tfl/skills',
+        image: 'mediforce-agent:base',
       },
     });
     expect(result.success).toBe(true);
@@ -237,16 +238,22 @@ describe('StepConfigSchema', () => {
     }
   });
 
-  it('[DATA] should accept agentConfig without skill (optional)', () => {
+  it('[DATA] should reject agentConfig without image (required)', () => {
     const result = StepConfigSchema.safeParse({
       stepId: 'step-1',
       executorType: 'agent',
-      agentConfig: {},
+      agentConfig: { skill: 'some-skill' },
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.agentConfig?.skill).toBeUndefined();
-    }
+    expect(result.success).toBe(false);
+  });
+
+  it('[DATA] should reject agentConfig with empty image string', () => {
+    const result = StepConfigSchema.safeParse({
+      stepId: 'step-1',
+      executorType: 'agent',
+      agentConfig: { image: '' },
+    });
+    expect(result.success).toBe(false);
   });
 
   it('[DATA] should accept stepConfig without agentConfig (optional)', () => {

@@ -16,8 +16,8 @@ export const AgentConfigSchema = z.object({
   model: z.string().optional(),
   skillsDir: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
-  // Container execution — when image is set, plugin spawns Docker instead of bare CLI
-  image: z.string().optional(),
+  // Container execution — all agent steps MUST run inside Docker for security
+  image: z.string().min(1),
   repo: z.string().optional(),
   commit: z.string().optional(),
 });

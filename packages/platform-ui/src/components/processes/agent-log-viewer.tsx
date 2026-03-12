@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { RefreshCw, FileText, Bot, CheckCircle2, Search, FolderOpen } from 'lucide-react';
+import { RefreshCw, FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LogEntry {
@@ -274,10 +274,90 @@ async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawC
   }
 }
 
+/** Serialize a section's log entries into readable plain text for clipboard. */
+function serializeSectionToText(section: AgentLogSection): string {
+  const lines: string[] = [];
+  lines.push(`Agent: ${section.stepId}`);
+  lines.push(`Events: ${section.entries.length}`);
+  lines.push('---');
+
+  if (section.rawContent) {
+    lines.push(section.rawContent);
+    return lines.join('\n');
+  }
+
+  let prevTs: string | null = null;
+  for (const entry of section.entries) {
+    const category = classifyEntry(entry);
+    if (category === 'skip') continue;
+
+    const time = formatTime(entry.ts);
+    if (prevTs) {
+      const elapsed = new Date(entry.ts).getTime() - new Date(prevTs).getTime();
+      if (elapsed >= 500) {
+        lines.push(`  +${(elapsed / 1000).toFixed(1)}s`);
+      }
+    }
+
+    if (category === 'tool_call') {
+      const tool = entry.tool ?? 'Tool';
+      let detail = '';
+      if (entry.input) {
+        if (entry.tool === 'Bash' && typeof entry.input.command === 'string') {
+          detail = entry.input.command;
+        } else if (typeof entry.input.file_path === 'string') {
+          detail = cleanPath(entry.input.file_path);
+        } else if (typeof entry.input.pattern === 'string') {
+          detail = entry.input.pattern;
+        }
+      }
+      lines.push(`[${time}] ${tool} ${detail}`);
+    } else if (category === 'assistant_text') {
+      lines.push(`[${time}] ${(entry.text ?? '').slice(0, 500)}`);
+    } else if (category === 'tool_result') {
+      const content = typeof entry.content === 'string' ? entry.content : JSON.stringify(entry.content ?? '');
+      lines.push(`[${time}] Result: ${content.slice(0, 500)}`);
+    } else if (category === 'result') {
+      lines.push(`[${time}] Done (${entry.subtype ?? 'completed'})`);
+    }
+
+    prevTs = entry.ts;
+  }
+
+  return lines.join('\n');
+}
+
+function AgentTabContent({ section }: { section: AgentLogSection }) {
+  const groups = buildGroups(section.entries);
+  const isEmpty = groups.length === 0 && !section.rawContent;
+
+  return (
+    <>
+      {section.error && (
+        <div className="text-xs text-amber-600 dark:text-amber-400 py-1">{section.error}</div>
+      )}
+
+      {isEmpty && !section.error && (
+        <p className="text-xs text-muted-foreground py-2">
+          Waiting for agent activity...
+        </p>
+      )}
+
+      {section.rawContent && (
+        <pre className="text-xs font-mono whitespace-pre-wrap break-all">{section.rawContent}</pre>
+      )}
+
+      <LogGroupList groups={groups} />
+    </>
+  );
+}
+
 export function AgentLogViewer({ logFiles }: AgentLogViewerProps) {
   const [sections, setSections] = React.useState<AgentLogSection[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [autoRefresh, setAutoRefresh] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState(0);
+  const [copied, setCopied] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   const fetchLogs = React.useCallback(async () => {
@@ -310,6 +390,13 @@ export function AgentLogViewer({ logFiles }: AgentLogViewerProps) {
     }
   }, [sections]);
 
+  // Clamp active tab if sections change
+  React.useEffect(() => {
+    if (sections.length > 0 && activeTab >= sections.length) {
+      setActiveTab(0);
+    }
+  }, [sections, activeTab]);
+
   if (logFiles.length === 0) {
     return (
       <div className="text-sm text-muted-foreground py-8 text-center">
@@ -319,10 +406,21 @@ export function AgentLogViewer({ logFiles }: AgentLogViewerProps) {
   }
 
   const totalEvents = sections.reduce((sum, section) => sum + section.entries.length, 0);
+  const hasTabs = sections.length > 1;
+  const activeSection = sections[activeTab] ?? null;
+
+  const handleCopy = React.useCallback(async () => {
+    if (!activeSection) return;
+    const text = serializeSectionToText(activeSection);
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [activeSection]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
+    <div className="space-y-0">
+      {/* Controls bar */}
+      <div className="flex items-center justify-between mb-2">
         <div className="text-xs text-muted-foreground">
           {totalEvents > 0 && <span>{totalEvents} events across {sections.length} agent{sections.length > 1 ? 's' : ''}</span>}
         </div>
@@ -344,57 +442,74 @@ export function AgentLogViewer({ logFiles }: AgentLogViewerProps) {
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
             Refresh
           </button>
+          <button
+            onClick={handleCopy}
+            disabled={sections.length === 0}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
         </div>
       </div>
 
-      <div
-        ref={scrollRef}
-        className="border rounded-md p-3 overflow-auto max-h-[500px] space-y-0.5"
-      >
-        {sections.length === 0 && (
-          <p className="text-xs text-muted-foreground text-center py-4">
-            {loading ? 'Loading...' : 'Waiting for agent activity...'}
-          </p>
-        )}
-        {sections.map((section, sectionIndex) => {
-          const groups = buildGroups(section.entries);
-          const isEmpty = groups.length === 0 && !section.rawContent;
-
-          return (
-            <div key={sectionIndex}>
-              {/* Separator between agents */}
-              {sections.length > 1 && (
-                <div className={cn('flex items-center gap-2 py-2', sectionIndex > 0 && 'mt-4 border-t border-dashed border-border pt-4')}>
-                  <Bot className="h-3.5 w-3.5 text-blue-500" />
-                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                    {section.stepId}
-                  </span>
+      {/* Terminal-style container */}
+      <div className="border rounded-md overflow-hidden bg-background">
+        {/* Tab bar — only shown when multiple agents */}
+        {hasTabs && (
+          <div className="flex items-stretch bg-muted/60 border-b overflow-x-auto">
+            {sections.map((section, index) => {
+              const isActive = index === activeTab;
+              return (
+                <button
+                  key={index}
+                  onClick={() => setActiveTab(index)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors border-r border-border/50 last:border-r-0',
+                    isActive
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                  )}
+                >
+                  <Bot className={cn('h-3 w-3', isActive ? 'text-blue-500' : 'text-muted-foreground/60')} />
+                  {section.stepId}
                   {section.entries.length > 0 && (
-                    <span className="text-[10px] text-muted-foreground">
-                      ({section.entries.length} events)
+                    <span className={cn(
+                      'text-[10px] rounded-full px-1.5 py-0.5 tabular-nums',
+                      isActive
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                        : 'bg-muted text-muted-foreground',
+                    )}>
+                      {section.entries.length}
                     </span>
                   )}
-                </div>
-              )}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-              {section.error && (
-                <div className="text-xs text-amber-600 dark:text-amber-400 py-1">{section.error}</div>
-              )}
+        {/* Log content area */}
+        <div
+          ref={scrollRef}
+          className="p-3 overflow-auto max-h-[500px] space-y-0.5"
+        >
+          {sections.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              {loading ? 'Loading...' : 'Waiting for agent activity...'}
+            </p>
+          )}
 
-              {isEmpty && !section.error && (
-                <p className="text-xs text-muted-foreground py-2">
-                  Waiting for agent activity...
-                </p>
-              )}
+          {/* Single agent — show directly */}
+          {sections.length === 1 && activeSection && (
+            <AgentTabContent section={activeSection} />
+          )}
 
-              {section.rawContent && (
-                <pre className="text-xs font-mono whitespace-pre-wrap break-all">{section.rawContent}</pre>
-              )}
-
-              <LogGroupList groups={groups} />
-            </div>
-          );
-        })}
+          {/* Multiple agents — show active tab */}
+          {hasTabs && activeSection && (
+            <AgentTabContent section={activeSection} />
+          )}
+        </div>
       </div>
     </div>
   );

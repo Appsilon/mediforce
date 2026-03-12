@@ -30,6 +30,7 @@ export default function ProcessDefinitionPage() {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [startRunOpen, setStartRunOpen] = React.useState(false);
   const [showArchivedVersions, setShowArchivedVersions] = React.useState(false);
+  const [archiveOverrides, setArchiveOverrides] = React.useState<Record<string, boolean>>({});
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -51,9 +52,12 @@ export default function ProcessDefinitionPage() {
     ? versions.find((v) => v.version === selectedVersion) ?? latest
     : latest;
 
-  const activeVersions = versions.filter((v) => v.archived !== true);
-  const archivedVersionCount = versions.length - activeVersions.length;
-  const visibleVersions = showArchivedVersions ? versions : activeVersions;
+  const effectiveVersions = versions.map((v) =>
+    v.version in archiveOverrides ? { ...v, archived: archiveOverrides[v.version] } : v,
+  );
+  const activeVersions = effectiveVersions.filter((v) => v.archived !== true);
+  const archivedVersionCount = effectiveVersions.length - activeVersions.length;
+  const visibleVersions = showArchivedVersions ? effectiveVersions : activeVersions;
 
   // Reconstruct YAML from stored definition when version is selected
   React.useEffect(() => {
@@ -315,7 +319,16 @@ export default function ProcessDefinitionPage() {
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
-                          await setDefinitionVersionArchived(decodedName, v.version, v.archived !== true);
+                          const newArchived = v.archived !== true;
+                          setArchiveOverrides((prev) => ({ ...prev, [v.version]: newArchived }));
+                          const result = await setDefinitionVersionArchived(decodedName, v.version, newArchived);
+                          if (!result.success) {
+                            setArchiveOverrides((prev) => {
+                              const next = { ...prev };
+                              delete next[v.version];
+                              return next;
+                            });
+                          }
                         }}
                         className="ml-auto text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
                         title={v.archived ? 'Unarchive version' : 'Archive version'}

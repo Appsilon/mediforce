@@ -54,10 +54,12 @@ export {
   StepExecutionStatusSchema,
   GateResultSchema,
   ReviewVerdictSchema,
+  AgentOutputSnapshotSchema,
   StepExecutionSchema,
   type StepExecutionStatus,
   type GateResult,
   type ReviewVerdict,
+  type AgentOutputSnapshot,
   type StepExecution,
 } from './step-execution.js';
 

@@ -205,8 +205,9 @@ export async function POST(
       if (stepConfig.executorType === 'agent') {
         console.log(`[auto-runner] Executing agent step '${instance.currentStepId}' on instance '${instanceId}' (iteration ${stepsExecuted})`);
 
+        const executionId = crypto.randomUUID();
         await instanceRepo.addStepExecution(instanceId, {
-          id: crypto.randomUUID(),
+          id: executionId,
           instanceId,
           stepId: instance.currentStepId,
           status: 'running',
@@ -244,6 +245,7 @@ export async function POST(
           instance.currentStepId,
           appContext,
           triggeredBy ?? 'auto-runner',
+          executionId,
         );
 
         stepsExecuted++;

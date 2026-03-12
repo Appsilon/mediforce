@@ -1,13 +1,17 @@
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin.js';
 
-type SpawnTarget = { spawnClaudeCli: (prompt: string, options?: { model?: string; timeoutMs?: number }) => Promise<string> };
+type DockerResult = { cliOutput: string; gitMetadata: null; outputDir: string };
+type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
 type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };
 
 function mockSpawn(plugin: ClaudeCodeAgentPlugin) {
-  return vi.spyOn(plugin as unknown as SpawnTarget, 'spawnClaudeCli');
+  return vi.spyOn(plugin as unknown as SpawnDockerTarget, 'spawnDockerContainer');
 }
 
 function mockReadSkill(plugin: ClaudeCodeAgentPlugin) {
@@ -33,6 +37,7 @@ function buildMockContext(overrides: Partial<AgentContext> = {}): AgentContext {
           agentConfig: {
             skill: 'trial-metadata-extractor',
             skillsDir: '/plugins/protocol-to-tfl/skills',
+            image: 'mediforce-agent:protocol-to-tfl',
           },
         },
       ],
@@ -78,6 +83,7 @@ describe('ClaudeCodeAgentPlugin', () => {
               plugin: 'claude-code-agent',
               agentConfig: {
                 prompt: 'Extract metadata from the uploaded PDF files',
+                image: 'mediforce-agent:protocol-to-tfl',
               },
             },
           ],
@@ -97,12 +103,34 @@ describe('ClaudeCodeAgentPlugin', () => {
               stepId: 'extract',
               executorType: 'agent',
               plugin: 'claude-code-agent',
-              agentConfig: {},
+              agentConfig: { image: 'mediforce-agent:protocol-to-tfl' },
             },
           ],
         },
       });
       await expect(plugin.initialize(context)).rejects.toThrow(/skill.*prompt/i);
+    });
+
+    it('[ERROR] throws if no Docker image configured', async () => {
+      const context = buildMockContext({
+        config: {
+          processName: 'protocol-to-tfl',
+          configName: 'default',
+          configVersion: 'v1',
+          stepConfigs: [
+            {
+              stepId: 'extract',
+              executorType: 'agent',
+              plugin: 'claude-code-agent',
+              agentConfig: {
+                skill: 'trial-metadata-extractor',
+                image: '',
+              },
+            },
+          ],
+        } satisfies ProcessConfig,
+      });
+      await expect(plugin.initialize(context)).rejects.toThrow(/docker image/i);
     });
 
     it('[ERROR] throws if stepConfig not found for stepId', async () => {
@@ -129,7 +157,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       const { emit, events } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata...');
       mockSpawn(plugin).mockResolvedValue(
-        JSON.stringify({ result: 'extracted metadata', confidence: 0.85 }),
+        { cliOutput: JSON.stringify({ result: 'extracted metadata', confidence: 0.85 }), gitMetadata: null, outputDir: '/tmp/mock-output' },
       );
 
       await plugin.run(emit);
@@ -146,7 +174,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       const { emit } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata from docs.');
       const spawnSpy = mockSpawn(plugin).mockResolvedValue(
-        JSON.stringify({ result: 'ok' }),
+        { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output' },
       );
 
       await plugin.run(emit);
@@ -173,6 +201,7 @@ describe('ClaudeCodeAgentPlugin', () => {
                 skill: 'trial-metadata-extractor',
                 skillsDir: '/plugins/protocol-to-tfl/skills',
                 prompt: 'Focus on endpoints and safety data only',
+                image: 'mediforce-agent:protocol-to-tfl',
               },
             },
           ],
@@ -182,7 +211,7 @@ describe('ClaudeCodeAgentPlugin', () => {
 
       const { emit } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue(JSON.stringify({ result: 'ok' }));
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output' });
 
       await plugin.run(emit);
 
@@ -204,6 +233,7 @@ describe('ClaudeCodeAgentPlugin', () => {
               plugin: 'claude-code-agent',
               agentConfig: {
                 prompt: 'Analyze these PDF files and extract key data',
+                image: 'mediforce-agent:protocol-to-tfl',
               },
             },
           ],
@@ -212,7 +242,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue(JSON.stringify({ result: 'ok' }));
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output' });
 
       await plugin.run(emit);
 
@@ -236,6 +266,7 @@ describe('ClaudeCodeAgentPlugin', () => {
                 skill: 'trial-metadata-extractor',
                 skillsDir: '/plugins/protocol-to-tfl/skills',
                 model: 'sonnet',
+                image: 'mediforce-agent:protocol-to-tfl',
               },
             },
           ],
@@ -245,7 +276,7 @@ describe('ClaudeCodeAgentPlugin', () => {
 
       const { emit } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Skill');
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue(JSON.stringify({ result: 'ok' }));
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output' });
 
       await plugin.run(emit);
 
@@ -260,7 +291,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       const { emit, events } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue(
-        JSON.stringify({ result: 'extracted data', confidence: 0.9 }),
+        { cliOutput: JSON.stringify({ result: 'extracted data', confidence: 0.9 }), gitMetadata: null, outputDir: '/tmp/mock-output' },
       );
 
       await plugin.run(emit);
@@ -275,6 +306,155 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(payload.annotations).toBeInstanceOf(Array);
       expect(payload.duration_ms).toBeTypeOf('number');
       expect(payload.result).toBeDefined();
+    });
+
+    it('[DATA] accepts standalone Docker mode (image only, no repo/commit)', async () => {
+      const context = buildMockContext({
+        config: {
+          processName: 'protocol-to-tfl',
+          configName: 'default',
+          configVersion: 'v1',
+          stepConfigs: [
+            {
+              stepId: 'extract',
+              executorType: 'agent',
+              plugin: 'claude-code-agent',
+              agentConfig: {
+                skill: 'trial-metadata-extractor',
+                skillsDir: '/plugins/protocol-to-tfl/skills',
+                image: 'mediforce-agent:protocol-to-tfl',
+                // no repo or commit — standalone mode
+              },
+            },
+          ],
+        },
+      });
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata...');
+      mockSpawn(plugin).mockResolvedValue(
+        { cliOutput: JSON.stringify({ result: 'standalone output', confidence: 0.85 }), gitMetadata: null, outputDir: '/tmp/mock-output' },
+      );
+
+      await plugin.run(emit);
+
+      const resultEvent = events.find((e) => e.type === 'result');
+      expect(resultEvent).toBeDefined();
+
+      const payload = resultEvent!.payload as Record<string, unknown>;
+      expect(payload.confidence).toBeTypeOf('number');
+      expect(payload.confidence).toBeGreaterThan(0);
+    });
+
+    it('[DATA] resolves output_file from Docker /output mount to host path', async () => {
+      // Simulate: agent writes JSON to /output/result.json inside Docker,
+      // which maps to a host temp dir via the volume mount.
+      const hostOutputDir = await mkdtemp(join(tmpdir(), 'test-docker-output-'));
+      const metadata = {
+        study_id: 'CDISCPILOT01',
+        phase: 'Phase II',
+        endpoints: ['ADAS-Cog 11', 'CIBIC+'],
+        confidence: 0.92,
+      };
+      await writeFile(join(hostOutputDir, 'trial-metadata.json'), JSON.stringify(metadata));
+
+      const agentResponse = JSON.stringify({
+        output_file: '/output/trial-metadata.json',
+        summary: 'Extracted trial metadata for CDISCPILOT01',
+      });
+      const streamJson = JSON.stringify({
+        type: 'result',
+        subtype: 'success',
+        result: agentResponse,
+      });
+
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: streamJson,
+        gitMetadata: null,
+        outputDir: hostOutputDir,
+      });
+
+      await plugin.run(emit);
+
+      const resultEvent = events.find((e) => e.type === 'result');
+      expect(resultEvent).toBeDefined();
+
+      const payload = resultEvent!.payload as Record<string, unknown>;
+      const result = payload.result as Record<string, unknown>;
+
+      // The actual metadata should be resolved, not { raw: "..." }
+      expect(result.study_id).toBe('CDISCPILOT01');
+      expect(result.phase).toBe('Phase II');
+      expect(result.endpoints).toEqual(['ADAS-Cog 11', 'CIBIC+']);
+      expect(result.summary).toBe('Extracted trial metadata for CDISCPILOT01');
+      expect(result).not.toHaveProperty('raw');
+
+      await rm(hostOutputDir, { recursive: true, force: true });
+    });
+
+    it('[DATA] falls back to raw when output_file is missing from host', async () => {
+      // Agent references a file that doesn't exist on the host
+      const hostOutputDir = await mkdtemp(join(tmpdir(), 'test-docker-output-'));
+
+      const agentResponse = JSON.stringify({
+        output_file: '/output/nonexistent.json',
+        summary: 'Some summary',
+      });
+      const streamJson = JSON.stringify({
+        type: 'result',
+        subtype: 'success',
+        result: agentResponse,
+      });
+
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: streamJson,
+        gitMetadata: null,
+        outputDir: hostOutputDir,
+      });
+
+      await plugin.run(emit);
+
+      const resultEvent = events.find((e) => e.type === 'result');
+      const payload = resultEvent!.payload as Record<string, unknown>;
+      const result = payload.result as Record<string, unknown>;
+
+      // Should fall back to raw + summary
+      expect(result.raw).toBe(agentResponse);
+      expect(result.summary).toBe('Some summary');
+
+      await rm(hostOutputDir, { recursive: true, force: true });
+    });
+
+    it('[DATA] prompt uses /output as output dir in Docker mode', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: 'ok' }),
+        gitMetadata: null,
+        outputDir: '/tmp/mock-output',
+      });
+
+      await plugin.run(emit);
+
+      const [prompt] = spawnSpy.mock.calls[0];
+      // Docker mode should tell agent to write to /output, not a host temp path
+      expect(prompt).toContain('/output');
+      expect(prompt).not.toMatch(/\/private\/var\/folders/);
+      expect(prompt).not.toMatch(/\/tmp\/mediforce-agent-/);
     });
 
     it('[ERROR] handles CLI errors gracefully with low confidence result', async () => {
@@ -306,7 +486,7 @@ describe('ClaudeCodeAgentPlugin', () => {
 
       const { emit } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Skill');
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue(JSON.stringify({ result: 'ok' }));
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output' });
 
       await plugin.run(emit);
 
