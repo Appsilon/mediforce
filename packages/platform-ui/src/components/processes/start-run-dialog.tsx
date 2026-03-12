@@ -24,7 +24,11 @@ export function StartRunDialog({
 }: StartRunDialogProps) {
   const router = useRouter();
   const { firebaseUser } = useAuth();
-  const { configs, loading: configsLoading } = useProcessConfigs(processName);
+  const { configs: allConfigs, loading: configsLoading } = useProcessConfigs(processName);
+  const configs = React.useMemo(
+    () => allConfigs.filter((config) => config.archived !== true),
+    [allConfigs],
+  );
   const [selectedConfig, setSelectedConfig] = React.useState<ProcessConfig | null>(null);
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);

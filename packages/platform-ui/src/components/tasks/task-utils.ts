@@ -48,12 +48,29 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
   const data = task.completionData as Record<string, unknown> | null;
   const agentOutput = data?.agentOutput as Record<string, unknown> | undefined;
   if (!agentOutput) return null;
+
+  const rawGit = agentOutput.gitMetadata as Record<string, unknown> | undefined;
+  const gitMetadata: GitMetadataData | null =
+    rawGit &&
+    typeof rawGit.commitSha === 'string' &&
+    typeof rawGit.branch === 'string' &&
+    Array.isArray(rawGit.changedFiles) &&
+    typeof rawGit.repoUrl === 'string'
+      ? {
+          commitSha: rawGit.commitSha,
+          branch: rawGit.branch,
+          changedFiles: rawGit.changedFiles as string[],
+          repoUrl: rawGit.repoUrl,
+        }
+      : null;
+
   return {
     confidence: typeof agentOutput.confidence === 'number' ? agentOutput.confidence : null,
     reasoning: typeof agentOutput.reasoning === 'string' ? agentOutput.reasoning : null,
     result: (agentOutput.result as Record<string, unknown> | null) ?? null,
     model: typeof agentOutput.model === 'string' ? agentOutput.model : null,
     duration_ms: typeof agentOutput.duration_ms === 'number' ? agentOutput.duration_ms : null,
+    gitMetadata,
   };
 }
 
@@ -72,10 +89,18 @@ export function getAgentOutputFromSiblings(
   return null;
 }
 
+export interface GitMetadataData {
+  commitSha: string;
+  branch: string;
+  changedFiles: string[];
+  repoUrl: string;
+}
+
 export interface AgentOutputData {
   confidence: number | null;
   reasoning: string | null;
   result: Record<string, unknown> | null;
   model: string | null;
   duration_ms: number | null;
+  gitMetadata: GitMetadataData | null;
 }

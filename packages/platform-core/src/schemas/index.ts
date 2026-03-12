@@ -63,8 +63,10 @@ export {
 
 export {
   AnnotationSchema,
+  GitMetadataSchema,
   AgentOutputEnvelopeSchema,
   type Annotation,
+  type GitMetadata,
   type AgentOutputEnvelope,
 } from './agent-output-envelope.js';
 
