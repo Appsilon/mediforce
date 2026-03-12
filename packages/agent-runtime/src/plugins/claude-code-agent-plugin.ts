@@ -1,9 +1,13 @@
 import { spawn } from 'node:child_process';
 import { readFile, mkdtemp, writeFile, rm, mkdir, appendFile, realpath } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { tmpdir, homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata } from '@mediforce/platform-core';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const DEFAULT_TIMEOUT_MS = 20 * 60_000;
 
@@ -26,6 +30,43 @@ interface SpawnCliOptions {
   logFile?: string;
   timeoutMs?: number;
   outputDir?: string;
+}
+
+interface GitResultFile {
+  commitSha: string;
+  branch: string;
+  changedFiles: string[];
+  repoUrl: string;
+}
+
+/** Normalize a repo reference to SSH clone URL and HTTPS browsable URL.
+ *  Supports: "org/repo", "git@github.com:org/repo.git", "https://github.com/org/repo", "/path/to/bare.git" */
+function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: string } {
+  // File path (local bare repo)
+  if (repo.startsWith('/') || repo.startsWith('.')) {
+    return { gitUrl: repo, httpsUrl: '' };
+  }
+  // Already an SSH URL
+  if (repo.startsWith('git@')) {
+    const match = repo.match(/git@github\.com:(.+?)(?:\.git)?$/);
+    const orgRepo = match ? match[1] : repo;
+    return { gitUrl: repo, httpsUrl: `https://github.com/${orgRepo}` };
+  }
+  // Already an HTTPS URL
+  if (repo.startsWith('https://')) {
+    const clean = repo.replace(/\.git$/, '');
+    return { gitUrl: `${clean}.git`, httpsUrl: clean };
+  }
+  // Short form: "org/repo"
+  return {
+    gitUrl: `git@github.com:${repo}.git`,
+    httpsUrl: `https://github.com/${repo}`,
+  };
+}
+
+interface SpawnDockerResult {
+  cliOutput: string;
+  gitMetadata: GitMetadata | null;
 }
 
 interface StreamEvent {
@@ -274,7 +315,30 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
         timestamp: new Date().toISOString(),
       });
 
-      const cliOutput = await this.spawnClaudeCli(prompt, options);
+      let cliOutput: string;
+      let gitMetadata: GitMetadata | null = null;
+
+      if (this.agentConfig.image) {
+        const mockLabel = process.env.MOCK_AGENT === 'true' ? ' (MOCK command)' : '';
+        console.log(`[claude-code-agent] Spawning Docker container: image=${this.agentConfig.image}, step=${this.context.stepId}${mockLabel}`);
+        await emit({
+          type: 'status',
+          payload: `using Docker container image '${this.agentConfig.image}'${mockLabel}`,
+          timestamp: new Date().toISOString(),
+        });
+        try {
+          const dockerResult = await this.spawnDockerContainer(prompt, options);
+          cliOutput = dockerResult.cliOutput;
+          gitMetadata = dockerResult.gitMetadata;
+          console.log(`[claude-code-agent] Docker container finished: step=${this.context.stepId}, hasGitMetadata=${!!gitMetadata}, outputLength=${cliOutput.length}`);
+        } catch (dockerErr) {
+          console.error(`[claude-code-agent] Docker container FAILED: step=${this.context.stepId}`, dockerErr);
+          throw dockerErr;
+        }
+      } else {
+        cliOutput = await this.spawnClaudeCli(prompt, options);
+      }
+
       const duration_ms = Date.now() - startTime;
 
       const parsedResult = await this.extractResult(cliOutput);
@@ -292,12 +356,14 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
             `Invoked skill: ${skillName}`,
             `Input keys: ${Object.keys(this.context.stepInput).join(', ')}`,
             tempDir ? `Downloaded files to temp dir` : 'No file downloads needed',
+            this.agentConfig.image ? `Docker container: ${this.agentConfig.image}` : 'Bare CLI execution',
             'CLI execution completed',
           ],
           annotations: [],
           model: this.agentConfig.model ?? 'claude-code-cli',
           duration_ms,
           result: parsedResult,
+          ...(gitMetadata ? { gitMetadata } : {}),
         },
         timestamp: new Date().toISOString(),
       });
@@ -544,5 +610,220 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
       child.stdin.write(prompt);
       child.stdin.end();
     });
+  }
+
+  protected async spawnDockerContainer(
+    prompt: string,
+    options?: SpawnCliOptions,
+  ): Promise<SpawnDockerResult> {
+    const repo = this.agentConfig.repo;
+    const commit = this.agentConfig.commit;
+    const image = this.agentConfig.image;
+
+    if (!repo || !commit) {
+      throw new Error(
+        `agentConfig.repo and agentConfig.commit are required when agentConfig.image is set ` +
+        `(step '${this.context.stepId}')`,
+      );
+    }
+
+    if (!image) {
+      throw new Error(`agentConfig.image is required for Docker container execution`);
+    }
+
+    const anthropicApiKey = process.env.ANTHROPIC_AUTH_TOKEN ?? process.env.OPENROUTER_API_KEY ?? process.env.ANTHROPIC_API_KEY;
+    if (!anthropicApiKey) {
+      throw new Error('ANTHROPIC_AUTH_TOKEN, OPENROUTER_API_KEY, or ANTHROPIC_API_KEY environment variable is required for Docker container execution');
+    }
+
+    const { gitUrl, httpsUrl } = normalizeRepoUrls(repo);
+
+    // Create temp directory for container /output mount
+    const rawOutputDir = await mkdtemp(join(tmpdir(), 'mediforce-docker-output-'));
+    const outputDir = await realpath(rawOutputDir);
+
+    const deployKeyPath = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
+    const entrypointPath = join(__dirname, '..', '..', 'container', 'entrypoint.sh');
+
+    const processInstanceId = this.context.processInstanceId;
+    const stepId = this.context.stepId;
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const logFile = options?.logFile ?? null;
+
+    // Build docker run args
+    const dockerArgs: string[] = [
+      'run', '--rm', '-i',
+      '--memory', '4g',
+      '--cpus', '2',
+      '-v', `${outputDir}:/output`,
+      '-v', `${deployKeyPath}:/root/.ssh/deploy_key:ro`,
+      '-v', `${entrypointPath}:/entrypoint.sh:ro`,
+      '-e', `ANTHROPIC_AUTH_TOKEN=${anthropicApiKey}`,
+      '-e', 'ANTHROPIC_API_KEY=',
+      '-e', `ANTHROPIC_BASE_URL=${process.env.ANTHROPIC_BASE_URL ?? 'https://openrouter.ai/api'}`,
+      '-e', `GIT_REPO=${gitUrl}`,
+      '-e', `GIT_BRANCH=run/${processInstanceId}`,
+      '-e', `START_COMMIT=${commit}`,
+      '-e', `STEP_ID=${stepId}`,
+      ...(httpsUrl ? ['-e', `REPO_URL=${httpsUrl}`] : []),
+    ];
+
+    // Mount data directory if files were downloaded
+    if (options?.addDirs) {
+      for (const dir of options.addDirs) {
+        dockerArgs.push('-v', `${dir}:/data:ro`);
+      }
+    }
+
+    dockerArgs.push(image);
+
+    // Entrypoint script mounted at /entrypoint.sh, receives the CLI command as "$@"
+    dockerArgs.push('/entrypoint.sh');
+
+    const isMockAgent = process.env.MOCK_AGENT === 'true';
+
+    if (isMockAgent) {
+      // Mock mode: create a file in the workspace so git has something to commit,
+      // then echo a valid stream-json result. Tests the full Docker + git pipeline
+      // without calling Claude API.
+      // Stream-json format: { type: "result", result: "<JSON string>" }
+      // extractResult() does JSON.parse(streamEvent.result) to get the agent output object.
+      const agentOutput = {
+        confidence: 0.80,
+        summary: `Mock container output for step ${stepId}`,
+        mock: true,
+      };
+      const mockStreamJson = JSON.stringify({
+        type: 'result',
+        subtype: 'success',
+        result: JSON.stringify(agentOutput),
+      });
+      dockerArgs.push(
+        'bash', '-c',
+        `echo "[mock-agent] Running mock command inside container for step ${stepId}" >&2 && ` +
+        `echo "# Mock output from step ${stepId}" > /workspace/mock-${stepId}-output.md && ` +
+        `echo '${mockStreamJson.replace(/'/g, "'\\''")}'`,
+      );
+    } else {
+      // Build the claude CLI command that entrypoint will execute
+      dockerArgs.push('claude', '-p', '--verbose', '--output-format', 'stream-json');
+      if (options?.model) {
+        dockerArgs.push('--model', options.model);
+      }
+      // Inside the container, data is at /data
+      if (options?.addDirs) {
+        dockerArgs.push('--add-dir', '/data');
+      }
+      dockerArgs.push('--allowedTools', 'Read,Write,Edit,Glob,Grep');
+    }
+
+    try {
+      const cliOutput = await new Promise<string>((resolve, reject) => {
+        const child = spawn('docker', dockerArgs, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: timeoutMs,
+        });
+
+        let finalResult = '';
+        let buffer = '';
+
+        child.stdout.on('data', (chunk: Buffer) => {
+          buffer += chunk.toString('utf-8');
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            try {
+              const event = JSON.parse(trimmed) as StreamEvent;
+
+              if (event.type === 'result') {
+                finalResult = trimmed;
+              }
+
+              if (logFile) {
+                const logLines = formatLogEntries(event);
+                if (logLines.length > 0) {
+                  appendFile(logFile, logLines.join('\n') + '\n').catch(() => {});
+                }
+              }
+            } catch {
+              // Skip non-JSON lines (e.g. Docker or entrypoint output)
+            }
+          }
+        });
+
+        const stderrChunks: Buffer[] = [];
+        child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
+
+        child.on('error', (error) => {
+          reject(new Error(`Docker process failed: ${error.message}`));
+        });
+
+        child.on('close', (code, signal) => {
+          // Process remaining buffer
+          if (buffer.trim()) {
+            try {
+              const event = JSON.parse(buffer.trim()) as StreamEvent;
+              if (event.type === 'result') {
+                finalResult = buffer.trim();
+              }
+              if (logFile) {
+                const logLines = formatLogEntries(event);
+                if (logLines.length > 0) {
+                  appendFile(logFile, logLines.join('\n') + '\n').catch(() => {});
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
+          const timeoutMinutes = Math.round(timeoutMs / 60_000);
+
+          if (code !== 0) {
+            const exitInfo = signal
+              ? `killed by ${signal}${signal === 'SIGTERM' ? ` (likely timeout — ${timeoutMinutes} min limit)` : ''}`
+              : `exit code ${code}`;
+            reject(new Error(`Docker container failed (${exitInfo}): ${stderr || 'no stderr output'}`));
+            return;
+          }
+
+          if (!finalResult) {
+            reject(new Error('Docker container produced no result event'));
+            return;
+          }
+
+          resolve(finalResult);
+        });
+
+        child.stdin.write(prompt);
+        child.stdin.end();
+      });
+
+      // Read git-result.json from the output directory
+      let gitMetadata: GitMetadata | null = null;
+      try {
+        const gitResultPath = join(outputDir, 'git-result.json');
+        const gitResultRaw = await readFile(gitResultPath, 'utf-8');
+        const gitResult = JSON.parse(gitResultRaw) as GitResultFile;
+        gitMetadata = {
+          commitSha: gitResult.commitSha,
+          branch: gitResult.branch,
+          changedFiles: gitResult.changedFiles,
+          repoUrl: gitResult.repoUrl,
+        };
+      } catch {
+        // git-result.json may not exist if the agent made no changes
+      }
+
+      return { cliOutput, gitMetadata };
+    } finally {
+      await rm(outputDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 }

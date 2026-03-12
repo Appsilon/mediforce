@@ -6,6 +6,13 @@ export const AnnotationSchema = z.object({
   timestamp: z.string().datetime(),
 });
 
+export const GitMetadataSchema = z.object({
+  commitSha: z.string(),
+  branch: z.string(),
+  changedFiles: z.array(z.string()),
+  repoUrl: z.string(),
+});
+
 export const AgentOutputEnvelopeSchema = z.object({
   confidence: z.number().min(0).max(1),
   reasoning_summary: z.string(),
@@ -14,7 +21,9 @@ export const AgentOutputEnvelopeSchema = z.object({
   model: z.string().nullable(), // null for non-LLM agents
   duration_ms: z.number().int().nonnegative(),
   result: z.record(z.string(), z.unknown()).nullable(), // nullable for L0/L2 annotations-only
+  gitMetadata: GitMetadataSchema.nullable().optional(), // container execution git output
 });
 
 export type Annotation = z.infer<typeof AnnotationSchema>;
+export type GitMetadata = z.infer<typeof GitMetadataSchema>;
 export type AgentOutputEnvelope = z.infer<typeof AgentOutputEnvelopeSchema>;

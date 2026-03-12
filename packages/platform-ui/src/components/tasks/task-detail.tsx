@@ -6,7 +6,7 @@ import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { ArrowLeft, Lock, FileText, CheckCircle, Download, Loader2 } from 'lucide-react';
 import { where, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import type { HumanTask, ProcessInstance } from '@mediforce/platform-core';
 import { ClaimButton, UnclaimButton } from './claim-button';
 import { TaskContextPanel } from './task-context-panel';
@@ -28,6 +28,12 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
 };
 
+function formatUploadSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
 export function TaskDetail({
   task,
   currentUserId,
@@ -40,6 +46,7 @@ export function TaskDetail({
   const [uploadComplete, setUploadComplete] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [uploading, setUploading] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState<{ completed: number; total: number; bytes: number; totalBytes: number }>({ completed: 0, total: 0, bytes: 0, totalBytes: 0 });
 
   const onContentLoaded = React.useCallback((has: boolean) => {
     setHasStepContent(has);
@@ -52,23 +59,50 @@ export function TaskDetail({
     setUploading(true);
 
     try {
-      // Upload each file to Firebase Storage
-      const uploadedFiles = await Promise.all(
-        files.map(async (file) => {
-          const storagePath = `tasks/${task.id}/${crypto.randomUUID()}_${file.name}`;
-          const storageRef = ref(storage, storagePath);
-          await uploadBytes(storageRef, file, { contentType: file.type });
-          const downloadUrl = await getDownloadURL(storageRef);
+      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+      setUploadProgress({ completed: 0, total: files.length, bytes: 0, totalBytes });
 
-          return {
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            storagePath,
-            downloadUrl,
-          };
-        }),
-      );
+      // Upload files sequentially to get accurate per-file progress
+      const uploadedFiles: { name: string; size: number; type: string; storagePath: string; downloadUrl: string }[] = [];
+      let bytesCompletedPrevious = 0;
+
+      for (let index = 0; index < files.length; index++) {
+        const file = files[index];
+        const storagePath = `tasks/${task.id}/${crypto.randomUUID()}_${file.name}`;
+        const storageRef = ref(storage, storagePath);
+
+        const downloadUrl = await new Promise<string>((resolve, reject) => {
+          const uploadTask = uploadBytesResumable(storageRef, file, { contentType: file.type || 'application/octet-stream' });
+          uploadTask.on('state_changed',
+            (snapshot) => {
+              setUploadProgress((prev) => ({
+                ...prev,
+                bytes: bytesCompletedPrevious + snapshot.bytesTransferred,
+              }));
+            },
+            reject,
+            async () => {
+              try {
+                const url = await getDownloadURL(uploadTask.snapshot.ref);
+                resolve(url);
+              } catch (err) {
+                reject(err);
+              }
+            },
+          );
+        });
+
+        bytesCompletedPrevious += file.size;
+        setUploadProgress((prev) => ({ ...prev, completed: index + 1, bytes: bytesCompletedPrevious }));
+
+        uploadedFiles.push({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          storagePath,
+          downloadUrl,
+        });
+      }
 
       // Complete the task with file metadata
       const result = await completeUploadTask(task.id, uploadedFiles);
@@ -78,7 +112,10 @@ export function TaskDetail({
         setUploadError(result.error ?? 'Upload failed');
       }
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload to storage failed');
+      const fileIndex = uploadProgress.completed;
+      const failedFileName = fileIndex < files.length ? files[fileIndex].name : 'unknown';
+      const baseMessage = err instanceof Error ? err.message : 'Upload to storage failed';
+      setUploadError(`Failed to upload "${failedFileName}": ${baseMessage}`);
     } finally {
       setUploading(false);
     }
@@ -280,9 +317,22 @@ export function TaskDetail({
         {isClaimedByMe && isFileUploadTask && !uploadComplete && (
           <>
             {uploading ? (
-              <div className="flex items-center gap-3 rounded-lg border p-6">
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground">Uploading files...</span>
+              <div className="space-y-3 rounded-lg border p-6">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">
+                    Uploading {uploadProgress.completed} of {uploadProgress.total} files
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{ width: uploadProgress.totalBytes > 0 ? `${Math.round((uploadProgress.bytes / uploadProgress.totalBytes) * 100)}%` : '0%' }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {formatUploadSize(uploadProgress.bytes)} / {formatUploadSize(uploadProgress.totalBytes)}
+                </p>
               </div>
             ) : (
               <FileUploadZone

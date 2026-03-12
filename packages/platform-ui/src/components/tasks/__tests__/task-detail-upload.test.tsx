@@ -13,7 +13,16 @@ vi.mock('@/lib/firebase', () => ({
 
 vi.mock('firebase/storage', () => ({
   ref: vi.fn(),
-  uploadBytes: vi.fn().mockResolvedValue({}),
+  uploadBytesResumable: vi.fn().mockImplementation(() => {
+    const task = {
+      snapshot: { ref: {} },
+      on: (_event: string, _progress: unknown, _error: unknown, complete: () => void) => {
+        // Immediately complete the upload
+        complete();
+      },
+    };
+    return task;
+  }),
   getDownloadURL: vi.fn().mockResolvedValue('https://storage.example.com/file.pdf'),
 }));
 

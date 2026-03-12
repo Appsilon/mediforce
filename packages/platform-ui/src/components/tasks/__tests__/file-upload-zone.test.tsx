@@ -57,7 +57,7 @@ describe('FileUploadZone', () => {
 
     fireEvent.change(input, { target: { files: [file] } });
 
-    expect(screen.getByText(/1(.0)?\s*MB/i)).toBeInTheDocument();
+    expect(screen.getByText(/^1(.0)?\s*MB$/i)).toBeInTheDocument();
   });
 
   it('[ERROR] rejects file with invalid MIME type', async () => {

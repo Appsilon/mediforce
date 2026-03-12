@@ -1,5 +1,5 @@
 name: protocol-to-tfl
-version: "3"
+version: "4"
 description: >
   Transform clinical trial protocol documents into production-ready
   Tables, Figures, and Listings (TFLs).
@@ -41,8 +41,12 @@ steps:
         acceptedTypes:
           - application/octet-stream
           - text/csv
+          - .xpt
+          - .sas7bdat
+          - .csv
+          - .json
         minFiles: 1
-        maxFiles: 50
+        maxFiles: 200
 
   - id: generate-adam
     name: Generate ADaM

@@ -8,6 +8,7 @@ interface FileUploadZoneProps {
   acceptedTypes: string[];
   minFiles: number;
   maxFiles: number;
+  maxFileSizeMB?: number;
   onSubmit: (files: File[]) => void;
 }
 
@@ -26,6 +27,7 @@ function mimeToLabel(mime: string): string {
     'application/octet-stream': 'Binary files (XPT, SAS, etc.)',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
   };
+  if (mime.startsWith('.')) return mime.slice(1).toUpperCase();
   return map[mime] ?? mime;
 }
 
@@ -33,6 +35,7 @@ export function FileUploadZone({
   acceptedTypes,
   minFiles,
   maxFiles,
+  maxFileSizeMB = 100,
   onSubmit,
 }: FileUploadZoneProps) {
   const [files, setFiles] = React.useState<File[]>([]);
@@ -40,24 +43,40 @@ export function FileUploadZone({
   const [dragOver, setDragOver] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  const typeLabels = acceptedTypes.map(mimeToLabel).join(', ');
+  const typeLabels = [...new Set(acceptedTypes.map(mimeToLabel))].join(', ');
 
   function addFiles(incoming: FileList | File[]) {
     setError(null);
     const newFiles = Array.from(incoming);
 
-    // Validate MIME types.
-    // When application/octet-stream is accepted, also allow files with empty type
-    // (browsers often leave .xpt, .sas7bdat, etc. untyped) and common data formats.
+    // Validate file types.
+    // acceptedTypes can contain MIME types (e.g. "application/pdf") or
+    // file extensions (e.g. ".xpt"). Check both.
     const acceptsOctetStream = acceptedTypes.includes('application/octet-stream');
+    const acceptedExtensions = acceptedTypes
+      .filter((type) => type.startsWith('.'))
+      .map((ext) => ext.toLowerCase());
+    const acceptedMimes = acceptedTypes.filter((type) => !type.startsWith('.'));
+
     const invalid = newFiles.filter((file) => {
-      if (acceptedTypes.includes(file.type)) return false;
+      if (acceptedMimes.includes(file.type)) return false;
       if (acceptsOctetStream && (file.type === '' || file.type === 'application/json')) return false;
+      const fileName = file.name.toLowerCase();
+      if (acceptedExtensions.some((ext) => fileName.endsWith(ext))) return false;
       return true;
     });
     if (invalid.length > 0) {
       const names = invalid.map((file) => file.name).join(', ');
       setError(`File type not accepted: ${names}. Accepted: ${typeLabels}`);
+      return;
+    }
+
+    // Validate file sizes
+    const maxBytes = maxFileSizeMB * 1024 * 1024;
+    const tooLarge = newFiles.filter((file) => file.size > maxBytes);
+    if (tooLarge.length > 0) {
+      const details = tooLarge.map((file) => `${file.name} (${formatFileSize(file.size)})`).join(', ');
+      setError(`File${tooLarge.length > 1 ? 's' : ''} too large (max ${maxFileSizeMB} MB): ${details}`);
       return;
     }
 
@@ -130,7 +149,7 @@ export function FileUploadZone({
           Drop files here or click to browse
         </p>
         <p className="text-xs text-muted-foreground/70">
-          {typeLabels} — {minFiles} to {maxFiles} files
+          {typeLabels} — {minFiles} to {maxFiles} files, max {maxFileSizeMB} MB each
         </p>
         <input
           ref={inputRef}
@@ -157,10 +176,11 @@ export function FileUploadZone({
               className="flex items-center justify-between rounded-md border px-3 py-2"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <FileText className={cn('h-4 w-4 shrink-0', file.size > maxFileSizeMB * 1024 * 1024 ? 'text-destructive' : 'text-muted-foreground')} />
                 <span className="text-sm truncate">{file.name}</span>
-                <span className="text-xs text-muted-foreground shrink-0">
+                <span className={cn('text-xs shrink-0', file.size > maxFileSizeMB * 1024 * 1024 ? 'text-destructive font-medium' : 'text-muted-foreground')}>
                   {formatFileSize(file.size)}
+                  {file.size > maxFileSizeMB * 1024 * 1024 && ' (too large)'}
                 </span>
               </div>
               <button

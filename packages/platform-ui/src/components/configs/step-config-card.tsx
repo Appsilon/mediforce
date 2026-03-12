@@ -255,6 +255,96 @@ export function StepConfigCard({
             </div>
           )}
 
+          {/* Agent Config section — visible when agent executor with agentConfig */}
+          {config.executorType === 'agent' && config.agentConfig && (
+            <div className="animate-in slide-in-from-top-2 duration-200 space-y-3">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Agent Config
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                {config.agentConfig.skill && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Skill</label>
+                    <input
+                      type="text"
+                      value={config.agentConfig.skill}
+                      disabled={readOnly}
+                      readOnly
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                )}
+                {config.agentConfig.model && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Model</label>
+                    <input
+                      type="text"
+                      value={config.agentConfig.model}
+                      disabled={readOnly}
+                      readOnly
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                )}
+              </div>
+              {config.agentConfig.image && (
+                <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                  <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Container Execution
+                  </h5>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Docker Image</label>
+                      <input
+                        type="text"
+                        value={config.agentConfig.image}
+                        disabled={readOnly}
+                        readOnly
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    {config.agentConfig.repo && (
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">GitHub Repository</label>
+                        <input
+                          type="text"
+                          value={config.agentConfig.repo}
+                          disabled={readOnly}
+                          readOnly
+                          className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    )}
+                    {config.agentConfig.commit && (
+                      <div className="space-y-1 col-span-2">
+                        <label className="text-xs font-medium text-muted-foreground">Base Commit</label>
+                        <input
+                          type="text"
+                          value={config.agentConfig.commit}
+                          disabled={readOnly}
+                          readOnly
+                          className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {config.agentConfig.skillsDir && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Skills Directory</label>
+                  <input
+                    type="text"
+                    value={config.agentConfig.skillsDir}
+                    disabled={readOnly}
+                    readOnly
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Optional fields */}
           <details className="group">
             <summary className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">

@@ -188,6 +188,7 @@ export async function executeAgentStep(
           model: runResult.envelope?.model ?? null,
           annotations: runResult.envelope?.annotations ?? null,
           duration_ms: runResult.envelope?.duration_ms ?? null,
+          gitMetadata: runResult.envelope?.gitMetadata ?? null,
         },
         iterationNumber: 0,
       },

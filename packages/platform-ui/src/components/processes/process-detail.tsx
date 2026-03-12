@@ -120,7 +120,8 @@ export function ProcessDetail({
           <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-          <span>Version: <span className="font-mono text-foreground">{instance.definitionVersion}</span></span>
+          <span>Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span></span>
+          <span>Config: <span className="font-mono text-foreground">{instance.configName} v{instance.configVersion}</span></span>
           <span>ID: <span className="font-mono text-foreground text-xs">{instance.id}</span></span>
           {instance.currentStepId && (
             <span>Current step: <span className="font-mono text-foreground">{instance.currentStepId}</span></span>
