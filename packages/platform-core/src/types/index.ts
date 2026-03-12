@@ -33,6 +33,7 @@ export type {
   StepExecutionStatus,
   GateResult,
   ReviewVerdict,
+  AgentOutputSnapshot,
   StepExecution,
 } from '../schemas/step-execution.js';
 

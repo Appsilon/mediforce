@@ -1,7 +1,7 @@
 {
   "processName": "protocol-to-tfl",
   "configName": "agent-extract",
-  "configVersion": "5",
+  "configVersion": "6",
   "stepConfigs": [
     {
       "stepId": "upload-documents",
@@ -18,7 +18,8 @@
       "agentConfig": {
         "skill": "trial-metadata-extractor",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
-        "model": "sonnet"
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-tfl"
       }
     },
     {
@@ -32,7 +33,8 @@
       "agentConfig": {
         "skill": "mock-tlg-generator",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
-        "model": "sonnet"
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-tfl"
       }
     },
     {

@@ -71,6 +71,7 @@ export async function executeAgentStep(
   stepId: string,
   appContext: Record<string, unknown>,
   triggeredBy: string,
+  stepExecutionId?: string,
 ): Promise<AgentStepResult> {
   const { engine, agentRunner, pluginRegistry, instanceRepo, processRepo, llmClient, auditRepo, humanTaskRepo } = getPlatformServices();
 
@@ -150,6 +151,23 @@ export async function executeAgentStep(
   };
 
   const runResult = await agentRunner.run(plugin, agentContext, stepConfig);
+
+  // Persist agent output to step execution so getPreviousStepOutputs() returns it
+  if (stepExecutionId) {
+    const envelope = runResult.envelope;
+    await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {
+      output: envelope?.result ?? null,
+      status: runResult.status === 'completed' || runResult.status === 'paused' ? 'completed' : 'failed',
+      completedAt: new Date().toISOString(),
+      agentOutput: envelope ? {
+        confidence: envelope.confidence ?? null,
+        reasoning: envelope.reasoning_summary ?? null,
+        model: envelope.model ?? null,
+        duration_ms: envelope.duration_ms ?? null,
+        gitMetadata: envelope.gitMetadata ?? null,
+      } : undefined,
+    });
+  }
 
   // ---- L3 Review Routing ----
   // When an L3 step pauses (awaiting approval), route to either human or agent reviewer.

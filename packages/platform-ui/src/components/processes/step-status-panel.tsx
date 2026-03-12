@@ -40,7 +40,7 @@ interface StepStatusPanelProps {
   agentEvents?: AgentEventItem[];
   onStepClick?: (stepId: string) => void;
   stepConfigMap?: Map<string, StepConfigInfo>;
-  onAgentLogClick?: () => void;
+  onAgentLogClick?: (stepId: string) => void;
 }
 
 type EffectiveStatus = 'pending' | 'running' | 'completed' | 'failed' | 'waiting';
@@ -212,14 +212,16 @@ function StepProgress({ stepId, agentEvents }: { stepId: string; agentEvents: Ag
 }
 
 function StepConfigDetail({
+  stepId,
   config,
   hasAgentLog,
   onAgentLogClick,
   assembledPrompt,
 }: {
+  stepId: string;
   config: StepConfigInfo;
   hasAgentLog: boolean;
-  onAgentLogClick?: () => void;
+  onAgentLogClick?: (stepId: string) => void;
   assembledPrompt?: string;
 }) {
   const entries: Array<{ label: string; value: string }> = [];
@@ -269,7 +271,7 @@ function StepConfigDetail({
       )}
       {hasAgentLog && onAgentLogClick && (
         <button
-          onClick={onAgentLogClick}
+          onClick={() => onAgentLogClick(stepId)}
           className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
         >
           <FileText className="h-3 w-3" />
@@ -426,6 +428,7 @@ export function StepStatusPanel({
                 {/* Expandable step config detail */}
                 {isExpanded && stepConfig && (
                   <StepConfigDetail
+                    stepId={step.id}
                     config={stepConfig}
                     hasAgentLog={hasAgentLog}
                     onAgentLogClick={onAgentLogClick}

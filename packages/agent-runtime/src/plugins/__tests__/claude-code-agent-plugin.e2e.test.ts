@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
 import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
+import { execSync } from 'node:child_process';
 import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin.js';
@@ -35,6 +36,7 @@ const PROCESS_CONFIG: ProcessConfig = {
         skill: 'trial-metadata-extractor',
         skillsDir: SKILLS_DIR,
         model: 'sonnet',
+        image: 'mediforce-agent:protocol-to-tfl',
       },
     },
     { stepId: 'review-metadata', executorType: 'human' },
@@ -53,11 +55,12 @@ class StubClaudeCodeAgentPlugin extends ClaudeCodeAgentPlugin {
     super();
   }
 
-  protected override async spawnClaudeCli(
+  protected override async spawnDockerContainer(
     _prompt: string,
     _options?: { model?: string },
-  ): Promise<string> {
-    return readFile(this.stubOutputPath, 'utf-8');
+  ): Promise<{ cliOutput: string; gitMetadata: null; outputDir: string }> {
+    const cliOutput = await readFile(this.stubOutputPath, 'utf-8');
+    return { cliOutput, gitMetadata: null, outputDir: '/tmp/stub-output' };
   }
 }
 
@@ -171,6 +174,96 @@ describe('ClaudeCodeAgentPlugin E2E', () => {
       expect(payload.duration_ms).toBeTypeOf('number');
       expect(payload.duration_ms).toBeGreaterThanOrEqual(0);
     });
+  });
+
+  describe('Docker output file resolution (MOCK_AGENT)', () => {
+    // Tests the full Docker pipeline: container writes output file to /output/ volume →
+    // plugin reads it back via host path mapping → extractResult resolves the actual JSON.
+    // Uses MOCK_AGENT=true so no Claude API call is needed.
+
+    function dockerImageExists(): boolean {
+      try {
+        execSync('docker images -q mediforce-agent:protocol-to-tfl', { stdio: 'pipe' });
+        const output = execSync('docker images -q mediforce-agent:protocol-to-tfl', { encoding: 'utf-8' }).trim();
+        return output.length > 0;
+      } catch {
+        return false;
+      }
+    }
+
+    const hasDockerImage = dockerImageExists();
+    const savedEnv: Record<string, string | undefined> = {};
+
+    function setEnv(key: string, value: string) {
+      if (!(key in savedEnv)) savedEnv[key] = process.env[key];
+      process.env[key] = value;
+    }
+
+    afterEach(() => {
+      for (const [key, value] of Object.entries(savedEnv)) {
+        if (value !== undefined) {
+          process.env[key] = value;
+        } else {
+          delete process.env[key];
+        }
+      }
+    });
+
+    it.skipIf(!hasDockerImage)(
+      '[E2E] standalone Docker mock writes output file and plugin resolves it',
+      { timeout: 60_000 },
+      async () => {
+        setEnv('MOCK_AGENT', 'true');
+        setEnv('ANTHROPIC_AUTH_TOKEN', 'test-dummy-key');
+
+        const plugin = new ClaudeCodeAgentPlugin();
+        const context = buildContext({
+          config: {
+            processName: 'protocol-to-tfl',
+            configName: 'agent-extract',
+            configVersion: '1',
+            stepConfigs: [
+              { stepId: 'upload-documents', executorType: 'human' },
+              {
+                stepId: 'extract-metadata',
+                executorType: 'agent',
+                plugin: 'claude-code-agent',
+                autonomyLevel: 'L3',
+                agentConfig: {
+                  skill: 'trial-metadata-extractor',
+                  skillsDir: SKILLS_DIR,
+                  model: 'sonnet',
+                  image: 'mediforce-agent:protocol-to-tfl',
+                  // No repo/commit — standalone mode
+                },
+              },
+            ],
+          },
+        });
+
+        await plugin.initialize(context);
+
+        const { emit, events } = buildEmitSpy();
+        await plugin.run(emit);
+
+        const resultEvent = events.find((event) => event.type === 'result');
+        expect(resultEvent).toBeDefined();
+
+        const payload = resultEvent!.payload as ResultPayload;
+
+        // The mock writes { confidence: 0.80, summary: "...", mock: true } to /output/mock-result.json
+        // extractResult should resolve it via the Docker output dir mapping
+        expect(payload.result.confidence).toBe(0.80);
+        expect(payload.result.mock).toBe(true);
+        expect(payload.result.summary).toContain('Mock container output');
+
+        // Must NOT be the fallback { raw: "..." } format
+        expect(payload.result).not.toHaveProperty('raw');
+
+        expect(payload.reasoning_summary).toMatch(/completed successfully/i);
+        expect(payload.duration_ms).toBeGreaterThanOrEqual(0);
+      },
+    );
   });
 
   describe('real CLI', () => {
