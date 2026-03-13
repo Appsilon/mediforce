@@ -154,12 +154,13 @@ describe('OpenCodeAgentPlugin', () => {
     });
   });
 
-  describe('getContainerEnvVars', () => {
+  describe('getInternalEnvVars', () => {
     it('[DATA] always sets OPENCODE_CONFIG and XDG_DATA_HOME', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
-      const vars = plugin.getContainerEnvVars();
+      // getInternalEnvVars is protected; access via type assertion
+      const vars = (plugin as unknown as { getInternalEnvVars(): Record<string, string> }).getInternalEnvVars();
       expect(vars.OPENCODE_CONFIG).toBe('/output/opencode.json');
       expect(vars.XDG_DATA_HOME).toBe('/output/.local/share');
     });
@@ -268,7 +269,7 @@ describe('OpenCodeAgentPlugin', () => {
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: agentResponse }),
         gitMetadata: null,
-        outputDir: '/tmp/mock-output',
+        outputDir: '/tmp/mock-output', injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -288,7 +289,7 @@ describe('OpenCodeAgentPlugin', () => {
       const spawnSpy = mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok' }),
         gitMetadata: null,
-        outputDir: '/tmp/mock-output',
+        outputDir: '/tmp/mock-output', injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -328,7 +329,7 @@ describe('OpenCodeAgentPlugin', () => {
       const spawnSpy = mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok' }),
         gitMetadata: null,
-        outputDir: '/tmp/mock-output',
+        outputDir: '/tmp/mock-output', injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -354,7 +355,7 @@ describe('OpenCodeAgentPlugin', () => {
       const spawnSpy = mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok' }),
         gitMetadata: null,
-        outputDir: '/tmp/mock-output',
+        outputDir: '/tmp/mock-output', injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -376,7 +377,7 @@ describe('OpenCodeAgentPlugin', () => {
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'extracted data', confidence: 0.9 }),
         gitMetadata: null,
-        outputDir: '/tmp/mock-output',
+        outputDir: '/tmp/mock-output', injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -418,7 +419,7 @@ describe('OpenCodeAgentPlugin', () => {
       mockSpawn(plugin).mockResolvedValue({
         cliOutput,
         gitMetadata: null,
-        outputDir: hostOutputDir,
+        outputDir: hostOutputDir, injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -480,6 +481,7 @@ describe('OpenCodeAgentPlugin', () => {
             cliOutput: JSON.stringify({ result: '"done"' }),
             gitMetadata: null,
             outputDir,
+            injectedEnvVars: [],
           };
         });
 
@@ -512,7 +514,7 @@ describe('OpenCodeAgentPlugin', () => {
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: '"done"' }),
         gitMetadata: null,
-        outputDir: '/tmp/mock',
+        outputDir: '/tmp/mock', injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -549,6 +551,7 @@ describe('OpenCodeAgentPlugin', () => {
           cliOutput: JSON.stringify({ result: '"done"' }),
           gitMetadata: null,
           outputDir,
+          injectedEnvVars: [],
         };
       });
 
@@ -583,7 +586,7 @@ describe('OpenCodeAgentPlugin', () => {
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: agentResponse }),
         gitMetadata: null,
-        outputDir: hostOutputDir,
+        outputDir: hostOutputDir, injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -613,7 +616,7 @@ describe('OpenCodeAgentPlugin', () => {
         // result is text, not JSON — should fall back to reading result.json
         cliOutput: JSON.stringify({ result: 'I completed the task successfully.' }),
         gitMetadata: null,
-        outputDir: hostOutputDir,
+        outputDir: hostOutputDir, injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -646,7 +649,7 @@ describe('OpenCodeAgentPlugin', () => {
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: agentResponse }),
         gitMetadata: null,
-        outputDir: hostOutputDir,
+        outputDir: hostOutputDir, injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -676,7 +679,7 @@ describe('OpenCodeAgentPlugin', () => {
           changedFiles: ['src/adam.R', 'src/utils.R'],
           repoUrl: 'https://github.com/Appsilon/mediforce-clinical-workspace',
         },
-        outputDir: '/tmp/mock',
+        outputDir: '/tmp/mock', injectedEnvVars: [],
       });
 
       await plugin.run(emit);

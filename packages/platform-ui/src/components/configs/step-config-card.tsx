@@ -2,7 +2,7 @@
 
 import * as Accordion from '@radix-ui/react-accordion';
 import * as Select from '@radix-ui/react-select';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PluginCombobox } from './plugin-combobox';
 import { PluginPreviewCard } from './plugin-preview-card';
@@ -136,6 +136,56 @@ const scriptModeOptions = [
   { value: 'inline', label: 'Inline' },
   { value: 'container', label: 'Container' },
 ];
+
+const providerPresets: Record<string, { label: string; description: string; env: Record<string, string> }> = {
+  anthropic: {
+    label: 'Anthropic (Direct)',
+    description: 'Direct Anthropic API — requires ANTHROPIC_API_KEY on the server',
+    env: { ANTHROPIC_API_KEY: '{{ANTHROPIC_API_KEY}}' },
+  },
+  openrouter: {
+    label: 'OpenRouter',
+    description: 'OpenRouter proxy — requires OPENROUTER_API_KEY on the server',
+    env: {
+      ANTHROPIC_AUTH_TOKEN: '{{OPENROUTER_API_KEY}}',
+      ANTHROPIC_API_KEY: '',
+      ANTHROPIC_BASE_URL: 'https://openrouter.ai/api',
+    },
+  },
+  deepseek: {
+    label: 'DeepSeek (Direct)',
+    description: 'DeepSeek direct API — requires DEEPSEEK_API_KEY on the server',
+    env: {
+      ANTHROPIC_AUTH_TOKEN: '{{DEEPSEEK_API_KEY}}',
+      ANTHROPIC_API_KEY: '',
+      ANTHROPIC_BASE_URL: 'https://api.deepseek.com',
+    },
+  },
+};
+
+const providerPresetOptions = [
+  { value: 'custom', label: 'Custom' },
+  ...Object.entries(providerPresets).map(([key, preset]) => ({
+    value: key,
+    label: preset.label,
+  })),
+];
+
+function detectProviderPreset(env: Record<string, string> | undefined): string {
+  if (!env || Object.keys(env).length === 0) return 'custom';
+  for (const [key, preset] of Object.entries(providerPresets)) {
+    const presetKeys = Object.keys(preset.env).sort();
+    const envKeys = Object.keys(env).sort();
+    if (
+      presetKeys.length === envKeys.length &&
+      presetKeys.every((k, i) => k === envKeys[i]) &&
+      presetKeys.every((k) => preset.env[k] === env[k])
+    ) {
+      return key;
+    }
+  }
+  return 'custom';
+}
 
 function detectScriptMode(agentConfig?: AgentConfig): 'inline' | 'container' {
   if (agentConfig?.inlineScript !== undefined && agentConfig.inlineScript.length > 0) return 'inline';
@@ -480,6 +530,96 @@ export function StepConfigCard({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Environment Variables — agent and script executors only */}
+          {(config.executorType === 'agent' || config.executorType === 'script') && (
+            <div className="animate-in slide-in-from-top-2 duration-200 space-y-3">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Environment Variables
+              </h4>
+              <SelectField
+                label="Provider Preset"
+                value={detectProviderPreset(config.env)}
+                onValueChange={(v) => {
+                  if (v === 'custom') {
+                    updateField('env', config.env ?? {});
+                  } else {
+                    const preset = providerPresets[v];
+                    if (preset) {
+                      updateField('env', { ...preset.env });
+                    }
+                  }
+                }}
+                options={providerPresetOptions}
+                disabled={readOnly}
+              />
+              <div className="space-y-2">
+                {Object.entries(config.env ?? {}).map(([envKey, envValue], index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={envKey}
+                      onChange={(event) => {
+                        const entries = Object.entries(config.env ?? {});
+                        entries[index] = [event.target.value, envValue];
+                        updateField('env', Object.fromEntries(entries));
+                      }}
+                      onBlur={() => onBlur?.(`${step.id}.env`)}
+                      placeholder="KEY"
+                      disabled={readOnly}
+                      className="w-1/3 rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={envValue}
+                        onChange={(event) => {
+                          const entries = Object.entries(config.env ?? {});
+                          entries[index] = [envKey, event.target.value];
+                          updateField('env', Object.fromEntries(entries));
+                        }}
+                        onBlur={() => onBlur?.(`${step.id}.env`)}
+                        placeholder="value or {{SECRET}}"
+                        disabled={readOnly}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      {/\{\{.+\}\}/.test(envValue) && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          secret
+                        </span>
+                      )}
+                    </div>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const entries = Object.entries(config.env ?? {});
+                          entries.splice(index, 1);
+                          updateField('env', entries.length > 0 ? Object.fromEntries(entries) : undefined);
+                        }}
+                        className="rounded-md p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = config.env ?? {};
+                      updateField('env', { ...current, '': '' });
+                    }}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add variable
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

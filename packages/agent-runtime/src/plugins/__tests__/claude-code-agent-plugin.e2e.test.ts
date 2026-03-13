@@ -58,9 +58,9 @@ class StubClaudeCodeAgentPlugin extends ClaudeCodeAgentPlugin {
   protected override async spawnDockerContainer(
     _prompt: string,
     _options?: { model?: string },
-  ): Promise<{ cliOutput: string; gitMetadata: null; outputDir: string }> {
+  ): Promise<{ cliOutput: string; gitMetadata: null; outputDir: string; injectedEnvVars: string[] }> {
     const cliOutput = await readFile(this.stubOutputPath, 'utf-8');
-    return { cliOutput, gitMetadata: null, outputDir: '/tmp/stub-output' };
+    return { cliOutput, gitMetadata: null, outputDir: '/tmp/stub-output', injectedEnvVars: [] };
   }
 }
 
@@ -214,7 +214,7 @@ describe('ClaudeCodeAgentPlugin E2E', () => {
       { timeout: 60_000 },
       async () => {
         setEnv('MOCK_AGENT', 'true');
-        setEnv('ANTHROPIC_AUTH_TOKEN', 'test-dummy-key');
+        setEnv('ANTHROPIC_API_KEY', 'test-dummy-key');
 
         const plugin = new ClaudeCodeAgentPlugin();
         const context = buildContext({

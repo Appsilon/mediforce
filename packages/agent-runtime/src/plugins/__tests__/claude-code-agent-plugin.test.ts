@@ -6,7 +6,7 @@ import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-p
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin.js';
 
-type DockerResult = { cliOutput: string; gitMetadata: null; outputDir: string };
+type DockerResult = { cliOutput: string; gitMetadata: null; outputDir: string; injectedEnvVars: string[] };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
 type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };
 
@@ -191,7 +191,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       const { emit, events } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata...');
       mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: 'extracted metadata', confidence: 0.85 }), gitMetadata: null, outputDir: '/tmp/mock-output' },
+        { cliOutput: JSON.stringify({ result: 'extracted metadata', confidence: 0.85 }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
       );
 
       await plugin.run(emit);
@@ -208,7 +208,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       const { emit } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata from docs.');
       const spawnSpy = mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output' },
+        { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
       );
 
       await plugin.run(emit);
@@ -245,7 +245,7 @@ describe('ClaudeCodeAgentPlugin', () => {
 
       const { emit } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output' });
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
 
       await plugin.run(emit);
 
@@ -276,7 +276,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output' });
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
 
       await plugin.run(emit);
 
@@ -310,7 +310,7 @@ describe('ClaudeCodeAgentPlugin', () => {
 
       const { emit } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Skill');
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output' });
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
 
       await plugin.run(emit);
 
@@ -325,7 +325,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       const { emit, events } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: 'extracted data', confidence: 0.9 }), gitMetadata: null, outputDir: '/tmp/mock-output' },
+        { cliOutput: JSON.stringify({ result: 'extracted data', confidence: 0.9 }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
       );
 
       await plugin.run(emit);
@@ -368,7 +368,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       const { emit, events } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata...');
       mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: 'standalone output', confidence: 0.85 }), gitMetadata: null, outputDir: '/tmp/mock-output' },
+        { cliOutput: JSON.stringify({ result: 'standalone output', confidence: 0.85 }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
       );
 
       await plugin.run(emit);
@@ -412,6 +412,7 @@ describe('ClaudeCodeAgentPlugin', () => {
         cliOutput: streamJson,
         gitMetadata: null,
         outputDir: hostOutputDir,
+        injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -455,6 +456,7 @@ describe('ClaudeCodeAgentPlugin', () => {
         cliOutput: streamJson,
         gitMetadata: null,
         outputDir: hostOutputDir,
+        injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -480,6 +482,7 @@ describe('ClaudeCodeAgentPlugin', () => {
         cliOutput: JSON.stringify({ result: 'ok' }),
         gitMetadata: null,
         outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
       });
 
       await plugin.run(emit);
@@ -520,7 +523,7 @@ describe('ClaudeCodeAgentPlugin', () => {
 
       const { emit } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Skill');
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output' });
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
 
       await plugin.run(emit);
 
