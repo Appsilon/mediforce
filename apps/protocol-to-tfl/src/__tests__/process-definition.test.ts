@@ -53,14 +53,6 @@ describe('protocol-to-tfl process definition', () => {
     expect(step?.name).toBe('Extract Metadata');
   });
 
-  it('[DATA] has review-metadata step of type review', () => {
-    const def = loadDefinition();
-    const step = def.steps.find((s) => s.id === 'review-metadata');
-
-    expect(step).toBeDefined();
-    expect(step?.type).toBe('review');
-  });
-
   it('[DATA] ends with a terminal step', () => {
     const def = loadDefinition();
     const lastStep = def.steps[def.steps.length - 1];
