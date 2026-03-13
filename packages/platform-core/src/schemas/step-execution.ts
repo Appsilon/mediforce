@@ -48,7 +48,7 @@ export const StepExecutionSchema = z.object({
   gateResult: GateResultSchema.nullable(),
   error: z.string().nullable(),
   reviewVerdicts: z.array(ReviewVerdictSchema).optional(),
-  agentOutput: AgentOutputSnapshotSchema.optional(),
+  agentOutput: AgentOutputSnapshotSchema.nullable().optional(),
 });
 
 export type StepExecutionStatus = z.infer<typeof StepExecutionStatusSchema>;

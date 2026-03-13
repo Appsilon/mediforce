@@ -256,10 +256,19 @@ describe('TriggerSchema', () => {
     }
   });
 
-  it('should reject a trigger with unknown type', () => {
+  it('should accept a cron trigger type', () => {
     const result = TriggerSchema.safeParse({
       type: 'cron',
       name: 'Cron Trigger',
+      schedule: '0 8 * * 1-5',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject a trigger with unknown type', () => {
+    const result = TriggerSchema.safeParse({
+      type: 'scheduled',
+      name: 'Unknown Trigger',
     });
     expect(result.success).toBe(false);
   });

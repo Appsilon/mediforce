@@ -7,6 +7,7 @@ export interface ProcessRepository {
     version: string,
   ): Promise<ProcessDefinition | null>;
   saveProcessDefinition(definition: ProcessDefinition): Promise<void>;
+  listProcessDefinitions(): Promise<ProcessDefinition[]>;
   getProcessConfig(
     processName: string,
     configName: string,
