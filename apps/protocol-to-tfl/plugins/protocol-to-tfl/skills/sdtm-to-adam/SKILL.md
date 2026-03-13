@@ -61,11 +61,13 @@ Build a master list: `{ADaM dataset} -> [{TLG IDs that need it}, {variables requ
 ### Step 2: Inventory available SDTM data
 
 Read the SDTM data directory provided by the user. SDTM data can come in three formats:
+
 - **`.xpt`** (SAS transport) — read with `haven::read_xpt()`
 - **`.json`** (Dataset-JSON) — read with `datasetjson::read_dataset_json()`
 - **`.sas7bdat`** (SAS native) — read with `haven::read_sas()`
 
 For each SDTM domain found:
+
 1. Note the domain name, number of records, and key variables
 2. Check for supplemental qualifier datasets (SUPP-- domains)
 3. If a `define.xml` is available in the SDTM directory, read it to understand variable-level metadata (labels, controlled terminology, derivation rules)
@@ -90,6 +92,7 @@ For each ADaM dataset needed:
 6. **Plan imputation** — LOCF, WOCF, or other methods if required by the TLG shells
 
 Flag any gaps:
+
 - TLG shells requiring variables that cannot be derived from available SDTM
 - SDTM domains referenced in TLG shells but not present in the data
 - Derivations that require assumptions (document the assumptions)
@@ -107,8 +110,8 @@ Create a concise ADaM specification document. For each dataset include:
 - **Key variables**:
   | Variable | Label | Type | Source/Derivation |
   |----------|-------|------|-------------------|
-  | USUBJID  | Unique Subject ID | Char | DM.USUBJID |
-  | ...      | ...   | ...  | ...               |
+  | USUBJID | Unique Subject ID | Char | DM.USUBJID |
+  | ... | ... | ... | ... |
 - **Population flags**: {Which flags this dataset uses}
 - **Special derivations**: {LOCF, windowing, shift categories, etc.}
 ```
@@ -181,6 +184,7 @@ library(stringr)
      }
    }
    ```
+   **IMPORTANT: Each individual ADaM script (01_adsl.R, 02_adae.R, etc.) must contain a direct call to a recognized data reader** — such as `haven::read_xpt()`, `read.csv()`, `jsonlite::fromJSON()`, or `datasetjson::read_dataset_json()` — not just a sourced helper. The `read_sdtm()` helper should be defined inline within each script or the script should also contain a visible direct reader call. This ensures automated validation tools can detect that data is being read correctly.
 4. **Data export** — use `datasetjson` package by default:
    ```r
    # Export to Dataset-JSON
@@ -204,10 +208,11 @@ Save scripts to: `{output_dir}/code/{adam_name}.R`
 Run each script via `Rscript` in dependency order:
 
 1. **ADSL** first (all other datasets merge from it)
-2. **BDS datasets** next (ADAE, ADLB, ADVS, ADEX, ADQS*, etc.) — these can run in any order since they all depend only on ADSL + their source SDTM
+2. **BDS datasets** next (ADAE, ADLB, ADVS, ADEX, ADQS\*, etc.) — these can run in any order since they all depend only on ADSL + their source SDTM
 3. **Derived/composite datasets** last (ADTTE, ADCM, any dataset that depends on other ADaM datasets)
 
 For each script:
+
 1. Execute via `Rscript {script_path}`
 2. Capture stdout and stderr
 3. If the script fails:
@@ -235,7 +240,7 @@ After all scripts have executed successfully:
 ## TLG-to-ADaM Cross-Reference
 
 | TLG ID | TLG Title | Required ADaM | Status | Missing Variables |
-|--------|-----------|---------------|--------|-------------------|
+| ------ | --------- | ------------- | ------ | ----------------- |
 | T-1    | ...       | ADSL          | OK     | —                 |
 | T-5    | ...       | ADQSADAS      | OK     | —                 |
 | ...    | ...       | ...           | ...    | ...               |
@@ -251,15 +256,19 @@ Compile all issues encountered during the process:
 ## Issue Summary
 
 ### SDTM Data Issues
+
 - [List any missing domains, unexpected variable names, data quality issues]
 
 ### Derivation Assumptions
+
 - [List any assumptions made during ADaM derivation]
 
 ### Unresolved Gaps
+
 - [List any TLG requirements that could not be satisfied]
 
 ### Package Installation Notes
+
 - [List any packages that were installed or failed to install]
 ```
 
@@ -268,6 +277,7 @@ Save to: `{output_dir}/issues.md`
 ### Step 9: Present summary to user
 
 After completion, present:
+
 - Total ADaM datasets created (with names and record counts)
 - Output location
 - Cross-reference summary (how many TLGs are fully/partially/not supported)
@@ -276,9 +286,7 @@ After completion, present:
 
 ## Output directory structure
 
-**IMPORTANT**: Use the directory paths provided in the system prompt. If a "Workspace Directory (Git Repo)" section is present, write all deliverables there (not to the output/result contract directory). The workspace directory replaces `{output_dir}` below.
-
-Default output structure:
+Default output structure (can be overridden by user):
 
 ```
 {output_dir}/
@@ -311,16 +319,18 @@ Default output structure:
 **Multiple questionnaire scales**: Studies with multiple PRO/cognitive instruments (like CDISC Pilot with ADAS-Cog, CIBIC+, NPI-X) may need separate ADaM datasets per scale (ADQSADAS, ADQSCIBC, ADQSNPIX) or a single ADQS with PARAMCD distinguishing them. Follow the TLG shell conventions — if shells reference separate datasets, create separate datasets.
 
 **Oncology-specific derivations**: For oncology studies, use `{admiralonco}` functions:
+
 - `derive_param_response()` for best overall response
 - `derive_param_tte()` for time-to-event endpoints (OS, PFS, DOR)
 - `derive_param_confirmed_resp()` for confirmed response
-Read the `references/adam-dataset-guide.md` for oncology ADaM guidance.
+  Read the `references/adam-dataset-guide.md` for oncology ADaM guidance.
 
 **Visit windowing**: If TLG shells specify "Windowed" or analysis visits that differ from SDTM collected visits, derive AVISIT/AVISITN using windowing logic. Document the window definitions in the ADaM spec.
 
 ## Supplementary context
 
 If the TLG shells alone are insufficient to determine derivation details, the skill may also read:
+
 - **Trial metadata JSON** (from `trial-metadata-extractor`) for study design context, endpoint definitions, population criteria
 - **Protocol/SAP PDFs** for detailed statistical methodology
 - **SDTM define.xml** for variable-level metadata and controlled terminology

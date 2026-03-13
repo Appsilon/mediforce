@@ -79,6 +79,15 @@ When scanning a document, these phrases help locate critical information:
 - "ANCOVA", "MMRM", "logistic regression", "Cox proportional hazards"
 - "Kaplan-Meier", "log-rank test", "stratified", "adjusted for"
 - "mixed model for repeated measures", "generalized linear model"
+- "Fisher's exact", "chi-square", "Cochran-Mantel-Haenszel", "CMH"
+- "Wilcoxon", "t-test", "ANOVA", "analysis of covariance"
+
+**Time-to-event methods (often in safety sections, Section 5.3):**
+- "Kaplan-Meier", "KM curve", "KM estimate", "survival curve", "survival analysis"
+- "time to event", "time to first", "time-to-event", "time to onset"
+- "log-rank", "log-rank test", "Cox", "Cox regression", "hazard ratio"
+- "censored", "censoring", "event-free", "median time to"
+- Note: These methods commonly appear in safety analysis sections for endpoints like time to first dermatological event, time to first serious AE, or AE onset analysis — not just in the efficacy sections
 
 **Missing data:**
 - "missing data", "imputation", "LOCF", "BOCF", "WOCF"
