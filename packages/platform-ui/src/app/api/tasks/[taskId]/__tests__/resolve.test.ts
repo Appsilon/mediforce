@@ -26,6 +26,7 @@ vi.mock('@/lib/platform-services', () => ({
     engine: { advanceStep: mockAdvanceStep },
   }),
   validateApiKey: () => true,
+  getAppBaseUrl: () => 'http://localhost:3000',
 }));
 
 vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response()));
@@ -124,7 +125,7 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
     );
 
     const stepOutput = mockAdvanceStep.mock.calls[0][1] as Record<string, unknown>;
-    expect(stepOutput.agentOutput).toEqual({ extracted: true });
+    expect(stepOutput).toEqual({ extracted: true });
   });
 
   it('[DATA] auto-claims pending task before resolving', async () => {
@@ -192,6 +193,50 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
     expect(res.status).toBe(409);
     const json = await res.json();
     expect(json.error).toContain('completed');
+  });
+
+  it('[ERROR] returns 422 when approving L3 task with no agent output', async () => {
+    const emptyOutputTask = {
+      ...claimedVerdictTask,
+      completionData: {
+        reviewType: 'agent_output_review',
+        agentOutput: { result: null, confidence: null },
+      },
+    };
+    mockGetById.mockResolvedValue(emptyOutputTask);
+    mockInstanceGetById.mockResolvedValue(pausedInstance);
+
+    const res = await POST(
+      makeRequest('task-1', { verdict: 'approve' }),
+      { params: makeParams('task-1') },
+    );
+
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toContain('no output');
+    expect(mockAdvanceStep).not.toHaveBeenCalled();
+  });
+
+  it('[ERROR] returns 422 when approving L3 task with empty object result', async () => {
+    const emptyResultTask = {
+      ...claimedVerdictTask,
+      completionData: {
+        reviewType: 'agent_output_review',
+        agentOutput: { result: {}, confidence: 0.5 },
+      },
+    };
+    mockGetById.mockResolvedValue(emptyResultTask);
+    mockInstanceGetById.mockResolvedValue(pausedInstance);
+
+    const res = await POST(
+      makeRequest('task-1', { verdict: 'approve' }),
+      { params: makeParams('task-1') },
+    );
+
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toContain('no output');
+    expect(mockAdvanceStep).not.toHaveBeenCalled();
   });
 
   it('[ERROR] returns 409 when instance is not paused', async () => {
@@ -273,10 +318,10 @@ describe('POST /api/tasks/:taskId/resolve — file-upload', () => {
     expect(files[0].name).toBe('protocol.pdf');
     expect(files[0].uploadedAt).toBeDefined();
 
-    // stepOutput to advanceStep should have files + taskId
+    // stepOutput to advanceStep should have files only (no task metadata)
     const stepOutput = mockAdvanceStep.mock.calls[0][1] as Record<string, unknown>;
     expect(stepOutput.files).toBeDefined();
-    expect(stepOutput.taskId).toBe('task-2');
+    expect(stepOutput.taskId).toBeUndefined();
   });
 
   it('[DATA] auto-claims pending upload task', async () => {

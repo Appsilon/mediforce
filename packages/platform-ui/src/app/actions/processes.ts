@@ -1,6 +1,6 @@
 'use server';
 
-import { getPlatformServices } from '@/lib/platform-services';
+import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 
 interface StartRunInput {
   definitionName: string;
@@ -27,7 +27,7 @@ export async function startProcessRun(
     });
 
     // Fire-and-forget: trigger auto-runner asynchronously
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:9003';
+    const baseUrl = getAppBaseUrl();
     fetch(`${baseUrl}/api/processes/${result.instanceId}/run`, {
       method: 'POST',
       headers: {

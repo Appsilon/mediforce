@@ -105,6 +105,13 @@ export class FirestoreProcessRepository implements ProcessRepository {
     await setDoc(docRef, definition);
   }
 
+  async listProcessDefinitions(): Promise<ProcessDefinition[]> {
+    const snapshot = await getDocs(
+      collection(this.db, this.definitionsCollection),
+    );
+    return snapshot.docs.map((d) => ProcessDefinitionSchema.parse(d.data()));
+  }
+
   async getProcessConfig(
     processName: string,
     configName: string,

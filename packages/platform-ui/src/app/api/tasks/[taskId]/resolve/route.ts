@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
 import type { HumanTask } from '@mediforce/platform-core';
 
 /**
@@ -74,6 +74,8 @@ export async function POST(
     const now = new Date().toISOString();
 
     // ── 4. Build completionData + stepOutput ─────────────────────────────
+    // stepOutput = semantic output of the step (what downstream steps consume).
+    // Task metadata (verdict, comment, taskId) stays in completionData / stepExecution fields.
     let completionData: Record<string, unknown>;
     let stepOutput: Record<string, unknown>;
 
@@ -89,20 +91,35 @@ export async function POST(
       }));
 
       completionData = { files, completedBy: actorId, completedAt: now };
-      stepOutput = { files, taskId };
+      stepOutput = { files };
     } else {
       const verdict = body.verdict as string;
       const comment = (body.comment as string) ?? '';
       completionData = { verdict, comment, completedBy: actorId, completedAt: now };
-      stepOutput = { verdict, comment, taskId };
 
-      // Include agent output for L3 review tasks
+      // L3 agent review: semantic output is the agent's actual result
       const agentReviewData = resolvedTask.completionData as Record<string, unknown> | null;
       if (agentReviewData?.reviewType === 'agent_output_review') {
         const agentOutput = agentReviewData.agentOutput as Record<string, unknown> | undefined;
-        if (agentOutput?.result) {
-          stepOutput.agentOutput = agentOutput.result;
+        const agentResult = agentOutput?.result as Record<string, unknown> | null | undefined;
+
+        // Reject approval when agent produced no output — prevents auto-advance
+        // from advancing steps that failed silently or completed without results
+        if (agentResult === null || agentResult === undefined || Object.keys(agentResult).length === 0) {
+          return NextResponse.json(
+            { error: `Cannot approve step '${resolvedTask.stepId}': agent produced no output` },
+            { status: 422 },
+          );
         }
+
+        stepOutput = agentResult;
+      } else {
+        stepOutput = {};
+      }
+
+      // Reviewer comment flows to downstream steps as context
+      if (comment.length > 0) {
+        stepOutput.reviewerComment = comment;
       }
     }
 
@@ -171,7 +188,7 @@ export async function POST(
     });
 
     // ── 8. Trigger auto-runner for subsequent agent steps ─────────────────
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:9003';
+    const appUrl = getAppBaseUrl();
     fetch(`${appUrl}/api/processes/${resolvedTask.processInstanceId}/run`, {
       method: 'POST',
       headers: {

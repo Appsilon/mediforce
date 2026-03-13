@@ -108,7 +108,10 @@ export async function executeAgentStep(
   const plugin: AgentPlugin = pluginRegistry.get(pluginId);
 
   // Resolve autonomy level from config (not from caller)
-  const autonomyLevel = stepConfig.autonomyLevel ?? 'L2';
+  // Script steps are deterministic — always auto-advance (L4) regardless of config
+  const autonomyLevel = stepConfig.executorType === 'script'
+    ? 'L4'
+    : (stepConfig.autonomyLevel ?? 'L2');
 
   // Emit audit event so the UI shows agent step has started
   await auditRepo.append({
@@ -130,11 +133,18 @@ export async function executeAgentStep(
     reviewerType: 'none',
   });
 
+  // Merge step params from config into the input — params are the primary source,
+  // appContext (from trigger payload / API body) can override or supplement
+  const mergedInput: Record<string, unknown> = {
+    ...(stepConfig.params ?? {}),
+    ...appContext,
+  };
+
   const agentContext: AgentContext = {
     stepId,
     processInstanceId: instanceId,
     definitionVersion: instance.definitionVersion,
-    stepInput: appContext,
+    stepInput: mergedInput,
     autonomyLevel,
     config: resolvedConfig,
     llm: llmClient,
@@ -153,8 +163,8 @@ export async function executeAgentStep(
   const runResult = await agentRunner.run(plugin, agentContext, stepConfig);
 
   // Persist agent output to step execution so getPreviousStepOutputs() returns it
+  const envelope = runResult.envelope;
   if (stepExecutionId) {
-    const envelope = runResult.envelope;
     await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {
       output: envelope?.result ?? null,
       status: runResult.status === 'completed' || runResult.status === 'paused' ? 'completed' : 'failed',
@@ -165,13 +175,31 @@ export async function executeAgentStep(
         model: envelope.model ?? null,
         duration_ms: envelope.duration_ms ?? null,
         gitMetadata: envelope.gitMetadata ?? null,
-      } : undefined,
+      } : null,
     });
   }
 
+  // Also persist output to instance.variables so it's available to subsequent
+  // steps even when the current step pauses (L3) or doesn't advance (L0/L1/L2).
+  // getPreviousStepOutputs() reads from stepExecutions, but instance.variables
+  // is the canonical workflow context used by advanceStep and step input resolution.
+  const agentOutput = envelope?.result ?? null;
+  if (agentOutput !== null) {
+    const freshInstance = await instanceRepo.getById(instanceId);
+    if (freshInstance) {
+      await instanceRepo.update(instanceId, {
+        variables: {
+          ...freshInstance.variables,
+          [stepId]: agentOutput,
+        },
+      });
+    }
+  }
+
   // ---- L3 Review Routing ----
-  // When an L3 step pauses (awaiting approval), route to either human or agent reviewer.
-  if (runResult.status === 'paused' && autonomyLevel === 'L3') {
+  // When an L3 step pauses or escalates (low confidence / error), route to human or agent reviewer.
+  // Both 'paused' (normal completion) and 'escalated' (fallback) need a review task created.
+  if ((runResult.status === 'paused' || runResult.status === 'escalated') && autonomyLevel === 'L3') {
     const reviewerType = stepConfig.reviewerType ?? 'human';
 
     if (reviewerType === 'agent') {
@@ -273,10 +301,19 @@ export async function executeAgentStep(
   }
 
   // L4: appliedToWorkflow=true -- advance the step
+  // Guard: do not advance if result is null/empty — indicates a failed execution
   if (runResult.appliedToWorkflow) {
+    const stepResult = runResult.envelope?.result;
+    if (stepResult === null || stepResult === undefined) {
+      throw new Error(
+        `Step '${stepId}' completed with null result — cannot advance. ` +
+        `Reason: ${runResult.fallbackReason ?? runResult.envelope?.reasoning_summary ?? 'unknown'}`,
+      );
+    }
+
     const updatedInstance = await engine.advanceStep(
       instanceId,
-      { agentStatus: runResult.status, agentOutput: runResult.envelope?.result ?? null },
+      stepResult,
       { id: triggeredBy, role: 'agent' },
       stepConfig,
       runResult,

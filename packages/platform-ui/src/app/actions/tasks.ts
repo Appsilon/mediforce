@@ -1,6 +1,6 @@
 'use server';
 
-import { getPlatformServices } from '@/lib/platform-services';
+import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 import { doc, updateDoc } from 'firebase/firestore';
 import { getFirestoreDb } from '@mediforce/platform-infra';
 
@@ -220,7 +220,7 @@ export async function completeTask(
 
     // 7. Fire-and-forget: trigger auto-runner to continue with next steps
     const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:9003';
+      getAppBaseUrl();
     fetch(`${appUrl}/api/processes/${task.processInstanceId}/run`, {
       method: 'POST',
       headers: {

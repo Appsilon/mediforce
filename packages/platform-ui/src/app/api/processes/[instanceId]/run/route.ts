@@ -202,8 +202,16 @@ export async function POST(
       }
 
       // Agent executor — write running execution record then call advance
-      if (stepConfig.executorType === 'agent') {
+      if (stepConfig.executorType === 'agent' || stepConfig.executorType === 'script') {
         console.log(`[auto-runner] Executing agent step '${instance.currentStepId}' on instance '${instanceId}' (iteration ${stepsExecuted})`);
+
+        // Capture semantic input: previous step's output from instance variables
+        const previousStepId = definition.transitions.find(
+          (t) => t.to === instance.currentStepId,
+        )?.from ?? null;
+        const stepInput = previousStepId
+          ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
+          : {};
 
         const executionId = crypto.randomUUID();
         await instanceRepo.addStepExecution(instanceId, {
@@ -211,7 +219,7 @@ export async function POST(
           instanceId,
           stepId: instance.currentStepId,
           status: 'running',
-          input: appContext,
+          input: stepInput,
           output: null,
           verdict: null,
           executedBy: 'auto-runner',

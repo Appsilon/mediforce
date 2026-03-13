@@ -26,6 +26,7 @@ vi.mock('@/lib/platform-services', () => ({
     engine: { advanceStep: mockAdvanceStep },
   }),
   validateApiKey: () => true,
+  getAppBaseUrl: () => 'http://localhost:3000',
 }));
 
 // Suppress fire-and-forget fetch in complete route
