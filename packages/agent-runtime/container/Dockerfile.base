@@ -2,7 +2,7 @@
 # Mediforce Golden Image
 #
 # Standard runtime environment for Mediforce AI agents.
-# Provides: R + tidyverse, Python 3, Node.js, Claude Code CLI, git, SSH
+# Provides: R + tidyverse, Python 3, Node.js, Claude Code CLI, OpenCode CLI, git, SSH
 # Usage:    docker build -f Dockerfile.base -t mediforce-golden-image .
 # =============================================================================
 
@@ -28,6 +28,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
 
 # Install Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
+
+# Install OpenCode CLI
+RUN curl -fsSL https://opencode.ai/install | bash \
+  && ln -s /root/.opencode/bin/opencode /usr/local/bin/opencode
 
 # Create standard directories
 RUN mkdir -p /workspace /output /data
