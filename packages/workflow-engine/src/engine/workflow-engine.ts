@@ -74,7 +74,7 @@ export class WorkflowEngine {
     definitionName: string,
     version: string,
     triggeredBy: string,
-    triggerType: 'manual' | 'webhook',
+    triggerType: 'manual' | 'webhook' | 'cron',
     payload: Record<string, unknown>,
     configName = 'default',
     configVersion = '1.0',
@@ -313,7 +313,9 @@ export class WorkflowEngine {
       throw err;
     }
 
-    // HumanTask creation: only create task when next step's executor is 'human'.
+    // HumanTask creation: create task when next step's executor is 'human'.
+    // Checks executorType from ProcessConfig (not step type from definition),
+    // so both 'creation' and 'review' steps with human executors get tasks.
     // Agent steps handle their own task creation (e.g. L3 review tasks in executeAgentStep).
     if (this.humanTaskRepository) {
       const updatedInstance = await this.loadInstance(instanceId);
@@ -321,7 +323,7 @@ export class WorkflowEngine {
         const nextStep = definition.steps.find(
           (s) => s.id === updatedInstance.currentStepId,
         );
-        if (nextStep?.type === 'creation') {
+        if (nextStep && nextStep.type !== 'terminal') {
           const config = await this.processRepository.getProcessConfig(
             updatedInstance.definitionName,
             updatedInstance.configName,
@@ -331,8 +333,9 @@ export class WorkflowEngine {
             (sc) => sc.stepId === nextStep.id,
           );
 
-          // Only create task for human executor steps — agent steps create their own tasks
-          if (!nextStepConfig || nextStepConfig.executorType === 'human') {
+          // Only create task for human executor steps — agent steps create their own tasks.
+          // Requires explicit executorType='human' in config; no config = no auto-task.
+          if (nextStepConfig?.executorType === 'human') {
             const assignedRole = nextStepConfig?.allowedRoles?.[0] ?? 'unassigned';
 
             const now = new Date().toISOString();
@@ -352,6 +355,13 @@ export class WorkflowEngine {
               ...(nextStep.ui ? { ui: nextStep.ui } : {}),
             };
             await this.humanTaskRepository.create(task);
+
+            // Pause instance to wait for human input
+            await this.instanceRepository.update(instanceId, {
+              status: 'paused',
+              pauseReason: 'waiting_for_human',
+              updatedAt: now,
+            });
           }
         }
       }

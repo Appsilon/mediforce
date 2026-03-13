@@ -81,6 +81,16 @@ const reviewDef: ProcessDefinition = {
   triggers: [{ type: 'manual', name: 'Start Review' }],
 };
 
+const linearConfig: ProcessConfig = {
+  processName: 'linear-process',
+  configName: 'default',
+  configVersion: '1.0',
+  stepConfigs: [
+    { stepId: 'start', executorType: 'agent' },
+    { stepId: 'process', executorType: 'human' },
+  ],
+};
+
 const reviewConfig: ProcessConfig = {
   processName: 'review-process',
   configName: 'default',
@@ -135,6 +145,7 @@ describe('WorkflowEngine', () => {
     await processRepo.saveProcessDefinition(linearDef);
     await processRepo.saveProcessDefinition(branchingDef);
     await processRepo.saveProcessDefinition(reviewDef);
+    await processRepo.saveProcessConfig(linearConfig);
     await processRepo.saveProcessConfig(reviewConfig);
   });
 
@@ -633,12 +644,14 @@ describe('WorkflowEngine', () => {
         {},
       );
       await engineWithHumanTasks.startInstance(instance.id);
-      // Advance start -> process (creates 1 HumanTask)
+      // Advance start -> process (creates 1 HumanTask + pauses for human input)
       await engineWithHumanTasks.advanceStep(
         instance.id,
         { result: 'done' },
         { id: 'user-1', role: 'operator' },
       );
+      // Resume so we can advance past the human step
+      await engineWithHumanTasks.resumeInstance(instance.id, { id: 'user-1', role: 'operator' });
       // Advance process -> done (terminal, no new HumanTask)
       await engineWithHumanTasks.advanceStep(
         instance.id,

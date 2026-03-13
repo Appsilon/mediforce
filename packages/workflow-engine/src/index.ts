@@ -25,9 +25,11 @@ export type { ReviewState } from './review/review-types.js';
 // Triggers
 export { ManualTrigger } from './triggers/manual-trigger.js';
 export { WebhookTrigger } from './triggers/webhook-trigger.js';
+export { CronTrigger } from './triggers/cron-trigger.js';
 export { TriggerHandler } from './triggers/trigger-handler.js';
 export type { TriggerContext, TriggerResult } from './triggers/trigger-types.js';
 export {
   WebhookPayloadValidationError,
   TriggerNotFoundError,
 } from './triggers/trigger-errors.js';
+export { validateCronSchedule, isDue } from './triggers/cron-utils.js';
