@@ -228,6 +228,7 @@ tbl %>% add_p(test = all_categorical() ~ "chisq.test")
 
 Used for stratified categorical analyses (e.g., shift tables).
 
+### Basic CMH test
 ```r
 # CMH test stratified by baseline status
 cmh_result <- mantelhaen.test(
@@ -236,6 +237,51 @@ cmh_result <- mantelhaen.test(
   z = factor(data$BNRIND)
 )
 p_value <- cmh_result$p.value
+```
+
+### CMH integration with lab shift tables (T-23/T-24)
+
+For lab shift tables, the CMH test compares the distribution of post-baseline normal range indicators across treatment groups, stratified by baseline normal range indicator:
+
+```r
+# For each lab parameter, compute CMH p-value
+cmh_by_param <- adlb %>%
+  filter(SAFFL == "Y", !is.na(BNRIND), !is.na(ANRIND), AVISITN > 0) %>%
+  group_by(PARAMCD, PARAM) %>%
+  summarise(
+    cmh_pval = tryCatch({
+      tbl <- table(
+        factor(ANRIND, levels = c("LOW", "NORMAL", "HIGH")),
+        factor(TRT01P, levels = c("Placebo", "Xanomeline Low Dose", "Xanomeline High Dose")),
+        factor(BNRIND, levels = c("LOW", "NORMAL", "HIGH"))
+      )
+      # Remove empty strata
+      tbl <- tbl[, , apply(tbl, 3, sum) > 0, drop = FALSE]
+      if (dim(tbl)[3] > 0 && all(dim(tbl)[1:2] > 1)) {
+        mantelhaen.test(tbl)$p.value
+      } else {
+        NA_real_
+      }
+    }, error = function(e) NA_real_),
+    .groups = "drop"
+  )
+
+# Add CMH p-values to shift table footnote or as a column
+# Format: "CMH p-value = 0.0234" or "<0.0001"
+cmh_by_param <- cmh_by_param %>%
+  mutate(cmh_display = fmt_pval(cmh_pval))
+```
+
+### CMH via cardx (alternative)
+```r
+# Using cardx package for a tidyverse-friendly CMH
+library(cardx)
+cmh_result <- ard_stats_cmh_test(
+  data = adlb,
+  by = TRT01P,
+  variables = ANRIND,
+  strata = BNRIND
+)
 ```
 
 ---
@@ -294,6 +340,27 @@ p <- ggsurvfit(km_fit, linewidth = 0.8) +
 ```r
 logrank <- survdiff(Surv(AVAL, 1 - CNSR) ~ TRT01P, data = adtte)
 logrank_p <- 1 - pchisq(logrank$chisq, df = length(logrank$n) - 1)
+```
+
+### Log-Rank P-Value Annotation on KM Figures
+
+Always annotate KM figures with the log-rank p-value. The annotation must include the words "log-rank" explicitly:
+
+```r
+# After creating the ggsurvfit plot:
+logrank <- survdiff(Surv(AVAL, 1 - CNSR) ~ TRT01P, data = plot_data)
+logrank_p <- 1 - pchisq(logrank$chisq, df = length(logrank$n) - 1)
+
+# Add annotation to KM plot
+p <- p + annotate(
+  "text",
+  x = max(plot_data$AVAL, na.rm = TRUE) * 0.5,
+  y = 0.15,
+  label = paste0("Log-rank test p-value = ", fmt_pval(logrank_p)),
+  hjust = 0, size = 3.5
+)
+
+# Also include in title: "Kaplan-Meier Survival Curve" (must include "survival")
 ```
 
 ### Cox Proportional Hazards

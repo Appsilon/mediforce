@@ -10,6 +10,7 @@ description: "Generate production-quality Tables, Listings, and Figures (TLGs) f
 This skill reads mock TLG shells (produced by `mock-tlg-generator`) and ADaM datasets (produced by `sdtm-to-adam`) and generates the actual TLG outputs — fully formatted tables, listings, and figures with computed statistics, ready for review.
 
 Each TLG is produced by an R script that:
+
 1. Reads the required ADaM dataset(s)
 2. Applies the specified population filter
 3. Computes the required statistics (descriptive summaries, hypothesis tests, regression models)
@@ -61,6 +62,7 @@ Build a master plan: `{TLG_ID} -> {type, dataset, population, method, variables,
 ### Step 2: Inventory ADaM datasets
 
 Read the ADaM data directory. ADaM datasets may be in:
+
 - `.csv` format (from `sdtm-to-adam` skill)
 - `.json` format (jsonlite or Dataset-JSON)
 - `.xpt` format (SAS transport)
@@ -68,9 +70,31 @@ Read the ADaM data directory. ADaM datasets may be in:
 
 For each dataset, note available variables and record counts. Verify each TLG shell's required dataset exists.
 
-### Step 3: Create the output directory structure
+### Step 2.5: Validate Population Denominators (CRITICAL)
 
-**IMPORTANT**: Use the directory paths provided in the system prompt. If a "Workspace Directory (Git Repo)" section is present, write all deliverables there (not to the output/result contract directory). The workspace directory replaces `{output_dir}` below.
+**This step is mandatory and must be completed before generating any TLG scripts.**
+
+Population N (the denominator used in column headers and percentage calculations) must ALWAYS be computed from ADSL, never from BDS datasets (ADLB, ADQS, ADAE, ADVS, ADEX, etc.) which have multiple rows per subject.
+
+1. **Read ADSL and verify** it has exactly one row per USUBJID. If duplicates exist, deduplicate:
+   ```r
+   adsl <- read_adam("adsl")
+   stopifnot(n_distinct(adsl$USUBJID) == nrow(adsl))
+   ```
+2. **Compute N for each population** (ITT, Safety, Efficacy) from ADSL by treatment group (TRT01P):
+   ```r
+   # Safety population N by treatment
+   safety_n <- adsl %>% filter(SAFFL == "Y") %>% count(TRT01P) %>% deframe()
+   # ITT population N by treatment
+   itt_n <- adsl %>% filter(ITTFL == "Y") %>% count(TRT01P) %>% deframe()
+   # Efficacy population N by treatment
+   eff_n <- adsl %>% filter(EFFFL == "Y") %>% count(TRT01P) %>% deframe()
+   ```
+3. **Store N values** in a named list and use these for ALL column headers: `"Placebo\n(N=86)"`, `"Xanomeline Low Dose\n(N=84)"`, etc.
+4. **NEVER compute N from BDS datasets** (ADLB, ADQS, ADAE, etc.) — these have multiple rows per subject and will produce inflated N values (e.g., N=453 instead of N=86).
+5. **Include the N computation** in `00_setup.R` so all individual TLG scripts use the same pre-computed values.
+
+### Step 3: Create the output directory structure
 
 ```
 {output_dir}/
@@ -100,6 +124,7 @@ Script naming convention: `{type}_{number}_{short_name}.R` where type is `t` (ta
 ### Step 4: Generate the shared setup script (00_setup.R)
 
 This script contains:
+
 - Library loading
 - Path configuration (ADaM data dir, output dir)
 - ADaM data reading helper (handles CSV/JSON/XPT/SAS7BDAT)
@@ -108,6 +133,7 @@ This script contains:
 - Common helper functions (formatting p-values, CIs, etc.)
 
 The gtsummary theme should set:
+
 - Consistent decimal formatting
 - Standard header/footnote formatting
 - Treatment arm display names with N
@@ -254,9 +280,10 @@ Create a markdown index linking each TLG ID to its output file and status:
 ```markdown
 ## TLG Output Index
 
-| TLG ID | Title | Type | Script | Output | Status |
-|--------|-------|------|--------|--------|--------|
-| T-1 | Summary of Populations | Table | t_01_pop.R | t_01_pop.html | OK |
+| TLG ID | Title                  | Type  | Script     | Output        | Status |
+| ------ | ---------------------- | ----- | ---------- | ------------- | ------ |
+| T-1    | Summary of Populations | Table | t_01_pop.R | t_01_pop.html | OK     |
+
 | ...
 | F-1 | KM: Time to First Derm Event | Figure | f_01_km_derm.R | f_01_km_derm.png | OK |
 ```
@@ -269,33 +296,86 @@ Compile all issues:
 ## TLG Generation Issues
 
 ### Failed TLGs
+
 - {TLG ID}: {error message and reason}
 
 ### Warnings
+
 - {TLG ID}: {warning about data or formatting}
 
 ### Missing Data
+
 - {TLG ID}: {ADaM dataset or variable not found}
 ```
 
 ### Step 10: Present summary to user
 
 After completion, present:
+
 - Total TLGs generated vs total in shells
 - Breakdown by type (tables, listings, figures)
 - Any failed TLGs with reasons
 - Output location
 - How to re-run individual TLGs or modify formatting
 
+## Ground Truth Label Matching
+
+Before generating each table, **READ the mock shell** for exact row labels and match them precisely. Do not use generic labels when the mock shell specifies a particular wording.
+
+### Standard label mappings for CDISCPILOT01 (Alzheimer's disease study)
+
+Demographics labels:
+
+- `AGE` → "Age (y)" (NOT "Age (years)")
+- `SEX` → "Sex"
+- `RACE` → "Race (Origin)"
+  - Race categories: "Caucasian", "African Descent", "Hispanic", "Other" (match the data values exactly)
+- `MMSETOT` → "MMSE"
+- `DURDIS` → "Duration of disease"
+- `DURDSGR1` → "Duration of disease group"
+- `EDUCLVL` → "Years of education"
+- `WEIGHTBL` → "Baseline weight (kg)"
+- `HEIGHTBL` → "Baseline height (cm)"
+- `BMIBL` → "Baseline BMI"
+- `BMIBLGR1` → "BMI category"
+- `AGEGR1` → "Age category"
+
+### Demographics table structure
+
+Demographics tables (T-3) should use a two-column structure with **Parameter** and **Statistic** as the first two columns, followed by treatment arm columns. For continuous variables, the Statistic column shows "n", "Mean (SD)", "Median", "Min, Max". For categorical variables, each category value is a row.
+
+### Percentage formatting
+
+Use the format `xx ( xx%)` with a space before the opening parenthesis and inside before the percentage:
+
+```r
+sprintf("%d (%3d%%)", n, round(100 * n / N))
+# Or for one decimal: sprintf("%d (%5.1f%%)", n, 100 * n / N)
+```
+
+### Treatment arm ordering
+
+Always order treatment arms logically.
+For example:
+
+1. Placebo
+2. Xanomeline Low Dose
+3. Xanomeline High Dose
+4. Total
+
+Use `ordered_levels = c("Placebo", "Xanomeline Low Dose", "Xanomeline High Dose")` in `add_trt_factor()`.
+
 ## Statistical methods implementation
 
 The skill must implement the statistical methods specified in the TLG shells. Common methods and their R implementations:
 
 ### Descriptive statistics
+
 - **n, Mean, SD, Median, Min, Max, Q1, Q3**: `gtsummary::tbl_summary()` with appropriate `statistic` argument
 - **n (%)**: `gtsummary::tbl_summary()` for categorical variables
 
 ### Hypothesis tests
+
 - **Fisher's exact test**: `gtsummary::add_p(test = all_categorical() ~ "fisher.test")`
 - **Pearson's chi-square**: `gtsummary::add_p(test = all_categorical() ~ "chisq.test")`
 - **ANOVA**: `gtsummary::add_p(test = all_continuous() ~ "aov")`
@@ -303,17 +383,20 @@ The skill must implement the statistical methods specified in the TLG shells. Co
 - **CMH test**: `stats::mantelhaen.test()` or `cardx::ard_stats_cmh_test()`
 
 ### Regression models
+
 - **ANCOVA**: `lm(CHG ~ TRT01P + BASE + SITEGR1, data = ...)` then `emmeans::emmeans()` for LS means and pairwise comparisons
 - **ANOVA (no baseline covariate)**: `lm(AVAL ~ TRT01P + SITEGR1, data = ...)` then `emmeans`
 - **MMRM**: `mmrm::mmrm(CHG ~ TRT01P * AVISIT + BASE * AVISIT + SITEGR1, data = ..., covariance = "unstructured")` then `emmeans` for visit-level contrasts
 - **Dose-response test**: Treatment coded as continuous (Placebo=0, Low=54, High=81) in the ANCOVA model
 
 ### Survival analysis
+
 - **Kaplan-Meier**: `survival::survfit(Surv(AVAL, 1-CNSR) ~ TRT01P, data = ...)` then `ggsurvfit::ggsurvfit()` for the KM plot with number-at-risk table
 - **Log-rank test**: `survival::survdiff()` or extracted from `survfit`
 - **Cox regression**: `survival::coxph()` for hazard ratios
 
 ### Multiple comparisons
+
 - Pairwise comparisons via `emmeans::contrast()` with method = "pairwise"
 - Confidence intervals and p-values from `emmeans::confint()` and `emmeans::test()`
 
@@ -337,6 +420,7 @@ Always include N in column headers: `"Placebo (N=86)"`. Use `modify_header()` to
 ### Footnotes
 
 Reproduce footnotes from mock shells:
+
 - Statistical method references
 - Abbreviation definitions
 - Population definition
@@ -345,6 +429,7 @@ Reproduce footnotes from mock shells:
 ### Title/subtitle
 
 Include:
+
 - Protocol ID
 - Population
 - Table title from mock shell
@@ -368,6 +453,7 @@ study_theme <- function() {
 ### KM curves (via ggsurvfit)
 
 Must include:
+
 - Kaplan-Meier survival curves with distinct line styles per arm
 - Number-at-risk table below the plot
 - Censoring tick marks
@@ -382,24 +468,28 @@ Follow the mock shell descriptions for axis labels, reference lines, legends, et
 ## Output format details
 
 ### Tables: HTML (default)
+
 - Generated via `gt::gtsave(as_gt(tbl), "file.html")`
 - Clean, self-contained HTML files
 - If user requests RTF: `gtsummary::as_flex_table(tbl) %>% flextable::save_as_docx("file.docx")`
 - If user requests PDF: render via `gt::gtsave(as_gt(tbl), "file.pdf")`
 
 ### Figures: PNG (default)
+
 - Generated via `ggplot2::ggsave("file.png", dpi = 300, width = 10, height = 7)`
 - HD resolution (300 DPI)
 - If user requests PDF: `ggsave("file.pdf")`
 - If user requests SVG: `ggsave("file.svg")`
 
 ### Listings: HTML (default)
+
 - Generated via `gt::gtsave(tbl, "file.html")`
 - Patient-level data formatted with gt
 
 ## Supplementary context
 
 If mock shells alone are insufficient, the skill may also read:
+
 - **Trial metadata JSON** for study design context
 - **ADaM spec** (from `sdtm-to-adam`) for variable definitions
 - **Protocol/SAP PDFs** for detailed statistical methodology
