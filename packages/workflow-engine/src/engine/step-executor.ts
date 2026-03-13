@@ -89,6 +89,7 @@ export class StepExecutor {
           instance,
           currentStepId,
           'failed',
+          {},
           stepOutput,
           actor,
           definition.version,
@@ -130,6 +131,7 @@ export class StepExecutor {
           instance,
           currentStepId,
           'failed',
+          {},
           stepOutput,
           actor,
           definition.version,
@@ -191,11 +193,21 @@ export class StepExecutor {
       });
     }
 
+    // Compute semantic input: previous step's output from instance variables
+    const incomingTransition = definition.transitions.find(
+      (t) => t.to === currentStepId,
+    );
+    const previousStepId = incomingTransition?.from ?? null;
+    const stepInput = previousStepId
+      ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
+      : {};
+
     // Record step execution
     await this.recordStepExecution(
       instance,
       currentStepId,
       'completed',
+      stepInput,
       stepOutput,
       actor,
       definition.version,
@@ -233,6 +245,7 @@ export class StepExecutor {
       stepId,
       'failed',
       {},
+      {},
       actor,
       instance.definitionVersion,
       null,
@@ -255,21 +268,50 @@ export class StepExecutor {
     instance: ProcessInstance,
     stepId: string,
     status: 'completed' | 'failed',
-    input: Record<string, unknown>,
+    stepInput: Record<string, unknown>,
+    stepOutput: Record<string, unknown>,
     actor: StepActor,
     definitionVersion: string,
     gateResult: { next: string; reason: string } | null,
     error: string | null,
   ): Promise<void> {
     const now = new Date().toISOString();
+    const verdict = typeof stepOutput.verdict === 'string' ? stepOutput.verdict : null;
+
+    // Merge into existing execution if one exists (e.g. auto-runner already
+    // created a 'running' record before the agent ran). This prevents
+    // duplicate rows in the step history.
+    const allExecs = await this.instanceRepository.getStepExecutions(instance.id);
+    const existing = allExecs
+      .filter((e) => e.stepId === stepId)
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0] ?? null;
+
+    if (existing) {
+      // Preserve output if already set (e.g. executeAgentStep stored envelope.result)
+      const outputAlreadySet = existing.output !== null && existing.output !== undefined;
+      await this.instanceRepository.updateStepExecution(
+        instance.id,
+        existing.id,
+        {
+          status,
+          output: outputAlreadySet ? existing.output : (status === 'completed' ? stepOutput : null),
+          verdict,
+          completedAt: now,
+          gateResult,
+          error,
+        },
+      );
+      return;
+    }
+
     await this.instanceRepository.addStepExecution(instance.id, {
       id: crypto.randomUUID(),
       instanceId: instance.id,
       stepId,
       status,
-      input,
-      output: status === 'completed' ? input : null,
-      verdict: typeof input.verdict === 'string' ? input.verdict : null,
+      input: stepInput,
+      output: status === 'completed' ? stepOutput : null,
+      verdict,
       executedBy: actor.id,
       startedAt: now,
       completedAt: now,
