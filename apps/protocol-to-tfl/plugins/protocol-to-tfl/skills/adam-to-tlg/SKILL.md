@@ -70,6 +70,8 @@ For each dataset, note available variables and record counts. Verify each TLG sh
 
 ### Step 3: Create the output directory structure
 
+**IMPORTANT**: Use the directory paths provided in the system prompt. If a "Workspace Directory (Git Repo)" section is present, write all deliverables there (not to the output/result contract directory). The workspace directory replaces `{output_dir}` below.
+
 ```
 {output_dir}/
 ├── code/

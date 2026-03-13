@@ -15,7 +15,7 @@ The output JSON serves as a **contract** between this extraction step and the `m
 
 **This is a headless pipeline step. There is no human listening.**
 
-**CRITICAL WARNING**: The output metadata JSON is very large (500+ lines). If you compose it in your head and try to output it as text, you WILL exceed the time limit and the entire run will be killed. You MUST use the Write tool to save the JSON to a file. Your final text response must be tiny.
+**CRITICAL WARNING**: The output metadata JSON is very large (500+ lines). You MUST write it to a file using bash. Do NOT try to output the entire JSON as text in your response — it will exceed the time limit and the run will be killed.
 
 Your ONLY output as a final message must be a raw JSON object (no markdown fences, no preamble, no explanation):
 
@@ -24,22 +24,95 @@ Your ONLY output as a final message must be a raw JSON object (no markdown fence
 ```
 
 Rules:
-- **Use the Write tool** to save the metadata JSON to a file. Do NOT include the metadata JSON in your response text -- it is too large and will cause a timeout.
+- **Write the metadata JSON to a file using bash** (e.g., `cat > /output/file.json << 'ENDJSON'` or `python3 -c "import json; ..."`). Do NOT include the metadata JSON in your response text.
 - Your final text response is ONLY the small contract JSON above (the one with `output_file` and `summary`). Nothing else.
 - Do NOT write conversational summaries, recommendations, or next step suggestions
 - Do NOT wrap anything in markdown code fences
 - Do NOT continue working after writing the output file and emitting the JSON response
 - **Budget your time** -- you will be told how much time you have in the input. Prioritize core extraction (study ID, design, endpoints, analyses). If running low on time, skip validation and output what you have.
 
+## How to Read and Write Files
+
+You are running inside a Docker container with bash, python3, and standard Unix tools.
+
+### Reading PDF documents
+
+Use `pdftotext` (from poppler-utils, already installed) to extract text from PDFs:
+
+```bash
+# Extract all text from a PDF
+pdftotext /path/to/document.pdf /tmp/document.txt
+cat /tmp/document.txt
+
+# Extract specific pages (e.g., pages 1-10)
+pdftotext -f 1 -l 10 /path/to/document.pdf /tmp/document-pages1-10.txt
+cat /tmp/document-pages1-10.txt
+```
+
+**Strategy for large PDFs** (most Protocol/SAP documents are 50-200+ pages):
+1. First extract pages 1-5 to get the title page, synopsis, and table of contents
+2. Use the TOC to identify page numbers for key sections
+3. Extract targeted page ranges for each schema section you need to fill
+
+### Writing output files
+
+**MANDATORY**: You MUST use one of these two exact patterns. Do NOT pass raw JSON/Python dicts directly to bash.
+
+**Pattern 1 (preferred) — bash heredoc:**
+```bash
+cat > /output/CDISCPILOT01-trial-metadata.json << 'ENDJSON'
+{
+  "schema_version": "1.0",
+  ...entire JSON here...
+}
+ENDJSON
+```
+
+**Pattern 2 — Python heredoc** (note: the ENTIRE python script must be inside the heredoc):
+```bash
+python3 << 'ENDPY'
+import json
+
+metadata = {
+    "schema_version": "1.0",
+    # ... build your metadata dict ...
+}
+
+with open("/output/CDISCPILOT01-trial-metadata.json", "w") as f:
+    json.dump(metadata, f, indent=2)
+
+print("Written successfully")
+ENDPY
+```
+
+**NEVER** do this (it will fail — bash cannot execute a Python dict literal):
+```
+# WRONG — this passes a dict to bash as a command:
+bash: {"schema_version": "1.0", ...}
+```
+
+### Downloading files from URLs
+
+If input provides download URLs instead of local paths:
+
+```bash
+curl -sL "https://example.com/protocol.pdf" -o /tmp/protocol.pdf
+pdftotext /tmp/protocol.pdf /tmp/protocol.txt
+```
+
 ## Workflow
 
 ### Step 1: Identify and read the input documents
 
-The user will typically provide one or more of:
-- PDF file paths (Protocol and/or SAP) -- read them with the Read tool (supports PDFs up to 20 pages per read; for large documents read in chunks by section)
-- Files already pasted into the conversation context
+The input JSON will contain file paths or download URLs for one or more documents. Download them (if URLs) and convert PDFs to text using `pdftotext`.
 
-Document pairing convention in this project: files in `test-docs/` are named `{NCT_ID}_Prot_*.pdf` and `{NCT_ID}_SAP_*.pdf`. Match by NCT ID.
+Start by extracting the first 5 pages to get the synopsis and table of contents:
+```bash
+pdftotext -f 1 -l 5 /tmp/protocol.pdf /tmp/protocol-synopsis.txt
+cat /tmp/protocol-synopsis.txt
+```
+
+Then extract targeted sections based on the TOC.
 
 Handle partial inputs:
 - **Protocol only** -- Extract what's available, flag SAP-dependent fields as `"source": "not_available_from_protocol"`
@@ -49,7 +122,7 @@ Handle partial inputs:
 ### Step 2: Extract metadata into the standardized schema
 
 Extract information systematically by working through each section of the schema (see "Output Schema" below). For each field:
-1. Search the source document(s) for relevant sections
+1. Search the source document text for relevant sections
 2. Extract the information faithfully -- do not invent or assume
 3. If information is ambiguous, include a `"_notes"` field explaining the ambiguity
 4. If information is absent, use `null` with a `"_notes"` explaining what's missing and where it would typically be found
@@ -71,19 +144,17 @@ Add a `"validation_summary"` section noting any gaps found. Do not re-read docum
 
 ### Step 4: Write the output file
 
-Use the **Write tool** to save the extracted metadata JSON to a file named `{NCT_ID}-trial-metadata.json` in the output directory specified in the "Output Directory" section of the input. Use the full absolute path provided there.
+Use bash to write the extracted metadata JSON to a file named `{study_id}-trial-metadata.json` in the output directory specified in the "Output Directory" section of the input. Use the full absolute path provided there.
 
-This is essential: call the Write tool with the complete JSON content. Do NOT try to output the JSON as text -- it is too large and will cause the process to time out before you finish generating it.
-
-Then, as your **final message**, output ONLY the small contract JSON described in the "HARD STOP" section above:
+Then, as your **final message**, output ONLY the small contract JSON:
 ```
-{"output_file": "/absolute/path/to/file.json", "summary": "1-2 sentence summary"}
+{"output_file": "/output/CDISCPILOT01-trial-metadata.json", "summary": "1-2 sentence summary"}
 ```
 Nothing else.
 
 ## Handling edge cases
 
-**Large PDFs**: Most Protocol and SAP documents exceed 20 pages. Use targeted page ranges with the Read tool -- start with the first 5 pages (title, synopsis, TOC) to orient, then read specific sections relevant to each schema field. The SAP Section Guide below lists where key information typically appears.
+**Large PDFs**: Most Protocol and SAP documents exceed 20 pages. Use `pdftotext -f <start> -l <end>` to extract targeted page ranges. Start with the first 5 pages (title, synopsis, TOC) to orient, then read specific sections relevant to each schema field. The SAP Section Guide below lists where key information typically appears.
 
 **Incomplete documents**: Some SAPs are posted without mock shells for disclosure. Some protocols are early drafts. Always extract what's available and clearly document gaps.
 
