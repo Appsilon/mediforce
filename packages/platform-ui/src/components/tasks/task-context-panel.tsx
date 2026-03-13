@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import * as Collapsible from '@radix-ui/react-collapsible';
 import * as Tabs from '@radix-ui/react-tabs';
-import { FileText, Code } from 'lucide-react';
+import { FileText, Code, ChevronDown } from 'lucide-react';
 import type { StepExecution } from '@mediforce/platform-core';
 import { useSubcollection } from '@/hooks/use-process-instances';
 import { cn } from '@/lib/utils';
@@ -72,54 +73,59 @@ export function TaskContextPanel({
   const isObject = typeof output === 'object' && output !== null;
 
   return (
-    <div className="rounded-lg border">
-      <div className="px-4 pt-3 pb-0">
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-          Previous Step Output
-          <span className="ml-2 font-normal normal-case text-muted-foreground/70">
-            ({previousStepOutput!.stepId})
-          </span>
-        </div>
-      </div>
-      <Tabs.Root defaultValue="summary">
-        <Tabs.List className="flex gap-1 border-b px-4">
-          {[
-            { value: 'summary', label: 'Summary', icon: FileText },
-            { value: 'full', label: 'Full Output', icon: Code },
-          ].map(({ value, label, icon: Icon }) => (
-            <Tabs.Trigger
-              key={value}
-              value={value}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium',
-                'text-muted-foreground border-b-2 border-transparent -mb-px',
-                'transition-colors',
-                'data-[state=active]:border-primary data-[state=active]:text-primary',
+    <Collapsible.Root defaultOpen={false}>
+      <div className="rounded-lg border">
+        <Collapsible.Trigger className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Previous Step Output
+            <span className="ml-2 font-normal normal-case text-muted-foreground/70">
+              ({previousStepOutput!.stepId})
+            </span>
+          </div>
+          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
+        </Collapsible.Trigger>
+        <Collapsible.Content>
+          <Tabs.Root defaultValue="summary">
+            <Tabs.List className="flex gap-1 border-b px-4">
+              {[
+                { value: 'summary', label: 'Summary', icon: FileText },
+                { value: 'full', label: 'Full Output', icon: Code },
+              ].map(({ value, label, icon: Icon }) => (
+                <Tabs.Trigger
+                  key={value}
+                  value={value}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium',
+                    'text-muted-foreground border-b-2 border-transparent -mb-px',
+                    'transition-colors',
+                    'data-[state=active]:border-primary data-[state=active]:text-primary',
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </Tabs.Trigger>
+              ))}
+            </Tabs.List>
+
+            <Tabs.Content value="summary" className="p-4">
+              {isObject ? (
+                <SummaryView output={output as Record<string, unknown>} />
+              ) : (
+                <pre className="text-sm whitespace-pre-wrap break-words">
+                  {String(output)}
+                </pre>
               )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
+            </Tabs.Content>
 
-        <Tabs.Content value="summary" className="p-4">
-          {isObject ? (
-            <SummaryView output={output as Record<string, unknown>} />
-          ) : (
-            <pre className="text-sm whitespace-pre-wrap break-words">
-              {String(output)}
-            </pre>
-          )}
-        </Tabs.Content>
-
-        <Tabs.Content value="full" className="p-4">
-          <pre className="rounded-md bg-muted p-4 text-xs overflow-auto max-h-96 whitespace-pre-wrap break-words">
-            {isObject ? JSON.stringify(output, null, 2) : String(output)}
-          </pre>
-        </Tabs.Content>
-      </Tabs.Root>
-    </div>
+            <Tabs.Content value="full" className="p-4">
+              <pre className="rounded-md bg-muted p-4 text-xs overflow-auto max-h-96 whitespace-pre-wrap break-words">
+                {isObject ? JSON.stringify(output, null, 2) : String(output)}
+              </pre>
+            </Tabs.Content>
+          </Tabs.Root>
+        </Collapsible.Content>
+      </div>
+    </Collapsible.Root>
   );
 }
 

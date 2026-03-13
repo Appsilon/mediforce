@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   collection,
   query,
@@ -8,6 +8,7 @@ import {
   type Query,
   type DocumentData,
   type QueryConstraint,
+  type FirestoreError,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -32,6 +33,8 @@ export type FirestoreState<T> = {
  *   const { data } = useCollection<HumanTask>('humanTasks', constraints);
  */
 const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
+const MAX_AUTH_RETRIES = 3;
+const RETRY_DELAY_MS = 500;
 
 export function useCollection<T extends { id: string }>(
   collectionPath: string,
@@ -42,6 +45,7 @@ export function useCollection<T extends { id: string }>(
     loading: true,
     error: null,
   });
+  const retryCount = useRef(0);
 
   useEffect(() => {
     if (!collectionPath) {
@@ -49,25 +53,52 @@ export function useCollection<T extends { id: string }>(
       return;
     }
     setState((prev) => ({ ...prev, loading: true }));
-    const colRef = collection(db, collectionPath);
-    const q: Query<DocumentData> =
-      constraints.length > 0 ? query(colRef, ...constraints) : query(colRef);
+    retryCount.current = 0;
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const docs = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as T[];
-        setState({ data: docs, loading: false, error: null });
-      },
-      (error) => {
-        setState((prev) => ({ ...prev, loading: false, error }));
-      },
-    );
+    let unsubscribe: (() => void) | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
 
-    return unsubscribe;
+    function subscribe() {
+      const colRef = collection(db, collectionPath);
+      const q: Query<DocumentData> =
+        constraints.length > 0 ? query(colRef, ...constraints) : query(colRef);
+
+      unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          if (cancelled) return;
+          retryCount.current = 0;
+          const docs = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as T[];
+          setState({ data: docs, loading: false, error: null });
+        },
+        (error: FirestoreError) => {
+          if (cancelled) return;
+          // onSnapshot terminates the listener on error. For permission-denied
+          // errors during app startup, Firestore's auth token may not have
+          // propagated yet — retry a few times to let it settle.
+          if (error.code === 'permission-denied' && retryCount.current < MAX_AUTH_RETRIES) {
+            retryCount.current += 1;
+            retryTimer = setTimeout(() => {
+              if (!cancelled) subscribe();
+            }, RETRY_DELAY_MS * retryCount.current);
+          } else {
+            setState((prev) => ({ ...prev, loading: false, error }));
+          }
+        },
+      );
+    }
+
+    subscribe();
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
+    };
   }, [collectionPath, constraints]);
 
   return state;

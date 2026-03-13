@@ -353,6 +353,7 @@ export class WorkflowEngine {
               completionData: null,
               creationReason: 'human_executor',
               ...(nextStep.ui ? { ui: nextStep.ui } : {}),
+              ...(nextStep.params?.length ? { params: nextStep.params } : {}),
             };
             await this.humanTaskRepository.create(task);
 

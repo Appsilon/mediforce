@@ -175,6 +175,7 @@ export async function POST(
           completionData: null,
           creationReason: 'human_executor',
           ...(currentStep.ui ? { ui: currentStep.ui } : {}),
+          ...(currentStep.params?.length ? { params: currentStep.params } : {}),
         });
 
         await auditRepo.append({

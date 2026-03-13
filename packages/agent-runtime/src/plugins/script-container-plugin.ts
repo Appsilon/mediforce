@@ -12,7 +12,7 @@ const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: s
   javascript: { image: 'node:20-slim', ext: '.mjs', cmd: (p) => `node ${p}` },
   python: { image: 'python:3.12-slim', ext: '.py', cmd: (p) => `python ${p}` },
   r: { image: 'rocker/r-ver:4', ext: '.R', cmd: (p) => `Rscript ${p}` },
-  bash: { image: 'alpine:3.19', ext: '.sh', cmd: (p) => `bash ${p}` },
+  bash: { image: 'alpine:3.19', ext: '.sh', cmd: (p) => `sh ${p}` },
 };
 
 /**
