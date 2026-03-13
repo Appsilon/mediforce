@@ -1,7 +1,7 @@
 {
   "processName": "protocol-to-tfl",
   "configName": "opencode-extract",
-  "configVersion": "7",
+  "configVersion": "8",
   "env": {
     "DEEPSEEK_API_KEY": "{{DEEPSEEK_API_KEY}}",
     "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}"
@@ -33,7 +33,7 @@
       "autonomyLevel": "L3",
       "confidenceThreshold": 0.7,
       "fallbackBehavior": "escalate_to_human",
-      "timeoutMinutes": 30,
+      "timeoutMinutes": 45,
       "agentConfig": {
         "skill": "mock-tlg-generator",
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
