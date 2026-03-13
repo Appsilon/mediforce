@@ -2,6 +2,7 @@
 export {
   VerdictSchema,
   StepUiSchema,
+  StepParamSchema,
   StepSchema,
   TransitionSchema,
   TriggerSchema,

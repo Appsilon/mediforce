@@ -148,8 +148,16 @@ describe('ProcessInstanceSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('should reject an instance with invalid triggerType', () => {
+  it('should accept cron trigger type', () => {
     const result = ProcessInstanceSchema.safeParse({ ...validInstance, triggerType: 'cron' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.triggerType).toBe('cron');
+    }
+  });
+
+  it('should reject an instance with invalid triggerType', () => {
+    const result = ProcessInstanceSchema.safeParse({ ...validInstance, triggerType: 'scheduled' });
     expect(result.success).toBe(false);
   });
 

@@ -238,22 +238,25 @@ describe('StepConfigSchema', () => {
     }
   });
 
-  it('[DATA] should reject agentConfig without image (required)', () => {
+  it('[DATA] should accept agentConfig without image (optional for local execution)', () => {
     const result = StepConfigSchema.safeParse({
       stepId: 'step-1',
       executorType: 'agent',
       agentConfig: { skill: 'some-skill' },
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agentConfig?.image).toBeUndefined();
+    }
   });
 
-  it('[DATA] should reject agentConfig with empty image string', () => {
+  it('[DATA] should accept agentConfig with empty image string (image is optional for inline scripts)', () => {
     const result = StepConfigSchema.safeParse({
       stepId: 'step-1',
       executorType: 'agent',
       agentConfig: { image: '' },
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('[DATA] should accept stepConfig without agentConfig (optional)', () => {

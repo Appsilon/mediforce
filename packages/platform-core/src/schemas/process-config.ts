@@ -16,15 +16,20 @@ export const AgentConfigSchema = z.object({
   model: z.string().optional(),
   skillsDir: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
-  // Container execution — all agent steps MUST run inside Docker for security
-  image: z.string().min(1),
+  command: z.string().optional(),
+  inlineScript: z.string().optional(),
+  runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
+  // Container image — when omitted, inline scripts auto-resolve the image from the runtime
+  image: z.string().optional(),
   repo: z.string().optional(),
   commit: z.string().optional(),
+  // API provider: determines which env vars are injected into the agent process
+  provider: z.enum(['anthropic', 'openrouter', 'deepseek']).optional(),
 });
 
 export const StepConfigSchema = z.object({
   stepId: z.string(),
-  executorType: z.enum(['human', 'agent']), // required: who executes this step
+  executorType: z.enum(['human', 'agent', 'script']), // required: who executes this step
   plugin: z.string().optional(), // e.g. '@mediforce/example-agent'
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(), // L0 added
   confidenceThreshold: z.number().min(0).max(1).optional(), // default 0 (always pass)
@@ -38,6 +43,7 @@ export const StepConfigSchema = z.object({
   reviewerType: z.enum(['human', 'agent', 'none']).optional(), // who reviews; 'none' for L4 no-review
   reviewerPlugin: z.string().optional(), // required at runtime when reviewerType='agent'
   agentConfig: AgentConfigSchema.optional(),
+  params: z.record(z.string(), z.unknown()).optional(), // Step parameters — merged into step input at runtime
 });
 
 export const ProcessNotificationConfigSchema = z.object({

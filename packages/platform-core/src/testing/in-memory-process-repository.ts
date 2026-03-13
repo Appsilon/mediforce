@@ -31,6 +31,10 @@ export class InMemoryProcessRepository implements ProcessRepository {
     );
   }
 
+  async listProcessDefinitions(): Promise<ProcessDefinition[]> {
+    return Array.from(this.definitions.values());
+  }
+
   async getProcessConfig(
     processName: string,
     configName: string,
