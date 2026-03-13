@@ -2,13 +2,21 @@
 # Start a protocol-to-tfl process and resolve the upload-documents step
 # with CDISC Pilot 01 test documents (protocol + SAP from GitHub).
 #
-# Usage: ./scripts/start-test-run.sh [base_url]
+# Usage: ./scripts/start-test-run.sh <config-name> [base_url]
 #
 # Requires the dev server running (pnpm dev).
 
 set -euo pipefail
 
-BASE_URL="${1:-http://localhost:9003}"
+if [ -z "${1:-}" ]; then
+  echo "Usage: $0 <config-name> [base_url]" >&2
+  echo "Example: $0 opencode-extract" >&2
+  echo "         $0 agent-extract http://localhost:9003" >&2
+  exit 1
+fi
+
+CONFIG_NAME_ARG="$1"
+BASE_URL="${2:-http://localhost:9003}"
 API_KEY="${PLATFORM_API_KEY:-aad7fee7cb4c68d2966079ab514d6164120c0b258d74fae8749aae94117ce748}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -42,7 +50,7 @@ parse_response() {
 
 die() { echo "ERROR: $1" >&2; exit 1; }
 
-# ── 1. Discover latest config ─────────────────────────────────────────────────
+# ── 1. Validate config exists ───────────────────────────────────────────────
 
 echo "Querying available configs..."
 
@@ -51,16 +59,19 @@ parse_response "$RESPONSE"
 
 [ "$HTTP_CODE" = "200" ] || die "Failed to query configs (HTTP $HTTP_CODE): $BODY"
 
-# Pick latest agent-extract config (highest version number)
+# Find latest version of the requested config name
 CONFIG=$(echo "$BODY" | python3 -c "
 import sys, json
+config_name = '$CONFIG_NAME_ARG'
 configs = json.load(sys.stdin).get('configs', [])
-agent_configs = [c for c in configs if c['configName'] == 'agent-extract']
-if not agent_configs:
-    print('ERROR: no agent-extract config found', file=sys.stderr)
+matching = [c for c in configs if c['configName'] == config_name]
+if not matching:
+    available = sorted(set(c['configName'] for c in configs))
+    names = ', '.join(available) if available else '(none)'
+    print('ERROR: config \"' + config_name + '\" not found. Available: ' + names, file=sys.stderr)
     sys.exit(1)
-latest = max(agent_configs, key=lambda c: int(c['configVersion']))
-print(f\"{latest['configName']}:{latest['configVersion']}\")
+latest = max(matching, key=lambda c: int(c['configVersion']))
+print(latest['configName'] + ':' + latest['configVersion'])
 ")
 
 CONFIG_NAME=$(echo "$CONFIG" | cut -d: -f1)
