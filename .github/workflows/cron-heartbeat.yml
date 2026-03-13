@@ -1,0 +1,16 @@
+name: Cron Heartbeat
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger heartbeat
+        run: |
+          curl -sf -X POST "${{ secrets.PLATFORM_URL }}/api/cron/heartbeat" \
+            -H "X-Api-Key: ${{ secrets.PLATFORM_API_KEY }}" \
+            -H "Content-Type: application/json"

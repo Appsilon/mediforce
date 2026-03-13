@@ -1,52 +1,103 @@
-# Continuation Prompt — Agent Pipeline Fixes
+# Continue: OpenCode pipeline — git workspace fix, retry run
 
-Branch: `refactor/move-apps-directory`. Previous commit: `2d1e3fb`.
+## Context
 
-## What was fixed this session:
+OpenCode agent pipeline running end-to-end with DeepSeek direct API. Four fixes were made this session. The pipeline completes all 6 steps, but `generate-adam` and `generate-tlg` write output to `/output/` instead of `/workspace/` — so nothing gets committed to the clinical workspace git repo.
 
-1. **Permission blocking** — Agent couldn't write output files. Root cause: `--allowedTools` variadic flag consumed the prompt arg, and path-scoped patterns don't work in CLI. Fix: `--allowedTools Read,Write,Edit,Glob,Grep` + pipe prompt via stdin.
+## What was fixed this session
 
-2. **macOS /var symlink** — `tmpdir()` returns `/var/folders/...` but CLI resolves to `/private/var/folders/...`. Fix: `realpath()` after `mkdtemp`.
+### 1. Large file path bug (root cause of last session's ENOENT)
+- **Problem**: `buildPrompt()` wrote large previous step output files to `/output/` on the host machine (a literal path), but the Docker container mounts a *different* temp directory as `/output/`.
+- **Fix**: `run()` in `base-container-agent-plugin.ts` now creates the Docker output temp dir *before* calling `buildPrompt()`, and passes `hostOutputDir` so files are written to the actual mounted directory.
+- **Files**: `packages/agent-runtime/src/plugins/base-container-agent-plugin.ts`
+- **Verified**: `generate-adam` found `/output/prev-generate-tlg-shells-raw.md` successfully in run `f2792e14`.
 
-3. **Timeout at 10min** — Agent was generating huge JSON inline instead of using Write tool. Fix: SKILL.md updated with explicit "use Write tool" instructions + timeout bumped to 20min.
+### 2. Empty output guard on task resolution
+- **Problem**: Autoadvance script blindly approved L3 review tasks even when the agent produced no output (escalated with confidence: 0, result: null). Steps advanced with empty `{}` output.
+- **Fix**: Resolve route returns HTTP 422 when approving an `agent_output_review` task where `agentOutput.result` is null or `{}`.
+- **Files**: `packages/platform-ui/src/app/api/tasks/[taskId]/resolve/route.ts`
+- **Tests**: 2 new tests (null result, empty object result) — both pass.
 
-4. **Missing log events** — Logger only captured `assistant` events, not `user` (tool results) or other types. Fix: added handlers for `user` tool_result blocks, generic fallback for unknown events.
+### 3. Autoadvance script improvements
+- Poll interval: 60s (was 5s). Max 30 polls = 30 min (was 120 × 5s = 10 min).
+- Handles HTTP 422 gracefully: logs warning and stops instead of dying.
+- **File**: `scripts/autoadvance-run.sh`
 
-5. **Temp dir cleanup on failure** — Was deleting debug artifacts. Fix: only cleanup on success, include tempDir path in error payload.
+### 4. Docker I/O tests
+- 7 new tests in `packages/agent-runtime/src/plugins/__tests__/opencode-agent-plugin.test.ts`
+- **Previous step outputs → container**: large output written to hostOutputDir, small output inlined, multiple large outputs each get own file
+- **Container outputs → system**: output_file contract resolution, result.json fallback, markdown raw format, git metadata collection
+- All 695 tests pass.
 
-6. **Log viewer broken** — Format changed from `kind` to `type`+`subtype`. Fix: `classifyEntry()` normalizer, skip empty entries, added `ToolResultEntry` component.
+## The remaining bug: agent writes to /output/ instead of /workspace/
 
-7. **SKILL.md improvements** — Inlined output-schema.md and sap-section-guide.md. Removed "offer next steps" step. Made validation lightweight. Added time budget awareness. Added HARD STOP contract.
+### What happens
+In git mode steps (`generate-adam`, `generate-tlg`), the entrypoint.sh clones the clinical workspace repo to `/workspace/`, runs the agent command, then commits+pushes any changes in `/workspace/`.
 
-8. **Output contract** — Agent writes JSON to file via Write tool, returns `{"output_file": "...", "summary": "..."}`. Plugin reads file from disk via `extractResult()`.
+But the agent writes all its code and data files to `/output/` (the volume mount for results), not `/workspace/` (the git repo). So the entrypoint finds no changes → no commit → no push → GitHub compare URL is dead.
 
-9. **Configurable timeout** — `agentConfig.timeoutMs` in ProcessConfig schema, default 20min.
+### Root cause
+The SKILL.md files for `sdtm-to-adam` and `adam-to-tlg` don't tell the agent where to write for git mode. The prompt's "Output Directory" section says `Write all output files to this absolute path: /output` — which is correct for standalone steps but wrong for git mode steps where the deliverables should go to `/workspace/`.
 
-## Key files changed:
+### How to fix
+Two-part fix needed:
 
-- `packages/agent-runtime/src/plugins/claude-code-agent-plugin.ts` — permissions, logging, output contract, realpath, cwd
-- `packages/platform-ui/src/components/processes/agent-log-viewer.tsx` — new format support, skip empty entries
-- `packages/platform-core/src/schemas/process-config.ts` — timeoutMs in AgentConfig
-- `apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/trial-metadata-extractor/SKILL.md` — rewritten with inlined schemas
+1. **Prompt building** (`base-container-agent-plugin.ts` `buildPrompt()`): In git mode, add a "## Workspace Directory" section telling the agent to write deliverables (R scripts, data files) to `/workspace/` and only write the output contract JSON to `/output/`.
 
-## Latest successful run:
+2. **SKILL.md files**: Update `sdtm-to-adam/SKILL.md` and `adam-to-tlg/SKILL.md` to reference `/workspace/` for code and data output. The skills should instruct the agent to:
+   - Write R scripts to `/workspace/code/`
+   - Write generated data to `/workspace/data/`
+   - Write the output contract to `/output/result.json`
+   - Use `/output/` only for temp files and the final contract
 
-Agent completed in ~5.5 minutes. Write succeeded. Contract JSON returned with output_file path.
+### Key constraint
+The `/output/` directory is the Docker volume where the system reads results. The `/workspace/` directory is the git repo. The agent needs both:
+- `/workspace/` for deliverables that get committed to git
+- `/output/` for the result contract and any large intermediate files
 
-## What's next:
+## What to do next
 
-1. **Commit all changes** — significant unstaged work from this session
-2. **Verify extractResult reads the file** — confirm the plugin actually reads the JSON from disk and passes it through as the result
-3. **Process advancement** — after agent completes, process should advance extract-metadata → review-metadata → done
-4. **Review step UI** — display extracted metadata for human review/approval
-5. **E2E tests** — Playwright tests for the upload + extraction flow
+### 1. Fix the workspace/output split
+Update `buildPrompt()` to add workspace instructions for git mode steps. Update SKILL.md files.
 
-## Unstaged changes (from earlier sessions):
+### 2. Retry the pipeline
+```bash
+pnpm dev  # restart dev server to pick up changes
+bash scripts/start-test-run.sh opencode-extract
+bash scripts/autoadvance-run.sh <instanceId>
+```
 
-- `packages/platform-ui/src/app/(app)/processes/[name]/page.tsx` — start-run dialog
-- `packages/platform-ui/src/app/actions/processes.ts` — process actions
-- `packages/platform-ui/src/components/tasks/task-detail.tsx` — task detail upload
-- `packages/platform-ui/src/components/processes/start-run-dialog.tsx` — new file
-- `packages/platform-ui/src/components/tasks/next-step-card.tsx` — new file
-- `scripts/seed-upload-task.cjs` / `.mjs` — seed scripts
-- `scripts/test-allowed-tools.sh` — test script (can delete)
+### 3. Verify
+- `generate-adam`: R scripts committed to workspace repo, GitHub compare URL works
+- `generate-tlg`: Same verification
+- Output contract in `/output/result.json` correctly read by the system
+
+## Key files
+- `packages/agent-runtime/src/plugins/base-container-agent-plugin.ts` — Docker orchestration, prompt building
+- `packages/agent-runtime/src/plugins/opencode-agent-plugin.ts` — OpenCode plugin
+- `packages/agent-runtime/container/entrypoint.sh` — git clone/commit/push logic
+- `apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/sdtm-to-adam/SKILL.md` — ADaM generation skill (needs workspace fix)
+- `apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/adam-to-tlg/SKILL.md` — TLG generation skill (needs workspace fix)
+- `packages/platform-ui/src/app/api/tasks/[taskId]/resolve/route.ts` — task resolution with empty output guard
+- `scripts/autoadvance-run.sh` — auto-advance script (60s polling, 30min max)
+
+## Successful run reference
+Instance `f2792e14-0e0a-404a-8c95-5ada56e6dabc` (config opencode-extract v6):
+- extract-metadata: ✓ (DeepSeek, auto-approved)
+- generate-tlg-shells: ✓ (42 TLGs: 28 tables, 8 listings, 6 figures)
+- upload-sdtm: ✓ (22 .xpt files)
+- generate-adam: ✓ ran 27 min, wrote R code + 3 ADaM datasets — BUT to /output/ not /workspace/
+- generate-tlg: ran (status TBD — autoadvance timed out)
+
+Clinical workspace repo: `Appsilon/mediforce-clinical-workspace`
+- Initial commit: `4beb1b0ad77872b04bc7ef930def16e555946222`
+- Deploy key: `~/.ssh/mediforce_deploy_key`
+- No branch `run/f2792e14-*` exists (because nothing was committed)
+
+## Test commands
+```bash
+pnpm typecheck          # ~5s
+pnpm test:fast          # ~6s, 695 tests
+pnpm vitest run packages/agent-runtime/src/plugins/__tests__/opencode-agent-plugin.test.ts  # Docker I/O tests
+pnpm vitest run packages/platform-ui/src/app/api/tasks  # resolve route tests (36 tests)
+```

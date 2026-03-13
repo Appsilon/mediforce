@@ -1,0 +1,78 @@
+name: community-digest
+version: "1"
+description: "Daily GitHub scan → rank changes → draft Discord posts"
+
+triggers:
+  - name: daily-digest
+    type: cron
+    schedule: "0 8 * * 1-5"
+    config: {}
+  - name: manual
+    type: manual
+    config: {}
+
+steps:
+  - id: gather-changes
+    name: Gather GitHub Changes
+    type: creation
+    description: "Fetch commits, PRs, and issues from GitHub API"
+    params:
+      - name: repo
+        type: string
+        required: true
+        description: "GitHub repository (owner/name)"
+      - name: lookbackHours
+        type: number
+        required: false
+        description: "How many hours back to scan"
+        default: 24
+
+  - id: rank-changes
+    name: Rank Changes
+    type: creation
+    description: "AI ranks changes by community interest"
+
+  - id: review-ranking
+    name: Review Ranking
+    type: review
+    description: "Human reviews and adjusts the ranking"
+    verdicts:
+      approve:
+        target: draft-posts
+      revise:
+        target: rank-changes
+
+  - id: draft-posts
+    name: Draft Discord Posts
+    type: creation
+    description: "AI drafts Discord posts from ranked changes"
+
+  - id: review-posts
+    name: Review Posts
+    type: review
+    description: "Human approves or revises the drafted posts"
+    verdicts:
+      approve:
+        target: done
+      revise:
+        target: draft-posts
+
+  - id: done
+    name: Done
+    type: terminal
+
+transitions:
+  - from: gather-changes
+    to: rank-changes
+  - from: rank-changes
+    to: review-ranking
+  - from: review-ranking
+    to: draft-posts
+  - from: review-ranking
+    to: rank-changes
+  - from: draft-posts
+    to: review-posts
+  - from: review-posts
+    to: done
+  - from: review-posts
+    to: draft-posts
