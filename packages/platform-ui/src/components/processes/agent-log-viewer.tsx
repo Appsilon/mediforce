@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { RefreshCw, FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check } from 'lucide-react';
+import { RefreshCw, FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LogEntry {
@@ -25,6 +25,7 @@ interface AgentLogFile {
 
 interface AgentLogViewerProps {
   logFiles: AgentLogFile[];
+  initialStepId?: string | null;
 }
 
 interface AgentLogSection {
@@ -83,7 +84,56 @@ function ElapsedBadge({ prevTs, currentTs }: { prevTs: string | null; currentTs:
   );
 }
 
+interface TodoItem {
+  content: string;
+  status: string;
+  priority?: string;
+}
+
+function isTodoWriteEntry(entry: LogEntry): entry is LogEntry & { input: { todos: TodoItem[] } } {
+  const toolName = (entry.tool ?? entry.tool_name ?? '').toLowerCase();
+  if (toolName !== 'todowrite') return false;
+  const todos = entry.input?.todos;
+  return Array.isArray(todos) && todos.length > 0;
+}
+
+function TodoWriteEntry({ todos }: { todos: TodoItem[] }) {
+  return (
+    <div className="flex items-start gap-2 py-1">
+      <div className="mt-0.5 shrink-0 w-5 h-5 rounded bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+        <ListTodo className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+      </div>
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Tasks</span>
+        {todos.map((todo, index) => {
+          const StatusIcon = todo.status === 'completed' ? CheckCircle2
+            : todo.status === 'in_progress' ? Loader2
+            : Circle;
+          const statusColor = todo.status === 'completed' ? 'text-green-500'
+            : todo.status === 'in_progress' ? 'text-blue-500'
+            : 'text-muted-foreground';
+          return (
+            <div key={index} className="flex items-center gap-1.5">
+              <StatusIcon className={cn('h-3 w-3 shrink-0', statusColor)} />
+              <span className={cn(
+                'text-xs',
+                todo.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground/80',
+              )}>
+                {todo.content}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ToolCallEntry({ entry }: { entry: LogEntry }) {
+  if (isTodoWriteEntry(entry)) {
+    return <TodoWriteEntry todos={entry.input.todos} />;
+  }
+
   const IconComponent: LucideIcon = (entry.tool ? TOOL_ICONS[entry.tool] : undefined) ?? Bot;
   const inputStr = entry.input ? cleanPath(JSON.stringify(entry.input)) : '';
 
@@ -352,13 +402,22 @@ function AgentTabContent({ section }: { section: AgentLogSection }) {
   );
 }
 
-export function AgentLogViewer({ logFiles }: AgentLogViewerProps) {
+export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps) {
   const [sections, setSections] = React.useState<AgentLogSection[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [autoRefresh, setAutoRefresh] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState(0);
   const [copied, setCopied] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  // When initialStepId changes, select the matching tab
+  React.useEffect(() => {
+    if (!initialStepId || sections.length === 0) return;
+    const index = sections.findIndex((s) => s.stepId === initialStepId);
+    if (index >= 0) {
+      setActiveTab(index);
+    }
+  }, [initialStepId, sections]);
 
   const fetchLogs = React.useCallback(async () => {
     if (logFiles.length === 0) return;

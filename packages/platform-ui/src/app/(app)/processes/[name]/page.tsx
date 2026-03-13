@@ -3,18 +3,18 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, ChevronRight, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Eye, EyeOff, Clock, Zap } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
-import { ProcessStatusBadge } from '@/components/processes/process-status-badge';
 import { YamlEditor } from '@/components/processes/yaml-editor';
 import { definitionToYaml } from '@/app/actions/definitions';
 import { ConfigList } from '@/components/configs/config-list';
+import { RunsTable } from '@/components/processes/runs-table';
 import { StartRunDialog } from '@/components/processes/start-run-dialog';
 import { setProcessArchived, setDefinitionVersionArchived } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+
 
 export default function ProcessDefinitionPage() {
   const { name } = useParams<{ name: string }>();
@@ -117,6 +117,16 @@ export default function ProcessDefinitionPage() {
                 {latest?.steps.length} steps
               </span>
               <span>{runs.length} runs</span>
+              {latest?.triggers?.map((trigger: { type: string; name: string; schedule?: string }) => (
+                <span key={trigger.name} className="inline-flex items-center gap-1">
+                  {trigger.type === 'cron' ? <Clock className="h-3 w-3" /> : trigger.type === 'manual' ? <Play className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+                  {trigger.type === 'cron' && trigger.schedule ? (
+                    <span className="font-mono bg-muted px-1.5 py-0.5 rounded" title={`Cron: ${trigger.schedule}`}>{trigger.name}: {trigger.schedule}</span>
+                  ) : (
+                    <span>{trigger.name}</span>
+                  )}
+                </span>
+              ))}
               <RepoLink definition={latest as Record<string, unknown>} />
               <AppLink definition={latest as Record<string, unknown>} />
             </div>
@@ -213,57 +223,11 @@ export default function ProcessDefinitionPage() {
             onClose={() => setStartRunOpen(false)}
           />
 
-          {runsLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => <div key={i} className="h-10 rounded bg-muted animate-pulse" />)}
-            </div>
-          ) : runs.length === 0 ? (
-            <div className="text-center py-16 text-sm text-muted-foreground">
-              No runs yet for this process.
-            </div>
-          ) : (
-            <div className="rounded-md border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-                    <th className="px-4 py-2.5 text-left font-medium">Run ID</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Version</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Current Step</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Started</th>
-                    <th className="px-4 py-2.5 text-left font-medium w-8" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {runs.map((run) => (
-                    <tr key={run.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {run.id.slice(0, 8)}…
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs">{run.definitionVersion}</td>
-                      <td className="px-4 py-3">
-                        <ProcessStatusBadge status={run.status} />
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {run.currentStepId ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/processes/${encodeURIComponent(decodedName)}/runs/${run.id}`}
-                          className="text-primary hover:underline inline-flex items-center gap-0.5 text-xs"
-                        >
-                          View <ChevronRight className="h-3 w-3" />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <RunsTable
+            runs={runs}
+            loading={runsLoading}
+            emptyMessage="No runs yet for this process."
+          />
         </Tabs.Content>
 
         {/* Configurations tab */}

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-core';
 import { AutonomyBadge } from '../agents/autonomy-badge';
@@ -41,6 +42,8 @@ interface StepStatusPanelProps {
   onStepClick?: (stepId: string) => void;
   stepConfigMap?: Map<string, StepConfigInfo>;
   onAgentLogClick?: (stepId: string) => void;
+  /** Base href for step detail links, e.g. "/processes/foo/runs/abc". Steps link to `{base}/steps/{stepId}`. */
+  stepDetailBaseHref?: string;
 }
 
 type EffectiveStatus = 'pending' | 'running' | 'completed' | 'failed' | 'waiting';
@@ -308,6 +311,7 @@ export function StepStatusPanel({
   onStepClick,
   stepConfigMap,
   onAgentLogClick,
+  stepDetailBaseHref,
 }: StepStatusPanelProps) {
   const [expandedStepId, setExpandedStepId] = React.useState<string | null>(null);
 
@@ -378,7 +382,17 @@ export function StepStatusPanel({
               {/* Step info */}
               <div className="pb-1 min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium">{step.name}</span>
+                  {stepDetailBaseHref && status !== 'pending' ? (
+                    <Link
+                      href={`${stepDetailBaseHref}/steps/${encodeURIComponent(step.id)}`}
+                      className="text-sm font-medium text-primary hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {step.name}
+                    </Link>
+                  ) : (
+                    <span className="text-sm font-medium">{step.name}</span>
+                  )}
                   {execCount > 1 && (
                     <span className="text-xs text-muted-foreground ml-1">
                       x{execCount}

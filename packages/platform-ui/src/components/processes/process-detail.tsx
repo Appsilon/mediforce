@@ -37,6 +37,7 @@ export function ProcessDetail({
   backHref = '/processes',
   backLabel = 'Processes',
   stepConfigMap,
+  runDetailHref,
 }: {
   instance: ProcessInstance;
   stepExecutions: StepExecution[];
@@ -49,6 +50,8 @@ export function ProcessDetail({
   backHref?: string;
   backLabel?: string;
   stepConfigMap?: Map<string, Record<string, unknown>>;
+  /** Href for this run's detail page, used to build step detail links. */
+  runDetailHref?: string;
 }) {
   const needsHumanAction = instance.pauseReason === 'waiting_for_human'
     || instance.pauseReason === 'awaiting_agent_approval';
@@ -61,17 +64,22 @@ export function ProcessDetail({
     const logEvents = agentEvents.filter(
       (e) => e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:'),
     );
-    return logEvents.map((e) => {
+    const unsorted = logEvents.map((e) => {
       const fullPath = (e.payload as string).replace('agent activity log: ', '');
       return {
         stepId: e.stepId,
         file: fullPath.split('/').pop() ?? '',
       };
     }).filter((entry) => entry.file.length > 0);
-  }, [agentEvents]);
+
+    // Sort tabs to match the definition step order
+    const stepOrder = new Map(definitionSteps.map((s, i) => [s.id, i]));
+    return unsorted.sort((a, b) => (stepOrder.get(a.stepId) ?? 0) - (stepOrder.get(b.stepId) ?? 0));
+  }, [agentEvents, definitionSteps]);
 
   // Controlled tab state for graph-to-history interaction
   const [activeTab, setActiveTab] = React.useState('history');
+  const [agentLogStepId, setAgentLogStepId] = React.useState<string | null>(null);
 
   // Cancel double-confirm: 0 = idle, 1 = first confirm shown, 2 = cancelling in progress
   const [cancelStep, setCancelStep] = React.useState<0 | 1 | 2>(0);
@@ -201,7 +209,8 @@ export function ProcessDetail({
           agentEvents={agentEvents}
           onStepClick={handleStepClick}
           stepConfigMap={stepConfigMap}
-          onAgentLogClick={agentLogFiles.length > 0 ? () => setActiveTab('agent-log') : undefined}
+          stepDetailBaseHref={runDetailHref}
+          onAgentLogClick={agentLogFiles.length > 0 ? (stepId: string) => { setAgentLogStepId(stepId); setActiveTab('agent-log'); } : undefined}
         />
       )}
 
@@ -238,7 +247,7 @@ export function ProcessDetail({
 
         {agentLogFiles.length > 0 && (
           <Tabs.Content value="agent-log">
-            <AgentLogViewer logFiles={agentLogFiles} />
+            <AgentLogViewer logFiles={agentLogFiles} initialStepId={agentLogStepId} />
           </Tabs.Content>
         )}
       </Tabs.Root>

@@ -99,6 +99,7 @@ export default function RunDetailPage() {
       backHref={`/processes/${encodeURIComponent(decodedName)}`}
       backLabel={decodedName}
       stepConfigMap={stepConfigMap}
+      runDetailHref={`/processes/${encodeURIComponent(decodedName)}/runs/${runId}`}
     />
   );
 }
