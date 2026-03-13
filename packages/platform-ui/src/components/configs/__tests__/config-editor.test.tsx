@@ -18,9 +18,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-// Mock fetch for save
-const mockFetch = vi.fn();
-globalThis.fetch = mockFetch;
+const mockSaveConfig = vi.fn();
+vi.mock('@/app/actions/configs', () => ({
+  saveConfig: (...args: unknown[]) => mockSaveConfig(...args),
+}));
 
 import { ConfigEditor } from '../config-editor';
 
@@ -164,16 +165,13 @@ describe('ConfigEditor', () => {
     expect(saveButton).toBeDisabled();
   });
 
-  it('[ERROR] displays validation errors from POST response in banner', async () => {
+  it('[ERROR] displays validation errors from server action response in banner', async () => {
     const user = userEvent.setup();
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 400,
-      json: async () => ({
-        error: 'Validation failed',
-        errors: ['Missing plugin for step intake'],
-        warnings: [],
-      }),
+    mockSaveConfig.mockResolvedValueOnce({
+      success: false,
+      error: 'Validation failed',
+      errors: ['Missing plugin for step intake'],
+      warnings: [],
     });
 
     render(
