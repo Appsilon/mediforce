@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
 
 interface StartProcessBody {
   definitionName: string;
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     });
 
     // Fire-and-forget: trigger auto-runner asynchronously (do not await — start returns immediately)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:9003';
+    const baseUrl = getAppBaseUrl();
     fetch(`${baseUrl}/api/processes/${result.instanceId}/run`, {
       method: 'POST',
       headers: {

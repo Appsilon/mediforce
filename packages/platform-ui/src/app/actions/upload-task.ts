@@ -78,7 +78,7 @@ export async function completeUploadTask(
     return { success: false, error: `Process instance '${processInstanceId}' not found` };
   }
 
-  const appContext = { files: completionData.files, taskId };
+  const appContext = { files: completionData.files };
 
   if (instance.status === 'paused') {
     try {

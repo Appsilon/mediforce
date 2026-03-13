@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
 
 /**
  * POST /api/tasks/:taskId/complete
@@ -137,7 +137,7 @@ export async function POST(
     });
 
     // 7. Fire-and-forget: trigger auto-runner for next steps
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:9003';
+    const appUrl = getAppBaseUrl();
     fetch(`${appUrl}/api/processes/${task.processInstanceId}/run`, {
       method: 'POST',
       headers: {
