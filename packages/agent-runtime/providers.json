@@ -1,0 +1,27 @@
+{
+  "anthropic": {
+    "label": "Anthropic (Direct)",
+    "description": "Direct Anthropic API — requires ANTHROPIC_API_KEY on the server",
+    "env": {
+      "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}"
+    }
+  },
+  "openrouter": {
+    "label": "OpenRouter",
+    "description": "OpenRouter proxy — requires OPENROUTER_API_KEY on the server",
+    "env": {
+      "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+      "ANTHROPIC_API_KEY": "",
+      "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+    }
+  },
+  "deepseek": {
+    "label": "DeepSeek (Direct)",
+    "description": "DeepSeek direct API — requires DEEPSEEK_API_KEY on the server",
+    "env": {
+      "ANTHROPIC_AUTH_TOKEN": "{{DEEPSEEK_API_KEY}}",
+      "ANTHROPIC_API_KEY": "",
+      "ANTHROPIC_BASE_URL": "https://api.deepseek.com"
+    }
+  }
+}

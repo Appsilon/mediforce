@@ -5,6 +5,7 @@ import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata } from '@mediforce/platform-core';
+import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
 
 const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
@@ -54,6 +55,8 @@ export interface SpawnDockerResult {
   cliOutput: string;
   gitMetadata: GitMetadata | null;
   outputDir: string;
+  /** Env var names injected into the process (for audit logging) */
+  injectedEnvVars: string[];
 }
 
 export interface AgentOutputContract {
@@ -155,9 +158,15 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
   /** Human-readable agent name for log/status messages (e.g. "Claude Code", "OpenCode"). */
   abstract readonly agentName: string;
 
-  /** Return env vars to inject into the Docker container.
-   *  Throw if required vars (e.g. API keys) are missing. */
-  abstract getContainerEnvVars(): Record<string, string>;
+  /** Resolved env vars from config — set during run(), used by spawnDockerContainer */
+  protected resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
+
+  /** Return plugin-internal env vars needed by the container (e.g. config paths).
+   *  NOT for API keys — those come from the step config's `env` field.
+   *  Default: empty. */
+  protected getInternalEnvVars(): Record<string, string> {
+    return {};
+  }
 
   /** Return the CLI command spec to run the agent inside the container.
    *  @param promptFilePath — container path to the prompt file (/output/prompt.txt) */
@@ -309,6 +318,15 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
     const skillName = this.agentConfig.skill ?? 'custom-prompt';
     const timeoutMs = this.agentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
+    // Resolve env vars from config-level + step-level env
+    const stepConfig = this.context.config.stepConfigs.find(
+      (s) => s.stepId === this.context.stepId,
+    );
+    this.resolvedEnv = resolveStepEnv(
+      this.context.config.env,
+      stepConfig?.env,
+    );
+
     await emit({
       type: 'status',
       payload: `spawning ${this.agentName} with skill '${skillName}'`,
@@ -421,6 +439,21 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
         }
       }
 
+      // Log injected env vars for audit
+      if (spawnResult.injectedEnvVars.length > 0) {
+        await emit({
+          type: 'status',
+          payload: `injected env vars: ${spawnResult.injectedEnvVars.join(', ')}`,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        await emit({
+          type: 'status',
+          payload: `no env vars injected (local mode — using host auth)`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       const duration_ms = Date.now() - startTime;
 
       const outputDirMapping = isLocalMode
@@ -444,6 +477,9 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
             `Input keys: ${Object.keys(this.context.stepInput).join(', ')}`,
             tempDir ? `Downloaded files to temp dir` : 'No file downloads needed',
             isLocalMode ? `Local execution (no Docker)` : `Docker container: ${this.agentConfig.image}`,
+            spawnResult.injectedEnvVars.length > 0
+              ? `Injected env vars: ${spawnResult.injectedEnvVars.join(', ')}`
+              : `No env vars injected (local mode)`,
             `Agent: ${this.agentName}`,
             'CLI execution completed',
           ],
@@ -751,17 +787,14 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
     }
 
     // --- Spawn the agent CLI ---
+    // Local mode: inherit host env (agent CLI uses host auth)
     const commandSpec = this.getAgentCommand(promptFilePath, options);
-    const envVars = this.getContainerEnvVars();
 
     const cliOutput = await new Promise<string>((resolve, reject) => {
       const child = spawn(commandSpec.args[0], commandSpec.args.slice(1), {
         cwd: workingDir,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          ...envVars,
-        },
+        env: { ...process.env },
       });
 
       let settled = false;
@@ -900,7 +933,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       }
     }
 
-    return { cliOutput, gitMetadata, outputDir };
+    return { cliOutput, gitMetadata, outputDir, injectedEnvVars: [] };
   }
 
   protected async spawnDockerContainer(
@@ -915,8 +948,10 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       throw new Error(`agentConfig.image is required for Docker container execution`);
     }
 
-    // Get agent-specific env vars (subclass validates required vars)
-    const envVars = this.getContainerEnvVars();
+    // Merge config-driven env vars with plugin-internal env vars
+    const internalVars = this.getInternalEnvVars();
+    const envVars = { ...this.resolvedEnv.vars, ...internalVars };
+    const injectedEnvVars = this.resolvedEnv.injectedKeys;
 
     const isGitMode = Boolean(repo && commit);
 
@@ -1155,6 +1190,6 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       // git-result.json may not exist if the agent made no changes
     }
 
-    return { cliOutput, gitMetadata, outputDir };
+    return { cliOutput, gitMetadata, outputDir, injectedEnvVars };
   }
 }

@@ -137,44 +137,6 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
     roles: ['executor'],
   };
 
-  getContainerEnvVars(): Record<string, string> {
-    const provider = this.agentConfig.provider ?? 'anthropic';
-
-    switch (provider) {
-      case 'anthropic': {
-        const apiKey = process.env.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-          throw new Error('ANTHROPIC_API_KEY is required for provider "anthropic"');
-        }
-        return { ANTHROPIC_API_KEY: apiKey };
-      }
-
-      case 'openrouter': {
-        const apiKey = process.env.OPENROUTER_API_KEY ?? process.env.ANTHROPIC_AUTH_TOKEN;
-        if (!apiKey) {
-          throw new Error('OPENROUTER_API_KEY or ANTHROPIC_AUTH_TOKEN is required for provider "openrouter"');
-        }
-        return {
-          ANTHROPIC_AUTH_TOKEN: apiKey,
-          ANTHROPIC_API_KEY: '',
-          ANTHROPIC_BASE_URL: 'https://openrouter.ai/api',
-        };
-      }
-
-      case 'deepseek': {
-        const apiKey = process.env.DEEPSEEK_API_KEY;
-        if (!apiKey) {
-          throw new Error('DEEPSEEK_API_KEY is required for provider "deepseek"');
-        }
-        return {
-          ANTHROPIC_AUTH_TOKEN: apiKey,
-          ANTHROPIC_API_KEY: '',
-          ANTHROPIC_BASE_URL: 'https://api.deepseek.com',
-        };
-      }
-    }
-  }
-
   getAgentCommand(_promptFilePath: string, options?: SpawnCliOptions): AgentCommandSpec {
     const args: string[] = [
       'claude', '-p', '--verbose', '--output-format', 'stream-json',

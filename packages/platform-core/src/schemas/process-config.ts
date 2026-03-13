@@ -23,8 +23,6 @@ export const AgentConfigSchema = z.object({
   image: z.string().optional(),
   repo: z.string().optional(),
   commit: z.string().optional(),
-  // API provider: determines which env vars are injected into the agent process
-  provider: z.enum(['anthropic', 'openrouter', 'deepseek']).optional(),
 });
 
 export const StepConfigSchema = z.object({
@@ -44,6 +42,9 @@ export const StepConfigSchema = z.object({
   reviewerPlugin: z.string().optional(), // required at runtime when reviewerType='agent'
   agentConfig: AgentConfigSchema.optional(),
   params: z.record(z.string(), z.unknown()).optional(), // Step parameters — merged into step input at runtime
+  // Env vars injected into the agent process. Overrides config-level env.
+  // Values can reference server secrets: "{{SECRET_NAME}}"
+  env: z.record(z.string(), z.string()).optional(),
 });
 
 export const ProcessNotificationConfigSchema = z.object({
@@ -61,6 +62,9 @@ export const ProcessConfigSchema = z.object({
   notifications: z.array(ProcessNotificationConfigSchema).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   archived: z.boolean().optional(),
+  // Default env vars for all agent steps. Step-level env overrides these.
+  // Values can reference server secrets: "{{SECRET_NAME}}"
+  env: z.record(z.string(), z.string()).optional(),
 });
 
 export type ReviewConstraints = z.infer<typeof ReviewConstraintsSchema>;

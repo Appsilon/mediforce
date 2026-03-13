@@ -37,17 +37,13 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     roles: ['executor'],
   };
 
-  getContainerEnvVars(): Record<string, string> {
-    const vars: Record<string, string> = {};
-
-    // OpenCode reads config from OPENCODE_CONFIG env var.
-    // prepareOutputDir always writes a config file (provider + model + auth).
-    vars.OPENCODE_CONFIG = '/output/opencode.json';
-
-    // XDG override so OpenCode writes auth.json where we mount it
-    vars.XDG_DATA_HOME = '/output/.local/share';
-
-    return vars;
+  protected override getInternalEnvVars(): Record<string, string> {
+    return {
+      // OpenCode reads config from OPENCODE_CONFIG env var.
+      OPENCODE_CONFIG: '/output/opencode.json',
+      // XDG override so OpenCode writes auth.json where we mount it
+      XDG_DATA_HOME: '/output/.local/share',
+    };
   }
 
   getAgentCommand(promptFilePath: string, _options?: SpawnCliOptions): AgentCommandSpec {
@@ -256,29 +252,26 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
 
   protected override async prepareOutputDir(outputDir: string): Promise<void> {
     // Write OpenCode config with provider configuration.
-    // OpenCode reads config from OPENCODE_CONFIG env var (set in getContainerEnvVars).
     const config: Record<string, unknown> = {
       $schema: 'https://opencode.ai/config.json',
-      // Headless container — auto-approve all tool calls (no interactive prompt).
       permission: 'allow',
     };
 
     const configPath = join(outputDir, 'opencode.json');
     await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
 
-    // Write auth.json so OpenCode can authenticate with the provider.
+    // Write auth.json from resolved env vars.
     // OpenCode stores credentials at $XDG_DATA_HOME/opencode/auth.json.
-    // We set XDG_DATA_HOME=/output/.local/share in getContainerEnvVars.
+    // The step config's env should provide DEEPSEEK_API_KEY / OPENROUTER_API_KEY.
     const auth: Record<string, { type: string; key: string }> = {};
+    const env = this.resolvedEnv.vars;
 
-    const deepseekKey = process.env.DEEPSEEK_API_KEY ?? '';
-    if (deepseekKey) {
-      auth.deepseek = { type: 'api', key: deepseekKey };
+    if (env.DEEPSEEK_API_KEY) {
+      auth.deepseek = { type: 'api', key: env.DEEPSEEK_API_KEY };
     }
 
-    const openRouterKey = process.env.OPENROUTER_API_KEY ?? '';
-    if (openRouterKey) {
-      auth.openrouter = { type: 'api', key: openRouterKey };
+    if (env.OPENROUTER_API_KEY) {
+      auth.openrouter = { type: 'api', key: env.OPENROUTER_API_KEY };
     }
 
     if (Object.keys(auth).length > 0) {
