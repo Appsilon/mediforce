@@ -2,6 +2,12 @@ import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/te
 
 const useEmulators = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
 
+// When using emulators, run on a separate port so we don't reuse a dev server
+// that connects to production Firebase. This is the #1 cause of "data not found"
+// failures: seed data goes into the emulator but the reused dev server reads
+// from production.
+const testPort = useEmulators ? 9007 : 9003;
+
 const projects: PlaywrightTestConfig['projects'] = [];
 
 if (useEmulators) {
@@ -38,17 +44,17 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:9003',
+    baseURL: `http://localhost:${testPort}`,
     headless: true,
     trace: 'on-first-retry',
   },
   projects,
   webServer: {
     command: useEmulators
-      ? 'NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce pnpm dev'
+      ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce npx next dev -p ${testPort}`
       : 'pnpm dev',
-    port: 9003,
-    reuseExistingServer: true,
+    port: testPort,
+    reuseExistingServer: !useEmulators,
     timeout: 60_000,
   },
 });

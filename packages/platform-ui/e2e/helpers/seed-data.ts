@@ -614,5 +614,18 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
-  return { humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs };
+  // User profile document — required by Firestore security rules.
+  // humanTasks and handoffEntities rules call get(/users/{uid}).data.roles
+  // to verify the reader has a matching role.
+  const users: Record<string, Record<string, unknown>> = {
+    [testUserId]: {
+      uid: testUserId,
+      email: 'test@mediforce.dev',
+      displayName: 'Test User',
+      role: 'admin',
+      roles: ['reviewer', 'analyst', 'operator'],
+    },
+  };
+
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs };
 }
