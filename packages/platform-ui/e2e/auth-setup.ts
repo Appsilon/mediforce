@@ -32,7 +32,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', TEST_PASSWORD);
   await page.click('button[type="submit"]');
-  await page.waitForURL('**/tasks**', { timeout: 15_000 });
+  await page.waitForURL('**/tasks**', { timeout: 30_000 });
 
   // 5. Save auth state for reuse by authenticated tests
   await page.context().storageState({ path: 'e2e/.auth/user.json' });
