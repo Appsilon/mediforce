@@ -251,11 +251,12 @@ describe('ClaudeCodeAgentPlugin E2E', () => {
 
         const payload = resultEvent!.payload as ResultPayload;
 
-        // The mock writes { confidence: 0.80, summary: "...", mock: true } to /output/mock-result.json
-        // extractResult should resolve it via the Docker output dir mapping
-        expect(payload.result.confidence).toBe(0.80);
-        expect(payload.result.mock).toBe(true);
-        expect(payload.result.summary).toContain('Mock container output');
+        // The mock copies a step-specific fixture from /mock-fixtures/extract-metadata.json
+        // into /output/mock-result.json inside the Docker container.
+        // extractResult should resolve it via the Docker output dir mapping.
+        expect(payload.result).toHaveProperty('study_identification');
+        const studyId = (payload.result.study_identification as Record<string, unknown>).study_id;
+        expect(studyId).toBe('CDISCPILOT01');
 
         // Must NOT be the fallback { raw: "..." } format
         expect(payload.result).not.toHaveProperty('raw');

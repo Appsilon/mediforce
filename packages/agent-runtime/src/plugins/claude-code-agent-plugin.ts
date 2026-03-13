@@ -1,76 +1,9 @@
-import { spawn } from 'node:child_process';
-import { readFile, mkdtemp, writeFile, rm, mkdir, appendFile, realpath } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { tmpdir, homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata } from '@mediforce/platform-core';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const DEFAULT_TIMEOUT_MS = 20 * 60_000;
-
-/** Strip YAML frontmatter (--- ... ---) from markdown content. */
-function stripFrontmatter(content: string): string {
-  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
-  return match ? content.slice(match[0].length) : content;
-}
-
-interface FileEntry {
-  name: string;
-  downloadUrl: string;
-  localPath?: string;
-  [key: string]: unknown;
-}
-
-interface SpawnCliOptions {
-  model?: string;
-  addDirs?: string[];
-  logFile?: string;
-  timeoutMs?: number;
-  outputDir?: string;
-  /** Host path to the skill directory — mounted at /workspace in standalone Docker mode. */
-  skillDir?: string;
-}
-
-interface GitResultFile {
-  commitSha: string;
-  branch: string;
-  changedFiles: string[];
-  repoUrl: string;
-}
-
-/** Normalize a repo reference to SSH clone URL and HTTPS browsable URL.
- *  Supports: "org/repo", "git@github.com:org/repo.git", "https://github.com/org/repo", "/path/to/bare.git" */
-function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: string } {
-  // File path (local bare repo)
-  if (repo.startsWith('/') || repo.startsWith('.')) {
-    return { gitUrl: repo, httpsUrl: '' };
-  }
-  // Already an SSH URL
-  if (repo.startsWith('git@')) {
-    const match = repo.match(/git@github\.com:(.+?)(?:\.git)?$/);
-    const orgRepo = match ? match[1] : repo;
-    return { gitUrl: repo, httpsUrl: `https://github.com/${orgRepo}` };
-  }
-  // Already an HTTPS URL
-  if (repo.startsWith('https://')) {
-    const clean = repo.replace(/\.git$/, '');
-    return { gitUrl: `${clean}.git`, httpsUrl: clean };
-  }
-  // Short form: "org/repo"
-  return {
-    gitUrl: `git@github.com:${repo}.git`,
-    httpsUrl: `https://github.com/${repo}`,
-  };
-}
-
-interface SpawnDockerResult {
-  cliOutput: string;
-  gitMetadata: GitMetadata | null;
-  outputDir: string;
-}
+import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
+import {
+  BaseContainerAgentPlugin,
+  type SpawnCliOptions,
+  type AgentCommandSpec,
+} from './base-container-agent-plugin.js';
 
 interface StreamEvent {
   type: string;
@@ -83,49 +16,6 @@ interface StreamEvent {
   tool_name?: string;
   tool_input?: unknown;
   [key: string]: unknown;
-}
-
-function hasFiles(input: Record<string, unknown>): input is Record<string, unknown> & { files: FileEntry[] } {
-  return Array.isArray(input.files) &&
-    input.files.length > 0 &&
-    typeof input.files[0].downloadUrl === 'string';
-}
-
-/** Download remote files to a temp directory and return updated input with localPath fields. */
-async function downloadFilesToLocal(
-  stepInput: Record<string, unknown>,
-): Promise<{ updatedInput: Record<string, unknown>; tempDir: string | null }> {
-  if (!hasFiles(stepInput)) {
-    return { updatedInput: stepInput, tempDir: null };
-  }
-
-  // Resolve symlinks (macOS: /var -> /private/var) so --allowedTools patterns match
-  const rawTempDir = await mkdtemp(join(tmpdir(), 'mediforce-agent-'));
-  const tempDir = await realpath(rawTempDir);
-  const updatedFiles: FileEntry[] = [];
-
-  for (const file of stepInput.files) {
-    const localPath = join(tempDir, file.name);
-    const response = await fetch(file.downloadUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download '${file.name}': HTTP ${response.status}`);
-    }
-    const buffer = Buffer.from(await response.arrayBuffer());
-    await writeFile(localPath, buffer);
-    updatedFiles.push({ ...file, localPath });
-  }
-
-  return {
-    updatedInput: { ...stepInput, files: updatedFiles },
-    tempDir,
-  };
-}
-
-/** Clean up temp directory, swallowing errors. */
-async function cleanupTempDir(tempDir: string | null): Promise<void> {
-  if (tempDir) {
-    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
-  }
 }
 
 interface LogEntry {
@@ -229,12 +119,9 @@ function extractErrorDetail(resultLine: string): string | null {
   return null;
 }
 
-interface AgentOutputContract {
-  output_file?: string;
-  summary?: string;
-}
+export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
+  readonly agentName = 'Claude Code';
 
-export class ClaudeCodeAgentPlugin implements AgentPlugin {
   readonly metadata: PluginCapabilityMetadata = {
     name: 'Claude Code Agent',
     description:
@@ -250,660 +137,146 @@ export class ClaudeCodeAgentPlugin implements AgentPlugin {
     roles: ['executor'],
   };
 
-  private context!: AgentContext;
-  private agentConfig!: AgentConfig;
+  getContainerEnvVars(): Record<string, string> {
+    const provider = this.agentConfig.provider ?? 'anthropic';
 
-  async initialize(context: AgentContext): Promise<void> {
-    this.context = context;
-
-    const stepConfig = context.config.stepConfigs.find(
-      (sc: StepConfig) => sc.stepId === context.stepId,
-    );
-
-    if (!stepConfig) {
-      throw new Error(`Step config not found for stepId '${context.stepId}'`);
-    }
-
-    const agentConfig = stepConfig.agentConfig;
-    if (!agentConfig) {
-      throw new Error(
-        `No agentConfig found for step '${context.stepId}'. ` +
-        'ClaudeCodeAgentPlugin requires agentConfig with at least image and skill or prompt.',
-      );
-    }
-
-    if (!agentConfig.skill && !agentConfig.prompt) {
-      throw new Error(
-        `Neither skill nor prompt configured in agentConfig for step '${context.stepId}'. ` +
-        'ClaudeCodeAgentPlugin requires at least one of agentConfig.skill or agentConfig.prompt.',
-      );
-    }
-
-    if (!agentConfig.image) {
-      throw new Error(
-        `No Docker image configured in agentConfig for step '${context.stepId}'. ` +
-        'All agent steps must run inside a Docker container for security. ' +
-        'Set agentConfig.image to a valid container image.',
-      );
-    }
-
-    this.agentConfig = agentConfig;
-  }
-
-  async run(emit: EmitFn): Promise<void> {
-    const startTime = Date.now();
-    const skillName = this.agentConfig.skill ?? 'custom-prompt';
-    const timeoutMs = this.agentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-
-    await emit({
-      type: 'status',
-      payload: `spawning Claude Code CLI with skill '${skillName}'`,
-      timestamp: new Date().toISOString(),
-    });
-
-    let tempDir: string | null = null;
-    let dockerOutputDir: string | null = null;
-    let succeeded = false;
-
-    try {
-      // Download remote files to local temp dir so the CLI can read them directly
-      const { updatedInput, tempDir: downloadedTempDir } = await downloadFilesToLocal(
-        this.context.stepInput,
-      );
-      tempDir = downloadedTempDir;
-
-      if (tempDir) {
-        await emit({
-          type: 'status',
-          payload: `downloaded ${(updatedInput as Record<string, unknown> & { files: FileEntry[] }).files.length} file(s) to local temp directory`,
-          timestamp: new Date().toISOString(),
-        });
-      }
-
-      const outputDirForPrompt = this.agentConfig.image ? '/output' : (tempDir ?? undefined);
-      const prompt = await this.buildPrompt(updatedInput, timeoutMs, outputDirForPrompt);
-
-      await emit({
-        type: 'prompt',
-        payload: prompt,
-        timestamp: new Date().toISOString(),
-      });
-
-      const options: SpawnCliOptions = { timeoutMs };
-      if (this.agentConfig.model) options.model = this.agentConfig.model;
-      if (tempDir) {
-        options.addDirs = [tempDir];
-        options.outputDir = tempDir;
-      }
-
-      // Mount skill directory so reference files are available inside the container
-      if (this.agentConfig.skill && this.agentConfig.skillsDir) {
-        options.skillDir = join(this.agentConfig.skillsDir, this.agentConfig.skill);
-      }
-
-      // Create activity log file for observability
-      const logsDir = join(tmpdir(), 'mediforce-agent-logs');
-      await mkdir(logsDir, { recursive: true });
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const logFile = join(logsDir, `${this.context.processInstanceId}_${this.context.stepId}_${timestamp}.log`);
-      options.logFile = logFile;
-
-      await emit({
-        type: 'status',
-        payload: `agent activity log: ${logFile}`,
-        timestamp: new Date().toISOString(),
-      });
-
-      let cliOutput: string;
-      let gitMetadata: GitMetadata | null = null;
-
-      if (this.agentConfig.image) {
-        const mockLabel = process.env.MOCK_AGENT === 'true' ? ' (MOCK command)' : '';
-        console.log(`[claude-code-agent] Spawning Docker container: image=${this.agentConfig.image}, step=${this.context.stepId}${mockLabel}`);
-        await emit({
-          type: 'status',
-          payload: `using Docker container image '${this.agentConfig.image}'${mockLabel}`,
-          timestamp: new Date().toISOString(),
-        });
-        try {
-          const dockerResult = await this.spawnDockerContainer(prompt, options);
-          cliOutput = dockerResult.cliOutput;
-          gitMetadata = dockerResult.gitMetadata;
-          dockerOutputDir = dockerResult.outputDir;
-          console.log(`[claude-code-agent] Docker container finished: step=${this.context.stepId}, hasGitMetadata=${!!gitMetadata}, outputLength=${cliOutput.length}`);
-        } catch (dockerErr) {
-          console.error(`[claude-code-agent] Docker container FAILED: step=${this.context.stepId}`, dockerErr);
-          throw dockerErr;
+    switch (provider) {
+      case 'anthropic': {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+          throw new Error('ANTHROPIC_API_KEY is required for provider "anthropic"');
         }
-      } else {
-        // This branch should never be reached — initialize() enforces image is set.
-        // Kept as a defensive fallback; will be removed once bare CLI is fully deprecated.
-        cliOutput = await this.spawnClaudeCli(prompt, options);
+        return { ANTHROPIC_API_KEY: apiKey };
       }
 
-      const duration_ms = Date.now() - startTime;
-
-      const outputDirMapping = dockerOutputDir
-        ? { containerPath: '/output/', hostPath: dockerOutputDir + '/' }
-        : undefined;
-      const parsedResult = await this.extractResult(cliOutput, outputDirMapping);
-
-      const confidence = typeof parsedResult.confidence === 'number'
-        ? parsedResult.confidence
-        : 0.7;
-
-      await emit({
-        type: 'result',
-        payload: {
-          confidence,
-          reasoning_summary: `Claude Code skill '${skillName}' completed successfully`,
-          reasoning_chain: [
-            `Invoked skill: ${skillName}`,
-            `Input keys: ${Object.keys(this.context.stepInput).join(', ')}`,
-            tempDir ? `Downloaded files to temp dir` : 'No file downloads needed',
-            this.agentConfig.image ? `Docker container: ${this.agentConfig.image}` : 'Bare CLI execution',
-            'CLI execution completed',
-          ],
-          annotations: [],
-          model: this.agentConfig.model ?? 'claude-code-cli',
-          duration_ms,
-          result: parsedResult,
-          ...(gitMetadata ? { gitMetadata } : {}),
-        },
-        timestamp: new Date().toISOString(),
-      });
-
-      succeeded = true;
-    } catch (error) {
-      const duration_ms = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      await emit({
-        type: 'result',
-        payload: {
-          confidence: 0,
-          reasoning_summary: `Claude Code skill '${skillName}' failed with error: ${errorMessage}`,
-          reasoning_chain: [
-            `Invoked skill: ${skillName}`,
-            `Error: ${errorMessage}`,
-          ],
-          annotations: [],
-          model: this.agentConfig.model ?? 'claude-code-cli',
-          duration_ms,
-          result: null,
-          ...(tempDir ? { tempDir } : {}),
-        },
-        timestamp: new Date().toISOString(),
-      });
-    } finally {
-      if (succeeded) {
-        await cleanupTempDir(tempDir);
-      }
-      if (dockerOutputDir) {
-        await rm(dockerOutputDir, { recursive: true, force: true }).catch(() => {});
-      }
-    }
-  }
-
-  private async extractResult(
-    cliOutput: string,
-    outputDirMapping?: { containerPath: string; hostPath: string },
-  ): Promise<Record<string, unknown>> {
-    let streamEvent: Record<string, unknown>;
-    try {
-      streamEvent = JSON.parse(cliOutput) as Record<string, unknown>;
-    } catch {
-      return { raw: cliOutput };
-    }
-
-    const agentText = typeof streamEvent.result === 'string' ? streamEvent.result : null;
-    if (!agentText) {
-      return streamEvent;
-    }
-
-    let contract: AgentOutputContract;
-    try {
-      contract = JSON.parse(agentText) as AgentOutputContract;
-    } catch {
-      return { raw: agentText };
-    }
-
-    if (contract.output_file) {
-      try {
-        let filePath = contract.output_file;
-        if (outputDirMapping && filePath.startsWith(outputDirMapping.containerPath)) {
-          filePath = filePath.replace(outputDirMapping.containerPath, outputDirMapping.hostPath);
+      case 'openrouter': {
+        const apiKey = process.env.OPENROUTER_API_KEY ?? process.env.ANTHROPIC_AUTH_TOKEN;
+        if (!apiKey) {
+          throw new Error('OPENROUTER_API_KEY or ANTHROPIC_AUTH_TOKEN is required for provider "openrouter"');
         }
-        const fileContents = await readFile(filePath, 'utf-8');
-        const parsed = JSON.parse(fileContents) as Record<string, unknown>;
-        if (contract.summary) {
-          parsed.summary = contract.summary;
+        return {
+          ANTHROPIC_AUTH_TOKEN: apiKey,
+          ANTHROPIC_API_KEY: '',
+          ANTHROPIC_BASE_URL: 'https://openrouter.ai/api',
+        };
+      }
+
+      case 'deepseek': {
+        const apiKey = process.env.DEEPSEEK_API_KEY;
+        if (!apiKey) {
+          throw new Error('DEEPSEEK_API_KEY is required for provider "deepseek"');
         }
-        return parsed;
-      } catch {
-        return { raw: agentText, summary: contract.summary };
+        return {
+          ANTHROPIC_AUTH_TOKEN: apiKey,
+          ANTHROPIC_API_KEY: '',
+          ANTHROPIC_BASE_URL: 'https://api.deepseek.com',
+        };
       }
     }
-
-    return contract as unknown as Record<string, unknown>;
   }
 
-  private async buildPrompt(
-    stepInput?: Record<string, unknown>,
-    timeoutMs?: number,
-    outputDir?: string,
-  ): Promise<string> {
-    const parts: string[] = [];
-    const input = stepInput ?? this.context.stepInput;
-
-    // 1. Skill prompt from SKILL.md
-    if (this.agentConfig.skill && this.agentConfig.skillsDir) {
-      const skillContent = await this.readSkillFile(
-        this.agentConfig.skillsDir,
-        this.agentConfig.skill,
-      );
-      parts.push(skillContent);
-    }
-
-    // 2. Custom prompt
-    if (this.agentConfig.prompt) {
-      parts.push(this.agentConfig.prompt);
-    }
-
-    // 3. Time budget
-    const budgetMs = timeoutMs ?? this.agentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    const budgetMinutes = Math.round(budgetMs / 60_000);
-    parts.push(
-      `## Time Budget\n` +
-      `You have approximately ${budgetMinutes} minutes to complete this task. ` +
-      `Budget your time accordingly — prioritize core extraction over validation if time is tight. ` +
-      `Do not offer conversational summaries or next steps.`,
-    );
-
-    // 4. Output directory — agent MUST use absolute paths when writing files
-    if (outputDir) {
-      parts.push(
-        `## Output Directory\n` +
-        `Write all output files to this absolute path: ${outputDir}\n` +
-        `You MUST use the full absolute path when calling Write. Relative paths will be rejected.`,
-      );
-    }
-
-    // 5. Input context
-    const previousOutputs = await this.context.getPreviousStepOutputs();
-    const hasPreviousOutputs = Object.keys(previousOutputs).length > 0;
-
-    parts.push('## Input Data');
-    parts.push(JSON.stringify(input, null, 2));
-
-    if (hasPreviousOutputs) {
-      parts.push('## Previous Step Outputs');
-      parts.push(JSON.stringify(previousOutputs, null, 2));
-    }
-
-    return parts.join('\n\n');
-  }
-
-  protected async readSkillFile(skillsDir: string, skill: string): Promise<string> {
-    const skillPath = join(skillsDir, skill, 'SKILL.md');
-    const raw = await readFile(skillPath, 'utf-8');
-    return stripFrontmatter(raw);
-  }
-
-  protected async spawnClaudeCli(prompt: string, options?: SpawnCliOptions): Promise<string> {
-    // Use stream-json to capture agent activity for observability.
-    // The final "result" event contains the same output as --output-format json.
-    const args = ['-p', '--verbose', '--output-format', 'stream-json'];
+  getAgentCommand(_promptFilePath: string, options?: SpawnCliOptions): AgentCommandSpec {
+    const args: string[] = [
+      'claude', '-p', '--verbose', '--output-format', 'stream-json',
+    ];
 
     if (options?.model) {
       args.push('--model', options.model);
     }
     if (options?.addDirs) {
+      // In Docker mode, files are mounted at /data; in local mode, use the real host path
       for (const dir of options.addDirs) {
-        args.push('--add-dir', dir);
+        args.push('--add-dir', this.agentConfig.image ? '/data' : dir);
       }
     }
     // Headless pipeline: grant specific tool permissions so the agent never blocks on prompts.
-    // The agent is sandboxed: cwd set to temp dir, output read back by plugin.
-    // Note: path-scoped patterns (e.g. Write(/path/*)) don't work reliably in the CLI,
-    // so we grant tool-level access. The cwd and prompt constrain where the agent writes.
-    // Future: use --permission-prompt-tool for human-in-the-loop approval via platform UI.
     args.push('--allowedTools', 'Bash,Read,Write,Edit,Glob,Grep');
 
-    const logFile = options?.logFile ?? null;
-    const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-
-    return new Promise((resolve, reject) => {
-      const child = spawn('claude', args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: timeoutMs,
-        // Set cwd to outputDir so relative paths resolve to the temp dir.
-        // This ensures Write("file.json") matches the --allowedTools pattern.
-        ...(options?.outputDir ? { cwd: options.outputDir } : {}),
-      });
-
-      let finalResult = '';
-      let buffer = '';
-
-      child.stdout.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString('utf-8');
-
-        // Process complete lines (newline-delimited JSON)
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? ''; // keep incomplete last line
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          try {
-            const event = JSON.parse(trimmed) as StreamEvent;
-
-            // Capture the final result
-            if (event.type === 'result') {
-              finalResult = trimmed;
-            }
-
-            // Write human-readable activity to log file
-            if (logFile) {
-              const logLines = formatLogEntries(event);
-              if (logLines.length > 0) {
-                appendFile(logFile, logLines.join('\n') + '\n').catch(() => {});
-              }
-            }
-          } catch {
-            // Skip malformed lines
-          }
-        }
-      });
-
-      const stderrChunks: Buffer[] = [];
-      child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
-
-      child.on('error', (error) => {
-        reject(new Error(`CLI process failed: ${error.message}`));
-      });
-
-      child.on('close', (code, signal) => {
-        // Process any remaining buffer
-        if (buffer.trim()) {
-          try {
-            const event = JSON.parse(buffer.trim()) as StreamEvent;
-            if (event.type === 'result') {
-              finalResult = buffer.trim();
-            }
-            if (logFile) {
-              const logLines = formatLogEntries(event);
-              if (logLines.length > 0) {
-                appendFile(logFile, logLines.join('\n') + '\n').catch(() => {});
-              }
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
-        const timeoutMinutes = Math.round(timeoutMs / 60_000);
-
-        if (code !== 0) {
-          const exitInfo = signal
-            ? `killed by ${signal}${signal === 'SIGTERM' ? ` (likely timeout — ${timeoutMinutes} min limit)` : ''}`
-            : `exit code ${code}`;
-          const detail = extractErrorDetail(finalResult) || stderr || 'no stderr output';
-          reject(new Error(`CLI process failed (${exitInfo}): ${detail}`));
-          return;
-        }
-
-        if (!finalResult) {
-          reject(new Error('CLI produced no result event'));
-          return;
-        }
-
-        resolve(finalResult);
-      });
-
-      child.stdin.write(prompt);
-      child.stdin.end();
-    });
+    return { args, promptDelivery: 'stdin' };
   }
 
-  protected async spawnDockerContainer(
-    prompt: string,
-    options?: SpawnCliOptions,
-  ): Promise<SpawnDockerResult> {
-    const repo = this.agentConfig.repo;
-    const commit = this.agentConfig.commit;
-    const image = this.agentConfig.image;
+  getMockDockerArgs(stepId: string, isGitMode: boolean): string[] {
+    // /mock-data/ has the real output files (ro mount of data/outputs/cdiscpilot01-outputs/)
+    // /mock-fixtures/ has per-step result JSONs (ro mount of mock-fixtures/)
+    // 1. Copy all data files to /output/
+    // 2. Copy the step's fixture as /output/mock-result.json
+    // 3. In git mode: copy workspace files from fixture's _workspaceDir into /workspace/
+    // 4. Echo stream-json result to stdout
+    const copyOutputCmd =
+      `cp -r /mock-data/* /output/ 2>/dev/null; ` +
+      `if [ -f "/mock-fixtures/${stepId}.json" ]; then ` +
+        `cp /mock-fixtures/${stepId}.json /output/mock-result.json && ` +
+        `echo "[mock-agent] step=${stepId}: copied data + fixture" >&2; ` +
+      `else ` +
+        `echo '{"mock":true,"summary":"Mock output for step ${stepId}"}' > /output/mock-result.json && ` +
+        `echo "[mock-agent] step=${stepId}: no fixture, generic mock" >&2; ` +
+      `fi`;
 
-    if (!image) {
-      throw new Error(`agentConfig.image is required for Docker container execution`);
-    }
-
-    const anthropicApiKey = process.env.ANTHROPIC_AUTH_TOKEN ?? process.env.OPENROUTER_API_KEY ?? process.env.ANTHROPIC_API_KEY;
-    if (!anthropicApiKey) {
-      throw new Error('ANTHROPIC_AUTH_TOKEN, OPENROUTER_API_KEY, or ANTHROPIC_API_KEY environment variable is required for Docker container execution');
-    }
-
-    const isGitMode = Boolean(repo && commit);
-
-    let gitUrl = '';
-    let httpsUrl = '';
-    if (repo) {
-      const urls = normalizeRepoUrls(repo);
-      gitUrl = urls.gitUrl;
-      httpsUrl = urls.httpsUrl;
-    }
-
-    // Create temp directory for container /output mount
-    const rawOutputDir = await mkdtemp(join(tmpdir(), 'mediforce-docker-output-'));
-    const outputDir = await realpath(rawOutputDir);
-
-    const processInstanceId = this.context.processInstanceId;
-    const stepId = this.context.stepId;
-    const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    const logFile = options?.logFile ?? null;
-
-    // Build docker run args
-    const dockerArgs: string[] = [
-      'run', '--rm', '-i',
-      '--memory', '4g',
-      '--cpus', '2',
-      '-v', `${outputDir}:/output`,
-      '-e', `ANTHROPIC_AUTH_TOKEN=${anthropicApiKey}`,
-      '-e', 'ANTHROPIC_API_KEY=',
-      '-e', `ANTHROPIC_BASE_URL=${process.env.ANTHROPIC_BASE_URL ?? 'https://openrouter.ai/api'}`,
-    ];
-
-    if (isGitMode) {
-      // Git mode: mount entrypoint and deploy key, set git env vars
-      const deployKeyPath = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-      const entrypointPath = join(__dirname, '..', '..', 'container', 'entrypoint.sh');
-
-      dockerArgs.push(
-        '-v', `${deployKeyPath}:/root/.ssh/deploy_key:ro`,
-        '-v', `${entrypointPath}:/entrypoint.sh:ro`,
-        '-e', `GIT_REPO=${gitUrl}`,
-        '-e', `GIT_BRANCH=run/${processInstanceId}`,
-        '-e', `START_COMMIT=${commit}`,
-        '-e', `STEP_ID=${stepId}`,
-        ...(httpsUrl ? ['-e', `REPO_URL=${httpsUrl}`] : []),
-      );
-    } else {
-      // Standalone mode: no git, just set working directory
-      dockerArgs.push('-w', '/workspace');
-
-      // Mount skill directory so reference files (e.g. references/*.md) are readable
-      if (options?.skillDir) {
-        dockerArgs.push('-v', `${options.skillDir}:/workspace:ro`);
-      }
-    }
-
-    // Mount data directory if files were downloaded
-    if (options?.addDirs) {
-      for (const dir of options.addDirs) {
-        dockerArgs.push('-v', `${dir}:/data:ro`);
-      }
-    }
-
-    dockerArgs.push(image);
-
-    // Command to run inside container
-    if (isGitMode) {
-      dockerArgs.push('/entrypoint.sh');
-    }
-
-    const isMockAgent = process.env.MOCK_AGENT === 'true';
-
-    if (isMockAgent) {
-      const agentOutput = {
-        confidence: 0.80,
-        summary: `Mock container output for step ${stepId}`,
-        mock: true,
-      };
-      // Mock writes output file to /output/ (testing the volume mount pipeline)
-      // and returns a stream-json result referencing it via output_file.
-      const mockOutputFileData = JSON.stringify(agentOutput, null, 2);
-      const mockAgentResponse = JSON.stringify({
-        output_file: '/output/mock-result.json',
-        summary: agentOutput.summary,
-      });
-      const mockStreamJson = JSON.stringify({
-        type: 'result',
-        subtype: 'success',
-        result: mockAgentResponse,
-      });
-      if (isGitMode) {
-        dockerArgs.push(
-          'bash', '-c',
-          `echo "[mock-agent] Running mock command inside container for step ${stepId}" >&2 && ` +
-          `echo "# Mock output from step ${stepId}" > /workspace/mock-${stepId}-output.md && ` +
-          `echo '${mockOutputFileData.replace(/'/g, "'\\''")}'  > /output/mock-result.json && ` +
-          `echo '${mockStreamJson.replace(/'/g, "'\\''")}'`,
-        );
-      } else {
-        dockerArgs.push(
-          'bash', '-c',
-          `echo "[mock-agent] Running mock standalone command for step ${stepId}" >&2 && ` +
-          `echo '${mockOutputFileData.replace(/'/g, "'\\''")}'  > /output/mock-result.json && ` +
-          `echo '${mockStreamJson.replace(/'/g, "'\\''")}'`,
-        );
-      }
-    } else {
-      dockerArgs.push('claude', '-p', '--verbose', '--output-format', 'stream-json');
-      if (options?.model) {
-        dockerArgs.push('--model', options.model);
-      }
-      if (options?.addDirs) {
-        dockerArgs.push('--add-dir', '/data');
-      }
-      dockerArgs.push('--allowedTools', 'Bash,Read,Write,Edit,Glob,Grep');
-    }
-
-    const cliOutput = await new Promise<string>((resolve, reject) => {
-      const child = spawn('docker', dockerArgs, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: timeoutMs,
-      });
-
-      let finalResult = '';
-      let buffer = '';
-
-      child.stdout.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString('utf-8');
-
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          try {
-            const event = JSON.parse(trimmed) as StreamEvent;
-
-            if (event.type === 'result') {
-              finalResult = trimmed;
-            }
-
-            if (logFile) {
-              const logLines = formatLogEntries(event);
-              if (logLines.length > 0) {
-                appendFile(logFile, logLines.join('\n') + '\n').catch(() => {});
-              }
-            }
-          } catch {
-            // Skip non-JSON lines (e.g. Docker or entrypoint output)
-          }
-        }
-      });
-
-      const stderrChunks: Buffer[] = [];
-      child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
-
-      child.on('error', (error) => {
-        reject(new Error(`Docker process failed: ${error.message}`));
-      });
-
-      child.on('close', (code, signal) => {
-        // Process remaining buffer
-        if (buffer.trim()) {
-          try {
-            const event = JSON.parse(buffer.trim()) as StreamEvent;
-            if (event.type === 'result') {
-              finalResult = buffer.trim();
-            }
-            if (logFile) {
-              const logLines = formatLogEntries(event);
-              if (logLines.length > 0) {
-                appendFile(logFile, logLines.join('\n') + '\n').catch(() => {});
-              }
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
-        const timeoutMinutes = Math.round(timeoutMs / 60_000);
-
-        if (code !== 0) {
-          const exitInfo = signal
-            ? `killed by ${signal}${signal === 'SIGTERM' ? ` (likely timeout — ${timeoutMinutes} min limit)` : ''}`
-            : `exit code ${code}`;
-          const detail = extractErrorDetail(finalResult) || stderr || 'no stderr output';
-          reject(new Error(`Docker container failed (${exitInfo}): ${detail}`));
-          return;
-        }
-
-        if (!finalResult) {
-          reject(new Error('Docker container produced no result event'));
-          return;
-        }
-
-        resolve(finalResult);
-      });
-
-      child.stdin.write(prompt);
-      child.stdin.end();
+    const mockAgentResponse = JSON.stringify({
+      output_file: '/output/mock-result.json',
+      summary: `Mock output for step ${stepId}`,
+    });
+    const mockStreamJson = JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      result: mockAgentResponse,
     });
 
-    // Read git-result.json from the output directory
-    let gitMetadata: GitMetadata | null = null;
-    try {
-      const gitResultPath = join(outputDir, 'git-result.json');
-      const gitResultRaw = await readFile(gitResultPath, 'utf-8');
-      const gitResult = JSON.parse(gitResultRaw) as GitResultFile;
-      gitMetadata = {
-        commitSha: gitResult.commitSha,
-        branch: gitResult.branch,
-        changedFiles: gitResult.changedFiles,
-        repoUrl: gitResult.repoUrl,
-      };
-    } catch {
-      // git-result.json may not exist if the agent made no changes
+    if (isGitMode) {
+      // Read _workspaceDir from fixture JSON and copy real code/data into /workspace/
+      // so the entrypoint commits them to the git branch.
+      // Uses grep+sed to avoid needing jq in the container.
+      const copyWorkspaceCmd =
+        `WSDIR=$(grep -o '"_workspaceDir"[[:space:]]*:[[:space:]]*"[^"]*"' /mock-fixtures/${stepId}.json 2>/dev/null | sed 's/.*"\\([^"]*\\)"$/\\1/'); ` +
+        `if [ -n "$WSDIR" ] && [ -d "/mock-data/$WSDIR" ]; then ` +
+          `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
+          `echo "[mock-agent] step=${stepId}: copied $WSDIR/ into /workspace/ for git commit" >&2; ` +
+        `else ` +
+          `echo "# Mock output from step ${stepId}" > /workspace/mock-${stepId}-output.md; ` +
+        `fi`;
+
+      return [
+        'bash', '-c',
+        `${copyOutputCmd} && ${copyWorkspaceCmd} && ` +
+        `echo '${mockStreamJson.replace(/'/g, "'\\''")}'`,
+      ];
     }
 
-    return { cliOutput, gitMetadata, outputDir };
+    return [
+      'bash', '-c',
+      `${copyOutputCmd} && ` +
+      `echo '${mockStreamJson.replace(/'/g, "'\\''")}'`,
+    ];
+  }
+
+  parseAgentOutput(rawStdout: string): string {
+    // Claude CLI outputs NDJSON (stream-json). Scan for the last `result` event.
+    let lastResult = '';
+    for (const line of rawStdout.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const event = JSON.parse(trimmed) as StreamEvent;
+        if (event.type === 'result') {
+          lastResult = trimmed;
+        }
+      } catch {
+        // Skip non-JSON lines (Docker/entrypoint output)
+      }
+    }
+    return lastResult;
+  }
+
+  protected override processOutputLine(line: string): string[] {
+    try {
+      const event = JSON.parse(line) as StreamEvent;
+      return formatLogEntries(event);
+    } catch {
+      return [];
+    }
+  }
+
+  protected override extractErrorFromResult(resultLine: string): string | null {
+    return extractErrorDetail(resultLine);
   }
 }

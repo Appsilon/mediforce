@@ -1,7 +1,7 @@
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin.js';
@@ -9,6 +9,17 @@ import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin.js';
 type DockerResult = { cliOutput: string; gitMetadata: null; outputDir: string };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
 type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };
+
+// Ensure ALLOW_LOCAL_AGENTS is not set during tests (unless explicitly set in a test)
+const originalAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
+beforeEach(() => {
+  delete process.env.ALLOW_LOCAL_AGENTS;
+});
+afterAll(() => {
+  if (originalAllowLocal !== undefined) {
+    process.env.ALLOW_LOCAL_AGENTS = originalAllowLocal;
+  }
+});
 
 function mockSpawn(plugin: ClaudeCodeAgentPlugin) {
   return vi.spyOn(plugin as unknown as SpawnDockerTarget, 'spawnDockerContainer');
@@ -111,7 +122,8 @@ describe('ClaudeCodeAgentPlugin', () => {
       await expect(plugin.initialize(context)).rejects.toThrow(/skill.*prompt/i);
     });
 
-    it('[ERROR] throws if no Docker image configured', async () => {
+    it('[ERROR] throws if no Docker image and local execution not allowed', async () => {
+      delete process.env.ALLOW_LOCAL_AGENTS;
       const context = buildMockContext({
         config: {
           processName: 'protocol-to-tfl',
@@ -124,13 +136,35 @@ describe('ClaudeCodeAgentPlugin', () => {
               plugin: 'claude-code-agent',
               agentConfig: {
                 skill: 'trial-metadata-extractor',
-                image: '',
               },
             },
           ],
         } satisfies ProcessConfig,
       });
-      await expect(plugin.initialize(context)).rejects.toThrow(/docker image/i);
+      await expect(plugin.initialize(context)).rejects.toThrow(/ALLOW_LOCAL_AGENTS/i);
+    });
+
+    it('[DATA] allows no image when ALLOW_LOCAL_AGENTS=true', async () => {
+      process.env.ALLOW_LOCAL_AGENTS = 'true';
+      const context = buildMockContext({
+        config: {
+          processName: 'protocol-to-tfl',
+          configName: 'default',
+          configVersion: 'v1',
+          stepConfigs: [
+            {
+              stepId: 'extract',
+              executorType: 'agent',
+              plugin: 'claude-code-agent',
+              agentConfig: {
+                skill: 'trial-metadata-extractor',
+                skillsDir: '/plugins/protocol-to-tfl/skills',
+              },
+            },
+          ],
+        } satisfies ProcessConfig,
+      });
+      await expect(plugin.initialize(context)).resolves.toBeUndefined();
     });
 
     it('[ERROR] throws if stepConfig not found for stepId', async () => {
