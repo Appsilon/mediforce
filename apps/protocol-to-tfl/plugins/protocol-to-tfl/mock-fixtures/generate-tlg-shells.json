@@ -1,0 +1,44 @@
+{
+  "study_id": "CDISCPILOT01",
+  "generation_date": "2026-03-12",
+  "total_outputs": 30,
+  "tables": [
+    { "id": "T-1", "title": "Summary of Populations", "population": "All Subjects", "template": 1 },
+    { "id": "T-2", "title": "Summary of End of Study Data", "population": "ITT", "template": 2 },
+    { "id": "T-3", "title": "Summary of Demographic and Baseline Characteristics", "population": "ITT", "template": 3 },
+    { "id": "T-4", "title": "Summary of Number of Subjects by Site", "population": "Safety", "template": 4 },
+    { "id": "T-5", "title": "Primary Endpoint Analysis: ADAS Cog (11) - Change from Baseline to Week 24 - LOCF", "population": "Efficacy", "template": 5 },
+    { "id": "T-6", "title": "Primary Endpoint Analysis: CIBIC+ - Summary at Week 24 - LOCF", "population": "Efficacy", "template": 6 },
+    { "id": "T-7", "title": "ADAS Cog (11) - Change from Baseline to Week 8 - LOCF", "population": "Efficacy", "template": 5 },
+    { "id": "T-8", "title": "CIBIC+ - Summary at Week 8 - LOCF", "population": "Efficacy", "template": 6 },
+    { "id": "T-9", "title": "ADAS Cog (11) - Change from Baseline to Week 16 - LOCF", "population": "Efficacy", "template": 5 },
+    { "id": "T-10", "title": "CIBIC+ - Summary at Week 16 - LOCF", "population": "Efficacy", "template": 6 },
+    { "id": "T-11", "title": "ADAS Cog (11) - Change from Baseline to Week 24 - Completers - Observed Cases", "population": "Efficacy (Completers)", "template": 7 },
+    { "id": "T-12", "title": "ADAS Cog (11) - Change from Baseline to Week 24 in Male Subjects - LOCF", "population": "Efficacy (Males)", "template": 8 },
+    { "id": "T-13", "title": "ADAS Cog (11) - Change from Baseline to Week 24 in Female Subjects - LOCF", "population": "Efficacy (Females)", "template": 8 },
+    { "id": "T-14", "title": "ADAS Cog (11) - Mean and Mean Change from Baseline over Time", "population": "Efficacy", "template": 9 },
+    { "id": "T-15", "title": "ADAS Cog (11) - Repeated Measures Analysis of Change from Baseline to Week 24", "population": "Efficacy", "template": 10 },
+    { "id": "T-16", "title": "Mean NPI-X Total Score from Week 4 through Week 24 - Windowed", "population": "Efficacy", "template": 11 },
+    { "id": "T-17", "title": "Summary of Planned Exposure to Study Drug, as of End of Study", "population": "Safety", "template": 12 },
+    { "id": "T-18", "title": "Incidence of Treatment Emergent Adverse Events by Treatment Group", "population": "Safety", "template": 13 },
+    { "id": "T-19", "title": "Incidence of Treatment Emergent Serious Adverse Events by Treatment Group", "population": "Safety", "template": 14 },
+    { "id": "T-20", "title": "Summary Statistics for Continuous Laboratory Values", "population": "Safety", "template": 15 },
+    { "id": "T-21", "title": "Frequency of Normal and Abnormal (Beyond Normal Range) Laboratory Values During Treatment", "population": "Safety", "template": 16 },
+    { "id": "T-22", "title": "Frequency of Normal and Abnormal (Clinically Significant Change from Previous Visit) Laboratory Values During Treatment", "population": "Safety", "template": 17 },
+    { "id": "T-23", "title": "Shifts of Laboratory Values During Treatment, Categorized Based on Threshold Ranges, by Visit", "population": "Safety", "template": 18 },
+    { "id": "T-24", "title": "Shifts of Laboratory Values During Treatment, Categorized Based on Threshold Ranges", "population": "Safety", "template": 19 },
+    { "id": "T-25", "title": "Shifts of Hy's Law Values During Treatment", "population": "Safety", "template": 20 },
+    { "id": "T-26", "title": "Summary of Vital Signs at Baseline and End of Treatment", "population": "Safety", "template": 21 },
+    { "id": "T-27", "title": "Summary of Vital Signs Change From Baseline at End of Treatment", "population": "Safety", "template": 22 },
+    { "id": "T-28", "title": "Summary of Weight Change From Baseline at End of Treatment", "population": "Safety", "template": 23 },
+    { "id": "T-29", "title": "Summary of Concomitant Medications (Number of Subjects)", "population": "Safety", "template": 24 }
+  ],
+  "figures": [
+    { "id": "F-1", "title": "Time to First Dermatological Event by Treatment Group", "population": "Safety" }
+  ],
+  "listings": [],
+  "output_files": [
+    "cdiscpilot01-mock-tlg-shells.md"
+  ],
+  "summary": "Generated 30 TLG shells (29 tables, 1 figure) for CDISCPILOT01 based on trial metadata and SAP."
+}

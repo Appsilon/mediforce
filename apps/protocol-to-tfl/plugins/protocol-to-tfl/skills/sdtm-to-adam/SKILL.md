@@ -276,7 +276,9 @@ After completion, present:
 
 ## Output directory structure
 
-Default output structure (can be overridden by user):
+**IMPORTANT**: Use the directory paths provided in the system prompt. If a "Workspace Directory (Git Repo)" section is present, write all deliverables there (not to the output/result contract directory). The workspace directory replaces `{output_dir}` below.
+
+Default output structure:
 
 ```
 {output_dir}/

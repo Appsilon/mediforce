@@ -1,0 +1,84 @@
+{
+  "processName": "protocol-to-tfl",
+  "configName": "agent-extract",
+  "configVersion": "7",
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+  },
+  "stepConfigs": [
+    {
+      "stepId": "upload-documents",
+      "executorType": "human"
+    },
+    {
+      "stepId": "extract-metadata",
+      "executorType": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 20,
+      "agentConfig": {
+        "skill": "trial-metadata-extractor",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-tfl"
+      }
+    },
+    {
+      "stepId": "generate-tlg-shells",
+      "executorType": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 20,
+      "agentConfig": {
+        "skill": "mock-tlg-generator",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-tfl"
+      }
+    },
+    {
+      "stepId": "upload-sdtm",
+      "executorType": "human"
+    },
+    {
+      "stepId": "generate-adam",
+      "executorType": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 30,
+      "agentConfig": {
+        "skill": "sdtm-to-adam",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-tfl",
+        "repo": "Appsilon/mediforce-clinical-workspace",
+        "commit": "4beb1b0ad77872b04bc7ef930def16e555946222"
+      }
+    },
+    {
+      "stepId": "generate-tlg",
+      "executorType": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 30,
+      "agentConfig": {
+        "skill": "adam-to-tlg",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:protocol-to-tfl",
+        "repo": "Appsilon/mediforce-clinical-workspace",
+        "commit": "4beb1b0ad77872b04bc7ef930def16e555946222"
+      }
+    }
+  ]
+}

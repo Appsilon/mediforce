@@ -15,7 +15,7 @@ Mock shells are the bridge between the statistical analysis plan and actual prog
 
 **This is a headless pipeline step. There is no human listening.**
 
-**CRITICAL WARNING**: The TLG shells markdown is very large (1000+ lines for a Phase 3 study). If you compose it in your head and try to output it as text, you WILL exceed the time limit and the entire run will be killed. You MUST use the Write tool to save the markdown to a file. Your final text response must be tiny.
+**CRITICAL WARNING**: The TLG shells markdown is very large (1000+ lines for a Phase 3 study). You MUST write it to a file using **bash with a heredoc**. Do NOT use the Write tool — it will fail on large content because the JSON serialization of the tool arguments breaks. Do NOT try to output the full content as text in your response.
 
 Your ONLY output as a final message must be a raw JSON object (no markdown fences, no preamble, no explanation):
 
@@ -24,11 +24,44 @@ Your ONLY output as a final message must be a raw JSON object (no markdown fence
 ```
 
 Rules:
-- **Use the Write tool** to save the TLG shells markdown to a file. Do NOT include the full content in your response text — it is too large and will cause a timeout.
+- **Write the output using bash heredoc** (see "How to Write Large Files" below). NEVER use the Write tool for the TLG shells — it will fail on large content.
+- If the file is very large, write it in multiple bash calls (append with `>>` or `cat >> file << 'EOF'`).
 - Your final text response is ONLY the small contract JSON above (the one with `output_file` and `summary`). Nothing else.
 - Do NOT write conversational summaries, recommendations, or next step suggestions
 - Do NOT wrap anything in markdown code fences
 - Do NOT continue working after writing the output file and emitting the JSON response
+
+## How to Write Large Files
+
+**MANDATORY**: Use bash heredoc to write files. The Write tool CANNOT handle large content.
+
+**Pattern 1 — Single write (if content fits in one heredoc):**
+```bash
+cat > /output/H2Q-MC-LZZT-mock-tlg-shells.md << 'ENDSHELLS'
+# Mock TLG Shells — H2Q-MC-LZZT
+...entire content here...
+ENDSHELLS
+```
+
+**Pattern 2 — Chunked write (for very large files, preferred):**
+```bash
+# First chunk — creates the file
+cat > /output/H2Q-MC-LZZT-mock-tlg-shells.md << 'ENDCHUNK'
+# Mock TLG Shells — H2Q-MC-LZZT
+## Generation metadata
+...first section...
+ENDCHUNK
+```
+Then in subsequent bash calls:
+```bash
+# Append additional sections
+cat >> /output/H2Q-MC-LZZT-mock-tlg-shells.md << 'ENDCHUNK'
+## Table Shells
+...more content...
+ENDCHUNK
+```
+
+**NEVER use the Write tool for the TLG shells file.** It will fail with "Invalid input" on large content.
 
 ## Workflow
 
@@ -142,7 +175,7 @@ If the metadata already has TLG IDs (from `planned_tlg_list`), preserve those ID
 
 ### Step 5: Write the output file
 
-Use the **Write tool** to save the complete TLG shells package to:
+Use **bash heredoc** (see "How to Write Large Files" above) to save the complete TLG shells package to:
 
 ```
 {output_directory}/{study_id}-mock-tlg-shells.md
@@ -150,7 +183,7 @@ Use the **Write tool** to save the complete TLG shells package to:
 
 Where `{output_directory}` is the absolute path from the "Output Directory" section of the input.
 
-The output document structure should be:
+Write the file in chunks using `cat >` for the first chunk and `cat >>` for subsequent chunks. The output document structure should be:
 
 ```markdown
 # Mock TLG Shells — {study_id}: {short_title}
@@ -180,8 +213,6 @@ The output document structure should be:
 
 [Each figure shell with description and axis labels]
 ```
-
-This is essential: call the Write tool with the complete markdown content. Do NOT try to output the markdown as text — it is too large and will cause the process to time out before you finish generating it.
 
 Then, as your **final message**, output ONLY the small contract JSON described in the "HARD STOP" section above:
 ```
