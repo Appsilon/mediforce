@@ -46,7 +46,7 @@ die() { echo "ERROR: $1" >&2; exit 1; }
 echo "Auto-advancing process: $INSTANCE_ID"
 echo "Polling for human tasks..."
 
-MAX_POLLS=30  # 30 minutes max (30 * 60s)
+MAX_POLLS=50  # 50 minutes max (50 * 60s)
 POLL_COUNT=0
 
 while [ "$POLL_COUNT" -lt "$MAX_POLLS" ]; do

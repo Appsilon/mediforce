@@ -42,6 +42,7 @@ export {
 export type {
   Verdict,
   StepUi,
+  StepParam,
   Step,
   Transition,
   Trigger,

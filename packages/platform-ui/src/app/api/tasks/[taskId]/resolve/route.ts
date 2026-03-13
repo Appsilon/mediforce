@@ -11,6 +11,9 @@ import type { HumanTask } from '@mediforce/platform-core';
  * File-upload steps (ui.component === 'file-upload'):
  *   Body: { "attachments": [{ name, size, type, storagePath, downloadUrl }] }
  *
+ * Params steps (task.params is non-empty array):
+ *   Body: { "paramValues": { ... } }
+ *
  * Verdict steps (everything else):
  *   Body: { "verdict": "approve" | "revise", "comment": "..." }
  *
@@ -54,12 +57,20 @@ export async function POST(
 
     const actorId = resolvedTask.assignedUserId ?? 'api-user';
     const isFileUpload = resolvedTask.ui?.component === 'file-upload';
+    const isParamsTask = Array.isArray(resolvedTask.params) && resolvedTask.params.length > 0;
 
     // ── 3. Validate body based on task type ─────────────────────────────
     if (isFileUpload) {
       const validationError = validateFileUploadBody(body, resolvedTask);
       if (validationError) {
         return NextResponse.json({ error: validationError }, { status: 400 });
+      }
+    } else if (isParamsTask) {
+      if (!body.paramValues || typeof body.paramValues !== 'object') {
+        return NextResponse.json(
+          { error: 'paramValues object required for params task' },
+          { status: 400 },
+        );
       }
     } else {
       const verdict = body.verdict;
@@ -92,15 +103,18 @@ export async function POST(
 
       completionData = { files, completedBy: actorId, completedAt: now };
       stepOutput = { files };
+    } else if (isParamsTask) {
+      const paramValues = body.paramValues as Record<string, unknown>;
+      completionData = { paramValues, completedBy: actorId, completedAt: now };
+      stepOutput = paramValues;
     } else {
       const verdict = body.verdict as string;
       const comment = (body.comment as string) ?? '';
-      completionData = { verdict, comment, completedBy: actorId, completedAt: now };
-
       // L3 agent review: semantic output is the agent's actual result
       const agentReviewData = resolvedTask.completionData as Record<string, unknown> | null;
+      const agentOutput = agentReviewData?.agentOutput as Record<string, unknown> | undefined;
+
       if (agentReviewData?.reviewType === 'agent_output_review') {
-        const agentOutput = agentReviewData.agentOutput as Record<string, unknown> | undefined;
         const agentResult = agentOutput?.result as Record<string, unknown> | null | undefined;
 
         // Reject approval when agent produced no output — prevents auto-advance
@@ -116,6 +130,14 @@ export async function POST(
       } else {
         stepOutput = {};
       }
+
+      completionData = {
+        verdict,
+        comment,
+        completedBy: actorId,
+        completedAt: now,
+        ...(agentOutput !== undefined ? { agentOutput } : {}),
+      };
 
       // Reviewer comment flows to downstream steps as context
       if (comment.length > 0) {
@@ -133,7 +155,9 @@ export async function POST(
       action: 'task.completed',
       description: isFileUpload
         ? `Task '${taskId}' resolved with ${(body.attachments as Attachment[]).length} file(s) for step '${resolvedTask.stepId}'`
-        : `Task '${taskId}' resolved with verdict '${body.verdict}' for step '${resolvedTask.stepId}'`,
+        : isParamsTask
+          ? `Task '${taskId}' resolved with param values for step '${resolvedTask.stepId}'`
+          : `Task '${taskId}' resolved with verdict '${body.verdict}' for step '${resolvedTask.stepId}'`,
       timestamp: now,
       inputSnapshot: { taskId, stepId: resolvedTask.stepId, ...(isFileUpload ? { fileCount: (body.attachments as Attachment[]).length } : { verdict: body.verdict }) },
       outputSnapshot: { status: 'completed', completionData },

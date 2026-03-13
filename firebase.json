@@ -1,5 +1,9 @@
 {
   "//": "Emulator-only config for E2E tests. Hosting config lives in packages/platform-ui/firebase.json.",
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
   "storage": {
     "rules": "storage.rules"
   },

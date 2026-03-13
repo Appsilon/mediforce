@@ -756,10 +756,18 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       const sshCmd = `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR`;
 
       console.log(`[${this.agentName}] Local git mode: cloning ${gitUrl} into ${workingDir}`);
-      execSync(`GIT_SSH_COMMAND="${sshCmd}" git clone "${gitUrl}" "${workingDir}"`, {
-        stdio: 'pipe',
-        env: { ...process.env, GIT_SSH_COMMAND: sshCmd },
-      });
+      try {
+        execSync(`GIT_SSH_COMMAND="${sshCmd}" git clone "${gitUrl}" "${workingDir}"`, {
+          stdio: 'pipe',
+          env: { ...process.env, GIT_SSH_COMMAND: sshCmd },
+        });
+      } catch (cloneErr) {
+        const msg = cloneErr instanceof Error ? cloneErr.message : String(cloneErr);
+        throw new Error(
+          `Git clone failed for step '${stepId}': ${msg}. ` +
+          `Check DEPLOY_KEY_PATH env var (current: ${deployKeyPath}) and repo access (${repo}).`,
+        );
+      }
 
       // Configure git identity
       execSync('git config user.email "agent@mediforce.dev"', { cwd: workingDir, stdio: 'pipe' });
@@ -928,8 +936,8 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
           await writeFile(join(outputDir, 'git-result.json'), JSON.stringify(gitResult, null, 2), 'utf-8');
         }
       } catch (gitErr) {
-        console.error(`[${this.agentName}] Git commit/push failed:`, gitErr);
-        // Don't throw — the agent's work is done, git push failure is recoverable
+        const msg = gitErr instanceof Error ? gitErr.message : String(gitErr);
+        throw new Error(`Git commit/push failed for step '${stepId}': ${msg}`);
       }
     }
 

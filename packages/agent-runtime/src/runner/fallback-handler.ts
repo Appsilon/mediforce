@@ -2,6 +2,7 @@ import type {
   ProcessInstanceRepository,
   StepConfig,
   AgentEvent,
+  AgentOutputEnvelope,
 } from '@mediforce/platform-core';
 import type { AgentContext } from '../interfaces/agent-plugin.js';
 import type { AgentRunResult } from './agent-runner.js';
@@ -16,6 +17,7 @@ export class FallbackHandler {
     context: AgentContext,
     stepConfig: StepConfig,
     partialWork: AgentEvent[],
+    originalEnvelope?: AgentOutputEnvelope | null,
   ): Promise<AgentRunResult> {
     const behavior = stepConfig.fallbackBehavior ?? 'escalate_to_human';
 
@@ -27,7 +29,7 @@ export class FallbackHandler {
         });
         return {
           status: 'escalated',
-          envelope: null,
+          envelope: originalEnvelope ?? null,
           appliedToWorkflow: false,
           fallbackReason: reason,
         };
@@ -37,7 +39,7 @@ export class FallbackHandler {
         // No instance update — workflow continues
         return {
           status: 'flagged',
-          envelope: null,
+          envelope: originalEnvelope ?? null,
           appliedToWorkflow: false,
           fallbackReason: reason,
         };
@@ -50,7 +52,7 @@ export class FallbackHandler {
         });
         return {
           status: 'paused',
-          envelope: null,
+          envelope: originalEnvelope ?? null,
           appliedToWorkflow: false,
           fallbackReason: reason,
         };
@@ -64,7 +66,7 @@ export class FallbackHandler {
         });
         return {
           status: 'escalated',
-          envelope: null,
+          envelope: originalEnvelope ?? null,
           appliedToWorkflow: false,
           fallbackReason: reason,
         };

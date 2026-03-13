@@ -107,6 +107,122 @@ export async function unclaimTask(
 }
 
 // --------------------------------------------------------------------------
+// completeParamsTask — submit param values, resume process, advance step
+// --------------------------------------------------------------------------
+export async function completeParamsTask(
+  taskId: string,
+  paramValues: Record<string, unknown>,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { humanTaskRepo, instanceRepo, auditRepo, engine } =
+      getPlatformServices();
+
+    const task = await humanTaskRepo.getById(taskId);
+    if (!task) {
+      return { success: false, error: 'Task not found' };
+    }
+
+    if (task.status !== 'claimed') {
+      return {
+        success: false,
+        error: `Cannot complete a ${task.status} task — must be claimed first`,
+      };
+    }
+
+    const now = new Date().toISOString();
+    const completionData = {
+      paramValues,
+      completedBy: task.assignedUserId,
+      completedAt: now,
+    };
+
+    await humanTaskRepo.complete(taskId, completionData);
+
+    await auditRepo.append({
+      actorId: task.assignedUserId ?? 'user',
+      actorType: 'user',
+      actorRole: 'operator',
+      action: 'task.completed',
+      description: `Task '${taskId}' completed with param values for step '${task.stepId}'`,
+      timestamp: now,
+      inputSnapshot: { taskId, paramValues, stepId: task.stepId },
+      outputSnapshot: { status: 'completed', completionData },
+      basis: 'User submitted params via UI',
+      entityType: 'humanTask',
+      entityId: taskId,
+      processInstanceId: task.processInstanceId,
+    });
+
+    const instance = await instanceRepo.getById(task.processInstanceId);
+    if (!instance) {
+      return {
+        success: false,
+        error: `Process instance '${task.processInstanceId}' not found`,
+      };
+    }
+
+    if (instance.status !== 'paused') {
+      return {
+        success: false,
+        error: `Process instance is '${instance.status}', expected 'paused'`,
+      };
+    }
+
+    await instanceRepo.update(task.processInstanceId, {
+      status: 'running',
+      pauseReason: null,
+      updatedAt: now,
+    });
+
+    // Param values ARE the semantic step output — downstream steps consume them
+    await engine.advanceStep(
+      task.processInstanceId,
+      paramValues,
+      { id: task.assignedUserId ?? 'user', role: 'human' },
+    );
+
+    await auditRepo.append({
+      actorId: task.assignedUserId ?? 'user',
+      actorType: 'user',
+      actorRole: 'operator',
+      action: 'process.resumed_after_task',
+      description: `Process '${task.processInstanceId}' resumed after param submission`,
+      timestamp: new Date().toISOString(),
+      inputSnapshot: {
+        taskId,
+        processInstanceId: task.processInstanceId,
+      },
+      outputSnapshot: {},
+      basis: 'Param task completion triggered process advancement',
+      entityType: 'processInstance',
+      entityId: task.processInstanceId,
+      processInstanceId: task.processInstanceId,
+    });
+
+    const appUrl = getAppBaseUrl();
+    fetch(`${appUrl}/api/processes/${task.processInstanceId}/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
+      },
+      body: JSON.stringify({
+        triggeredBy: task.assignedUserId ?? 'user',
+      }),
+    }).catch(() => {
+      // Fire-and-forget
+    });
+
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
+}
+
+// --------------------------------------------------------------------------
 // completeTask — submit verdict, resume process, advance step, trigger runner
 // --------------------------------------------------------------------------
 export async function completeTask(

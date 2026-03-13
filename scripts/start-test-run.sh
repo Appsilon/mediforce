@@ -54,10 +54,16 @@ die() { echo "ERROR: $1" >&2; exit 1; }
 
 echo "Querying available configs..."
 
-RESPONSE=$(api GET "/api/configs?processName=protocol-to-tfl")
-parse_response "$RESPONSE"
+# Retry up to 3 times — Next.js dev mode may return 404 while compiling pages
+for attempt in 1 2 3; do
+  RESPONSE=$(api GET "/api/configs?processName=protocol-to-tfl")
+  parse_response "$RESPONSE"
+  [ "$HTTP_CODE" = "200" ] && break
+  echo "  Attempt $attempt: HTTP $HTTP_CODE (retrying in 3s...)"
+  sleep 3
+done
 
-[ "$HTTP_CODE" = "200" ] || die "Failed to query configs (HTTP $HTTP_CODE): $BODY"
+[ "$HTTP_CODE" = "200" ] || die "Failed to query configs (HTTP $HTTP_CODE)"
 
 # Find latest version of the requested config name
 CONFIG=$(echo "$BODY" | python3 -c "

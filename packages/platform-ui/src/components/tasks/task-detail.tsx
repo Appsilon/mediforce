@@ -13,6 +13,7 @@ import { TaskContextPanel } from './task-context-panel';
 import { AgentOutputReviewPanel } from './agent-output-review-panel';
 import { FileUploadZone } from './file-upload-zone';
 import { VerdictForm, VerdictConfirmationReadOnly } from './verdict-form';
+import { ParamsForm, ParamsConfirmationReadOnly } from './params-form';
 import { NextStepCard } from './next-step-card';
 import { getTaskDisplayTitle, isAgentReviewTask, getAgentOutput, getAgentOutputFromSiblings } from './task-utils';
 import { completeUploadTask } from '@/app/actions/upload-task';
@@ -53,6 +54,7 @@ export function TaskDetail({
   }, []);
 
   const isFileUploadTask = task.ui?.component === 'file-upload';
+  const isParamsTask = Array.isArray(task.params) && task.params.length > 0;
 
   const handleFileUpload = React.useCallback(async (files: File[]) => {
     setUploadError(null);
@@ -361,7 +363,20 @@ export function TaskDetail({
           </div>
         )}
 
-        {isClaimedByMe && !isFileUploadTask && (
+        {isClaimedByMe && !isFileUploadTask && isParamsTask && (
+          <>
+            <ParamsForm
+              taskId={task.id}
+              params={task.params!}
+              remainingTaskCount={remainingTaskCount}
+            />
+            <div className="pt-1 border-t">
+              <UnclaimButton taskId={task.id} currentUserId={currentUserId} />
+            </div>
+          </>
+        )}
+
+        {isClaimedByMe && !isFileUploadTask && !isParamsTask && (
           <>
             <VerdictForm
               taskId={task.id}
@@ -394,7 +409,13 @@ export function TaskDetail({
         {isCompleted && task.completionData && isFileUploadTask && (
           <UploadConfirmationReadOnly completionData={task.completionData} />
         )}
-        {isCompleted && task.completionData && !isFileUploadTask && (
+        {isCompleted && task.completionData && !isFileUploadTask && isParamsTask && (
+          <ParamsConfirmationReadOnly
+            completionData={task.completionData}
+            params={task.params!}
+          />
+        )}
+        {isCompleted && task.completionData && !isFileUploadTask && !isParamsTask && (
           <VerdictConfirmationReadOnly
             completionData={task.completionData}
             remainingTaskCount={remainingTaskCount}
