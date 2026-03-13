@@ -6,7 +6,8 @@ import { ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PluginCombobox } from './plugin-combobox';
 import { PluginPreviewCard } from './plugin-preview-card';
-import type { StepConfig } from '@mediforce/platform-core';
+import { LazyScriptEditor } from './lazy-script-editor';
+import type { StepConfig, AgentConfig } from '@mediforce/platform-core';
 
 interface PluginMetadata {
   name: string;
@@ -101,6 +102,7 @@ function SelectField({
 const executorTypeOptions = [
   { value: 'human', label: 'Human' },
   { value: 'agent', label: 'Agent' },
+  { value: 'script', label: 'Script' },
 ];
 
 const autonomyLevelOptions = [
@@ -123,6 +125,24 @@ const fallbackBehaviorOptions = [
   { value: 'pause', label: 'Pause' },
 ];
 
+const runtimeOptions = [
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'python', label: 'Python' },
+  { value: 'r', label: 'R' },
+  { value: 'bash', label: 'Bash' },
+];
+
+const scriptModeOptions = [
+  { value: 'inline', label: 'Inline' },
+  { value: 'container', label: 'Container' },
+];
+
+function detectScriptMode(agentConfig?: AgentConfig): 'inline' | 'container' {
+  if (agentConfig?.inlineScript !== undefined && agentConfig.inlineScript.length > 0) return 'inline';
+  if (agentConfig?.image) return 'container';
+  return 'inline'; // default for new script steps
+}
+
 export function StepConfigCard({
   step,
   config,
@@ -138,9 +158,13 @@ export function StepConfigCard({
   ) => {
     const updated = { ...config, [key]: value };
 
-    // Clear plugin when switching executor type away from agent
-    if (key === 'executorType' && value !== 'agent') {
-      updated.plugin = undefined;
+    // Auto-set plugin for script executor; clear for non-agent types
+    if (key === 'executorType') {
+      if (value === 'script') {
+        updated.plugin = 'script-container';
+      } else if (value !== 'agent') {
+        updated.plugin = undefined;
+      }
     }
     // Clear reviewer plugin when switching reviewer type away from agent
     if (key === 'reviewerType' && value !== 'agent') {
@@ -196,7 +220,7 @@ export function StepConfigCard({
             />
           </div>
 
-          {/* Plugin combobox - slides in when executorType is 'agent' */}
+          {/* Plugin combobox - slides in when executorType is 'agent' (script always uses script-container) */}
           {config.executorType === 'agent' && (
             <div className="animate-in slide-in-from-top-2 duration-200 space-y-2">
               <label className="text-xs font-medium text-muted-foreground">
@@ -255,7 +279,7 @@ export function StepConfigCard({
             </div>
           )}
 
-          {/* Agent Config section — visible when agent executor with agentConfig */}
+          {/* Agent Config section — visible for agent executor with existing agentConfig */}
           {config.executorType === 'agent' && config.agentConfig && (
             <div className="animate-in slide-in-from-top-2 duration-200 space-y-3">
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -283,6 +307,18 @@ export function StepConfigCard({
                       disabled={readOnly}
                       readOnly
                       className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                )}
+                {config.agentConfig.command && (
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">Command</label>
+                    <input
+                      type="text"
+                      value={config.agentConfig.command}
+                      disabled={readOnly}
+                      readOnly
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 )}
@@ -340,6 +376,108 @@ export function StepConfigCard({
                     readOnly
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                   />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Script config — mode toggle between inline and container */}
+          {config.executorType === 'script' && (
+            <div className="animate-in slide-in-from-top-2 duration-200 space-y-3">
+              <SelectField
+                label="Script Mode"
+                value={detectScriptMode(config.agentConfig)}
+                onValueChange={(v) => {
+                  const mode = v as 'inline' | 'container';
+                  if (mode === 'inline') {
+                    onChange({
+                      ...config,
+                      agentConfig: {
+                        runtime: config.agentConfig?.runtime ?? 'python',
+                        inlineScript: config.agentConfig?.inlineScript ?? '',
+                      },
+                    });
+                  } else {
+                    onChange({
+                      ...config,
+                      agentConfig: {
+                        image: config.agentConfig?.image ?? '',
+                        command: config.agentConfig?.command ?? '',
+                      },
+                    });
+                  }
+                }}
+                options={scriptModeOptions}
+                disabled={readOnly}
+              />
+
+              {detectScriptMode(config.agentConfig) === 'inline' ? (
+                <div className="space-y-3">
+                  <SelectField
+                    label="Runtime"
+                    value={config.agentConfig?.runtime ?? 'python'}
+                    onValueChange={(v) => {
+                      const agentConfig = config.agentConfig ?? {};
+                      onChange({
+                        ...config,
+                        agentConfig: { ...agentConfig, runtime: v as 'javascript' | 'python' | 'r' | 'bash' },
+                      });
+                    }}
+                    options={runtimeOptions}
+                    disabled={readOnly}
+                  />
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Script
+                    </label>
+                    <LazyScriptEditor
+                      value={config.agentConfig?.inlineScript ?? ''}
+                      runtime={(config.agentConfig?.runtime as 'javascript' | 'python' | 'r' | 'bash') ?? 'python'}
+                      onChange={(script) => {
+                        const agentConfig = config.agentConfig ?? {};
+                        onChange({
+                          ...config,
+                          agentConfig: {
+                            ...agentConfig,
+                            inlineScript: script,
+                            runtime: agentConfig.runtime ?? 'python',
+                          },
+                        });
+                      }}
+                      readOnly={readOnly}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Docker Image</label>
+                    <input
+                      type="text"
+                      value={config.agentConfig?.image ?? ''}
+                      onChange={(event) => {
+                        const agentConfig = config.agentConfig ?? {};
+                        onChange({ ...config, agentConfig: { ...agentConfig, image: event.target.value } });
+                      }}
+                      placeholder="e.g. mediforce-script:community-digest"
+                      disabled={readOnly}
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Command</label>
+                    <input
+                      type="text"
+                      value={config.agentConfig?.command ?? ''}
+                      onChange={(event) => {
+                        const agentConfig = config.agentConfig ?? {};
+                        onChange({ ...config, agentConfig: { ...agentConfig, command: event.target.value } });
+                      }}
+                      placeholder="e.g. python /app/gather.py"
+                      disabled={readOnly}
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </div>
                 </div>
               )}
             </div>
