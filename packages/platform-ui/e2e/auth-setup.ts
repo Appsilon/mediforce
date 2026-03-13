@@ -15,6 +15,7 @@ setup('authenticate and seed data', async ({ page }) => {
 
   // 3. Seed Firestore with test data
   const data = buildSeedData(testUserId);
+  await seedCollection('users', data.users);
   await seedCollection('humanTasks', data.humanTasks);
   await seedCollection('processInstances', data.processInstances);
   await seedCollection('agentRuns', data.agentRuns);

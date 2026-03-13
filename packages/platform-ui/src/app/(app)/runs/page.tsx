@@ -1,10 +1,23 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useProcessInstances } from '@/hooks/use-process-instances';
+import { useProcessDefinitions } from '@/hooks/use-process-definitions';
 import { RunsTable } from '@/components/processes/runs-table';
 
 export default function RunsPage() {
-  const { data: runs, loading } = useProcessInstances('all');
+  const { data: runs, loading: runsLoading } = useProcessInstances('all');
+  const { definitions, loading: defsLoading } = useProcessDefinitions();
+
+  const archivedNames = useMemo(
+    () => new Set(definitions.filter((d) => d.archived).map((d) => d.name)),
+    [definitions],
+  );
+
+  const visibleRuns = useMemo(
+    () => runs.filter((r) => !archivedNames.has(r.definitionName)),
+    [runs, archivedNames],
+  );
 
   return (
     <div className="flex flex-1 flex-col gap-0">
@@ -17,8 +30,8 @@ export default function RunsPage() {
 
       <div className="p-6">
         <RunsTable
-          runs={runs}
-          loading={loading}
+          runs={visibleRuns}
+          loading={runsLoading || defsLoading}
           showProcess
           emptyMessage="No runs yet."
         />

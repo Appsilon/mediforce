@@ -7,12 +7,12 @@ import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@medifor
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
-/** Runtime → Docker image, file extension, and run command. */
-const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: string) => string }> = {
-  javascript: { image: 'node:20-slim', ext: '.mjs', cmd: (p) => `node ${p}` },
-  python: { image: 'python:3.12-slim', ext: '.py', cmd: (p) => `python ${p}` },
-  r: { image: 'rocker/r-ver:4', ext: '.R', cmd: (p) => `Rscript ${p}` },
-  bash: { image: 'alpine:3.19', ext: '.sh', cmd: (p) => `sh ${p}` },
+/** Runtime → Docker image, file extension, and run command (as array for spawn). */
+const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: string) => string[] }> = {
+  javascript: { image: 'mediforce-node:latest', ext: '.mjs', cmd: (p) => ['node', p] },
+  python: { image: 'python:3.12-slim', ext: '.py', cmd: (p) => ['python', p] },
+  r: { image: 'rocker/r-ver:4', ext: '.R', cmd: (p) => ['Rscript', p] },
+  bash: { image: 'alpine:3.19', ext: '.sh', cmd: (p) => ['sh', p] },
 };
 
 /**
@@ -43,7 +43,8 @@ export class ScriptContainerPlugin implements AgentPlugin {
 
   private context!: AgentContext;
   private image!: string;
-  private command!: string;
+  private commandArgs!: string[];
+  private commandDisplay!: string;
   private inlineScript: string | null = null;
   private runtime: string | null = null;
 
@@ -88,7 +89,8 @@ export class ScriptContainerPlugin implements AgentPlugin {
       this.runtime = runtime;
       this.image = agentConfig.image ?? runtimeCfg.image;
       const scriptPath = `/output/script${runtimeCfg.ext}`;
-      this.command = runtimeCfg.cmd(scriptPath);
+      this.commandArgs = runtimeCfg.cmd(scriptPath);
+      this.commandDisplay = this.commandArgs.join(' ');
     } else if (agentConfig.command) {
       // Command mode — existing behavior
       if (!agentConfig.image) {
@@ -98,7 +100,8 @@ export class ScriptContainerPlugin implements AgentPlugin {
         );
       }
       this.image = agentConfig.image;
-      this.command = agentConfig.command;
+      this.commandArgs = agentConfig.command.split(' ');
+      this.commandDisplay = agentConfig.command;
     } else {
       throw new Error(
         `No command or inlineScript configured for step '${context.stepId}'. ` +
@@ -112,7 +115,7 @@ export class ScriptContainerPlugin implements AgentPlugin {
 
     await emit({
       type: 'status',
-      payload: `starting script container: image='${this.image}', command='${this.command}'`,
+      payload: `starting script container: image='${this.image}', command='${this.commandDisplay}'`,
       timestamp: new Date().toISOString(),
     });
 
@@ -144,7 +147,7 @@ export class ScriptContainerPlugin implements AgentPlugin {
         '--cpus', '2',
         '-v', `${outputDir}:/output`,
         this.image,
-        ...this.command.split(' '),
+        ...this.commandArgs,
       ];
 
       console.log(`[ScriptContainer] Spawning: docker ${dockerArgs.join(' ')}`);
@@ -233,10 +236,10 @@ export class ScriptContainerPlugin implements AgentPlugin {
         type: 'result',
         payload: {
           confidence: 1.0,
-          reasoning_summary: `Script container completed: ${this.command}`,
+          reasoning_summary: `Script container completed: ${this.commandDisplay}`,
           reasoning_chain: [
             `Image: ${this.image}`,
-            `Command: ${this.command}`,
+            `Command: ${this.commandDisplay}`,
             `Duration: ${durationMs}ms`,
           ],
           annotations: [],
