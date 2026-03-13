@@ -319,7 +319,8 @@ Laboratory Parameter          Baseline    Grade 0    Grade 1    Grade 2    Grade
 Note: Shift from baseline grade to worst post-baseline grade.
   Percentages based on subjects with both baseline and post-baseline assessments.
   Grading per NCI CTCAE v{x.x}.
-Abbreviations: CTCAE = Common Terminology Criteria for Adverse Events;
+  Statistical significance assessed using the Cochran-Mantel-Haenszel (CMH) test.
+Abbreviations: CMH = Cochran-Mantel-Haenszel; CTCAE = Common Terminology Criteria for Adverse Events;
   N = number of subjects; n = number of subjects in specified cell.
 Source: ADLB
 Program: t_lab_shift.sas
@@ -664,12 +665,12 @@ Program: t_pro.sas
 
 ```
 Figure {ID}
-Kaplan-Meier Curve for {Endpoint Name}
+Kaplan-Meier Survival Curve for {Endpoint Name}
 {Population: [Analysis Population]} — Study [Study ID]
 
 [Description]
 X-axis: Time ({unit: months/weeks/days}) from {randomization / first dose}
-Y-axis: {Endpoint} probability (0.0 to 1.0)
+Y-axis: Survival probability / Event-free probability (0.0 to 1.0)
 Curves: One line per treatment arm ({[Arm A] = solid blue, [Arm B] = dashed red})
 Censor marks: Tick marks on each curve at censoring times
 Legend: Treatment arm names with median and 95% CI
@@ -677,7 +678,7 @@ Below plot: Number at Risk table by treatment arm at regular intervals
 
 Annotations:
   HR = x.xx (95% CI: x.xx, x.xx)
-  {Stratified/Unstratified} log-rank p = x.xxxx
+  Log-rank test p-value = x.xxxx
   Median [Arm A]: xx.x months (95% CI: xx.x, xx.x)
   Median [Arm B]: xx.x months (95% CI: xx.x, xx.x)
 

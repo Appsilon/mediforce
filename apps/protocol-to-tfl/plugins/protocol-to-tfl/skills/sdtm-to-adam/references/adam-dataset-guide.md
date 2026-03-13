@@ -136,6 +136,126 @@ adsl <- dm %>%
   )
 ```
 
+### Critical ADSL derivation instructions
+
+The following variables **MUST** be derived in ADSL. Missing these causes cascading NA values in downstream TLGs (demographics tables, disposition tables, etc.). Each derivation includes its source SDTM domain and logic:
+
+#### MMSETOT — Baseline MMSE Total Score
+```r
+# Source: QS domain
+# Filter for MMSE total score at baseline
+mmse_bl <- qs %>%
+  filter(QSCAT == "MINI-MENTAL STATE" | QSTESTCD == "MMSCORE" |
+         (QSCAT == "MMSE" & QSTESTCD %in% c("MMSETOT", "MMSCORE"))) %>%
+  # Take the baseline/screening value
+  filter(VISITNUM <= 3 | grepl("SCREEN|BASELINE", VISIT, ignore.case = TRUE)) %>%
+  group_by(USUBJID) %>%
+  slice_max(VISITNUM, n = 1) %>%
+  ungroup() %>%
+  mutate(MMSETOT = as.numeric(QSSTRESN)) %>%
+  select(USUBJID, MMSETOT)
+
+adsl <- adsl %>% left_join(mmse_bl, by = "USUBJID")
+```
+
+#### HEIGHTBL — Baseline Height
+```r
+# Source: VS domain
+# Filter for HEIGHT at screening/baseline visit
+height_bl <- vs %>%
+  filter(VSTESTCD == "HEIGHT") %>%
+  filter(VISITNUM <= 3 | grepl("SCREEN|BASELINE", VISIT, ignore.case = TRUE)) %>%
+  group_by(USUBJID) %>%
+  slice_max(VISITNUM, n = 1) %>%
+  ungroup() %>%
+  mutate(HEIGHTBL = as.numeric(VSSTRESN)) %>%
+  select(USUBJID, HEIGHTBL)
+
+adsl <- adsl %>% left_join(height_bl, by = "USUBJID")
+```
+
+#### BMIBL — Baseline BMI
+```r
+# Derived from WEIGHTBL and HEIGHTBL
+adsl <- adsl %>%
+  mutate(BMIBL = round(WEIGHTBL / (HEIGHTBL / 100)^2, 1))
+```
+
+#### BMIBLGR1 — Baseline BMI Group
+```r
+adsl <- adsl %>%
+  mutate(BMIBLGR1 = case_when(
+    BMIBL < 25 ~ "<25",
+    BMIBL >= 25 & BMIBL < 30 ~ "25-<30",
+    BMIBL >= 30 ~ ">=30",
+    TRUE ~ NA_character_
+  ))
+```
+
+#### DURDIS — Duration of Disease (months)
+```r
+# Source: MH domain
+# Calculate months between disease onset and reference start date
+disease_onset <- mh %>%
+  filter(MHCAT == "PRIMARY DIAGNOSIS" | grepl("ALZHEIMER|DEMENTIA", MHTERM, ignore.case = TRUE)) %>%
+  mutate(DISONSDT = as.Date(MHSTDTC)) %>%
+  group_by(USUBJID) %>%
+  slice_min(DISONSDT, n = 1) %>%
+  ungroup() %>%
+  select(USUBJID, DISONSDT)
+
+adsl <- adsl %>%
+  left_join(disease_onset, by = "USUBJID") %>%
+  mutate(DURDIS = as.numeric(difftime(RFSTDTC_date, DISONSDT, units = "days")) / 30.4375)
+# Where RFSTDTC_date is the parsed RFSTDTC
+```
+
+#### DURDSGR1 — Duration of Disease Group
+```r
+adsl <- adsl %>%
+  mutate(DURDSGR1 = case_when(
+    DURDIS < 12 ~ "<12",
+    DURDIS >= 12 ~ ">=12",
+    TRUE ~ NA_character_
+  ))
+```
+
+#### COMP24FL — Completed Week 24 Flag
+```r
+# Source: DS and/or SV domain
+# Y if subject completed the Week 24 visit
+comp24 <- sv %>%
+  filter(grepl("WEEK 24|VISIT 12", VISIT, ignore.case = TRUE) |
+         VISITNUM == 12) %>%
+  distinct(USUBJID) %>%
+  mutate(COMP24FL = "Y")
+
+adsl <- adsl %>%
+  left_join(comp24, by = "USUBJID") %>%
+  mutate(COMP24FL = if_else(is.na(COMP24FL), "N", COMP24FL))
+```
+
+#### COMP26FL (or COMPLFL) — Completed Study Flag
+```r
+# Source: DS domain
+# Y if EOSSTT == "COMPLETED"
+adsl <- adsl %>%
+  mutate(COMP26FL = if_else(EOSSTT == "COMPLETED", "Y", "N"))
+```
+
+#### EDUCLVL — Years of Education
+```r
+# Source: SC domain (Subject Characteristics)
+edu <- sc %>%
+  filter(SCTESTCD == "EDLEVEL") %>%
+  mutate(EDUCLVL = as.numeric(SCSTRESN)) %>%
+  select(USUBJID, EDUCLVL)
+
+adsl <- adsl %>% left_join(edu, by = "USUBJID")
+```
+
+**All of these derivations should be included in the ADSL script.** If a source domain (QS, VS, MH, SC, SV) is not available, log a warning but do not fail — set the variable to NA and document the gap in the issue summary.
+
 ---
 
 ## ADAE — Adverse Event Analysis Dataset
