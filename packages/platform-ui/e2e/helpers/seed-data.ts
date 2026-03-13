@@ -71,6 +71,27 @@ export function buildSeedData(testUserId: string) {
       completedAt: null,
       completionData: null,
     },
+    'task-upload-docs': {
+      id: 'task-upload-docs',
+      processInstanceId: 'proc-upload-waiting',
+      stepId: 'upload-documents',
+      assignedRole: 'operator',
+      assignedUserId: testUserId,
+      status: 'claimed',
+      deadline: nextWeek,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      completionData: null,
+      ui: {
+        component: 'file-upload',
+        config: {
+          acceptedTypes: ['application/pdf'],
+          minFiles: 1,
+          maxFiles: 5,
+        },
+      },
+    },
   };
 
   const processInstances: Record<string, Record<string, unknown>> = {
@@ -181,6 +202,24 @@ export function buildSeedData(testUserId: string) {
       pauseReason: 'waiting_for_human',
       error: null,
       assignedRoles: ['reviewer'],
+    },
+    'proc-upload-waiting': {
+      id: 'proc-upload-waiting',
+      definitionName: 'Protocol to TFL',
+      definitionVersion: '0.1.0',
+      configName: 'default',
+      configVersion: '1',
+      status: 'paused',
+      currentStepId: 'upload-documents',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: now,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: 'waiting_for_human',
+      error: null,
+      assignedRoles: ['operator'],
     },
   };
 
@@ -575,5 +614,18 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
-  return { humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs };
+  // User profile document — required by Firestore security rules.
+  // humanTasks and handoffEntities rules call get(/users/{uid}).data.roles
+  // to verify the reader has a matching role.
+  const users: Record<string, Record<string, unknown>> = {
+    [testUserId]: {
+      uid: testUserId,
+      email: 'test@mediforce.dev',
+      displayName: 'Test User',
+      role: 'admin',
+      roles: ['reviewer', 'analyst', 'operator'],
+    },
+  };
+
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs };
 }

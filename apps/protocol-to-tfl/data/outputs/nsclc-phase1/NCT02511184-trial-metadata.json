@@ -1,0 +1,1012 @@
+{
+  "schema_version": "1.0",
+  "extraction_date": "2026-03-06",
+  "source_documents": [
+    {
+      "type": "protocol",
+      "filename": "NCT02511184_Prot_000.pdf",
+      "version": "Original protocol",
+      "date": "2015-04-22"
+    },
+    {
+      "type": "sap",
+      "filename": "NCT02511184_SAP_001.pdf",
+      "version": "1.0",
+      "date": "2015-06-26"
+    }
+  ],
+
+  "study_identification": {
+    "study_id": "A8081054",
+    "nct_id": "NCT02511184",
+    "study_title": "A Phase 1B Study of Crizotinib in Combination with Pembrolizumab (MK-3475) in Patients with Untreated Advanced ALK-Translocated Non-Small Cell Lung Cancer",
+    "short_title": null,
+    "sponsor": "Pfizer",
+    "phase": "Phase I",
+    "_notes": "Protocol specifies 'Phase 1b'",
+    "indication": "Previously untreated advanced ALK-positive non-squamous non-small cell lung cancer (NSCLC)",
+    "therapeutic_area": "Oncology",
+    "compound_name": "Crizotinib (PF-2341066) / Pembrolizumab (MK-3475)",
+    "compound_class": "Tyrosine kinase inhibitor (crizotinib) + monoclonal antibody anti-PD-1 (pembrolizumab)",
+    "regulatory_status": "IND",
+    "_source": "Protocol title page; IND Number: 73,544"
+  },
+
+  "study_design": {
+    "type": "Phase 1b, open-label, multicenter, multiple-dose, dose-finding, safety, and pharmacokinetic study in sequential cohorts",
+    "randomized": false,
+    "blinding": "open-label",
+    "control_type": "none",
+    "adaptive": true,
+    "adaptive_details": "Modified Toxicity Probability Interval (mTPI) design for dose de-escalation using an Up-and-Down matrix approach. Bayesian beta/binomial hierarchical model with target DLT rate pT=0.30, underdosing interval (0, 0.25), proper-dosing interval (0.25, 0.33), overdosing interval (0.33, 1.0).",
+
+    "treatment_arms": [
+      {
+        "arm_id": "DL0",
+        "arm_name": "Crizotinib 250 mg BID + Pembrolizumab 200 mg Q3W",
+        "arm_type": "experimental",
+        "dose": "Crizotinib 250 mg BID oral + Pembrolizumab 200 mg IV Q3 weeks",
+        "route": "Crizotinib: oral; Pembrolizumab: IV",
+        "regimen": "Crizotinib BID continuously, Pembrolizumab 30-min IV infusion Day 1 of each 21-day cycle",
+        "planned_n": null,
+        "_notes": "Starting dose level (target dose). No plans to escalate above DL0."
+      },
+      {
+        "arm_id": "DL-1",
+        "arm_name": "Crizotinib 250 mg BID (3-wk lead-in) then + Pembrolizumab 200 mg Q3W",
+        "arm_type": "experimental",
+        "dose": "Crizotinib 250 mg BID oral (21-day lead-in monotherapy) then + Pembrolizumab 200 mg IV Q3W",
+        "route": "Crizotinib: oral; Pembrolizumab: IV",
+        "regimen": "21-day crizotinib monotherapy lead-in (Cycle -1), then combination as per DL0",
+        "planned_n": null
+      },
+      {
+        "arm_id": "DL-2",
+        "arm_name": "Crizotinib 200 mg BID + Pembrolizumab 200 mg Q3W",
+        "arm_type": "experimental",
+        "dose": "Crizotinib 200 mg BID oral + Pembrolizumab 200 mg IV Q3 weeks",
+        "route": "Crizotinib: oral; Pembrolizumab: IV",
+        "regimen": "Crizotinib BID continuously, Pembrolizumab 30-min IV infusion Day 1 of each 21-day cycle",
+        "planned_n": null
+      },
+      {
+        "arm_id": "DL-3",
+        "arm_name": "Crizotinib 250 mg QD + Pembrolizumab 200 mg Q3W",
+        "arm_type": "experimental",
+        "dose": "Crizotinib 250 mg QD oral + Pembrolizumab 200 mg IV Q3 weeks",
+        "route": "Crizotinib: oral; Pembrolizumab: IV",
+        "regimen": "Crizotinib QD continuously, Pembrolizumab 30-min IV infusion Day 1 of each 21-day cycle",
+        "planned_n": null
+      }
+    ],
+    "_notes_treatment_arms": "Dose de-escalation design: starts at DL0 and may de-escalate to DL-1, DL-2, or DL-3 based on mTPI decisions. Up to 4 potential dose levels with crizotinib doses ranging from 250 mg BID down to 250 mg QD, and pembrolizumab fixed at 200 mg Q3W.",
+
+    "total_planned_n": 70,
+    "randomization_ratio": null,
+    "stratification_factors": [],
+
+    "study_periods": [
+      {
+        "period_name": "Screening",
+        "duration": "Up to 28 days",
+        "description": "Screening assessments within 28 days prior to study enrollment"
+      },
+      {
+        "period_name": "Lead-in (DL-1 only)",
+        "duration": "21 days (Cycle -1)",
+        "description": "Crizotinib 250 mg BID monotherapy for 21 days prior to start of pembrolizumab. Only applicable to Dose Level -1."
+      },
+      {
+        "period_name": "DLT Observation Period (Dose Finding Phase)",
+        "duration": "6 weeks (2 cycles)",
+        "description": "First 2 cycles of treatment during which DLTs are evaluated"
+      },
+      {
+        "period_name": "Treatment",
+        "duration": "Until disease progression, unacceptable toxicity, death, or consent withdrawal",
+        "description": "21-day treatment cycles with crizotinib (oral, continuous) and pembrolizumab (IV, Day 1 of each cycle)"
+      },
+      {
+        "period_name": "End of Treatment",
+        "duration": "28-35 days after last dose",
+        "description": "Review of AEs, concomitant medications; patients with ongoing treatment-related toxicity followed every 4 weeks"
+      },
+      {
+        "period_name": "Follow-up",
+        "duration": "Until death or 18 months after last patient enrolled",
+        "description": "Survival status collected every 2 months; includes information on subsequent anticancer therapies"
+      }
+    ],
+
+    "cohorts": [
+      {
+        "cohort_name": "Dose Finding Phase",
+        "description": "Sequential cohorts of 3 patients per dose level using mTPI design to determine MTD. Approximately 30 DLT-evaluable patients expected. Completed when 10 DLT-evaluable patients treated at the highest dose with DLT rate <0.33.",
+        "planned_n": 30,
+        "_notes": "Estimated ~30 DLT-evaluable patients needed"
+      },
+      {
+        "cohort_name": "Dose Expansion Phase",
+        "description": "Up to 40 additional patients treated at the MTD to confirm RP2D and explore safety, tolerability, and anti-tumor activity. Total of 50 patients at MTD (including 10 from Dose Finding Phase).",
+        "planned_n": 40,
+        "_notes": "50 total at MTD including 10 from Dose Finding Phase"
+      }
+    ]
+  },
+
+  "populations": {
+    "intent_to_treat": {
+      "abbreviation": "ITT",
+      "definition": null,
+      "is_primary_efficacy_population": false,
+      "_notes": "Not explicitly defined in this study. The SAP uses Safety Analysis Set and Response Evaluable as the primary populations."
+    },
+    "modified_itt": {
+      "abbreviation": "mITT",
+      "definition": null,
+      "is_primary_efficacy_population": false,
+      "_notes": "Not defined in this study"
+    },
+    "per_protocol": {
+      "abbreviation": "PP",
+      "definition": "The per protocol analysis set (DLT-evaluable population) includes all patients enrolled in the Dose Finding Phase who are in the safety analysis population, and either experience DLT during the first 2 cycles, or complete the observation period for the first 2 cycles of treatment. Patients who do not receive at least 80% of the planned first 2 cycles of crizotinib dosing or both infusions of pembrolizumab within the DLT observation period due to reasons other than treatment-related AEs will not be evaluable for DLT.",
+      "is_primary_efficacy_population": false,
+      "_source": "SAP Section 5.2"
+    },
+    "safety": {
+      "abbreviation": "SA",
+      "definition": "The safety analysis set includes all enrolled patients who receive at least 1 dose of crizotinib or pembrolizumab. This is the primary population for all standard analyses and is also the primary population for the efficacy endpoints of PFS and OS.",
+      "is_primary_safety_population": true,
+      "_source": "SAP Section 5.1"
+    },
+    "pk_population": {
+      "abbreviation": "PK",
+      "definition": "PK concentration population: all patients in the safety analysis population who have at least 1 concentration of crizotinib, its metabolite PF-06260182, or pembrolizumab. PK parameter analysis population: all patients in the safety analysis population who have at least 1 of the PK parameters of crizotinib, its metabolite PF-06260182, or pembrolizumab.",
+      "_source": "SAP Section 5.4"
+    },
+    "other_populations": [
+      {
+        "name": "Response Evaluable Analysis Set",
+        "abbreviation": "RE",
+        "definition": "All patients in the safety analysis population who have an adequate baseline tumor assessment. At interim reporting, patients also need at least one post-baseline disease assessment (at least 6 weeks from first dose) or withdrawal/progression/death on study.",
+        "purpose": "Primary population for efficacy endpoints ORR, DR, and TTR",
+        "_source": "SAP Section 5.3"
+      },
+      {
+        "name": "PRO Analysis Set",
+        "abbreviation": "PRO",
+        "definition": "All patients in the safety analysis population who complete the patient reported questionnaires for at least one of the items both at baseline and at least 1 post-baseline assessment.",
+        "purpose": "Primary population for patient-reported outcome analyses",
+        "_source": "SAP Section 5.5"
+      }
+    ]
+  },
+
+  "endpoints": {
+    "primary": [
+      {
+        "endpoint_id": "PE01",
+        "name": "Dose-Limiting Toxicity (DLT)",
+        "description": "AEs meeting one of the definition criteria in Study Protocol Section 3.2 and occurring in the first 2 cycles of treatment (6 weeks) which are attributable to crizotinib, pembrolizumab or both. Severity graded according to NCI CTCAE v4.03.",
+        "type": "safety",
+        "measurement": "Occurrence of DLT during the first 2 cycles (6 weeks) of treatment",
+        "timepoint": "First 2 cycles (6 weeks)",
+        "variable_type": "binary",
+        "direction_of_benefit": "lower_is_better",
+        "clinically_meaningful_difference": "Target DLT rate <33%",
+        "related_adam_dataset": "ADAE",
+        "_source": "Protocol Page 10; SAP Section 6.2.1"
+      }
+    ],
+    "secondary": [
+      {
+        "endpoint_id": "SE01",
+        "name": "Adverse Events (AEs)",
+        "description": "Adverse Events as characterized by type, frequency, severity (as graded by NCI CTCAE v.4.03), timing, seriousness and relationship to study treatments. Focus on treatment-emergent AEs (initial onset or increasing severity after first dose through 28 days after last crizotinib dose or 90 days after last pembrolizumab dose).",
+        "type": "safety",
+        "measurement": "AE incidence, severity, relatedness by MedDRA PT and clustered terms",
+        "timepoint": "Ongoing throughout treatment",
+        "variable_type": "categorical",
+        "related_adam_dataset": "ADAE"
+      },
+      {
+        "endpoint_id": "SE02",
+        "name": "Objective Response Rate (ORR)",
+        "description": "Percent of patients with confirmed complete response (CR) or confirmed partial response (PR) according to RECIST v1.1 relative to the response evaluable population. Confirmed responses persist on repeat imaging study at least 4 weeks after initial documentation of response.",
+        "type": "efficacy",
+        "measurement": "Proportion of patients with confirmed CR or PR per RECIST v1.1",
+        "timepoint": "Assessed at Week 9, then every 6 weeks",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADRS"
+      },
+      {
+        "endpoint_id": "SE03",
+        "name": "Duration of Response (DR)",
+        "description": "Time from first documentation of objective tumor response (CR or PR) that is subsequently confirmed, to the first documentation of objective tumor progression or death on study due to any cause, whichever occurs first. DR (weeks) = [progression/death date - first date of OR +1]/7.02. Censoring rules identical to PFS.",
+        "type": "efficacy",
+        "measurement": "Time from confirmed response to progression/death (weeks)",
+        "timepoint": "From first confirmed response until progression",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE04",
+        "name": "Time to Tumor Response (TTR)",
+        "description": "Time from first dose of crizotinib or pembrolizumab to the first documentation of objective tumor response (CR or PR) that is subsequently confirmed. TTR (weeks) = [first date of Objective response (OR) - date of first dose +1]/7.02. Calculated only for patients with confirmed objective tumor response.",
+        "type": "efficacy",
+        "measurement": "Time from first dose to first confirmed response (weeks)",
+        "timepoint": "From first dose until confirmed response",
+        "variable_type": "continuous",
+        "related_adam_dataset": "ADTTE",
+        "_notes": "Summarized descriptively; not a time-to-event analysis"
+      },
+      {
+        "endpoint_id": "SE05",
+        "name": "Progression-Free Survival (PFS)",
+        "description": "Time from the date of the first dose of crizotinib or pembrolizumab to the date of the first documentation of objective tumor progression or death on-study due to any cause, whichever occurs first. PFS (months) = (first event date - first dose date +1)/30.44. Includes 6-, 12-, and 18-month PFS probabilities.",
+        "type": "efficacy",
+        "measurement": "Time from first dose to progression or death (months)",
+        "timepoint": "From first dose until progression or death",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE",
+        "_source": "SAP Section 6.1"
+      },
+      {
+        "endpoint_id": "SE06",
+        "name": "Overall Survival (OS)",
+        "description": "Time from the first dose of crizotinib or pembrolizumab to the date of death due to any cause. OS (months) = [date of death - date of first dose +1]/30.44. Includes 12- and 18-month OS probabilities. Censored on last date known alive for patients still alive.",
+        "type": "efficacy",
+        "measurement": "Time from first dose to death (months)",
+        "timepoint": "From first dose until death",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE07",
+        "name": "Laboratory Abnormalities",
+        "description": "Laboratory abnormalities characterized by type, frequency, severity (as graded by NCI CTCAE v.4.03), and timing. Includes hematology, blood chemistry, coagulation, thyroid function, and liver function tests.",
+        "type": "safety",
+        "measurement": "Worst toxicity grade per lab test, shift tables",
+        "timepoint": "Ongoing throughout treatment",
+        "variable_type": "categorical",
+        "related_adam_dataset": "ADLB"
+      },
+      {
+        "endpoint_id": "SE08",
+        "name": "Pharmacokinetic Parameters - Crizotinib",
+        "description": "Cmax, Tmax, Ctrough, AUC0-8, AUCtau, and apparent plasma clearance (CL/F) for crizotinib. Cmax, Tmax, Ctrough, AUC0-8, AUCtau, MRAUCtau, and MRCmax for metabolite PF-06260182.",
+        "type": "pharmacokinetic",
+        "measurement": "Non-compartmental PK parameter estimation from plasma concentrations",
+        "timepoint": "Day 1 of Cycles 1, 2, 4, 6, 8; Day 15 of lead-in (DL-1); Cycle 6 Day 1 (full profile for DL-1)",
+        "variable_type": "continuous",
+        "related_adam_dataset": "ADPC/ADPP"
+      },
+      {
+        "endpoint_id": "SE09",
+        "name": "Pharmacokinetic Parameters - Pembrolizumab",
+        "description": "Ctrough for pembrolizumab. Population-based PK parameters if performed (separate report).",
+        "type": "pharmacokinetic",
+        "measurement": "Serum trough concentrations",
+        "timepoint": "Pre-dose and end of infusion at multiple visits",
+        "variable_type": "continuous",
+        "related_adam_dataset": "ADPC/ADPP"
+      },
+      {
+        "endpoint_id": "SE10",
+        "name": "Patient-Reported Outcomes (EORTC QLQ-C30, QLQ-LC13)",
+        "description": "Overall change from baseline in patient-reported lung cancer symptom, functioning, and global QOL scores per the validated cancer-specific EORTC QLQ-C30 and its lung cancer module QLQ-LC-13. Scores transformed to 0-100 scale. A 10-point change from baseline is considered clinically significant.",
+        "type": "PRO",
+        "measurement": "Change from baseline in QLQ-C30 and QLQ-LC13 subscale scores",
+        "timepoint": "Cycle 1 Day 1, Cycle 3 Day 1, every 4 cycles thereafter, End of Treatment",
+        "variable_type": "continuous",
+        "related_adam_dataset": "ADQS"
+      },
+      {
+        "endpoint_id": "SE11",
+        "name": "Visual Symptoms (VSAQ-ALK)",
+        "description": "Frequency of occurrence and degree of bothersomeness of visual disturbances as reported by the patients on the VSAQ-ALK questionnaire.",
+        "type": "PRO",
+        "measurement": "Frequency analysis per item",
+        "timepoint": "Same as QLQ-C30/QLQ-LC13 schedule",
+        "variable_type": "categorical",
+        "related_adam_dataset": "ADQS"
+      }
+    ],
+    "exploratory": [
+      {
+        "endpoint_id": "EE01",
+        "name": "PD-L1 Expression and Clinical Outcomes",
+        "description": "Association between tumor PD-L1 expression assessed by PD-L1 immunohistochemistry and endpoints of clinical outcome (response-related and time-to-event endpoints).",
+        "type": "biomarker",
+        "variable_type": null,
+        "_source": "Protocol Page 10-11"
+      },
+      {
+        "endpoint_id": "EE02",
+        "name": "Effect of Pembrolizumab on Crizotinib PK",
+        "description": "For DL-1: evaluation of the effect of pembrolizumab on crizotinib PK using steady-state AUCtau and Cmax comparing crizotinib alone (Cycle -1 Day 15) vs. in combination with pembrolizumab (Cycle 6 Day 1). Analyzed using mixed effect model with treatment as fixed effect and patient as random effect on log-transformed parameters.",
+        "type": "pharmacokinetic",
+        "variable_type": "continuous",
+        "_source": "SAP Section 8.3.4.2"
+      }
+    ],
+    "safety_endpoints": [
+      {
+        "endpoint_id": "SAF01",
+        "name": "Treatment-Emergent Adverse Events",
+        "description": "AEs with initial onset or increasing in severity after the first dose of study treatment, through 28 calendar days after the last administration of crizotinib or 90 calendar days after the last administration of pembrolizumab, whichever is later, and before initiation of a new anti-cancer treatment.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF02",
+        "name": "Treatment-Related AEs",
+        "description": "AEs judged by the Investigator to be at least possibly related to the study drugs (crizotinib and/or pembrolizumab), or for which relatedness is recorded as unknown.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF03",
+        "name": "Serious Adverse Events (SAEs)",
+        "description": "All-causality and treatment-related SAEs, summarized similarly to treatment-emergent AEs.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF04",
+        "name": "ECG Parameters",
+        "description": "QT intervals corrected for heart rate (QTcF default, QTcB). Categorical analysis of maximum increase from baseline in QTcF/QTcB (<30, 30-60, >=60 ms), maximum post-dose values (<450, 450-<480, 480-<500, >=500 ms), PR interval, and QRS complex changes. Shift tables for baseline vs. worst on-study QTcF and QTcB.",
+        "type": "ECG"
+      },
+      {
+        "endpoint_id": "SAF05",
+        "name": "Vital Signs",
+        "description": "Blood pressure, body weight, and pulse rate categorical analyses. Includes maximum change from baseline thresholds for SBP (>=40 mmHg), DBP (>=20 mmHg), body weight (>=10%), and pulse rate (<50 bpm, >120 bpm, change >=30 bpm).",
+        "type": "vital signs"
+      },
+      {
+        "endpoint_id": "SAF06",
+        "name": "ECOG Performance Status",
+        "description": "Shift table of baseline vs. worst on-study ECOG performance status.",
+        "type": "functional status"
+      },
+      {
+        "endpoint_id": "SAF07",
+        "name": "Deaths",
+        "description": "Deaths summarized by two time periods: (1) within 28 days of last crizotinib dose and/or within 90 days of last pembrolizumab dose (on-treatment deaths), (2) beyond those windows. Cause of death listed.",
+        "type": "mortality"
+      }
+    ]
+  },
+
+  "statistical_analyses": {
+    "primary_analysis": [
+      {
+        "analysis_id": "PA01",
+        "endpoint_id": "PE01",
+        "description": "DLT occurrence during the Dose Finding Phase used to estimate the MTD via the mTPI method. The estimated MTD is the highest tested dose level with a DLT rate <0.33 in 10 DLT-evaluable patients. Bivariate isotonic regression (Dykstra-Robertson algorithm) used to smooth the resulting toxicity surface to a monotonically increasing one.",
+        "population": "DLT-evaluable population (Per Protocol Analysis Set)",
+        "statistical_method": "Modified Toxicity Probability Interval (mTPI) - Bayesian beta/binomial hierarchical model with bivariate isotonic regression for MTD contour estimation",
+        "model_details": {
+          "response_variable": "DLT (yes/no) within first 2 cycles",
+          "covariates": [],
+          "factors": ["Dose level"],
+          "interaction_terms": [],
+          "other_details": "Target DLT rate pT=0.30; underdosing interval (0, 0.25); proper-dosing interval (0.25, 0.33); overdosing interval (0.33, 1.0). Unit probability mass (UPM) used for dose-finding decisions. Modification: if 4 DLTs at any dose level, that dose is unacceptable (DU). Re-escalation allowed if <=3/10 patients have DLTs."
+        },
+        "hypothesis": {
+          "null_hypothesis": null,
+          "alternative": null,
+          "alpha": null,
+          "alpha_adjustment": null,
+          "_notes": "This is an estimation-focused design, not hypothesis testing. The emphasis of the final analyses will be on estimation of key summary statistics rather than hypothesis testing."
+        },
+        "multiplicity_strategy": null,
+        "sensitivity_analyses": []
+      }
+    ],
+    "secondary_analyses": [
+      {
+        "analysis_id": "SA01",
+        "endpoint_id": "SE02",
+        "description": "ORR summarized as percentage with exact 2-sided 95% CI based on the F-distribution. Best overall response (BOR) also summarized. Analysis based on Dose Expansion Phase including 10 patients from Dose Finding Phase treated at MTD.",
+        "population": "Response Evaluable (RE)",
+        "statistical_method": "Exact method based on F-distribution (95% CI)",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA02",
+        "endpoint_id": "SE03",
+        "description": "DR analyzed by Kaplan-Meier method with median event time and 2-sided 95% CI. Calculated for the subgroup of patients with confirmed objective tumor response (CR or PR).",
+        "population": "Subgroup of patients with OR from Response Evaluable population",
+        "statistical_method": "Kaplan-Meier",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA03",
+        "endpoint_id": "SE04",
+        "description": "TTR summarized with descriptive statistics (median and range) for the subgroup of patients with confirmed objective response.",
+        "population": "Subgroup of patients with OR from Response Evaluable population",
+        "statistical_method": "Descriptive statistics (median, range)",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA04",
+        "endpoint_id": "SE05",
+        "description": "PFS analyzed by Kaplan-Meier method. Median event time and other quartiles with 2-sided 95% CI provided. Six-, 12-, and 18-month PFS probabilities summarized as product limit estimator with 2-sided 95% CI (calculated via normal approximation on log[-log(PFS)] then back-transformed).",
+        "population": "Safety Analysis Set (SA)",
+        "statistical_method": "Kaplan-Meier with product limit estimator for landmark probabilities",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA05",
+        "endpoint_id": "SE06",
+        "description": "OS analyzed by Kaplan-Meier method. Median event time with 2-sided 95% CI. Twelve- and 18-month OS probabilities provided similarly to PFS.",
+        "population": "Safety Analysis Set (SA)",
+        "statistical_method": "Kaplan-Meier with product limit estimator for landmark probabilities",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA06",
+        "endpoint_id": "SE08",
+        "description": "PK parameters for crizotinib and PF-06260182 listed and summarized by visit, dose level, and treatment (alone vs. combination). Descriptive statistics (n, mean, SD, %CV, median, min, max, geometric mean, 95% CI). For DL-1: formal comparison of crizotinib alone (Cycle -1 Day 15) vs. combination (Cycle 6 Day 1) using mixed-effect model on log-transformed AUCtau and Cmax with 90% CI for geometric mean ratio.",
+        "population": "PK Analysis Set",
+        "statistical_method": "Descriptive statistics; Mixed-effect model (for DL-1 drug interaction assessment)",
+        "multiplicity_handling": null
+      },
+      {
+        "analysis_id": "SA07",
+        "endpoint_id": "SE10",
+        "description": "Summary statistics (mean, SD, median, range, 95% CI) of actual scores and change from baseline at each time point for all EORTC QLQ-C30 and QLQ-LC13 subscales. Patients classified as improved, stable, or deteriorated based on 10-point change threshold. Visit windows applied per Appendix 5.",
+        "population": "PRO Analysis Set",
+        "statistical_method": "Descriptive statistics; categorical responder analysis (10-point threshold)",
+        "multiplicity_handling": null
+      }
+    ],
+    "subgroup_analyses": [
+      {
+        "subgroup_variable": "Dose level",
+        "endpoints_analyzed": ["SE01", "SE02", "SE05", "SE06", "SE07"],
+        "method": "All safety and efficacy summaries presented by dose level and/or by dose level within dosing regimen"
+      },
+      {
+        "subgroup_variable": "Ethnicity and race group (Asians vs. Non-Asians)",
+        "endpoints_analyzed": ["SE08"],
+        "method": "PK Ctrough,ss summaries by ethnicity and race group"
+      }
+    ],
+    "interim_analyses": [
+      {
+        "timing": "No formal interim analysis planned",
+        "purpose": "safety",
+        "spending_function": null,
+        "stopping_rules": null,
+        "_notes": "This is an open-label, single-arm trial for which no formal interim analysis is planned. The final analysis of efficacy will be performed approximately 18 months after enrollment of the last patient; however, earlier analyses may be performed for publication and regulatory reporting purposes."
+      }
+    ]
+  },
+
+  "missing_data": {
+    "primary_strategy": "No imputation for efficacy analyses. Time-to-event endpoints use censoring; for ORR, patients with no post-baseline tumor evaluations are counted as non-responders.",
+    "imputation_methods": [
+      {
+        "method_name": "Date imputation (Pfizer standards)",
+        "applied_to": "Missing dates in all analyses",
+        "is_primary_or_sensitivity": "primary",
+        "details": "For start dates: missing day replaced by 1st of month, missing day+month replaced by Jan 1. For stop dates: missing day replaced by last day of month, missing day+month replaced by Dec 31. Exception: if resulting in negative duration, set to 0. For PFS, TTR, DR, and OS, negative durations reset to 1 day."
+      },
+      {
+        "method_name": "Censoring for TTE endpoints",
+        "applied_to": "PFS, OS, DR",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Patients without events censored at last evaluable tumor assessment (PFS/DR) or last date known alive (OS). Patients with inadequate baseline assessments censored at date of first dose."
+      },
+      {
+        "method_name": "Non-responder imputation",
+        "applied_to": "ORR",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Patients who do not have on-study radiographic tumor re-evaluation or who die, progress, or drop out prior to reaching CR or PR will be counted as non-responders."
+      },
+      {
+        "method_name": "BLQ set to zero",
+        "applied_to": "PK concentrations",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Concentrations below the limit of quantification (BLQ) set to zero for calculations. BLQ excluded from geometric mean calculations."
+      },
+      {
+        "method_name": "PRO missing data handling",
+        "applied_to": "EORTC QLQ-C30, QLQ-LC13, VSAQ-ALK",
+        "is_primary_or_sensitivity": "primary",
+        "details": "If multiple answers given, more severe answer counted. Multi-item subscale considered missing if less than half of constituent items answered. Single-item subscales missing if item incomplete. Scoring per EORTC manual."
+      }
+    ],
+    "estimand_framework": {
+      "used": false,
+      "intercurrent_events": [],
+      "_notes": "Estimand framework (ICH E9 R1) not explicitly referenced. Protocol predates widespread adoption."
+    }
+  },
+
+  "baseline_definition": {
+    "general_rule": "Last observation within 28 days prior to the first dose of study treatment",
+    "exceptions": [
+      {
+        "domain": "Vital Signs (DL-1)",
+        "rule": "For DL-1, baseline assessment will be the one obtained prior to start of crizotinib"
+      },
+      {
+        "domain": "ECG (DL-1)",
+        "rule": "For DL-1, baseline ECG assessment will be the one obtained prior to start of crizotinib during the crizotinib lead-in period"
+      },
+      {
+        "domain": "Tumor Assessment (Adequate Baseline)",
+        "rule": "Baseline tumor evaluations must be performed within 4 weeks (28 days) prior to the first dose of study treatment; presence of at least one measurable lesion per RECIST v1.1; all lesions recorded at baseline must have an associated status on the CRF"
+      }
+    ],
+    "_source": "SAP Appendix 2"
+  },
+
+  "visit_schedule": {
+    "visits": [
+      {
+        "visit_name": "Screening",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -28,
+        "window_upper": 0,
+        "assessments": ["Informed consent", "Tumor history", "Medical history", "Physical exam", "Height", "Weight", "Vital signs", "ECOG PS", "Labs (hematology, blood chemistry, coagulation, thyroid, urinalysis, pregnancy)", "12-Lead ECG", "CT/MRI scan", "Archival tumor tissue"]
+      },
+      {
+        "visit_name": "Cycle -1 Day 1 (DL-1 only, Lead-in)",
+        "visit_number": -1,
+        "target_day": -21,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["Baseline signs/symptoms", "Physical exam", "Vital signs", "ECOG PS", "Labs", "12-Lead ECG", "Start crizotinib monotherapy", "PRO questionnaires"]
+      },
+      {
+        "visit_name": "Cycle 1 Day 1",
+        "visit_number": 1,
+        "target_day": 1,
+        "window_lower": -2,
+        "window_upper": 2,
+        "assessments": ["Registration", "Physical exam", "Vital signs", "ECOG PS", "Labs", "12-Lead ECG", "Crizotinib dosing", "Pembrolizumab infusion", "PK sampling", "PRO questionnaires (EORTC QLQ-C30, QLQ-LC13, VSAQ-ALK)"]
+      },
+      {
+        "visit_name": "Cycle 1 Day 4-8",
+        "visit_number": null,
+        "target_day": 6,
+        "window_lower": -2,
+        "window_upper": 2,
+        "assessments": ["Labs (hematology, blood chemistry)", "PK sampling (pembrolizumab)"]
+      },
+      {
+        "visit_name": "Cycle 1 Day 15",
+        "visit_number": null,
+        "target_day": 15,
+        "window_lower": -2,
+        "window_upper": 2,
+        "assessments": ["Labs (hematology, blood chemistry)", "PK sampling (pembrolizumab)"]
+      },
+      {
+        "visit_name": "Cycles 3-8 Day 1",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -2,
+        "window_upper": 2,
+        "assessments": ["Physical exam", "Vital signs", "ECOG PS", "Labs", "12-Lead ECG (Cycles 3 and 6 only)", "Pembrolizumab infusion (Q3W)", "PK sampling", "PRO questionnaires"]
+      },
+      {
+        "visit_name": "Cycles >8 Day 1",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -2,
+        "window_upper": 2,
+        "assessments": ["Physical exam", "Vital signs", "ECOG PS", "Labs", "Pembrolizumab infusion", "PK sampling", "PRO questionnaires"]
+      },
+      {
+        "visit_name": "Tumor Assessment (Week 9 then Q6W)",
+        "visit_number": null,
+        "target_day": 63,
+        "window_lower": -7,
+        "window_upper": 7,
+        "assessments": ["CT/MRI scan (chest, abdomen, pelvis; brain if indicated; bone scan Q12W if indicated)"],
+        "_notes": "First tumor assessment at Week 9 (+7 days) after start of pembrolizumab, then every 6 weeks (+/-7 days) thereafter"
+      },
+      {
+        "visit_name": "End of Treatment",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["Physical exam", "Vital signs", "ECOG PS", "Labs", "CT/MRI scan", "AE review", "Concomitant treatments", "PK sampling", "PRO questionnaires"],
+        "_notes": "At least 28 days but no more than 35 days after last dose of study treatment"
+      },
+      {
+        "visit_name": "Follow-up",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["Survival status (every 2 months)", "Subsequent anticancer therapies", "PK sampling (pembrolizumab)", "Contraception check"],
+        "_notes": "Until death or 18 months after enrollment of last patient"
+      }
+    ],
+    "windowing_rules": "All patient visits can be performed +/-2 days of scheduled visit. One cycle = 21 days. Visit windows for PRO endpoints defined in SAP Appendix 5: Cycle 1 Day 1 (<=Day 1), Cycle 2 (Days 12-32, target Day 22), Cycle 3 (Days 33-53, target Day 43), etc. with 21-day windows."
+  },
+
+  "sample_size": {
+    "total_planned": 70,
+    "per_arm": {
+      "_notes": "Not a parallel-arm study. Dose Finding Phase ~30 DLT-evaluable patients across dose levels; Dose Expansion Phase 50 total patients at MTD (including 10 from Dose Finding Phase)"
+    },
+    "power": 0.85,
+    "alpha": 0.05,
+    "assumptions": "Sample size based on logistic feasibility and past experience with Phase 1b studies in Oncology, not entirely driven by statistical considerations. Dose Expansion Phase sample size of 50 patients calculated using 1-sample survival method to test 18-month PFS probability >=50% vs. <=32% (historical control from crizotinib arm of Study A8081014).",
+    "dropout_rate_assumed": null,
+    "method": "1-sample survival method (for Dose Expansion Phase); mTPI Bayesian design (for Dose Finding Phase)",
+    "_source": "SAP Section 8.1.3"
+  },
+
+  "planned_tlg_list": {
+    "_notes": "The SAP does not include an explicit numbered TLG list or mock shells. The following are derived from the planned analyses described in SAP Sections 8.3.1-8.3.5 and 8.4.",
+    "tables": [
+      {
+        "tlg_id": "T-1",
+        "title": "Patient Disposition",
+        "population": "SA",
+        "description": "Study conduct and patient disposition; reasons for discontinuation"
+      },
+      {
+        "tlg_id": "T-2",
+        "title": "Baseline Demographics and Characteristics",
+        "population": "SA",
+        "description": "Age, gender, height, weight, ethnicity, ECOG PS, smoking history, histopathological classification, stage at diagnosis, extent of disease, medical history"
+      },
+      {
+        "tlg_id": "T-3",
+        "title": "Treatment Administration/Compliance",
+        "population": "SA",
+        "description": "Total cycles, median cycles, dose intensity, dose modifications, dose interruptions, dose delays by medication"
+      },
+      {
+        "tlg_id": "T-4",
+        "title": "DLT Summary by Dose Level",
+        "population": "DLT-evaluable",
+        "description": "Number and rate of DLTs at each dose level"
+      },
+      {
+        "tlg_id": "T-5",
+        "title": "Overall Summary of Treatment-Emergent AEs",
+        "population": "SA",
+        "description": "Number and % patients with any AE, any SAE, any treatment-related AE, any treatment-related SAE, discontinuation/dose reduction due to AE"
+      },
+      {
+        "tlg_id": "T-6",
+        "title": "Treatment-Emergent AEs by MedDRA PT and Maximum CTCAE Grade",
+        "population": "SA",
+        "description": "All-causality TEAEs by preferred term/clustered term and maximum grade, in decreasing order of frequency, by dose level"
+      },
+      {
+        "tlg_id": "T-7",
+        "title": "Treatment-Emergent AEs by Grade Group (1-2, 3-4, 5)",
+        "population": "SA",
+        "description": "AEs by preferred term/clustered term and maximum CTCAE grade group, decreasing frequency"
+      },
+      {
+        "tlg_id": "T-8",
+        "title": "Treatment-Related AEs by MedDRA PT and Maximum CTCAE Grade",
+        "population": "SA",
+        "description": "Treatment-related TEAEs similarly to T-6"
+      },
+      {
+        "tlg_id": "T-9",
+        "title": "Treatment-Emergent SAEs",
+        "population": "SA",
+        "description": "All-causality and treatment-related SAEs"
+      },
+      {
+        "tlg_id": "T-10",
+        "title": "TEAEs Leading to Permanent/Temporary Discontinuation or Dose Reduction",
+        "population": "SA",
+        "description": "AEs associated with treatment modifications"
+      },
+      {
+        "tlg_id": "T-11",
+        "title": "AE Summary by Cycle (Cycle 1, Cycle 2, Cycles >=3)",
+        "population": "SA",
+        "description": "AEs presented by cycle period; for DL-1 includes lead-in period"
+      },
+      {
+        "tlg_id": "T-12",
+        "title": "Deaths Summary",
+        "population": "SA",
+        "description": "Deaths by time period (on-treatment vs. post-treatment) and cause of death"
+      },
+      {
+        "tlg_id": "T-13",
+        "title": "Laboratory Test Abnormalities by Worst CTCAE Grade",
+        "population": "SA",
+        "description": "Hematology and blood chemistry by worst grade; by cycle (Cycle 1, Cycle 2, Cycles >=3)"
+      },
+      {
+        "tlg_id": "T-14",
+        "title": "Laboratory Shift Tables (Baseline vs. Maximum Post-Baseline CTCAE Grade)",
+        "population": "SA",
+        "description": "Shift summary of baseline grade by maximum post-baseline CTCAE grade"
+      },
+      {
+        "tlg_id": "T-15",
+        "title": "E-DISH Scatter Plots (ALT/AST vs. Total Bilirubin)",
+        "population": "SA",
+        "description": "Evaluation of Drug-Induced Serious Hepatotoxicity"
+      },
+      {
+        "tlg_id": "T-16",
+        "title": "ECG Parameters Summary",
+        "population": "SA",
+        "description": "HR, RR, PR, QRS, QTcF, QTcB by dose level; categorical analysis of QTc changes and outliers"
+      },
+      {
+        "tlg_id": "T-17",
+        "title": "ECG Shift Tables (Baseline vs. Worst On-Study QTcF/QTcB)",
+        "population": "SA",
+        "description": "Shift tables using maximum CTCAE Grade"
+      },
+      {
+        "tlg_id": "T-18",
+        "title": "Vital Signs Categorical Analysis",
+        "population": "SA",
+        "description": "Blood pressure, body weight, pulse rate categorical thresholds"
+      },
+      {
+        "tlg_id": "T-19",
+        "title": "Vital Signs Descriptive Statistics by Visit",
+        "population": "SA",
+        "description": "Baseline and change from baseline in BP and pulse rate by visit"
+      },
+      {
+        "tlg_id": "T-20",
+        "title": "ECOG Performance Status Shift Table",
+        "population": "SA",
+        "description": "Baseline vs. worst on-study status"
+      },
+      {
+        "tlg_id": "T-21",
+        "title": "Best Overall Response Summary",
+        "population": "RE",
+        "description": "BOR categories (CR, PR, SD, PD, Early Death, IND) and ORR with 95% CI"
+      },
+      {
+        "tlg_id": "T-22",
+        "title": "PFS Summary (Kaplan-Meier)",
+        "population": "SA",
+        "description": "Median PFS, quartiles, 6-, 12-, 18-month PFS probabilities with 95% CIs"
+      },
+      {
+        "tlg_id": "T-23",
+        "title": "OS Summary (Kaplan-Meier)",
+        "population": "SA",
+        "description": "Median OS, 12- and 18-month OS probabilities with 95% CIs"
+      },
+      {
+        "tlg_id": "T-24",
+        "title": "Duration of Response Summary (Kaplan-Meier)",
+        "population": "RE (subgroup with OR)",
+        "description": "Median DR with 95% CI for confirmed responders"
+      },
+      {
+        "tlg_id": "T-25",
+        "title": "Time to Response Summary",
+        "population": "RE (subgroup with OR)",
+        "description": "Median and range of TTR for confirmed responders"
+      },
+      {
+        "tlg_id": "T-26",
+        "title": "Crizotinib Plasma Concentrations by Visit and Dose Level",
+        "population": "PK",
+        "description": "Descriptive statistics and geometric means with 95% CI"
+      },
+      {
+        "tlg_id": "T-27",
+        "title": "PF-06260182 Plasma Concentrations by Visit and Dose Level",
+        "population": "PK",
+        "description": "Descriptive statistics for metabolite concentrations"
+      },
+      {
+        "tlg_id": "T-28",
+        "title": "Pembrolizumab Serum Concentrations by Visit and Dose Level",
+        "population": "PK",
+        "description": "Descriptive statistics for pembrolizumab trough concentrations"
+      },
+      {
+        "tlg_id": "T-29",
+        "title": "Crizotinib and PF-06260182 PK Parameters (DL-1)",
+        "population": "PK",
+        "description": "Cmax, Tmax, Ctrough, AUC0-8, AUCtau, CL/F for crizotinib; Cmax, Tmax, Ctrough, AUC0-8, AUCtau, MRAUCtau, MRCmax for PF-06260182, by visit and treatment"
+      },
+      {
+        "tlg_id": "T-30",
+        "title": "Effect of Pembrolizumab on Crizotinib PK (Mixed-Effect Model, DL-1)",
+        "population": "PK",
+        "description": "90% CI for geometric mean ratio (combination/alone) of AUCtau and Cmax"
+      },
+      {
+        "tlg_id": "T-31",
+        "title": "Crizotinib Steady-State Ctrough Summary by Visit and Ethnicity",
+        "population": "PK",
+        "description": "Ctrough,ss and Ctrough,ss,mean by visit, ethnicity and race group"
+      },
+      {
+        "tlg_id": "T-32",
+        "title": "PRO Instrument Compliance Rates",
+        "population": "PRO",
+        "description": "Number and % completing QLQ-C30, QLQ-LC13, VSAQ-ALK at each time point"
+      },
+      {
+        "tlg_id": "T-33",
+        "title": "EORTC QLQ-C30 and QLQ-LC13 Scores and Change from Baseline",
+        "population": "PRO",
+        "description": "Mean, SD, median, range, 95% CI of actual scores and change from baseline at each time point"
+      },
+      {
+        "tlg_id": "T-34",
+        "title": "PRO Responder Analysis (Improved/Stable/Deteriorated)",
+        "population": "PRO",
+        "description": "Number and % of patients improved, worsened, or stable (10-point threshold) for each domain"
+      },
+      {
+        "tlg_id": "T-35",
+        "title": "VSAQ-ALK Frequency Analysis",
+        "population": "PRO",
+        "description": "Frequency of occurrence and degree of bothersomeness of visual disturbances per item"
+      },
+      {
+        "tlg_id": "T-36",
+        "title": "Prior and Concomitant Medications Summary",
+        "population": "SA",
+        "description": "Number of patients with concomitant drug/non-drug treatments"
+      }
+    ],
+    "listings": [
+      {
+        "tlg_id": "L-1",
+        "title": "DLT Listing by Dose Level",
+        "population": "DLT-evaluable",
+        "description": "Patient ID, DLT term, date, time from treatment start to onset, time to resolution, action taken"
+      },
+      {
+        "tlg_id": "L-2",
+        "title": "Patients with Grade >=3 Laboratory Toxicities",
+        "population": "SA",
+        "description": "Listing of patients who developed grade >=3 lab toxicities"
+      },
+      {
+        "tlg_id": "L-3",
+        "title": "Death Listing",
+        "population": "SA",
+        "description": "Individual death data"
+      },
+      {
+        "tlg_id": "L-4",
+        "title": "Efficacy Listings (Dose Finding Phase)",
+        "population": "SA/RE",
+        "description": "Individual patient efficacy data listings for the Dose Finding Phase"
+      },
+      {
+        "tlg_id": "L-5",
+        "title": "Other Laboratory Test Results",
+        "population": "SA",
+        "description": "Individual patient test results for labs without CTCAE definitions"
+      },
+      {
+        "tlg_id": "L-6",
+        "title": "Prior and Follow-up Systemic Therapy Listing",
+        "population": "SA",
+        "description": "Prior and follow-up systemic therapy for primary diagnosis"
+      },
+      {
+        "tlg_id": "L-7",
+        "title": "Prior and Concomitant Drug/Non-Drug Treatment Listings",
+        "population": "SA",
+        "description": "Separate listings for drug and non-drug treatments"
+      },
+      {
+        "tlg_id": "L-8",
+        "title": "Protocol Deviations Listing",
+        "population": "SA",
+        "description": "Full list of protocol deviations related to statistical analyses or analysis populations"
+      }
+    ],
+    "figures": [
+      {
+        "tlg_id": "F-1",
+        "title": "Kaplan-Meier Plot of PFS",
+        "population": "SA",
+        "description": "Kaplan-Meier curve for Progression-Free Survival"
+      },
+      {
+        "tlg_id": "F-2",
+        "title": "Kaplan-Meier Plot of OS",
+        "population": "SA",
+        "description": "Kaplan-Meier curve for Overall Survival"
+      },
+      {
+        "tlg_id": "F-3",
+        "title": "Kaplan-Meier Plot of DR",
+        "population": "RE (subgroup with OR)",
+        "description": "Kaplan-Meier curve for Duration of Response"
+      },
+      {
+        "tlg_id": "F-4",
+        "title": "Crizotinib Mean/Median Concentration-Time Plots",
+        "population": "PK",
+        "description": "By dose level, visit, on linear-linear and log-linear scales"
+      },
+      {
+        "tlg_id": "F-5",
+        "title": "Crizotinib Individual Concentration-Time Profiles",
+        "population": "PK",
+        "description": "By treatment, dose level, cycle, and day"
+      },
+      {
+        "tlg_id": "F-6",
+        "title": "Pembrolizumab Mean/Median Concentration-Time Plots",
+        "population": "PK",
+        "description": "By dose level and visit"
+      },
+      {
+        "tlg_id": "F-7",
+        "title": "Ctrough Plots by Visit (Crizotinib and PF-06260182)",
+        "population": "PK",
+        "description": "Median/mean Ctrough,ss by visit, ethnicity, and race group (linear plots)"
+      },
+      {
+        "tlg_id": "F-8",
+        "title": "Pembrolizumab Trough Concentration Plots",
+        "population": "PK",
+        "description": "Box-whisker or linear plots by visit to assess steady-state attainment"
+      },
+      {
+        "tlg_id": "F-9",
+        "title": "Box Plots for AUCtau and Cmax (Crizotinib and PF-06260182)",
+        "population": "PK",
+        "description": "Comparison of crizotinib alone vs. combination (DL-1) with geometric mean and median overlaid"
+      },
+      {
+        "tlg_id": "F-10",
+        "title": "E-DISH Scatter Plots",
+        "population": "SA",
+        "description": "Maximum ALT vs. maximum total bilirubin; maximum AST vs. maximum total bilirubin"
+      },
+      {
+        "tlg_id": "F-11",
+        "title": "AE Duration Kaplan-Meier Plots",
+        "population": "SA",
+        "description": "Duration of AEs of special interest, if applicable"
+      }
+    ]
+  },
+
+  "validation_summary": {
+    "completeness_score": "High",
+    "fields_missing": [
+      "DLT definition criteria details (referenced as Protocol Section 3.2, content partially redacted/CCI in both documents)",
+      "Some exploratory objectives redacted (CCI blocks in both Protocol and SAP)",
+      "Section 5.6 of SAP (population between PRO and Treatment Misallocations) redacted",
+      "Some biomarker/immunogenicity analysis details redacted (CCI blocks)"
+    ],
+    "inconsistencies_found": [
+      "No material inconsistencies found between Protocol and SAP. SAP text taken directly from the protocol is presented in italics and matches faithfully."
+    ],
+    "reviewer_attention_items": [
+      "DLT definition criteria: The specific DLT definition criteria are in Protocol Section 3.2, which was not included in the pages read. The SAP references it but does not reproduce the full criteria. A reviewer should verify the complete DLT definition.",
+      "Redacted (CCI) sections: Multiple sections in both documents are redacted as Confidential Commercial Information. These may contain additional exploratory objectives, biomarker endpoints, and analysis details that could expand the TLG list.",
+      "Dose levels table (Table 5/6 in Protocol): The specific crizotinib dose amounts for each dose level are referenced but the detailed table was not fully visible in the pages read. The 4 dose levels (DL0, DL-1, DL-2, DL-3) are confirmed from SAP text.",
+      "No formal TLG list or mock shells in SAP: The planned TLGs were derived from the analysis descriptions. A reviewer should confirm completeness."
+    ],
+    "recommendations": [
+      "Obtain the complete DLT definition criteria from Protocol Section 3.2 to ensure the primary endpoint is fully captured.",
+      "Review CCI-redacted sections if access is available, as they may contain additional endpoints and analyses.",
+      "The derived TLG list (~36 tables, 8 listings, 11 figures = ~55 total) is appropriate for a Phase 1b oncology study. Consider whether additional AE-of-special-interest tables (e.g., immune-related AEs for pembrolizumab) are needed.",
+      "Confirm that the complete dose level table (DL0 through DL-3) matches the extracted arm definitions before proceeding to TLG shell generation."
+    ]
+  }
+}

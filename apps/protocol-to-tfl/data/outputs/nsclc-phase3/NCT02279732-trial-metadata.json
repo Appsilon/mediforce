@@ -1,0 +1,840 @@
+{
+  "schema_version": "1.0",
+  "extraction_date": "2026-03-06",
+  "source_documents": [
+    {
+      "type": "protocol",
+      "filename": "NCT02279732_Prot_000.pdf",
+      "version": "Revised Protocol No. 02 (incorporates Amendment 02 and Administrative Letter 01)",
+      "date": "2014-12-11"
+    },
+    {
+      "type": "sap",
+      "filename": "NCT02279732_SAP_001.pdf",
+      "version": "December 11, 2014",
+      "date": "2014-12-11",
+      "_notes": "The SAP file posted (NCT02279732_SAP_001.pdf) is a standalone extraction of Section 8 (Statistical Considerations) from the clinical protocol. It is not a full standalone SAP document. Consequently, many SAP-typical sections (detailed derivation rules, ADaM variable specs, full TLG listing, imputation methodology) are absent and flagged throughout. Full SAP details are deferred to a separate SAP document referenced in the protocol ('Details will be provided in the Statistical Analysis Plan')."
+    }
+  ],
+
+  "study_identification": {
+    "study_id": "CA184153",
+    "nct_number": "NCT02279732",
+    "study_title": "A Randomized, Multicenter, Double-Blind, Multinational, Phase 3 Trial Comparing the Efficacy of Ipilimumab in Addition to Paclitaxel and Carboplatin versus Placebo in Addition to Paclitaxel and Carboplatin in Subjects with Stage IV/Recurrent Non-Small Cell Lung Cancer (NSCLC) with Squamous Histology",
+    "short_title": "CA184153 — Ipilimumab + paclitaxel/carboplatin vs. placebo + paclitaxel/carboplatin in Stage IV/Recurrent Squamous NSCLC",
+    "sponsor": "Bristol-Myers Squibb (BMS)",
+    "phase": "Phase III",
+    "indication": "Stage IV or recurrent non-small cell lung cancer (NSCLC) of predominantly squamous histology, previously untreated with chemotherapy for locally advanced or metastatic disease",
+    "therapeutic_area": "Oncology",
+    "compound_name": "Ipilimumab (BMS-734016)",
+    "compound_class": "monoclonal antibody (anti-CTLA-4)",
+    "regulatory_status": "Non-IND (Ex-US); EUDRACT 2014-002604-25",
+    "_source": "Protocol title page, synopsis"
+  },
+
+  "study_design": {
+    "type": "Randomized, multicenter, double-blind, placebo-controlled, parallel-group, Phase 3",
+    "randomized": true,
+    "blinding": "double-blind",
+    "control_type": "placebo",
+    "adaptive": false,
+    "adaptive_details": null,
+
+    "treatment_arms": [
+      {
+        "arm_id": "ARM_A",
+        "arm_name": "Ipilimumab + Paclitaxel/Carboplatin (Phased Ipilimumab)",
+        "arm_type": "experimental",
+        "dose": "Ipilimumab 10 mg/kg IV; Paclitaxel 175 mg/m² IV; Carboplatin AUC=6 IV",
+        "route": "IV (intravenous)",
+        "regimen": "Paclitaxel 175 mg/m² IV q3w for up to 6 doses starting at Cycle 1 (Day 1); Carboplatin AUC=6 IV q3w for up to 6 doses starting at Cycle 1 (Day 1). Ipilimumab 10 mg/kg IV Induction: q3w for up to 4 doses starting at Cycle 3 (Week 7). Ipilimumab Maintenance: q12w for eligible subjects beginning 9 weeks after last ipilimumab induction dose, for a maximum treatment period of 3 years from the first dose of blinded study therapy.",
+        "planned_n": 434
+      },
+      {
+        "arm_id": "ARM_B",
+        "arm_name": "Placebo + Paclitaxel/Carboplatin (Phased Placebo)",
+        "arm_type": "placebo",
+        "dose": "Placebo IV; Paclitaxel 175 mg/m² IV; Carboplatin AUC=6 IV",
+        "route": "IV (intravenous)",
+        "regimen": "Paclitaxel 175 mg/m² IV q3w for up to 6 doses starting at Cycle 1 (Day 1); Carboplatin AUC=6 IV q3w for up to 6 doses starting at Cycle 1 (Day 1). Placebo Induction: q3w for up to 4 doses starting at Cycle 3. Placebo Maintenance: q12w for eligible subjects beginning 9 weeks after last placebo induction dose, for a maximum treatment period of 3 years from the first dose of placebo.",
+        "planned_n": 433
+      }
+    ],
+    "total_planned_n": 867,
+    "randomization_ratio": "1:1",
+    "stratification_factors": [
+      "ECOG performance status (0 vs. 1)",
+      "Smoking status (heavy smoker [≥10 pack years] vs. light/non-smoker)",
+      "Gender (male vs. female)"
+    ],
+
+    "study_periods": [
+      {
+        "period_name": "Screening",
+        "duration": "Up to 28 days prior to Induction Phase",
+        "description": "Eligibility assessments, baseline safety and efficacy assessments (CT/MRI chest & abdomen, CT/MRI brain, bone scan), laboratory tests, ECOG PS, medical history."
+      },
+      {
+        "period_name": "Induction",
+        "duration": "Up to 19 weeks (Cycles 1–6, approximately 6 × 3-week cycles + blinded drug cycles)",
+        "description": "All subjects receive paclitaxel + carboplatin q3w for up to 6 cycles starting at Cycle 1/Day 1. Blinded study drug (ipilimumab or placebo) starts at Cycle 3 (Week 7) q3w for up to 4 induction doses. CT/MRI every 6 weeks. Visit window ±3 days. Subjects enter Maintenance Phase if they achieve CR, PR, or SD and meet eligibility criteria."
+      },
+      {
+        "period_name": "Maintenance",
+        "duration": "Up to 3 years from first dose of blinded study therapy",
+        "description": "Eligible subjects receive blinded ipilimumab (or placebo) q12w beginning 9 weeks after last induction dose (Week 25 onward). CT/MRI every 12 weeks. Visit window ±14 days. LCSS collected at maximum 4 Maintenance visits."
+      },
+      {
+        "period_name": "Toxicity/Progression Follow-up",
+        "duration": "Until resolution of toxicities or confirmed disease progression",
+        "description": "Subjects who discontinue treatment enter toxicity/progression follow-up. Tumor assessments continue per protocol schedule for subjects not in maintenance."
+      },
+      {
+        "period_name": "Overall Survival Follow-up",
+        "duration": "Up to 5 years from end of study enrollment",
+        "description": "Survival status collected every 12 weeks by contact. Subsequent anti-cancer therapies also collected."
+      }
+    ],
+
+    "cohorts": null,
+
+    "_notes": "The study uses a 'phased' ipilimumab schedule (chemotherapy-alone lead-in for first 2 cycles, then blinded drug added at Cycle 3). Approximately 85% of subjects (estimated 736/867) are expected to come from China. No crossover between arms is allowed."
+  },
+
+  "populations": {
+    "intent_to_treat": {
+      "abbreviation": "ITT / All Randomized",
+      "definition": "All enrolled subjects who were randomized to a treatment arm.",
+      "is_primary_efficacy_population": false,
+      "_notes": "In this study the ITT/All Randomized population is used for sensitivity analyses of OS (secondary endpoint) and demographics/baseline, not for the primary efficacy analysis. The protocol uses the term 'All Randomized Subjects' rather than 'ITT'."
+    },
+    "modified_itt": {
+      "abbreviation": "mITT / Rand+Blinded",
+      "definition": "All enrolled subjects who were randomized and received at least 1 dose of blinded study therapy (ipilimumab or placebo). Unless otherwise indicated, demography, baseline characteristics and efficacy endpoints (including the primary endpoint of OS) will be analyzed in this population grouped as randomized.",
+      "is_primary_efficacy_population": true,
+      "_notes": "This is the primary analysis population. The protocol labels this 'Randomized Subjects who received at Least One Dose of Blinded Study Therapy' — it functions as the modified-ITT / per-blinded-dose population."
+    },
+    "per_protocol": {
+      "abbreviation": null,
+      "definition": null,
+      "is_primary_efficacy_population": false,
+      "_notes": "No formal per-protocol population is defined in the protocol or statistical section."
+    },
+    "safety": {
+      "abbreviation": "SAF / Treated+Blinded",
+      "definition": "All subjects who received at least 1 dose of blinded study therapy (ipilimumab or placebo). Safety analyses will be performed in this population grouped as treated, from the first dose of blinded study therapy to 90 days after the last dose.",
+      "is_primary_safety_population": true
+    },
+    "pk_population": {
+      "abbreviation": "PK",
+      "definition": "All available serum time-concentration data from randomized subjects dosed with ipilimumab.",
+      "_notes": "PK data from this study may be pooled with other studies for an integrated population PK analysis. These analyses will be described in a separate report."
+    },
+    "other_populations": [
+      {
+        "name": "Randomized Chinese Subjects who received at Least One Dose of Blinded Study Therapy",
+        "abbreviation": "CHN-mITT",
+        "definition": "All enrolled Chinese subjects who were randomized and received at least 1 dose of blinded study therapy (ipilimumab or placebo). Demography, baseline characteristics and efficacy endpoints will be analyzed in this population grouped as randomized.",
+        "purpose": "Chinese subset efficacy analyses (OS, PFS) — pre-specified secondary endpoints. Approximately 558 of the estimated 736 randomized Chinese subjects expected to receive blinded therapy."
+      },
+      {
+        "name": "All Randomized Chinese Subjects",
+        "abbreviation": "CHN-ITT",
+        "definition": "All enrolled Chinese subjects who were randomized to a treatment arm, regardless of whether they received blinded study therapy.",
+        "purpose": "Chinese subset sensitivity analyses of OS (all randomized Chinese) and selected efficacy analyses as sensitivity."
+      },
+      {
+        "name": "All Treated Subjects",
+        "abbreviation": "All Treated",
+        "definition": "All subjects who received at least 1 dose of study treatment (any of ipilimumab, placebo, paclitaxel, or carboplatin). Reporting period from first dose of study medication to 90 days (>5 half-lives) after last dose.",
+        "purpose": "Selected safety analyses repeated for all treated subjects including those who never received blinded therapy (due to death, PD, or intolerable AEs during first 2 chemotherapy cycles)."
+      },
+      {
+        "name": "All Treated Chinese Subjects",
+        "abbreviation": "CHN-All Treated",
+        "definition": "All Chinese subjects who received at least 1 dose of study treatment.",
+        "purpose": "Selected safety analyses for Chinese treated subjects regardless of blinded therapy receipt."
+      },
+      {
+        "name": "Treated Chinese Subjects who received at least One Dose of Blinded Study Therapy",
+        "abbreviation": "CHN-SAF",
+        "definition": "All Chinese subjects who received at least 1 dose of blinded study therapy (ipilimumab or placebo). Safety analyses from first dose of blinded study therapy to 90 days after last dose.",
+        "purpose": "Primary safety population for Chinese subgroup analyses."
+      },
+      {
+        "name": "Pharmacodynamic Data Set",
+        "abbreviation": "PD Set",
+        "definition": "ALC data for all randomized and treated subjects with known date of first dose of ipilimumab or placebo.",
+        "purpose": "Absolute Lymphocyte Count (ALC) pharmacodynamic and predictive analyses."
+      },
+      {
+        "name": "Outcomes Research Subjects",
+        "abbreviation": "OR Set",
+        "definition": "All randomized subjects who received at least one dose of blinded study medication and who had at least 1 baseline and 1 post-randomization LCSS assessment, grouped as randomized.",
+        "purpose": "Analysis of time to symptom progression (LCSS — Lung Cancer Symptom Scale)."
+      },
+      {
+        "name": "All Enrolled Subjects",
+        "abbreviation": "Enrolled",
+        "definition": "All subjects who signed an informed consent form and were registered into the IVRS.",
+        "purpose": "Enrollment accounting and disposition summaries."
+      }
+    ],
+    "_source": "Protocol Section 8.2"
+  },
+
+  "endpoints": {
+    "primary": [
+      {
+        "endpoint_id": "PE01",
+        "name": "Overall Survival (OS) — Primary Population",
+        "description": "Overall survival (OS) in the population of all randomized subjects who received at least one dose of blinded study therapy will be defined as the time from the date of randomization until the date of death. For those subjects who have not died, OS will be censored on the last date the subject was known to be alive.",
+        "type": "efficacy",
+        "measurement": "Time from date of randomization to date of death from any cause. Censoring: last date subject known alive if not yet died. Every effort will be made to collect survival data on all subjects not incarcerated and not withdrawn from survival follow-up; any date of subject contact in the study used to determine last known alive date.",
+        "timepoint": "Ongoing throughout study; primary analysis triggered when both 1) ≥468 OS events in the Rand+Blinded population and 2) ≥644 OS events in All Randomized subjects have been observed",
+        "variable_type": "time-to-event",
+        "direction_of_benefit": "higher_is_better",
+        "clinically_meaningful_difference": "Hazard ratio of 0.75 (ipilimumab + chemo vs. placebo + chemo) post chemotherapy-alone period, corresponding to assumed median OS of 10 months in control arm after 2 cycles of chemotherapy",
+        "related_adam_dataset": "ADTTE",
+        "_source": "Protocol Sections 8.3.1, Synopsis"
+      }
+    ],
+    "secondary": [
+      {
+        "endpoint_id": "SE01",
+        "name": "Overall Survival (OS) — All Randomized Subjects",
+        "description": "Among all randomized subjects, OS will be defined as the time from the date of randomization until the date of death. For those subjects who have not died, OS will be censored on the last date the subject was known to be alive.",
+        "type": "efficacy",
+        "measurement": "Time from date of randomization to date of death from any cause. Censoring: last date subject known alive.",
+        "timepoint": "Analyzed at primary analysis (same data lock as PE01)",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE",
+        "_source": "Protocol Sections 1.3.2, 8.3.2.1"
+      },
+      {
+        "endpoint_id": "SE02",
+        "name": "Progression-Free Survival (PFS) per mWHO — Rand+Blinded",
+        "description": "Progression-free survival (PFS) among all randomized subjects who received at least one dose of blinded study therapy per mWHO criteria will be defined as the time between the date of randomization and the date of progression per mWHO criteria or death, whichever occurs first. A subject who dies without reported progression per mWHO criteria will be considered to have progressed on the date of death. For those subjects who remain alive and have not progressed, PFS will be censored on the date of last evaluable tumor assessment. For those subjects who remain alive and have no recorded post-baseline tumor assessment, PFS will be censored on the day of randomization.",
+        "type": "efficacy",
+        "measurement": "Time from randomization to PD per mWHO or death, whichever first. Tumor assessments every 6 weeks (Induction), every 12 weeks (Maintenance) by CT/MRI chest/abdomen.",
+        "timepoint": "Tumor assessment per schedule; analyzed at primary analysis data lock",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE",
+        "_source": "Protocol Sections 1.3.2, 8.3.2.2"
+      },
+      {
+        "endpoint_id": "SE03",
+        "name": "OS — All Randomized Chinese Subjects",
+        "description": "OS among all randomized Chinese subjects, defined as the time from the date of randomization until the date of death. Censored at last known alive date for subjects not yet deceased.",
+        "type": "efficacy",
+        "measurement": "Time from randomization to death from any cause in Chinese subset of All Randomized population.",
+        "timepoint": "Analyzed at primary analysis data lock",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE",
+        "_source": "Protocol Sections 1.3.2, 8.4.2.5"
+      },
+      {
+        "endpoint_id": "SE04",
+        "name": "OS — Chinese Subjects who Received Blinded Study Therapy",
+        "description": "OS among all randomized Chinese subjects who received at least one dose of blinded study therapy, defined as the time from the date of randomization until the date of death.",
+        "type": "efficacy",
+        "measurement": "Time from randomization to death from any cause in Chinese subset of Rand+Blinded population.",
+        "timepoint": "Analyzed at primary analysis data lock",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE",
+        "_source": "Protocol Sections 1.3.2, 8.4.2.5"
+      },
+      {
+        "endpoint_id": "SE05",
+        "name": "PFS per mWHO — Chinese Subjects who Received Blinded Study Therapy",
+        "description": "PFS per mWHO among all randomized Chinese subjects who received at least one dose of blinded study therapy.",
+        "type": "efficacy",
+        "measurement": "Time from randomization to PD per mWHO or death in Chinese subset of Rand+Blinded population.",
+        "timepoint": "Tumor assessment per schedule; analyzed at primary analysis data lock",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE",
+        "_source": "Protocol Sections 1.3.2, 8.4.2.5"
+      }
+    ],
+    "exploratory": [
+      {
+        "endpoint_id": "EE01",
+        "name": "Best Overall Response Rate (BORR) per mWHO — Chinese Subgroup",
+        "description": "BORR per mWHO for each treatment arm estimated together with exact two-sided 95% CI in the population of randomized Chinese subjects who received at least one dose of blinded study therapy.",
+        "type": "efficacy",
+        "variable_type": "binary",
+        "_notes": "BORR is mentioned specifically in the context of Chinese subset analyses (Section 8.4.2.5). It is not explicitly labeled as 'exploratory' vs. 'secondary' in the protocol text but appears subordinate to the primary and defined secondary endpoints. Full response analysis details (CR, PR, SD, PD, DCR, DOR) are referenced in the glossary section of the protocol but their endpoint classification is not explicitly stated — flagged for reviewer attention.",
+        "_reviewer_attention": "Clarify whether BORR, DCR, and DOR per mWHO are pre-specified secondary or exploratory endpoints for the overall and/or Chinese-only populations. They appear in the abbreviations list and are analyzed for the Chinese subset per Section 8.4.2.5, but a formal Section 8.3.3 (Exploratory Endpoints) is absent from the extracted text.",
+        "_source": "Protocol Section 8.4.2.5, Abbreviations section"
+      },
+      {
+        "endpoint_id": "EE02",
+        "name": "Time to Symptom Progression (LCSS) — Outcomes Research",
+        "description": "Among subjects who received at least one dose of blinded study therapy, the distribution of time to symptom progression (defined as an increase of at least 15 mm from baseline prior to receiving any study drug in any of the three symptoms: cough, pain, and dyspnea) will be estimated using Kaplan-Meier method. Subjects who do not show deterioration in symptoms will be censored on the last assessment date that all three symptoms were assessed. Estimates of medians and two-sided 95% CIs will be calculated.",
+        "type": "PRO",
+        "variable_type": "time-to-event",
+        "_notes": "Assessed using the Lung Cancer Symptom Scale (LCSS), a 9-item visual analogue scale. LCSS administered at Induction cycles (Cycles 1–6) and up to 4 Maintenance visits, prior to subject seeing physician or receiving any tests/study drug.",
+        "_source": "Protocol Sections 8.4.7, 5.7"
+      },
+      {
+        "endpoint_id": "EE03",
+        "name": "Absolute Lymphocyte Count (ALC) — Pharmacodynamic and Predictive Analysis",
+        "description": "Two types of ALC analyses: (1) Pharmacodynamic: examine patterns of change in ALC over time and how patterns differ between treatment arms; (2) Predictive: examine relationship between ALC and measures of response such as OS. Both analyses include all treated subjects with known date of first dose of ipilimumab or placebo.",
+        "type": "biomarker",
+        "variable_type": "continuous",
+        "_notes": "Further details described in SAP (not included in the available document). ALC measured as part of routine hematology panel.",
+        "_source": "Protocol Sections 8.4.5, 5.10"
+      }
+    ],
+    "safety_endpoints": [
+      {
+        "endpoint_id": "SAF01",
+        "name": "Adverse Events (AEs)",
+        "description": "All on-study AEs tabulated using worst grade per NCI CTCAE v3.0 criteria by system organ class and preferred term. Listings produced for all deaths, all SAEs, and all AEs leading to study drug discontinuation.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF02",
+        "name": "Drug-related Adverse Events",
+        "description": "Drug-related AEs tabulated using worst grade per NCI CTCAE v3.0 criteria by system organ class and preferred term.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF03",
+        "name": "Immune-related Adverse Events (irAEs)",
+        "description": "AEs of unknown etiology, consistent with an immune phenomenon and identified by the investigator as study treatment related. Defined using a predefined list of MedDRA high-level group terms, high-level terms, and preferred terms. Six subcategories reported: GI, liver, skin, endocrine, neurological, and other. Immune-related AE summaries also produced on diarrhea as a separate grouped term. Analysis based on all treated subjects who received at least one dose of blinded study therapy; reporting period from first dose of blinded study therapy to 90 days after last dose.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF04",
+        "name": "Immune-mediated Adverse Reactions (imARs)",
+        "description": "Described using the same adjudication algorithm and predefined list of AEs of special interest (enterocolitis, hepatitis, dermatitis, endocrinopathies, neuropathies, and other) used for the USPI. Adjudication considers clinical evidence ruling out non-inflammatory etiologies (infection, tumor progression) and evidence of inflammation (biopsies, responsiveness to steroids), but not investigator causality assessment. Sponsor adjudicates in blinded manner. Reporting period from first dose of blinded study therapy to 90 days after last dose.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF05",
+        "name": "Serious Adverse Events (SAEs)",
+        "description": "All SAEs listed by subject.",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF06",
+        "name": "Laboratory Parameters",
+        "description": "On-study laboratory parameters including hematology, serum chemistry, liver function, and renal function summarized using worst grade per NCI CTCAE v3.0 criteria. LFTs monitored within 3 days prior to each blinded study drug administration.",
+        "type": "lab shift"
+      },
+      {
+        "endpoint_id": "SAF07",
+        "name": "Vital Signs and Physical Examination",
+        "description": "Abnormal vital signs and physical examination findings included in safety endpoints. Vital signs assessed prior to and every 30 minutes during blinded study drug administration.",
+        "type": "vital signs"
+      },
+      {
+        "endpoint_id": "SAF08",
+        "name": "Drug Exposure and Modifications",
+        "description": "Dose exposure (number of doses, cumulative dose), dose delays, and dose modifications summarized by treatment arm.",
+        "type": "AE incidence"
+      }
+    ],
+    "_source": "Protocol Sections 8.3, 8.4.3, 5.3"
+  },
+
+  "statistical_analyses": {
+    "primary_analysis": [
+      {
+        "analysis_id": "PA01",
+        "endpoint_id": "PE01",
+        "description": "Comparison of OS distribution between treatment arms in the Randomized Subjects who received at Least One Dose of Blinded Study Therapy population using a two-sided unstratified log-rank test. Hazard ratio and 95% CI estimated via unstratified Cox proportional hazards model with treatment arm as the only covariate. Kaplan-Meier product-limit method used to estimate and plot event-free OS probabilities. Median OS with two-sided 95% CIs calculated via complementary log-log transformation. KM estimates of OS rates at 6 months, 1 year, 18 months, and 2 years with associated two-sided log-log transformed 95% CIs calculated.",
+        "population": "Randomized Subjects who received at Least One Dose of Blinded Study Therapy (mITT / Rand+Blinded)",
+        "statistical_method": "Log-rank test (unstratified) + Cox proportional hazards model (unstratified) + Kaplan-Meier",
+        "model_details": {
+          "response_variable": "Time from randomization to death (Overall Survival)",
+          "covariates": ["Treatment arm (ipilimumab+chemo vs. placebo+chemo)"],
+          "factors": ["Treatment arm"],
+          "interaction_terms": [null],
+          "other_details": "Primary log-rank test is unstratified. Cox model is unstratified with treatment as single covariate. Median CIs via complementary log-log transformation. Rate CIs via log-log transformation."
+        },
+        "hypothesis": {
+          "null_hypothesis": "No difference in OS between ipilimumab + paclitaxel/carboplatin and placebo + paclitaxel/carboplatin in subjects who received at least one dose of blinded study therapy",
+          "alternative": "two-sided",
+          "alpha": 0.05,
+          "alpha_adjustment": null
+        },
+        "multiplicity_strategy": "Single primary endpoint; no multiplicity adjustment specified for primary analysis. Secondary endpoints tested at alpha=0.05 two-sided but no formal hierarchical testing procedure is documented in the protocol.",
+        "sensitivity_analyses": [
+          {
+            "name": "Stratified Log-rank Test",
+            "description": "If the primary analysis is statistically significant, a stratified log-rank test by the stratification factors (ECOG PS, smoking status, gender) will be conducted to compare OS between the 2 treatment arms.",
+            "method": "Stratified log-rank test with stratification by ECOG PS, smoking status, and gender"
+          },
+          {
+            "name": "Covariate-Adjusted Sensitivity Analysis",
+            "description": "If baseline imbalance in key prognostic factors is observed between treatment arms in the Rand+Blinded population, sensitivity analyses will be conducted to evaluate robustness of the treatment effect. Specific method described in full SAP.",
+            "method": "To be specified in full SAP; likely adjusted Cox model"
+          }
+        ],
+        "_reviewer_attention": "The protocol states the primary analysis log-rank test is 'unstratified' but also refers to a 'stratified log-rank test p value' being reported (appears to be an inconsistency in the Synopsis vs. Section 8.4.2.1). Section 8.4.2.1 in both protocol and SAP document consistently states 'two-sided log-rank test unstratified' for the primary test, with stratified analyses as sensitivity. Reviewer should confirm whether unstratified or stratified log-rank is the definitive primary test.",
+        "_source": "Protocol Sections 8.1, 8.4.2.1, Synopsis (Statistical Considerations)"
+      }
+    ],
+    "secondary_analyses": [
+      {
+        "analysis_id": "SA01",
+        "endpoint_id": "SE01",
+        "description": "OS among all randomized subjects compared between treatment arms using KM method. Event-free OS probabilities estimated and plotted. HR with two-sided 95% CI presented.",
+        "population": "All Randomized Subjects (ITT/CHN-ITT)",
+        "statistical_method": "Log-rank test + Cox proportional hazards model + Kaplan-Meier",
+        "multiplicity_handling": "Tested at two-sided alpha=0.05. No formal multiplicity control described for secondary endpoints in the protocol-level SAP document.",
+        "_notes": "Details of the analysis method for this secondary OS endpoint to be confirmed in full SAP. Consistent with primary endpoint method but population differs.",
+        "_source": "Protocol Section 8.4.2 (general), 8.3.2.1"
+      },
+      {
+        "analysis_id": "SA02",
+        "endpoint_id": "SE02",
+        "description": "PFS per mWHO among randomized subjects who received ≥1 dose of blinded study therapy. Event-free PFS probabilities estimated and plotted using KM. Medians and two-sided 95% CIs calculated by the Brookmeyer-Crowley method. PFS HR with two-sided 95% CI presented.",
+        "population": "Randomized Subjects who received at Least One Dose of Blinded Study Therapy (mITT / Rand+Blinded)",
+        "statistical_method": "Kaplan-Meier + Brookmeyer-Crowley + Cox proportional hazards model",
+        "multiplicity_handling": "Tested at two-sided alpha=0.05. No formal hierarchical gatekeeping described.",
+        "_source": "Protocol Sections 8.3.2.2, 8.4.2.5"
+      },
+      {
+        "analysis_id": "SA03",
+        "endpoint_id": "SE03",
+        "description": "OS among all randomized Chinese subjects. KM method, medians with log-log transformation CIs, HR with two-sided 95% CI.",
+        "population": "All Randomized Chinese Subjects (CHN-ITT)",
+        "statistical_method": "Kaplan-Meier + Cox proportional hazards model",
+        "multiplicity_handling": "Tested at two-sided alpha=0.05.",
+        "_source": "Protocol Section 8.4.2.5"
+      },
+      {
+        "analysis_id": "SA04",
+        "endpoint_id": "SE04",
+        "description": "OS among randomized Chinese subjects who received ≥1 dose of blinded study therapy. KM, medians with log-log CIs, HR.",
+        "population": "Randomized Chinese Subjects who received at Least One Dose of Blinded Study Therapy (CHN-mITT)",
+        "statistical_method": "Kaplan-Meier + Cox proportional hazards model",
+        "multiplicity_handling": "Tested at two-sided alpha=0.05.",
+        "_source": "Protocol Section 8.4.2.5"
+      },
+      {
+        "analysis_id": "SA05",
+        "endpoint_id": "SE05",
+        "description": "PFS per mWHO among randomized Chinese subjects who received ≥1 dose of blinded study therapy. KM, medians via Brookmeyer-Crowley, HR with two-sided 95% CI.",
+        "population": "Randomized Chinese Subjects who received at Least One Dose of Blinded Study Therapy (CHN-mITT)",
+        "statistical_method": "Kaplan-Meier + Brookmeyer-Crowley + Cox proportional hazards model",
+        "multiplicity_handling": "Tested at two-sided alpha=0.05.",
+        "_source": "Protocol Section 8.4.2.5"
+      }
+    ],
+    "subgroup_analyses": [
+      {
+        "subgroup_variable": "Age group (< 65 years vs. ≥ 65 years)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Unstratified Cox model with treatment as single covariate within each subgroup; HR with two-sided 95% CI; KM median with two-sided 95% CI via log-log transformation. Forest plot presentation implied."
+      },
+      {
+        "subgroup_variable": "Gender (male vs. female)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Unstratified Cox model within subgroup; HR with two-sided 95% CI."
+      },
+      {
+        "subgroup_variable": "ECOG Performance Status (0 vs. 1)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Unstratified Cox model within subgroup; HR with two-sided 95% CI."
+      },
+      {
+        "subgroup_variable": "Smoking status (heavy smoker [≥10 pack years] vs. light/non-smoker)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Unstratified Cox model within subgroup; HR with two-sided 95% CI."
+      },
+      {
+        "subgroup_variable": "M-stage (M1a vs. M1b vs. recurrent disease)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Unstratified Cox model within subgroup; HR with two-sided 95% CI."
+      }
+    ],
+    "interim_analyses": [
+      {
+        "timing": "Not applicable for efficacy",
+        "purpose": "safety",
+        "spending_function": null,
+        "stopping_rules": "DMC meets every 6 months (±2 months) for safety monitoring. DMC may also be convened on ad hoc basis. DMC can recommend continuation, modification, or discontinuation based on observed toxicities. No formal interim efficacy analysis — Section 8.5 states 'Not applicable'. Formal stopping rules for efficacy detailed in a separate DMC charter.",
+        "_notes": "While no formal interim efficacy analysis is described, the analysis trigger conditions (2 conditions: 1) ≥468 OS events in Rand+Blinded population AND 2) ≥644 OS events in All Randomized) imply a single primary analysis. The DMC charter contains additional details on stopping rules.",
+        "_source": "Protocol Sections 7, 8.5"
+      }
+    ],
+    "_source": "Protocol Sections 8.1, 8.4"
+  },
+
+  "missing_data": {
+    "primary_strategy": "For time-to-event endpoints (OS, PFS): subjects not experiencing the event are censored at last known alive date (OS) or last evaluable tumor assessment (PFS). Formal imputation methods not specified in the available protocol-level SAP document.",
+    "imputation_methods": [
+      {
+        "method_name": "Administrative censoring (OS)",
+        "applied_to": "OS (PE01, SE01, SE03, SE04)",
+        "is_primary_or_sensitivity": "primary",
+        "details": "For subjects who have not died, OS censored on last date subject was known to be alive. Every date of subject contact used to determine last known alive date."
+      },
+      {
+        "method_name": "Administrative censoring (PFS)",
+        "applied_to": "PFS per mWHO (SE02, SE05)",
+        "is_primary_or_sensitivity": "primary",
+        "details": "For subjects alive and not progressed: censored at date of last evaluable tumor assessment. For subjects alive with no post-baseline tumor assessment: censored at day of randomization."
+      }
+    ],
+    "estimand_framework": {
+      "used": false,
+      "intercurrent_events": [],
+      "_notes": "The protocol predates the ICH E9(R1) addendum (2019). No estimand framework (treatment policy, hypothetical, composite, etc.) is formally described. The primary endpoint uses an ITT-like population restricted to subjects who received blinded therapy, which implicitly adopts a 'treatment policy' perspective for the pre-blinded-dose dropout intercurrent event."
+    },
+    "_reviewer_attention": "Full missing data handling strategy, sensitivity analyses for missing data, and any MNAR/tipping-point analyses are deferred to the full SAP (not included in the available document). These details should be obtained before TLG generation.",
+    "_source": "Protocol Sections 8.3.1, 8.3.2.2"
+  },
+
+  "baseline_definition": {
+    "general_rule": "Most recent baseline evaluation counting backward from randomization date. 'Baseline characteristics analyses will be performed for all randomized subjects who received at least one dose of blinded study therapy. Most recent baseline evaluation (counting backward from randomization date) collected will be used for baseline analyses.'",
+    "exceptions": [
+      {
+        "domain": "Liver Function Tests (LFTs)",
+        "rule": "AST, ALT, T.Bilirubin must be collected, analyzed and reviewed within 3 days prior to study drug administration."
+      },
+      {
+        "domain": "Hematology (CBC with differential)",
+        "rule": "Must be collected and analyzed within 3 days prior to study drug administration."
+      },
+      {
+        "domain": "Thyroid (TSH — Endocrine Panel)",
+        "rule": "Must be collected prior to blinded study drug dosing."
+      },
+      {
+        "domain": "C-reactive protein",
+        "rule": "Collected at Day 1 and Cycle 3 only."
+      },
+      {
+        "domain": "Vital Signs during infusion",
+        "rule": "Vital signs collected prior to and every 30 minutes during blinded study drug administration; also prior to and after each chemotherapy administration."
+      }
+    ],
+    "_notes": "The protocol provides a general baseline definition based on last pre-randomization assessment. Full ADaM-level variable derivation rules (e.g., ABLFL flagging logic) are not specified in the protocol and are expected in the full SAP.",
+    "_source": "Protocol Sections 8.4, 5.1 (Table 5.1-2), 5.3"
+  },
+
+  "visit_schedule": {
+    "visits": [
+      {
+        "visit_name": "Screening",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": 0,
+        "assessments": [
+          "Informed consent",
+          "Screening IVRS registration",
+          "Inclusion/exclusion criteria",
+          "Medical history",
+          "ECOG performance status",
+          "HIV, Hepatitis B, Hepatitis C panel",
+          "Pregnancy test (WOCBP)",
+          "Physical examination",
+          "Pre-treatment events",
+          "Chemistry (including LFTs)",
+          "Hematology (CBC with differential)",
+          "MRI/CT chest and abdomen",
+          "MRI/CT brain",
+          "Bone scan (within 42 days of randomization; per institutional guidelines)"
+        ],
+        "_notes": "Screening must be completed within 28 days prior to start of Induction Phase."
+      },
+      {
+        "visit_name": "Cycle 1 / Week 1 / Day 1",
+        "visit_number": 1,
+        "target_day": 1,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": [
+          "ECOG performance status",
+          "Pregnancy test (WOCBP) — within 24h prior to study drug",
+          "Vital signs (prior to + every 30 min during drug administration)",
+          "Weight & Body Surface Area (within 3 days prior to dose)",
+          "Height",
+          "Adverse event assessment",
+          "Concomitant medications",
+          "LCSS (prior to physician contact, tests, or drug administration)",
+          "Healthcare Resource Utilization",
+          "Chemistry (including LFTs within 3 days prior)",
+          "Hematology (CBC within 3 days prior)",
+          "Urinalysis",
+          "Endocrine panel (TSH prior to blinded study drug)",
+          "C-reactive protein (Day 1 only)",
+          "Pharmacokinetics & ADA (pre-dose)",
+          "Complete screening (IVRS)",
+          "Randomization (IVRS)",
+          "Paclitaxel administration",
+          "Carboplatin administration"
+        ]
+      },
+      {
+        "visit_name": "Cycle 2 / Week 4",
+        "visit_number": 2,
+        "target_day": 22,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": [
+          "ECOG performance status",
+          "Pregnancy test (WOCBP)",
+          "Vital signs",
+          "Weight & BSA",
+          "Adverse event assessment",
+          "ECG (12-lead)",
+          "LCSS",
+          "Chemistry (including LFTs)",
+          "Hematology",
+          "Urinalysis",
+          "Endocrine panel (TSH)",
+          "Pharmacokinetics & ADA (pre-dose)",
+          "MRI/CT chest & abdomen (up to 7 days prior to visit)",
+          "Paclitaxel administration",
+          "Carboplatin administration"
+        ]
+      },
+      {
+        "visit_name": "Cycle 3 / Week 7 — First Blinded Drug Dose",
+        "visit_number": 3,
+        "target_day": 43,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": [
+          "ECOG performance status",
+          "Pregnancy test (WOCBP)",
+          "Vital signs",
+          "Weight & BSA",
+          "Adverse event assessment",
+          "LCSS",
+          "Healthcare Resource Utilization",
+          "Chemistry (LFTs)",
+          "Hematology",
+          "Urinalysis",
+          "Endocrine panel (TSH)",
+          "C-reactive protein (Cycle 3 only)",
+          "Pharmacokinetics & ADA (pre-dose)",
+          "Paclitaxel administration",
+          "Carboplatin administration",
+          "Blinded study drug (ipilimumab or placebo) — first induction dose"
+        ]
+      },
+      {
+        "visit_name": "Cycle 4 / Week 10",
+        "visit_number": 4,
+        "target_day": 64,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": [
+          "ECOG performance status",
+          "Pregnancy test (WOCBP)",
+          "Vital signs",
+          "Weight & BSA",
+          "Adverse event assessment",
+          "LCSS",
+          "Chemistry",
+          "Hematology",
+          "Urinalysis",
+          "Endocrine panel",
+          "Pharmacokinetics & ADA (pre-dose)",
+          "MRI/CT chest & abdomen",
+          "Paclitaxel administration",
+          "Carboplatin administration",
+          "Blinded study drug (ipilimumab or placebo) — 2nd induction dose"
+        ]
+      },
+      {
+        "visit_name": "Cycle 5 / Week 13",
+        "visit_number": 5,
+        "target_day": 85,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": [
+          "ECOG performance status",
+          "Pregnancy test (WOCBP)",
+          "Vital signs",
+          "Weight & BSA",
+          "Adverse event assessment",
+          "Chemistry",
+          "Hematology",
+          "Urinalysis",
+          "Endocrine panel",
+          "Paclitaxel administration",
+          "Carboplatin administration",
+          "Blinded study drug (ipilimumab or placebo) — 3rd induction dose"
+        ]
+      },
+      {
+        "visit_name": "Cycle 6 / Week 16",
+        "visit_number": 6,
+        "target_day": 106,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": [
+          "ECOG performance status",
+          "Pregnancy test (WOCBP)",
+          "Vital signs",
+          "Weight & BSA",
+          "Adverse event assessment",
+          "Chemistry",
+          "Hematology",
+          "Urinalysis",
+          "Endocrine panel",
+          "Paclitaxel administration",
+          "Carboplatin administration",
+          "Blinded study drug (ipilimumab or placebo) — 4th induction dose"
+        ]
+      },
+      {
+        "visit_name": "End of Induction / Week 19",
+        "visit_number": 7,
+        "target_day": 127,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": [
+          "ECOG performance status",
+          "Adverse event assessment",
+          "Chemistry",
+          "Hematology",
+          "MRI/CT chest & abdomen"
+        ],
+        "_notes": "End of induction phase assessment. Subjects meeting criteria enter Maintenance Phase."
+      },
+      {
+        "visit_name": "Maintenance / Week 25 (First Maintenance Dose)",
+        "visit_number": 8,
+        "target_day": 169,
+        "window_lower": -14,
+        "window_upper": 14,
+        "assessments": [
+          "ECOG performance status",
+          "Pregnancy test (WOCBP) — within 24h prior to study drug",
+          "Vital signs (prior to dosing)",
+          "Weight",
+          "Adverse event assessment",
+          "LCSS (up to 4 Maintenance visits)",
+          "Chemistry (LFTs within 3 days prior to drug)",
+          "Hematology",
+          "Endocrine panel",
+          "Blinded study drug (ipilimumab or placebo) — maintenance"
+        ],
+        "_notes": "Maintenance visits occur every 12 weeks (±14 days) starting 9 weeks after last induction dose. CT/MRI every 12 weeks."
+      },
+      {
+        "visit_name": "Maintenance Visits (subsequent, every 12 weeks)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -14,
+        "window_upper": 14,
+        "assessments": [
+          "As per Week 25 maintenance visit",
+          "MRI/CT chest & abdomen (every 12 weeks)"
+        ],
+        "_notes": "Continues every 12 weeks (±14 days) for maximum 3 years from first blinded dose, or until PD/AE leading to discontinuation."
+      },
+      {
+        "visit_name": "Toxicity/Progression Follow-up",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": [
+          "Adverse event collection (through 90 days post last dose)",
+          "Tumor assessments per Induction/Maintenance schedule for subjects not in Maintenance"
+        ]
+      },
+      {
+        "visit_name": "Overall Survival Follow-up",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": [
+          "Survival status contact every 12 weeks",
+          "Subsequent anti-cancer therapy collection"
+        ],
+        "_notes": "Up to 5 years from end of study enrollment."
+      }
+    ],
+    "windowing_rules": "Induction Phase visits: ±3 days. Maintenance Phase and Follow-up visits: ±14 days. CT/MRI may be performed up to 7 days prior to the visit. LFTs must be collected within 3 days prior to study drug administration.",
+    "_source": "Protocol Sections 5.1 (Tables 5.1-1, 5.1-2, 5.1-3, 5.1-4), 3.1.2"
+  },
+
+  "sample_size": {
+    "total_planned": 867,
+    "per_arm": {
+      "ARM_A": 434,
+      "ARM_B": 433
+    },
+    "power": 0.86,
+    "alpha": 0.05,
+    "assumptions": "Primary endpoint: OS among Rand+Blinded population. Piecewise exponential distribution assumed. True hazard ratio (ipilimumab+chemo vs. placebo+chemo) of 0.75 post chemotherapy-alone period. Median OS for control arm after 2 cycles chemotherapy: 10 months. Hazard ratio of 1.0 during the first 2 cycles chemotherapy-alone period. 24% dropout rate during first 2 cycles (i.e., proportion never receiving blinded therapy). ~85% of subjects (736/867) expected to come from China; 558 Chinese expected to receive blinded therapy. Piecewise constant accrual: 5/month (Months 1-3), 10/month (Months 4-6), 28/month thereafter (~33 months total accrual). Total study duration: ~45 months. Analysis triggered when BOTH conditions met: 1) 468 OS events in Rand+Blinded population AND 2) 644 OS events in All Randomized population.",
+    "dropout_rate_assumed": 0.24,
+    "method": "Log-rank test (two-sided); piecewise exponential simulation (10,000 simulations in R v2.11.1)",
+    "events_required": {
+      "rand_blinded_population": 468,
+      "all_randomized_population": 644,
+      "chinese_rand_blinded": 397
+    },
+    "additional_power_calculations": {
+      "all_randomized_OS": {
+        "events": 644,
+        "power": 0.75,
+        "overall_hr": 0.81,
+        "_notes": "75% power for OS in All Randomized subjects (overall HR ~0.81 based on piecewise model)"
+      },
+      "chinese_rand_blinded_OS": {
+        "events": 397,
+        "power": 0.80,
+        "hr": 0.75,
+        "_notes": "80% power for Chinese subpopulation primary endpoint replication"
+      }
+    },
+    "_source": "Protocol Sections 8.1, Synopsis (Statistical Considerations)"
+  },
+
+  "planned_tlg_list": {
+    "_notes": "No formal TLG listing (Appendix of data displays or mock shells) is included in either the protocol or the SAP document posted. The SAP_001 file is a sparse document covering only the protocol-level statistical section. A full TLG list is expected to exist in a separate complete SAP document but was not available for this extraction. The mock-tlg-generator will need to derive TLG shells from the analyses described above.",
+    "tables": null,
+    "listings": null,
+    "figures": null
+  },
+
+  "validation_summary": {
+    "completeness_score": "Medium",
+    "fields_missing": [
+      "Full standalone SAP (the SAP_001 document is limited to protocol Section 8 only — a complete SAP with derivation rules and TLG listing is referenced but not available)",
+      "Formal TLG appendix / list of data displays",
+      "ADaM variable derivation rules (ABLFL, BASE, CHG logic, PARAM definitions, AVAL derivation)",
+      "Explicit multiplicity control procedure / testing hierarchy for secondary endpoints",
+      "Complete missing data handling strategy (MNAR sensitivity, tipping point analysis)",
+      "Formal per-protocol population definition (none defined)",
+      "Exploratory endpoint list (Section 1.3.3 title appears truncated in protocol TOC; Section 8.3.3.1 Exploratory Endpoints is absent — likely removed in Amendment 01 along with irRC endpoints)",
+      "BORR, DCR, DOR endpoint definitions for the overall (non-Chinese) population",
+      "Full PK sampling schedule details (Table 5.5.1-1 not extracted — only referenced)",
+      "Estimand framework (study predates ICH E9(R1))",
+      "CMH test applicability details mentioned in abbreviations but not used explicitly in the extracted text",
+      "Details on ALC pharmacodynamic analyses (deferred to SAP)"
+    ],
+    "inconsistencies_found": [
+      "The Synopsis states 'The stratified log-rank test p value, hazard ratio and its associated two-sided 95% confidence interval (CI) will be estimated via an unstratified Cox model' — this conflates stratified (log-rank) and unstratified (Cox) terminology. Section 8.4.2.1 consistently refers to the primary log-rank test as unstratified. Requires clarification on whether the primary log-rank test is stratified or unstratified.",
+      "Section 1.3.3 (exploratory objectives) appears in the Table of Contents but its title is truncated and no body text for this section was found. Amendment 01 removed immune-related response endpoints; the section may have been deleted.",
+      "The SAP_001 document is labeled as a Statistical Analysis Plan but contains only the protocol-level statistical section (Section 8), not a full standalone SAP. The protocol text repeatedly says 'details will be provided in the Statistical Analysis Plan' — indicating the full SAP is a separate unposted document."
+    ],
+    "reviewer_attention_items": [
+      "Confirm whether BORR per mWHO is a pre-specified secondary or exploratory endpoint for the overall population (not just Chinese subset)",
+      "Confirm primary log-rank test is unstratified (as stated in Section 8.4.2.1) or stratified (as partially implied in the Synopsis wording)",
+      "Obtain full standalone SAP to verify: multiplicity hierarchy, TLG list, ADaM derivation rules, missing data strategy, and detailed safety analysis specifications",
+      "Verify whether Section 1.3.3 exploratory objectives were deleted in Amendment 01 or if they are available in another document",
+      "Confirm whether an estimand framework was added in any subsequent amendment or protocol revision not reflected in this posted version (Rev 02, Dec 2014)"
+    ],
+    "recommendations": [
+      "Obtain and review the full standalone SAP document (separate from the protocol) before proceeding to TLG shell generation — the posted SAP_001 is insufficiently detailed for complete TLG planning",
+      "Resolve the stratified vs. unstratified log-rank test ambiguity before generating primary analysis TLG shells",
+      "The mock-tlg-generator should plan for at minimum: OS KM curves + table (overall and Chinese subsets), PFS KM curves + table, subgroup forest plots (5 variables for OS), AE summary tables by NCI CTCAE v3.0 SOC/PT (on-study, drug-related, irAE subcategories × 6, imARs, SAEs, deaths, discontinuations), lab parameter summary tables, exposure tables, and LCSS outcomes research tables",
+      "Include separate Chinese subpopulation TLGs mirroring overall efficacy TLGs (per secondary endpoint structure)"
+    ]
+  }
+}

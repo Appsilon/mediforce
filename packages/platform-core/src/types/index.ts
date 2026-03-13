@@ -4,6 +4,8 @@
 
 export type {
   Verdict,
+  StepUi,
+  StepParam,
   Step,
   Transition,
   Trigger,
@@ -12,9 +14,12 @@ export type {
 
 export type {
   ReviewConstraints,
+  AgentConfig,
   StepConfig,
   ProcessConfig,
 } from '../schemas/process-config.js';
+
+export type { FileMetadata } from '../schemas/file-metadata.js';
 
 export type { AuditEvent } from '../schemas/audit-event.js';
 
@@ -29,11 +34,13 @@ export type {
   StepExecutionStatus,
   GateResult,
   ReviewVerdict,
+  AgentOutputSnapshot,
   StepExecution,
 } from '../schemas/step-execution.js';
 
 export type {
   Annotation,
+  GitMetadata,
   AgentOutputEnvelope,
 } from '../schemas/agent-output-envelope.js';
 

@@ -1,0 +1,7 @@
+{
+  "name": "protocol-to-tfl",
+  "description": "Skills for end-to-end clinical trial analysis: extracting structured metadata from Protocol/SAP documents, generating mock TLG shells, deriving ADaM datasets from SDTM using {admiral}, and producing production-quality TLGs using gtsummary/ggplot2.",
+  "author": {
+    "name": "vedha"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "protocol-to-tfl": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/vedha/Repo/protocol-to-tfl"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "protocol-to-tfl@protocol-to-tfl": true
+  }
+}

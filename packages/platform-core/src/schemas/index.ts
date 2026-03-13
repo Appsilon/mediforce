@@ -1,10 +1,14 @@
 export {
   VerdictSchema,
+  StepUiSchema,
+  StepParamSchema,
   StepSchema,
   TransitionSchema,
   TriggerSchema,
   ProcessDefinitionSchema,
   type Verdict,
+  type StepUi,
+  type StepParam,
   type Step,
   type Transition,
   type Trigger,
@@ -13,14 +17,21 @@ export {
 
 export {
   ReviewConstraintsSchema,
+  AgentConfigSchema,
   StepConfigSchema,
   ProcessNotificationConfigSchema,
   ProcessConfigSchema,
   type ReviewConstraints,
+  type AgentConfig,
   type StepConfig,
   type ProcessNotificationConfig,
   type ProcessConfig,
 } from './process-config.js';
+
+export {
+  FileMetadataSchema,
+  type FileMetadata,
+} from './file-metadata.js';
 
 export {
   AuditEventSchema,
@@ -45,17 +56,21 @@ export {
   StepExecutionStatusSchema,
   GateResultSchema,
   ReviewVerdictSchema,
+  AgentOutputSnapshotSchema,
   StepExecutionSchema,
   type StepExecutionStatus,
   type GateResult,
   type ReviewVerdict,
+  type AgentOutputSnapshot,
   type StepExecution,
 } from './step-execution.js';
 
 export {
   AnnotationSchema,
+  GitMetadataSchema,
   AgentOutputEnvelopeSchema,
   type Annotation,
+  type GitMetadata,
   type AgentOutputEnvelope,
 } from './agent-output-envelope.js';
 
@@ -72,6 +87,7 @@ export {
 } from './agent-run.js';
 
 export {
+  CreationReasonSchema,
   HumanTaskStatusSchema,
   HumanTaskSchema,
   type HumanTaskStatus,

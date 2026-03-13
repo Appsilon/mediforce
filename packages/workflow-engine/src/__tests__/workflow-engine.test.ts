@@ -81,6 +81,16 @@ const reviewDef: ProcessDefinition = {
   triggers: [{ type: 'manual', name: 'Start Review' }],
 };
 
+const linearConfig: ProcessConfig = {
+  processName: 'linear-process',
+  configName: 'default',
+  configVersion: '1.0',
+  stepConfigs: [
+    { stepId: 'start', executorType: 'agent' },
+    { stepId: 'process', executorType: 'human' },
+  ],
+};
+
 const reviewConfig: ProcessConfig = {
   processName: 'review-process',
   configName: 'default',
@@ -135,6 +145,7 @@ describe('WorkflowEngine', () => {
     await processRepo.saveProcessDefinition(linearDef);
     await processRepo.saveProcessDefinition(branchingDef);
     await processRepo.saveProcessDefinition(reviewDef);
+    await processRepo.saveProcessConfig(linearConfig);
     await processRepo.saveProcessConfig(reviewConfig);
   });
 
@@ -633,12 +644,14 @@ describe('WorkflowEngine', () => {
         {},
       );
       await engineWithHumanTasks.startInstance(instance.id);
-      // Advance start -> process (creates 1 HumanTask)
+      // Advance start -> process (creates 1 HumanTask + pauses for human input)
       await engineWithHumanTasks.advanceStep(
         instance.id,
         { result: 'done' },
         { id: 'user-1', role: 'operator' },
       );
+      // Resume so we can advance past the human step
+      await engineWithHumanTasks.resumeInstance(instance.id, { id: 'user-1', role: 'operator' });
       // Advance process -> done (terminal, no new HumanTask)
       await engineWithHumanTasks.advanceStep(
         instance.id,
@@ -687,7 +700,7 @@ describe('WorkflowEngine', () => {
       ).rejects.toThrow('Firestore unavailable');
     });
 
-    it('sets assignedRole from stepConfig.allowedRoles[0]', async () => {
+    it('sets assignedRole from ProcessConfig for the next step', async () => {
       const humanTaskRepo = new InMemoryHumanTaskRepository();
       const engineWithHumanTasks = new WorkflowEngine(
         processRepo,
@@ -701,20 +714,31 @@ describe('WorkflowEngine', () => {
         humanTaskRepo,
       );
 
+      // Save a ProcessConfig with allowedRoles for the 'process' step (the next step after 'start')
+      await processRepo.saveProcessConfig({
+        processName: 'linear-process',
+        configName: 'with-roles',
+        configVersion: '1.0',
+        stepConfigs: [
+          { stepId: 'start', executorType: 'human' },
+          { stepId: 'process', executorType: 'human', allowedRoles: ['reviewer'] },
+        ],
+      });
+
       const instance = await engineWithHumanTasks.createInstance(
         'linear-process',
         '1.0',
         'user-1',
         'manual',
         {},
+        'with-roles',
+        '1.0',
       );
       await engineWithHumanTasks.startInstance(instance.id);
-      const stepConfig: StepConfig = { stepId: 'start', executorType: 'human', allowedRoles: ['reviewer'] };
       await engineWithHumanTasks.advanceStep(
         instance.id,
         {},
         { id: 'user-1', role: 'operator' },
-        stepConfig,
       );
 
       expect(humanTaskRepo.getAll()[0].assignedRole).toBe('reviewer');

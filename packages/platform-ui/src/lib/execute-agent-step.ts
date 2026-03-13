@@ -15,10 +15,49 @@
 // Each app provides its own context, e.g. { studyId: '...' } or { supplierId: '...', ... }.
 // Plugins read what they need from AgentContext.stepInput (which is set to appContext).
 
+import { existsSync } from 'node:fs';
+import { resolve, isAbsolute, dirname, join } from 'node:path';
 import { getPlatformServices } from './platform-services';
 import type { AgentContext, AgentPlugin, ReviewPlugin, AgentRunResult } from '@mediforce/agent-runtime';
-import type { StepConfig, AgentOutputEnvelope, ProcessInstance } from '@mediforce/platform-core';
+import type { StepConfig, AgentOutputEnvelope, ProcessInstance, ProcessConfig } from '@mediforce/platform-core';
 import type { PlatformServices } from './platform-services';
+
+/** Walk up from cwd to find the monorepo root (contains pnpm-workspace.yaml). */
+function findWorkspaceRoot(): string {
+  let dir = process.cwd();
+  while (dir !== dirname(dir)) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) {
+      return dir;
+    }
+    dir = dirname(dir);
+  }
+  return process.cwd(); // fallback
+}
+
+/** Resolve relative skillsDir paths in stepConfigs to absolute paths anchored at workspace root. */
+function resolveSkillPaths(config: ProcessConfig): ProcessConfig {
+  const needsResolve = config.stepConfigs.some(
+    (sc) => sc.agentConfig?.skillsDir && !isAbsolute(sc.agentConfig.skillsDir),
+  );
+  if (!needsResolve) return config;
+
+  const root = findWorkspaceRoot();
+  return {
+    ...config,
+    stepConfigs: config.stepConfigs.map((sc) => {
+      if (sc.agentConfig?.skillsDir && !isAbsolute(sc.agentConfig.skillsDir)) {
+        return {
+          ...sc,
+          agentConfig: {
+            ...sc.agentConfig,
+            skillsDir: resolve(root, sc.agentConfig.skillsDir),
+          },
+        };
+      }
+      return sc;
+    }),
+  };
+}
 
 export interface AgentStepResult {
   instanceId: string;
@@ -32,6 +71,7 @@ export async function executeAgentStep(
   stepId: string,
   appContext: Record<string, unknown>,
   triggeredBy: string,
+  stepExecutionId?: string,
 ): Promise<AgentStepResult> {
   const { engine, agentRunner, pluginRegistry, instanceRepo, processRepo, llmClient, auditRepo, humanTaskRepo } = getPlatformServices();
 
@@ -52,8 +92,11 @@ export async function executeAgentStep(
     );
   }
 
+  // Resolve relative skillsDir paths to absolute (Next.js cwd != workspace root)
+  const resolvedConfig = resolveSkillPaths(processConfig);
+
   // Find StepConfig for this step
-  const stepConfig = processConfig.stepConfigs.find((sc) => sc.stepId === stepId);
+  const stepConfig = resolvedConfig.stepConfigs.find((sc) => sc.stepId === stepId);
   if (!stepConfig) {
     throw new Error(
       `StepConfig not found for step '${stepId}' in ProcessConfig '${instance.definitionName}'`,
@@ -65,15 +108,45 @@ export async function executeAgentStep(
   const plugin: AgentPlugin = pluginRegistry.get(pluginId);
 
   // Resolve autonomy level from config (not from caller)
-  const autonomyLevel = stepConfig.autonomyLevel ?? 'L2';
+  // Script steps are deterministic — always auto-advance (L4) regardless of config
+  const autonomyLevel = stepConfig.executorType === 'script'
+    ? 'L4'
+    : (stepConfig.autonomyLevel ?? 'L2');
+
+  // Emit audit event so the UI shows agent step has started
+  await auditRepo.append({
+    actorId: `agent:${pluginId}`,
+    actorType: 'agent',
+    actorRole: autonomyLevel,
+    action: 'agent.step.started',
+    description: `Agent step '${stepId}' started (plugin: ${pluginId}, autonomy: ${autonomyLevel})`,
+    timestamp: new Date().toISOString(),
+    inputSnapshot: { stepId, pluginId, autonomyLevel, ...appContext },
+    outputSnapshot: {},
+    basis: `Triggered by ${triggeredBy}`,
+    entityType: 'processInstance',
+    entityId: instanceId,
+    processInstanceId: instanceId,
+    stepId,
+    processDefinitionVersion: instance.definitionVersion,
+    executorType: 'agent',
+    reviewerType: 'none',
+  });
+
+  // Merge step params from config into the input — params are the primary source,
+  // appContext (from trigger payload / API body) can override or supplement
+  const mergedInput: Record<string, unknown> = {
+    ...(stepConfig.params ?? {}),
+    ...appContext,
+  };
 
   const agentContext: AgentContext = {
     stepId,
     processInstanceId: instanceId,
     definitionVersion: instance.definitionVersion,
-    stepInput: appContext,
+    stepInput: mergedInput,
     autonomyLevel,
-    config: processConfig,
+    config: resolvedConfig,
     llm: llmClient,
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
@@ -89,9 +162,44 @@ export async function executeAgentStep(
 
   const runResult = await agentRunner.run(plugin, agentContext, stepConfig);
 
+  // Persist agent output to step execution so getPreviousStepOutputs() returns it
+  const envelope = runResult.envelope;
+  if (stepExecutionId) {
+    await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {
+      output: envelope?.result ?? null,
+      status: runResult.status === 'completed' || runResult.status === 'paused' ? 'completed' : 'failed',
+      completedAt: new Date().toISOString(),
+      agentOutput: envelope ? {
+        confidence: envelope.confidence ?? null,
+        reasoning: envelope.reasoning_summary ?? null,
+        model: envelope.model ?? null,
+        duration_ms: envelope.duration_ms ?? null,
+        gitMetadata: envelope.gitMetadata ?? null,
+      } : null,
+    });
+  }
+
+  // Also persist output to instance.variables so it's available to subsequent
+  // steps even when the current step pauses (L3) or doesn't advance (L0/L1/L2).
+  // getPreviousStepOutputs() reads from stepExecutions, but instance.variables
+  // is the canonical workflow context used by advanceStep and step input resolution.
+  const agentOutput = envelope?.result ?? null;
+  if (agentOutput !== null) {
+    const freshInstance = await instanceRepo.getById(instanceId);
+    if (freshInstance) {
+      await instanceRepo.update(instanceId, {
+        variables: {
+          ...freshInstance.variables,
+          [stepId]: agentOutput,
+        },
+      });
+    }
+  }
+
   // ---- L3 Review Routing ----
-  // When an L3 step pauses (awaiting approval), route to either human or agent reviewer.
-  if (runResult.status === 'paused' && autonomyLevel === 'L3') {
+  // When an L3 step pauses or escalates (low confidence / error), route to human or agent reviewer.
+  // Both 'paused' (normal completion) and 'escalated' (fallback) need a review task created.
+  if ((runResult.status === 'paused' || runResult.status === 'escalated') && autonomyLevel === 'L3') {
     const reviewerType = stepConfig.reviewerType ?? 'human';
 
     if (reviewerType === 'agent') {
@@ -103,16 +211,19 @@ export async function executeAgentStep(
     }
 
     // Human reviewer path (default): create HumanTask with agent output embedded
+    const reviewTaskId = crypto.randomUUID();
+    const reviewTaskNow = new Date().toISOString();
+
     await humanTaskRepo.create({
-      id: crypto.randomUUID(),
+      id: reviewTaskId,
       processInstanceId: instanceId,
       stepId,
       assignedRole: stepConfig.allowedRoles?.[0] ?? 'reviewer',
       assignedUserId: null,
       status: 'pending',
       deadline: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: reviewTaskNow,
+      updatedAt: reviewTaskNow,
       completedAt: null,
       completionData: {
         reviewType: 'agent_output_review',
@@ -123,9 +234,30 @@ export async function executeAgentStep(
           model: runResult.envelope?.model ?? null,
           annotations: runResult.envelope?.annotations ?? null,
           duration_ms: runResult.envelope?.duration_ms ?? null,
+          gitMetadata: runResult.envelope?.gitMetadata ?? null,
         },
         iterationNumber: 0,
       },
+      creationReason: 'agent_review_l3',
+    });
+
+    await auditRepo.append({
+      actorId: `agent:${pluginId}`,
+      actorType: 'agent',
+      actorRole: autonomyLevel,
+      action: 'task.created',
+      description: `Human task created for step '${stepId}' (reason: agent_review_l3)`,
+      timestamp: reviewTaskNow,
+      inputSnapshot: { taskId: reviewTaskId, stepId, reason: 'agent_review_l3', assignedRole: stepConfig.allowedRoles?.[0] ?? 'reviewer' },
+      outputSnapshot: {},
+      basis: 'L3 agent step paused — human reviewer task created',
+      entityType: 'humanTask',
+      entityId: reviewTaskId,
+      processInstanceId: instanceId,
+      stepId,
+      processDefinitionVersion: instance.definitionVersion,
+      executorType: 'agent',
+      reviewerType: 'human',
     });
 
     const currentInstance = await instanceRepo.getById(instanceId);
@@ -169,10 +301,19 @@ export async function executeAgentStep(
   }
 
   // L4: appliedToWorkflow=true -- advance the step
+  // Guard: do not advance if result is null/empty — indicates a failed execution
   if (runResult.appliedToWorkflow) {
+    const stepResult = runResult.envelope?.result;
+    if (stepResult === null || stepResult === undefined) {
+      throw new Error(
+        `Step '${stepId}' completed with null result — cannot advance. ` +
+        `Reason: ${runResult.fallbackReason ?? runResult.envelope?.reasoning_summary ?? 'unknown'}`,
+      );
+    }
+
     const updatedInstance = await engine.advanceStep(
       instanceId,
-      { agentStatus: runResult.status, agentOutput: runResult.envelope?.result ?? null },
+      stepResult,
       { id: triggeredBy, role: 'agent' },
       stepConfig,
       runResult,

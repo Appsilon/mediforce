@@ -14,12 +14,17 @@ import {
   GateRegistry,
   alwaysProceed,
   ManualTrigger,
+  CronTrigger,
 } from '@mediforce/workflow-engine';
 import {
   AgentRunner,
   PluginRegistry,
   OpenRouterLlmClient,
   FirestoreAgentEventLog,
+  ClaudeCodeAgentPlugin,
+  MockClaudeCodeAgentPlugin,
+  OpenCodeAgentPlugin,
+  ScriptContainerPlugin,
 } from '@mediforce/agent-runtime';
 import { NoOpGateErrorNotifier } from '@mediforce/platform-core';
 import { registerSupplyIntelligencePlugins } from '@mediforce/supply-intelligence-plugins';
@@ -29,6 +34,7 @@ let services: PlatformServices | null = null;
 export interface PlatformServices {
   engine: WorkflowEngine;
   manualTrigger: ManualTrigger;
+  cronTrigger: CronTrigger;
   agentRunner: AgentRunner;
   pluginRegistry: PluginRegistry;
   llmClient: OpenRouterLlmClient;
@@ -77,6 +83,24 @@ export function getPlatformServices(): PlatformServices {
   // Register supply intelligence plugins from @mediforce/supply-intelligence-plugins.
   registerSupplyIntelligencePlugins(pluginRegistry);
 
+  // Register Claude Code agent plugin for protocol-to-tfl and other Claude-driven workflows.
+  // MOCK_AGENT=true → use mock plugin that returns fixture data instantly (for UAT)
+  const useMockAgent = process.env.MOCK_AGENT === 'true';
+  if (useMockAgent) {
+    console.log('[platform-services] MOCK_AGENT=true — using MockClaudeCodeAgentPlugin');
+  }
+  pluginRegistry.register(
+    'claude-code-agent',
+    useMockAgent ? new MockClaudeCodeAgentPlugin() : new ClaudeCodeAgentPlugin(),
+  );
+
+  // Register OpenCode agent plugin — supports multiple providers including local models (Ollama).
+  // Uses the same MOCK_AGENT env var for mock mode (handled by base class).
+  pluginRegistry.register('opencode-agent', new OpenCodeAgentPlugin());
+
+  // Register script container plugin — runs deterministic scripts in Docker (no LLM).
+  pluginRegistry.register('script-container', new ScriptContainerPlugin());
+
   const llmClient = new OpenRouterLlmClient(
     process.env.OPENROUTER_API_KEY ?? '',
     'anthropic/claude-sonnet-4',
@@ -104,6 +128,7 @@ export function getPlatformServices(): PlatformServices {
   services = {
     engine,
     manualTrigger: new ManualTrigger(engine),
+    cronTrigger: new CronTrigger(engine),
     agentRunner,
     pluginRegistry,
     llmClient,
@@ -120,4 +145,10 @@ export function getPlatformServices(): PlatformServices {
 export function validateApiKey(request: Request): boolean {
   const key = request.headers.get('X-Api-Key');
   return key !== null && key === process.env.PLATFORM_API_KEY;
+}
+
+/** Base URL for internal server-to-server calls (e.g. auto-runner trigger).
+ *  Reads NEXT_PUBLIC_APP_URL, falls back to localhost with PORT env var. */
+export function getAppBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
 }

@@ -105,6 +105,13 @@ export class FirestoreProcessRepository implements ProcessRepository {
     await setDoc(docRef, definition);
   }
 
+  async listProcessDefinitions(): Promise<ProcessDefinition[]> {
+    const snapshot = await getDocs(
+      collection(this.db, this.definitionsCollection),
+    );
+    return snapshot.docs.map((d) => ProcessDefinitionSchema.parse(d.data()));
+  }
+
   async getProcessConfig(
     processName: string,
     configName: string,
@@ -165,5 +172,29 @@ export class FirestoreProcessRepository implements ProcessRepository {
     for (const d of snapshot.docs) {
       await updateDoc(doc(this.db, this.definitionsCollection, d.id), { archived });
     }
+  }
+
+  async setConfigArchived(
+    processName: string,
+    configName: string,
+    configVersion: string,
+    archived: boolean,
+  ): Promise<void> {
+    const configKey = `${processName}:${configName}:${configVersion}`;
+    const docRef = doc(this.db, this.configsCollection, configKey);
+    await updateDoc(docRef, { archived });
+  }
+
+  async setDefinitionVersionArchived(
+    name: string,
+    version: string,
+    archived: boolean,
+  ): Promise<void> {
+    const docRef = doc(
+      this.db,
+      this.definitionsCollection,
+      this.compositeKey(name, version),
+    );
+    await updateDoc(docRef, { archived });
   }
 }

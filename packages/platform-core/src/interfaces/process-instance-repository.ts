@@ -19,4 +19,9 @@ export interface ProcessInstanceRepository {
     instanceId: string,
     stepId: string,
   ): Promise<StepExecution | null>;
+  updateStepExecution(
+    instanceId: string,
+    executionId: string,
+    updates: Partial<StepExecution>,
+  ): Promise<void>;
 }

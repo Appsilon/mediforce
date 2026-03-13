@@ -1,0 +1,62 @@
+                   script status time_sec
+               t_01_pop.R     OK      2.9
+               t_02_eos.R     OK      1.2
+              t_03_demo.R     OK      2.5
+              t_04_site.R     OK      1.0
+         t_05_adas_wk24.R     OK      0.2
+        t_06_cibic_wk24.R     OK      0.1
+          t_07_adas_wk8.R     OK      0.1
+         t_08_cibic_wk8.R     OK      0.1
+         t_09_adas_wk16.R     OK      0.1
+        t_10_cibic_wk16.R     OK      0.1
+         t_11_adas_comp.R     OK      0.0
+         t_12_adas_male.R     OK      0.1
+       t_13_adas_female.R     OK      0.1
+         t_14_adas_time.R     OK      2.7
+         t_15_adas_mmrm.R     OK      0.5
+              t_16_npix.R     OK      0.1
+              t_17_expo.R     OK      1.4
+              t_18_teae.R     OK      0.2
+               t_19_sae.R     OK      0.1
+          t_20_lab_summ.R     OK      8.1
+           t_21_lab_abn.R     OK      1.8
+        t_22_lab_abn_cs.R     OK      1.6
+   t_23_lab_shift_visit.R     OK      1.6
+ t_24_lab_shift_overall.R     OK      3.0
+            t_25_hyslaw.R     OK      1.8
+           t_26_vs_summ.R     OK      1.0
+            t_27_vs_chg.R     OK      1.0
+            t_28_wt_chg.R     OK      0.8
+                t_29_cm.R     OK      0.2
+           f_01_km_derm.R   FAIL      0.0
+                                    error
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+                                         
+ data set has no non-missing observations

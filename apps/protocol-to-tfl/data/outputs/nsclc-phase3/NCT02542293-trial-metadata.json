@@ -1,0 +1,825 @@
+{
+  "schema_version": "1.0",
+  "extraction_date": "2026-03-06",
+  "source_documents": [
+    {
+      "type": "protocol",
+      "filename": "NCT02542293_Prot_000.pdf",
+      "version": "9.0",
+      "date": "2020-01-20",
+      "_notes": "Protocol v9.0 (20 Jan 2020). Key amendment: Version 8.0 (03 April 2019) changed primary endpoint from PD-L1 ≥25% population to bTMB ≥20 mut/Mb population. Protocol readable via pdftotext."
+    },
+    {
+      "type": "sap",
+      "filename": "NCT02542293_SAP_001.pdf",
+      "version": "3.0",
+      "date": "2019-05-17",
+      "_notes": "Full standalone SAP Edition 3.0 (17 May 2019), based on CSP version 8.0 dated 3 April 2019. Readable. Complete with analysis sets, methods, multiplicity testing procedure, and safety summaries."
+    }
+  ],
+
+  "study_identification": {
+    "study_id": "D419AC00003 / NEPTUNE",
+    "study_title": "A Phase III Randomized, Open-Label, Multi-Center, Global Study of MEDI4736 in Combination with Tremelimumab Therapy Versus Standard of Care Platinum-Based Chemotherapy in First Line Treatment of Patients with Advanced or Metastatic Non Small-Cell Lung Cancer (NSCLC) (NEPTUNE)",
+    "short_title": "NEPTUNE",
+    "sponsor": "AstraZeneca AB",
+    "phase": "Phase III",
+    "indication": "First-line advanced or metastatic EGFR and ALK wild-type NSCLC",
+    "therapeutic_area": "Oncology",
+    "compound_name": "Durvalumab (MEDI4736) + Tremelimumab",
+    "compound_class": "monoclonal antibody (anti-PD-L1) + monoclonal antibody (anti-CTLA-4)",
+    "regulatory_status": null,
+    "_notes": "Primary endpoint was changed from OS in PD-L1 ≥25% population to OS in bTMB ≥20 mut/Mb population in Protocol amendment v8.0 (April 2019), based on emerging understanding of immune checkpoint inhibitor biomarkers. China cohort (n≈160) has a separate SAP and is analyzed separately from global cohort."
+  },
+
+  "study_design": {
+    "type": "Randomized, open-label, multi-center, global Phase III; 1:1 parallel group",
+    "randomized": true,
+    "blinding": "open-label",
+    "control_type": "active",
+    "adaptive": false,
+    "adaptive_details": null,
+
+    "treatment_arms": [
+      {
+        "arm_id": "COMBO",
+        "arm_name": "MEDI4736 (Durvalumab) + Tremelimumab",
+        "arm_type": "experimental",
+        "dose": "MEDI4736 dose per protocol; Tremelimumab dose per protocol",
+        "route": "IV",
+        "regimen": "MEDI4736 + tremelimumab combination therapy per CSP dosing schedule. Retreatment option available: if disease control during initial 4 months of combination therapy followed by progression during MEDI4736 monotherapy maintenance phase, patients may be retreated with MEDI4736 + tremelimumab combination.",
+        "planned_n": 400
+      },
+      {
+        "arm_id": "SOC",
+        "arm_name": "Standard of Care (SoC) platinum-based chemotherapy",
+        "arm_type": "active_comparator",
+        "dose": "Investigator choice from protocol-specified SoC regimens",
+        "route": "IV",
+        "regimen": "Investigator's choice of: (1) Paclitaxel + Carboplatin; (2) Gemcitabine + Cisplatin or Carboplatin (squamous histology only); (3) Pemetrexed + Cisplatin or Carboplatin (non-squamous only), with optional Pemetrexed maintenance (non-squamous, following pemetrexed/platinum induction). Each SoC cycle = 21 days. No crossover to MEDI4736+tremelimumab permitted.",
+        "planned_n": 400
+      }
+    ],
+    "total_planned_n": 800,
+    "_screening_n": 1330,
+    "_china_cohort_n": 160,
+    "_china_cohort_notes": "China cohort (≈160 additional patients) enrolled after global recruitment ends; analyzed in a separate China-specific SAP and not included in the global FAS or SAS.",
+    "randomization_ratio": "1:1",
+    "stratification_factors": [
+      "PD-L1 tumor expression status (≥25% versus <25%)",
+      "Histology (squamous versus non-squamous)",
+      "Smoking status (never smoker versus ever smoker)"
+    ],
+
+    "study_periods": [
+      {
+        "period_name": "Screening",
+        "duration": "Day -28 to Day -1",
+        "description": "Eligibility assessments; tumor biopsy sample for PD-L1 expression; mutation assessment for bTMB (blood sample). Informed consent may be obtained prior to the 28-day window if needed for biopsy."
+      },
+      {
+        "period_name": "Treatment",
+        "duration": "Until confirmed progression or discontinuation",
+        "description": "MEDI4736+tremelimumab or SoC per randomization. Tumor assessments every 6 weeks for first 48 weeks, then every 8 weeks until confirmed progression. Retreatment with MEDI4736+tremelimumab possible in Combo arm if criteria met."
+      },
+      {
+        "period_name": "Follow-up for OS",
+        "duration": "Until death or end of study",
+        "description": "Post-treatment OS follow-up. Safety follow-up: 90 days after last dose of MEDI4736/tremelimumab; 30 days after last dose of SoC."
+      }
+    ],
+
+    "cohorts": null
+  },
+
+  "populations": {
+    "intent_to_treat": {
+      "abbreviation": "FAS / ITT",
+      "definition": "The full analysis set (FAS) will include all randomized patients prior to the end of global recruitment. Any patients recruited in China, after global recruitment has ended, will not be included in the FAS. Efficacy analyses will be conducted in the FAS and in subsets of the FAS. Treatment groups will be compared on the basis of randomized IP, regardless of the treatment actually received. Patients who were randomized but did not subsequently go on to receive IP are included in the analysis in the treatment group to which they were randomized.",
+      "is_primary_efficacy_population": false,
+      "_notes": "FAS is not the primary efficacy population; bTMB ≥20 mut/Mb analysis set is primary. FAS is used for stratified secondary OS analysis."
+    },
+    "modified_itt": {
+      "abbreviation": null,
+      "definition": null,
+      "is_primary_efficacy_population": false
+    },
+    "per_protocol": {
+      "abbreviation": null,
+      "definition": null,
+      "is_primary_efficacy_population": false
+    },
+    "safety": {
+      "abbreviation": "SAS",
+      "definition": "The safety analysis set (SAS) will consist of patients recruited prior to the end of global recruitment who received at least 1 dose of IP. Any patients recruited in China, after global recruitment has ended, will not be included in the safety analysis set. Safety data will not be formally analyzed but summarized using the SAS, according to the treatment received (erroneously treated patients summarized per treatment actually received). If a patient received any dose of either MEDI4736 or tremelimumab, they will be reported under the MEDI4736+tremelimumab combination arm.",
+      "is_primary_safety_population": true
+    },
+    "pk_population": {
+      "abbreviation": "PK",
+      "definition": "All patients who received at least 1 dose of MEDI4736 or tremelimumab per the protocol for whom any post dose PK data are available and who do not violate or deviate from the protocol in ways that would significantly affect the PK analysis. The population will be defined by the Study Physician, Pharmacokineticist, and Statistician prior to any analyses being performed."
+    },
+    "other_populations": [
+      {
+        "name": "bTMB ≥20 mut/Mb analysis set",
+        "abbreviation": "bTMB20",
+        "definition": "Subset of FAS whose blood TMB status is ≥20 mut/Mb at baseline as defined by the CCI companion diagnostic assay.",
+        "purpose": "Primary efficacy population for OS analysis (primary endpoint)"
+      },
+      {
+        "name": "bTMB ≥16 mut/Mb analysis set",
+        "abbreviation": "bTMB16",
+        "definition": "Subset of FAS whose blood TMB status is ≥16 mut/Mb at baseline as defined by CCI.",
+        "purpose": "Secondary OS analysis (hierarchical testing step 2)"
+      },
+      {
+        "name": "bTMB ≥12 mut/Mb analysis set",
+        "abbreviation": "bTMB12",
+        "definition": "Subset of FAS whose blood TMB status is ≥12 mut/Mb at baseline as defined by CCI.",
+        "purpose": "Secondary OS analysis (hierarchical testing step 3)"
+      },
+      {
+        "name": "PD-L1-negative analysis set",
+        "abbreviation": "PDL1neg",
+        "definition": "Subset of FAS whose PD-L1 status is negative as defined by CCI (i.e., <1% PD-L1 membrane expression in tumoral tissue).",
+        "purpose": "Secondary OS analysis (hierarchical testing step 4); stratified log-rank test"
+      },
+      {
+        "name": "PD-L1 ≥25% analysis set",
+        "abbreviation": "PDL1pos25",
+        "definition": "Subset of FAS with ≥25% PD-L1 membrane expression in tumoral tissue.",
+        "purpose": "Additional secondary OS, PFS, and ORR analysis"
+      },
+      {
+        "name": "PD-L1 ≥50% analysis set",
+        "abbreviation": "PDL1pos50",
+        "definition": "Subset of FAS with ≥50% PD-L1 membrane expression in tumoral tissue.",
+        "purpose": "Additional secondary OS, PFS, and ORR analysis"
+      },
+      {
+        "name": "bTMB <20 mut/Mb analysis set",
+        "abbreviation": "bTMBlt20",
+        "definition": "Subset of FAS whose blood TMB status is <20 mut/Mb at baseline.",
+        "purpose": "Secondary OS and PFS analysis"
+      },
+      {
+        "name": "bTMB non-evaluable analysis set",
+        "abbreviation": "bTMBne",
+        "definition": "Subset of FAS whose blood TMB status cannot be determined by CCI (assay result 'failed' or 'not done'), or whose sample for bTMB evaluation is not available.",
+        "purpose": "Secondary OS and PFS analysis"
+      },
+      {
+        "name": "bTMB evaluable analysis set",
+        "abbreviation": "bTMBeval",
+        "definition": "Subset of FAS who have a valid bTMB value (TMB-high or TMB-low).",
+        "purpose": "Secondary OS analysis; demography"
+      },
+      {
+        "name": "bTMB no-call analysis set",
+        "abbreviation": "bTMBnc",
+        "definition": "Subset of FAS whose blood TMB status has been determined by CCI as a 'no-call' for bTMB.",
+        "purpose": "Secondary OS analysis"
+      },
+      {
+        "name": "tTMB-based analysis sets",
+        "abbreviation": "tTMB8/10/12/14",
+        "definition": "Tissue TMB-based analysis sets defined by cutpoints 8, 10, 12, and 14 mut/Mb: tTMB ≥8, ≥10, ≥12, ≥14 mut/Mb. Also tTMB evaluable, non-evaluable, and no-call sets defined analogously to bTMB.",
+        "purpose": "Secondary OS, PFS, and ORR analyses"
+      },
+      {
+        "name": "ADA evaluable set",
+        "abbreviation": "ADA",
+        "definition": "Subjects in the safety analysis set with non-missing baseline ADA sample and at least 1 post-baseline ADA sample.",
+        "purpose": "Immunogenicity analyses"
+      }
+    ]
+  },
+
+  "endpoints": {
+    "primary": [
+      {
+        "endpoint_id": "PE01",
+        "name": "Overall Survival (OS) in bTMB ≥20 mut/Mb population",
+        "description": "To assess the efficacy of MEDI4736 + tremelimumab combination therapy compared to SoC in terms of Overall Survival (OS) in patients with bTMB ≥20 mut/Mb. OS is defined as the time from the date of randomization to the date of death due to any cause. Patients alive at data cutoff will be censored at the date last known to be alive.",
+        "type": "efficacy",
+        "measurement": "Time from randomization to death from any cause",
+        "timepoint": "Final analysis at ~87% maturity in bTMB ≥20 mut/Mb population (~122 OS events)",
+        "variable_type": "time-to-event",
+        "direction_of_benefit": "higher_is_better",
+        "clinically_meaningful_difference": "HR=0.49 assumed (median OS 10 months in SoC arm, exponential distribution)",
+        "related_adam_dataset": "ADTTE"
+      }
+    ],
+
+    "secondary": [
+      {
+        "endpoint_id": "SE01",
+        "name": "OS in bTMB ≥16 mut/Mb population",
+        "description": "OS (time from randomization to death from any cause) in patients with bTMB ≥16 mut/Mb.",
+        "type": "efficacy",
+        "measurement": "Time from randomization to death",
+        "timepoint": "At primary analysis and at 91% maturity (~193 events in bTMB≥16)",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE02",
+        "name": "OS in bTMB ≥12 mut/Mb population",
+        "description": "OS in patients with bTMB ≥12 mut/Mb. Assumed HR=0.65, median SoC OS=10 months, ~280 events needed (92% maturity).",
+        "type": "efficacy",
+        "measurement": "Time from randomization to death",
+        "timepoint": "At 92% maturity (~280 events)",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE03",
+        "name": "OS in PD-L1-negative population (<1%)",
+        "description": "OS in patients with <1% PD-L1 membrane expression. Assumed HR=0.73, median SoC OS=10 months, ~182 events (94% maturity, 57% power).",
+        "type": "efficacy",
+        "measurement": "Time from randomization to death",
+        "timepoint": "At 94% maturity (~182 events)",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE04",
+        "name": "OS in all patients (FAS/ITT)",
+        "description": "OS in the full analysis set (all randomized global patients).",
+        "type": "efficacy",
+        "measurement": "Time from randomization to death",
+        "timepoint": "At primary analysis",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE05",
+        "name": "OS in bTMB <20, bTMB non-evaluable, evaluable, no-call populations",
+        "description": "Secondary OS analyses in additional bTMB-defined subpopulations.",
+        "type": "efficacy",
+        "measurement": "Time from randomization to death",
+        "timepoint": "At primary analysis",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE06",
+        "name": "Progression-Free Survival (PFS) — multiple populations",
+        "description": "PFS defined as time from date of randomization to first date of objective disease progression (per RECIST 1.1 by Investigator assessment) or death from any cause in the absence of progression. Assessed in bTMB ≥20/16/12 mut/Mb, PD-L1-negative, FAS, PD-L1 ≥25%/≥50%, bTMB <20, bTMB non-evaluable, and tTMB-defined populations.",
+        "type": "efficacy",
+        "measurement": "Time from randomization to progression (RECIST 1.1 investigator) or death",
+        "timepoint": "At primary analysis",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE07",
+        "name": "Objective Response Rate (ORR)",
+        "description": "Proportion of patients with confirmed complete response (CR) or partial response (PR) per RECIST 1.1 Investigator assessment. Assessed in multiple bTMB, PD-L1, and tTMB-defined populations.",
+        "type": "efficacy",
+        "measurement": "Proportion with CR or PR per RECIST 1.1 investigator",
+        "timepoint": "At primary analysis",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADRS"
+      },
+      {
+        "endpoint_id": "SE08",
+        "name": "Duration of Response (DoR)",
+        "description": "Time from date of first documented response (CR or PR) until first date of documented progression or death in the absence of disease progression. Assessed in multiple bTMB, PD-L1, and tTMB populations.",
+        "type": "efficacy",
+        "measurement": "Time from first response to progression or death",
+        "timepoint": "At primary analysis",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE09",
+        "name": "OS survival rates at 12, 18, 24 months (OS12, OS18, OS24)",
+        "description": "Kaplan-Meier estimates of OS rate at 12, 18, and 24 months in multiple bTMB, PD-L1, and FAS populations.",
+        "type": "efficacy",
+        "measurement": "KM-estimated proportion alive at landmark timepoints",
+        "timepoint": "12, 18, and 24 months from randomization",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE10",
+        "name": "Proportion Alive and Progression-Free at 12 months (APF12)",
+        "description": "Kaplan-Meier estimate of PFS at 12 months from randomization (per RECIST 1.1 investigator).",
+        "type": "efficacy",
+        "measurement": "KM estimate of PFS at 12 months",
+        "timepoint": "12 months from randomization",
+        "variable_type": "binary",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE11",
+        "name": "Time from Randomization to Second Progression (PFS2)",
+        "description": "Time from date of randomization to the earliest of the progression event subsequent to that used for PFS, or death. Date of second progression recorded by Investigator per local standard clinical practice (may include objective radiological imaging, symptomatic progression, or death). RECIST assessments not collected for PFS2.",
+        "type": "efficacy",
+        "measurement": "Time from randomization to second disease progression or death",
+        "timepoint": "At primary analysis",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE12",
+        "name": "OS and PFS in PD-L1 ≥25% and PD-L1 ≥50% populations",
+        "description": "OS and PFS in patients with PD-L1 TC ≥25% and PD-L1 TC ≥50%.",
+        "type": "efficacy",
+        "measurement": "Time-to-event",
+        "timepoint": "At primary analysis",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE13",
+        "name": "OS and PFS in tTMB-defined populations",
+        "description": "OS and PFS in populations defined by tTMB cutpoints of 8, 10, 12, and 14 mut/Mb.",
+        "type": "efficacy",
+        "measurement": "Time-to-event and binary response",
+        "timepoint": "At primary analysis",
+        "variable_type": "time-to-event",
+        "related_adam_dataset": "ADTTE"
+      },
+      {
+        "endpoint_id": "SE14",
+        "name": "Pharmacokinetics of MEDI4736 and Tremelimumab",
+        "description": "Concentration of MEDI4736 and tremelimumab in blood; non-compartmental PK parameters (peak concentration, trough) as data allow (sparse sampling). Population PK modelling also planned.",
+        "type": "pharmacokinetic",
+        "measurement": "Plasma/serum concentrations; non-compartmental PK parameters",
+        "timepoint": "Scheduled sparse sampling visits",
+        "variable_type": "continuous",
+        "related_adam_dataset": "ADPC"
+      },
+      {
+        "endpoint_id": "SE15",
+        "name": "Immunogenicity of MEDI4736 and Tremelimumab",
+        "description": "Presence of anti-drug antibodies (ADA) for MEDI4736 and tremelimumab. Tiered approach: screen, confirm, titer. ADA prevalence (any positive) and incidence (treatment-induced or treatment-boosted) reported.",
+        "type": "safety",
+        "measurement": "ADA positive/negative; titer; neutralizing antibody status",
+        "timepoint": "Scheduled ADA sampling visits",
+        "variable_type": "binary",
+        "related_adam_dataset": null
+      }
+    ],
+
+    "exploratory": [
+      {
+        "endpoint_id": "EE01",
+        "name": "Best Objective Response (BoR)",
+        "description": "Best overall response (CR, PR, SD, PD, NE) per RECIST 1.1 Investigator assessment, from randomization until RECIST progression or last evaluable assessment. SD must be ≥35 days from randomization.",
+        "type": "efficacy",
+        "variable_type": "categorical"
+      },
+      {
+        "endpoint_id": "EE02",
+        "name": "Change in Tumor Size",
+        "description": "Percentage change from baseline in sum of longest diameters of target lesions at each scheduled tumor assessment. Best percentage change from baseline also derived.",
+        "type": "efficacy",
+        "variable_type": "continuous"
+      },
+      {
+        "endpoint_id": "EE03",
+        "name": "PFS with confirmed progression (sensitivity)",
+        "description": "Exploratory PFS using RECIST 1.1 modified to require confirmation of progression. Confirmation at next scheduled scan, no sooner than 4 weeks after initial suspected progression.",
+        "type": "efficacy",
+        "variable_type": "time-to-event"
+      },
+      {
+        "endpoint_id": "EE04",
+        "name": "Biomarker analyses",
+        "description": "Relationship of exploratory biomarkers (residual biological samples including tumor and blood, somatic mutations, gene expression) to primary and secondary endpoints (OS, PFS, ORR, DoR) explored in FAS biomarker-evaluable patients.",
+        "type": "biomarker",
+        "variable_type": null
+      },
+      {
+        "endpoint_id": "EE05",
+        "name": "Impact of subsequent immunotherapy on OS (crossover adjustment)",
+        "description": "Exploratory OS analyses adjusting for impact of subsequent immunotherapy or investigational treatment using methods such as RPSFT, IPCW, two-stage model, if sufficient proportion of patients switch.",
+        "type": "efficacy",
+        "variable_type": "time-to-event"
+      }
+    ],
+
+    "safety_endpoints": [
+      {
+        "endpoint_id": "SAF01",
+        "name": "Adverse Events (AEs)",
+        "description": "All TEAEs and SAEs from first dose until 90 days after last dose of MEDI4736/tremelimumab or 30 days after last SoC dose. Coded by MedDRA v21.1; graded by CTCAE v4.03. Includes immune-mediated AEs (imAEs) and AEs of special interest (AESIs).",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF02",
+        "name": "Adverse Events of Special Interest (AESIs)",
+        "description": "Pre-specified AESIs with potential inflammatory/immune-mediated mechanism: Pneumonitis, Hepatic events, Diarrhea/Colitis, intestinal perforations, adrenal insufficiency, Type 1 diabetes mellitus, hyperthyroid/hypothyroid events, hypophysitis, thyroiditis, renal events, dermatitis/rash, pancreatic events, myocarditis, myasthenia gravis, Guillain-Barré syndrome, myositis, infusion/hypersensitivity reactions, other rare events.",
+        "type": "AESI"
+      },
+      {
+        "endpoint_id": "SAF03",
+        "name": "Laboratory data",
+        "description": "Clinical chemistry, haematology, urinalysis. Absolute values, change from baseline, CTCAE grade shifts. Special focus on Hy's Law criteria (ALT/AST + bilirubin elevations), thyroid function tests.",
+        "type": "lab shift"
+      },
+      {
+        "endpoint_id": "SAF04",
+        "name": "ECG",
+        "description": "ECG parameters at screening and as clinically indicated. QTcF calculated using Fridericia correction. Central digital ECG review.",
+        "type": "ECG"
+      },
+      {
+        "endpoint_id": "SAF05",
+        "name": "Vital signs",
+        "description": "Blood pressure, pulse rate. Absolute values and change from baseline by visit.",
+        "type": "vital signs"
+      },
+      {
+        "endpoint_id": "SAF06",
+        "name": "Treatment exposure and dose intensity",
+        "description": "Duration of exposure (total/intended and actual), relative dose intensity (RDI), number of cycles, dose delays/interruptions for MEDI4736, tremelimumab, and each SoC agent.",
+        "type": "exposure"
+      }
+    ]
+  },
+
+  "statistical_analyses": {
+    "primary_analysis": [
+      {
+        "analysis_id": "PA01",
+        "endpoint_id": "PE01",
+        "description": "Unstratified log-rank test comparing OS between MEDI4736 + tremelimumab versus SoC in the bTMB ≥20 mut/Mb analysis set. Analysis performed when approximately 87% maturity is achieved (~122 OS events from global cohort among ~140 patients in bTMB≥20 set).",
+        "population": "bTMB ≥20 mut/Mb analysis set",
+        "statistical_method": "Unstratified log-rank test",
+        "model_details": {
+          "response_variable": "Overall Survival (time from randomization to death from any cause)",
+          "covariates": [],
+          "factors": ["Treatment (MEDI4736+tremelimumab vs SoC)"],
+          "interaction_terms": [],
+          "other_details": "HR and 95% CI estimated using Cox proportional hazards model (Efron method for ties, profile likelihood CI). Kaplan-Meier plots by treatment arm. No stratification factors in primary model (unstratified). IVRS-entered values used for any stratification factors. Proportional hazards assumption tested via log(-log) plots. Max-combo test (log-rank G0,0 plus FH tests G0,1, G1,0, G1,1) conducted as sensitivity analysis for non-proportional hazards. Multiple imputation sensitivity analysis for missing bTMB data under MAR and MNAR assumptions."
+        },
+        "hypothesis": {
+          "null_hypothesis": "No difference in OS between MEDI4736+tremelimumab and SoC in bTMB ≥20 mut/Mb population",
+          "alternative": "two-sided",
+          "alpha": 0.05,
+          "alpha_adjustment": "Hierarchical gatekeeping procedure across 4 OS endpoints"
+        },
+        "multiplicity_strategy": "Hierarchical gatekeeping: OS bTMB≥20 (α=5%) → OS bTMB≥16 (α=5%) → OS bTMB≥12 (α=5%) → OS PD-L1-negative (α=5%). Each endpoint tested at full 5% alpha only if the previous hypothesis was rejected for superiority. Strong control of family-wise error rate (Glimm et al 2010). FAS OS and tTMB-based OS analyses performed with nominal p-values (no alpha protection).",
+        "sensitivity_analyses": [
+          {
+            "name": "Max-combo test (non-proportional hazards)",
+            "description": "Adaptive procedure combining log-rank (G0,0) and Fleming-Harrington tests (G0,1, G1,0, G1,1) in bTMB ≥20 mut/Mb analysis set.",
+            "method": "Max-combo test with alpha correction (Duke-Margolis 2018)"
+          },
+          {
+            "name": "Multiple imputation for missing bTMB",
+            "description": "Imputation of missing bTMB values using predictive models with prognostic baseline covariates and relevant clinical outcomes; OS analysis repeated on each imputed dataset and results combined. Both MAR and MNAR assumptions explored.",
+            "method": "Multiple imputation with Cox PH on each imputed dataset"
+          },
+          {
+            "name": "Mid-point censoring for evaluation-time bias (PFS)",
+            "description": "Sensitivity for PFS in bTMB ≥20 mut/Mb: midpoint between time of progression and previous evaluable RECIST assessment used for progression date. Date of death used as-is for death-as-PFS-event.",
+            "method": "Log-rank test on mid-point-adjusted PFS times"
+          },
+          {
+            "name": "Attrition bias sensitivity (PFS)",
+            "description": "Actual PFS event times used for patients who progressed/died immediately following 2+ non-evaluable tumor assessments; patients taking subsequent therapy prior to progression censored at last evaluable assessment.",
+            "method": "Log-rank test; supported by KM curve of time to censoring"
+          }
+        ]
+      }
+    ],
+
+    "secondary_analyses": [
+      {
+        "analysis_id": "SA01",
+        "endpoint_id": "SE01",
+        "description": "Unstratified log-rank test of OS in bTMB ≥16 mut/Mb analysis set. Tested at alpha=5% only if OS in bTMB≥20 is statistically significant.",
+        "population": "bTMB ≥16 mut/Mb analysis set",
+        "statistical_method": "Unstratified log-rank test; Cox PH model for HR and 95% CI",
+        "multiplicity_handling": "Step 2 of hierarchical gatekeeping procedure"
+      },
+      {
+        "analysis_id": "SA02",
+        "endpoint_id": "SE02",
+        "description": "Unstratified log-rank test of OS in bTMB ≥12 mut/Mb analysis set.",
+        "population": "bTMB ≥12 mut/Mb analysis set",
+        "statistical_method": "Unstratified log-rank test; Cox PH model for HR and 95% CI",
+        "multiplicity_handling": "Step 3 of hierarchical gatekeeping procedure"
+      },
+      {
+        "analysis_id": "SA03",
+        "endpoint_id": "SE03",
+        "description": "Stratified log-rank test of OS in PD-L1-negative analysis set, adjusting for histology and smoking status.",
+        "population": "PD-L1-negative analysis set (<1% PD-L1)",
+        "statistical_method": "Stratified log-rank test (strata: histology, smoking status); Cox PH model for HR",
+        "multiplicity_handling": "Step 4 of hierarchical gatekeeping procedure"
+      },
+      {
+        "analysis_id": "SA04",
+        "endpoint_id": "SE04",
+        "description": "Stratified log-rank test of OS in FAS (all randomized global patients), adjusting for PD-L1 tumor expression status (≥25% vs <25%), histology, and smoking status.",
+        "population": "FAS (ITT)",
+        "statistical_method": "Stratified log-rank test; Cox PH model for HR",
+        "multiplicity_handling": "Nominal p-value only; not within gatekeeping procedure"
+      },
+      {
+        "analysis_id": "SA05",
+        "endpoint_id": "SE06",
+        "description": "Log-rank test of PFS (RECIST 1.1 investigator) in multiple analysis sets including bTMB ≥20/16/12, PD-L1-negative, FAS, PD-L1 ≥25%/≥50%, bTMB <20, tTMB populations. Same methodology as OS within each set.",
+        "population": "Multiple bTMB, PD-L1, and tTMB-defined analysis sets",
+        "statistical_method": "Log-rank test (unstratified for bTMB sets; stratified for FAS and PD-L1 sets); Cox PH for HR",
+        "multiplicity_handling": "Nominal p-values; no formal multiplicity control"
+      },
+      {
+        "analysis_id": "SA06",
+        "endpoint_id": "SE07",
+        "description": "Logistic regression of ORR (RECIST 1.1 investigator) in multiple analysis sets, adjusting for PD-L1 tumor expression, histology, and smoking status (as appropriate for each set). Odds ratio with profile likelihood CI presented. Fisher's exact test (mid-p-value) if insufficient responses for logistic regression.",
+        "population": "Multiple bTMB, PD-L1, and tTMB-defined analysis sets",
+        "statistical_method": "Logistic regression (primary); Fisher's exact test mid-p-value (if needed)",
+        "multiplicity_handling": "Nominal p-values; no formal multiplicity control"
+      },
+      {
+        "analysis_id": "SA07",
+        "endpoint_id": "SE08",
+        "description": "Descriptive analysis of DoR using Ellis et al 2008 method in responding patients. Median DoR and 95% CI by treatment group; KM curves. No formal comparison or p-value.",
+        "population": "FAS responders and multiple biomarker-defined analysis sets",
+        "statistical_method": "Descriptive; KM estimator",
+        "multiplicity_handling": "No formal hypothesis testing for DoR"
+      },
+      {
+        "analysis_id": "SA08",
+        "endpoint_id": "SE09",
+        "description": "KM estimates of OS at 12, 18, 24 months with 95% CI (Glimm et al 2010 / Klein et al 2007 method) in multiple populations.",
+        "population": "Multiple bTMB, PD-L1, tTMB, and FAS analysis sets",
+        "statistical_method": "Kaplan-Meier landmark estimates with 95% CI",
+        "multiplicity_handling": "Descriptive; nominal results"
+      },
+      {
+        "analysis_id": "SA09",
+        "endpoint_id": "SE11",
+        "description": "Log-rank test of PFS2 (time to second progression) in bTMB ≥20/16/12, PD-L1-negative, and FAS populations.",
+        "population": "bTMB ≥20/16/12 mut/Mb, PD-L1-negative, FAS",
+        "statistical_method": "Log-rank test",
+        "multiplicity_handling": "Nominal p-values"
+      }
+    ],
+
+    "subgroup_analyses": [
+      {
+        "subgroup_variable": "Sex (male vs female)",
+        "endpoints_analyzed": ["PE01", "SE06"],
+        "method": "Cox PH model with treatment + subgroup factor; forest plot of HR and 95% CI"
+      },
+      {
+        "subgroup_variable": "Age at randomization (<65 vs ≥65 years)",
+        "endpoints_analyzed": ["PE01", "SE06"],
+        "method": "Cox PH model; forest plot"
+      },
+      {
+        "subgroup_variable": "Histology (squamous vs non-squamous)",
+        "endpoints_analyzed": ["PE01", "SE06"],
+        "method": "Cox PH model; forest plot"
+      },
+      {
+        "subgroup_variable": "Smoking status (never vs ever smoker)",
+        "endpoints_analyzed": ["PE01", "SE06"],
+        "method": "Cox PH model; forest plot"
+      },
+      {
+        "subgroup_variable": "Race (Asian vs non-Asian)",
+        "endpoints_analyzed": ["PE01", "SE06"],
+        "method": "Cox PH model; forest plot"
+      },
+      {
+        "subgroup_variable": "ECOG PS (0 vs ≥1)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Cox PH model; forest plot"
+      },
+      {
+        "subgroup_variable": "Baseline liver metastases (Yes vs No)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Cox PH model; forest plot"
+      },
+      {
+        "subgroup_variable": "bTMB subgroups (≥12 vs <12, ≥16 vs <16, ≥20 vs <20 mut/Mb; evaluable vs non-evaluable vs no-call) in FAS",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Cox PH model; forest plot"
+      },
+      {
+        "subgroup_variable": "tTMB subgroups (≥8/10/12/14 vs <8/10/12/14 mut/Mb) in FAS",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Cox PH model; forest plot"
+      },
+      {
+        "subgroup_variable": "PD-L1 subgroups (≥1%, ≥10%, ≥25%, ≥50% tumor expression; IC ≥25%) in FAS",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Cox PH model; forest plot"
+      },
+      {
+        "subgroup_variable": "Combined bTMB and PD-L1 subgroups (bTMB≥20 × PD-L1≥1%, etc.) in FAS",
+        "endpoints_analyzed": ["PE01"],
+        "method": "Cox PH model; forest plot"
+      },
+      {
+        "subgroup_variable": "_notes",
+        "endpoints_analyzed": [],
+        "method": "Subgroups with <20 events not formally analyzed (descriptive summaries only). Quantitative interactions tested via Gail-Simon (1985) for qualitative interaction check. All subgroup p-values are nominal."
+      }
+    ],
+
+    "interim_analyses": [
+      {
+        "timing": "No formal interim efficacy analyses planned",
+        "purpose": "safety",
+        "spending_function": null,
+        "stopping_rules": "IDMC meets approximately 6 months after study start (or after first 30 patients randomized, whichever first), then at least every 6 months thereafter, for safety review. IDMC may recommend continuing unchanged, stopping, or modifying the study based on safety findings. No formal alpha-spending for efficacy interim."
+      }
+    ]
+  },
+
+  "missing_data": {
+    "primary_strategy": "No formal imputation for survival or efficacy endpoints. Patients without events censored at last known alive date (OS) or last evaluable assessment (PFS). Missing bTMB values addressed via multiple imputation sensitivity analysis.",
+    "imputation_methods": [
+      {
+        "method_name": "Multiple imputation for missing bTMB",
+        "applied_to": "Primary OS analysis in bTMB ≥20 mut/Mb set",
+        "is_primary_or_sensitivity": "sensitivity",
+        "details": "Missing bTMB values imputed using predictive models including prognostic baseline covariates and clinical outcomes. OS analysis repeated on each imputed dataset; results combined. Both MAR and MNAR assumptions explored."
+      },
+      {
+        "method_name": "LLOQ imputation for PK",
+        "applied_to": "PK concentration data",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Samples below LLOQ treated as missing in PK analyses."
+      },
+      {
+        "method_name": "Value < or > quantification range",
+        "applied_to": "Laboratory safety values",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Values of the form '<x' or '>x' imputed as 'x' for summary statistics; displayed as '<x' or '>x' in listings."
+      },
+      {
+        "method_name": "Missing AE causality",
+        "applied_to": "AE causality assessments",
+        "is_primary_or_sensitivity": "primary",
+        "details": "AEs with missing causality after data querying assumed to be related to study drug."
+      }
+    ],
+    "estimand_framework": {
+      "used": false,
+      "intercurrent_events": []
+    }
+  },
+
+  "baseline_definition": {
+    "general_rule": "Baseline is the last assessment of the variable under consideration prior to the intake of the first dose of IP, except for efficacy variables. For efficacy variables (RECIST), baseline is the last evaluable assessment prior to starting treatment, assessed within 28 days prior to randomization.",
+    "exceptions": [
+      {
+        "domain": "Laboratory / vital signs / safety",
+        "rule": "Last non-missing measurement prior to dosing with study treatment. Day 1 laboratory assessments considered pre-dose. If two visits equally eligible (e.g., screening and baseline on same date), average taken as baseline value."
+      },
+      {
+        "domain": "RECIST tumor assessments",
+        "rule": "Baseline within 28 days prior to randomization. If more than one baseline scan, measurements closest to and prior to date of randomization used."
+      },
+      {
+        "domain": "Retreatment period (MEDI4736+tremelimumab arm)",
+        "rule": "For retreatment period, baseline is defined as the last non-missing measurement prior to the first dose on the retreatment period."
+      }
+    ]
+  },
+
+  "visit_schedule": {
+    "_notes": "Tumor assessments by RECIST 1.1 (investigator) every 6 weeks for first 48 weeks, then every 8 weeks until confirmed progression. PFS2 assessments per local clinical practice (date + progression status in eCRF). Safety follow-up: 90 days post last dose of MEDI4736/tremelimumab; 30 days post last dose of SoC.",
+    "visits": [
+      {
+        "visit_name": "Screening",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -28,
+        "window_upper": -1,
+        "assessments": ["Informed consent", "Eligibility", "Tumor biopsy for PD-L1 IHC", "Blood sample for bTMB assay", "Baseline tumor imaging (RECIST 1.1)", "Labs", "ECG", "Vital signs", "ECOG PS", "Medical/medication history"]
+      },
+      {
+        "visit_name": "Day 1 (First dose)",
+        "visit_number": 1,
+        "target_day": 1,
+        "window_lower": 0,
+        "window_upper": 0,
+        "assessments": ["First dose of MEDI4736+tremelimumab or SoC", "Pre-dose PK sample", "Labs", "Vital signs"]
+      },
+      {
+        "visit_name": "On-treatment tumor assessments — First 48 weeks",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -7,
+        "window_upper": 7,
+        "assessments": ["RECIST 1.1 tumor assessment every 6 weeks (weeks 6, 12, 18, 24, 30, 36, 42, 48)", "PK sampling (sparse)", "ADA sampling", "Labs", "Vital signs", "ECOG PS", "AE assessment"]
+      },
+      {
+        "visit_name": "On-treatment tumor assessments — After week 48",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": -7,
+        "window_upper": 7,
+        "assessments": ["RECIST 1.1 tumor assessment every 8 weeks until confirmed progression", "PK sampling", "ADA sampling", "Labs", "Vital signs", "AE assessment"]
+      },
+      {
+        "visit_name": "Safety follow-up (post-MEDI4736/tremelimumab)",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": 90,
+        "assessments": ["AE collection for 90 days after last dose of immunotherapy (30 days for SoC)", "Labs", "ADA sampling"]
+      },
+      {
+        "visit_name": "OS follow-up",
+        "visit_number": null,
+        "target_day": null,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["Survival status assessment per schedule"]
+      }
+    ],
+    "windowing_rules": "Visit windows for vital signs: lower limit Day 2 for first post-baseline visit; upper limit midway between consecutive visits (if even days, upper = midpoint -1 day). All visits summarized only if observations > min(20, 1/3 of dosed patients). Closest value to scheduled visit date used for per-visit summaries (earlier if equidistant). Visit windows defined separately for MEDI4736+tremelimumab (4-week cycles) and SoC."
+  },
+
+  "sample_size": {
+    "total_planned": 800,
+    "per_arm": {
+      "COMBO": 400,
+      "SOC": 400
+    },
+    "power": 0.9,
+    "alpha": 0.05,
+    "assumptions": "Primary: OS in bTMB≥20 mut/Mb: assumed HR=0.49, median SoC OS=10 months (exponential distribution), ~140 patients in bTMB≥20 set, 122 OS events needed at 87% maturity. 3-month delay in separation of OS curves assumed. 12-month recruitment period; minimum 43-month follow-up; analysis at ~55 months post first patient. Planned enrollment 1330 to randomize 800 globally, including ~336 PD-L1-positive25% patients. China cohort (160 patients) enrolled separately after global completion.",
+    "dropout_rate_assumed": null,
+    "method": "Log-rank test (unstratified) for primary; event-driven (87% maturity in bTMB≥20 set)"
+  },
+
+  "planned_tlg_list": {
+    "_notes": "SAP does not include a formal numbered TLG list appendix. TLGs are derived from the extensive SAP analysis methods. Given the complexity (multiple biomarker-defined populations, OS + PFS + ORR + DoR + OS12/18/24 + APF12 + PFS2), the TLG package is large. Only key table categories listed below.",
+    "tables": null,
+    "listings": null,
+    "figures": null,
+    "_derived_tlg_categories": [
+      "Disposition and analysis set membership (FAS + all biomarker subsets)",
+      "Demographics and baseline characteristics (FAS + bTMB20/16/12 + PDL1neg + bTMB evaluable/non-evaluable + tTMB evaluable sets)",
+      "Protocol deviations",
+      "OS summary tables by population (bTMB20/16/12, PDL1neg, FAS, PDL1≥25%/≥50%, bTMB<20, non-evaluable, tTMB sets)",
+      "PFS summary tables by population (same populations as OS)",
+      "ORR tables by population",
+      "DoR tables by population",
+      "OS12/18/24 landmark tables",
+      "APF12 tables",
+      "PFS2 tables",
+      "Best overall response frequency tables",
+      "Change in tumor size (waterfall plots, spider plots) in bTMB≥20",
+      "Subgroup forest plots for OS (primary and FAS)",
+      "KM curves for OS (multiple populations)",
+      "KM curves for PFS (multiple populations)",
+      "Safety summary: AE incidence by SOC/PT",
+      "Safety: AESIs by category/PT with CTCAE grades",
+      "Safety: Deaths summary",
+      "Safety: Lab data (shift tables, CTC grade summaries)",
+      "Safety: ECG summaries",
+      "Safety: Vital signs summaries",
+      "Safety: Exposure and dose intensity",
+      "Safety: Long-term tolerability (prevalence plots, life table plots, cumulative incidence plots for AESIs)",
+      "Safety: Infection AE summaries",
+      "Safety: Liver enzyme elevations and Hy's Law",
+      "Safety: Thyroid function test summaries",
+      "PK: Concentration summary tables for MEDI4736 and tremelimumab",
+      "Immunogenicity: ADA summary tables"
+    ]
+  },
+
+  "validation_summary": {
+    "completeness_score": "High",
+    "fields_missing": [
+      "Formal TLG numbered list (SAP does not include appendix with shell list; TLG categories derived from SAP body)",
+      "Exact dose for MEDI4736 and tremelimumab (redacted as CCI in SAP/Protocol — standard labeled doses apply per CSP)",
+      "bTMB and tTMB assay companion diagnostic details (CCI-redacted in SAP)",
+      "Visit schedule window table for tumor assessments from Protocol (not fully reproduced in SAP)",
+      "China cohort analysis details (covered in separate China-specific SAP, not this document)"
+    ],
+    "inconsistencies_found": [
+      "Primary endpoint changed from OS in PD-L1 ≥25% to OS in bTMB ≥20 mut/Mb in Protocol v8.0/SAP v3.0 — earlier versions used PD-L1 as primary biomarker. This JSON reflects the current (v8.0/v3.0) design.",
+      "SAP v3.0 is based on CSP v8.0 (April 2019) but Protocol PDF is v9.0 (January 2020). Protocol v9.0 changes include AESI list updates and post-DCO section clarifications; primary endpoint unchanged. No material statistical discrepancies identified.",
+      "SAP Amendment History notes interim analysis originally planned in protocol version 7 was removed — no efficacy interim analyses in current version"
+    ],
+    "reviewer_attention_items": [
+      "bTMB assay (CCI redacted) is a central companion diagnostic — availability and success rate of bTMB testing will determine the size of the bTMB ≥20 analysis set and statistical power",
+      "If primary OS in bTMB≥20 is not statistically significant, all downstream hierarchical tests (bTMB≥16, bTMB≥12, PD-L1-negative) will be reported with nominal p-values only — downstream TLG headers should reflect this conditionality",
+      "China cohort (n≈160) is analyzed separately in a China-specific SAP; ensure China-specific outputs are not confused with global cohort outputs",
+      "Retreatment option in MEDI4736+tremelimumab arm adds complexity to exposure summaries — initial treatment and retreatment generally combined but may need to be separated for specific safety outputs",
+      "Safety follow-up periods differ by treatment arm (90 days for immunotherapy, 30 days for SoC) — AE window rules in TLGs must reflect this asymmetry"
+    ],
+    "recommendations": [
+      "Obtain the China-specific SAP for China cohort TLG generation",
+      "Confirm bTMB assay performance characteristics (expected evaluable rate) to validate ~140 patients expected in bTMB≥20 set",
+      "Plan TLG output in two tiers: (1) biomarker-defined populations within hierarchical testing procedure with formal p-values; (2) all other populations with nominal results clearly labeled",
+      "Include a 'testing hierarchy flow diagram' TLG (forest plot or schema) to communicate the multiplicity control strategy clearly",
+      "For AESI outputs, confirm the final MedDRA preferred term list (reviewed pre-DBL per SAP) before TLG generation"
+    ]
+  }
+}

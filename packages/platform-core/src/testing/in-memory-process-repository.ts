@@ -31,6 +31,10 @@ export class InMemoryProcessRepository implements ProcessRepository {
     );
   }
 
+  async listProcessDefinitions(): Promise<ProcessDefinition[]> {
+    return Array.from(this.definitions.values());
+  }
+
   async getProcessConfig(
     processName: string,
     configName: string,
@@ -58,6 +62,31 @@ export class InMemoryProcessRepository implements ProcessRepository {
       if (def.name === name) {
         this.definitions.set(key, { ...def, metadata: { ...def.metadata, archived } });
       }
+    }
+  }
+
+  async setConfigArchived(
+    processName: string,
+    configName: string,
+    configVersion: string,
+    archived: boolean,
+  ): Promise<void> {
+    const key = `${processName}:${configName}:${configVersion}`;
+    const config = this.configs.get(key);
+    if (config) {
+      this.configs.set(key, { ...config, archived });
+    }
+  }
+
+  async setDefinitionVersionArchived(
+    name: string,
+    version: string,
+    archived: boolean,
+  ): Promise<void> {
+    const key = this.compositeKey(name, version);
+    const def = this.definitions.get(key);
+    if (def) {
+      this.definitions.set(key, { ...def, archived });
     }
   }
 

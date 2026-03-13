@@ -10,7 +10,10 @@ import { ProcessStatusBadge } from './process-status-badge';
 import { StepHistoryTabs } from './step-history-tabs';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
+import { AgentLogViewer } from './agent-log-viewer';
+import { RunResultsPanel } from './run-results-panel';
 import { cancelProcessRun } from '@/app/actions/processes';
+import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 
 type AuditEventWithId = AuditEvent & { id: string };
 
@@ -34,6 +37,7 @@ export function ProcessDetail({
   backHref = '/processes',
   backLabel = 'Processes',
   stepConfigMap,
+  runDetailHref,
 }: {
   instance: ProcessInstance;
   stepExecutions: StepExecution[];
@@ -45,10 +49,37 @@ export function ProcessDetail({
   agentEvents?: AgentEventItem[];
   backHref?: string;
   backLabel?: string;
-  stepConfigMap?: Map<string, { autonomyLevel?: string; executorType?: string }>;
+  stepConfigMap?: Map<string, Record<string, unknown>>;
+  /** Href for this run's detail page, used to build step detail links. */
+  runDetailHref?: string;
 }) {
+  const needsHumanAction = instance.pauseReason === 'waiting_for_human'
+    || instance.pauseReason === 'awaiting_agent_approval';
+  const { task: blockingTask } = useActiveTaskForInstance(
+    needsHumanAction ? instance.id : null,
+  );
+
+  // Extract all agent log filenames from agent status events
+  const agentLogFiles = React.useMemo(() => {
+    const logEvents = agentEvents.filter(
+      (e) => e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:'),
+    );
+    const unsorted = logEvents.map((e) => {
+      const fullPath = (e.payload as string).replace('agent activity log: ', '');
+      return {
+        stepId: e.stepId,
+        file: fullPath.split('/').pop() ?? '',
+      };
+    }).filter((entry) => entry.file.length > 0);
+
+    // Sort tabs to match the definition step order
+    const stepOrder = new Map(definitionSteps.map((s, i) => [s.id, i]));
+    return unsorted.sort((a, b) => (stepOrder.get(a.stepId) ?? 0) - (stepOrder.get(b.stepId) ?? 0));
+  }, [agentEvents, definitionSteps]);
+
   // Controlled tab state for graph-to-history interaction
   const [activeTab, setActiveTab] = React.useState('history');
+  const [agentLogStepId, setAgentLogStepId] = React.useState<string | null>(null);
 
   // Cancel double-confirm: 0 = idle, 1 = first confirm shown, 2 = cancelling in progress
   const [cancelStep, setCancelStep] = React.useState<0 | 1 | 2>(0);
@@ -98,7 +129,8 @@ export function ProcessDetail({
           <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-          <span>Version: <span className="font-mono text-foreground">{instance.definitionVersion}</span></span>
+          <span>Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span></span>
+          <span>Config: <span className="font-mono text-foreground">{instance.configName} v{instance.configVersion}</span></span>
           <span>ID: <span className="font-mono text-foreground text-xs">{instance.id}</span></span>
           {instance.currentStepId && (
             <span>Current step: <span className="font-mono text-foreground">{instance.currentStepId}</span></span>
@@ -107,7 +139,21 @@ export function ProcessDetail({
         </div>
         {instance.pauseReason && (
           <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-            Paused: {instance.pauseReason}
+            <span>Paused: {instance.pauseReason}</span>
+            {blockingTask && (
+              <span className="ml-2">
+                — waiting on{' '}
+                <Link
+                  href={`/tasks/${blockingTask.id}`}
+                  className="font-medium underline hover:text-amber-900 dark:hover:text-amber-200"
+                >
+                  {blockingTask.stepId}
+                </Link>
+                {blockingTask.status === 'claimed' && blockingTask.assignedUserId && (
+                  <span className="ml-1 text-amber-600 dark:text-amber-400">(claimed)</span>
+                )}
+              </span>
+            )}
           </div>
         )}
         {instance.error && (
@@ -163,7 +209,14 @@ export function ProcessDetail({
           agentEvents={agentEvents}
           onStepClick={handleStepClick}
           stepConfigMap={stepConfigMap}
+          stepDetailBaseHref={runDetailHref}
+          onAgentLogClick={agentLogFiles.length > 0 ? (stepId: string) => { setAgentLogStepId(stepId); setActiveTab('agent-log'); } : undefined}
         />
+      )}
+
+      {/* Results — shown for completed runs with agent output */}
+      {instance.status === 'completed' && (
+        <RunResultsPanel stepExecutions={stepExecutions} />
       )}
 
       {/* Tabs: Step History | Audit Log */}
@@ -172,6 +225,7 @@ export function ProcessDetail({
           {[
             { value: 'history', label: 'Step History' },
             { value: 'audit', label: 'Audit Log' },
+            ...(agentLogFiles.length > 0 ? [{ value: 'agent-log', label: 'Agent Log' }] : []),
           ].map(({ value, label }) => (
             <Tabs.Trigger
               key={value}
@@ -190,6 +244,12 @@ export function ProcessDetail({
         <Tabs.Content value="audit">
           <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />
         </Tabs.Content>
+
+        {agentLogFiles.length > 0 && (
+          <Tabs.Content value="agent-log">
+            <AgentLogViewer logFiles={agentLogFiles} initialStepId={agentLogStepId} />
+          </Tabs.Content>
+        )}
       </Tabs.Root>
     </div>
   );

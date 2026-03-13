@@ -72,8 +72,9 @@ jobs:
         run: npm install -g firebase-tools
 
       - name: Start Firebase Emulators
+        working-directory: packages/platform-ui
         run: |
-          firebase emulators:start --project demo-mediforce --only auth,firestore &
+          firebase emulators:start --project demo-mediforce --only auth,firestore --config firebase.ci.json &
           sleep 10
           curl --retry 5 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
           curl --retry 5 --retry-delay 2 --retry-connrefused http://127.0.0.1:8080/

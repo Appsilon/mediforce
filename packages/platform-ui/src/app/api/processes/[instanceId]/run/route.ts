@@ -137,15 +137,62 @@ export async function POST(
         break;
       }
 
-      // Human executor — create HumanTask, pause
+      // Guard: skip if a pending/claimed task already exists for this step (prevents duplicates from race conditions)
+      const { humanTaskRepo } = getPlatformServices();
+      const existingTasks = await humanTaskRepo.getByInstanceId(instanceId);
+      const hasPendingTask = existingTasks.some(
+        (t) => t.stepId === instance.currentStepId && (t.status === 'pending' || t.status === 'claimed'),
+      );
+      if (hasPendingTask) {
+        console.log(`[auto-runner] Duplicate guard: pending task already exists for step '${instance.currentStepId}' on instance '${instanceId}' — pausing`);
+        // Ensure instance is paused so the UI shows the task correctly
+        if (instance.status === 'running') {
+          await instanceRepo.update(instanceId, {
+            status: 'paused',
+            pauseReason: 'waiting_for_human',
+            updatedAt: new Date().toISOString(),
+          });
+        }
+        break;
+      }
+
+      // Human executor — create HumanTask, pause (do NOT advanceStep — the human hasn't acted yet)
       if (stepConfig.executorType === 'human') {
-        const { engine } = getPlatformServices();
-        await engine.advanceStep(
-          instanceId,
-          { reason: 'human_step_reached' },
-          { id: triggeredBy ?? 'auto-runner', role: 'agent' },
-          stepConfig,
-        );
+        const now = new Date().toISOString();
+        const taskId = crypto.randomUUID();
+
+        await humanTaskRepo.create({
+          id: taskId,
+          processInstanceId: instanceId,
+          stepId: instance.currentStepId,
+          assignedRole: stepConfig.allowedRoles?.[0] ?? 'unassigned',
+          assignedUserId: null,
+          status: 'pending',
+          deadline: null,
+          createdAt: now,
+          updatedAt: now,
+          completedAt: null,
+          completionData: null,
+          creationReason: 'human_executor',
+          ...(currentStep.ui ? { ui: currentStep.ui } : {}),
+          ...(currentStep.params?.length ? { params: currentStep.params } : {}),
+        });
+
+        await auditRepo.append({
+          actorId: 'auto-runner',
+          actorType: 'system',
+          actorRole: 'orchestrator',
+          action: 'task.created',
+          description: `Human task created for step '${instance.currentStepId}' (reason: human_executor)`,
+          timestamp: now,
+          inputSnapshot: { taskId, stepId: instance.currentStepId, reason: 'human_executor', assignedRole: stepConfig.allowedRoles?.[0] ?? 'unassigned' },
+          outputSnapshot: {},
+          basis: 'Human executor step reached in auto-runner loop',
+          entityType: 'humanTask',
+          entityId: taskId,
+          processInstanceId: instanceId,
+          processDefinitionVersion: initialInstance.definitionVersion,
+        });
 
         await instanceRepo.update(instanceId, {
           status: 'paused',
@@ -156,13 +203,24 @@ export async function POST(
       }
 
       // Agent executor — write running execution record then call advance
-      if (stepConfig.executorType === 'agent') {
+      if (stepConfig.executorType === 'agent' || stepConfig.executorType === 'script') {
+        console.log(`[auto-runner] Executing agent step '${instance.currentStepId}' on instance '${instanceId}' (iteration ${stepsExecuted})`);
+
+        // Capture semantic input: previous step's output from instance variables
+        const previousStepId = definition.transitions.find(
+          (t) => t.to === instance.currentStepId,
+        )?.from ?? null;
+        const stepInput = previousStepId
+          ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
+          : {};
+
+        const executionId = crypto.randomUUID();
         await instanceRepo.addStepExecution(instanceId, {
-          id: crypto.randomUUID(),
+          id: executionId,
           instanceId,
           stepId: instance.currentStepId,
           status: 'running',
-          input: appContext,
+          input: stepInput,
           output: null,
           verdict: null,
           executedBy: 'auto-runner',
@@ -196,6 +254,7 @@ export async function POST(
           instance.currentStepId,
           appContext,
           triggeredBy ?? 'auto-runner',
+          executionId,
         );
 
         stepsExecuted++;

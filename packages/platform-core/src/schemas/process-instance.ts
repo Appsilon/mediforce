@@ -17,7 +17,7 @@ export const ProcessInstanceSchema = z.object({
   status: InstanceStatusSchema,
   currentStepId: z.string().nullable(),
   variables: z.record(z.string(), z.unknown()),
-  triggerType: z.enum(['manual', 'webhook']),
+  triggerType: z.enum(['manual', 'webhook', 'cron']),
   triggerPayload: z.record(z.string(), z.unknown()),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
