@@ -30,13 +30,7 @@ steps:
 transitions:
   - from: collect-data
     to: review
-    gate: data-complete
-  - from: review
-    to: complete
-  - from: review
-    to: collect-data
-  - from: review
-    to: closed
+    when: 'output.dataComplete == true'
 triggers:
   - type: manual
     name: Start Supply Chain Review

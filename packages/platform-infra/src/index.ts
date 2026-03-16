@@ -19,4 +19,4 @@ export { FirestoreAgentRunRepository } from './firestore/agent-run-repository.js
 export { FirestoreHandoffRepository } from './firestore/handoff-repository.js';
 export { SendGridNotificationService } from './notifications/sendgrid-notification-service.js';
 export { WebhookNotificationService } from './notifications/webhook-notification-service.js';
-export { NotificationGateErrorNotifier } from './notifications/gate-error-notifier-impl.js';
+

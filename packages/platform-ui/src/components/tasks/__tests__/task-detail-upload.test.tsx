@@ -47,15 +47,12 @@ vi.mock('@/hooks/use-collection', () => ({
   useCollection: () => ({ data: [], loading: false }),
 }));
 
-// Mock server actions
+// Mock server actions (all consolidated in tasks.ts)
 const mockCompleteUploadTask = vi.fn().mockResolvedValue({ success: true });
-vi.mock('@/app/actions/upload-task', () => ({
-  completeUploadTask: (...args: unknown[]) => mockCompleteUploadTask(...args),
-}));
-
-// Mock completeTask (imported by verdict-form)
 vi.mock('@/app/actions/tasks', () => ({
+  completeUploadTask: (...args: unknown[]) => mockCompleteUploadTask(...args),
   completeTask: vi.fn().mockResolvedValue({ success: true }),
+  completeParamsTask: vi.fn().mockResolvedValue({ success: true }),
   claimTask: vi.fn().mockResolvedValue({ success: true }),
   unclaimTask: vi.fn().mockResolvedValue({ success: true }),
 }));
@@ -77,6 +74,83 @@ function createUploadTask(overrides?: Partial<HumanTask>): HumanTask {
     ...overrides,
   });
 }
+
+// ---- Selection task rendering ----
+
+function createSelectionTask(overrides?: Partial<HumanTask>): HumanTask {
+  return buildHumanTask({
+    status: 'claimed',
+    assignedUserId: 'user-1',
+    options: [
+      { label: 'All-human', description: 'Every step by humans', value: { mode: 'human' } },
+      { label: 'Hybrid', description: 'Agent + human review', value: { mode: 'hybrid' } },
+    ],
+    selection: { min: 1, max: 2 },
+    ...overrides,
+  });
+}
+
+describe('TaskDetail — selection task rendering', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('[RENDER] shows option cards when task has options', () => {
+    const task = createSelectionTask();
+    render(<TaskDetail task={task} currentUserId="user-1" />);
+
+    expect(screen.getByText('All-human')).toBeInTheDocument();
+    expect(screen.getByText('Hybrid')).toBeInTheDocument();
+    expect(screen.getByText(/every step by humans/i)).toBeInTheDocument();
+  });
+
+  it('[RENDER] shows approve and revise buttons for selection tasks', () => {
+    const task = createSelectionTask();
+    render(<TaskDetail task={task} currentUserId="user-1" />);
+
+    expect(screen.getByRole('button', { name: /approve selected/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /request revisions/i })).toBeInTheDocument();
+  });
+
+  it('[RENDER] does not show verdict form when selection task is active', () => {
+    const task = createSelectionTask();
+    render(<TaskDetail task={task} currentUserId="user-1" />);
+
+    // Should show selection form, not the regular verdict form
+    expect(screen.getByText('All-human')).toBeInTheDocument();
+    // Verdict form has a standalone "Approve" button (not "Approve selected")
+    const approveButtons = screen.getAllByRole('button').filter(
+      (btn) => btn.textContent?.trim() === 'Approve',
+    );
+    expect(approveButtons).toHaveLength(0);
+  });
+
+  it('[RENDER] does not show selection form when task is pending', () => {
+    const task = createSelectionTask({ status: 'pending', assignedUserId: null });
+    render(<TaskDetail task={task} currentUserId="user-1" />);
+
+    expect(screen.queryByText('All-human')).not.toBeInTheDocument();
+  });
+
+  it('[RENDER] shows completed state for selection task', () => {
+    const task = createSelectionTask({
+      status: 'completed',
+      completedAt: '2026-03-14T12:00:00.000Z',
+      completionData: {
+        verdict: 'approve',
+        selectedIndex: 0,
+        selectedOption: { label: 'All-human', description: 'Every step by humans', value: { mode: 'human' } },
+        completedBy: 'user-1',
+        completedAt: '2026-03-14T12:00:00.000Z',
+      },
+    });
+    render(<TaskDetail task={task} currentUserId="user-1" />);
+
+    expect(screen.getByText(/you approved: all-human/i)).toBeInTheDocument();
+  });
+});
+
+// ---- File upload rendering ----
 
 describe('TaskDetail — file upload integration', () => {
   beforeEach(() => {

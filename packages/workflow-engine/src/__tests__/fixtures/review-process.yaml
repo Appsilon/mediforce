@@ -24,15 +24,6 @@ steps:
 transitions:
   - from: draft
     to: review
-  - from: review
-    to: approved
-    gate: review-gate
-  - from: review
-    to: draft
-    gate: review-gate
-  - from: review
-    to: rejected
-    gate: review-gate
 triggers:
   - type: manual
     name: Start Review

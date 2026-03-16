@@ -3,7 +3,6 @@ import {
   InMemoryProcessRepository,
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
-  NoOpGateErrorNotifier,
   InMemoryHumanTaskRepository,
 } from '@mediforce/platform-core';
 import type {
@@ -14,10 +13,8 @@ import type {
   HumanTaskRepository,
 } from '@mediforce/platform-core';
 import {
-  GateRegistry,
   WorkflowEngine,
   InvalidTransitionError,
-  createSimpleReviewGate,
 } from '../index.js';
 import type { StepActor } from '../index.js';
 
@@ -46,8 +43,8 @@ const branchingDef: ProcessDefinition = {
     { id: 'done', name: 'Done', type: 'terminal' },
   ],
   transitions: [
-    { from: 'start', to: 'path-a', gate: 'route-decision' },
-    { from: 'start', to: 'path-b', gate: 'route-decision' },
+    { from: 'start', to: 'path-a', when: 'output.route == "a"' },
+    { from: 'start', to: 'path-b', when: 'output.route == "b"' },
     { from: 'path-a', to: 'done' },
     { from: 'path-b', to: 'done' },
   ],
@@ -74,9 +71,9 @@ const reviewDef: ProcessDefinition = {
   ],
   transitions: [
     { from: 'draft', to: 'review' },
-    { from: 'review', to: 'approved', gate: 'review-gate' },
-    { from: 'review', to: 'draft', gate: 'review-gate' },
-    { from: 'review', to: 'rejected', gate: 'review-gate' },
+    { from: 'review', to: 'approved' },
+    { from: 'review', to: 'draft' },
+    { from: 'review', to: 'rejected' },
   ],
   triggers: [{ type: 'manual', name: 'Start Review' }],
 };
@@ -123,22 +120,16 @@ describe('WorkflowEngine', () => {
   let processRepo: InMemoryProcessRepository;
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
-  let gateRegistry: GateRegistry;
-  let gateErrorNotifier: NoOpGateErrorNotifier;
   let engine: WorkflowEngine;
 
   beforeEach(async () => {
     processRepo = new InMemoryProcessRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository();
-    gateRegistry = new GateRegistry();
-    gateErrorNotifier = new NoOpGateErrorNotifier();
     engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
     );
 
     // Seed definitions
@@ -234,7 +225,7 @@ describe('WorkflowEngine', () => {
 
   // --- submitReviewVerdict ---
 
-  it('submitReviewVerdict adds verdict to ReviewTracker, invokes StepExecutor with verdicts', async () => {
+  it('submitReviewVerdict adds verdict to ReviewTracker, routes via native verdicts', async () => {
     const instance = await engine.createInstance(
       'review-process',
       '1.0',
@@ -245,15 +236,6 @@ describe('WorkflowEngine', () => {
     await engine.startInstance(instance.id);
     // Advance from draft to review
     await engine.advanceStep(instance.id, {}, actor);
-
-    gateRegistry.register(
-      'review-gate',
-      createSimpleReviewGate({
-        approve: 'approved',
-        revise: 'draft',
-        reject: 'rejected',
-      }),
-    );
 
     const verdict = makeReviewVerdict('approve');
     const result = await engine.submitReviewVerdict(
@@ -267,15 +249,6 @@ describe('WorkflowEngine', () => {
   });
 
   it('submitReviewVerdict when maxIterations exceeded: pauses instance with reason max_iterations_exceeded', async () => {
-    gateRegistry.register(
-      'review-gate',
-      createSimpleReviewGate({
-        approve: 'approved',
-        revise: 'draft',
-        reject: 'rejected',
-      }),
-    );
-
     const instance = await engine.createInstance(
       'review-process',
       '1.0',
@@ -420,15 +393,7 @@ describe('WorkflowEngine', () => {
     expect(step2.currentStepId).toBeNull();
   });
 
-  it('full branching flow: gate routes to correct step based on output', async () => {
-    gateRegistry.register('route-decision', (input) => {
-      const route = input.stepOutput['route'] as string;
-      return {
-        next: route === 'a' ? 'path-a' : 'path-b',
-        reason: `Routed to ${route}`,
-      };
-    });
-
+  it('full branching flow: when expression routes to correct step based on output', async () => {
     const instance = await engine.createInstance(
       'branching-process',
       '1.0',
@@ -438,7 +403,7 @@ describe('WorkflowEngine', () => {
     );
     await engine.startInstance(instance.id);
 
-    // Gate routes to path-b
+    // when expression routes to path-b
     const routed = await engine.advanceStep(
       instance.id,
       { route: 'b' },
@@ -452,15 +417,6 @@ describe('WorkflowEngine', () => {
   });
 
   it('full review loop: two revise verdicts then approve -- loops back, then completes', async () => {
-    gateRegistry.register(
-      'review-gate',
-      createSimpleReviewGate({
-        approve: 'approved',
-        revise: 'draft',
-        reject: 'rejected',
-      }),
-    );
-
     const instance = await engine.createInstance(
       'review-process',
       '1.0',
@@ -517,51 +473,6 @@ describe('WorkflowEngine', () => {
     expect(current!.currentStepId).toBeNull();
   });
 
-  // --- GateErrorNotifier tests ---
-
-  it('gate error calls GateErrorNotifier.notifyGateError() with correct fields', async () => {
-    const instance = await engine.createInstance(
-      'branching-process',
-      '1.0',
-      'user-1',
-      'manual',
-      {},
-    );
-    await engine.startInstance(instance.id);
-    // Do NOT register route-decision gate -- will trigger gate error
-
-    await expect(
-      engine.advanceStep(instance.id, {}, actor),
-    ).rejects.toThrow();
-
-    expect(gateErrorNotifier.notifications).toHaveLength(1);
-    const notification = gateErrorNotifier.notifications[0];
-    expect(notification.instanceId).toBe(instance.id);
-    expect(notification.stepId).toBe('start');
-    expect(notification.gateName).toBeDefined();
-    expect(notification.error).toBeDefined();
-    expect(notification.timestamp).toBeDefined();
-  });
-
-  it('gate error notification includes correct gateName from transition', async () => {
-    const instance = await engine.createInstance(
-      'branching-process',
-      '1.0',
-      'user-1',
-      'manual',
-      {},
-    );
-    await engine.startInstance(instance.id);
-    // Not registering route-decision gate
-
-    await expect(
-      engine.advanceStep(instance.id, {}, actor),
-    ).rejects.toThrow();
-
-    const notification = gateErrorNotifier.notifications[0];
-    expect(notification.gateName).toBe('route-decision');
-  });
-
   // --- HumanTask creation ---
 
   describe('HumanTask creation', () => {
@@ -571,8 +482,6 @@ describe('WorkflowEngine', () => {
         processRepo,
         instanceRepo,
         auditRepo,
-        gateRegistry,
-        gateErrorNotifier,
         undefined, // rbacService
         undefined, // handoffRepository
         undefined, // notificationService
@@ -628,8 +537,6 @@ describe('WorkflowEngine', () => {
         processRepo,
         instanceRepo,
         auditRepo,
-        gateRegistry,
-        gateErrorNotifier,
         undefined,
         undefined,
         undefined,
@@ -674,8 +581,6 @@ describe('WorkflowEngine', () => {
         processRepo,
         instanceRepo,
         auditRepo,
-        gateRegistry,
-        gateErrorNotifier,
         undefined,
         undefined,
         undefined,
@@ -706,8 +611,6 @@ describe('WorkflowEngine', () => {
         processRepo,
         instanceRepo,
         auditRepo,
-        gateRegistry,
-        gateErrorNotifier,
         undefined,
         undefined,
         undefined,
@@ -750,8 +653,6 @@ describe('WorkflowEngine', () => {
         processRepo,
         instanceRepo,
         auditRepo,
-        gateRegistry,
-        gateErrorNotifier,
         undefined,
         undefined,
         undefined,
@@ -780,6 +681,121 @@ describe('WorkflowEngine', () => {
       const tasks = humanTaskRepo.getAll();
       expect(tasks).toHaveLength(1);
       expect(tasks[0].assignedRole).toBe('supply-analyst');
+    });
+  });
+
+  describe('selection review', () => {
+    const selectionDef: ProcessDefinition = {
+      name: 'selection-process',
+      version: '1.0',
+      steps: [
+        { id: 'generate', name: 'Generate Options', type: 'creation' },
+        {
+          id: 'select-review',
+          name: 'Select Review',
+          type: 'review',
+          selection: 2,
+          verdicts: {
+            approve: { target: 'done' },
+            reject: { target: 'done' },
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal' },
+      ],
+      transitions: [
+        { from: 'generate', to: 'select-review' },
+        { from: 'select-review', to: 'done' },
+      ],
+      triggers: [{ type: 'manual', name: 'Start' }],
+    };
+
+    const selectionConfig: ProcessConfig = {
+      processName: 'selection-process',
+      configName: 'default',
+      configVersion: '1.0',
+      stepConfigs: [
+        { stepId: 'generate', executorType: 'agent' },
+        { stepId: 'select-review', executorType: 'human', allowedRoles: ['reviewer'] },
+      ],
+    };
+
+    it('copies selection and options to HumanTask when review step has selection', async () => {
+      const humanTaskRepo = new InMemoryHumanTaskRepository();
+      const engineWithSelection = new WorkflowEngine(
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        undefined,
+        undefined,
+        undefined,
+        humanTaskRepo,
+      );
+
+      await processRepo.saveProcessDefinition(selectionDef);
+      await processRepo.saveProcessConfig(selectionConfig);
+
+      const instance = await engineWithSelection.createInstance(
+        'selection-process', '1.0', 'user-1', 'manual', {},
+      );
+      await engineWithSelection.startInstance(instance.id);
+
+      // Advance from 'generate' -> 'select-review' with options in output
+      const optionsPayload = {
+        options: [
+          { id: 'opt-1', label: 'Option A' },
+          { id: 'opt-2', label: 'Option B' },
+        ],
+      };
+      await engineWithSelection.advanceStep(
+        instance.id,
+        optionsPayload,
+        { id: 'user-1', role: 'operator' },
+      );
+
+      const tasks = humanTaskRepo.getAll();
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].selection).toBe(2);
+      expect(tasks[0].options).toEqual([
+        { id: 'opt-1', label: 'Option A' },
+        { id: 'opt-2', label: 'Option B' },
+      ]);
+    });
+
+    it('throws when options count violates selection constraint', async () => {
+      const humanTaskRepo = new InMemoryHumanTaskRepository();
+      const engineWithSelection = new WorkflowEngine(
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        undefined,
+        undefined,
+        undefined,
+        humanTaskRepo,
+      );
+
+      await processRepo.saveProcessDefinition(selectionDef);
+      await processRepo.saveProcessConfig(selectionConfig);
+
+      const instance = await engineWithSelection.createInstance(
+        'selection-process', '1.0', 'user-1', 'manual', {},
+      );
+      await engineWithSelection.startInstance(instance.id);
+
+      // Advance with 3 options but selection is exactly 2 (min=max=2)
+      const tooManyOptions = {
+        options: [
+          { id: 'opt-1', label: 'Option A' },
+          { id: 'opt-2', label: 'Option B' },
+          { id: 'opt-3', label: 'Option C' },
+        ],
+      };
+      await expect(
+        engineWithSelection.advanceStep(
+          instance.id,
+          tooManyOptions,
+          { id: 'user-1', role: 'operator' },
+        ),
+      ).rejects.toThrow(/options/);
     });
   });
 });

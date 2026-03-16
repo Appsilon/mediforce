@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   ProcessDefinitionSchema,
+  SelectionSchema,
+  normalizeSelection,
   StepSchema,
   TransitionSchema,
   TriggerSchema,
@@ -216,20 +218,48 @@ describe('StepSchema', () => {
   });
 });
 
+describe('SelectionSchema', () => {
+  it('[DATA] selection shorthand (number) parses correctly', () => {
+    const result = SelectionSchema.safeParse(3);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toBe(3);
+    }
+  });
+
+  it('[DATA] selection object form parses correctly', () => {
+    const result = SelectionSchema.safeParse({ min: 2, max: 5 });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({ min: 2, max: 5 });
+    }
+  });
+
+  it('[DATA] normalizeSelection converts number to {min, max}', () => {
+    const normalized = normalizeSelection(3);
+    expect(normalized).toEqual({ min: 3, max: 3 });
+  });
+
+  it('[DATA] normalizeSelection passes through object form', () => {
+    const normalized = normalizeSelection({ min: 1, max: 4 });
+    expect(normalized).toEqual({ min: 1, max: 4 });
+  });
+});
+
 describe('TransitionSchema', () => {
   it('should parse a minimal transition', () => {
     const result = TransitionSchema.safeParse(minimalTransition);
     expect(result.success).toBe(true);
   });
 
-  it('should parse a transition with gate', () => {
+  it('should parse a transition with when condition', () => {
     const result = TransitionSchema.safeParse({
       ...minimalTransition,
-      gate: 'data-complete',
+      when: 'data-complete',
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.gate).toBe('data-complete');
+      expect(result.data.when).toBe('data-complete');
     }
   });
 });
@@ -313,7 +343,7 @@ describe('ProcessDefinitionSchema', () => {
         { id: 'closed', name: 'Closed', type: 'terminal' },
       ],
       transitions: [
-        { from: 'collect-data', to: 'review', gate: 'data-complete' },
+        { from: 'collect-data', to: 'review', when: 'data-complete' },
       ],
       triggers: [
         { type: 'manual', name: 'Start Supply Chain Review' },

@@ -9,11 +9,11 @@ export class StepFailureError extends Error {
   }
 }
 
-export class GateError extends Error {
-  override name = 'GateError';
+export class RoutingError extends Error {
+  override name = 'RoutingError';
 
   constructor(
-    public readonly gateName: string,
+    public readonly stepId: string,
     message: string,
   ) {
     super(message);

@@ -53,13 +53,56 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
     }
   }
 
-  // 4. At least one terminal step exists
+  // 4. When-expression validation: if multiple transitions from same step, all must have `when`
+  const transitionsBySource = new Map<string, typeof definition.transitions>();
+  for (const transition of definition.transitions) {
+    const existing = transitionsBySource.get(transition.from) ?? [];
+    existing.push(transition);
+    transitionsBySource.set(transition.from, existing);
+  }
+  for (const [stepId, transitions] of transitionsBySource) {
+    if (transitions.length > 1) {
+      // Review steps with verdicts route via verdict targets — their transitions
+      // are informational (for graph visualization) and don't need `when`.
+      const step = definition.steps.find((s) => s.id === stepId);
+      const hasVerdicts = step?.verdicts && Object.keys(step.verdicts).length > 0;
+      if (!hasVerdicts) {
+        const missingWhen = transitions.filter((t) => !t.when);
+        if (missingWhen.length > 0) {
+          errors.push(
+            `Step "${stepId}" has multiple outgoing transitions but not all have 'when' conditions. ` +
+              `Missing on transitions to: ${missingWhen.map((t) => t.to).join(', ')}`,
+          );
+        }
+      }
+    }
+  }
+
+  // 5. Selection constraints: only on review steps, min <= max
+  for (const step of definition.steps) {
+    if (step.selection !== undefined) {
+      if (step.type !== 'review') {
+        errors.push(
+          `Step "${step.id}" has 'selection' but is type "${step.type}" — selection is only allowed on review steps`,
+        );
+      }
+      if (typeof step.selection === 'object') {
+        if (step.selection.min > step.selection.max) {
+          errors.push(
+            `Step "${step.id}" selection min (${step.selection.min}) exceeds max (${step.selection.max})`,
+          );
+        }
+      }
+    }
+  }
+
+  // 6. At least one terminal step exists
   const terminalSteps = definition.steps.filter((s) => s.type === 'terminal');
   if (terminalSteps.length === 0) {
     errors.push('Process definition has no terminal step');
   }
 
-  // 5. Every non-terminal step has at least one outgoing transition or verdict
+  // 7. Every non-terminal step has at least one outgoing transition or verdict
   for (const step of definition.steps) {
     if (step.type === 'terminal') continue;
 
@@ -75,7 +118,7 @@ export function validateStepGraph(definition: ProcessDefinition): ValidationResu
     }
   }
 
-  // 6. Reachability: BFS from step[0] (entry point)
+  // 8. Reachability: BFS from step[0] (entry point)
   if (definition.steps.length > 0) {
     const reachable = new Set<string>();
     const queue: string[] = [definition.steps[0].id];

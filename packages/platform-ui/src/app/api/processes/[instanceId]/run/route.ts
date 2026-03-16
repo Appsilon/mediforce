@@ -206,13 +206,17 @@ export async function POST(
       if (stepConfig.executorType === 'agent' || stepConfig.executorType === 'script') {
         console.log(`[auto-runner] Executing agent step '${instance.currentStepId}' on instance '${instanceId}' (iteration ${stepsExecuted})`);
 
-        // Capture semantic input: previous step's output from instance variables
+        // Capture semantic input: previous step's output as top-level keys
+        // (backward compatible), plus a `steps` map with ALL prior step outputs
+        // keyed by step ID so any step can access non-adjacent data
+        // (e.g., register-definition reads steps['validate-definition'].yaml).
         const previousStepId = definition.transitions.find(
           (t) => t.to === instance.currentStepId,
         )?.from ?? null;
-        const stepInput = previousStepId
+        const previousStepOutput = previousStepId
           ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
           : {};
+        const stepInput = { ...previousStepOutput, steps: instance.variables };
 
         const executionId = crypto.randomUUID();
         await instanceRepo.addStepExecution(instanceId, {
@@ -249,10 +253,14 @@ export async function POST(
 
         // Call executeAgentStep directly — no HTTP, no timeout issues.
         // No autonomyLevel arg — resolved internally from ProcessConfig.
+        // Merge trigger payload with previous step's output so the plugin
+        // receives semantic data from the prior step (e.g., YAML content).
+        // stepInput wins over appContext for overlapping keys — it's more specific.
+        const mergedAppContext = { ...appContext, ...stepInput };
         await executeAgentStep(
           instanceId,
           instance.currentStepId,
-          appContext,
+          mergedAppContext,
           triggeredBy ?? 'auto-runner',
           executionId,
         );

@@ -4,7 +4,6 @@ import type {
   AuditRepository,
   ProcessInstance,
   ReviewVerdict,
-  GateErrorNotifier,
   StepConfig,
   HandoffRepository,
   HandoffEntity,
@@ -14,11 +13,11 @@ import type {
   HumanTask,
   UserDirectoryService,
 } from '@mediforce/platform-core';
-import { RbacService, RbacError } from '@mediforce/platform-core';
-import type { GateRegistry } from '../gates/gate-registry.js';
+import type { Selection } from '@mediforce/platform-core';
+import { RbacService, RbacError, normalizeSelection } from '@mediforce/platform-core';
 import { validateStepGraph } from '../graph/graph-validator.js';
 import { StepExecutor, type StepActor } from './step-executor.js';
-import { GateError, InvalidTransitionError } from './errors.js';
+import { RoutingError, InvalidTransitionError } from './errors.js';
 import { ReviewTracker } from '../review/review-tracker.js';
 
 /**
@@ -54,19 +53,13 @@ export class WorkflowEngine {
     private readonly processRepository: ProcessRepository,
     private readonly instanceRepository: ProcessInstanceRepository,
     private readonly auditRepository: AuditRepository,
-    private readonly gateRegistry: GateRegistry,
-    private readonly gateErrorNotifier: GateErrorNotifier,
     private readonly rbacService?: RbacService,          // optional: Phase 4 RBAC enforcement
     private readonly handoffRepository?: HandoffRepository, // optional: Phase 4 handoff creation on escalation
     private readonly notificationService?: NotificationService, // optional: escalation notifications
     private readonly humanTaskRepository?: HumanTaskRepository, // optional: Phase 4.1 HumanTask creation on human step advance
     private readonly userDirectoryService?: UserDirectoryService, // optional: resolves roles to email targets for notifications
   ) {
-    this.stepExecutor = new StepExecutor(
-      instanceRepository,
-      auditRepository,
-      gateRegistry,
-    );
+    this.stepExecutor = new StepExecutor(instanceRepository, auditRepository);
     this.reviewTracker = new ReviewTracker();
   }
 
@@ -292,26 +285,12 @@ export class WorkflowEngine {
       return this.loadInstance(instanceId);
     }
 
-    try {
-      await this.stepExecutor.executeStep(
-        instance,
-        stepOutput,
-        actor,
-        definition,
-      );
-    } catch (err) {
-      if (err instanceof GateError) {
-        await this.gateErrorNotifier.notifyGateError({
-          instanceId,
-          gateName: err.gateName,
-          stepId: instance.currentStepId!,
-          error: err.message,
-          timestamp: new Date().toISOString(),
-        });
-        throw err;
-      }
-      throw err;
-    }
+    await this.stepExecutor.executeStep(
+      instance,
+      stepOutput,
+      actor,
+      definition,
+    );
 
     // HumanTask creation: create task when next step's executor is 'human'.
     // Checks executorType from ProcessConfig (not step type from definition),
@@ -339,6 +318,25 @@ export class WorkflowEngine {
             const assignedRole = nextStepConfig?.allowedRoles?.[0] ?? 'unassigned';
 
             const now = new Date().toISOString();
+
+            // Selection review: copy selection constraint + extract options from previous step output
+            const selectionFields: { selection?: Selection; options?: Record<string, unknown>[] } = {};
+            if (nextStep.selection !== undefined) {
+              selectionFields.selection = nextStep.selection;
+              // Previous step output is in instance.variables[currentStepId]
+              const prevOutput = updatedInstance.variables[instance.currentStepId!] as Record<string, unknown> | undefined;
+              const rawOptions = prevOutput?.options;
+              if (Array.isArray(rawOptions) && rawOptions.length > 0) {
+                const { min, max } = normalizeSelection(nextStep.selection);
+                if (rawOptions.length < min || rawOptions.length > max) {
+                  throw new Error(
+                    `Step "${nextStep.id}" expects ${min}–${max} options but previous step produced ${rawOptions.length}`,
+                  );
+                }
+                selectionFields.options = rawOptions as Record<string, unknown>[];
+              }
+            }
+
             const task: HumanTask = {
               id: crypto.randomUUID(),
               processInstanceId: instanceId,
@@ -354,6 +352,7 @@ export class WorkflowEngine {
               creationReason: 'human_executor',
               ...(nextStep.ui ? { ui: nextStep.ui } : {}),
               ...(nextStep.params?.length ? { params: nextStep.params } : {}),
+              ...selectionFields,
             };
             await this.humanTaskRepository.create(task);
 
@@ -441,28 +440,14 @@ export class WorkflowEngine {
     // Remember current step before executing
     const previousStepId = instance.currentStepId;
 
-    // Execute step with review verdicts
-    try {
-      await this.stepExecutor.executeStep(
-        instance,
-        { verdict: verdict.verdict, comment: verdict.comment },
-        actor,
-        definition,
-        allVerdicts,
-      );
-    } catch (err) {
-      if (err instanceof GateError) {
-        await this.gateErrorNotifier.notifyGateError({
-          instanceId,
-          gateName: err.gateName,
-          stepId: instance.currentStepId!,
-          error: err.message,
-          timestamp: new Date().toISOString(),
-        });
-        throw err;
-      }
-      throw err;
-    }
+    // Execute step with review verdicts (native verdict routing reads step.verdicts)
+    await this.stepExecutor.executeStep(
+      instance,
+      { verdict: verdict.verdict, comment: verdict.comment },
+      actor,
+      definition,
+      allVerdicts,
+    );
 
     // Check if the step routed back (loop detected) -- increment iteration
     const updatedInstance = await this.loadInstance(instanceId);

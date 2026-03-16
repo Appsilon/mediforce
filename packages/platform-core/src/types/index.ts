@@ -6,6 +6,7 @@ export type {
   Verdict,
   StepUi,
   StepParam,
+  Selection,
   Step,
   Transition,
   Trigger,

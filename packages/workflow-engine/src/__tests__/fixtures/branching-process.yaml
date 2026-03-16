@@ -1,6 +1,6 @@
 name: branching-process
 version: "1.0"
-description: Process with gate-driven branch
+description: Process with expression-driven branch
 steps:
   - id: start
     name: Start
@@ -17,10 +17,10 @@ steps:
 transitions:
   - from: start
     to: path-a
-    gate: route-decision
+    when: 'output.route == "a"'
   - from: start
     to: path-b
-    gate: route-decision
+    when: 'output.route == "b"'
   - from: path-a
     to: done
   - from: path-b

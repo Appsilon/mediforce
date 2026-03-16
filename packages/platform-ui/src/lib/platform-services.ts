@@ -11,8 +11,6 @@ import {
 import { connectFirestoreEmulator } from 'firebase/firestore';
 import {
   WorkflowEngine,
-  GateRegistry,
-  alwaysProceed,
   ManualTrigger,
   CronTrigger,
 } from '@mediforce/workflow-engine';
@@ -26,7 +24,6 @@ import {
   OpenCodeAgentPlugin,
   ScriptContainerPlugin,
 } from '@mediforce/agent-runtime';
-import { NoOpGateErrorNotifier } from '@mediforce/platform-core';
 import { registerSupplyIntelligencePlugins } from '@mediforce/supply-intelligence-plugins';
 
 let services: PlatformServices | null = null;
@@ -75,9 +72,6 @@ export function getPlatformServices(): PlatformServices {
   const humanTaskRepo = new FirestoreHumanTaskRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
-  const gateRegistry = new GateRegistry();
-  gateRegistry.register('alwaysProceed', alwaysProceed);
-
   const pluginRegistry = new PluginRegistry();
 
   // Register supply intelligence plugins from @mediforce/supply-intelligence-plugins.
@@ -110,8 +104,6 @@ export function getPlatformServices(): PlatformServices {
     processRepo,
     instanceRepo,
     auditRepo,
-    gateRegistry,
-    new NoOpGateErrorNotifier(),
     undefined, // rbacService
     undefined, // handoffRepository
     undefined, // notificationService

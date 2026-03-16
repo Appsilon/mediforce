@@ -1,8 +1,6 @@
 FROM node:20-slim
 
-WORKDIR /packages
-RUN npm init -y && npm install yaml
-
-ENV NODE_PATH=/packages/node_modules
+RUN mkdir -p /deps && cd /deps && npm init -y && npm install yaml && \
+    ln -s /deps/node_modules /node_modules
 
 CMD ["node", "/output/script.mjs"]

@@ -1,7 +1,14 @@
-// Gates
-export { GateRegistry, GateNotFoundError, GateExecutionError } from './gates/gate-registry.js';
-export type { GateInput, GateFunction } from './gates/gate-types.js';
-export { alwaysProceed, createSimpleReviewGate } from './gates/built-in-gates.js';
+// Expressions
+export { evaluateExpression, ExpressionError } from './expressions/expression-evaluator.js';
+export type { ExpressionContext } from './expressions/expression-evaluator.js';
+
+// Transition resolver
+export {
+  resolveTransitions,
+  TransitionValidationError,
+  NoMatchingTransitionError,
+} from './engine/transition-resolver.js';
+export type { ResolvedTransition, TransitionContext } from './engine/transition-resolver.js';
 
 // Graph
 export { validateStepGraph, type ValidationResult } from './graph/graph-validator.js';
@@ -13,7 +20,7 @@ export { StepExecutor } from './engine/step-executor.js';
 export type { StepActor } from './engine/step-executor.js';
 export {
   StepFailureError,
-  GateError,
+  RoutingError,
   InvalidTransitionError,
   MaxIterationsExceededError,
 } from './engine/errors.js';

@@ -66,13 +66,5 @@ transitions:
     to: rank-changes
   - from: rank-changes
     to: review-ranking
-  - from: review-ranking
-    to: draft-posts
-  - from: review-ranking
-    to: rank-changes
   - from: draft-posts
     to: review-posts
-  - from: review-posts
-    to: done
-  - from: review-posts
-    to: draft-posts

@@ -14,9 +14,10 @@ import { AgentOutputReviewPanel } from './agent-output-review-panel';
 import { FileUploadZone } from './file-upload-zone';
 import { VerdictForm, VerdictConfirmationReadOnly } from './verdict-form';
 import { ParamsForm, ParamsConfirmationReadOnly } from './params-form';
+import { SelectionForm, SelectionConfirmationReadOnly } from './selection-form';
 import { NextStepCard } from './next-step-card';
 import { getTaskDisplayTitle, isAgentReviewTask, getAgentOutput, getAgentOutputFromSiblings } from './task-utils';
-import { completeUploadTask } from '@/app/actions/upload-task';
+import { completeUploadTask } from '@/app/actions/tasks';
 import { useCollection } from '@/hooks/use-collection';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { storage } from '@/lib/firebase';
@@ -54,6 +55,7 @@ export function TaskDetail({
   }, []);
 
   const isFileUploadTask = task.ui?.component === 'file-upload';
+  const isSelectionTask = Array.isArray(task.options) && task.options.length > 0;
   const isParamsTask = Array.isArray(task.params) && task.params.length > 0;
 
   const handleFileUpload = React.useCallback(async (files: File[]) => {
@@ -363,7 +365,20 @@ export function TaskDetail({
           </div>
         )}
 
-        {isClaimedByMe && !isFileUploadTask && isParamsTask && (
+        {isClaimedByMe && !isFileUploadTask && isSelectionTask && (
+          <>
+            <SelectionForm
+              taskId={task.id}
+              options={task.options!}
+              remainingTaskCount={remainingTaskCount}
+            />
+            <div className="pt-1 border-t">
+              <UnclaimButton taskId={task.id} currentUserId={currentUserId} />
+            </div>
+          </>
+        )}
+
+        {isClaimedByMe && !isFileUploadTask && !isSelectionTask && isParamsTask && (
           <>
             <ParamsForm
               taskId={task.id}
@@ -376,7 +391,7 @@ export function TaskDetail({
           </>
         )}
 
-        {isClaimedByMe && !isFileUploadTask && !isParamsTask && (
+        {isClaimedByMe && !isFileUploadTask && !isSelectionTask && !isParamsTask && (
           <>
             <VerdictForm
               taskId={task.id}
@@ -409,13 +424,19 @@ export function TaskDetail({
         {isCompleted && task.completionData && isFileUploadTask && (
           <UploadConfirmationReadOnly completionData={task.completionData} />
         )}
-        {isCompleted && task.completionData && !isFileUploadTask && isParamsTask && (
+        {isCompleted && task.completionData && !isFileUploadTask && isSelectionTask && (
+          <SelectionConfirmationReadOnly
+            completionData={task.completionData}
+            remainingTaskCount={remainingTaskCount}
+          />
+        )}
+        {isCompleted && task.completionData && !isFileUploadTask && !isSelectionTask && isParamsTask && (
           <ParamsConfirmationReadOnly
             completionData={task.completionData}
             params={task.params!}
           />
         )}
-        {isCompleted && task.completionData && !isFileUploadTask && !isParamsTask && (
+        {isCompleted && task.completionData && !isFileUploadTask && !isSelectionTask && !isParamsTask && (
           <VerdictConfirmationReadOnly
             completionData={task.completionData}
             remainingTaskCount={remainingTaskCount}

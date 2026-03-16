@@ -17,6 +17,17 @@ export const StepParamSchema = z.object({
   default: z.unknown().optional(),
 });
 
+/** Selection constraint for review steps that present multiple options.
+ *  - number shorthand: exact count (e.g. `selection: 3` → min=max=3)
+ *  - object form: range (e.g. `selection: { min: 2, max: 5 }`) */
+export const SelectionSchema = z.union([
+  z.number().int().positive(),
+  z.object({
+    min: z.number().int().positive(),
+    max: z.number().int().positive(),
+  }),
+]);
+
 export const StepSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -24,6 +35,7 @@ export const StepSchema = z.object({
   description: z.string().optional(),
   params: z.array(StepParamSchema).optional(),
   verdicts: z.record(z.string(), VerdictSchema).optional(),
+  selection: SelectionSchema.optional(),
   ui: StepUiSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
@@ -31,7 +43,7 @@ export const StepSchema = z.object({
 export const TransitionSchema = z.object({
   from: z.string(),
   to: z.string(),
-  gate: z.string().optional(),
+  when: z.string().optional(),
 });
 
 export const TriggerSchema = z.object({
@@ -60,9 +72,16 @@ export const ProcessDefinitionSchema = z.object({
   archived: z.boolean().optional(),
 });
 
+/** Normalize selection shorthand (number) to { min, max } form. */
+export function normalizeSelection(selection: Selection): { min: number; max: number } {
+  if (typeof selection === 'number') return { min: selection, max: selection };
+  return selection;
+}
+
 export type Verdict = z.infer<typeof VerdictSchema>;
 export type StepUi = z.infer<typeof StepUiSchema>;
 export type StepParam = z.infer<typeof StepParamSchema>;
+export type Selection = z.infer<typeof SelectionSchema>;
 export type Step = z.infer<typeof StepSchema>;
 export type Transition = z.infer<typeof TransitionSchema>;
 export type Trigger = z.infer<typeof TriggerSchema>;

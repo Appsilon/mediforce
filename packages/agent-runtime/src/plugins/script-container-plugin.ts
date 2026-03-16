@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
@@ -47,6 +48,7 @@ export class ScriptContainerPlugin implements AgentPlugin {
   private commandDisplay!: string;
   private inlineScript: string | null = null;
   private runtime: string | null = null;
+  private resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
 
   async initialize(context: AgentContext): Promise<void> {
     this.context = context;
@@ -108,6 +110,9 @@ export class ScriptContainerPlugin implements AgentPlugin {
         'ScriptContainerPlugin requires either agentConfig.command or agentConfig.inlineScript.',
       );
     }
+
+    // Resolve env vars from config (same mechanism as BaseContainerAgentPlugin)
+    this.resolvedEnv = resolveStepEnv(context.config.env, stepConfig.env);
   }
 
   async run(emit: EmitFn): Promise<void> {
@@ -140,12 +145,18 @@ export class ScriptContainerPlugin implements AgentPlugin {
       const timeoutMs = DEFAULT_TIMEOUT_MS;
       const containerName = `mediforce-script-${this.context.processInstanceId}-${this.context.stepId}`.slice(0, 63);
 
+      const envFlags: string[] = [];
+      for (const [key, value] of Object.entries(this.resolvedEnv.vars)) {
+        envFlags.push('-e', `${key}=${value}`);
+      }
+
       const dockerArgs: string[] = [
         'run', '--rm',
         '--name', containerName,
         '--memory', '4g',
         '--cpus', '2',
         '-v', `${outputDir}:/output`,
+        ...envFlags,
         this.image,
         ...this.commandArgs,
       ];

@@ -41,7 +41,7 @@ describe('parseProcessDefinition', () => {
         classification: 'critical',
       });
       expect(result.data.steps).toHaveLength(4);
-      expect(result.data.transitions).toHaveLength(4);
+      expect(result.data.transitions).toHaveLength(1);
       expect(result.data.triggers).toHaveLength(2);
     });
 
@@ -79,19 +79,19 @@ describe('parseProcessDefinition', () => {
       ]);
     });
 
-    it('gate names are strings (not resolved at parse time)', () => {
+    it('when conditions are strings (not resolved at parse time)', () => {
       const yaml = loadFixture('full-valid.yaml');
       const result = parseProcessDefinition(yaml);
 
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      const gatedTransition = result.data.transitions.find(
-        (t) => t.gate !== undefined,
+      const conditionalTransition = result.data.transitions.find(
+        (t) => t.when !== undefined,
       );
-      expect(gatedTransition).toBeDefined();
-      expect(typeof gatedTransition!.gate).toBe('string');
-      expect(gatedTransition!.gate).toBe('data-complete');
+      expect(conditionalTransition).toBeDefined();
+      expect(typeof conditionalTransition!.when).toBe('string');
+      expect(conditionalTransition!.when).toBe('output.dataComplete == true');
     });
   });
 

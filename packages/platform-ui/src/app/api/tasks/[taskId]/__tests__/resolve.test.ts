@@ -125,7 +125,7 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
     );
 
     const stepOutput = mockAdvanceStep.mock.calls[0][1] as Record<string, unknown>;
-    expect(stepOutput).toEqual({ extracted: true });
+    expect(stepOutput).toEqual({ extracted: true, verdict: 'approve' });
   });
 
   it('[DATA] auto-claims pending task before resolving', async () => {
@@ -251,6 +251,107 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
     expect(res.status).toBe(409);
     const json = await res.json();
     expect(json.error).toContain('running');
+  });
+});
+
+// ---- Selection review resolution ----
+
+describe('POST /api/tasks/:taskId/resolve — selection', () => {
+  const selectionOptions = [
+    { label: 'All-human', description: 'Every step by humans', value: { mode: 'human' } },
+    { label: 'Hybrid', description: 'Agent + human review', value: { mode: 'hybrid' } },
+    { label: 'Full-auto', description: 'Fully automated', value: { mode: 'auto' } },
+  ];
+
+  const claimedSelectionTask = {
+    id: 'task-sel',
+    processInstanceId: 'inst-1',
+    stepId: 'review-configs',
+    assignedRole: 'reviewer',
+    assignedUserId: 'user-1',
+    status: 'claimed',
+    completionData: null,
+    ui: undefined,
+    selection: { min: 1, max: 3 },
+    options: selectionOptions,
+    createdAt: '2026-03-14T10:00:00Z',
+    updatedAt: '2026-03-14T10:00:00Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInstanceGetById.mockResolvedValue(pausedInstance);
+    mockInstanceUpdate.mockResolvedValue(undefined);
+    mockAdvanceStep.mockResolvedValue(advancedInstance);
+    mockComplete.mockResolvedValue({ ...claimedSelectionTask, status: 'completed' });
+  });
+
+  it('[DATA] resolves with selected option value as stepOutput', async () => {
+    mockGetById.mockResolvedValue(claimedSelectionTask);
+    mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(advancedInstance);
+
+    const res = await POST(
+      makeRequest('task-sel', { verdict: 'approve', selectedIndex: 1 }),
+      { params: makeParams('task-sel') },
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.ok).toBe(true);
+
+    // stepOutput should be the option's value + verdict
+    const stepOutput = mockAdvanceStep.mock.calls[0][1] as Record<string, unknown>;
+    expect(stepOutput.mode).toBe('hybrid');
+    expect(stepOutput.verdict).toBe('approve');
+
+    // completionData should store selectedIndex and selectedOption
+    const completionArg = mockComplete.mock.calls[0][1] as Record<string, unknown>;
+    expect(completionArg.selectedIndex).toBe(1);
+    expect(completionArg.selectedOption).toEqual(selectionOptions[1]);
+    expect(completionArg.verdict).toBe('approve');
+  });
+
+  it('[DATA] revise works without selectedIndex', async () => {
+    mockGetById.mockResolvedValue(claimedSelectionTask);
+    mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(advancedInstance);
+
+    const res = await POST(
+      makeRequest('task-sel', { verdict: 'revise', comment: 'Need more options' }),
+      { params: makeParams('task-sel') },
+    );
+
+    expect(res.status).toBe(200);
+    const stepOutput = mockAdvanceStep.mock.calls[0][1] as Record<string, unknown>;
+    expect(stepOutput.verdict).toBe('revise');
+    expect(stepOutput.reviewerComment).toBe('Need more options');
+  });
+
+  it('[ERROR] returns 400 for out-of-range selectedIndex', async () => {
+    mockGetById.mockResolvedValue(claimedSelectionTask);
+
+    const res = await POST(
+      makeRequest('task-sel', { verdict: 'approve', selectedIndex: 5 }),
+      { params: makeParams('task-sel') },
+    );
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('out of range');
+  });
+
+  it('[ERROR] returns 400 for negative selectedIndex', async () => {
+    mockGetById.mockResolvedValue(claimedSelectionTask);
+
+    const res = await POST(
+      makeRequest('task-sel', { verdict: 'approve', selectedIndex: -1 }),
+      { params: makeParams('task-sel') },
+    );
+
+    expect(res.status).toBe(400);
   });
 });
 
