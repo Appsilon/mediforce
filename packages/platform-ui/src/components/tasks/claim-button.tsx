@@ -13,11 +13,13 @@ export function ClaimButton({
   taskId,
   currentUserId,
   fullWidth = false,
+  variant = 'default',
   onClaimed,
 }: {
   taskId: string;
   currentUserId: string;
   fullWidth?: boolean;
+  variant?: 'default' | 'inline';
   onClaimed?: () => void;
 }) {
   const [pending, setPending] = React.useState(false);
@@ -38,6 +40,18 @@ export function ClaimButton({
     } finally {
       setPending(false);
     }
+  }
+
+  if (variant === 'inline') {
+    return (
+      <button
+        onClick={handleClaim}
+        disabled={pending}
+        className="inline-flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded hover:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+      >
+        {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Claim'}
+      </button>
+    );
   }
 
   return (

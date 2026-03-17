@@ -76,7 +76,28 @@ export function useProcessDefinitions() {
     });
   }, [data]);
 
-  return { definitions, loading, error };
+  /** Map from definition name to ordered non-terminal step IDs (latest version). */
+  const stepsByDefinition = useMemo((): Map<string, string[]> => {
+    const byName = new Map<string, ProcessDefinitionDoc[]>();
+    for (const doc of data) {
+      const existing = byName.get(doc.name) ?? [];
+      existing.push(doc);
+      byName.set(doc.name, existing);
+    }
+    const result = new Map<string, string[]>();
+    for (const [name, docs] of byName) {
+      const latest = [...docs].sort((a, b) => compareSemver(b.version, a.version))[0];
+      if (latest) {
+        result.set(
+          name,
+          latest.steps.filter((step) => step.type !== 'terminal').map((step) => step.id),
+        );
+      }
+    }
+    return result;
+  }, [data]);
+
+  return { definitions, stepsByDefinition, loading, error };
 }
 
 export function useProcessDefinitionVersions(name: string) {
