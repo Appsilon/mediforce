@@ -94,7 +94,8 @@ This is a pnpm monorepo. Quick start:
 pnpm install
 cp packages/platform-ui/.env.local.example packages/platform-ui/.env.local
 # fill in Firebase config values
-cd packages/platform-ui && pnpm dev
+pnpm dev:ui        # platform UI only (port 9003)
+pnpm dev           # platform UI + supply intelligence (ports 9003 + 9004)
 ```
 
 Run tests:
@@ -104,6 +105,17 @@ pnpm typecheck      # type checking
 pnpm test           # unit + integration
 cd packages/platform-ui && pnpm test:e2e  # E2E (Playwright)
 ```
+
+### Running agents locally (without Docker)
+
+By default, agents execute inside Docker containers. To run them using your local `claude` CLI instead (useful for development and reducing costs):
+
+```bash
+pnpm dev:ui:local  # platform UI only
+pnpm dev:local     # platform UI + supply intelligence
+```
+
+> Requires `claude` to be available on your `PATH`. Use the `:local` scripts (not `ALLOW_LOCAL_AGENTS=true pnpm dev:ui`) — the env var doesn't propagate reliably through pnpm script aliases.
 
 > Full guide: **[docs/development.md](docs/development.md)**
 
