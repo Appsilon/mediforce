@@ -32,17 +32,17 @@ test.describe('My Tasks', () => {
     await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
     // Click the Display button
     await page.getByRole('button', { name: /display/i }).click();
-    // Group by options with checkmarks
-    await expect(page.getByText('Process')).toBeVisible();
-    await expect(page.getByText('Action')).toBeVisible();
+    // Group by options with checkmarks — use exact match to avoid matching task labels
+    await expect(page.getByText('Process', { exact: true })).toBeVisible();
+    await expect(page.getByText('Action', { exact: true })).toBeVisible();
   });
 
   test('[CLICK] toggling action grouping adds sub-groups within process cards', async ({ page }) => {
     await page.goto('/tasks');
     await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
-    // Enable action sub-grouping
+    // Enable action sub-grouping — use exact match
     await page.getByRole('button', { name: /display/i }).click();
-    await page.getByText('Action').click();
+    await page.getByText('Action', { exact: true }).click();
     // Action sub-group labels should appear within cards
     await expect(page.getByText('Action needed').first()).toBeVisible();
   });

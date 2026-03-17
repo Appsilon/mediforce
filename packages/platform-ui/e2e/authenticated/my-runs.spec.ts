@@ -53,16 +53,11 @@ test.describe('My Runs', () => {
     await expect(page).toHaveURL(/\/processes\/Supply%20Chain%20Review\/runs\/proc-running-1/);
   });
 
-  test('[RENDER] completed instances are collapsed by default', async ({ page }) => {
-    await page.goto('/runs');
-    // Supply Chain Review has 2 completed + 1 failed = collapsed section
-    await expect(page.getByText('2 completed').first()).toBeVisible({ timeout: 10_000 });
-  });
-
-  test('[RENDER] Display popover shows grouping option', async ({ page }) => {
+  test('[RENDER] Display popover shows grouping and filter options', async ({ page }) => {
     await page.goto('/runs');
     await page.getByText('Supply Chain Review').first().waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: /display/i }).click();
-    await expect(page.getByText('Process')).toBeVisible();
+    await expect(page.getByText('Process', { exact: true })).toBeVisible();
+    await expect(page.getByText('Completed runs')).toBeVisible();
   });
 });
