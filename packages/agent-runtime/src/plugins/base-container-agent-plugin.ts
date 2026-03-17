@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
+import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
 
 const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
@@ -1059,128 +1060,67 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       dockerArgs.push('/entrypoint.sh');
     }
 
+    let promptViaStdin = false;
     if (isMockAgent) {
       dockerArgs.push(...this.getMockDockerArgs(stepId, isGitMode));
     } else {
       const commandSpec = this.getAgentCommand('/output/prompt.txt', options);
       dockerArgs.push(...commandSpec.args);
-
-      // Track prompt delivery method for later
-      var promptViaStdin = commandSpec.promptDelivery === 'stdin';
+      promptViaStdin = commandSpec.promptDelivery === 'stdin';
     }
 
-    const cliOutput = await new Promise<string>((resolve, reject) => {
-      const child = spawn('docker', dockerArgs, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-
-      let settled = false;
-
-      // Explicit timeout failsafe — spawn's timeout option doesn't reliably
-      // kill Docker containers since the container process may outlive the child.
-      // We extract the container ID from stderr and `docker kill` it directly.
-      let containerId: string | null = null;
-      const timeoutHandle = setTimeout(() => {
-        if (settled) return;
-        console.error(`[${this.agentName}] Docker timeout (${Math.round(timeoutMs / 60_000)} min) — killing container`);
-        child.kill('SIGTERM');
-        // Also docker kill — the child process may not propagate the signal to the container
-        const killTarget = containerId ?? containerName;
-        spawn('docker', ['kill', killTarget], { stdio: 'ignore' }).unref();
-      }, timeoutMs);
-
-      const rawLines: string[] = [];
-      let buffer = '';
-
-      child.stdout.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString('utf-8');
-
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          rawLines.push(trimmed);
-
-          // Let subclass process each line for activity logging
-          if (logFile) {
-            const logEntries = this.processOutputLine(trimmed);
-            if (logEntries.length > 0) {
-              appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
-            }
-          }
-        }
-      });
-
-      const stderrChunks: Buffer[] = [];
-      child.stderr.on('data', (chunk: Buffer) => {
-        stderrChunks.push(chunk);
-        // Try to capture the container ID from early Docker output
-        if (!containerId) {
-          const text = chunk.toString('utf-8');
-          const cidMatch = text.match(/^([0-9a-f]{12,64})\s*$/m);
-          if (cidMatch) containerId = cidMatch[1];
-        }
-      });
-
-      child.on('error', (error) => {
-        reject(new Error(`Docker process failed: ${error.message}`));
-      });
-
-      child.on('close', (code, signal) => {
-        settled = true;
-        clearTimeout(timeoutHandle);
-
-        // Process remaining buffer
-        if (buffer.trim()) {
-          rawLines.push(buffer.trim());
-          if (logFile) {
-            const logEntries = this.processOutputLine(buffer.trim());
-            if (logEntries.length > 0) {
-              appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
-            }
-          }
-        }
-
-        const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
-        const timeoutMinutes = Math.round(timeoutMs / 60_000);
-
-        // Let subclass extract final result from all stdout
-        const rawStdout = rawLines.join('\n');
-        const finalResult = this.parseAgentOutput(rawStdout);
-
-        if (code !== 0) {
-          const exitInfo = signal
-            ? `killed by ${signal}${signal === 'SIGTERM' ? ` (likely timeout — ${timeoutMinutes} min limit)` : ''}`
-            : `exit code ${code}`;
-          const detail = this.extractErrorFromResult(finalResult) || stderr || 'no stderr output';
-          reject(new Error(`Docker container failed (${exitInfo}): ${detail}`));
-          return;
-        }
-
-        if (!finalResult) {
-          // Agent wrote files but never emitted a text response with the contract
-          // (common with some models like Gemini Flash Lite that stop after tool calls).
-          // Fallback: try result.json first, then scan /output/ for any written files.
-          this.recoverOutputFromDirectory(outputDir)
-            .then((recovered) => resolve(recovered))
-            .catch(() => {
-              reject(new Error('Docker container produced no result event and no files found in output directory'));
-            });
-          return;
-        }
-
-        resolve(finalResult);
-      });
-
-      // Deliver prompt based on agent's preferred method
-      if (!isMockAgent && promptViaStdin) {
-        child.stdin.write(prompt);
-      }
-      child.stdin.end();
+    // Delegate container execution to the spawn strategy.
+    // LocalDockerSpawnStrategy: direct child process (default, same as before)
+    // QueuedDockerSpawnStrategy: enqueues to BullMQ worker (when REDIS_URL is set)
+    const strategy = getDockerSpawnStrategy();
+    const spawnResult = await strategy.spawn({
+      dockerArgs,
+      stdinPayload: (!isMockAgent && promptViaStdin) ? prompt : null,
+      timeoutMs,
+      containerName,
+      processInstanceId,
+      stepId,
+      outputDir,
     });
+
+    // Process stdout lines for activity logging (batch mode — lines arrive after completion
+    // when using the queued strategy; for local strategy this is equivalent to the old behavior
+    // minus real-time streaming, which is an acceptable v1 trade-off)
+    const rawLines: string[] = [];
+    for (const line of spawnResult.stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      rawLines.push(trimmed);
+
+      if (logFile) {
+        const logEntries = this.processOutputLine(trimmed);
+        if (logEntries.length > 0) {
+          await appendFile(logFile, logEntries.join('\n') + '\n');
+        }
+      }
+    }
+
+    const rawStdout = rawLines.join('\n');
+    const finalResult = this.parseAgentOutput(rawStdout);
+    const timeoutMinutes = Math.round(timeoutMs / 60_000);
+
+    if (spawnResult.exitCode !== 0) {
+      const exitInfo = spawnResult.signal
+        ? `killed by ${spawnResult.signal}${spawnResult.signal === 'SIGTERM' ? ` (likely timeout — ${timeoutMinutes} min limit)` : ''}`
+        : `exit code ${spawnResult.exitCode}`;
+      const detail = this.extractErrorFromResult(finalResult) || spawnResult.stderr.trim() || 'no stderr output';
+      throw new Error(`Docker container failed (${exitInfo}): ${detail}`);
+    }
+
+    let cliOutput: string;
+    if (finalResult) {
+      cliOutput = finalResult;
+    } else {
+      // Agent wrote files but never emitted a text response with the contract
+      // (common with some models like Gemini Flash Lite that stop after tool calls).
+      // Fallback: try result.json first, then scan /output/ for any written files.
+      cliOutput = await this.recoverOutputFromDirectory(outputDir);
+    }
 
     // Read git-result.json from the output directory
     let gitMetadata: GitMetadata | null = null;

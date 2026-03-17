@@ -10,6 +10,7 @@ export default defineConfig({
     alias: {
       '@mediforce/platform-core': path.resolve(__dirname, '../platform-core/src/index.ts'),
       '@mediforce/agent-runtime': path.resolve(__dirname, '../agent-runtime/src/index.ts'),
+      '@mediforce/agent-queue': path.resolve(__dirname, '../agent-queue/src/index.ts'),
     },
   },
 });

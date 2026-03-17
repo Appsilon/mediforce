@@ -15,6 +15,9 @@
     "dev": "pnpm --filter @mediforce/platform-ui --filter supply-intelligence dev",
     "dev:local": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui --filter supply-intelligence dev",
     "dev:ui:test": "pnpm --filter @mediforce/platform-ui dev:test",
+    "dev:redis": "docker run --rm -p 6379:6379 redis:7-alpine",
+    "dev:worker": "REDIS_URL=redis://localhost:6379 tsx packages/agent-queue/src/worker-entry.ts",
+    "dev:ui:queue": "REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
     "typecheck": "tsc -b --noEmit",
     "start": "if [ \"$APP_NAME\" = \"supply-intelligence\" ]; then pnpm --filter supply-intelligence start; else pnpm --filter @mediforce/platform-ui start; fi"
   },

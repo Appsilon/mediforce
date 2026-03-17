@@ -1,10 +1,10 @@
-import { spawn } from 'node:child_process';
 import { readFile, mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
+import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
@@ -163,72 +163,43 @@ export class ScriptContainerPlugin implements AgentPlugin {
 
       console.log(`[ScriptContainer] Spawning: docker ${dockerArgs.join(' ')}`);
 
-      const containerOutput = await new Promise<string>((resolve, reject) => {
-        const child = spawn('docker', dockerArgs, {
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
-
-        let settled = false;
-
-        const timeoutHandle = setTimeout(() => {
-          if (settled) return;
-          console.error(`[ScriptContainer] Docker timeout (${Math.round(timeoutMs / 60_000)} min) — killing container`);
-          child.kill('SIGTERM');
-          spawn('docker', ['kill', containerName], { stdio: 'ignore' }).unref();
-        }, timeoutMs);
-
-        const stdoutChunks: Buffer[] = [];
-        const stderrChunks: Buffer[] = [];
-
-        child.stdout.on('data', (chunk: Buffer) => {
-          stdoutChunks.push(chunk);
-          const lines = chunk.toString('utf-8').split('\n').filter(Boolean);
-          for (const line of lines) {
-            emit({
-              type: 'assistant',
-              payload: JSON.stringify({ ts: new Date().toISOString(), type: 'assistant', subtype: 'text', text: line }),
-              timestamp: new Date().toISOString(),
-            }).catch(() => {});
-          }
-        });
-
-        child.stderr.on('data', (chunk: Buffer) => {
-          stderrChunks.push(chunk);
-          const lines = chunk.toString('utf-8').split('\n').filter(Boolean);
-          for (const line of lines) {
-            emit({
-              type: 'assistant',
-              payload: JSON.stringify({ ts: new Date().toISOString(), type: 'assistant', subtype: 'text', text: `[stderr] ${line}` }),
-              timestamp: new Date().toISOString(),
-            }).catch(() => {});
-          }
-        });
-
-        child.on('error', (error) => {
-          reject(new Error(`Docker process failed: ${error.message}`));
-        });
-
-        child.on('close', (code, signal) => {
-          settled = true;
-          clearTimeout(timeoutHandle);
-
-          const stdout = Buffer.concat(stdoutChunks).toString('utf-8').trim();
-          const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
-
-          if (code !== 0) {
-            const exitInfo = signal
-              ? `killed by ${signal}`
-              : `exit code ${code}`;
-            const detail = stderr || stdout || 'no output';
-            reject(new Error(`Script container failed (${exitInfo}): ${detail}`));
-            return;
-          }
-
-          resolve(stdout);
-        });
-
-        child.stdin.end();
+      // Delegate container execution to the spawn strategy.
+      const strategy = getDockerSpawnStrategy();
+      const spawnResult = await strategy.spawn({
+        dockerArgs,
+        stdinPayload: null,
+        timeoutMs,
+        containerName,
+        processInstanceId: this.context.processInstanceId,
+        stepId: this.context.stepId,
+        outputDir,
       });
+
+      // Emit stdout/stderr lines as activity events (batch mode after completion)
+      for (const line of spawnResult.stdout.split('\n').filter(Boolean)) {
+        await emit({
+          type: 'assistant',
+          payload: JSON.stringify({ ts: new Date().toISOString(), type: 'assistant', subtype: 'text', text: line }),
+          timestamp: new Date().toISOString(),
+        });
+      }
+      for (const line of spawnResult.stderr.split('\n').filter(Boolean)) {
+        await emit({
+          type: 'assistant',
+          payload: JSON.stringify({ ts: new Date().toISOString(), type: 'assistant', subtype: 'text', text: `[stderr] ${line}` }),
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      if (spawnResult.exitCode !== 0) {
+        const exitInfo = spawnResult.signal
+          ? `killed by ${spawnResult.signal}`
+          : `exit code ${spawnResult.exitCode}`;
+        const detail = spawnResult.stderr.trim() || spawnResult.stdout.trim() || 'no output';
+        throw new Error(`Script container failed (${exitInfo}): ${detail}`);
+      }
+
+      const containerOutput = spawnResult.stdout.trim();
 
       // Read result.json from the output directory
       const resultPath = join(outputDir, 'result.json');
