@@ -2,6 +2,7 @@ import type {
   ProcessRepository,
   ProcessDefinition,
   ProcessConfig,
+  DefinitionListResult,
 } from '../index.js';
 
 /**
@@ -31,8 +32,8 @@ export class InMemoryProcessRepository implements ProcessRepository {
     );
   }
 
-  async listProcessDefinitions(): Promise<ProcessDefinition[]> {
-    return Array.from(this.definitions.values());
+  async listProcessDefinitions(): Promise<DefinitionListResult> {
+    return { valid: Array.from(this.definitions.values()), invalid: [] };
   }
 
   async getProcessConfig(

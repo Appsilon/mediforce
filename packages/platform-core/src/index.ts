@@ -89,6 +89,8 @@ export type {
   AuthService,
   AuthUser,
   ProcessRepository,
+  DefinitionListResult,
+  InvalidDefinitionEntry,
   ProcessInstanceRepository,
   HumanTaskRepository,
   HandoffRepository,

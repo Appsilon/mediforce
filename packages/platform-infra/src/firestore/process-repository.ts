@@ -3,6 +3,7 @@ import {
   type ProcessRepository,
   type ProcessDefinition,
   type ProcessConfig,
+  type DefinitionListResult,
 } from '@mediforce/platform-core';
 import {
   collection,
@@ -105,11 +106,25 @@ export class FirestoreProcessRepository implements ProcessRepository {
     await setDoc(docRef, definition);
   }
 
-  async listProcessDefinitions(): Promise<ProcessDefinition[]> {
+  async listProcessDefinitions(): Promise<DefinitionListResult> {
     const snapshot = await getDocs(
       collection(this.db, this.definitionsCollection),
     );
-    return snapshot.docs.map((d) => ProcessDefinitionSchema.parse(d.data()));
+    const result: DefinitionListResult = { valid: [], invalid: [] };
+    for (const docSnap of snapshot.docs) {
+      const raw = docSnap.data();
+      const parsed = ProcessDefinitionSchema.safeParse(raw);
+      if (parsed.success) {
+        result.valid.push(parsed.data);
+      } else {
+        console.warn(
+          `[process-repository] Invalid definition document ${docSnap.id}:`,
+          parsed.error.format(),
+        );
+        result.invalid.push({ data: raw, error: parsed.error });
+      }
+    }
+    return result;
   }
 
   async getProcessConfig(
