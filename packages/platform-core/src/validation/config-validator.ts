@@ -48,6 +48,20 @@ export function validateProcessConfig(
       errors.push(`Step '${sc.stepId}': reviewerType='agent' requires a 'reviewerPlugin' field`);
     }
 
+    // claude-code-agent requires either skill or prompt
+    if (sc.plugin === 'claude-code-agent' && !sc.agentConfig?.skill && !sc.agentConfig?.prompt) {
+      errors.push(
+        `Step '${sc.stepId}': plugin 'claude-code-agent' requires agentConfig.skill or agentConfig.prompt`,
+      );
+    }
+
+    // script-container requires inlineScript or command
+    if (sc.plugin === 'script-container' && !sc.agentConfig?.inlineScript && !sc.agentConfig?.command) {
+      errors.push(
+        `Step '${sc.stepId}': plugin 'script-container' requires agentConfig.inlineScript or agentConfig.command`,
+      );
+    }
+
     // Plugin registry validation
     if (registeredPlugins) {
       if (sc.plugin && !registeredPlugins.includes(sc.plugin)) {

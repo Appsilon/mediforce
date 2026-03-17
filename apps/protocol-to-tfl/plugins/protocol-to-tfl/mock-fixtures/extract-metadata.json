@@ -1,0 +1,755 @@
+{
+  "schema_version": "1.0",
+  "extraction_date": "2026-03-06",
+  "source_documents": [
+    {
+      "type": "protocol",
+      "filename": "cdiscpilot01-protocol.pdf",
+      "version": "H2Q-MC-LZZT(c)",
+      "date": null,
+      "_notes": "Copyright 2006 Eli Lilly and Company. Protocol amendment (c)."
+    },
+    {
+      "type": "sap",
+      "filename": "cdiscpilot01-sap.pdf",
+      "version": "Final SAP",
+      "date": null,
+      "_notes": "SAP for CDISC SDTM/ADaM Pilot Project. Authored by Cathy Barrows, Joel Hoffman, Susan Kenny, Sandy Lei, and Arline Nakanishi."
+    }
+  ],
+
+  "study_identification": {
+    "study_id": "CDISCPILOT01",
+    "study_title": "Safety and Efficacy of the Xanomeline Transdermal Therapeutic System (TTS) in Patients with Mild to Moderate Alzheimer's Disease",
+    "short_title": "Xanomeline TTS in Alzheimer's Disease",
+    "sponsor": "Eli Lilly and Company",
+    "_notes_sponsor": "Legacy data provided by Eli Lilly. The CDISC SDTM/ADaM Pilot Project team conducted the reanalysis.",
+    "phase": "Phase III",
+    "indication": "Mild to moderate Alzheimer's Disease",
+    "therapeutic_area": "CNS",
+    "compound_name": "Xanomeline (LY246708)",
+    "compound_class": "M1 muscarinic-cholinergic receptor agonist",
+    "regulatory_status": "IND",
+    "_notes_regulatory": "This is a CDISC pilot submission to demonstrate SDTM/ADaM standards for FDA review."
+  },
+
+  "study_design": {
+    "type": "Prospective, randomized, multi-center, double-blind, placebo-controlled, parallel-group",
+    "randomized": true,
+    "blinding": "double-blind",
+    "control_type": "placebo",
+    "adaptive": false,
+    "adaptive_details": null,
+
+    "treatment_arms": [
+      {
+        "arm_id": "PBO",
+        "arm_name": "Placebo",
+        "arm_type": "placebo",
+        "dose": "0 mg (both patches placebo)",
+        "route": "transdermal",
+        "regimen": "Two adhesive patches (50 cm2 + 25 cm2) applied daily in the morning, worn 12-14 hours",
+        "planned_n": 100
+      },
+      {
+        "arm_id": "XAN_LO",
+        "arm_name": "Xanomeline Low Dose",
+        "arm_type": "experimental",
+        "dose": "54 mg (50 cm2 active patch + 25 cm2 placebo patch)",
+        "route": "transdermal",
+        "regimen": "Two adhesive patches applied daily in the morning, worn 12-14 hours",
+        "planned_n": 100
+      },
+      {
+        "arm_id": "XAN_HI",
+        "arm_name": "Xanomeline High Dose",
+        "arm_type": "experimental",
+        "dose": "81 mg (50 cm2 active patch + 25 cm2 active patch)",
+        "route": "transdermal",
+        "regimen": "Two adhesive patches applied daily in the morning, worn 12-14 hours. All patients started at 50 cm2 TTS then escalated to 75 cm2.",
+        "planned_n": 100
+      }
+    ],
+    "total_planned_n": 300,
+    "_notes_actual_n": "A total of 295 patients were actually randomized: 97 high dose, 98 low dose, 100 placebo.",
+    "randomization_ratio": "1:1:1",
+    "stratification_factors": null,
+    "_notes_stratification": "No stratification factors described in Protocol or SAP.",
+
+    "study_periods": [
+      {
+        "period_name": "Screening",
+        "duration": "Up to 2 weeks",
+        "description": "Visit 1 (Week -2). Informed consent, neuropsychiatric assessment, psychometric testing, medical history, physical exam, vital signs, ECG, chest x-ray, safety labs, CNS imaging review, placebo TTS tolerability test."
+      },
+      {
+        "period_name": "Ambulatory ECG",
+        "duration": "~1 week",
+        "description": "Visit 2 (Week -3 to -1). 24-hour Ambulatory ECG monitoring."
+      },
+      {
+        "period_name": "Treatment",
+        "duration": "24 weeks",
+        "description": "Visits 3-12 (Week 0 to Week 24). Randomization at Visit 3. Clinic visits every 2 weeks for first 8 weeks, then every 4 weeks. Efficacy assessments (ADAS-Cog, CIBIC+, DAD) at Visits 3, 8, 10, 12. NPI-X every 2 weeks (clinic or telephone)."
+      },
+      {
+        "period_name": "Follow-up",
+        "duration": "2 weeks",
+        "description": "Visit 13 (Week 26). End of study visit. Option to enter open-label extension."
+      }
+    ],
+
+    "cohorts": null
+  },
+
+  "populations": {
+    "intent_to_treat": {
+      "abbreviation": "ITT",
+      "definition": "All patients randomized",
+      "is_primary_efficacy_population": false,
+      "_source": "SAP Section 6"
+    },
+    "modified_itt": {
+      "abbreviation": "mITT",
+      "definition": null,
+      "is_primary_efficacy_population": false,
+      "_notes": "No mITT population defined in this study."
+    },
+    "per_protocol": {
+      "abbreviation": "PP",
+      "definition": null,
+      "is_primary_efficacy_population": false,
+      "_notes": "No per-protocol population explicitly defined. Completers population serves a similar role."
+    },
+    "safety": {
+      "abbreviation": "SAF",
+      "definition": "All patients randomized and known to have taken at least one dose of randomized drug",
+      "is_primary_safety_population": true,
+      "_source": "SAP Section 6"
+    },
+    "pk_population": {
+      "abbreviation": "PK",
+      "definition": null,
+      "_notes": "PK analyses not performed in the CDISC pilot submission (SAP Section 15.2)."
+    },
+    "other_populations": [
+      {
+        "name": "Efficacy Population",
+        "abbreviation": "EFF",
+        "definition": "All patients who were randomized and took drug, and have at least 1 post-baseline measure for both ADAS-Cog and CIBIC+",
+        "purpose": "Primary population for all efficacy analyses",
+        "_source": "SAP Section 6"
+      },
+      {
+        "name": "Completers",
+        "abbreviation": "COMP",
+        "definition": "All patients in the efficacy population who completed their Week 24 visit (Visit 12)",
+        "purpose": "Secondary/sensitivity efficacy analyses (completers analysis)",
+        "_source": "SAP Section 6"
+      }
+    ]
+  },
+
+  "endpoints": {
+    "primary": [
+      {
+        "endpoint_id": "PE01",
+        "name": "ADAS-Cog (11) at Week 24",
+        "description": "Alzheimer's Disease Assessment Scale - Cognitive Subscale, total of 11 items [ADAS-Cog (11)] at Week 24. Change from baseline in ADAS-Cog (11) score. The ADAS-Cog (11) is a standard 11-item instrument used to assess word recall, naming objects, commands, constructional praxis, ideational praxis, orientation, word recognition tasks, spoken language ability, comprehension, word finding difficulty, and recall of test instructions. Score range: 0-70 (higher = worse cognition).",
+        "type": "efficacy",
+        "measurement": "ADAS-Cog (11) total score, change from baseline",
+        "timepoint": "Week 24",
+        "variable_type": "continuous",
+        "direction_of_benefit": "lower_is_better",
+        "clinically_meaningful_difference": "3.0 mean treatment difference in ADAS-Cog",
+        "related_adam_dataset": "ADQSADAS",
+        "_source": "SAP Sections 3.2.1, 10.1.1"
+      },
+      {
+        "endpoint_id": "PE02",
+        "name": "CIBIC+ at Week 24",
+        "description": "Video-referenced Clinician's Interview-based Impression of Change (CIBIC+) at Week 24. Assessment of global clinical status relative to baseline on a 1-7 scale (1=marked improvement, 4=no change, 7=marked worsening). No corresponding baseline score exists; this is a post-baseline only assessment.",
+        "type": "efficacy",
+        "measurement": "CIBIC+ score at Week 24 (not change from baseline)",
+        "timepoint": "Week 24",
+        "variable_type": "ordinal",
+        "direction_of_benefit": "lower_is_better",
+        "clinically_meaningful_difference": "0.36 mean treatment difference in CIBIC+",
+        "related_adam_dataset": "ADQSCIBC",
+        "_source": "SAP Sections 3.2.1, 10.1.2"
+      }
+    ],
+    "secondary": [
+      {
+        "endpoint_id": "SE01",
+        "name": "ADAS-Cog (11) at Weeks 8 and 16",
+        "description": "ADAS-Cog (11) change from baseline at Week 8 and Week 16",
+        "type": "efficacy",
+        "measurement": "ADAS-Cog (11) total score, change from baseline",
+        "timepoint": "Week 8, Week 16",
+        "variable_type": "continuous",
+        "related_adam_dataset": "ADQSADAS"
+      },
+      {
+        "endpoint_id": "SE02",
+        "name": "CIBIC+ at Weeks 8 and 16",
+        "description": "CIBIC+ score at Week 8 and Week 16",
+        "type": "efficacy",
+        "measurement": "CIBIC+ score",
+        "timepoint": "Week 8, Week 16",
+        "variable_type": "ordinal",
+        "related_adam_dataset": "ADQSCIBC"
+      },
+      {
+        "endpoint_id": "SE03",
+        "name": "Mean NPI-X Total Score (Week 4 to Week 24)",
+        "description": "Mean Revised Neuropsychiatric Inventory (NPI-X) total score from Week 4 to Week 24. NPI-X Total (9) is the sum of individual domain scores (Frequency x Severity) for 9 domains (excluding sleep, appetite, euphoria). Range 0-108. Calculated as mean of all available total scores between Weeks 4 and 24 inclusive.",
+        "type": "efficacy",
+        "measurement": "Mean NPI-X total score (9 domains), average of Weeks 4-24",
+        "timepoint": "Week 4 through Week 24 (mean)",
+        "variable_type": "continuous",
+        "related_adam_dataset": "ADQSNPIX"
+      }
+    ],
+    "exploratory": [
+      {
+        "endpoint_id": "EE01",
+        "name": "ADAS-Cog (11) Mean Change from Baseline Over Time",
+        "description": "ADAS-Cog (11) mean and mean change from baseline at each visit (baseline, Week 8, Week 16, Week 24)",
+        "type": "efficacy",
+        "variable_type": "continuous"
+      },
+      {
+        "endpoint_id": "EE02",
+        "name": "ADAS-Cog (11) by Gender Subgroup",
+        "description": "ADAS-Cog (11) change from baseline to Week 24 analyzed separately for male and female subjects",
+        "type": "efficacy",
+        "variable_type": "continuous"
+      },
+      {
+        "endpoint_id": "EE03",
+        "name": "ADAS-Cog (11) MMRM Analysis",
+        "description": "Repeated measures analysis of change from baseline in ADAS-Cog (11) to Week 24 using a likelihood-based MMRM model",
+        "type": "efficacy",
+        "variable_type": "continuous"
+      }
+    ],
+    "safety_endpoints": [
+      {
+        "endpoint_id": "SAF01",
+        "name": "Treatment-emergent adverse events",
+        "description": "Incidence of treatment-emergent adverse events by SOC and PT, coded using MedDRA. TEAEs defined relative to first dose (Visit 3/Week 0).",
+        "type": "AE incidence"
+      },
+      {
+        "endpoint_id": "SAF02",
+        "name": "Treatment-emergent serious adverse events",
+        "description": "Incidence of serious adverse events by SOC and PT",
+        "type": "SAE incidence"
+      },
+      {
+        "endpoint_id": "SAF03",
+        "name": "Dermatological adverse events (time to first event)",
+        "description": "Time to first dermatological event by treatment group, analyzed using Kaplan-Meier methods. Special interest AEs related to transdermal patch application (rash, pruritus, dermatitis).",
+        "type": "time-to-event"
+      },
+      {
+        "endpoint_id": "SAF04",
+        "name": "Clinical laboratory evaluations",
+        "description": "Hematology and clinical chemistry summarized at Baseline and Weeks 2, 4, 6, 8, 12, 16, 20, 24, 26. Includes shift tables, abnormality frequency, and Hy's Law assessment.",
+        "type": "lab shift"
+      },
+      {
+        "endpoint_id": "SAF05",
+        "name": "Vital signs",
+        "description": "Blood pressure (supine, standing 1 min, standing 3 min), heart rate (supine, standing 1 min, standing 3 min) at baseline and Week 24/end of treatment. Change from baseline summarized.",
+        "type": "vital signs"
+      },
+      {
+        "endpoint_id": "SAF06",
+        "name": "Weight change",
+        "description": "Weight at baseline and Week 24 (with and without early terminations). Change from baseline summarized.",
+        "type": "vital signs"
+      },
+      {
+        "endpoint_id": "SAF07",
+        "name": "Extent of exposure",
+        "description": "Average daily dose and cumulative dose at end of study (Week 26 or early termination)",
+        "type": "exposure"
+      }
+    ]
+  },
+
+  "statistical_analyses": {
+    "primary_analysis": [
+      {
+        "analysis_id": "PA01",
+        "endpoint_id": "PE01",
+        "description": "Primary analysis of ADAS-Cog (11) at Week 24 using the efficacy population with LOCF imputation. Test for dose response (treatment as continuous variable).",
+        "population": "Efficacy",
+        "statistical_method": "ANCOVA",
+        "model_details": {
+          "response_variable": "Change from baseline in ADAS-Cog (11) at Week 24",
+          "covariates": ["Baseline ADAS-Cog (11) score"],
+          "factors": ["Site (pooled investigator)", "Treatment (as continuous variable)"],
+          "interaction_terms": null,
+          "other_details": "Treatment included as continuous variable for dose-response test. If dose response is significant, pairwise comparisons among 3 groups performed at alpha=0.05. Site*treatment interaction NOT assessed per SAP deviation from protocol."
+        },
+        "hypothesis": {
+          "null_hypothesis": "H0: b = 0, where b is the coefficient for treatment (no dose-response relationship)",
+          "alternative": "two-sided",
+          "alpha": 0.05,
+          "alpha_adjustment": null
+        },
+        "multiplicity_strategy": "No adjustments for multiple primary endpoints (SAP Section 7.3). Nominal 2-sided p-values reported for each primary endpoint.",
+        "_notes_multiplicity_discrepancy": "The Protocol (Section 4.3.5) describes a randomization test combining ADAS-Cog and CIBIC+ dose-response p-values to control overall Type I error at 0.05. The SAP deviates from this by making no multiplicity adjustment.",
+        "sensitivity_analyses": [
+          {
+            "name": "Completers Analysis",
+            "description": "Analysis of ADAS-Cog (11) at Week 24 using completers subset (observed data only, no LOCF)",
+            "method": "ANCOVA with same model specification"
+          },
+          {
+            "name": "MMRM Analysis",
+            "description": "Likelihood-based repeated measures analysis of change from baseline in ADAS-Cog (11) at Week 24. Fixed categorical effects of treatment, site, time (week), treatment-by-time interaction, plus continuous effects of baseline ADAS-Cog (11) and baseline-by-time interaction. Unstructured covariance matrix (Toeplitz if computational singularity).",
+            "method": "MMRM (Mixed-effects Model for Repeated Measures)"
+          }
+        ],
+        "_source": "SAP Sections 7.3, 10.1.1"
+      },
+      {
+        "analysis_id": "PA02",
+        "endpoint_id": "PE02",
+        "description": "Primary analysis of CIBIC+ at Week 24 using the efficacy population with LOCF imputation. Test for dose response (treatment as continuous variable).",
+        "population": "Efficacy",
+        "statistical_method": "ANOVA",
+        "model_details": {
+          "response_variable": "CIBIC+ score at Week 24",
+          "covariates": [],
+          "factors": ["Site (pooled investigator)", "Treatment (as continuous variable)"],
+          "interaction_terms": null,
+          "other_details": "No baseline covariate (CIBIC+ has no baseline value). Treatment as continuous variable for dose-response test. If significant, pairwise comparisons among 3 groups at alpha=0.05."
+        },
+        "hypothesis": {
+          "null_hypothesis": "H0: b = 0, where b is the coefficient for treatment (no dose-response relationship)",
+          "alternative": "two-sided",
+          "alpha": 0.05,
+          "alpha_adjustment": null
+        },
+        "multiplicity_strategy": "No adjustments for multiple primary endpoints (SAP Section 7.3).",
+        "sensitivity_analyses": [],
+        "_source": "SAP Sections 7.3, 10.1.2"
+      }
+    ],
+    "secondary_analyses": [
+      {
+        "analysis_id": "SA01",
+        "endpoint_id": "SE03",
+        "description": "Analysis of mean NPI-X total score from Week 4 to Week 24 using ANCOVA with baseline score, site, and treatment as independent variables. Treatment as continuous variable for dose-response test.",
+        "population": "Efficacy",
+        "statistical_method": "ANCOVA",
+        "multiplicity_handling": null,
+        "_source": "SAP Section 10.2.1"
+      },
+      {
+        "analysis_id": "SA02",
+        "endpoint_id": "PE02",
+        "description": "CMH test for overall differences in CIBIC+ controlling for site. Added at request of FDA reviewers (not pre-specified in protocol).",
+        "population": "Efficacy",
+        "statistical_method": "Cochran-Mantel-Haenszel (CMH) test",
+        "multiplicity_handling": null,
+        "_source": "SAP Section 16.1 (Appendix 3)"
+      }
+    ],
+    "subgroup_analyses": [
+      {
+        "subgroup_variable": "Gender (Male / Female)",
+        "endpoints_analyzed": ["PE01"],
+        "method": "ANCOVA with same model specification, analyzed separately by gender",
+        "_source": "SAP Section 7.2; Tables 12 and 13 in TLG list"
+      }
+    ],
+    "interim_analyses": [
+      {
+        "timing": "When 50% of patients have completed Visit 8 (8 weeks) and Visit 12 (24 weeks)",
+        "purpose": "futility",
+        "spending_function": null,
+        "stopping_rules": "Method by Enas and Offen (1993) used as guideline for stopping one arm or study for ineffectiveness",
+        "_notes": "Protocol specified two interim efficacy analyses. SAP Appendix 2 (Section 15.1) states interim analyses will NOT be performed for this pilot submission."
+      }
+    ]
+  },
+
+  "missing_data": {
+    "primary_strategy": "LOCF (Last Observation Carried Forward)",
+    "imputation_methods": [
+      {
+        "method_name": "LOCF",
+        "applied_to": "All efficacy endpoints (ADAS-Cog, CIBIC+, NPI-X) — missing postbaseline values",
+        "is_primary_or_sensitivity": "primary",
+        "details": "Missing postbaseline efficacy values imputed using LOCF. Based on targeted assessments (the analyzable assessment within assessment windows). Missing baseline values and missing safety data are NOT imputed."
+      },
+      {
+        "method_name": "Item-level score adjustment",
+        "applied_to": "ADAS-Cog (11) and NPI-X total scores when individual items are missing",
+        "is_primary_or_sensitivity": "primary",
+        "details": "If >30% of items missing, total score treated as missing. If 1-30% missing, total score adjusted to maintain full scale range (e.g., for ADAS-Cog(11) with 1 item missing out of 11: sum remaining items and multiply by 70/(70 minus max score of missing item))."
+      }
+    ],
+    "estimand_framework": {
+      "used": false,
+      "intercurrent_events": []
+    }
+  },
+
+  "baseline_definition": {
+    "general_rule": "Assessments collected at Visit 3 (Week 0, randomization visit) serve as baseline for efficacy measures (ADAS-Cog, CIBIC+, NPI-X).",
+    "exceptions": [
+      {
+        "domain": "Laboratory",
+        "rule": "Baseline laboratory values are those collected at Week -2 (Visit 1, screening)"
+      },
+      {
+        "domain": "Weight/Height",
+        "rule": "Weight baseline at Visit 3; Height baseline at Visit 1"
+      },
+      {
+        "domain": "CIBIC+",
+        "rule": "No baseline CIBIC+ score exists — CIBIC+ is an assessment of change relative to baseline clinical status"
+      }
+    ]
+  },
+
+  "visit_schedule": {
+    "visits": [
+      {
+        "visit_name": "Screening",
+        "visit_number": 1,
+        "target_day": -14,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["Informed consent", "MMSE", "Hachinski", "Physical exam", "ECG", "Safety labs", "CNS imaging review", "Placebo TTS tolerability"]
+      },
+      {
+        "visit_name": "Ambulatory ECG",
+        "visit_number": 2,
+        "target_day": -7,
+        "window_lower": null,
+        "window_upper": null,
+        "assessments": ["24-hour Ambulatory ECG"]
+      },
+      {
+        "visit_name": "Baseline / Randomization (Week 0)",
+        "visit_number": 3,
+        "target_day": 1,
+        "window_lower": null,
+        "window_upper": 1,
+        "assessments": ["Randomization", "ADAS-Cog", "CIBIC+", "NPI-X", "DAD", "Vital signs", "Labs", "PK sample", "Concomitant meds"]
+      },
+      {
+        "visit_name": "Week 2",
+        "visit_number": 4,
+        "target_day": 14,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": ["NPI-X", "Vital signs", "Labs", "AEs", "PK sample"]
+      },
+      {
+        "visit_name": "Week 4",
+        "visit_number": 5,
+        "target_day": 28,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": ["NPI-X", "Vital signs", "Labs", "AEs", "PK sample"]
+      },
+      {
+        "visit_name": "Week 6",
+        "visit_number": 7,
+        "target_day": 42,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": ["NPI-X", "Vital signs", "Labs", "AEs"]
+      },
+      {
+        "visit_name": "Week 8",
+        "visit_number": 8,
+        "target_day": 56,
+        "window_lower": -3,
+        "window_upper": 3,
+        "assessments": ["ADAS-Cog", "CIBIC+", "NPI-X", "DAD", "Vital signs", "Labs", "AEs", "PK sample"]
+      },
+      {
+        "visit_name": "Week 12",
+        "visit_number": 9,
+        "target_day": 84,
+        "window_lower": -4,
+        "window_upper": 4,
+        "assessments": ["NPI-X", "Vital signs", "Labs", "AEs", "Urinalysis", "PK sample"]
+      },
+      {
+        "visit_name": "Week 16",
+        "visit_number": 10,
+        "target_day": 112,
+        "window_lower": -4,
+        "window_upper": 4,
+        "assessments": ["ADAS-Cog", "CIBIC+", "NPI-X", "DAD", "Vital signs", "Labs", "AEs"]
+      },
+      {
+        "visit_name": "Week 20",
+        "visit_number": 11,
+        "target_day": 140,
+        "window_lower": -4,
+        "window_upper": 4,
+        "assessments": ["NPI-X", "Vital signs", "Labs", "AEs", "PK sample"]
+      },
+      {
+        "visit_name": "Week 24 (End of Treatment)",
+        "visit_number": 12,
+        "target_day": 168,
+        "window_lower": -4,
+        "window_upper": 4,
+        "assessments": ["ADAS-Cog", "CIBIC+", "NPI-X", "DAD", "Vital signs", "Labs", "AEs", "Urinalysis"]
+      },
+      {
+        "visit_name": "Week 26 (End of Study)",
+        "visit_number": 13,
+        "target_day": 182,
+        "window_lower": -4,
+        "window_upper": 4,
+        "assessments": ["NPI-X", "Vital signs", "Labs", "AEs", "Urinalysis"]
+      }
+    ],
+    "windowing_rules": "Assessments assigned to visits as collected on CRFs. ADAS-Cog, CIBIC+, and NPI-X also assigned to visits based on actual visit dates using day = visit date - randomization date. If multiple assessments fall in same window, the one closest to target day is selected. If equidistant, the assessment prior to target day is selected. Retrieval visits (visit 201) included for Week 24 window selection.",
+    "_notes_telephone_visits": "NPI-X also collected via telephone at Weeks 10, 14, 18, 22 (visit numbers 8.1, 9.1, 10.1, 11.1)."
+  },
+
+  "sample_size": {
+    "total_planned": 300,
+    "per_arm": {
+      "PBO": 100,
+      "XAN_LO": 100,
+      "XAN_HI": 100
+    },
+    "power": 0.9,
+    "alpha": 0.05,
+    "assumptions": "90% power to detect 3.0 mean treatment difference in ADAS-Cog (p<.05, two-sided), based on SD=6.5. 80% power to detect 0.36 mean treatment difference in CIBIC+ (p<.05, two-sided), based on SD=0.9. Based on previous experience with oral xanomeline.",
+    "dropout_rate_assumed": null,
+    "method": "Based on prior oral xanomeline study experience",
+    "_notes_actual": "295 patients actually randomized: 97 high dose, 98 low dose, 100 placebo."
+  },
+
+  "planned_tlg_list": {
+    "_notes": "Explicit TLG listing from SAP Section 13.1. 29 tables, 1 figure, 0 listings. Templates provided in SAP Section 13.2.",
+    "tables": [
+      {
+        "tlg_id": "T-1",
+        "title": "Summary of Populations",
+        "population": "All Subjects",
+        "description": "Template 1. Counts of ITT, Safety, Efficacy, Completer Week 24, and Complete Study populations by treatment group."
+      },
+      {
+        "tlg_id": "T-2",
+        "title": "Summary of End of Study Data",
+        "population": "ITT",
+        "description": "Template 2. Completion status and reasons for early termination by treatment group. Fisher's exact test."
+      },
+      {
+        "tlg_id": "T-3",
+        "title": "Summary of Demographic and Baseline Characteristics",
+        "population": "ITT",
+        "description": "Template 3. Age, age category, sex, race, MMSE, duration of disease, years of education, weight, height, BMI, BMI category."
+      },
+      {
+        "tlg_id": "T-4",
+        "title": "Summary of Number of Subjects by Site",
+        "population": "Safety",
+        "description": "Template 4. Subject counts by pooled site and treatment group."
+      },
+      {
+        "tlg_id": "T-5",
+        "title": "Primary Endpoint Analysis: ADAS Cog (11) - Change from Baseline to Week 24 - LOCF",
+        "population": "Efficacy",
+        "description": "Template 5. ANCOVA results for ADAS-Cog(11) change from baseline at Week 24 with LOCF."
+      },
+      {
+        "tlg_id": "T-6",
+        "title": "Primary Endpoint Analysis: CIBIC+ - Summary at Week 24 - LOCF",
+        "population": "Efficacy",
+        "description": "Template 6. ANOVA results for CIBIC+ at Week 24 with LOCF."
+      },
+      {
+        "tlg_id": "T-7",
+        "title": "ADAS Cog (11) - Change from Baseline to Week 8 - LOCF",
+        "population": "Efficacy",
+        "description": "Template 5. Secondary timepoint analysis."
+      },
+      {
+        "tlg_id": "T-8",
+        "title": "CIBIC+ - Summary at Week 8 - LOCF",
+        "population": "Efficacy",
+        "description": "Template 6. Secondary timepoint analysis."
+      },
+      {
+        "tlg_id": "T-9",
+        "title": "ADAS Cog (11) - Change from Baseline to Week 16 - LOCF",
+        "population": "Efficacy",
+        "description": "Template 5. Secondary timepoint analysis."
+      },
+      {
+        "tlg_id": "T-10",
+        "title": "CIBIC+ - Summary at Week 16 - LOCF",
+        "population": "Efficacy",
+        "description": "Template 6. Secondary timepoint analysis."
+      },
+      {
+        "tlg_id": "T-11",
+        "title": "ADAS Cog (11) - Change from Baseline to Week 24 - Completers at Week 24 - Observed Cases-Windowed",
+        "population": "Completers",
+        "description": "Template 7. Sensitivity analysis using observed data for completers."
+      },
+      {
+        "tlg_id": "T-12",
+        "title": "ADAS Cog (11) - Change from Baseline to Week 24 in Male Subjects - LOCF",
+        "population": "Efficacy (Males)",
+        "description": "Template 8. Subgroup analysis by gender."
+      },
+      {
+        "tlg_id": "T-13",
+        "title": "ADAS Cog (11) - Change from Baseline to Week 24 in Female Subjects - LOCF",
+        "population": "Efficacy (Females)",
+        "description": "Template 8. Subgroup analysis by gender."
+      },
+      {
+        "tlg_id": "T-14",
+        "title": "ADAS Cog (11) - Mean and Mean Change from Baseline over Time",
+        "population": "Efficacy",
+        "description": "Template 9. Summary statistics by visit and treatment group."
+      },
+      {
+        "tlg_id": "T-15",
+        "title": "ADAS Cog (11) - Repeated Measures Analysis of Change from Baseline to Week 24",
+        "population": "Efficacy",
+        "description": "Template 10. MMRM supportive analysis."
+      },
+      {
+        "tlg_id": "T-16",
+        "title": "Mean NPI-X Total Score from Week 4 through Week 24 - Windowed",
+        "population": "Efficacy",
+        "description": "Template 11. ANCOVA for mean NPI-X total score."
+      },
+      {
+        "tlg_id": "T-17",
+        "title": "Summary of Planned Exposure to Study Drug, as of End of Study",
+        "population": "Safety",
+        "description": "Template 12. Average daily dose and cumulative dose."
+      },
+      {
+        "tlg_id": "T-18",
+        "title": "Incidence of Treatment Emergent Adverse Events by Treatment Group",
+        "population": "Safety",
+        "description": "Template 13. TEAEs by SOC and PT with Fisher's exact test."
+      },
+      {
+        "tlg_id": "T-19",
+        "title": "Incidence of Treatment Emergent Serious Adverse Events by Treatment Group",
+        "population": "Safety",
+        "description": "Template 14. Serious TEAEs by SOC and PT with Fisher's exact test."
+      },
+      {
+        "tlg_id": "T-20",
+        "title": "Summary Statistics for Continuous Laboratory Values",
+        "population": "Safety",
+        "description": "Template 15. Descriptive statistics for hematology and chemistry by visit."
+      },
+      {
+        "tlg_id": "T-21",
+        "title": "Frequency of Normal and Abnormal (Beyond Normal Range) Laboratory Values During Treatment",
+        "population": "Safety",
+        "description": "Template 16. Frequency of abnormal lab values (outside normal range)."
+      },
+      {
+        "tlg_id": "T-22",
+        "title": "Frequency of Normal and Abnormal (Clinically Significant Change from Previous Visit) Laboratory Values During Treatment",
+        "population": "Safety",
+        "description": "Template 17. Frequency of clinically significant lab changes."
+      },
+      {
+        "tlg_id": "T-23",
+        "title": "Shifts of Laboratory Values During Treatment, Categorized Based on Threshold Ranges, by Visit",
+        "population": "Safety",
+        "description": "Template 18. 3x3 shift tables (L/N/H) by visit for each analyte."
+      },
+      {
+        "tlg_id": "T-24",
+        "title": "Shifts of Laboratory Values During Treatment, Categorized Based on Threshold Ranges",
+        "population": "Safety",
+        "description": "Template 19. Overall shift tables (baseline vs. most extreme on-treatment)."
+      },
+      {
+        "tlg_id": "T-25",
+        "title": "Shifts of Hy's Law Values During Treatment",
+        "population": "Safety",
+        "description": "Template 20. Shift table for Hy's Law assessment (transaminase + bilirubin)."
+      },
+      {
+        "tlg_id": "T-26",
+        "title": "Summary of Vital Signs at Baseline and End of Treatment",
+        "population": "Safety",
+        "description": "Template 21. BP and HR (supine, standing) at baseline and EOT."
+      },
+      {
+        "tlg_id": "T-27",
+        "title": "Summary of Vital Signs Change From Baseline at End of Treatment",
+        "population": "Safety",
+        "description": "Template 22. Change from baseline in vital signs."
+      },
+      {
+        "tlg_id": "T-28",
+        "title": "Summary of Weight Change From Baseline at End of Treatment",
+        "population": "Safety",
+        "description": "Template 23. Weight at baseline and Week 24, with and without early terminations."
+      },
+      {
+        "tlg_id": "T-29",
+        "title": "Summary of Concomitant Medications (Number of Subjects)",
+        "population": "Safety",
+        "description": "Template 24. Concomitant meds by Body System and ingredient, coded using WHO Drug."
+      }
+    ],
+    "listings": [],
+    "figures": [
+      {
+        "tlg_id": "F-1",
+        "title": "Time to First Dermatological Event by Treatment Group",
+        "population": "Safety",
+        "description": "Figure 1. Kaplan-Meier survival curves for time to first dermatological adverse event."
+      }
+    ]
+  },
+
+  "validation_summary": {
+    "completeness_score": "High",
+    "fields_missing": [
+      "study_design.stratification_factors — No stratification factors mentioned in either document",
+      "sample_size.dropout_rate_assumed — Not explicitly stated",
+      "source_documents.date — Document dates not available from the PDFs"
+    ],
+    "inconsistencies_found": [
+      "Multiplicity: Protocol Section 4.3.5 describes a randomization test combining ADAS-Cog and CIBIC+ p-values to control Type I error at 0.05. SAP Section 7.3 explicitly states 'No adjustments for multiple primary endpoints will be made.' The SAP takes precedence.",
+      "Efficacy population definition: SAP Section 6 defines it as requiring post-baseline measures for both ADAS-Cog AND CIBIC+. Template 1 note says it includes 'all subjects in the safety population who also have at least one post-baseline ADAS-Cog and CIBIC+ assessment.' These are consistent.",
+      "Protocol specifies one-sided tests for pairwise comparisons (Section 4.3.4); SAP Section 7 states all tests are 2-sided at alpha=0.05. SAP takes precedence.",
+      "Protocol specifies additional endpoints (ADAS-Cog(14), DAD) and analyses (Apo E, PK, ECG, interim) that SAP Appendix 2 explicitly excludes from the pilot submission."
+    ],
+    "reviewer_attention_items": [
+      "SAP deviates from protocol on multiple analyses — see SAP Appendix 2 (Section 15). Key omissions: ADAS-Cog(14), DAD, interim analyses, PK analyses, ECG analyses, Apo E covariate analyses.",
+      "CIBIC+ CMH analysis (Table Ad hoc Template 1) was added at FDA request and is not in the original TLG numbering — may need a separate table shell.",
+      "No listings are included in the planned TLG list. Typical submissions include subject-level listings (e.g., AE listings, lab listings, concomitant medications listings)."
+    ],
+    "recommendations": [
+      "Confirm whether the CIBIC+ CMH analysis (SAP Section 16.1) should be added as an additional table in the TLG package.",
+      "Consider whether subject-level listings should be added for the submission package.",
+      "The SAP uses 'site' (pooled investigator) while the protocol uses 'investigator' — confirm these are the same variable in the analysis datasets.",
+      "Review the NPI-X telephone visit handling — telephone visits are included in assessment windows but should be verified for completeness."
+    ]
+  }
+}

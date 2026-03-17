@@ -11,8 +11,8 @@ test.describe('My Tasks', () => {
     await page.goto('/tasks');
     // Page heading
     await expect(page.getByRole('heading', { name: 'My Tasks' })).toBeVisible();
-    // Should show seeded task step IDs in the task list (default table view)
-    await expect(page.getByText('review-intake-data')).toBeVisible();
+    // Should show seeded tasks with formatted step names in the task list
+    await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
   });
 
   test('My Tasks page shows active tab with count badge', async ({ page }) => {
@@ -37,13 +37,15 @@ test.describe('My Tasks', () => {
   test('task detail page shows claim button for pending task', async ({ page }) => {
     await page.goto('/tasks/task-human-review');
     // Claim button should be visible for pending tasks
-    await expect(page.getByRole('button', { name: /claim/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /claim/i }).first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('task detail page shows previous step output', async ({ page }) => {
     // task-human-review is linked to proc-human-waiting which has step executions
     await page.goto('/tasks/task-human-review');
-    // TaskContextPanel should show Summary and Full Output tabs
+    // TaskContextPanel is collapsible (defaultOpen=false) — open it first
+    await page.getByText(/previous step output/i).click();
+    // Summary and Full Output tabs should now be visible
     await expect(page.getByRole('tab', { name: /summary/i })).toBeVisible();
     await expect(page.getByRole('tab', { name: /full output/i })).toBeVisible();
   });
@@ -64,8 +66,8 @@ test.describe('My Tasks', () => {
 
   test('clicking task in list navigates to detail', async ({ page }) => {
     await page.goto('/tasks');
-    // Click on task-pending-1's step ID link
-    await page.getByText('review-intake-data').click();
+    // Click on task-pending-1's formatted step name link
+    await page.getByText('Review Intake Data').click({ timeout: 10_000 });
     // Should navigate to the task detail page
     await expect(page).toHaveURL(/\/tasks\/task-pending-1/);
   });

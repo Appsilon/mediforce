@@ -1,0 +1,759 @@
+"STUDYID","USUBJID","SITEID","TRT01P","TRT01A","TRT01PN","TRTP","TRTA","TRTSDT","TRTEDT","SAFFL","ITTFL","PARAMCD","PARAM","PARAMN","AVAL","AVISIT","AVISITN"
+"CDISCPILOT01","01-701-1015","701","Placebo","Placebo",0,"Placebo","Placebo",2014-01-02,2014-07-02,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1023","701","Placebo","Placebo",0,"Placebo","Placebo",2012-08-05,2012-09-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1028","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-07-19,2014-01-14,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.7,"End of Study",99
+"CDISCPILOT01","01-701-1033","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-18,2014-03-31,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1034","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-07-01,2014-12-30,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.9,"End of Study",99
+"CDISCPILOT01","01-701-1047","701","Placebo","Placebo",0,"Placebo","Placebo",2013-02-12,2013-03-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1097","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-01,2014-07-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1111","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-07,2012-09-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1115","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-30,2013-01-23,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1118","701","Placebo","Placebo",0,"Placebo","Placebo",2014-03-12,2014-09-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1130","701","Placebo","Placebo",0,"Placebo","Placebo",2014-02-15,2014-08-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1133","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-28,2013-04-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.2,"End of Study",99
+"CDISCPILOT01","01-701-1146","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-20,2013-06-26,"Y","Y","AVGDD","Average Daily Dose (mg)",1,70.3,"End of Study",99
+"CDISCPILOT01","01-701-1148","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-23,2014-02-20,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.1,"End of Study",99
+"CDISCPILOT01","01-701-1153","701","Placebo","Placebo",0,"Placebo","Placebo",2013-09-23,2014-03-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1180","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-12,2013-03-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,70.2,"End of Study",99
+"CDISCPILOT01","01-701-1181","701","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-12-05,2013-12-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1188","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-15,2013-03-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1192","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-07-22,2013-01-20,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1203","701","Placebo","Placebo",0,"Placebo","Placebo",2013-02-02,2013-08-03,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1211","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-15,2013-01-12,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1234","701","Placebo","Placebo",0,"Placebo","Placebo",2013-03-30,2013-09-22,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1239","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-11,2014-07-10,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.8,"End of Study",99
+"CDISCPILOT01","01-701-1275","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-02-07,2014-05-31,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.2,"End of Study",99
+"CDISCPILOT01","01-701-1287","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-25,2014-07-26,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.3,"End of Study",99
+"CDISCPILOT01","01-701-1294","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-24,2013-06-14,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1302","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-29,2013-11-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,74,"End of Study",99
+"CDISCPILOT01","01-701-1317","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-05-22,2014-11-20,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1324","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-10-02,2013-04-02,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1341","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-05,2013-01-26,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1345","701","Placebo","Placebo",0,"Placebo","Placebo",2013-10-08,2014-03-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1360","701","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-07-31,2013-08-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1363","701","Placebo","Placebo",0,"Placebo","Placebo",2013-05-30,2013-11-27,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1383","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-04,2013-08-06,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.6,"End of Study",99
+"CDISCPILOT01","01-701-1387","701","Placebo","Placebo",0,"Placebo","Placebo",2014-03-12,2014-03-25,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1392","701","Placebo","Placebo",0,"Placebo","Placebo",2012-10-28,2013-04-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1415","701","Placebo","Placebo",0,"Placebo","Placebo",2013-09-23,2014-03-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1429","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-19,2013-04-30,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1440","701","Placebo","Placebo",0,"Placebo","Placebo",2013-08-08,2014-02-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-701-1442","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-26,2014-04-26,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-701-1444","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-05,2013-02-12,"Y","Y","AVGDD","Average Daily Dose (mg)",1,71.3,"End of Study",99
+"CDISCPILOT01","01-702-1082","702","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-26,2013-10-13,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-703-1042","703","Placebo","Placebo",0,"Placebo","Placebo",2013-03-02,2013-08-31,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-703-1076","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-25,2013-12-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,75.2,"End of Study",99
+"CDISCPILOT01","01-703-1086","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-02,2012-12-04,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-703-1096","703","Placebo","Placebo",0,"Placebo","Placebo",2013-01-25,2013-03-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-703-1100","703","Placebo","Placebo",0,"Placebo","Placebo",2013-03-13,2013-09-14,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-703-1119","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-20,2013-06-13,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-703-1175","703","Placebo","Placebo",0,"Placebo","Placebo",2013-12-20,2013-12-26,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-703-1182","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-17,2013-12-11,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-703-1197","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-06-16,2013-06-29,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-703-1210","703","Placebo","Placebo",0,"Placebo","Placebo",2013-03-16,2013-09-06,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-703-1258","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-07-20,2013-01-11,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.3,"End of Study",99
+"CDISCPILOT01","01-703-1279","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-05-13,2013-06-03,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-703-1295","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-11-21,2014-04-19,"Y","Y","AVGDD","Average Daily Dose (mg)",1,78.3,"End of Study",99
+"CDISCPILOT01","01-703-1299","703","Placebo","Placebo",0,"Placebo","Placebo",2012-09-12,2013-03-13,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-703-1335","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-03-17,2014-05-07,"Y","Y","AVGDD","Average Daily Dose (mg)",1,73.2,"End of Study",99
+"CDISCPILOT01","01-703-1379","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-22,2014-03-21,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-703-1403","703","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2012-12-12,2012-12-13,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-703-1439","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-03-12,2014-09-11,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.7,"End of Study",99
+"CDISCPILOT01","01-704-1008","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-13,2013-02-21,"Y","Y","AVGDD","Average Daily Dose (mg)",1,70.2,"End of Study",99
+"CDISCPILOT01","01-704-1009","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-08-27,2013-09-25,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-704-1010","704","Placebo","Placebo",0,"Placebo","Placebo",2014-02-21,2014-07-08,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-704-1017","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-06,2013-11-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,72.4,"End of Study",99
+"CDISCPILOT01","01-704-1025","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-27,2013-10-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-704-1065","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-24,2013-12-22,"Y","Y","AVGDD","Average Daily Dose (mg)",1,74.2,"End of Study",99
+"CDISCPILOT01","01-704-1074","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-22,2014-03-20,"Y","Y","AVGDD","Average Daily Dose (mg)",1,72.2,"End of Study",99
+"CDISCPILOT01","01-704-1093","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-03-15,2013-06-17,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.5,"End of Study",99
+"CDISCPILOT01","01-704-1114","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-23,2013-07-07,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-704-1120","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-12-02,2014-02-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-704-1127","704","Placebo","Placebo",0,"Placebo","Placebo",2013-10-02,2014-03-31,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-704-1135","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-31,2014-05-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-704-1164","704","Placebo","Placebo",0,"Placebo","Placebo",2012-09-19,2013-04-04,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-704-1218","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-19,2013-05-27,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-704-1233","704","Placebo","Placebo",0,"Placebo","Placebo",2013-03-21,2013-04-04,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-704-1241","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-25,2013-10-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,74,"End of Study",99
+"CDISCPILOT01","01-704-1260","704","Placebo","Placebo",0,"Placebo","Placebo",2012-08-30,2012-11-04,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-704-1266","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-13,2013-12-06,"Y","Y","AVGDD","Average Daily Dose (mg)",1,73.6,"End of Study",99
+"CDISCPILOT01","01-704-1323","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-08,2013-08-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-704-1325","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-04-23,2014-07-04,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-704-1332","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-09,2014-02-14,"Y","Y","AVGDD","Average Daily Dose (mg)",1,75,"End of Study",99
+"CDISCPILOT01","01-704-1351","704","Placebo","Placebo",0,"Placebo","Placebo",2013-10-12,2014-04-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-704-1388","704","Placebo","Placebo",0,"Placebo","Placebo",2012-12-07,2013-06-11,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-704-1435","704","Placebo","Placebo",0,"Placebo","Placebo",2012-11-17,2013-01-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-704-1445","704","Placebo","Placebo",0,"Placebo","Placebo",2014-05-11,2014-11-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-705-1031","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-11-27,2013-12-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-705-1059","705","Placebo","Placebo",0,"Placebo","Placebo",2013-08-05,2013-12-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-705-1186","705","Placebo","Placebo",0,"Placebo","Placebo",2014-01-08,2014-01-26,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-705-1199","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-16,2013-09-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-705-1280","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-17,2014-07-25,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.9,"End of Study",99
+"CDISCPILOT01","01-705-1281","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-11-28,2014-02-27,"Y","Y","AVGDD","Average Daily Dose (mg)",1,75.7,"End of Study",99
+"CDISCPILOT01","01-705-1282","705","Placebo","Placebo",0,"Placebo","Placebo",2012-12-26,2013-06-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-705-1292","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-14,2014-05-13,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-705-1303","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-16,2013-12-30,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-705-1310","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-11-02,2014-01-23,"Y","Y","AVGDD","Average Daily Dose (mg)",1,74.2,"End of Study",99
+"CDISCPILOT01","01-705-1349","705","Placebo","Placebo",0,"Placebo","Placebo",2013-03-10,2013-09-08,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-705-1377","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-04,2014-01-25,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-705-1393","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-07,2013-02-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-705-1431","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-06-23,2013-12-19,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-706-1041","706","Placebo","Placebo",0,"Placebo","Placebo",2013-12-31,2014-07-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-706-1049","706","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-14,2013-06-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,69.8,"End of Study",99
+"CDISCPILOT01","01-706-1384","706","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-15,2012-09-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-707-1037","707","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-12-20,2013-12-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-707-1206","707","Placebo","Placebo",0,"Placebo","Placebo",2013-10-28,2014-04-26,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-708-1019","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-12-20,2014-01-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-708-1032","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-09,2013-03-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-708-1084","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-05-09,2013-11-11,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-708-1087","708","Placebo","Placebo",0,"Placebo","Placebo",2012-10-22,2013-04-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-708-1158","708","Placebo","Placebo",0,"Placebo","Placebo",2014-02-08,2014-03-21,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-708-1171","708","Placebo","Placebo",0,"Placebo","Placebo",2012-12-06,2013-06-04,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-708-1178","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-29,2014-04-06,"Y","Y","AVGDD","Average Daily Dose (mg)",1,75.3,"End of Study",99
+"CDISCPILOT01","01-708-1213","708","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-02-09,2013-02-22,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-708-1216","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-24,2012-11-29,"Y","Y","AVGDD","Average Daily Dose (mg)",1,69.3,"End of Study",99
+"CDISCPILOT01","01-708-1236","708","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-09-21,2013-09-21,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-708-1253","708","Placebo","Placebo",0,"Placebo","Placebo",2013-05-07,2013-11-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-708-1272","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-06,2013-03-22,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-708-1286","708","Placebo","Placebo",0,"Placebo","Placebo",2013-09-10,2014-03-08,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-708-1296","708","Placebo","Placebo",0,"Placebo","Placebo",2013-06-14,2013-12-12,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-708-1297","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-25,2013-05-03,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-708-1316","708","Placebo","Placebo",0,"Placebo","Placebo",2013-08-23,2014-03-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-708-1336","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-07,2013-06-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.7,"End of Study",99
+"CDISCPILOT01","01-708-1342","708","Placebo","Placebo",0,"Placebo","Placebo",2012-12-29,2013-06-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-708-1347","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-04-20,2013-06-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,74.2,"End of Study",99
+"CDISCPILOT01","01-708-1348","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-08-05,2014-02-13,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-708-1353","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-04,2013-08-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-708-1372","708","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-04-12,2013-04-19,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-708-1378","708","Placebo","Placebo",0,"Placebo","Placebo",2013-09-03,2014-01-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-708-1406","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-26,2014-07-02,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.6,"End of Study",99
+"CDISCPILOT01","01-708-1428","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-11-09,2013-12-14,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-709-1001","709","Placebo","Placebo",0,"Placebo","Placebo",2013-10-08,2014-04-08,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-709-1007","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-07-31,2012-08-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-709-1020","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-01,2013-06-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-709-1029","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-25,2013-06-26,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.6,"End of Study",99
+"CDISCPILOT01","01-709-1081","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-18,2014-04-27,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-709-1088","709","Placebo","Placebo",0,"Placebo","Placebo",2014-04-12,2014-10-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-709-1099","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-25,2014-04-25,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.1,"End of Study",99
+"CDISCPILOT01","01-709-1102","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-15,2013-03-27,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-709-1168","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-02,2013-09-26,"Y","Y","AVGDD","Average Daily Dose (mg)",1,73.3,"End of Study",99
+"CDISCPILOT01","01-709-1217","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-04,2013-06-11,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-709-1238","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-15,2013-08-06,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.2,"End of Study",99
+"CDISCPILOT01","01-709-1259","709","Placebo","Placebo",0,"Placebo","Placebo",2013-01-26,2013-06-13,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-709-1285","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-24,2013-05-23,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-709-1301","709","Placebo","Placebo",0,"Placebo","Placebo",2013-07-19,2014-01-17,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-709-1306","709","Placebo","Placebo",0,"Placebo","Placebo",2014-02-03,2014-06-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-709-1309","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-06-19,2013-12-19,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77,"End of Study",99
+"CDISCPILOT01","01-709-1312","709","Placebo","Placebo",0,"Placebo","Placebo",2014-04-20,2014-10-19,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-709-1326","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-05,2013-10-02,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-709-1329","709","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-08-15,2013-08-25,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-709-1339","709","Placebo","Placebo",0,"Placebo","Placebo",2012-12-23,2013-06-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-709-1424","709","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-03-03,2013-03-07,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1002","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-14,2014-01-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1006","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-10,2013-08-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.1,"End of Study",99
+"CDISCPILOT01","01-710-1021","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-09-27,2013-10-29,"Y","Y","AVGDD","Average Daily Dose (mg)",1,68.7,"End of Study",99
+"CDISCPILOT01","01-710-1027","710","Placebo","Placebo",0,"Placebo","Placebo",2014-02-28,2014-08-29,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1045","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-06-03,2013-08-13,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1053","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-26,2013-02-10,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1060","710","Placebo","Placebo",0,"Placebo","Placebo",2013-01-01,2013-07-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1070","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-09-08,2013-01-22,"Y","Y","AVGDD","Average Daily Dose (mg)",1,78,"End of Study",99
+"CDISCPILOT01","01-710-1077","710","Placebo","Placebo",0,"Placebo","Placebo",2013-11-17,2014-05-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1078","710","Placebo","Placebo",0,"Placebo","Placebo",2013-09-17,2014-03-23,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1083","710","Placebo","Placebo",0,"Placebo","Placebo",2013-07-22,2013-08-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1137","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-11,2013-11-13,"Y","Y","AVGDD","Average Daily Dose (mg)",1,69.1,"End of Study",99
+"CDISCPILOT01","01-710-1142","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-02,2012-10-20,"Y","Y","AVGDD","Average Daily Dose (mg)",1,59.7,"End of Study",99
+"CDISCPILOT01","01-710-1154","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-29,2014-04-27,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1166","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-30,2013-03-19,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1183","710","Placebo","Placebo",0,"Placebo","Placebo",2013-11-16,2014-05-17,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1187","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-11-10,2013-05-12,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.7,"End of Study",99
+"CDISCPILOT01","01-710-1235","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-26,2013-03-27,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1249","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-28,2014-06-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.7,"End of Study",99
+"CDISCPILOT01","01-710-1264","710","Placebo","Placebo",0,"Placebo","Placebo",2013-06-13,2013-10-11,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1270","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-02-12,2014-03-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1271","710","Placebo","Placebo",0,"Placebo","Placebo",2012-09-27,2012-11-21,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1278","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-24,2013-02-26,"Y","Y","AVGDD","Average Daily Dose (mg)",1,74.8,"End of Study",99
+"CDISCPILOT01","01-710-1300","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-15,2013-02-15,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1314","710","Placebo","Placebo",0,"Placebo","Placebo",2013-04-24,2013-05-23,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1315","710","Placebo","Placebo",0,"Placebo","Placebo",2013-02-27,2013-07-06,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1354","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-11-11,2013-05-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.1,"End of Study",99
+"CDISCPILOT01","01-710-1358","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-17,2013-02-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1368","710","Placebo","Placebo",0,"Placebo","Placebo",2013-10-23,2014-04-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-710-1385","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-10-29,2013-02-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-710-1408","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-05,2013-07-12,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.1,"End of Study",99
+"CDISCPILOT01","01-711-1012","711","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-04-03,2013-04-29,"Y","Y","AVGDD","Average Daily Dose (mg)",1,66,"End of Study",99
+"CDISCPILOT01","01-711-1036","711","Placebo","Placebo",0,"Placebo","Placebo",2012-07-29,2013-02-10,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-711-1143","711","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-03,2013-05-30,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-711-1433","711","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-01-27,2013-02-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-713-1043","713","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-15,2014-03-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-713-1073","713","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-30,2014-10-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-713-1106","713","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-31,2013-05-06,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.7,"End of Study",99
+"CDISCPILOT01","01-713-1141","713","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-31,2013-07-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,68.3,"End of Study",99
+"CDISCPILOT01","01-713-1179","713","Placebo","Placebo",0,"Placebo","Placebo",2013-08-09,2014-02-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-713-1209","713","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-27,2013-11-22,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77,"End of Study",99
+"CDISCPILOT01","01-713-1256","713","Placebo","Placebo",0,"Placebo","Placebo",2012-09-19,2013-03-25,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-713-1269","713","Placebo","Placebo",0,"Placebo","Placebo",2014-01-27,2014-07-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-713-1448","713","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-19,2014-05-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-714-1035","714","Placebo","Placebo",0,"Placebo","Placebo",2014-04-17,2014-10-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-714-1068","714","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-08-08,2013-10-08,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-714-1195","714","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-26,2013-10-23,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-714-1288","714","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-04,2014-06-17,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.2,"End of Study",99
+"CDISCPILOT01","01-714-1375","714","Placebo","Placebo",0,"Placebo","Placebo",2013-02-26,2013-09-07,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-714-1425","714","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-08-15,2013-08-19,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-715-1085","715","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-16,2013-08-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-715-1107","715","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-26,2013-05-07,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-715-1155","715","Placebo","Placebo",0,"Placebo","Placebo",2013-12-13,2014-01-25,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-715-1207","715","Placebo","Placebo",0,"Placebo","Placebo",2012-11-18,2013-05-27,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-715-1319","715","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-17,2013-03-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,57.2,"End of Study",99
+"CDISCPILOT01","01-715-1321","715","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-02-11,2014-04-21,"Y","Y","AVGDD","Average Daily Dose (mg)",1,74.8,"End of Study",99
+"CDISCPILOT01","01-715-1397","715","Placebo","Placebo",0,"Placebo","Placebo",2013-04-03,2013-10-02,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-715-1405","715","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-06,2013-07-07,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-716-1024","716","Placebo","Placebo",0,"Placebo","Placebo",2012-07-09,2013-01-20,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-716-1026","716","Placebo","Placebo",0,"Placebo","Placebo",2014-04-02,2014-10-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-716-1030","716","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-12-28,2014-01-02,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-716-1044","716","Placebo","Placebo",0,"Placebo","Placebo",2013-04-27,2013-11-03,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-716-1063","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-05-09,2013-08-25,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-716-1071","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-06-08,2013-08-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,73.6,"End of Study",99
+"CDISCPILOT01","01-716-1094","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-19,2013-01-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-716-1103","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-20,2014-09-20,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-716-1108","716","Placebo","Placebo",0,"Placebo","Placebo",2013-02-12,2013-08-10,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-716-1151","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-01,2013-05-11,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-716-1157","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-02,2014-04-04,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-716-1160","716","Placebo","Placebo",0,"Placebo","Placebo",2013-04-05,2013-10-11,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-716-1167","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-10-08,2013-04-12,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-716-1177","716","Placebo","Placebo",0,"Placebo","Placebo",2014-09-02,2015-03-05,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-716-1189","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-09,2013-02-27,"Y","Y","AVGDD","Average Daily Dose (mg)",1,78,"End of Study",99
+"CDISCPILOT01","01-716-1229","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-20,2013-03-31,"Y","Y","AVGDD","Average Daily Dose (mg)",1,70.9,"End of Study",99
+"CDISCPILOT01","01-716-1298","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-08,2013-06-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-716-1308","716","Placebo","Placebo",0,"Placebo","Placebo",2013-08-28,2013-10-07,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-716-1311","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-05-14,2014-09-21,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-716-1364","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-07-04,2014-01-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.6,"End of Study",99
+"CDISCPILOT01","01-716-1373","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-14,2013-02-27,"Y","Y","AVGDD","Average Daily Dose (mg)",1,75,"End of Study",99
+"CDISCPILOT01","01-716-1418","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-05,2013-11-20,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.1,"End of Study",99
+"CDISCPILOT01","01-716-1441","716","Placebo","Placebo",0,"Placebo","Placebo",2014-01-22,2014-07-22,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-716-1447","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-16,2014-06-17,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.2,"End of Study",99
+"CDISCPILOT01","01-717-1004","717","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-14,2014-07-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-717-1109","717","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-27,2014-07-28,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.3,"End of Study",99
+"CDISCPILOT01","01-717-1174","717","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-22,2013-07-24,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.5,"End of Study",99
+"CDISCPILOT01","01-717-1201","717","Placebo","Placebo",0,"Placebo","Placebo",2013-12-19,2014-02-21,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-717-1344","717","Placebo","Placebo",0,"Placebo","Placebo",2014-01-11,2014-03-14,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-717-1357","717","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-01,2013-10-14,"Y","Y","AVGDD","Average Daily Dose (mg)",1,78.6,"End of Study",99
+"CDISCPILOT01","01-717-1446","717","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-01,2014-03-03,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-718-1066","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-07,2013-07-16,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-718-1079","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-19,2012-10-31,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-718-1101","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-17,2013-07-31,"Y","Y","AVGDD","Average Daily Dose (mg)",1,78.5,"End of Study",99
+"CDISCPILOT01","01-718-1139","718","Placebo","Placebo",0,"Placebo","Placebo",2013-05-19,2013-11-17,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-718-1150","718","Placebo","Placebo",0,"Placebo","Placebo",2013-01-19,2013-07-29,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-718-1170","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-16,2013-10-12,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-718-1172","718","Placebo","Placebo",0,"Placebo","Placebo",2013-09-21,2013-11-29,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-718-1250","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-21,2014-01-31,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-718-1254","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-10,2014-01-09,"Y","Y","AVGDD","Average Daily Dose (mg)",1,54,"End of Study",99
+"CDISCPILOT01","01-718-1328","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-01,2013-04-18,"Y","Y","AVGDD","Average Daily Dose (mg)",1,76.1,"End of Study",99
+"CDISCPILOT01","01-718-1355","718","Placebo","Placebo",0,"Placebo","Placebo",2013-02-28,2013-08-29,"Y","Y","AVGDD","Average Daily Dose (mg)",1,0,"End of Study",99
+"CDISCPILOT01","01-718-1371","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-04-26,2013-08-01,"Y","Y","AVGDD","Average Daily Dose (mg)",1,77.4,"End of Study",99
+"CDISCPILOT01","01-718-1427","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-17,2013-02-11,"Y","Y","AVGDD","Average Daily Dose (mg)",1,73.9,"End of Study",99
+"CDISCPILOT01","01-701-1015","701","Placebo","Placebo",0,"Placebo","Placebo",2014-01-02,2014-07-02,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1023","701","Placebo","Placebo",0,"Placebo","Placebo",2012-08-05,2012-09-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1028","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-07-19,2014-01-14,"Y","Y","CUMD","Cumulative Dose (mg)",2,13986,"End of Study",99
+"CDISCPILOT01","01-701-1033","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-18,2014-03-31,"Y","Y","CUMD","Cumulative Dose (mg)",2,756,"End of Study",99
+"CDISCPILOT01","01-701-1034","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-07-01,2014-12-30,"Y","Y","CUMD","Cumulative Dose (mg)",2,14067,"End of Study",99
+"CDISCPILOT01","01-701-1047","701","Placebo","Placebo",0,"Placebo","Placebo",2013-02-12,2013-03-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1097","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-01,2014-07-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,10260,"End of Study",99
+"CDISCPILOT01","01-701-1111","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-07,2012-09-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,540,"End of Study",99
+"CDISCPILOT01","01-701-1115","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-30,2013-01-23,"Y","Y","CUMD","Cumulative Dose (mg)",2,2970,"End of Study",99
+"CDISCPILOT01","01-701-1118","701","Placebo","Placebo",0,"Placebo","Placebo",2014-03-12,2014-09-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1130","701","Placebo","Placebo",0,"Placebo","Placebo",2014-02-15,2014-08-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1133","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-28,2013-04-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,14121,"End of Study",99
+"CDISCPILOT01","01-701-1146","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-20,2013-06-26,"Y","Y","CUMD","Cumulative Dose (mg)",2,2673,"End of Study",99
+"CDISCPILOT01","01-701-1148","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-23,2014-02-20,"Y","Y","CUMD","Cumulative Dose (mg)",2,14040,"End of Study",99
+"CDISCPILOT01","01-701-1153","701","Placebo","Placebo",0,"Placebo","Placebo",2013-09-23,2014-03-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1180","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-12,2013-03-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,2457,"End of Study",99
+"CDISCPILOT01","01-701-1181","701","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-12-05,2013-12-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,270,"End of Study",99
+"CDISCPILOT01","01-701-1188","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-15,2013-03-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,2052,"End of Study",99
+"CDISCPILOT01","01-701-1192","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-07-22,2013-01-20,"Y","Y","CUMD","Cumulative Dose (mg)",2,9882,"End of Study",99
+"CDISCPILOT01","01-701-1203","701","Placebo","Placebo",0,"Placebo","Placebo",2013-02-02,2013-08-03,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1211","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-15,2013-01-12,"Y","Y","CUMD","Cumulative Dose (mg)",2,3186,"End of Study",99
+"CDISCPILOT01","01-701-1234","701","Placebo","Placebo",0,"Placebo","Placebo",2013-03-30,2013-09-22,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1239","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-11,2014-07-10,"Y","Y","CUMD","Cumulative Dose (mg)",2,13905,"End of Study",99
+"CDISCPILOT01","01-701-1275","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-02-07,2014-05-31,"Y","Y","CUMD","Cumulative Dose (mg)",2,8802,"End of Study",99
+"CDISCPILOT01","01-701-1287","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-25,2014-07-26,"Y","Y","CUMD","Cumulative Dose (mg)",2,13959,"End of Study",99
+"CDISCPILOT01","01-701-1294","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-24,2013-06-14,"Y","Y","CUMD","Cumulative Dose (mg)",2,4482,"End of Study",99
+"CDISCPILOT01","01-701-1302","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-29,2013-11-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,5103,"End of Study",99
+"CDISCPILOT01","01-701-1317","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-05-22,2014-11-20,"Y","Y","CUMD","Cumulative Dose (mg)",2,9882,"End of Study",99
+"CDISCPILOT01","01-701-1324","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-10-02,2013-04-02,"Y","Y","CUMD","Cumulative Dose (mg)",2,9882,"End of Study",99
+"CDISCPILOT01","01-701-1341","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-05,2013-01-26,"Y","Y","CUMD","Cumulative Dose (mg)",2,1188,"End of Study",99
+"CDISCPILOT01","01-701-1345","701","Placebo","Placebo",0,"Placebo","Placebo",2013-10-08,2014-03-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1360","701","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-07-31,2013-08-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,324,"End of Study",99
+"CDISCPILOT01","01-701-1363","701","Placebo","Placebo",0,"Placebo","Placebo",2013-05-30,2013-11-27,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1383","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-04,2013-08-06,"Y","Y","CUMD","Cumulative Dose (mg)",2,14283,"End of Study",99
+"CDISCPILOT01","01-701-1387","701","Placebo","Placebo",0,"Placebo","Placebo",2014-03-12,2014-03-25,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1392","701","Placebo","Placebo",0,"Placebo","Placebo",2012-10-28,2013-04-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1415","701","Placebo","Placebo",0,"Placebo","Placebo",2013-09-23,2014-03-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1429","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-19,2013-04-30,"Y","Y","CUMD","Cumulative Dose (mg)",2,2322,"End of Study",99
+"CDISCPILOT01","01-701-1440","701","Placebo","Placebo",0,"Placebo","Placebo",2013-08-08,2014-02-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-701-1442","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-26,2014-04-26,"Y","Y","CUMD","Cumulative Dose (mg)",2,9882,"End of Study",99
+"CDISCPILOT01","01-701-1444","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-05,2013-02-12,"Y","Y","CUMD","Cumulative Dose (mg)",2,2781,"End of Study",99
+"CDISCPILOT01","01-702-1082","702","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-26,2013-10-13,"Y","Y","CUMD","Cumulative Dose (mg)",2,4320,"End of Study",99
+"CDISCPILOT01","01-703-1042","703","Placebo","Placebo",0,"Placebo","Placebo",2013-03-02,2013-08-31,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-703-1076","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-25,2013-12-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,4590,"End of Study",99
+"CDISCPILOT01","01-703-1086","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-02,2012-12-04,"Y","Y","CUMD","Cumulative Dose (mg)",2,5076,"End of Study",99
+"CDISCPILOT01","01-703-1096","703","Placebo","Placebo",0,"Placebo","Placebo",2013-01-25,2013-03-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-703-1100","703","Placebo","Placebo",0,"Placebo","Placebo",2013-03-13,2013-09-14,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-703-1119","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-20,2013-06-13,"Y","Y","CUMD","Cumulative Dose (mg)",2,6156,"End of Study",99
+"CDISCPILOT01","01-703-1175","703","Placebo","Placebo",0,"Placebo","Placebo",2013-12-20,2013-12-26,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-703-1182","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-17,2013-12-11,"Y","Y","CUMD","Cumulative Dose (mg)",2,3024,"End of Study",99
+"CDISCPILOT01","01-703-1197","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-06-16,2013-06-29,"Y","Y","CUMD","Cumulative Dose (mg)",2,756,"End of Study",99
+"CDISCPILOT01","01-703-1210","703","Placebo","Placebo",0,"Placebo","Placebo",2013-03-16,2013-09-06,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-703-1258","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-07-20,2013-01-11,"Y","Y","CUMD","Cumulative Dose (mg)",2,13608,"End of Study",99
+"CDISCPILOT01","01-703-1279","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-05-13,2013-06-03,"Y","Y","CUMD","Cumulative Dose (mg)",2,1188,"End of Study",99
+"CDISCPILOT01","01-703-1295","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-11-21,2014-04-19,"Y","Y","CUMD","Cumulative Dose (mg)",2,11745,"End of Study",99
+"CDISCPILOT01","01-703-1299","703","Placebo","Placebo",0,"Placebo","Placebo",2012-09-12,2013-03-13,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-703-1335","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-03-17,2014-05-07,"Y","Y","CUMD","Cumulative Dose (mg)",2,3807,"End of Study",99
+"CDISCPILOT01","01-703-1379","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-22,2014-03-21,"Y","Y","CUMD","Cumulative Dose (mg)",2,9774,"End of Study",99
+"CDISCPILOT01","01-703-1403","703","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2012-12-12,2012-12-13,"Y","Y","CUMD","Cumulative Dose (mg)",2,108,"End of Study",99
+"CDISCPILOT01","01-703-1439","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-03-12,2014-09-11,"Y","Y","CUMD","Cumulative Dose (mg)",2,14121,"End of Study",99
+"CDISCPILOT01","01-704-1008","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-13,2013-02-21,"Y","Y","CUMD","Cumulative Dose (mg)",2,2808,"End of Study",99
+"CDISCPILOT01","01-704-1009","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-08-27,2013-09-25,"Y","Y","CUMD","Cumulative Dose (mg)",2,1620,"End of Study",99
+"CDISCPILOT01","01-704-1010","704","Placebo","Placebo",0,"Placebo","Placebo",2014-02-21,2014-07-08,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-704-1017","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-06,2013-11-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,3186,"End of Study",99
+"CDISCPILOT01","01-704-1025","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-27,2013-10-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,1512,"End of Study",99
+"CDISCPILOT01","01-704-1065","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-24,2013-12-22,"Y","Y","CUMD","Cumulative Dose (mg)",2,4455,"End of Study",99
+"CDISCPILOT01","01-704-1074","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-22,2014-03-20,"Y","Y","CUMD","Cumulative Dose (mg)",2,4185,"End of Study",99
+"CDISCPILOT01","01-704-1093","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-03-15,2013-06-17,"Y","Y","CUMD","Cumulative Dose (mg)",2,7263,"End of Study",99
+"CDISCPILOT01","01-704-1114","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-23,2013-07-07,"Y","Y","CUMD","Cumulative Dose (mg)",2,8964,"End of Study",99
+"CDISCPILOT01","01-704-1120","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-12-02,2014-02-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,3348,"End of Study",99
+"CDISCPILOT01","01-704-1127","704","Placebo","Placebo",0,"Placebo","Placebo",2013-10-02,2014-03-31,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-704-1135","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-31,2014-05-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,10692,"End of Study",99
+"CDISCPILOT01","01-704-1164","704","Placebo","Placebo",0,"Placebo","Placebo",2012-09-19,2013-04-04,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-704-1218","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-19,2013-05-27,"Y","Y","CUMD","Cumulative Dose (mg)",2,10260,"End of Study",99
+"CDISCPILOT01","01-704-1233","704","Placebo","Placebo",0,"Placebo","Placebo",2013-03-21,2013-04-04,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-704-1241","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-25,2013-10-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,3402,"End of Study",99
+"CDISCPILOT01","01-704-1260","704","Placebo","Placebo",0,"Placebo","Placebo",2012-08-30,2012-11-04,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-704-1266","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-13,2013-12-06,"Y","Y","CUMD","Cumulative Dose (mg)",2,4050,"End of Study",99
+"CDISCPILOT01","01-704-1323","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-08,2013-08-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,1566,"End of Study",99
+"CDISCPILOT01","01-704-1325","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-04-23,2014-07-04,"Y","Y","CUMD","Cumulative Dose (mg)",2,3942,"End of Study",99
+"CDISCPILOT01","01-704-1332","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-09,2014-02-14,"Y","Y","CUMD","Cumulative Dose (mg)",2,5103,"End of Study",99
+"CDISCPILOT01","01-704-1351","704","Placebo","Placebo",0,"Placebo","Placebo",2013-10-12,2014-04-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-704-1388","704","Placebo","Placebo",0,"Placebo","Placebo",2012-12-07,2013-06-11,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-704-1435","704","Placebo","Placebo",0,"Placebo","Placebo",2012-11-17,2013-01-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-704-1445","704","Placebo","Placebo",0,"Placebo","Placebo",2014-05-11,2014-11-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-705-1018","705","Placebo","Placebo",0,"Placebo","Placebo",2013-07-05,,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-705-1031","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-11-27,2013-12-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,1188,"End of Study",99
+"CDISCPILOT01","01-705-1059","705","Placebo","Placebo",0,"Placebo","Placebo",2013-08-05,2013-12-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-705-1186","705","Placebo","Placebo",0,"Placebo","Placebo",2014-01-08,2014-01-26,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-705-1199","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-16,2013-09-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,702,"End of Study",99
+"CDISCPILOT01","01-705-1280","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-17,2014-07-25,"Y","Y","CUMD","Cumulative Dose (mg)",2,14607,"End of Study",99
+"CDISCPILOT01","01-705-1281","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-11-28,2014-02-27,"Y","Y","CUMD","Cumulative Dose (mg)",2,6966,"End of Study",99
+"CDISCPILOT01","01-705-1282","705","Placebo","Placebo",0,"Placebo","Placebo",2012-12-26,2013-06-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-705-1292","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-14,2014-05-13,"Y","Y","CUMD","Cumulative Dose (mg)",2,11448,"End of Study",99
+"CDISCPILOT01","01-705-1303","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-16,2013-12-30,"Y","Y","CUMD","Cumulative Dose (mg)",2,810,"End of Study",99
+"CDISCPILOT01","01-705-1310","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-11-02,2014-01-23,"Y","Y","CUMD","Cumulative Dose (mg)",2,6156,"End of Study",99
+"CDISCPILOT01","01-705-1349","705","Placebo","Placebo",0,"Placebo","Placebo",2013-03-10,2013-09-08,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-705-1377","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-04,2014-01-25,"Y","Y","CUMD","Cumulative Dose (mg)",2,1188,"End of Study",99
+"CDISCPILOT01","01-705-1382","705","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-05-13,,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-705-1393","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-07,2013-02-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,7992,"End of Study",99
+"CDISCPILOT01","01-705-1431","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-06-23,2013-12-19,"Y","Y","CUMD","Cumulative Dose (mg)",2,9720,"End of Study",99
+"CDISCPILOT01","01-706-1041","706","Placebo","Placebo",0,"Placebo","Placebo",2013-12-31,2014-07-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-706-1049","706","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-14,2013-06-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,2511,"End of Study",99
+"CDISCPILOT01","01-706-1384","706","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-15,2012-09-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,540,"End of Study",99
+"CDISCPILOT01","01-707-1037","707","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-12-20,2013-12-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,270,"End of Study",99
+"CDISCPILOT01","01-707-1206","707","Placebo","Placebo",0,"Placebo","Placebo",2013-10-28,2014-04-26,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-708-1019","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-12-20,2014-01-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,702,"End of Study",99
+"CDISCPILOT01","01-708-1032","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-09,2013-03-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,1134,"End of Study",99
+"CDISCPILOT01","01-708-1084","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-05-09,2013-11-11,"Y","Y","CUMD","Cumulative Dose (mg)",2,10098,"End of Study",99
+"CDISCPILOT01","01-708-1087","708","Placebo","Placebo",0,"Placebo","Placebo",2012-10-22,2013-04-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-708-1158","708","Placebo","Placebo",0,"Placebo","Placebo",2014-02-08,2014-03-21,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-708-1171","708","Placebo","Placebo",0,"Placebo","Placebo",2012-12-06,2013-06-04,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-708-1178","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-29,2014-04-06,"Y","Y","CUMD","Cumulative Dose (mg)",2,7452,"End of Study",99
+"CDISCPILOT01","01-708-1213","708","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-02-09,2013-02-22,"Y","Y","CUMD","Cumulative Dose (mg)",2,756,"End of Study",99
+"CDISCPILOT01","01-708-1216","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-24,2012-11-29,"Y","Y","CUMD","Cumulative Dose (mg)",2,2565,"End of Study",99
+"CDISCPILOT01","01-708-1236","708","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-09-21,2013-09-21,"Y","Y","CUMD","Cumulative Dose (mg)",2,54,"End of Study",99
+"CDISCPILOT01","01-708-1253","708","Placebo","Placebo",0,"Placebo","Placebo",2013-05-07,2013-11-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-708-1272","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-06,2013-03-22,"Y","Y","CUMD","Cumulative Dose (mg)",2,2430,"End of Study",99
+"CDISCPILOT01","01-708-1286","708","Placebo","Placebo",0,"Placebo","Placebo",2013-09-10,2014-03-08,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-708-1296","708","Placebo","Placebo",0,"Placebo","Placebo",2013-06-14,2013-12-12,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-708-1297","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-25,2013-05-03,"Y","Y","CUMD","Cumulative Dose (mg)",2,5346,"End of Study",99
+"CDISCPILOT01","01-708-1316","708","Placebo","Placebo",0,"Placebo","Placebo",2013-08-23,2014-03-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-708-1336","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-07,2013-06-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,13878,"End of Study",99
+"CDISCPILOT01","01-708-1342","708","Placebo","Placebo",0,"Placebo","Placebo",2012-12-29,2013-06-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-708-1347","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-04-20,2013-06-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,4455,"End of Study",99
+"CDISCPILOT01","01-708-1348","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-08-05,2014-02-13,"Y","Y","CUMD","Cumulative Dose (mg)",2,10422,"End of Study",99
+"CDISCPILOT01","01-708-1353","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-04,2013-08-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,3024,"End of Study",99
+"CDISCPILOT01","01-708-1372","708","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-04-12,2013-04-19,"Y","Y","CUMD","Cumulative Dose (mg)",2,432,"End of Study",99
+"CDISCPILOT01","01-708-1378","708","Placebo","Placebo",0,"Placebo","Placebo",2013-09-03,2014-01-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-708-1406","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-26,2014-07-02,"Y","Y","CUMD","Cumulative Dose (mg)",2,14472,"End of Study",99
+"CDISCPILOT01","01-708-1428","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-11-09,2013-12-14,"Y","Y","CUMD","Cumulative Dose (mg)",2,1944,"End of Study",99
+"CDISCPILOT01","01-709-1001","709","Placebo","Placebo",0,"Placebo","Placebo",2013-10-08,2014-04-08,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-709-1007","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-07-31,2012-08-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,1566,"End of Study",99
+"CDISCPILOT01","01-709-1020","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-01,2013-06-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,9882,"End of Study",99
+"CDISCPILOT01","01-709-1029","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-25,2013-06-26,"Y","Y","CUMD","Cumulative Dose (mg)",2,14094,"End of Study",99
+"CDISCPILOT01","01-709-1081","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-18,2014-04-27,"Y","Y","CUMD","Cumulative Dose (mg)",2,5400,"End of Study",99
+"CDISCPILOT01","01-709-1088","709","Placebo","Placebo",0,"Placebo","Placebo",2014-04-12,2014-10-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-709-1099","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-25,2014-04-25,"Y","Y","CUMD","Cumulative Dose (mg)",2,13932,"End of Study",99
+"CDISCPILOT01","01-709-1102","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-15,2013-03-27,"Y","Y","CUMD","Cumulative Dose (mg)",2,3888,"End of Study",99
+"CDISCPILOT01","01-709-1168","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-02,2013-09-26,"Y","Y","CUMD","Cumulative Dose (mg)",2,4104,"End of Study",99
+"CDISCPILOT01","01-709-1217","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-04,2013-06-11,"Y","Y","CUMD","Cumulative Dose (mg)",2,5400,"End of Study",99
+"CDISCPILOT01","01-709-1238","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-15,2013-08-06,"Y","Y","CUMD","Cumulative Dose (mg)",2,6399,"End of Study",99
+"CDISCPILOT01","01-709-1259","709","Placebo","Placebo",0,"Placebo","Placebo",2013-01-26,2013-06-13,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-709-1285","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-24,2013-05-23,"Y","Y","CUMD","Cumulative Dose (mg)",2,3294,"End of Study",99
+"CDISCPILOT01","01-709-1301","709","Placebo","Placebo",0,"Placebo","Placebo",2013-07-19,2014-01-17,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-709-1306","709","Placebo","Placebo",0,"Placebo","Placebo",2014-02-03,2014-06-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-709-1309","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-06-19,2013-12-19,"Y","Y","CUMD","Cumulative Dose (mg)",2,14175,"End of Study",99
+"CDISCPILOT01","01-709-1312","709","Placebo","Placebo",0,"Placebo","Placebo",2014-04-20,2014-10-19,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-709-1326","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-05,2013-10-02,"Y","Y","CUMD","Cumulative Dose (mg)",2,9774,"End of Study",99
+"CDISCPILOT01","01-709-1329","709","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-08-15,2013-08-25,"Y","Y","CUMD","Cumulative Dose (mg)",2,594,"End of Study",99
+"CDISCPILOT01","01-709-1339","709","Placebo","Placebo",0,"Placebo","Placebo",2012-12-23,2013-06-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-709-1424","709","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-03-03,2013-03-07,"Y","Y","CUMD","Cumulative Dose (mg)",2,270,"End of Study",99
+"CDISCPILOT01","01-710-1002","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-14,2014-01-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,270,"End of Study",99
+"CDISCPILOT01","01-710-1006","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-10,2013-08-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,13959,"End of Study",99
+"CDISCPILOT01","01-710-1021","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-09-27,2013-10-29,"Y","Y","CUMD","Cumulative Dose (mg)",2,2268,"End of Study",99
+"CDISCPILOT01","01-710-1027","710","Placebo","Placebo",0,"Placebo","Placebo",2014-02-28,2014-08-29,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1045","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-06-03,2013-08-13,"Y","Y","CUMD","Cumulative Dose (mg)",2,3888,"End of Study",99
+"CDISCPILOT01","01-710-1053","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-26,2013-02-10,"Y","Y","CUMD","Cumulative Dose (mg)",2,2538,"End of Study",99
+"CDISCPILOT01","01-710-1060","710","Placebo","Placebo",0,"Placebo","Placebo",2013-01-01,2013-07-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1070","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-09-08,2013-01-22,"Y","Y","CUMD","Cumulative Dose (mg)",2,10692,"End of Study",99
+"CDISCPILOT01","01-710-1077","710","Placebo","Placebo",0,"Placebo","Placebo",2013-11-17,2014-05-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1078","710","Placebo","Placebo",0,"Placebo","Placebo",2013-09-17,2014-03-23,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1083","710","Placebo","Placebo",0,"Placebo","Placebo",2013-07-22,2013-08-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1137","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-11,2013-11-13,"Y","Y","CUMD","Cumulative Dose (mg)",2,2349,"End of Study",99
+"CDISCPILOT01","01-710-1142","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-02,2012-10-20,"Y","Y","CUMD","Cumulative Dose (mg)",2,1134,"End of Study",99
+"CDISCPILOT01","01-710-1154","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-29,2014-04-27,"Y","Y","CUMD","Cumulative Dose (mg)",2,1620,"End of Study",99
+"CDISCPILOT01","01-710-1166","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-30,2013-03-19,"Y","Y","CUMD","Cumulative Dose (mg)",2,5940,"End of Study",99
+"CDISCPILOT01","01-710-1183","710","Placebo","Placebo",0,"Placebo","Placebo",2013-11-16,2014-05-17,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1187","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-11-10,2013-05-12,"Y","Y","CUMD","Cumulative Dose (mg)",2,14121,"End of Study",99
+"CDISCPILOT01","01-710-1235","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-26,2013-03-27,"Y","Y","CUMD","Cumulative Dose (mg)",2,9882,"End of Study",99
+"CDISCPILOT01","01-710-1249","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-28,2014-06-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,14040,"End of Study",99
+"CDISCPILOT01","01-710-1264","710","Placebo","Placebo",0,"Placebo","Placebo",2013-06-13,2013-10-11,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1270","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-02-12,2014-03-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,972,"End of Study",99
+"CDISCPILOT01","01-710-1271","710","Placebo","Placebo",0,"Placebo","Placebo",2012-09-27,2012-11-21,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1278","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-24,2013-02-26,"Y","Y","CUMD","Cumulative Dose (mg)",2,4860,"End of Study",99
+"CDISCPILOT01","01-710-1300","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-15,2013-02-15,"Y","Y","CUMD","Cumulative Dose (mg)",2,3402,"End of Study",99
+"CDISCPILOT01","01-710-1314","710","Placebo","Placebo",0,"Placebo","Placebo",2013-04-24,2013-05-23,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1315","710","Placebo","Placebo",0,"Placebo","Placebo",2013-02-27,2013-07-06,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1354","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-11-11,2013-05-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,13257,"End of Study",99
+"CDISCPILOT01","01-710-1358","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-17,2013-02-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,7884,"End of Study",99
+"CDISCPILOT01","01-710-1368","710","Placebo","Placebo",0,"Placebo","Placebo",2013-10-23,2014-04-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-710-1385","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-10-29,2013-02-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,6102,"End of Study",99
+"CDISCPILOT01","01-710-1408","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-05,2013-07-12,"Y","Y","CUMD","Cumulative Dose (mg)",2,14391,"End of Study",99
+"CDISCPILOT01","01-711-1012","711","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-04-03,2013-04-29,"Y","Y","CUMD","Cumulative Dose (mg)",2,1782,"End of Study",99
+"CDISCPILOT01","01-711-1036","711","Placebo","Placebo",0,"Placebo","Placebo",2012-07-29,2013-02-10,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-711-1143","711","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-03,2013-05-30,"Y","Y","CUMD","Cumulative Dose (mg)",2,3132,"End of Study",99
+"CDISCPILOT01","01-711-1433","711","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-01-27,2013-02-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,540,"End of Study",99
+"CDISCPILOT01","01-713-1043","713","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-15,2014-03-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,10314,"End of Study",99
+"CDISCPILOT01","01-713-1073","713","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-30,2014-10-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,10260,"End of Study",99
+"CDISCPILOT01","01-713-1106","713","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-31,2013-05-06,"Y","Y","CUMD","Cumulative Dose (mg)",2,14418,"End of Study",99
+"CDISCPILOT01","01-713-1141","713","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-31,2013-07-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,2187,"End of Study",99
+"CDISCPILOT01","01-713-1179","713","Placebo","Placebo",0,"Placebo","Placebo",2013-08-09,2014-02-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-713-1209","713","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-27,2013-11-22,"Y","Y","CUMD","Cumulative Dose (mg)",2,13851,"End of Study",99
+"CDISCPILOT01","01-713-1256","713","Placebo","Placebo",0,"Placebo","Placebo",2012-09-19,2013-03-25,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-713-1269","713","Placebo","Placebo",0,"Placebo","Placebo",2014-01-27,2014-07-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-713-1448","713","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-19,2014-05-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,6372,"End of Study",99
+"CDISCPILOT01","01-714-1035","714","Placebo","Placebo",0,"Placebo","Placebo",2014-04-17,2014-10-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-714-1068","714","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-08-08,2013-10-08,"Y","Y","CUMD","Cumulative Dose (mg)",2,3348,"End of Study",99
+"CDISCPILOT01","01-714-1195","714","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-26,2013-10-23,"Y","Y","CUMD","Cumulative Dose (mg)",2,9774,"End of Study",99
+"CDISCPILOT01","01-714-1288","714","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-04,2014-06-17,"Y","Y","CUMD","Cumulative Dose (mg)",2,14931,"End of Study",99
+"CDISCPILOT01","01-714-1375","714","Placebo","Placebo",0,"Placebo","Placebo",2013-02-26,2013-09-07,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-714-1425","714","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-08-15,2013-08-19,"Y","Y","CUMD","Cumulative Dose (mg)",2,270,"End of Study",99
+"CDISCPILOT01","01-715-1085","715","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-16,2013-08-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,9936,"End of Study",99
+"CDISCPILOT01","01-715-1107","715","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-26,2013-05-07,"Y","Y","CUMD","Cumulative Dose (mg)",2,3834,"End of Study",99
+"CDISCPILOT01","01-715-1155","715","Placebo","Placebo",0,"Placebo","Placebo",2013-12-13,2014-01-25,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-715-1207","715","Placebo","Placebo",0,"Placebo","Placebo",2012-11-18,2013-05-27,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-715-1319","715","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-17,2013-03-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,972,"End of Study",99
+"CDISCPILOT01","01-715-1321","715","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-02-11,2014-04-21,"Y","Y","CUMD","Cumulative Dose (mg)",2,5238,"End of Study",99
+"CDISCPILOT01","01-715-1397","715","Placebo","Placebo",0,"Placebo","Placebo",2013-04-03,2013-10-02,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-715-1405","715","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-06,2013-07-07,"Y","Y","CUMD","Cumulative Dose (mg)",2,108,"End of Study",99
+"CDISCPILOT01","01-716-1024","716","Placebo","Placebo",0,"Placebo","Placebo",2012-07-09,2013-01-20,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-716-1026","716","Placebo","Placebo",0,"Placebo","Placebo",2014-04-02,2014-10-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-716-1030","716","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-12-28,2014-01-02,"Y","Y","CUMD","Cumulative Dose (mg)",2,324,"End of Study",99
+"CDISCPILOT01","01-716-1044","716","Placebo","Placebo",0,"Placebo","Placebo",2013-04-27,2013-11-03,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-716-1063","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-05-09,2013-08-25,"Y","Y","CUMD","Cumulative Dose (mg)",2,5886,"End of Study",99
+"CDISCPILOT01","01-716-1071","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-06-08,2013-08-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,4050,"End of Study",99
+"CDISCPILOT01","01-716-1094","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-19,2013-01-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,1998,"End of Study",99
+"CDISCPILOT01","01-716-1103","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-20,2014-09-20,"Y","Y","CUMD","Cumulative Dose (mg)",2,9990,"End of Study",99
+"CDISCPILOT01","01-716-1108","716","Placebo","Placebo",0,"Placebo","Placebo",2013-02-12,2013-08-10,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-716-1151","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-01,2013-05-11,"Y","Y","CUMD","Cumulative Dose (mg)",2,5400,"End of Study",99
+"CDISCPILOT01","01-716-1157","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-02,2014-04-04,"Y","Y","CUMD","Cumulative Dose (mg)",2,9990,"End of Study",99
+"CDISCPILOT01","01-716-1160","716","Placebo","Placebo",0,"Placebo","Placebo",2013-04-05,2013-10-11,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-716-1167","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-10-08,2013-04-12,"Y","Y","CUMD","Cumulative Dose (mg)",2,10098,"End of Study",99
+"CDISCPILOT01","01-716-1177","716","Placebo","Placebo",0,"Placebo","Placebo",2014-09-02,2015-03-05,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-716-1189","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-09,2013-02-27,"Y","Y","CUMD","Cumulative Dose (mg)",2,11070,"End of Study",99
+"CDISCPILOT01","01-716-1229","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-20,2013-03-31,"Y","Y","CUMD","Cumulative Dose (mg)",2,2835,"End of Study",99
+"CDISCPILOT01","01-716-1298","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-08,2013-06-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,4428,"End of Study",99
+"CDISCPILOT01","01-716-1308","716","Placebo","Placebo",0,"Placebo","Placebo",2013-08-28,2013-10-07,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-716-1311","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-05-14,2014-09-21,"Y","Y","CUMD","Cumulative Dose (mg)",2,7074,"End of Study",99
+"CDISCPILOT01","01-716-1364","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-07-04,2014-01-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,14553,"End of Study",99
+"CDISCPILOT01","01-716-1373","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-14,2013-02-27,"Y","Y","CUMD","Cumulative Dose (mg)",2,5697,"End of Study",99
+"CDISCPILOT01","01-716-1418","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-05,2013-11-20,"Y","Y","CUMD","Cumulative Dose (mg)",2,15417,"End of Study",99
+"CDISCPILOT01","01-716-1441","716","Placebo","Placebo",0,"Placebo","Placebo",2014-01-22,2014-07-22,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-716-1447","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-16,2014-06-17,"Y","Y","CUMD","Cumulative Dose (mg)",2,14202,"End of Study",99
+"CDISCPILOT01","01-717-1004","717","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-14,2014-07-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,9936,"End of Study",99
+"CDISCPILOT01","01-717-1109","717","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-27,2014-07-28,"Y","Y","CUMD","Cumulative Dose (mg)",2,14148,"End of Study",99
+"CDISCPILOT01","01-717-1174","717","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-22,2013-07-24,"Y","Y","CUMD","Cumulative Dose (mg)",2,14067,"End of Study",99
+"CDISCPILOT01","01-717-1201","717","Placebo","Placebo",0,"Placebo","Placebo",2013-12-19,2014-02-21,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-717-1344","717","Placebo","Placebo",0,"Placebo","Placebo",2014-01-11,2014-03-14,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-717-1357","717","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-01,2013-10-14,"Y","Y","CUMD","Cumulative Dose (mg)",2,13122,"End of Study",99
+"CDISCPILOT01","01-717-1446","717","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-01,2014-03-03,"Y","Y","CUMD","Cumulative Dose (mg)",2,9936,"End of Study",99
+"CDISCPILOT01","01-718-1066","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-07,2013-07-16,"Y","Y","CUMD","Cumulative Dose (mg)",2,540,"End of Study",99
+"CDISCPILOT01","01-718-1079","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-19,2012-10-31,"Y","Y","CUMD","Cumulative Dose (mg)",2,2322,"End of Study",99
+"CDISCPILOT01","01-718-1101","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-17,2013-07-31,"Y","Y","CUMD","Cumulative Dose (mg)",2,12960,"End of Study",99
+"CDISCPILOT01","01-718-1139","718","Placebo","Placebo",0,"Placebo","Placebo",2013-05-19,2013-11-17,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-718-1150","718","Placebo","Placebo",0,"Placebo","Placebo",2013-01-19,2013-07-29,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-718-1170","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-16,2013-10-12,"Y","Y","CUMD","Cumulative Dose (mg)",2,1458,"End of Study",99
+"CDISCPILOT01","01-718-1172","718","Placebo","Placebo",0,"Placebo","Placebo",2013-09-21,2013-11-29,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-718-1250","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-21,2014-01-31,"Y","Y","CUMD","Cumulative Dose (mg)",2,7182,"End of Study",99
+"CDISCPILOT01","01-718-1254","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-10,2014-01-09,"Y","Y","CUMD","Cumulative Dose (mg)",2,9936,"End of Study",99
+"CDISCPILOT01","01-718-1328","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-01,2013-04-18,"Y","Y","CUMD","Cumulative Dose (mg)",2,5859,"End of Study",99
+"CDISCPILOT01","01-718-1355","718","Placebo","Placebo",0,"Placebo","Placebo",2013-02-28,2013-08-29,"Y","Y","CUMD","Cumulative Dose (mg)",2,0,"End of Study",99
+"CDISCPILOT01","01-718-1371","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-04-26,2013-08-01,"Y","Y","CUMD","Cumulative Dose (mg)",2,7587,"End of Study",99
+"CDISCPILOT01","01-718-1427","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-17,2013-02-11,"Y","Y","CUMD","Cumulative Dose (mg)",2,4212,"End of Study",99
+"CDISCPILOT01","01-701-1015","701","Placebo","Placebo",0,"Placebo","Placebo",2014-01-02,2014-07-02,"Y","Y","TRTDUR","Duration of Treatment (days)",3,182,"End of Study",99
+"CDISCPILOT01","01-701-1023","701","Placebo","Placebo",0,"Placebo","Placebo",2012-08-05,2012-09-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,28,"End of Study",99
+"CDISCPILOT01","01-701-1028","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-07-19,2014-01-14,"Y","Y","TRTDUR","Duration of Treatment (days)",3,180,"End of Study",99
+"CDISCPILOT01","01-701-1033","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-18,2014-03-31,"Y","Y","TRTDUR","Duration of Treatment (days)",3,14,"End of Study",99
+"CDISCPILOT01","01-701-1034","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-07-01,2014-12-30,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1047","701","Placebo","Placebo",0,"Placebo","Placebo",2013-02-12,2013-03-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,26,"End of Study",99
+"CDISCPILOT01","01-701-1097","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-01,2014-07-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,190,"End of Study",99
+"CDISCPILOT01","01-701-1111","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-07,2012-09-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,10,"End of Study",99
+"CDISCPILOT01","01-701-1115","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-30,2013-01-23,"Y","Y","TRTDUR","Duration of Treatment (days)",3,55,"End of Study",99
+"CDISCPILOT01","01-701-1118","701","Placebo","Placebo",0,"Placebo","Placebo",2014-03-12,2014-09-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,182,"End of Study",99
+"CDISCPILOT01","01-701-1130","701","Placebo","Placebo",0,"Placebo","Placebo",2014-02-15,2014-08-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1133","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-28,2013-04-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1146","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-20,2013-06-26,"Y","Y","TRTDUR","Duration of Treatment (days)",3,38,"End of Study",99
+"CDISCPILOT01","01-701-1148","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-23,2014-02-20,"Y","Y","TRTDUR","Duration of Treatment (days)",3,182,"End of Study",99
+"CDISCPILOT01","01-701-1153","701","Placebo","Placebo",0,"Placebo","Placebo",2013-09-23,2014-03-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,175,"End of Study",99
+"CDISCPILOT01","01-701-1180","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-12,2013-03-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,35,"End of Study",99
+"CDISCPILOT01","01-701-1181","701","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-12-05,2013-12-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,5,"End of Study",99
+"CDISCPILOT01","01-701-1188","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-15,2013-03-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,38,"End of Study",99
+"CDISCPILOT01","01-701-1192","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-07-22,2013-01-20,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1203","701","Placebo","Placebo",0,"Placebo","Placebo",2013-02-02,2013-08-03,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1211","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-15,2013-01-12,"Y","Y","TRTDUR","Duration of Treatment (days)",3,59,"End of Study",99
+"CDISCPILOT01","01-701-1234","701","Placebo","Placebo",0,"Placebo","Placebo",2013-03-30,2013-09-22,"Y","Y","TRTDUR","Duration of Treatment (days)",3,177,"End of Study",99
+"CDISCPILOT01","01-701-1239","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-11,2014-07-10,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-701-1275","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-02-07,2014-05-31,"Y","Y","TRTDUR","Duration of Treatment (days)",3,114,"End of Study",99
+"CDISCPILOT01","01-701-1287","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-25,2014-07-26,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1294","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-24,2013-06-14,"Y","Y","TRTDUR","Duration of Treatment (days)",3,83,"End of Study",99
+"CDISCPILOT01","01-701-1302","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-29,2013-11-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,69,"End of Study",99
+"CDISCPILOT01","01-701-1317","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-05-22,2014-11-20,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1324","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-10-02,2013-04-02,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1341","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-05,2013-01-26,"Y","Y","TRTDUR","Duration of Treatment (days)",3,22,"End of Study",99
+"CDISCPILOT01","01-701-1345","701","Placebo","Placebo",0,"Placebo","Placebo",2013-10-08,2014-03-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,162,"End of Study",99
+"CDISCPILOT01","01-701-1360","701","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-07-31,2013-08-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,6,"End of Study",99
+"CDISCPILOT01","01-701-1363","701","Placebo","Placebo",0,"Placebo","Placebo",2013-05-30,2013-11-27,"Y","Y","TRTDUR","Duration of Treatment (days)",3,182,"End of Study",99
+"CDISCPILOT01","01-701-1383","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-04,2013-08-06,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-701-1387","701","Placebo","Placebo",0,"Placebo","Placebo",2014-03-12,2014-03-25,"Y","Y","TRTDUR","Duration of Treatment (days)",3,14,"End of Study",99
+"CDISCPILOT01","01-701-1392","701","Placebo","Placebo",0,"Placebo","Placebo",2012-10-28,2013-04-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1415","701","Placebo","Placebo",0,"Placebo","Placebo",2013-09-23,2014-03-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1429","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-19,2013-04-30,"Y","Y","TRTDUR","Duration of Treatment (days)",3,43,"End of Study",99
+"CDISCPILOT01","01-701-1440","701","Placebo","Placebo",0,"Placebo","Placebo",2013-08-08,2014-02-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,182,"End of Study",99
+"CDISCPILOT01","01-701-1442","701","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-26,2014-04-26,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-701-1444","701","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-05,2013-02-12,"Y","Y","TRTDUR","Duration of Treatment (days)",3,39,"End of Study",99
+"CDISCPILOT01","01-702-1082","702","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-26,2013-10-13,"Y","Y","TRTDUR","Duration of Treatment (days)",3,80,"End of Study",99
+"CDISCPILOT01","01-703-1042","703","Placebo","Placebo",0,"Placebo","Placebo",2013-03-02,2013-08-31,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-703-1076","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-25,2013-12-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,61,"End of Study",99
+"CDISCPILOT01","01-703-1086","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-02,2012-12-04,"Y","Y","TRTDUR","Duration of Treatment (days)",3,94,"End of Study",99
+"CDISCPILOT01","01-703-1096","703","Placebo","Placebo",0,"Placebo","Placebo",2013-01-25,2013-03-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,51,"End of Study",99
+"CDISCPILOT01","01-703-1100","703","Placebo","Placebo",0,"Placebo","Placebo",2013-03-13,2013-09-14,"Y","Y","TRTDUR","Duration of Treatment (days)",3,186,"End of Study",99
+"CDISCPILOT01","01-703-1119","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-20,2013-06-13,"Y","Y","TRTDUR","Duration of Treatment (days)",3,114,"End of Study",99
+"CDISCPILOT01","01-703-1175","703","Placebo","Placebo",0,"Placebo","Placebo",2013-12-20,2013-12-26,"Y","Y","TRTDUR","Duration of Treatment (days)",3,7,"End of Study",99
+"CDISCPILOT01","01-703-1182","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-17,2013-12-11,"Y","Y","TRTDUR","Duration of Treatment (days)",3,56,"End of Study",99
+"CDISCPILOT01","01-703-1197","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-06-16,2013-06-29,"Y","Y","TRTDUR","Duration of Treatment (days)",3,14,"End of Study",99
+"CDISCPILOT01","01-703-1210","703","Placebo","Placebo",0,"Placebo","Placebo",2013-03-16,2013-09-06,"Y","Y","TRTDUR","Duration of Treatment (days)",3,175,"End of Study",99
+"CDISCPILOT01","01-703-1258","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-07-20,2013-01-11,"Y","Y","TRTDUR","Duration of Treatment (days)",3,176,"End of Study",99
+"CDISCPILOT01","01-703-1279","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-05-13,2013-06-03,"Y","Y","TRTDUR","Duration of Treatment (days)",3,22,"End of Study",99
+"CDISCPILOT01","01-703-1295","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-11-21,2014-04-19,"Y","Y","TRTDUR","Duration of Treatment (days)",3,150,"End of Study",99
+"CDISCPILOT01","01-703-1299","703","Placebo","Placebo",0,"Placebo","Placebo",2012-09-12,2013-03-13,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-703-1335","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-03-17,2014-05-07,"Y","Y","TRTDUR","Duration of Treatment (days)",3,52,"End of Study",99
+"CDISCPILOT01","01-703-1379","703","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-22,2014-03-21,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-703-1403","703","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2012-12-12,2012-12-13,"Y","Y","TRTDUR","Duration of Treatment (days)",3,2,"End of Study",99
+"CDISCPILOT01","01-703-1439","703","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-03-12,2014-09-11,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-704-1008","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-13,2013-02-21,"Y","Y","TRTDUR","Duration of Treatment (days)",3,40,"End of Study",99
+"CDISCPILOT01","01-704-1009","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-08-27,2013-09-25,"Y","Y","TRTDUR","Duration of Treatment (days)",3,30,"End of Study",99
+"CDISCPILOT01","01-704-1010","704","Placebo","Placebo",0,"Placebo","Placebo",2014-02-21,2014-07-08,"Y","Y","TRTDUR","Duration of Treatment (days)",3,138,"End of Study",99
+"CDISCPILOT01","01-704-1017","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-06,2013-11-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,44,"End of Study",99
+"CDISCPILOT01","01-704-1025","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-27,2013-10-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,28,"End of Study",99
+"CDISCPILOT01","01-704-1065","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-24,2013-12-22,"Y","Y","TRTDUR","Duration of Treatment (days)",3,60,"End of Study",99
+"CDISCPILOT01","01-704-1074","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-22,2014-03-20,"Y","Y","TRTDUR","Duration of Treatment (days)",3,58,"End of Study",99
+"CDISCPILOT01","01-704-1093","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-03-15,2013-06-17,"Y","Y","TRTDUR","Duration of Treatment (days)",3,95,"End of Study",99
+"CDISCPILOT01","01-704-1114","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-23,2013-07-07,"Y","Y","TRTDUR","Duration of Treatment (days)",3,166,"End of Study",99
+"CDISCPILOT01","01-704-1120","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-12-02,2014-02-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,62,"End of Study",99
+"CDISCPILOT01","01-704-1127","704","Placebo","Placebo",0,"Placebo","Placebo",2013-10-02,2014-03-31,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-704-1135","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-31,2014-05-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,198,"End of Study",99
+"CDISCPILOT01","01-704-1164","704","Placebo","Placebo",0,"Placebo","Placebo",2012-09-19,2013-04-04,"Y","Y","TRTDUR","Duration of Treatment (days)",3,198,"End of Study",99
+"CDISCPILOT01","01-704-1218","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-19,2013-05-27,"Y","Y","TRTDUR","Duration of Treatment (days)",3,190,"End of Study",99
+"CDISCPILOT01","01-704-1233","704","Placebo","Placebo",0,"Placebo","Placebo",2013-03-21,2013-04-04,"Y","Y","TRTDUR","Duration of Treatment (days)",3,15,"End of Study",99
+"CDISCPILOT01","01-704-1241","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-25,2013-10-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,46,"End of Study",99
+"CDISCPILOT01","01-704-1260","704","Placebo","Placebo",0,"Placebo","Placebo",2012-08-30,2012-11-04,"Y","Y","TRTDUR","Duration of Treatment (days)",3,67,"End of Study",99
+"CDISCPILOT01","01-704-1266","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-13,2013-12-06,"Y","Y","TRTDUR","Duration of Treatment (days)",3,55,"End of Study",99
+"CDISCPILOT01","01-704-1323","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-08,2013-08-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,29,"End of Study",99
+"CDISCPILOT01","01-704-1325","704","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-04-23,2014-07-04,"Y","Y","TRTDUR","Duration of Treatment (days)",3,73,"End of Study",99
+"CDISCPILOT01","01-704-1332","704","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-09,2014-02-14,"Y","Y","TRTDUR","Duration of Treatment (days)",3,68,"End of Study",99
+"CDISCPILOT01","01-704-1351","704","Placebo","Placebo",0,"Placebo","Placebo",2013-10-12,2014-04-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,189,"End of Study",99
+"CDISCPILOT01","01-704-1388","704","Placebo","Placebo",0,"Placebo","Placebo",2012-12-07,2013-06-11,"Y","Y","TRTDUR","Duration of Treatment (days)",3,187,"End of Study",99
+"CDISCPILOT01","01-704-1435","704","Placebo","Placebo",0,"Placebo","Placebo",2012-11-17,2013-01-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,54,"End of Study",99
+"CDISCPILOT01","01-704-1445","704","Placebo","Placebo",0,"Placebo","Placebo",2014-05-11,2014-11-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,175,"End of Study",99
+"CDISCPILOT01","01-705-1031","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-11-27,2013-12-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,22,"End of Study",99
+"CDISCPILOT01","01-705-1059","705","Placebo","Placebo",0,"Placebo","Placebo",2013-08-05,2013-12-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,123,"End of Study",99
+"CDISCPILOT01","01-705-1186","705","Placebo","Placebo",0,"Placebo","Placebo",2014-01-08,2014-01-26,"Y","Y","TRTDUR","Duration of Treatment (days)",3,19,"End of Study",99
+"CDISCPILOT01","01-705-1199","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-16,2013-09-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,13,"End of Study",99
+"CDISCPILOT01","01-705-1280","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-17,2014-07-25,"Y","Y","TRTDUR","Duration of Treatment (days)",3,190,"End of Study",99
+"CDISCPILOT01","01-705-1281","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-11-28,2014-02-27,"Y","Y","TRTDUR","Duration of Treatment (days)",3,92,"End of Study",99
+"CDISCPILOT01","01-705-1282","705","Placebo","Placebo",0,"Placebo","Placebo",2012-12-26,2013-06-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-705-1292","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-14,2014-05-13,"Y","Y","TRTDUR","Duration of Treatment (days)",3,212,"End of Study",99
+"CDISCPILOT01","01-705-1303","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-16,2013-12-30,"Y","Y","TRTDUR","Duration of Treatment (days)",3,15,"End of Study",99
+"CDISCPILOT01","01-705-1310","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-11-02,2014-01-23,"Y","Y","TRTDUR","Duration of Treatment (days)",3,83,"End of Study",99
+"CDISCPILOT01","01-705-1349","705","Placebo","Placebo",0,"Placebo","Placebo",2013-03-10,2013-09-08,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-705-1377","705","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-04,2014-01-25,"Y","Y","TRTDUR","Duration of Treatment (days)",3,22,"End of Study",99
+"CDISCPILOT01","01-705-1393","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-07,2013-02-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,148,"End of Study",99
+"CDISCPILOT01","01-705-1431","705","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-06-23,2013-12-19,"Y","Y","TRTDUR","Duration of Treatment (days)",3,180,"End of Study",99
+"CDISCPILOT01","01-706-1041","706","Placebo","Placebo",0,"Placebo","Placebo",2013-12-31,2014-07-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,210,"End of Study",99
+"CDISCPILOT01","01-706-1049","706","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-14,2013-06-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,36,"End of Study",99
+"CDISCPILOT01","01-706-1384","706","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-15,2012-09-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,10,"End of Study",99
+"CDISCPILOT01","01-707-1037","707","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-12-20,2013-12-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,5,"End of Study",99
+"CDISCPILOT01","01-707-1206","707","Placebo","Placebo",0,"Placebo","Placebo",2013-10-28,2014-04-26,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-708-1019","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-12-20,2014-01-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,13,"End of Study",99
+"CDISCPILOT01","01-708-1032","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-09,2013-03-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,21,"End of Study",99
+"CDISCPILOT01","01-708-1084","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-05-09,2013-11-11,"Y","Y","TRTDUR","Duration of Treatment (days)",3,187,"End of Study",99
+"CDISCPILOT01","01-708-1087","708","Placebo","Placebo",0,"Placebo","Placebo",2012-10-22,2013-04-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,189,"End of Study",99
+"CDISCPILOT01","01-708-1158","708","Placebo","Placebo",0,"Placebo","Placebo",2014-02-08,2014-03-21,"Y","Y","TRTDUR","Duration of Treatment (days)",3,42,"End of Study",99
+"CDISCPILOT01","01-708-1171","708","Placebo","Placebo",0,"Placebo","Placebo",2012-12-06,2013-06-04,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-708-1178","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-29,2014-04-06,"Y","Y","TRTDUR","Duration of Treatment (days)",3,99,"End of Study",99
+"CDISCPILOT01","01-708-1213","708","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-02-09,2013-02-22,"Y","Y","TRTDUR","Duration of Treatment (days)",3,14,"End of Study",99
+"CDISCPILOT01","01-708-1216","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-24,2012-11-29,"Y","Y","TRTDUR","Duration of Treatment (days)",3,37,"End of Study",99
+"CDISCPILOT01","01-708-1236","708","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-09-21,2013-09-21,"Y","Y","TRTDUR","Duration of Treatment (days)",3,1,"End of Study",99
+"CDISCPILOT01","01-708-1253","708","Placebo","Placebo",0,"Placebo","Placebo",2013-05-07,2013-11-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-708-1272","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-06,2013-03-22,"Y","Y","TRTDUR","Duration of Treatment (days)",3,45,"End of Study",99
+"CDISCPILOT01","01-708-1286","708","Placebo","Placebo",0,"Placebo","Placebo",2013-09-10,2014-03-08,"Y","Y","TRTDUR","Duration of Treatment (days)",3,180,"End of Study",99
+"CDISCPILOT01","01-708-1296","708","Placebo","Placebo",0,"Placebo","Placebo",2013-06-14,2013-12-12,"Y","Y","TRTDUR","Duration of Treatment (days)",3,182,"End of Study",99
+"CDISCPILOT01","01-708-1297","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-25,2013-05-03,"Y","Y","TRTDUR","Duration of Treatment (days)",3,99,"End of Study",99
+"CDISCPILOT01","01-708-1316","708","Placebo","Placebo",0,"Placebo","Placebo",2013-08-23,2014-03-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,191,"End of Study",99
+"CDISCPILOT01","01-708-1336","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-07,2013-06-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-708-1342","708","Placebo","Placebo",0,"Placebo","Placebo",2012-12-29,2013-06-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,182,"End of Study",99
+"CDISCPILOT01","01-708-1347","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-04-20,2013-06-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,60,"End of Study",99
+"CDISCPILOT01","01-708-1348","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-08-05,2014-02-13,"Y","Y","TRTDUR","Duration of Treatment (days)",3,193,"End of Study",99
+"CDISCPILOT01","01-708-1353","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-04,2013-08-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,56,"End of Study",99
+"CDISCPILOT01","01-708-1372","708","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-04-12,2013-04-19,"Y","Y","TRTDUR","Duration of Treatment (days)",3,8,"End of Study",99
+"CDISCPILOT01","01-708-1378","708","Placebo","Placebo",0,"Placebo","Placebo",2013-09-03,2014-01-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,148,"End of Study",99
+"CDISCPILOT01","01-708-1406","708","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-26,2014-07-02,"Y","Y","TRTDUR","Duration of Treatment (days)",3,189,"End of Study",99
+"CDISCPILOT01","01-708-1428","708","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-11-09,2013-12-14,"Y","Y","TRTDUR","Duration of Treatment (days)",3,36,"End of Study",99
+"CDISCPILOT01","01-709-1001","709","Placebo","Placebo",0,"Placebo","Placebo",2013-10-08,2014-04-08,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-709-1007","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-07-31,2012-08-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,29,"End of Study",99
+"CDISCPILOT01","01-709-1020","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-01,2013-06-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-709-1029","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-25,2013-06-26,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-709-1081","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-18,2014-04-27,"Y","Y","TRTDUR","Duration of Treatment (days)",3,100,"End of Study",99
+"CDISCPILOT01","01-709-1088","709","Placebo","Placebo",0,"Placebo","Placebo",2014-04-12,2014-10-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-709-1099","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-25,2014-04-25,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-709-1102","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-01-15,2013-03-27,"Y","Y","TRTDUR","Duration of Treatment (days)",3,72,"End of Study",99
+"CDISCPILOT01","01-709-1168","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-08-02,2013-09-26,"Y","Y","TRTDUR","Duration of Treatment (days)",3,56,"End of Study",99
+"CDISCPILOT01","01-709-1217","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-04,2013-06-11,"Y","Y","TRTDUR","Duration of Treatment (days)",3,100,"End of Study",99
+"CDISCPILOT01","01-709-1238","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-15,2013-08-06,"Y","Y","TRTDUR","Duration of Treatment (days)",3,84,"End of Study",99
+"CDISCPILOT01","01-709-1259","709","Placebo","Placebo",0,"Placebo","Placebo",2013-01-26,2013-06-13,"Y","Y","TRTDUR","Duration of Treatment (days)",3,139,"End of Study",99
+"CDISCPILOT01","01-709-1285","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-03-24,2013-05-23,"Y","Y","TRTDUR","Duration of Treatment (days)",3,61,"End of Study",99
+"CDISCPILOT01","01-709-1301","709","Placebo","Placebo",0,"Placebo","Placebo",2013-07-19,2014-01-17,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-709-1306","709","Placebo","Placebo",0,"Placebo","Placebo",2014-02-03,2014-06-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,134,"End of Study",99
+"CDISCPILOT01","01-709-1309","709","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-06-19,2013-12-19,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-709-1312","709","Placebo","Placebo",0,"Placebo","Placebo",2014-04-20,2014-10-19,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-709-1326","709","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-05,2013-10-02,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-709-1329","709","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-08-15,2013-08-25,"Y","Y","TRTDUR","Duration of Treatment (days)",3,11,"End of Study",99
+"CDISCPILOT01","01-709-1339","709","Placebo","Placebo",0,"Placebo","Placebo",2012-12-23,2013-06-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-709-1424","709","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-03-03,2013-03-07,"Y","Y","TRTDUR","Duration of Treatment (days)",3,5,"End of Study",99
+"CDISCPILOT01","01-710-1002","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-14,2014-01-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,5,"End of Study",99
+"CDISCPILOT01","01-710-1006","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-10,2013-08-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-710-1021","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-09-27,2013-10-29,"Y","Y","TRTDUR","Duration of Treatment (days)",3,33,"End of Study",99
+"CDISCPILOT01","01-710-1027","710","Placebo","Placebo",0,"Placebo","Placebo",2014-02-28,2014-08-29,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-710-1045","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-06-03,2013-08-13,"Y","Y","TRTDUR","Duration of Treatment (days)",3,72,"End of Study",99
+"CDISCPILOT01","01-710-1053","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-26,2013-02-10,"Y","Y","TRTDUR","Duration of Treatment (days)",3,47,"End of Study",99
+"CDISCPILOT01","01-710-1060","710","Placebo","Placebo",0,"Placebo","Placebo",2013-01-01,2013-07-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,186,"End of Study",99
+"CDISCPILOT01","01-710-1070","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-09-08,2013-01-22,"Y","Y","TRTDUR","Duration of Treatment (days)",3,137,"End of Study",99
+"CDISCPILOT01","01-710-1077","710","Placebo","Placebo",0,"Placebo","Placebo",2013-11-17,2014-05-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-710-1078","710","Placebo","Placebo",0,"Placebo","Placebo",2013-09-17,2014-03-23,"Y","Y","TRTDUR","Duration of Treatment (days)",3,188,"End of Study",99
+"CDISCPILOT01","01-710-1083","710","Placebo","Placebo",0,"Placebo","Placebo",2013-07-22,2013-08-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,11,"End of Study",99
+"CDISCPILOT01","01-710-1137","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-10-11,2013-11-13,"Y","Y","TRTDUR","Duration of Treatment (days)",3,34,"End of Study",99
+"CDISCPILOT01","01-710-1142","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-02,2012-10-20,"Y","Y","TRTDUR","Duration of Treatment (days)",3,19,"End of Study",99
+"CDISCPILOT01","01-710-1154","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-29,2014-04-27,"Y","Y","TRTDUR","Duration of Treatment (days)",3,30,"End of Study",99
+"CDISCPILOT01","01-710-1166","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-11-30,2013-03-19,"Y","Y","TRTDUR","Duration of Treatment (days)",3,110,"End of Study",99
+"CDISCPILOT01","01-710-1183","710","Placebo","Placebo",0,"Placebo","Placebo",2013-11-16,2014-05-17,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-710-1187","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-11-10,2013-05-12,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-710-1235","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-26,2013-03-27,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-710-1249","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-28,2014-06-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-710-1264","710","Placebo","Placebo",0,"Placebo","Placebo",2013-06-13,2013-10-11,"Y","Y","TRTDUR","Duration of Treatment (days)",3,121,"End of Study",99
+"CDISCPILOT01","01-710-1270","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-02-12,2014-03-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,18,"End of Study",99
+"CDISCPILOT01","01-710-1271","710","Placebo","Placebo",0,"Placebo","Placebo",2012-09-27,2012-11-21,"Y","Y","TRTDUR","Duration of Treatment (days)",3,56,"End of Study",99
+"CDISCPILOT01","01-710-1278","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-24,2013-02-26,"Y","Y","TRTDUR","Duration of Treatment (days)",3,65,"End of Study",99
+"CDISCPILOT01","01-710-1300","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-15,2013-02-15,"Y","Y","TRTDUR","Duration of Treatment (days)",3,63,"End of Study",99
+"CDISCPILOT01","01-710-1314","710","Placebo","Placebo",0,"Placebo","Placebo",2013-04-24,2013-05-23,"Y","Y","TRTDUR","Duration of Treatment (days)",3,30,"End of Study",99
+"CDISCPILOT01","01-710-1315","710","Placebo","Placebo",0,"Placebo","Placebo",2013-02-27,2013-07-06,"Y","Y","TRTDUR","Duration of Treatment (days)",3,130,"End of Study",99
+"CDISCPILOT01","01-710-1354","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-11-11,2013-05-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,172,"End of Study",99
+"CDISCPILOT01","01-710-1358","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-17,2013-02-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,146,"End of Study",99
+"CDISCPILOT01","01-710-1368","710","Placebo","Placebo",0,"Placebo","Placebo",2013-10-23,2014-04-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-710-1385","710","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-10-29,2013-02-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,113,"End of Study",99
+"CDISCPILOT01","01-710-1408","710","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-05,2013-07-12,"Y","Y","TRTDUR","Duration of Treatment (days)",3,189,"End of Study",99
+"CDISCPILOT01","01-711-1012","711","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-04-03,2013-04-29,"Y","Y","TRTDUR","Duration of Treatment (days)",3,27,"End of Study",99
+"CDISCPILOT01","01-711-1036","711","Placebo","Placebo",0,"Placebo","Placebo",2012-07-29,2013-02-10,"Y","Y","TRTDUR","Duration of Treatment (days)",3,197,"End of Study",99
+"CDISCPILOT01","01-711-1143","711","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-03,2013-05-30,"Y","Y","TRTDUR","Duration of Treatment (days)",3,58,"End of Study",99
+"CDISCPILOT01","01-711-1433","711","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-01-27,2013-02-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,10,"End of Study",99
+"CDISCPILOT01","01-713-1043","713","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-15,2014-03-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,191,"End of Study",99
+"CDISCPILOT01","01-713-1073","713","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-30,2014-10-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,190,"End of Study",99
+"CDISCPILOT01","01-713-1106","713","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-31,2013-05-06,"Y","Y","TRTDUR","Duration of Treatment (days)",3,188,"End of Study",99
+"CDISCPILOT01","01-713-1141","713","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-31,2013-07-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,32,"End of Study",99
+"CDISCPILOT01","01-713-1179","713","Placebo","Placebo",0,"Placebo","Placebo",2013-08-09,2014-02-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-713-1209","713","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-27,2013-11-22,"Y","Y","TRTDUR","Duration of Treatment (days)",3,180,"End of Study",99
+"CDISCPILOT01","01-713-1256","713","Placebo","Placebo",0,"Placebo","Placebo",2012-09-19,2013-03-25,"Y","Y","TRTDUR","Duration of Treatment (days)",3,188,"End of Study",99
+"CDISCPILOT01","01-713-1269","713","Placebo","Placebo",0,"Placebo","Placebo",2014-01-27,2014-07-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-713-1448","713","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-19,2014-05-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,118,"End of Study",99
+"CDISCPILOT01","01-714-1035","714","Placebo","Placebo",0,"Placebo","Placebo",2014-04-17,2014-10-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-714-1068","714","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-08-08,2013-10-08,"Y","Y","TRTDUR","Duration of Treatment (days)",3,62,"End of Study",99
+"CDISCPILOT01","01-714-1195","714","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-26,2013-10-23,"Y","Y","TRTDUR","Duration of Treatment (days)",3,181,"End of Study",99
+"CDISCPILOT01","01-714-1288","714","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-04,2014-06-17,"Y","Y","TRTDUR","Duration of Treatment (days)",3,196,"End of Study",99
+"CDISCPILOT01","01-714-1375","714","Placebo","Placebo",0,"Placebo","Placebo",2013-02-26,2013-09-07,"Y","Y","TRTDUR","Duration of Treatment (days)",3,194,"End of Study",99
+"CDISCPILOT01","01-714-1425","714","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-08-15,2013-08-19,"Y","Y","TRTDUR","Duration of Treatment (days)",3,5,"End of Study",99
+"CDISCPILOT01","01-715-1085","715","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-16,2013-08-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-715-1107","715","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-26,2013-05-07,"Y","Y","TRTDUR","Duration of Treatment (days)",3,71,"End of Study",99
+"CDISCPILOT01","01-715-1155","715","Placebo","Placebo",0,"Placebo","Placebo",2013-12-13,2014-01-25,"Y","Y","TRTDUR","Duration of Treatment (days)",3,44,"End of Study",99
+"CDISCPILOT01","01-715-1207","715","Placebo","Placebo",0,"Placebo","Placebo",2012-11-18,2013-05-27,"Y","Y","TRTDUR","Duration of Treatment (days)",3,191,"End of Study",99
+"CDISCPILOT01","01-715-1319","715","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-17,2013-03-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,17,"End of Study",99
+"CDISCPILOT01","01-715-1321","715","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-02-11,2014-04-21,"Y","Y","TRTDUR","Duration of Treatment (days)",3,70,"End of Study",99
+"CDISCPILOT01","01-715-1397","715","Placebo","Placebo",0,"Placebo","Placebo",2013-04-03,2013-10-02,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-715-1405","715","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-06,2013-07-07,"Y","Y","TRTDUR","Duration of Treatment (days)",3,2,"End of Study",99
+"CDISCPILOT01","01-716-1024","716","Placebo","Placebo",0,"Placebo","Placebo",2012-07-09,2013-01-20,"Y","Y","TRTDUR","Duration of Treatment (days)",3,196,"End of Study",99
+"CDISCPILOT01","01-716-1026","716","Placebo","Placebo",0,"Placebo","Placebo",2014-04-02,2014-10-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,198,"End of Study",99
+"CDISCPILOT01","01-716-1030","716","Xanomeline High Dose","Xanomeline Low Dose",2,"Xanomeline High Dose","Xanomeline Low Dose",2013-12-28,2014-01-02,"Y","Y","TRTDUR","Duration of Treatment (days)",3,6,"End of Study",99
+"CDISCPILOT01","01-716-1044","716","Placebo","Placebo",0,"Placebo","Placebo",2013-04-27,2013-11-03,"Y","Y","TRTDUR","Duration of Treatment (days)",3,191,"End of Study",99
+"CDISCPILOT01","01-716-1063","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-05-09,2013-08-25,"Y","Y","TRTDUR","Duration of Treatment (days)",3,109,"End of Study",99
+"CDISCPILOT01","01-716-1071","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-06-08,2013-08-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,55,"End of Study",99
+"CDISCPILOT01","01-716-1094","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-12-19,2013-01-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,37,"End of Study",99
+"CDISCPILOT01","01-716-1103","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-03-20,2014-09-20,"Y","Y","TRTDUR","Duration of Treatment (days)",3,185,"End of Study",99
+"CDISCPILOT01","01-716-1108","716","Placebo","Placebo",0,"Placebo","Placebo",2013-02-12,2013-08-10,"Y","Y","TRTDUR","Duration of Treatment (days)",3,180,"End of Study",99
+"CDISCPILOT01","01-716-1151","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-02-01,2013-05-11,"Y","Y","TRTDUR","Duration of Treatment (days)",3,100,"End of Study",99
+"CDISCPILOT01","01-716-1157","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-10-02,2014-04-04,"Y","Y","TRTDUR","Duration of Treatment (days)",3,185,"End of Study",99
+"CDISCPILOT01","01-716-1160","716","Placebo","Placebo",0,"Placebo","Placebo",2013-04-05,2013-10-11,"Y","Y","TRTDUR","Duration of Treatment (days)",3,190,"End of Study",99
+"CDISCPILOT01","01-716-1167","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-10-08,2013-04-12,"Y","Y","TRTDUR","Duration of Treatment (days)",3,187,"End of Study",99
+"CDISCPILOT01","01-716-1177","716","Placebo","Placebo",0,"Placebo","Placebo",2014-09-02,2015-03-05,"Y","Y","TRTDUR","Duration of Treatment (days)",3,185,"End of Study",99
+"CDISCPILOT01","01-716-1189","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-10-09,2013-02-27,"Y","Y","TRTDUR","Duration of Treatment (days)",3,142,"End of Study",99
+"CDISCPILOT01","01-716-1229","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-20,2013-03-31,"Y","Y","TRTDUR","Duration of Treatment (days)",3,40,"End of Study",99
+"CDISCPILOT01","01-716-1298","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-04-08,2013-06-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,82,"End of Study",99
+"CDISCPILOT01","01-716-1308","716","Placebo","Placebo",0,"Placebo","Placebo",2013-08-28,2013-10-07,"Y","Y","TRTDUR","Duration of Treatment (days)",3,41,"End of Study",99
+"CDISCPILOT01","01-716-1311","716","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-05-14,2014-09-21,"Y","Y","TRTDUR","Duration of Treatment (days)",3,131,"End of Study",99
+"CDISCPILOT01","01-716-1364","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-07-04,2014-01-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,190,"End of Study",99
+"CDISCPILOT01","01-716-1373","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-14,2013-02-27,"Y","Y","TRTDUR","Duration of Treatment (days)",3,76,"End of Study",99
+"CDISCPILOT01","01-716-1418","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-05,2013-11-20,"Y","Y","TRTDUR","Duration of Treatment (days)",3,200,"End of Study",99
+"CDISCPILOT01","01-716-1441","716","Placebo","Placebo",0,"Placebo","Placebo",2014-01-22,2014-07-22,"Y","Y","TRTDUR","Duration of Treatment (days)",3,182,"End of Study",99
+"CDISCPILOT01","01-716-1447","716","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-12-16,2014-06-17,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-717-1004","717","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2014-01-14,2014-07-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-717-1109","717","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2014-01-27,2014-07-28,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-717-1174","717","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-01-22,2013-07-24,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-717-1201","717","Placebo","Placebo",0,"Placebo","Placebo",2013-12-19,2014-02-21,"Y","Y","TRTDUR","Duration of Treatment (days)",3,65,"End of Study",99
+"CDISCPILOT01","01-717-1344","717","Placebo","Placebo",0,"Placebo","Placebo",2014-01-11,2014-03-14,"Y","Y","TRTDUR","Duration of Treatment (days)",3,63,"End of Study",99
+"CDISCPILOT01","01-717-1357","717","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-05-01,2013-10-14,"Y","Y","TRTDUR","Duration of Treatment (days)",3,167,"End of Study",99
+"CDISCPILOT01","01-717-1446","717","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-01,2014-03-03,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-718-1066","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-07,2013-07-16,"Y","Y","TRTDUR","Duration of Treatment (days)",3,10,"End of Study",99
+"CDISCPILOT01","01-718-1079","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2012-09-19,2012-10-31,"Y","Y","TRTDUR","Duration of Treatment (days)",3,43,"End of Study",99
+"CDISCPILOT01","01-718-1101","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-17,2013-07-31,"Y","Y","TRTDUR","Duration of Treatment (days)",3,165,"End of Study",99
+"CDISCPILOT01","01-718-1139","718","Placebo","Placebo",0,"Placebo","Placebo",2013-05-19,2013-11-17,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-718-1150","718","Placebo","Placebo",0,"Placebo","Placebo",2013-01-19,2013-07-29,"Y","Y","TRTDUR","Duration of Treatment (days)",3,192,"End of Study",99
+"CDISCPILOT01","01-718-1170","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-16,2013-10-12,"Y","Y","TRTDUR","Duration of Treatment (days)",3,27,"End of Study",99
+"CDISCPILOT01","01-718-1172","718","Placebo","Placebo",0,"Placebo","Placebo",2013-09-21,2013-11-29,"Y","Y","TRTDUR","Duration of Treatment (days)",3,70,"End of Study",99
+"CDISCPILOT01","01-718-1250","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-09-21,2014-01-31,"Y","Y","TRTDUR","Duration of Treatment (days)",3,133,"End of Study",99
+"CDISCPILOT01","01-718-1254","718","Xanomeline Low Dose","Xanomeline Low Dose",1,"Xanomeline Low Dose","Xanomeline Low Dose",2013-07-10,2014-01-09,"Y","Y","TRTDUR","Duration of Treatment (days)",3,184,"End of Study",99
+"CDISCPILOT01","01-718-1328","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-02-01,2013-04-18,"Y","Y","TRTDUR","Duration of Treatment (days)",3,77,"End of Study",99
+"CDISCPILOT01","01-718-1355","718","Placebo","Placebo",0,"Placebo","Placebo",2013-02-28,2013-08-29,"Y","Y","TRTDUR","Duration of Treatment (days)",3,183,"End of Study",99
+"CDISCPILOT01","01-718-1371","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2013-04-26,2013-08-01,"Y","Y","TRTDUR","Duration of Treatment (days)",3,98,"End of Study",99
+"CDISCPILOT01","01-718-1427","718","Xanomeline High Dose","Xanomeline High Dose",2,"Xanomeline High Dose","Xanomeline High Dose",2012-12-17,2013-02-11,"Y","Y","TRTDUR","Duration of Treatment (days)",3,57,"End of Study",99

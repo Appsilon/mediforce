@@ -3,11 +3,12 @@
 import { useState, useMemo, useCallback } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import Link from 'next/link';
-import { Save, CheckCircle, XCircle, Pencil } from 'lucide-react';
+import { Save, CheckCircle, XCircle, Pencil, Clock, Play, Webhook, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePlugins } from '@/hooks/use-plugins';
 import { StepConfigCard } from './step-config-card';
 import { ConfigValidationBanner } from './config-validation-banner';
+import { saveConfig } from '@/app/actions/configs';
 import type { ProcessDefinition, StepConfig } from '@mediforce/platform-core';
 
 interface PluginMetadata {
@@ -146,42 +147,38 @@ export function ConfigEditor({
     setServerWarnings([]);
 
     try {
-      const body = {
-        processName,
-        configName: configName.trim(),
-        configVersion: configVersion.trim(),
-        stepConfigs,
-      };
+      const trimmedName = configName.trim();
+      const trimmedVersion = configVersion.trim();
 
-      const res = await fetch('/api/configs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+      const result = await saveConfig({
+        processName,
+        configName: trimmedName,
+        configVersion: trimmedVersion,
+        stepConfigs,
       });
 
-      if (res.status === 201) {
+      if (result.success) {
         setSaveState({
           status: 'saved',
-          configName: body.configName,
-          configVersion: body.configVersion,
+          configName: trimmedName,
+          configVersion: trimmedVersion,
         });
-        onSaved?.(body.configName, body.configVersion);
-      } else if (res.status === 409) {
+        onSaved?.(trimmedName, trimmedVersion);
+      } else if (result.conflict) {
         setSaveState({
           status: 'error',
           message: 'This version already exists. Choose a different version name.',
         });
       } else {
-        const data = await res.json();
-        if (data.errors?.length) {
-          setServerErrors(data.errors);
+        if (result.errors?.length) {
+          setServerErrors(result.errors);
         }
-        if (data.warnings?.length) {
-          setServerWarnings(data.warnings);
+        if (result.warnings?.length) {
+          setServerWarnings(result.warnings);
         }
         setSaveState({
           status: 'error',
-          message: data.error ?? 'Validation failed',
+          message: result.error ?? 'Validation failed',
         });
       }
     } catch (err) {
@@ -252,6 +249,32 @@ export function ConfigEditor({
               </span>
             </div>
           ))}
+
+          {/* Triggers */}
+          {definition.triggers.length > 0 && (
+            <div className="mt-6 pt-4 border-t">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                Triggers
+              </h3>
+              {definition.triggers.map((trigger) => (
+                <div key={trigger.name} className="py-2 text-sm flex items-start gap-2">
+                  {trigger.type === 'cron' && <Clock className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />}
+                  {trigger.type === 'manual' && <Play className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />}
+                  {trigger.type === 'webhook' && <Webhook className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />}
+                  {trigger.type === 'event' && <Zap className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />}
+                  <div>
+                    <div className="font-mono text-xs">{trigger.name}</div>
+                    <div className="text-xs text-muted-foreground">{trigger.type}</div>
+                    {trigger.schedule && (
+                      <code className="text-xs bg-muted px-1 py-0.5 rounded mt-0.5 inline-block">
+                        {trigger.schedule}
+                      </code>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right: accordion config cards */}

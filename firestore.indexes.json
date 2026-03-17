@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "processDefinitions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "name", "order": "ASCENDING" },
+        { "fieldPath": "version", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "humanTasks",
       "queryScope": "COLLECTION",
       "fields": [

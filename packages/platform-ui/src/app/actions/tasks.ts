@@ -1,8 +1,9 @@
 'use server';
 
 import { getPlatformServices } from '@/lib/platform-services';
-import { doc, updateDoc } from 'firebase/firestore';
 import { getFirestoreDb } from '@mediforce/platform-infra';
+import { doc, updateDoc } from 'firebase/firestore';
+import { resolveTask, isResolveError } from '@/lib/resolve-task';
 
 // --------------------------------------------------------------------------
 // claimTask — assign a pending task to the given user
@@ -107,123 +108,73 @@ export async function unclaimTask(
 }
 
 // --------------------------------------------------------------------------
+// completeParamsTask — submit param values, resume process, advance step
+// --------------------------------------------------------------------------
+export async function completeParamsTask(
+  taskId: string,
+  paramValues: Record<string, unknown>,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await resolveTask(taskId, { paramValues });
+    if (isResolveError(result)) {
+      return { success: false, error: result.error };
+    }
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
+}
+
+// --------------------------------------------------------------------------
 // completeTask — submit verdict, resume process, advance step, trigger runner
 // --------------------------------------------------------------------------
 export async function completeTask(
   taskId: string,
   verdict: 'approve' | 'revise',
   comment: string,
+  selectedIndex?: number,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { humanTaskRepo, instanceRepo, auditRepo, engine } =
-      getPlatformServices();
-
-    // 1. Load and validate task
-    const task = await humanTaskRepo.getById(taskId);
-    if (!task) {
-      return { success: false, error: 'Task not found' };
+    const body: Record<string, unknown> = { verdict, comment };
+    if (selectedIndex !== undefined) {
+      body.selectedIndex = selectedIndex;
     }
-
-    if (task.status !== 'claimed') {
-      return {
-        success: false,
-        error: `Cannot complete a ${task.status} task — must be claimed first`,
-      };
+    const result = await resolveTask(taskId, body);
+    if (isResolveError(result)) {
+      return { success: false, error: result.error };
     }
-
-    const now = new Date().toISOString();
-    const completionData = {
-      verdict,
-      comment,
-      completedBy: task.assignedUserId,
-      completedAt: now,
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
     };
+  }
+}
 
-    // 2. Mark task as completed in Firestore
-    await humanTaskRepo.complete(taskId, completionData);
+// --------------------------------------------------------------------------
+// completeUploadTask — submit files, resume process, advance step
+// --------------------------------------------------------------------------
+interface FileInfo {
+  name: string;
+  size: number;
+  type: string;
+  storagePath?: string;
+  downloadUrl?: string;
+}
 
-    // 3. Write task completion audit event
-    await auditRepo.append({
-      actorId: task.assignedUserId ?? 'user',
-      actorType: 'user',
-      actorRole: 'operator',
-      action: 'task.completed',
-      description: `Task '${taskId}' completed with verdict '${verdict}' for step '${task.stepId}'`,
-      timestamp: now,
-      inputSnapshot: { taskId, verdict, comment, stepId: task.stepId },
-      outputSnapshot: { status: 'completed', completionData },
-      basis: 'User submitted verdict via UI',
-      entityType: 'humanTask',
-      entityId: taskId,
-      processInstanceId: task.processInstanceId,
-    });
-
-    // 4. Resume the paused process instance
-    const instance = await instanceRepo.getById(task.processInstanceId);
-    if (!instance) {
-      return {
-        success: false,
-        error: `Process instance '${task.processInstanceId}' not found`,
-      };
+export async function completeUploadTask(
+  taskId: string,
+  files: FileInfo[],
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await resolveTask(taskId, { attachments: files });
+    if (isResolveError(result)) {
+      return { success: false, error: result.error };
     }
-
-    if (instance.status !== 'paused') {
-      return {
-        success: false,
-        error: `Process instance is '${instance.status}', expected 'paused'`,
-      };
-    }
-
-    // Set instance back to running so advanceStep won't throw InvalidTransitionError
-    await instanceRepo.update(task.processInstanceId, {
-      status: 'running',
-      pauseReason: null,
-      updatedAt: now,
-    });
-
-    // 5. Advance to the next step in the workflow
-    await engine.advanceStep(
-      task.processInstanceId,
-      { verdict, comment, taskId },
-      { id: task.assignedUserId ?? 'user', role: 'human' },
-    );
-
-    // 6. Write process resumed audit event
-    await auditRepo.append({
-      actorId: task.assignedUserId ?? 'user',
-      actorType: 'user',
-      actorRole: 'operator',
-      action: 'process.resumed_after_task',
-      description: `Process '${task.processInstanceId}' resumed after task verdict '${verdict}'`,
-      timestamp: new Date().toISOString(),
-      inputSnapshot: {
-        taskId,
-        verdict,
-        processInstanceId: task.processInstanceId,
-      },
-      outputSnapshot: {},
-      basis: 'Task completion triggered process advancement',
-      entityType: 'processInstance',
-      entityId: task.processInstanceId,
-      processInstanceId: task.processInstanceId,
-    });
-
-    // 7. Fire-and-forget: trigger auto-runner to continue with next steps
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:9003';
-    fetch(`${appUrl}/api/processes/${task.processInstanceId}/run`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
-      },
-      body: JSON.stringify({
-        triggeredBy: task.assignedUserId ?? 'user',
-      }),
-    }).catch(() => {
-      // Fire-and-forget — swallow errors; auto-runner will pick up on next poll
-    });
-
     return { success: true };
   } catch (err) {
     return {

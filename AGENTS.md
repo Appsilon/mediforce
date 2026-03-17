@@ -129,6 +129,15 @@ const instance = buildProcessInstance({ status: 'paused' });
 const task = buildHumanTask({ assignee: 'user-1' });
 ```
 
+## Local API Access
+
+Use the `MEDIFORCE_API_KEY` env var for local API calls (set in shell profile).
+Never hardcode the API key in commands. Dev servers may run on different ports (9003, 9004, etc).
+
+```bash
+curl -s -H "X-Api-Key: $MEDIFORCE_API_KEY" "http://localhost:$PORT/api/..."
+```
+
 ## Core Principles
 
 - **Simplicity First**: Make every change as simple as possible. Minimal code impact.

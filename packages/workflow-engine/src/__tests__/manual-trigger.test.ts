@@ -3,11 +3,9 @@ import {
   InMemoryProcessRepository,
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
-  NoOpGateErrorNotifier,
 } from '@mediforce/platform-core';
 import type { ProcessDefinition } from '@mediforce/platform-core';
 import {
-  GateRegistry,
   WorkflowEngine,
   ManualTrigger,
 } from '../index.js';
@@ -32,7 +30,6 @@ describe('ManualTrigger', () => {
   let processRepo: InMemoryProcessRepository;
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
-  let gateRegistry: GateRegistry;
   let engine: WorkflowEngine;
   let trigger: ManualTrigger;
 
@@ -40,14 +37,10 @@ describe('ManualTrigger', () => {
     processRepo = new InMemoryProcessRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository();
-    gateRegistry = new GateRegistry();
-    const notifier = new NoOpGateErrorNotifier();
     engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      notifier,
     );
     trigger = new ManualTrigger(engine);
 

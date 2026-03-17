@@ -1,0 +1,14 @@
+{
+  "name": "@mediforce/community-digest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "build:gather": "tsc -p tsconfig.json",
+    "docker:build": "docker build -t mediforce-agent:community-digest -f container/Dockerfile ."
+  },
+  "dependencies": {
+    "@mediforce/platform-core": "workspace:*"
+  }
+}

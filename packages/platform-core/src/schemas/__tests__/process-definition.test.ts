@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   ProcessDefinitionSchema,
+  SelectionSchema,
+  normalizeSelection,
   StepSchema,
   TransitionSchema,
   TriggerSchema,
@@ -163,6 +165,85 @@ describe('StepSchema', () => {
       expect(result.success).toBe(true);
     }
   });
+
+  it('[DATA] should accept step with ui component and config', () => {
+    const result = StepSchema.safeParse({
+      ...minimalStep,
+      ui: {
+        component: 'file-upload',
+        config: { acceptedTypes: ['application/pdf'], minFiles: 1, maxFiles: 5 },
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.ui?.component).toBe('file-upload');
+      expect(result.data.ui?.config?.acceptedTypes).toEqual(['application/pdf']);
+    }
+  });
+
+  it('[DATA] should accept step with ui component without config', () => {
+    const result = StepSchema.safeParse({
+      ...minimalStep,
+      ui: { component: 'metadata-viewer' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.ui?.component).toBe('metadata-viewer');
+      expect(result.data.ui?.config).toBeUndefined();
+    }
+  });
+
+  it('[DATA] should accept step without ui (optional)', () => {
+    const result = StepSchema.safeParse(minimalStep);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.ui).toBeUndefined();
+    }
+  });
+
+  it('[DATA] should reject ui without component (required)', () => {
+    const result = StepSchema.safeParse({
+      ...minimalStep,
+      ui: { config: { acceptedTypes: ['application/pdf'] } },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[DATA] should reject ui with empty component string', () => {
+    const result = StepSchema.safeParse({
+      ...minimalStep,
+      ui: { component: '' },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('SelectionSchema', () => {
+  it('[DATA] selection shorthand (number) parses correctly', () => {
+    const result = SelectionSchema.safeParse(3);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toBe(3);
+    }
+  });
+
+  it('[DATA] selection object form parses correctly', () => {
+    const result = SelectionSchema.safeParse({ min: 2, max: 5 });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({ min: 2, max: 5 });
+    }
+  });
+
+  it('[DATA] normalizeSelection converts number to {min, max}', () => {
+    const normalized = normalizeSelection(3);
+    expect(normalized).toEqual({ min: 3, max: 3 });
+  });
+
+  it('[DATA] normalizeSelection passes through object form', () => {
+    const normalized = normalizeSelection({ min: 1, max: 4 });
+    expect(normalized).toEqual({ min: 1, max: 4 });
+  });
 });
 
 describe('TransitionSchema', () => {
@@ -171,14 +252,14 @@ describe('TransitionSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('should parse a transition with gate', () => {
+  it('should parse a transition with when condition', () => {
     const result = TransitionSchema.safeParse({
       ...minimalTransition,
-      gate: 'data-complete',
+      when: 'data-complete',
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.gate).toBe('data-complete');
+      expect(result.data.when).toBe('data-complete');
     }
   });
 });
@@ -205,10 +286,19 @@ describe('TriggerSchema', () => {
     }
   });
 
-  it('should reject a trigger with unknown type', () => {
+  it('should accept a cron trigger type', () => {
     const result = TriggerSchema.safeParse({
       type: 'cron',
       name: 'Cron Trigger',
+      schedule: '0 8 * * 1-5',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject a trigger with unknown type', () => {
+    const result = TriggerSchema.safeParse({
+      type: 'scheduled',
+      name: 'Unknown Trigger',
     });
     expect(result.success).toBe(false);
   });
@@ -253,7 +343,7 @@ describe('ProcessDefinitionSchema', () => {
         { id: 'closed', name: 'Closed', type: 'terminal' },
       ],
       transitions: [
-        { from: 'collect-data', to: 'review', gate: 'data-complete' },
+        { from: 'collect-data', to: 'review', when: 'data-complete' },
       ],
       triggers: [
         { type: 'manual', name: 'Start Supply Chain Review' },

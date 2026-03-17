@@ -150,6 +150,109 @@ describe('validateStepGraph', () => {
     expect(result.errors.some((e) => e.includes('island'))).toBe(true);
   });
 
+  it('selection on review step is valid', () => {
+    const definition: ProcessDefinition = {
+      name: 'selection-review',
+      version: '1.0',
+      steps: [
+        { id: 'start', name: 'Start', type: 'creation' },
+        {
+          id: 'review',
+          name: 'Review',
+          type: 'review',
+          selection: 3,
+          verdicts: {
+            approve: { target: 'done' },
+            reject: { target: 'done' },
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal' },
+      ],
+      transitions: [
+        { from: 'start', to: 'review' },
+        { from: 'review', to: 'done' },
+      ],
+      triggers: [{ type: 'manual', name: 'Start' }],
+    };
+    const result = validateStepGraph(definition);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('selection with min/max on review step is valid', () => {
+    const definition: ProcessDefinition = {
+      name: 'selection-range-review',
+      version: '1.0',
+      steps: [
+        { id: 'start', name: 'Start', type: 'creation' },
+        {
+          id: 'review',
+          name: 'Review',
+          type: 'review',
+          selection: { min: 2, max: 5 },
+          verdicts: {
+            approve: { target: 'done' },
+            reject: { target: 'done' },
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal' },
+      ],
+      transitions: [
+        { from: 'start', to: 'review' },
+        { from: 'review', to: 'done' },
+      ],
+      triggers: [{ type: 'manual', name: 'Start' }],
+    };
+    const result = validateStepGraph(definition);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('selection on non-review step is invalid', () => {
+    const definition: ProcessDefinition = {
+      name: 'selection-wrong-type',
+      version: '1.0',
+      steps: [
+        { id: 'start', name: 'Start', type: 'creation', selection: 2 },
+        { id: 'done', name: 'Done', type: 'terminal' },
+      ],
+      transitions: [{ from: 'start', to: 'done' }],
+      triggers: [{ type: 'manual', name: 'Start' }],
+    };
+    const result = validateStepGraph(definition);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('selection') && e.includes('start'))).toBe(true);
+  });
+
+  it('selection with min > max is invalid', () => {
+    const definition: ProcessDefinition = {
+      name: 'selection-bad-range',
+      version: '1.0',
+      steps: [
+        { id: 'start', name: 'Start', type: 'creation' },
+        {
+          id: 'review',
+          name: 'Review',
+          type: 'review',
+          selection: { min: 5, max: 2 },
+          verdicts: {
+            approve: { target: 'done' },
+            reject: { target: 'done' },
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal' },
+      ],
+      transitions: [
+        { from: 'start', to: 'review' },
+        { from: 'review', to: 'done' },
+      ],
+      triggers: [{ type: 'manual', name: 'Start' }],
+    };
+    const result = validateStepGraph(definition);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('min') && e.includes('max'))).toBe(true);
+  });
+
   it('returns multiple errors when multiple issues exist', () => {
     const definition: ProcessDefinition = {
       name: 'multi-error',

@@ -68,6 +68,19 @@ export class InMemoryProcessInstanceRepository
     );
   }
 
+  async updateStepExecution(
+    instanceId: string,
+    executionId: string,
+    updates: Partial<StepExecution>,
+  ): Promise<void> {
+    const executions = this.stepExecutions.get(instanceId) ?? [];
+    const index = executions.findIndex((e) => e.id === executionId);
+    if (index === -1) {
+      throw new Error(`StepExecution not found: ${executionId}`);
+    }
+    executions[index] = { ...executions[index], ...updates };
+  }
+
   async getLatestStepExecution(
     instanceId: string,
     stepId: string,

@@ -114,6 +114,7 @@ export class AgentRunner {
               context,
               stepConfig,
               partialWork,
+              envelope,
             );
             const duration_ms = Date.now() - startedAt;
             await this.appendAuditEvent(context, stepConfig, envelope, fallbackResult.status, duration_ms);

@@ -8,9 +8,8 @@ import type {
   ProcessInstance,
 } from '@mediforce/platform-core';
 import {
-  GateRegistry,
   StepExecutor,
-  GateError,
+  RoutingError,
   InvalidTransitionError,
 } from '../index.js';
 import type { StepActor } from '../index.js';
@@ -40,8 +39,8 @@ const branchingDef: ProcessDefinition = {
     { id: 'done', name: 'Done', type: 'terminal' },
   ],
   transitions: [
-    { from: 'start', to: 'path-a', gate: 'route-decision' },
-    { from: 'start', to: 'path-b', gate: 'route-decision' },
+    { from: 'start', to: 'path-a', when: 'output.route == "a"' },
+    { from: 'start', to: 'path-b', when: 'output.route == "b"' },
     { from: 'path-a', to: 'done' },
     { from: 'path-b', to: 'done' },
   ],
@@ -78,17 +77,15 @@ function makeRunningInstance(
 describe('StepExecutor', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
-  let gateRegistry: GateRegistry;
   let executor: StepExecutor;
 
   beforeEach(() => {
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository();
-    gateRegistry = new GateRegistry();
-    executor = new StepExecutor(instanceRepo, auditRepo, gateRegistry);
+    executor = new StepExecutor(instanceRepo, auditRepo);
   });
 
-  it('completes a step without a gate: instance moves to next step, StepExecution recorded', async () => {
+  it('completes a step without branching: instance moves to next step, StepExecution recorded', async () => {
     const instance = makeRunningInstance('start');
     await instanceRepo.create(instance);
 
@@ -137,40 +134,30 @@ describe('StepExecutor', () => {
     expect(stepExec!.verdict).toBeNull();
   });
 
-  it('completes a step with a gate: GateRegistry invoked, result.next used as next step', async () => {
+  it('completes a branching step: when expression routes to correct next step', async () => {
     const instance = makeRunningInstance('start', {
       definitionName: 'branching-process',
     });
     await instanceRepo.create(instance);
-    gateRegistry.register('route-decision', () => ({
-      next: 'path-b',
-      reason: 'Route to B based on output',
-    }));
 
-    await executor.executeStep(instance, { value: 42 }, actor, branchingDef);
+    await executor.executeStep(instance, { route: 'b' }, actor, branchingDef);
 
     const updated = await instanceRepo.getById('instance-1');
     expect(updated!.currentStepId).toBe('path-b');
   });
 
-  it('stores gate reason in StepExecution.gateResult', async () => {
+  it('stores routing result in StepExecution.gateResult', async () => {
     const instance = makeRunningInstance('start', {
       definitionName: 'branching-process',
     });
     await instanceRepo.create(instance);
-    gateRegistry.register('route-decision', () => ({
-      next: 'path-a',
-      reason: 'Always route A',
-    }));
 
-    await executor.executeStep(instance, {}, actor, branchingDef);
+    await executor.executeStep(instance, { route: 'a' }, actor, branchingDef);
 
     const executions = await instanceRepo.getStepExecutions('instance-1');
     const stepExec = executions.find((e) => e.stepId === 'start');
-    expect(stepExec!.gateResult).toEqual({
-      next: 'path-a',
-      reason: 'Always route A',
-    });
+    expect(stepExec!.gateResult).toBeDefined();
+    expect(stepExec!.gateResult!.next).toBe('path-a');
   });
 
   it('emits audit event with action step.completed, actor, inputSnapshot, outputSnapshot, basis', async () => {
@@ -224,61 +211,24 @@ describe('StepExecutor', () => {
     expect(failEvent).toBeDefined();
   });
 
-  it('gate not found: GateError thrown, instance paused with pauseReason=gate_error, audit action gate.error', async () => {
+  it('no matching when expression: RoutingError thrown, instance paused with pauseReason=routing_error', async () => {
     const instance = makeRunningInstance('start', {
       definitionName: 'branching-process',
     });
     await instanceRepo.create(instance);
-    // Do NOT register route-decision gate
+    // Output does not match any when expression
 
     await expect(
-      executor.executeStep(instance, {}, actor, branchingDef),
-    ).rejects.toThrow(GateError);
+      executor.executeStep(instance, { route: 'c' }, actor, branchingDef),
+    ).rejects.toThrow(RoutingError);
 
     const updated = await instanceRepo.getById('instance-1');
     expect(updated!.status).toBe('paused');
-    expect(updated!.pauseReason).toBe('gate_error');
+    expect(updated!.pauseReason).toBe('routing_error');
 
     const events = auditRepo.getAll();
-    const gateEvent = events.find((e) => e.action === 'gate.error');
-    expect(gateEvent).toBeDefined();
-  });
-
-  it('gate function throws: GateError wraps GateExecutionError, instance paused, audit gate.error', async () => {
-    const instance = makeRunningInstance('start', {
-      definitionName: 'branching-process',
-    });
-    await instanceRepo.create(instance);
-    gateRegistry.register('route-decision', () => {
-      throw new Error('Gate runtime failure');
-    });
-
-    await expect(
-      executor.executeStep(instance, {}, actor, branchingDef),
-    ).rejects.toThrow(GateError);
-
-    const updated = await instanceRepo.getById('instance-1');
-    expect(updated!.status).toBe('paused');
-    expect(updated!.pauseReason).toBe('gate_error');
-  });
-
-  it('gate returns invalid nextStepId (not in definition): GateError, instance paused', async () => {
-    const instance = makeRunningInstance('start', {
-      definitionName: 'branching-process',
-    });
-    await instanceRepo.create(instance);
-    gateRegistry.register('route-decision', () => ({
-      next: 'nonexistent-step',
-      reason: 'Bad routing',
-    }));
-
-    await expect(
-      executor.executeStep(instance, {}, actor, branchingDef),
-    ).rejects.toThrow(GateError);
-
-    const updated = await instanceRepo.getById('instance-1');
-    expect(updated!.status).toBe('paused');
-    expect(updated!.pauseReason).toBe('gate_error');
+    const routingEvent = events.find((e) => e.action === 'routing.error');
+    expect(routingEvent).toBeDefined();
   });
 
   it('attempt to execute on non-running instance: throws InvalidTransitionError', async () => {

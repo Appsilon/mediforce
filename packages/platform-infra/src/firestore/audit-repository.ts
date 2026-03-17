@@ -69,11 +69,12 @@ export class FirestoreAuditRepository implements AuditRepository {
     const q = query(
       colRef,
       where('processInstanceId', '==', processInstanceId),
-      orderBy('timestamp', 'desc'),
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((d) => this.docToAuditEvent(d.data()));
+    return snapshot.docs
+      .map((d) => this.docToAuditEvent(d.data()))
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   }
 
   async getByActor(

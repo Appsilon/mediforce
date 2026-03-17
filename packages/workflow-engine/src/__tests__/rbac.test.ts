@@ -4,18 +4,15 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
   InMemoryAuthService,
-  NoOpGateErrorNotifier,
   RbacService,
   RbacError,
   type StepConfig,
   type ProcessDefinition,
 } from '@mediforce/platform-core';
 import { WorkflowEngine } from '../engine/workflow-engine.js';
-import { GateRegistry } from '../gates/gate-registry.js';
-import { alwaysProceed } from '../gates/built-in-gates.js';
 import type { StepActor } from '../index.js';
 
-// A simple 2-step process (start -> done) with an alwaysProceed gate
+// A simple 2-step process (start -> done) with no gate needed (single transition)
 const simpleDefinition: ProcessDefinition = {
   name: 'rbac-test-process',
   version: '1.0',
@@ -23,7 +20,7 @@ const simpleDefinition: ProcessDefinition = {
     { id: 'start', name: 'Start', type: 'creation' },
     { id: 'done', name: 'Done', type: 'terminal' },
   ],
-  transitions: [{ from: 'start', to: 'done', gate: 'always-proceed' }],
+  transitions: [{ from: 'start', to: 'done' }],
   triggers: [{ type: 'manual', name: 'Start RBAC Test' }],
 };
 
@@ -46,8 +43,6 @@ describe('WorkflowEngine — RBAC enforcement', () => {
   let auditRepo: InMemoryAuditRepository;
   let authService: InMemoryAuthService;
   let rbacService: RbacService;
-  let gateRegistry: GateRegistry;
-  let gateErrorNotifier: NoOpGateErrorNotifier;
 
   beforeEach(async () => {
     processRepo = new InMemoryProcessRepository();
@@ -55,10 +50,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     auditRepo = new InMemoryAuditRepository();
     authService = new InMemoryAuthService();
     rbacService = new RbacService(authService);
-    gateRegistry = new GateRegistry();
-    gateErrorNotifier = new NoOpGateErrorNotifier();
 
-    gateRegistry.register('always-proceed', alwaysProceed);
     await processRepo.saveProcessDefinition(simpleDefinition);
   });
 
@@ -70,8 +62,6 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       rbacService,
     );
     const instance = await engine.createInstance(
@@ -85,15 +75,13 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     return instance.id;
   }
 
-  // ─── Test 1: No rbacService configured — backward compatible ────────────────
+  // --- Test 1: No rbacService configured — backward compatible ---
 
   it('succeeds without rbacService configured (backward compatible)', async () => {
     const engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       // rbacService intentionally omitted
     );
     const instance = await engine.createInstance(
@@ -120,7 +108,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     expect(deniedEvent).toBeUndefined();
   });
 
-  // ─── Test 2: No allowedRoles on step — any authenticated user can proceed ───
+  // --- Test 2: No allowedRoles on step — any authenticated user can proceed ---
 
   it('succeeds when stepConfig has no allowedRoles (any authenticated user)', async () => {
     authService.setCurrentUser({
@@ -135,8 +123,6 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       rbacService,
     );
 
@@ -154,7 +140,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     expect(deniedEvent).toBeUndefined();
   });
 
-  // ─── Test 3: User has required role — proceeds normally ─────────────────────
+  // --- Test 3: User has required role — proceeds normally ---
 
   it('succeeds when user has the required role', async () => {
     authService.setCurrentUser({
@@ -169,8 +155,6 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       rbacService,
     );
 
@@ -188,7 +172,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     expect(deniedEvent).toBeUndefined();
   });
 
-  // ─── Test 4: User lacks required role — throws RbacError + audit event ──────
+  // --- Test 4: User lacks required role — throws RbacError + audit event ---
 
   it('throws RbacError and appends rbac.access_denied audit event when user lacks required role', async () => {
     authService.setCurrentUser({
@@ -203,8 +187,6 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       rbacService,
     );
 
@@ -229,7 +211,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     expect(deniedEvent!.basis).toBe('RBAC enforcement: user lacks required role');
   });
 
-  // ─── Test 5: Unauthenticated user — throws when rbacService is present ──────
+  // --- Test 5: Unauthenticated user — throws when rbacService is present ---
 
   it('throws when user is unauthenticated and rbacService is configured', async () => {
     // No user set in authService — requireAuth will throw
@@ -240,8 +222,6 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       rbacService,
     );
 
@@ -251,7 +231,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     ).rejects.toThrow('Authentication required');
   });
 
-  // ─── Test 6: stepConfig not passed — RBAC check skipped ─────────────────────
+  // --- Test 6: stepConfig not passed — RBAC check skipped ---
 
   it('skips RBAC check when stepConfig is not passed, even with rbacService configured', async () => {
     // User has no roles at all, but RBAC should not fire without stepConfig
@@ -262,8 +242,6 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       rbacService,
     );
 

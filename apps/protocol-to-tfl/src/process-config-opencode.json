@@ -1,0 +1,83 @@
+{
+  "processName": "protocol-to-tfl",
+  "configName": "opencode-extract",
+  "configVersion": "8",
+  "env": {
+    "DEEPSEEK_API_KEY": "{{DEEPSEEK_API_KEY}}",
+    "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}"
+  },
+  "stepConfigs": [
+    {
+      "stepId": "upload-documents",
+      "executorType": "human"
+    },
+    {
+      "stepId": "extract-metadata",
+      "executorType": "agent",
+      "plugin": "opencode-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 20,
+      "agentConfig": {
+        "skill": "trial-metadata-extractor",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "image": "mediforce-agent:protocol-to-tfl",
+        "model": "deepseek/deepseek-chat"
+      }
+    },
+    {
+      "stepId": "generate-tlg-shells",
+      "executorType": "agent",
+      "plugin": "opencode-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 45,
+      "agentConfig": {
+        "skill": "mock-tlg-generator",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "image": "mediforce-agent:protocol-to-tfl",
+        "model": "deepseek/deepseek-chat"
+      }
+    },
+    {
+      "stepId": "upload-sdtm",
+      "executorType": "human"
+    },
+    {
+      "stepId": "generate-adam",
+      "executorType": "agent",
+      "plugin": "opencode-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 30,
+      "agentConfig": {
+        "skill": "sdtm-to-adam",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "image": "mediforce-agent:protocol-to-tfl",
+        "model": "deepseek/deepseek-chat",
+        "repo": "Appsilon/mediforce-clinical-workspace",
+        "commit": "4beb1b0ad77872b04bc7ef930def16e555946222"
+      }
+    },
+    {
+      "stepId": "generate-tlg",
+      "executorType": "agent",
+      "plugin": "opencode-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.7,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 30,
+      "agentConfig": {
+        "skill": "adam-to-tlg",
+        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "image": "mediforce-agent:protocol-to-tfl",
+        "model": "deepseek/deepseek-chat",
+        "repo": "Appsilon/mediforce-clinical-workspace",
+        "commit": "4beb1b0ad77872b04bc7ef930def16e555946222"
+      }
+    }
+  ]
+}

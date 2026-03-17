@@ -1,0 +1,6 @@
+FROM node:20-slim
+
+RUN mkdir -p /deps && cd /deps && npm init -y && npm install yaml && \
+    ln -s /deps/node_modules /node_modules
+
+CMD ["node", "/output/script.mjs"]

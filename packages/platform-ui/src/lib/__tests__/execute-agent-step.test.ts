@@ -330,9 +330,10 @@ describe('executeAgentStep', () => {
 
   // ---- Signature ----
 
-  it('[DATA] has exactly 4 parameters (no autonomyLevel param)', () => {
-    // executeAgentStep should accept 4 params: instanceId, stepId, appContext, triggeredBy
-    expect(executeAgentStep.length).toBeLessThanOrEqual(4);
+  it('[DATA] has no autonomyLevel param (4 required + optional stepExecutionId)', () => {
+    // executeAgentStep should accept 4 required params + optional stepExecutionId
+    // Function.length only counts params before the first optional one
+    expect(executeAgentStep.length).toBeLessThanOrEqual(5);
   });
 
   // ---- L3 Review Routing ----

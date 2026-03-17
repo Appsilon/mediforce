@@ -4,11 +4,9 @@ import {
   InMemoryProcessRepository,
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
-  NoOpGateErrorNotifier,
 } from '@mediforce/platform-core';
 import type { ProcessDefinition } from '@mediforce/platform-core';
 import {
-  GateRegistry,
   WorkflowEngine,
   WebhookTrigger,
   WebhookPayloadValidationError,
@@ -48,7 +46,6 @@ describe('WebhookTrigger', () => {
   let processRepo: InMemoryProcessRepository;
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
-  let gateRegistry: GateRegistry;
   let engine: WorkflowEngine;
   let schemaRegistry: Map<string, z.ZodType>;
   let trigger: WebhookTrigger;
@@ -57,14 +54,10 @@ describe('WebhookTrigger', () => {
     processRepo = new InMemoryProcessRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository();
-    gateRegistry = new GateRegistry();
-    const notifier = new NoOpGateErrorNotifier();
     engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      notifier,
     );
     schemaRegistry = new Map();
     trigger = new WebhookTrigger(engine, schemaRegistry);

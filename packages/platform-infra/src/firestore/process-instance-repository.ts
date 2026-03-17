@@ -110,6 +110,21 @@ export class FirestoreProcessInstanceRepository
     return snapshot.docs.map((d) => StepExecutionSchema.parse(d.data()));
   }
 
+  async updateStepExecution(
+    instanceId: string,
+    executionId: string,
+    updates: Partial<StepExecution>,
+  ): Promise<void> {
+    const docRef = doc(
+      this.db,
+      this.collectionName,
+      instanceId,
+      this.stepExecutionsSubcollection,
+      executionId,
+    );
+    await updateDoc(docRef, { ...updates });
+  }
+
   async getLatestStepExecution(
     instanceId: string,
     stepId: string,

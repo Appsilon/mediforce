@@ -4,7 +4,6 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
   InMemoryHandoffRepository,
-  NoOpGateErrorNotifier,
   NoopNotificationService,
 } from '@mediforce/platform-core';
 import type {
@@ -15,8 +14,6 @@ import type {
   DirectoryUser,
 } from '@mediforce/platform-core';
 import { WorkflowEngine } from '../workflow-engine.js';
-import { GateRegistry } from '../../gates/gate-registry.js';
-import { alwaysProceed } from '../../gates/built-in-gates.js';
 import type { StepActor, AgentRunResult } from '../../index.js';
 
 // In-memory test double for UserDirectoryService (not exported, test-only)
@@ -42,7 +39,7 @@ const agentProcessDef: ProcessDefinition = {
     { id: 'agent-step', name: 'Agent Step', type: 'creation' },
     { id: 'done', name: 'Done', type: 'terminal' },
   ],
-  transitions: [{ from: 'agent-step', to: 'done', gate: 'always-proceed' }],
+  transitions: [{ from: 'agent-step', to: 'done' }],
   triggers: [{ type: 'manual', name: 'Start Agent Process' }],
 };
 
@@ -90,8 +87,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
   let auditRepo: InMemoryAuditRepository;
   let handoffRepo: InMemoryHandoffRepository;
   let notificationService: NoopNotificationService;
-  let gateRegistry: GateRegistry;
-  let gateErrorNotifier: NoOpGateErrorNotifier;
 
   beforeEach(async () => {
     processRepo = new InMemoryProcessRepository();
@@ -99,10 +94,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     auditRepo = new InMemoryAuditRepository();
     handoffRepo = new InMemoryHandoffRepository();
     notificationService = new NoopNotificationService();
-    gateRegistry = new GateRegistry();
-    gateErrorNotifier = new NoOpGateErrorNotifier();
 
-    gateRegistry.register('always-proceed', alwaysProceed);
     await processRepo.saveProcessDefinition(agentProcessDef);
   });
 
@@ -130,15 +122,13 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     });
   }
 
-  // ─── Test 1: Escalation with handoffRepository — HandoffEntity created ───────
+  // --- Test 1: Escalation with handoffRepository — HandoffEntity created ---
 
   it('creates HandoffEntity with status=created when agent escalates with handoffRepository', async () => {
     const engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       undefined, // no rbacService
       handoffRepo,
       notificationService,
@@ -178,15 +168,13 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     expect(handoff.updatedAt).toBeDefined();
   });
 
-  // ─── Test 2: Escalation with envelope — agentWork and agentReasoning populated ─
+  // --- Test 2: Escalation with envelope — agentWork and agentReasoning populated ---
 
   it('populates agentWork and agentReasoning from envelope when escalation has result', async () => {
     const engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       undefined,
       handoffRepo,
       notificationService,
@@ -212,15 +200,13 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     expect(handoff.agentQuestion).toContain('confidence');
   });
 
-  // ─── Test 3: Escalation without handoffRepository — no error (graceful degradation) ─
+  // --- Test 3: Escalation without handoffRepository — no error (graceful degradation) ---
 
   it('does not throw when agent escalates but no handoffRepository configured', async () => {
     const engineNoHandoff = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       undefined, // no rbacService
       undefined, // no handoffRepository
       undefined, // no notificationService
@@ -244,7 +230,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     expect(handoffRepo.getAll()).toHaveLength(0);
   });
 
-  // ─── Test 4: NotificationService.send() called with resolved targets on escalation ─
+  // --- Test 4: NotificationService.send() called with resolved targets on escalation ---
 
   it('calls NotificationService.send() with agent_escalation event when both services injected', async () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
@@ -264,8 +250,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       undefined,
       handoffRepo,
       notificationService,
@@ -294,15 +278,13 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     expect(sent.targets).toContainEqual({ channel: 'email', address: 'reviewer@example.com' });
   });
 
-  // ─── Test 5: Timeout escalation has correct agentQuestion ────────────────────
+  // --- Test 5: Timeout escalation has correct agentQuestion ---
 
   it('sets agentQuestion to timeout message when fallbackReason is timeout', async () => {
     const engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       undefined,
       handoffRepo,
       notificationService,
@@ -324,15 +306,13 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     expect(handoffs[0].agentQuestion).toContain('timed out');
   });
 
-  // ─── Test 6: Non-escalated AgentRunResult — normal step execution proceeds ───
+  // --- Test 6: Non-escalated AgentRunResult — normal step execution proceeds ---
 
   it('does not create HandoffEntity when agentRunResult.status is not escalated', async () => {
     const engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       undefined,
       handoffRepo,
       notificationService,
@@ -361,7 +341,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     expect(notificationService.sent).toHaveLength(0);
   });
 
-  // ─── NEW: Test 7: Notification targets resolved from roles ───────────────────
+  // --- Test 7: Notification targets resolved from roles ---
 
   it('resolves roles to email targets and sends notification with concrete targets', async () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
@@ -380,8 +360,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       undefined,
       handoffRepo,
       notificationService,
@@ -407,15 +385,13 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     });
   });
 
-  // ─── NEW: Test 8: No notification when userDirectoryService not injected ─────
+  // --- Test 8: No notification when userDirectoryService not injected ---
 
   it('skips notification when userDirectoryService is not injected (no error thrown)', async () => {
     const engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       undefined,
       handoffRepo,
       notificationService,
@@ -438,7 +414,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     expect(notificationService.sent).toHaveLength(0);
   });
 
-  // ─── NEW: Test 9: Notification failure propagates (fatal) ────────────────────
+  // --- Test 9: Notification failure propagates (fatal) ---
 
   it('propagates notification failure as advanceStep failure (fatal — no catch)', async () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
@@ -464,8 +440,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       undefined,
       handoffRepo,
       failingNotificationService,
@@ -481,7 +455,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     ).rejects.toThrow('SMTP failed');
   });
 
-  // ─── NEW: Test 10: No notification when no escalation config in ProcessConfig ─
+  // --- Test 10: No notification when no escalation config in ProcessConfig ---
 
   it('skips notification gracefully when no agent_escalation config in ProcessConfig', async () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
@@ -501,8 +475,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       processRepo,
       instanceRepo,
       auditRepo,
-      gateRegistry,
-      gateErrorNotifier,
       undefined,
       handoffRepo,
       notificationService,

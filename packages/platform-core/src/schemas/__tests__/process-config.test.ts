@@ -203,6 +203,72 @@ describe('StepConfigSchema', () => {
       expect(result.data.reviewerType).toBe('human');
     }
   });
+
+  it('[DATA] should accept agentConfig with skill', () => {
+    const result = StepConfigSchema.safeParse({
+      stepId: 'step-1',
+      executorType: 'agent',
+      plugin: 'claude-code',
+      agentConfig: { skill: 'trial-metadata-extractor', image: 'mediforce-agent:base' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agentConfig?.skill).toBe('trial-metadata-extractor');
+    }
+  });
+
+  it('[DATA] should accept agentConfig with prompt, model, and skillsDir', () => {
+    const result = StepConfigSchema.safeParse({
+      stepId: 'step-1',
+      executorType: 'agent',
+      plugin: 'claude-code-agent',
+      agentConfig: {
+        skill: 'trial-metadata-extractor',
+        prompt: 'Extract metadata from the uploaded protocol PDF',
+        model: 'sonnet',
+        skillsDir: 'apps/protocol-to-tfl/plugins/protocol-to-tfl/skills',
+        image: 'mediforce-agent:base',
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agentConfig?.prompt).toBe('Extract metadata from the uploaded protocol PDF');
+      expect(result.data.agentConfig?.model).toBe('sonnet');
+      expect(result.data.agentConfig?.skillsDir).toBe('apps/protocol-to-tfl/plugins/protocol-to-tfl/skills');
+    }
+  });
+
+  it('[DATA] should accept agentConfig without image (optional for local execution)', () => {
+    const result = StepConfigSchema.safeParse({
+      stepId: 'step-1',
+      executorType: 'agent',
+      agentConfig: { skill: 'some-skill' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agentConfig?.image).toBeUndefined();
+    }
+  });
+
+  it('[DATA] should accept agentConfig with empty image string (image is optional for inline scripts)', () => {
+    const result = StepConfigSchema.safeParse({
+      stepId: 'step-1',
+      executorType: 'agent',
+      agentConfig: { image: '' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('[DATA] should accept stepConfig without agentConfig (optional)', () => {
+    const result = StepConfigSchema.safeParse({
+      stepId: 'step-1',
+      executorType: 'human',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.agentConfig).toBeUndefined();
+    }
+  });
 });
 
 describe('ProcessConfigSchema', () => {
