@@ -1,9 +1,9 @@
 # 📋 Meeting Minutes
 
-Project: Mediforce 
-Date: 2026-03-06
-Time: 15:00 – 16:00 CET
-Location: Video call
+Project: Mediforce \
+Date: 2026-03-06 \
+Time: 15:00 – 16:00 CET \
+Location: Video call \
 
 ## 📅 Agenda
 1. Introductions
@@ -35,8 +35,6 @@ Need for Realistic Sample Data: To build a working demo for the clinical data qu
 
 ## 📌 Action Items
 
-**Action:** Create a tutorial for a first process or agent created on the platform.	
-
-**Action:** Look for realistic sample data (e.g., synthetic data sets) for building the clinical data quality check demo application.
-
+**Action:** Create a tutorial for a first process or agent created on the platform.	\
+**Action:** Look for realistic sample data (e.g., synthetic data sets) for building the clinical data quality check demo application. \
 **Action:** Think about leveraging Philip Toss's repository for skills and agent definitions.
