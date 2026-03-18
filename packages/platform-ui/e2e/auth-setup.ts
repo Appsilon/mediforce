@@ -24,6 +24,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedSubcollection('processInstances', 'proc-human-waiting', 'stepExecutions', data.humanWaitingStepExecutions);
   await seedCollection('processDefinitions', data.processDefinitions);
   await seedCollection('processConfigs', data.processConfigs);
+  await seedCollection('workflowDefinitions', data.workflowDefinitions);
   await seedSubcollection('processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions);
   await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);
 
