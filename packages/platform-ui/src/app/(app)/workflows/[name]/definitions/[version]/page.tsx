@@ -37,15 +37,18 @@ export default function WorkflowDefinitionVersionPage() {
 
   const [editing, setEditing] = useState(false);
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>([]);
+  const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>([]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
 
   const currentSteps = editing ? editedSteps : (definition?.steps ?? []);
+  const currentTransitions = editing ? editedTransitions : (definition?.transitions ?? []);
   const selectedStep = currentSteps.find((s) => s.id === selectedStepId) ?? null;
 
   const enableEditing = useCallback(() => {
     if (!definition) return;
     setEditedSteps(structuredClone(definition.steps));
+    setEditedTransitions(structuredClone(definition.transitions));
     setEditing(true);
     setSaveState({ status: 'idle' });
   }, [definition]);
@@ -80,16 +83,26 @@ export default function WorkflowDefinitionVersionPage() {
 
   const removeStep = useCallback((stepId: string) => {
     setEditedSteps((prev) => prev.filter((s) => s.id !== stepId));
+    setEditedTransitions((prev) => prev.filter((t) => t.from !== stepId && t.to !== stepId));
+  }, []);
+
+  const connectSteps = useCallback((fromId: string, toId: string) => {
+    setEditedTransitions((prev) => {
+      if (prev.some((t) => t.from === fromId && t.to === toId)) return prev;
+      return [...prev, { from: fromId, to: toId }];
+    });
+  }, []);
+
+  const removeEdge = useCallback((fromId: string, toId: string) => {
+    setEditedTransitions((prev) => prev.filter((t) => !(t.from === fromId && t.to === toId)));
   }, []);
 
   const handleSave = useCallback(async () => {
     if (!definition) return;
     setSaveState({ status: 'saving' });
 
-    const transitions = editedSteps
-      .filter((_, idx) => idx < editedSteps.length - 1)
-      .map((step, idx) => ({ from: step.id, to: editedSteps[idx + 1].id }));
-
+    // Merge explicit transitions with verdict-based transitions
+    const transitions = [...editedTransitions];
     for (const step of editedSteps) {
       if (step.type === 'review' && step.verdicts) {
         for (const verdict of Object.values(step.verdicts)) {
@@ -126,7 +139,7 @@ export default function WorkflowDefinitionVersionPage() {
 
   // Build a WorkflowDefinition from edited steps for the diagram
   const diagramDefinition: WorkflowDefinition | null = definition
-    ? { ...definition, steps: currentSteps }
+    ? { ...definition, steps: currentSteps, transitions: currentTransitions }
     : null;
 
   if (loading) {
@@ -244,6 +257,8 @@ export default function WorkflowDefinitionVersionPage() {
             editing={editing}
             onAddStep={editing ? addStepAfter : undefined}
             onRemoveStep={editing ? removeStep : undefined}
+            onConnect={editing ? connectSteps : undefined}
+            onRemoveEdge={editing ? removeEdge : undefined}
           />
         </div>
 

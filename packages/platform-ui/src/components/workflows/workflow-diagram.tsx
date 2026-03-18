@@ -1,15 +1,18 @@
 'use client';
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
   type Node,
   type Edge,
   type NodeProps,
+  type NodeChange,
+  type Connection,
   Handle,
   Position,
   MarkerType,
+  applyNodeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { User, Bot, Terminal } from 'lucide-react';
@@ -335,9 +338,11 @@ interface WorkflowDiagramProps {
   editing?: boolean;
   onAddStep?: (afterStepId: string) => void;
   onRemoveStep?: (stepId: string) => void;
+  onConnect?: (fromStepId: string, toStepId: string) => void;
+  onRemoveEdge?: (fromStepId: string, toStepId: string) => void;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, selectedStepId, editing, onAddStep, onRemoveStep }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, selectedStepId, editing, onAddStep, onRemoveStep, onConnect: onConnectProp, onRemoveEdge }: WorkflowDiagramProps) {
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition),
     [definition],
@@ -388,11 +393,44 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, sel
     return { nodes: styledNodes, edges: finalEdges };
   }, [layoutNodes, layoutEdges, selectedStepId, editing, onAddStep, onRemoveStep]);
 
+  // In edit mode, allow dragging — track position overrides
+  const [draggedNodes, setDraggedNodes] = useState<Node<StepNodeData>[]>([]);
+  const displayNodes = editing && draggedNodes.length > 0 ? draggedNodes : nodes;
+
+  // Sync computed nodes → dragged state when layout changes
+  React.useEffect(() => {
+    if (editing) setDraggedNodes(nodes);
+  }, [nodes, editing]);
+
+  const onNodesChange = useCallback((changes: NodeChange<Node<StepNodeData>>[]) => {
+    if (!editing) return;
+    setDraggedNodes((prev) => applyNodeChanges(changes, prev));
+  }, [editing]);
+
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {
-      if (node.data.stepType !== 'terminal') onNodeClick?.(node.id);
+      if (node.data?.stepType !== 'terminal') onNodeClick?.(node.id);
     },
     [onNodeClick],
+  );
+
+  const handleConnect = useCallback(
+    (connection: Connection) => {
+      if (connection.source && connection.target) {
+        onConnectProp?.(connection.source, connection.target);
+      }
+    },
+    [onConnectProp],
+  );
+
+  const handleEdgeClick = useCallback(
+    (_: React.MouseEvent, edge: Edge) => {
+      if (!editing || !onRemoveEdge) return;
+      if (confirm(`Remove connection ${edge.source} → ${edge.target}?`)) {
+        onRemoveEdge(edge.source, edge.target);
+      }
+    },
+    [editing, onRemoveEdge],
   );
 
   return (
@@ -402,18 +440,21 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, sel
         style={{ width: '100%', height: `${Math.max(360, height)}px`, ...style }}
       >
         <ReactFlow
-          nodes={nodes}
+          nodes={displayNodes}
           edges={edges}
           nodeTypes={nodeTypes}
-          nodesDraggable={false}
-          nodesConnectable={false}
+          nodesDraggable={editing === true}
+          nodesConnectable={editing === true}
           elementsSelectable={true}
-          panOnDrag={false}
-          zoomOnScroll={false}
-          zoomOnPinch={false}
+          panOnDrag={editing === true}
+          zoomOnScroll={editing === true}
+          zoomOnPinch={editing === true}
           zoomOnDoubleClick={false}
-          preventScrolling={false}
+          preventScrolling={!editing}
+          onNodesChange={onNodesChange}
           onNodeClick={handleNodeClick}
+          onConnect={editing ? handleConnect : undefined}
+          onEdgeClick={editing ? handleEdgeClick : undefined}
           defaultViewport={{ x: 16, y: 16, zoom: 1 }}
           proOptions={{ hideAttribution: true }}
         />
