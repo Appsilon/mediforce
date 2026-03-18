@@ -9,8 +9,6 @@ import {
   type NodeProps,
   Handle,
   Position,
-  useNodesState,
-  useEdgesState,
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -67,6 +65,8 @@ type StepNodeData = {
   executor: string;
   autonomyLevel?: string;
   plugin?: string;
+  editing?: boolean;
+  onRemove?: () => void;
 };
 
 const NODE_WIDTH = 240;
@@ -111,12 +111,21 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
       <div
         style={{ width: NODE_WIDTH, minHeight: NODE_INNER_HEIGHT }}
         className={cn(
-          'rounded-xl border-[1.5px] px-4 py-3 transition-all cursor-pointer',
+          'rounded-xl border-[1.5px] px-4 py-3 transition-all cursor-pointer group/node relative',
           'hover:shadow-md',
           style.bg,
           selected ? `${style.activeBorder} shadow-md ring-1 ring-primary/10` : style.border,
         )}
       >
+        {/* Delete button — edit mode only */}
+        {data.editing && data.onRemove && (
+          <button
+            onClick={(e) => { e.stopPropagation(); data.onRemove?.(); }}
+            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-xs opacity-0 group-hover/node:opacity-100 transition-opacity shadow-sm hover:bg-red-600 z-10"
+          >
+            ×
+          </button>
+        )}
         <div className="flex items-start gap-2.5">
           <div className={cn('rounded-lg p-1.5 mt-0.5', exec.bg)}>
             <Icon className={cn('h-3.5 w-3.5', exec.color)} />
@@ -142,7 +151,28 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   );
 }
 
-const nodeTypes = { step: StepNode };
+type AddNodeData = {
+  onAdd: () => void;
+};
+
+function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
+  return (
+    <>
+      <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
+      <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
+      <div style={{ width: NODE_WIDTH }} className="flex justify-center">
+        <button
+          onClick={(e) => { e.stopPropagation(); data.onAdd(); }}
+          className="w-7 h-7 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all"
+        >
+          <span className="text-sm font-bold">+</span>
+        </button>
+      </div>
+    </>
+  );
+}
+
+const nodeTypes = { step: StepNode, addStep: AddStepNode };
 
 // ---------------------------------------------------------------------------
 // Layout engine — top-down, even spacing
@@ -302,21 +332,61 @@ interface WorkflowDiagramProps {
   style?: React.CSSProperties;
   onNodeClick?: (stepId: string) => void;
   selectedStepId?: string | null;
+  editing?: boolean;
+  onAddStep?: (afterStepId: string) => void;
+  onRemoveStep?: (stepId: string) => void;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, selectedStepId }: WorkflowDiagramProps) {
-  const { nodes: initialNodes, edges: initialEdges, height } = useMemo(
+export function WorkflowDiagram({ definition, className, style, onNodeClick, selectedStepId, editing, onAddStep, onRemoveStep }: WorkflowDiagramProps) {
+  const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition),
     [definition],
   );
 
-  const styledNodes = useMemo(
-    () => initialNodes.map((n) => ({ ...n, selected: n.id === selectedStepId })),
-    [initialNodes, selectedStepId],
-  );
+  // Inject editing callbacks into node data + add "+" nodes between steps in edit mode
+  const { nodes, edges } = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const styledNodes: Node<any>[] = layoutNodes.map((n) => ({
+      ...n,
+      selected: n.id === selectedStepId,
+      data: {
+        ...n.data,
+        editing,
+        onRemove: onRemoveStep ? () => onRemoveStep(n.id) : undefined,
+      },
+    }));
 
-  const [nodes] = useNodesState(styledNodes);
-  const [edges] = useEdgesState(initialEdges);
+    let finalEdges = [...layoutEdges];
+
+    // In edit mode, insert "+" nodes between sequential forward edges
+    if (editing && onAddStep) {
+      const forwardEdges = layoutEdges.filter((e) => e.sourceHandle === 'bottom');
+      for (const edge of forwardEdges) {
+        const sourceNode = styledNodes.find((n) => n.id === edge.source);
+        const targetNode = styledNodes.find((n) => n.id === edge.target);
+        if (!sourceNode || !targetNode) continue;
+
+        const addId = `add-after-${edge.source}`;
+        const midY = (sourceNode.position.y + targetNode.position.y) / 2;
+
+        styledNodes.push({
+          id: addId,
+          type: 'addStep',
+          position: { x: sourceNode.position.x, y: midY - 14 },
+          data: { onAdd: () => onAddStep(edge.source) },
+        });
+
+        // Replace original edge with two edges through the add node
+        finalEdges = finalEdges.filter((e) => e.id !== edge.id);
+        finalEdges.push(
+          { ...edge, id: `${edge.source}->add`, target: addId, targetHandle: 'top', label: undefined, markerEnd: undefined },
+          { ...edge, id: `add->${edge.target}`, source: addId, sourceHandle: 'bottom', label: edge.label },
+        );
+      }
+    }
+
+    return { nodes: styledNodes, edges: finalEdges };
+  }, [layoutNodes, layoutEdges, selectedStepId, editing, onAddStep, onRemoveStep]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {

@@ -62,6 +62,26 @@ export default function WorkflowDefinitionVersionPage() {
     );
   }, []);
 
+  const addStepAfter = useCallback((afterStepId: string) => {
+    setEditedSteps((prev) => {
+      const idx = prev.findIndex((s) => s.id === afterStepId);
+      if (idx === -1) return prev;
+      const newStep: WorkflowStep = {
+        id: `step-${Date.now()}`,
+        name: 'New Step',
+        type: 'creation',
+        executor: 'human',
+      };
+      const next = [...prev];
+      next.splice(idx + 1, 0, newStep);
+      return next;
+    });
+  }, []);
+
+  const removeStep = useCallback((stepId: string) => {
+    setEditedSteps((prev) => prev.filter((s) => s.id !== stepId));
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!definition) return;
     setSaveState({ status: 'saving' });
@@ -221,6 +241,9 @@ export default function WorkflowDefinitionVersionPage() {
             className="border-0"
             onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
             selectedStepId={selectedStepId}
+            editing={editing}
+            onAddStep={editing ? addStepAfter : undefined}
+            onRemoveStep={editing ? removeStep : undefined}
           />
         </div>
 
