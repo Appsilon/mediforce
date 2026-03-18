@@ -490,8 +490,18 @@ function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: 
         <Section title="Verdicts">
           <div className="space-y-1.5">
             {Object.entries(step.verdicts ?? {}).map(([verdictName, verdict]) => (
-              <div key={verdictName} className="flex items-center gap-2">
-                <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{verdictName}</span>
+              <div key={verdictName} className="flex items-center gap-1.5">
+                <input
+                  value={verdictName}
+                  onChange={(e) => {
+                    const newVerdicts: Record<string, { target: string }> = {};
+                    for (const [k, v] of Object.entries(step.verdicts ?? {})) {
+                      newVerdicts[k === verdictName ? e.target.value : k] = v;
+                    }
+                    onChange({ verdicts: newVerdicts });
+                  }}
+                  className="bg-transparent text-xs font-medium border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-20"
+                />
                 <span className="text-xs text-muted-foreground">→</span>
                 <input
                   value={verdict.target}
@@ -499,14 +509,24 @@ function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: 
                     const newVerdicts = { ...step.verdicts, [verdictName]: { ...verdict, target: e.target.value } };
                     onChange({ verdicts: newVerdicts });
                   }}
-                  className="bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-24"
+                  placeholder="target step id"
+                  className="bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors flex-1"
                 />
+                <button
+                  onClick={() => {
+                    const newVerdicts = { ...step.verdicts };
+                    delete newVerdicts[verdictName];
+                    onChange({ verdicts: Object.keys(newVerdicts).length > 0 ? newVerdicts : undefined });
+                  }}
+                  className="text-[10px] text-muted-foreground/40 hover:text-red-500 transition-colors"
+                >
+                  ×
+                </button>
               </div>
             ))}
             <button
               onClick={() => {
-                const name = `verdict-${Object.keys(step.verdicts ?? {}).length + 1}`;
-                onChange({ verdicts: { ...step.verdicts, [name]: { target: '' } } });
+                onChange({ verdicts: { ...step.verdicts, ['new-verdict']: { target: '' } } });
               }}
               className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
             >
