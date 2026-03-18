@@ -136,9 +136,8 @@ export class FirestoreProcessRepository implements ProcessRepository {
       if (parsed.success) {
         result.valid.push(parsed.data);
       } else {
-        console.warn(
-          `[process-repository] Invalid definition document ${docSnap.id}:`,
-          parsed.error.format(),
+        console.debug(
+          `[process-repository] Skipping invalid definition document ${docSnap.id}`,
         );
         result.invalid.push({ data: raw, error: parsed.error });
       }
