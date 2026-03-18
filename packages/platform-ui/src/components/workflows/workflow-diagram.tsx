@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import {
   ReactFlow,
   Background,
@@ -49,7 +49,7 @@ type StepNodeData = {
   plugin?: string;
 };
 
-function StepNode({ data }: NodeProps<Node<StepNodeData>>) {
+function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   const colors = stepTypeColors[data.stepType] ?? stepTypeColors.terminal;
   const Icon = executorIcons[data.executor] ?? User;
 
@@ -58,9 +58,9 @@ function StepNode({ data }: NodeProps<Node<StepNodeData>>) {
       <Handle type="target" position={Position.Top} className="!bg-muted-foreground !w-2 !h-2" />
       <div
         className={cn(
-          'rounded-lg border-2 px-4 py-3 min-w-[160px] shadow-sm',
+          'rounded-lg border-2 px-4 py-3 min-w-[160px] shadow-sm transition-all cursor-pointer',
           colors.bg,
-          colors.border,
+          selected ? 'border-primary ring-2 ring-primary/20 shadow-md' : colors.border,
         )}
       >
         <div className="flex items-center gap-2">
@@ -229,16 +229,34 @@ function layoutNodes(definition: WorkflowDefinition): { nodes: Node<StepNodeData
 interface WorkflowDiagramProps {
   definition: WorkflowDefinition;
   className?: string;
+  onNodeClick?: (stepId: string) => void;
+  selectedStepId?: string | null;
 }
 
-export function WorkflowDiagram({ definition, className }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, onNodeClick, selectedStepId }: WorkflowDiagramProps) {
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () => layoutNodes(definition),
     [definition],
   );
 
-  const [nodes] = useNodesState(initialNodes);
+  // Mark selected node
+  const styledNodes = useMemo(
+    () => initialNodes.map((node) => ({
+      ...node,
+      selected: node.id === selectedStepId,
+    })),
+    [initialNodes, selectedStepId],
+  );
+
+  const [nodes] = useNodesState(styledNodes);
   const [edges] = useEdgesState(initialEdges);
+
+  const handleNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node<StepNodeData>) => {
+      onNodeClick?.(node.id);
+    },
+    [onNodeClick],
+  );
 
   return (
     <div className={cn('h-[400px] rounded-lg border bg-card', className)}>
@@ -248,7 +266,8 @@ export function WorkflowDiagram({ definition, className }: WorkflowDiagramProps)
         nodeTypes={nodeTypes}
         nodesDraggable={false}
         nodesConnectable={false}
-        elementsSelectable={false}
+        elementsSelectable={true}
+        onNodeClick={handleNodeClick}
         fitView
         fitViewOptions={{ padding: 0.3 }}
         proOptions={{ hideAttribution: true }}
