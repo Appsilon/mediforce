@@ -137,6 +137,7 @@ export default function TasksPage() {
         completedTasks={completedTasks}
         loading={activeLoading || completedLoading}
         currentUserId={currentUserId}
+        currentUserName={firebaseUser?.displayName}
         groupByFields={groupByFields}
       />
     </div>

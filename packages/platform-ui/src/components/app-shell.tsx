@@ -3,14 +3,13 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CheckSquare, LayoutDashboard, GitBranch, Bot, Activity, LogOut, Menu, X } from 'lucide-react';
+import { CheckSquare, GitBranch, Bot, Activity, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { ThemeToggle } from './theme-toggle';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { href: '/tasks', label: 'My Tasks', icon: CheckSquare, badge: null },
-  { href: '/work', label: 'My Work', icon: LayoutDashboard, badge: 'beta' },
   { href: '/processes', label: 'Processes', icon: GitBranch, badge: null },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null },
 ] as const;

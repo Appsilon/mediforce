@@ -42,7 +42,15 @@ function sortTasksForDisplay(tasks: HumanTask[]): HumanTask[] {
 
 // --- Assignee Avatar ---
 
-function AssigneeAvatar({ isCurrentUser }: { isCurrentUser: boolean }) {
+function getInitials(name: string | null | undefined): string {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return parts[0].slice(0, 2).toUpperCase();
+}
+
+function AssigneeAvatar({ isCurrentUser, displayName }: { isCurrentUser: boolean; displayName?: string | null }) {
+  const initials = isCurrentUser ? getInitials(displayName) : '?';
   return (
     <span
       className={cn(
@@ -51,9 +59,9 @@ function AssigneeAvatar({ isCurrentUser }: { isCurrentUser: boolean }) {
           ? 'bg-primary text-primary-foreground'
           : 'bg-muted-foreground/20 text-muted-foreground',
       )}
-      title={isCurrentUser ? 'Assigned to you' : 'Assigned to another user'}
+      title={isCurrentUser ? (displayName ?? 'Assigned to you') : 'Assigned to another user'}
     >
-      {isCurrentUser ? 'Y' : '?'}
+      {initials}
     </span>
   );
 }
@@ -63,12 +71,14 @@ function AssigneeAvatar({ isCurrentUser }: { isCurrentUser: boolean }) {
 function TaskRow({
   task,
   currentUserId,
+  currentUserName,
   showProcess,
   processName,
   muted = false,
 }: {
   task: HumanTask;
   currentUserId: string;
+  currentUserName?: string | null;
   showProcess: boolean;
   processName?: string;
   muted?: boolean;
@@ -104,7 +114,7 @@ function TaskRow({
         )}
       </Link>
       <div className="pr-2 shrink-0">
-        {isClaimed && <AssigneeAvatar isCurrentUser={task.assignedUserId === currentUserId} />}
+        {isClaimed && <AssigneeAvatar isCurrentUser={task.assignedUserId === currentUserId} displayName={currentUserName} />}
         {task.status === 'pending' && <ClaimButton taskId={task.id} currentUserId={currentUserId} variant="inline" />}
       </div>
     </div>
@@ -130,10 +140,11 @@ interface ProcessCardProps {
   activeTasks: HumanTask[];
   completedTasks: HumanTask[];
   currentUserId: string;
+  currentUserName?: string | null;
   subGroupByAction: boolean;
 }
 
-function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, subGroupByAction }: ProcessCardProps) {
+function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, currentUserName, subGroupByAction }: ProcessCardProps) {
   const [expanded, setExpanded] = React.useState(false);
 
   const allTasks = React.useMemo(() => {
@@ -158,6 +169,7 @@ function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, 
           key={task.id}
           task={task}
           currentUserId={currentUserId}
+          currentUserName={currentUserName}
           showProcess={false}
           muted={task.status === 'completed' || task.status === 'cancelled'}
         />
@@ -187,6 +199,7 @@ function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, 
               key={task.id}
               task={task}
               currentUserId={currentUserId}
+              currentUserName={currentUserName}
               showProcess={false}
               muted={task.status === 'completed' || task.status === 'cancelled'}
             />
@@ -236,11 +249,13 @@ function ActionGroup({
   tasks,
   completedTasks,
   currentUserId,
+  currentUserName,
   processNameMap,
 }: {
   tasks: HumanTask[];
   completedTasks: HumanTask[];
   currentUserId: string;
+  currentUserName?: string | null;
   processNameMap: Map<string, string>;
 }) {
   const [expanded, setExpanded] = React.useState(false);
@@ -274,6 +289,7 @@ function ActionGroup({
             key={task.id}
             task={task}
             currentUserId={currentUserId}
+            currentUserName={currentUserName}
             showProcess
             processName={processNameMap.get(task.processInstanceId)}
             muted={task.status === 'completed' || task.status === 'cancelled'}
@@ -305,10 +321,12 @@ function ActionGroup({
 function FlatList({
   activeTasks,
   currentUserId,
+  currentUserName,
   processNameMap,
 }: {
   activeTasks: HumanTask[];
   currentUserId: string;
+  currentUserName?: string | null;
   processNameMap: Map<string, string>;
 }) {
   const sorted = React.useMemo(() => sortTasksForDisplay(activeTasks), [activeTasks]);
@@ -322,6 +340,7 @@ function FlatList({
           key={task.id}
           task={task}
           currentUserId={currentUserId}
+          currentUserName={currentUserName}
           showProcess
           processName={processNameMap.get(task.processInstanceId)}
         />
@@ -373,12 +392,14 @@ export function TaskGroupedView({
   completedTasks,
   loading,
   currentUserId,
+  currentUserName,
   groupByFields,
 }: {
   activeTasks: HumanTask[];
   completedTasks: HumanTask[];
   loading: boolean;
   currentUserId: string;
+  currentUserName?: string | null;
   groupByFields: Set<GroupByField>;
 }) {
   const processNameMap = useProcessNameMap();
@@ -390,7 +411,7 @@ export function TaskGroupedView({
 
   // No grouping — flat list
   if (!groupByProcess && !groupByAction) {
-    return <FlatList activeTasks={activeTasks} currentUserId={currentUserId} processNameMap={processNameMap} />;
+    return <FlatList activeTasks={activeTasks} currentUserId={currentUserId} currentUserName={currentUserName} processNameMap={processNameMap} />;
   }
 
   // Group by process (with optional action sub-grouping)
@@ -425,6 +446,7 @@ export function TaskGroupedView({
             activeTasks={group.active}
             completedTasks={group.completed}
             currentUserId={currentUserId}
+            currentUserName={currentUserName}
             subGroupByAction={groupByAction}
           />
         ))}
@@ -460,6 +482,7 @@ export function TaskGroupedView({
           tasks={group.active}
           completedTasks={group.completed}
           currentUserId={currentUserId}
+          currentUserName={currentUserName}
           processNameMap={processNameMap}
         />
       ))}
