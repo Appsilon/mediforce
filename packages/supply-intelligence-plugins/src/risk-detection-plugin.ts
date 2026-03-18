@@ -74,6 +74,7 @@ export class RiskDetectionPlugin implements AgentPlugin {
     inputDescription: 'App context with supply chain data',
     outputDescription: 'Draft issues for red-risk SKU-warehouse pairs',
     roles: ['executor'],
+    foundationModel: 'Claude Sonnet 4',
   };
 
   private context!: AgentContext;

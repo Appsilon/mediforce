@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
+import { Bot, Cpu, Terminal, BarChart3, Settings, Plus, Search } from 'lucide-react';
+import Link from 'next/link';
 import { useAgentRuns, useProcessNameMap } from '@/hooks/use-agent-runs';
 import { AgentRunListTable } from '@/components/agents/agent-run-list-table';
-import { StatCards } from '@/components/agents/stat-cards';
+import { cn } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
 
 const ALL_STATUSES = [
   'running',
@@ -23,6 +26,7 @@ interface PluginMetadata {
   inputDescription: string;
   outputDescription: string;
   roles: ('executor' | 'reviewer')[];
+  foundationModel?: string;
 }
 
 interface PluginEntry {
@@ -30,58 +34,98 @@ interface PluginEntry {
   metadata?: PluginMetadata;
 }
 
-function formatNamespace(ns: string): string {
-  return ns
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
 
-function RoleBadge({ role }: { role: string }) {
-  return (
-    <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-      {role.charAt(0).toUpperCase() + role.slice(1)}
-    </span>
-  );
+function getPluginIcon(pluginId: string): { Icon: LucideIcon; colorClass: string; bgClass: string } {
+  const id = pluginId.toLowerCase();
+  if (id.includes('claude')) return { Icon: Bot, colorClass: 'text-violet-500', bgClass: 'bg-violet-500/10' };
+  if (id.includes('opencode')) return { Icon: Cpu, colorClass: 'text-blue-500', bgClass: 'bg-blue-500/10' };
+  if (id.includes('script')) return { Icon: Terminal, colorClass: 'text-slate-500', bgClass: 'bg-slate-500/10' };
+  if (id.includes('risk') || id.includes('driver') || id.includes('supply')) return { Icon: BarChart3, colorClass: 'text-emerald-500', bgClass: 'bg-emerald-500/10' };
+  return { Icon: Bot, colorClass: 'text-primary', bgClass: 'bg-primary/10' };
 }
 
 function PluginCard({ plugin }: { plugin: PluginEntry }) {
   const meta = plugin.metadata;
+  const { Icon, colorClass, bgClass } = getPluginIcon(plugin.name);
+  const descRef = useRef<HTMLParagraphElement>(null);
+  const [isClamped, setIsClamped] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    const el = descRef.current;
+    if (el) {
+      setIsClamped(el.scrollHeight > el.clientHeight);
+    }
+  }, [meta?.description]);
 
   if (!meta) {
     return (
-      <div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-        <h3 className="font-medium">{plugin.name}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">No metadata available</p>
+      <div className="rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 mb-[10px]">
+        <div className="px-4 py-4 flex items-center gap-3">
+          <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', bgClass)}>
+            <Icon className={cn('h-3.5 w-3.5', colorClass)} />
+          </div>
+          <h3 className="font-semibold text-base">{plugin.name}</h3>
+        </div>
+        <div className="border-t border-border/50 px-4 py-3">
+          <p className="text-sm text-muted-foreground">No metadata available</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="font-medium">{meta.name}</h3>
-        <div className="flex gap-1 shrink-0">
-          {meta.roles.map((role) => (
-            <RoleBadge key={role} role={role} />
-          ))}
+    <div className="rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-md flex flex-col mb-[10px]">
+      {/* Header: icon + name + description + configure button */}
+      <div className="px-4 py-4 flex items-start gap-3">
+        <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md mt-0.5', bgClass)}>
+          <Icon className={cn('h-3.5 w-3.5', colorClass)} />
         </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-base">{meta.name}</h3>
+          <p
+            ref={descRef}
+            className={cn('mt-1 text-sm text-muted-foreground', !expanded && 'line-clamp-2')}
+          >
+            {meta.description}
+          </p>
+          {(isClamped || expanded) && (
+            <button
+              onClick={() => setExpanded((prev) => !prev)}
+              className="mt-0.5 text-[11px] text-muted-foreground/70 hover:text-primary transition-colors"
+            >
+              {expanded ? 'read less' : 'read more'}
+            </button>
+          )}
+        </div>
+        <button
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          onClick={() => {}}
+        >
+          <Settings className="h-3 w-3" />
+          Configure
+        </button>
       </div>
 
-      <p className="mt-2 text-sm text-muted-foreground">{meta.description}</p>
-
-      <div className="mt-3 space-y-2">
-        <div>
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Input
-          </span>
-          <p className="text-sm">{meta.inputDescription}</p>
+      {/* 3-row table: label | value */}
+      <div className="border-t border-border/50 divide-y divide-border/50 flex-1">
+        <div className="grid grid-cols-[5rem_1fr] items-start px-4 py-2 gap-3">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground pt-0.5">Model</span>
+          <div>
+            {meta.foundationModel ? (
+              <p className="text-xs text-foreground/80">{meta.foundationModel}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">—</p>
+            )}
+          </div>
         </div>
-        <div>
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Output
-          </span>
-          <p className="text-sm">{meta.outputDescription}</p>
+        <div className="grid grid-cols-[5rem_1fr] items-start px-4 py-2 gap-3">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground pt-0.5">Input</span>
+          <p className="text-xs text-foreground/80">{meta.inputDescription}</p>
+        </div>
+        <div className="grid grid-cols-[5rem_1fr] items-start px-4 py-2 gap-3">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground pt-0.5">Output</span>
+          <p className="text-xs text-foreground/80">{meta.outputDescription}</p>
         </div>
       </div>
     </div>
@@ -90,17 +134,40 @@ function PluginCard({ plugin }: { plugin: PluginEntry }) {
 
 function PluginSkeletonCard() {
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-sm animate-pulse">
-      <div className="h-5 w-2/3 rounded bg-muted" />
-      <div className="mt-3 h-4 w-full rounded bg-muted" />
-      <div className="mt-2 h-4 w-5/6 rounded bg-muted" />
-      <div className="mt-4 space-y-2">
-        <div className="h-3 w-1/4 rounded bg-muted" />
-        <div className="h-4 w-full rounded bg-muted" />
-        <div className="h-3 w-1/4 rounded bg-muted" />
-        <div className="h-4 w-full rounded bg-muted" />
+    <div className="rounded-lg border bg-card shadow-sm overflow-hidden animate-pulse flex flex-col">
+      <div className="px-4 py-4 flex items-start gap-3">
+        <div className="h-7 w-7 rounded-md bg-muted shrink-0" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 w-2/3 rounded bg-muted" />
+          <div className="h-3 w-full rounded bg-muted" />
+          <div className="h-3 w-5/6 rounded bg-muted" />
+        </div>
+      </div>
+      <div className="border-t border-border/50 divide-y divide-border/50">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="grid grid-cols-[5rem_1fr] px-4 py-2 gap-3">
+            <div className="h-2.5 w-10 rounded bg-muted mt-0.5" />
+            <div className="space-y-1.5">
+              <div className="h-2.5 w-full rounded bg-muted" />
+              <div className="h-2.5 w-4/5 rounded bg-muted" />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
+  );
+}
+
+function pluginMatchesQuery(plugin: PluginEntry, query: string): boolean {
+  const q = query.toLowerCase();
+  const meta = plugin.metadata;
+  return (
+    plugin.name.toLowerCase().includes(q) ||
+    (meta?.name.toLowerCase().includes(q) ?? false) ||
+    (meta?.description.toLowerCase().includes(q) ?? false) ||
+    (meta?.foundationModel?.toLowerCase().includes(q) ?? false) ||
+    (meta?.inputDescription.toLowerCase().includes(q) ?? false) ||
+    (meta?.outputDescription.toLowerCase().includes(q) ?? false)
   );
 }
 
@@ -108,6 +175,7 @@ function PluginCatalog() {
   const [plugins, setPlugins] = useState<PluginEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     fetch('/api/plugins')
@@ -126,28 +194,21 @@ function PluginCatalog() {
       });
   }, []);
 
-  const grouped = useMemo(() => {
-    const groups = new Map<string, PluginEntry[]>();
-    for (const plugin of plugins) {
-      const slashIdx = plugin.name.indexOf('/');
-      const ns = slashIdx > 0 ? plugin.name.slice(0, slashIdx) : 'other';
-      const list = groups.get(ns) ?? [];
-      list.push(plugin);
-      groups.set(ns, list);
-    }
-    return groups;
-  }, [plugins]);
+  const filtered = useMemo(
+    () => (query.trim() === '' ? plugins : plugins.filter((p) => pluginMatchesQuery(p, query.trim()))),
+    [plugins, query],
+  );
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <div className="h-6 w-48 rounded bg-muted animate-pulse mb-4" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <PluginSkeletonCard />
-            <PluginSkeletonCard />
-            <PluginSkeletonCard />
-          </div>
+      <div className="space-y-4">
+        <div className="relative">
+          <div className="h-9 rounded-md bg-muted animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <PluginSkeletonCard />
+          <PluginSkeletonCard />
+          <PluginSkeletonCard />
         </div>
       </div>
     );
@@ -166,17 +227,27 @@ function PluginCatalog() {
   }
 
   return (
-    <div className="space-y-6">
-      {Array.from(grouped.entries()).map(([namespace, items]) => (
-        <section key={namespace}>
-          <h2 className="text-lg font-semibold mb-4">{formatNamespace(namespace)}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((plugin) => (
-              <PluginCard key={plugin.name} plugin={plugin} />
-            ))}
-          </div>
-        </section>
-      ))}
+    <div className="space-y-4">
+      <div className="relative w-full lg:w-1/3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search agents by name, model, input, output…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full rounded-md border bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-8 text-center">No agents match your search.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((plugin) => (
+            <PluginCard key={plugin.name} plugin={plugin} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -209,11 +280,23 @@ export default function AgentsPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div>
-        <h1 className="text-xl font-headline font-semibold">Agents</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Available AI capabilities and run history
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-headline font-semibold">Agents</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Available AI agents for building workflows
+          </p>
+        </div>
+        <Link
+          href="/agents/new"
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
+            'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
+          )}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          New Agent
+        </Link>
       </div>
 
       <Tabs.Root defaultValue="overview">
@@ -222,7 +305,7 @@ export default function AgentsPage() {
             value="overview"
             className="px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary -mb-px"
           >
-            Overview
+            Available Agents
           </Tabs.Trigger>
           <Tabs.Trigger
             value="run-history"
@@ -233,7 +316,6 @@ export default function AgentsPage() {
         </Tabs.List>
 
         <Tabs.Content value="overview" className="space-y-6">
-          <StatCards runs={runs} loading={loading} />
           <PluginCatalog />
         </Tabs.Content>
 

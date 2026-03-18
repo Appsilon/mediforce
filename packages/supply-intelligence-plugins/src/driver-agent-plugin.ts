@@ -49,6 +49,7 @@ export class DriverAgentPlugin implements AgentPlugin {
     inputDescription: 'App context with supply chain data references',
     outputDescription: 'Risk narratives for SKUs, categories, and overview with markdown formatting',
     roles: ['executor'],
+    foundationModel: 'Claude Sonnet 4',
   };
 
   private context!: AgentContext;
