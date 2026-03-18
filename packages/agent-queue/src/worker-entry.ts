@@ -5,12 +5,15 @@
  */
 import { Worker } from 'bullmq';
 import { spawn } from 'node:child_process';
+import { appendFile, mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { getRedisConnection } from './connection.js';
 import { QUEUE_NAME, DockerJobDataSchema } from './schemas.js';
 import type { DockerJobResult } from './schemas.js';
 
 function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
   const data = DockerJobDataSchema.parse(rawData);
+  const logFile = data.logFile;
 
   return new Promise<DockerJobResult>((resolve, reject) => {
     const child = spawn('docker', data.dockerArgs, {
@@ -19,6 +22,12 @@ function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
 
     let settled = false;
     let containerId: string | null = null;
+
+    // Ensure log directory exists before first write
+    let logDirReady: Promise<void> | null = null;
+    if (logFile) {
+      logDirReady = mkdir(dirname(logFile), { recursive: true }).then(() => {});
+    }
 
     const timeoutHandle = setTimeout(() => {
       if (settled) return;
@@ -33,8 +42,25 @@ function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
 
+    // Stream stdout lines to log file in realtime
+    let stdoutBuffer = '';
     child.stdout.on('data', (chunk: Buffer) => {
       stdoutChunks.push(chunk);
+
+      if (logFile && logDirReady) {
+        stdoutBuffer += chunk.toString('utf-8');
+        const lines = stdoutBuffer.split('\n');
+        stdoutBuffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            logDirReady.then(() =>
+              appendFile(logFile, trimmed + '\n'),
+            ).catch(() => {});
+          }
+        }
+      }
     });
 
     child.stderr.on('data', (chunk: Buffer) => {
@@ -58,6 +84,13 @@ function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
 
       const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
       const stderr = Buffer.concat(stderrChunks).toString('utf-8');
+
+      // Flush remaining buffer to log
+      if (logFile && logDirReady && stdoutBuffer.trim()) {
+        logDirReady.then(() =>
+          appendFile(logFile, stdoutBuffer.trim() + '\n'),
+        ).catch(() => {});
+      }
 
       resolve({
         stdout,

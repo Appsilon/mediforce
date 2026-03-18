@@ -17,6 +17,7 @@ export interface DockerSpawnRequest {
   processInstanceId: string;
   stepId: string;
   outputDir: string;
+  logFile: string | null;
 }
 
 export interface DockerSpawnResult {
@@ -118,6 +119,7 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       processInstanceId: request.processInstanceId,
       stepId: request.stepId,
       outputDir: request.outputDir,
+      logFile: request.logFile,
     });
   }
 }

@@ -1081,6 +1081,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       processInstanceId,
       stepId,
       outputDir,
+      logFile,
     });
 
     // Process stdout lines for activity logging (batch mode — lines arrive after completion

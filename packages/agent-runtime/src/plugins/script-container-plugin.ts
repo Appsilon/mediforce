@@ -173,6 +173,7 @@ export class ScriptContainerPlugin implements AgentPlugin {
         processInstanceId: this.context.processInstanceId,
         stepId: this.context.stepId,
         outputDir,
+        logFile: null,
       });
 
       // Emit stdout/stderr lines as activity events (batch mode after completion)

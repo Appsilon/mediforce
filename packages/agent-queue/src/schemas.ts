@@ -27,6 +27,8 @@ export const DockerJobDataSchema = z.object({
   stepId: z.string(),
   /** Host-side output directory mounted at /output in the container. */
   outputDir: z.string(),
+  /** Host-side log file path for realtime activity streaming (null = no logging). */
+  logFile: z.string().nullable(),
 });
 
 export type DockerJobData = z.infer<typeof DockerJobDataSchema>;
@@ -41,4 +43,4 @@ export const DockerJobResultSchema = z.object({
 export type DockerJobResult = z.infer<typeof DockerJobResultSchema>;
 
 /** BullMQ queue name shared between client and worker. */
-export const QUEUE_NAME = 'mediforce:docker-jobs';
+export const QUEUE_NAME = 'mediforce-docker-jobs';
