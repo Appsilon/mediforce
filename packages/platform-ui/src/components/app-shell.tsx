@@ -14,7 +14,7 @@ const ACTION_ITEMS = [
 ] as const;
 
 const NAV_ITEMS = [
-  { href: '/processes', label: 'Processes', icon: GitBranch, badge: null },
+  { href: '/processes', label: 'Workflows', icon: GitBranch, badge: null },
   { href: '/tasks', label: 'Human Actions', icon: CheckSquare, badge: null },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null },
 ] as const;

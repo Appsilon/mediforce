@@ -51,7 +51,7 @@ export function AgentRunListTable({
       <table className="w-full text-sm">
         <thead className="bg-muted/50">
           <tr>
-            {['Agent', 'Autonomy', 'Process', 'Status', 'Confidence', 'Model', 'Duration', 'Started'].map((h) => (
+            {['Agent', 'Autonomy', 'Workflow', 'Status', 'Confidence', 'Model', 'Duration', 'Started'].map((h) => (
               <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                 {h}
               </th>

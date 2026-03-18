@@ -9,7 +9,7 @@ import { TaskGroupedView, type GroupByField } from '@/components/tasks/task-grou
 import { cn } from '@/lib/utils';
 
 const GROUP_FIELDS: { value: GroupByField; label: string }[] = [
-  { value: 'process', label: 'Process' },
+  { value: 'process', label: 'Workflow' },
   { value: 'action', label: 'Action' },
 ];
 
@@ -125,7 +125,7 @@ export default function TasksPage() {
           {!activeLoading && !completedLoading && totalTaskCount > 0 && (
             <p className="text-xs text-muted-foreground mt-1">
               {totalTaskCount} {totalTaskCount === 1 ? 'task' : 'tasks'} across {processCount}{' '}
-              {processCount === 1 ? 'process' : 'processes'}
+              {processCount === 1 ? 'workflow' : 'workflows'}
             </p>
           )}
         </div>

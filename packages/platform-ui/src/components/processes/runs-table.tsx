@@ -28,7 +28,7 @@ export function RunsTable({
   emptyMessage = 'No runs found.',
 }: RunsTableProps) {
   const headers = [
-    ...(showProcess ? ['Process'] : []),
+    ...(showProcess ? ['Workflow'] : []),
     'Run ID',
     'Version',
     'Status',

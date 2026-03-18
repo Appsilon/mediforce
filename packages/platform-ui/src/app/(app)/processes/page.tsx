@@ -87,7 +87,7 @@ function DisplayPopover({
                 showArchived ? 'text-foreground' : 'text-muted-foreground',
               )}
             >
-              Archived processes
+              Archived workflows
               {showArchived && <Check className="h-3.5 w-3.5" />}
             </button>
           )}
@@ -340,9 +340,9 @@ export default function ProcessCatalogPage() {
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-headline font-semibold">Processes</h1>
+          <h1 className="text-xl font-headline font-semibold">Workflows</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Business processes defined in the platform — each one orchestrates agents and humans.
+            Business workflows defined in the platform — each one orchestrates agents and humans.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -361,7 +361,7 @@ export default function ProcessCatalogPage() {
             )}
           >
             <Plus className="h-3.5 w-3.5" />
-            New Process
+            New Workflow
           </Link>
         </div>
       </div>
@@ -392,9 +392,9 @@ export default function ProcessCatalogPage() {
             <GitBranch className="h-7 w-7 text-muted-foreground" />
           </div>
           <div>
-            <p className="font-medium">No processes defined yet</p>
+            <p className="font-medium">No workflows defined yet</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Create your first process to start orchestrating agents and humans.
+              Create your first workflow to start orchestrating agents and humans.
             </p>
           </div>
           <Link
@@ -402,12 +402,12 @@ export default function ProcessCatalogPage() {
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
-            New Process
+            New Workflow
           </Link>
         </div>
       ) : sortedDefinitions.length === 0 ? (
         <div className="text-center py-16 text-sm text-muted-foreground">
-          All processes are archived.{' '}
+          All workflows are archived.{' '}
           <button onClick={() => setShowArchived(true)} className="text-primary hover:underline">
             Show archived
           </button>

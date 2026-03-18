@@ -244,7 +244,7 @@ export default function AgentsPage() {
               onChange={(e) => setProcessFilter(e.target.value || null)}
               className="rounded-md border bg-background px-3 py-1.5 text-sm text-foreground"
             >
-              <option value="">All Processes</option>
+              <option value="">All Workflows</option>
               {processNames.map((name) => (
                 <option key={name} value={name}>
                   {name}
