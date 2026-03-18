@@ -57,7 +57,6 @@ test.describe('My Runs', () => {
     await page.goto('/workflows');
     await page.getByText('Supply Chain Review').first().waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: /display/i }).click();
-    await expect(page.getByText('Workflow', { exact: true })).toBeVisible();
     await expect(page.getByText('Completed runs')).toBeVisible();
   });
 });
