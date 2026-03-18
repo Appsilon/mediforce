@@ -17,7 +17,7 @@ interface RunsTableProps {
 }
 
 function defaultRunHref(run: ProcessInstance): string {
-  return `/processes/${encodeURIComponent(run.definitionName)}/runs/${run.id}`;
+  return `/workflows/${encodeURIComponent(run.definitionName)}/runs/${run.id}`;
 }
 
 export function RunsTable({
@@ -76,7 +76,7 @@ export function RunsTable({
               {showProcess && (
                 <td className="px-4 py-3 font-medium">
                   <Link
-                    href={`/processes/${encodeURIComponent(run.definitionName)}`}
+                    href={`/workflows/${encodeURIComponent(run.definitionName)}`}
                     className="hover:underline text-primary"
                   >
                     {run.definitionName}

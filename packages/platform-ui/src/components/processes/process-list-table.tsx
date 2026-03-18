@@ -58,7 +58,7 @@ export function ProcessListTable({
                   {format(new Date(inst.createdAt), 'MMM d, HH:mm')}
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/processes/${inst.id}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                  <Link href={`/workflows/${inst.id}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
                     Detail <ExternalLink className="h-3 w-3" />
                   </Link>
                 </td>

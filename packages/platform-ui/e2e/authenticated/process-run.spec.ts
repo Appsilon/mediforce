@@ -7,33 +7,33 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Process Run Detail', () => {
   test('run detail page loads and shows process name', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible();
   });
 
   test('run detail page shows status badge', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
     // 'proc-running-1' has status: 'running'
     await expect(page.getByText(/running/i).first()).toBeVisible();
   });
 
   test('run detail page shows step history tab', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
     await expect(page.getByRole('tab', { name: /step history/i })).toBeVisible();
   });
 
   test('run detail page shows audit log tab', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
     await expect(page.getByRole('tab', { name: /audit log/i })).toBeVisible();
   });
 
   test('run detail page shows cancel button for running instance', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
     await expect(page.getByRole('button', { name: /cancel run/i })).toBeVisible();
   });
 
   test('cancel button shows double-confirm on first click', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
     await page.getByRole('button', { name: /cancel run/i }).click();
     // After first click, a confirmation prompt should appear
     await expect(page.getByText(/are you sure/i)).toBeVisible();
@@ -41,7 +41,7 @@ test.describe('Process Run Detail', () => {
   });
 
   test('cancel confirm can be dismissed with No button', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
     await page.getByRole('button', { name: /cancel run/i }).click();
     await expect(page.getByText(/are you sure/i)).toBeVisible();
     await page.getByRole('button', { name: /^no$/i }).click();
@@ -52,7 +52,7 @@ test.describe('Process Run Detail', () => {
   // --- Step graph visualization tests (10-02) ---
 
   test('step graph shows all non-terminal step names', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
 
     // All non-terminal steps from the Supply Chain Review definition should be visible
     const expectedSteps = [
@@ -75,7 +75,7 @@ test.describe('Process Run Detail', () => {
   });
 
   test('active step has colored left border accent', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
 
     // Scope to the Step Status panel to avoid matching step history items
     const stepStatusPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Step Status' }) });
@@ -90,7 +90,7 @@ test.describe('Process Run Detail', () => {
   });
 
   test('completed steps are visually dimmed', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
 
     // Scope to the Step Status panel to avoid matching step history items
     const stepStatusPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Step Status' }) });
@@ -104,7 +104,7 @@ test.describe('Process Run Detail', () => {
   });
 
   test('step graph shows verdict labels for review steps', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
 
     // The Manager Approval step (type: review) has verdicts: approve and request-actions
     // Verdict labels should be visible with target step names
@@ -115,7 +115,7 @@ test.describe('Process Run Detail', () => {
   });
 
   test('step history tab shows execution entries', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-running-1');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1');
 
     // Click the Step History tab
     await page.getByRole('tab', { name: /step history/i }).click();
@@ -131,7 +131,7 @@ test.describe('Process Run Detail', () => {
   });
 
   test('completed process run shows all steps in graph', async ({ page }) => {
-    await page.goto('/processes/Data%20Quality%20Review/runs/proc-completed-1');
+    await page.goto('/workflows/Data%20Quality%20Review/runs/proc-completed-1');
 
     // Non-terminal step names should be visible
     await expect(page.getByText('Verify Data Quality', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
@@ -149,7 +149,7 @@ test.describe('Process Run Detail', () => {
   test('taken verdict branch has distinct styling on completed review step', async ({ page }) => {
     // proc-completed-2 is a completed Supply Chain Review process with
     // manager-approval step execution that has verdict: 'approve'
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-completed-2');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-completed-2');
 
     // Wait for step graph to render
     const stepStatusPanel = page.locator('.bg-card').filter({
@@ -181,7 +181,7 @@ test.describe('Process Run Detail', () => {
   test('[DATA] Step status panel shows autonomy badges for agent steps', async ({ page }) => {
     // proc-completed-2 is a completed Supply Chain Review process
     // The processConfig seeds L4 for vendor-assessment and L2 for narrative-summary
-    await page.goto('/processes/Supply%20Chain%20Review/runs/proc-completed-2');
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-completed-2');
 
     // Wait for step graph to render
     const stepStatusPanel = page.locator('.bg-card').filter({
@@ -196,7 +196,7 @@ test.describe('Process Run Detail', () => {
   });
 
   test('step history shows execution entries for completed process', async ({ page }) => {
-    await page.goto('/processes/Data%20Quality%20Review/runs/proc-completed-1');
+    await page.goto('/workflows/Data%20Quality%20Review/runs/proc-completed-1');
 
     // Click the Step History tab explicitly
     await page.getByRole('tab', { name: /step history/i }).click();

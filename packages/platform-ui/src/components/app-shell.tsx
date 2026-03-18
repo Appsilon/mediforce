@@ -9,12 +9,12 @@ import { ThemeToggle } from './theme-toggle';
 import { cn } from '@/lib/utils';
 
 const ACTION_ITEMS = [
-  { href: '/catalog/new', label: 'Add new Agent', icon: Plus, badge: null },
-  { href: '/processes/new', label: 'Add new Workflow', icon: Plus, badge: null },
+  { href: '/agents/new', label: 'Add new Agent', icon: Plus, badge: null },
+  { href: '/workflows/new', label: 'Add new Workflow', icon: Plus, badge: null },
 ] as const;
 
 const NAV_ITEMS = [
-  { href: '/processes', label: 'Workflows', icon: GitBranch, badge: null },
+  { href: '/workflows', label: 'Workflows', icon: GitBranch, badge: null },
   { href: '/tasks', label: 'Human Actions', icon: CheckSquare, badge: null },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null },
 ] as const;

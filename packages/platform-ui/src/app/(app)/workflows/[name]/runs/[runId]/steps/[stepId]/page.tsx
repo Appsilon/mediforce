@@ -112,7 +112,7 @@ export default function StepDetailPage() {
     );
   }
 
-  const backHref = `/processes/${encodeURIComponent(decodedName)}/runs/${runId}`;
+  const backHref = `/workflows/${encodeURIComponent(decodedName)}/runs/${runId}`;
   const stepName = definitionStep?.name ?? formatStepName(decodedStepId);
   const isAgent = execution?.agentOutput !== undefined;
 

@@ -159,7 +159,7 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
   const shortHash = `#${instance.id.slice(0, 6)}`;
   const timeAgo = shortTimeAgo(new Date(instance.createdAt));
   const fullTimeAgo = formatDistanceToNow(new Date(instance.createdAt), { addSuffix: true });
-  const detailHref = `/processes/${encodeURIComponent(instance.definitionName)}/runs/${instance.id}`;
+  const detailHref = `/workflows/${encodeURIComponent(instance.definitionName)}/runs/${instance.id}`;
 
   return (
     <Link

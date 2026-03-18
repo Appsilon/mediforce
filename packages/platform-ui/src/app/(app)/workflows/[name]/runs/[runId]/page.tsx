@@ -96,10 +96,10 @@ export default function RunDetailPage() {
       auditEventsError={auditError}
       definitionSteps={definitionSteps}
       agentEvents={agentEvents}
-      backHref={`/processes/${encodeURIComponent(decodedName)}`}
+      backHref={`/workflows/${encodeURIComponent(decodedName)}`}
       backLabel={decodedName}
       stepConfigMap={stepConfigMap}
-      runDetailHref={`/processes/${encodeURIComponent(decodedName)}/runs/${runId}`}
+      runDetailHref={`/workflows/${encodeURIComponent(decodedName)}/runs/${runId}`}
     />
   );
 }

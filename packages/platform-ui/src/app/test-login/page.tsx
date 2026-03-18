@@ -14,7 +14,7 @@ export default function TestLoginPage() {
 
   React.useEffect(() => {
     if (!loading && firebaseUser) {
-      router.replace('/processes');
+      router.replace('/workflows');
     }
   }, [loading, firebaseUser, router]);
 
@@ -37,7 +37,7 @@ export default function TestLoginPage() {
     const password = form.get('password') as string;
     try {
       await signInWithEmail(email, password);
-      router.replace('/processes');
+      router.replace('/workflows');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
     } finally {

@@ -43,7 +43,7 @@ export function StuckProcessesList({
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-center gap-2">
                 <Link
-                  href={`/processes/${inst.id}`}
+                  href={`/workflows/${inst.id}`}
                   className="font-medium text-sm hover:text-primary transition-colors truncate"
                 >
                   {inst.definitionName}

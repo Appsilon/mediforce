@@ -155,7 +155,7 @@ export function AgentRunDetail({
           <span className="inline-flex items-center gap-1">Autonomy: <AutonomyBadge level={run.autonomyLevel} showLabel /></span>
           {run.executorType && <span>Executor: <span className="text-foreground font-medium">{run.executorType}</span></span>}
           {run.reviewerType && <span>Reviewer: <span className="text-foreground font-medium">{run.reviewerType}</span></span>}
-          <span>Workflow: <Link href={`/processes/${run.processInstanceId}`} className="text-primary hover:underline font-mono text-xs">{run.processInstanceId.slice(0, 12)}...</Link></span>
+          <span>Workflow: <Link href={`/workflows/${run.processInstanceId}`} className="text-primary hover:underline font-mono text-xs">{run.processInstanceId.slice(0, 12)}...</Link></span>
           <span>Step: <span className="text-foreground font-medium">{formatStepName(run.stepId)}</span></span>
           <span>Duration: <span className="text-foreground">{formatDuration(run.startedAt, run.completedAt)}</span></span>
           <span>Started: <span className="text-foreground">{format(new Date(run.startedAt), 'MMM d, yyyy HH:mm:ss')}</span></span>

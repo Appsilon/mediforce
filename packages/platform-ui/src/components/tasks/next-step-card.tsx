@@ -106,7 +106,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
 
   // Build the run link
   const runHref = instance
-    ? `/processes/${encodeURIComponent(instance.definitionName)}/runs/${processInstanceId}`
+    ? `/workflows/${encodeURIComponent(instance.definitionName)}/runs/${processInstanceId}`
     : null;
 
   return (

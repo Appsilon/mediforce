@@ -80,7 +80,7 @@ export function AgentRunListTable({
                   <AutonomyBadge level={run.autonomyLevel} />
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/processes/${run.processInstanceId}`} className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                  <Link href={`/workflows/${run.processInstanceId}`} className="text-xs text-muted-foreground hover:text-primary transition-colors">
                     {processNameMap?.get(run.processInstanceId) ?? `${run.processInstanceId.slice(0, 8)}...`}
                   </Link>
                 </td>
