@@ -15,7 +15,10 @@ export function useUserDisplayNames(): Map<string, string> {
   return useMemo(() => {
     const map = new Map<string, string>();
     for (const user of users) {
-      map.set(user.uid, user.displayName);
+      const name = user.displayName ?? user.email ?? user.id;
+      // Map by both uid field and document id (they may differ)
+      if (user.uid) map.set(user.uid, name);
+      map.set(user.id, name);
     }
     return map;
   }, [users]);

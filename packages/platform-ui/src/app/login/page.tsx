@@ -12,7 +12,7 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     if (!loading && firebaseUser) {
-      router.replace('/tasks');
+      router.replace('/processes');
     }
   }, [loading, firebaseUser, router]);
 
@@ -21,7 +21,7 @@ export default function LoginPage() {
     setPending(true);
     try {
       await signInWithGoogle();
-      router.replace('/tasks');
+      router.replace('/processes');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Sign in failed';
       setError(msg.replace('Firebase: ', '').replace(/\(auth\/.*\)\.?/, '').trim());

@@ -3,14 +3,19 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CheckSquare, GitBranch, Bot, Activity, LogOut, Menu, X } from 'lucide-react';
+import { CheckSquare, GitBranch, Bot, Activity, LogOut, Menu, X, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { ThemeToggle } from './theme-toggle';
 import { cn } from '@/lib/utils';
 
+const ACTION_ITEMS = [
+  { href: '/catalog/new', label: 'Add new Agent', icon: Plus, badge: null },
+  { href: '/processes/new', label: 'Add new Workflow', icon: Plus, badge: null },
+] as const;
+
 const NAV_ITEMS = [
-  { href: '/tasks', label: 'My Tasks', icon: CheckSquare, badge: null },
   { href: '/processes', label: 'Processes', icon: GitBranch, badge: null },
+  { href: '/tasks', label: 'Human Actions', icon: CheckSquare, badge: null },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null },
 ] as const;
 
@@ -67,6 +72,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       {/* Nav */}
       <nav className="flex-1 space-y-1 p-3">
+        {ACTION_ITEMS.map((item) => (
+          <NavItem
+            key={item.href}
+            href={item.href}
+            label={item.label}
+            icon={item.icon}
+            badge={item.badge}
+            active={pathname.startsWith(item.href)}
+          />
+        ))}
+        <div className="my-2 border-t" />
         {NAV_ITEMS.map((item) => (
           <NavItem
             key={item.href}
