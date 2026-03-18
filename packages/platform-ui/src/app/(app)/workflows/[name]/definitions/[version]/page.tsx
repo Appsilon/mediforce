@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
 import { stringify as yamlStringify } from 'yaml';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
 import { StartRunButton } from '@/components/processes/start-run-button';
@@ -301,6 +302,7 @@ export default function WorkflowDefinitionVersionPage() {
               {editing ? (
                 <StepEditor
                   step={selectedStep}
+                  allSteps={currentSteps}
                   onChange={(patch) => updateStep(selectedStep.id, patch)}
                 />
               ) : (
@@ -326,9 +328,27 @@ const FALLBACK_OPTIONS = [
   { value: 'pause', label: 'Pause' },
 ] as const;
 
-function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: Partial<WorkflowStep>) => void }) {
+const KNOWN_MODELS = [
+  { value: '', label: 'Default' },
+  { value: 'sonnet', label: 'Sonnet' },
+  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+  { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+] as const;
+
+const RUNTIME_OPTIONS = [
+  { value: '', label: 'None' },
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'python', label: 'Python' },
+  { value: 'r', label: 'R' },
+  { value: 'bash', label: 'Bash' },
+] as const;
+
+function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps: WorkflowStep[]; onChange: (patch: Partial<WorkflowStep>) => void }) {
+  const { plugins } = usePlugins();
   const inlineInput = 'w-full bg-transparent border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0.5 focus:outline-none transition-colors';
-  const fieldInput = 'bg-transparent text-xs text-right border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-24';
+  const selectInline = 'bg-transparent text-xs text-right border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors cursor-pointer';
+  const otherSteps = allSteps.filter((s) => s.id !== step.id);
 
   const isAgent = step.executor === 'agent' && step.type !== 'terminal';
   const isHuman = step.executor === 'human' && step.type !== 'terminal';
@@ -406,8 +426,22 @@ function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: 
       {/* ─── Core config — mirrors StepDetail fields, but editable ─── */}
       <div className="space-y-1.5">
         {isAgent && (
-          <EditableField label="Plugin" value={step.plugin ?? ''} mono placeholder="e.g. supply-data-collector"
-            onChange={(v) => onChange({ plugin: v || undefined })} />
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-xs text-muted-foreground shrink-0">Plugin</span>
+            <select
+              value={step.plugin ?? ''}
+              onChange={(e) => onChange({ plugin: e.target.value || undefined })}
+              className={selectInline}
+            >
+              <option value="">None</option>
+              {plugins.map((p) => (
+                <option key={p.name} value={p.name}>{p.name}</option>
+              ))}
+              {step.plugin && !plugins.some((p) => p.name === step.plugin) && (
+                <option value={step.plugin}>{step.plugin}</option>
+              )}
+            </select>
+          </div>
         )}
         {step.executor === 'script' && step.type !== 'terminal' && (
           <EditableField label="Plugin" value={step.plugin ?? ''} mono placeholder="e.g. script-container"
@@ -422,8 +456,21 @@ function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: 
       {/* ─── Agent section — mirrors StepDetail "Agent" section ─── */}
       {isAgent && (
         <Section title="Agent">
-          <EditableField label="Model" value={step.agent?.model ?? ''} mono placeholder="claude-sonnet-4-6"
-            onChange={(v) => onChange({ agent: { ...step.agent, model: v || undefined } })} />
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-xs text-muted-foreground shrink-0">Model</span>
+            <select
+              value={step.agent?.model ?? ''}
+              onChange={(e) => onChange({ agent: { ...step.agent, model: e.target.value || undefined } })}
+              className={selectInline}
+            >
+              {KNOWN_MODELS.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+              {step.agent?.model && !KNOWN_MODELS.some((m) => m.value === step.agent?.model) && (
+                <option value={step.agent.model}>{step.agent.model}</option>
+              )}
+            </select>
+          </div>
           <EditableField label="Skill" value={step.agent?.skill ?? ''} mono placeholder="skill-name"
             onChange={(v) => onChange({ agent: { ...step.agent, skill: v || undefined } })} />
           <EditableField label="Timeout" value={step.agent?.timeoutMinutes !== undefined ? `${step.agent.timeoutMinutes}` : ''} placeholder="30"
@@ -503,15 +550,19 @@ function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: 
                   className="bg-transparent text-xs font-medium border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-20"
                 />
                 <span className="text-xs text-muted-foreground">→</span>
-                <input
+                <select
                   value={verdict.target}
                   onChange={(e) => {
                     const newVerdicts = { ...step.verdicts, [verdictName]: { ...verdict, target: e.target.value } };
                     onChange({ verdicts: newVerdicts });
                   }}
-                  placeholder="target step id"
-                  className="bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors flex-1"
-                />
+                  className={cn(selectInline, 'flex-1')}
+                >
+                  <option value="">Select step...</option>
+                  {otherSteps.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.id})</option>
+                  ))}
+                </select>
                 <button
                   onClick={() => {
                     const newVerdicts = { ...step.verdicts };
@@ -539,8 +590,18 @@ function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: 
       {/* ─── Runtime — for script/agent steps with runtime config ─── */}
       {(step.executor === 'script' || step.executor === 'agent') && step.type !== 'terminal' && (
         <Section title="Runtime">
-          <EditableField label="Runtime" value={step.agent?.runtime ?? ''} placeholder="javascript"
-            onChange={(v) => onChange({ agent: { ...step.agent, runtime: (v || undefined) as 'javascript' | 'python' | 'r' | 'bash' | undefined } })} />
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-xs text-muted-foreground shrink-0">Runtime</span>
+            <select
+              value={step.agent?.runtime ?? ''}
+              onChange={(e) => onChange({ agent: { ...step.agent, runtime: (e.target.value || undefined) as 'javascript' | 'python' | 'r' | 'bash' | undefined } })}
+              className={selectInline}
+            >
+              {RUNTIME_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
           <EditableField label="Command" value={step.agent?.command ?? ''} mono placeholder="run.sh"
             onChange={(v) => onChange({ agent: { ...step.agent, command: v || undefined } })} />
           <EditableField label="Image" value={step.agent?.image ?? ''} mono placeholder="docker-image:tag"
