@@ -17,7 +17,9 @@ export const DEFAULT_TIMEOUT_MS = 20 * 60_000;
 function resolveProjectPath(relativePath: string): string {
   if (isAbsolute(relativePath)) return relativePath;
   const root = process.env.MEDIFORCE_ROOT ?? process.cwd();
-  return resolve(root, relativePath);
+  const resolved = resolve(root, relativePath);
+  console.log(`[resolveProjectPath] input="${relativePath}" MEDIFORCE_ROOT="${process.env.MEDIFORCE_ROOT}" cwd="${process.cwd()}" root="${root}" => "${resolved}"`);
+  return resolved;
 }
 
 /**
