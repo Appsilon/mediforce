@@ -21,6 +21,7 @@ export interface DefinitionGroup {
   latestVersion: string;
   versions: DefinitionVersion[];
   stepCount: number;
+  hasManualTrigger: boolean;
   repo?: { url: string; branch?: string; directory?: string };
   url?: string;
   archived?: boolean;
@@ -63,12 +64,14 @@ export function useProcessDefinitions() {
       const sorted = [...versions].sort((a, b) => compareSemver(b.version, a.version));
       const latestDoc = [...docs].sort((a, b) => compareSemver(b.version, a.version))[0];
       const latest = sorted[0];
+      const hasManualTrigger = latestDoc.triggers.some((trigger) => trigger.type === 'manual');
       return {
         name,
         description: latest.description,
         latestVersion: latest.version,
         versions: sorted,
         stepCount: latest.stepCount,
+        hasManualTrigger,
         repo: latestDoc.repo,
         url: latestDoc.url,
         archived: latestDoc.archived,

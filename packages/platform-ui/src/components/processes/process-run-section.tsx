@@ -1,11 +1,11 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { ChevronRight } from 'lucide-react';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { StatusDot } from '@/components/ui/status-dot';
-import { cn } from '@/lib/utils';
 
 function toHumanLabel(identifier: string): string {
   return identifier
@@ -13,58 +13,127 @@ function toHumanLabel(identifier: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function StepProgress({ steps, currentStepId, status }: { steps: string[]; currentStepId: string | null; status: string }) {
+function StepBreadcrumb({
+  steps,
+  currentStepId,
+  instanceStatus,
+}: {
+  steps: string[];
+  currentStepId: string | null;
+  instanceStatus: string;
+}) {
   if (steps.length === 0) return null;
-  const isCompleted = status === 'completed';
-  const currentIndex = currentStepId ? steps.indexOf(currentStepId) : -1;
 
-  function dotClass(index: number): string {
-    if (isCompleted) return 'bg-green-500/60';
-    if (index < currentIndex) return 'bg-green-500/60';
-    if (index === currentIndex) {
-      if (status === 'running') return 'ring-[1.5px] ring-blue-500 bg-transparent';
-      if (status === 'paused') return 'ring-[1.5px] ring-amber-500 bg-transparent';
-      if (status === 'failed') return 'ring-[1.5px] ring-red-500 bg-transparent';
-      return 'ring-[1.5px] ring-primary bg-transparent';
-    }
-    return 'bg-border';
+  if (instanceStatus === 'completed') {
+    return (
+      <div className="flex items-center flex-1 min-w-0 overflow-hidden">
+        <span className="text-xs text-green-600/70 dark:text-green-400/70 truncate">
+          ✓ Completed ({steps.length} steps)
+        </span>
+      </div>
+    );
   }
 
-  const title = isCompleted
-    ? `Completed (${steps.length} steps)`
-    : currentIndex >= 0
-      ? `Step ${currentIndex + 1} of ${steps.length}`
-      : `${steps.length} steps`;
+  if (instanceStatus === 'failed') {
+    const failedAt = currentStepId ? toHumanLabel(currentStepId) : null;
+    return (
+      <div className="flex items-center flex-1 min-w-0 overflow-hidden">
+        <span className="text-xs text-red-600/70 dark:text-red-400/70 truncate">
+          {failedAt !== null ? `✗ Failed at ${failedAt}` : '✗ Failed'}
+        </span>
+      </div>
+    );
+  }
+
+  const currentIndex = currentStepId !== null ? steps.indexOf(currentStepId) : -1;
+  const completedSteps = currentIndex > 0 ? steps.slice(0, currentIndex) : [];
+  const futureSteps = currentIndex >= 0 ? steps.slice(currentIndex + 1) : [];
+
+  const parts: React.ReactNode[] = [];
+
+  // Completed steps section
+  if (completedSteps.length >= 3) {
+    parts.push(
+      <span key="completed-count" className="text-xs text-green-600/60 dark:text-green-400/60 shrink-0">
+        ✓{completedSteps.length} steps
+      </span>,
+    );
+    parts.push(<span key="sep-after-completed" className="text-muted-foreground/30 mx-0.5 shrink-0">→</span>);
+  } else if (completedSteps.length > 0) {
+    for (let i = 0; i < completedSteps.length; i++) {
+      parts.push(
+        <span key={`completed-${completedSteps[i]}`} className="text-xs text-green-600/60 dark:text-green-400/60 shrink-0">
+          {toHumanLabel(completedSteps[i]!)}
+        </span>,
+      );
+      parts.push(<span key={`sep-c${i}`} className="text-muted-foreground/30 mx-0.5 shrink-0">→</span>);
+    }
+  }
+
+  // Current step
+  if (currentIndex >= 0 && currentStepId !== null) {
+    parts.push(
+      <span
+        key="current"
+        className="text-xs font-medium bg-primary/10 text-primary rounded px-1.5 py-0.5 shrink-0"
+      >
+        {toHumanLabel(currentStepId)}
+      </span>,
+    );
+  } else if (currentStepId === null) {
+    parts.push(
+      <span
+        key="current-starting"
+        className="text-xs font-medium bg-primary/10 text-primary rounded px-1.5 py-0.5 shrink-0"
+      >
+        Starting...
+      </span>,
+    );
+  }
+
+  // Future steps section
+  if (futureSteps.length > 0 && futureSteps.length <= 2) {
+    for (let i = 0; i < futureSteps.length; i++) {
+      parts.push(<span key={`sep-f${i}`} className="text-muted-foreground/30 mx-0.5 shrink-0">→</span>);
+      parts.push(
+        <span key={`future-${futureSteps[i]}`} className="text-xs text-muted-foreground/40 shrink-0">
+          {toHumanLabel(futureSteps[i]!)}
+        </span>,
+      );
+    }
+  } else if (futureSteps.length >= 3) {
+    parts.push(<span key="sep-before-future" className="text-muted-foreground/30 mx-0.5 shrink-0">→</span>);
+    parts.push(
+      <span key="future-first" className="text-xs text-muted-foreground/40 shrink-0">
+        {toHumanLabel(futureSteps[0]!)}
+      </span>,
+    );
+    parts.push(<span key="sep-more" className="text-muted-foreground/30 mx-0.5 shrink-0">→</span>);
+    parts.push(
+      <span key="future-more" className="text-xs text-muted-foreground/40 shrink-0">
+        +{futureSteps.length - 1}
+      </span>,
+    );
+  }
 
   return (
-    <div className="flex items-center gap-0.5 shrink-0" title={title}>
-      {steps.map((stepId, index) => (
-        <span
-          key={stepId}
-          className={cn(
-            'rounded-full',
-            'w-1.5 h-1.5',
-            dotClass(index),
-          )}
-        />
-      ))}
+    <div className="flex items-center flex-1 min-w-0 overflow-hidden">
+      <div className="flex items-center flex-nowrap overflow-hidden">
+        {parts}
+      </div>
     </div>
   );
 }
 
 export function ProcessInstanceRow({ instance, showProcess = false, steps }: { instance: ProcessInstance; showProcess?: boolean; steps?: string[] }) {
   const shortHash = `#${instance.id.slice(0, 6)}`;
-  const currentStep = instance.currentStepId
-    ? toHumanLabel(instance.currentStepId)
-    : null;
   const timeAgo = formatDistanceToNow(new Date(instance.createdAt), { addSuffix: true });
   const detailHref = `/processes/${encodeURIComponent(instance.definitionName)}/runs/${instance.id}`;
-  const isTerminal = instance.status === 'completed' || instance.status === 'failed';
 
   return (
     <Link
       href={detailHref}
-      className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors border-b border-border/40 last:border-b-0"
+      className="group flex items-center gap-3 px-4 py-1.5 hover:bg-muted/50 transition-colors border-b border-border/40 last:border-b-0"
     >
       <StatusDot status={instance.status} />
       <span className="font-mono text-xs text-muted-foreground w-[58px] shrink-0">
@@ -75,20 +144,11 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps }: { i
           {toHumanLabel(instance.definitionName)}
         </span>
       )}
-      {steps && steps.length > 0 && (
-        <StepProgress steps={steps} currentStepId={instance.currentStepId} status={instance.status} />
-      )}
-      {isTerminal ? (
-        <span className="text-sm flex-1 truncate text-muted-foreground">
-          {instance.status === 'failed' ? 'Failed' : 'Completed'}
-        </span>
-      ) : (
-        <span className="flex-1 truncate">
-          <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium">
-            {currentStep ?? 'Starting...'}
-          </span>
-        </span>
-      )}
+      <StepBreadcrumb
+        steps={steps ?? []}
+        currentStepId={instance.currentStepId}
+        instanceStatus={instance.status}
+      />
       <span className="text-xs text-muted-foreground tabular-nums shrink-0">
         {timeAgo}
       </span>

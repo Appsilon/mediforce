@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { CheckSquare } from 'lucide-react';
 import type { HumanTask } from '@mediforce/platform-core';
 import { useProcessNameMap } from '@/hooks/use-agent-runs';
 import { cn } from '@/lib/utils';
@@ -82,7 +83,7 @@ function TaskRow({
     <div className={cn('group flex items-center border-b border-border/30 last:border-b-0', muted && 'opacity-60')}>
       <Link
         href={`/tasks/${task.id}`}
-        className="flex flex-1 items-center gap-2.5 px-3 py-2 hover:bg-muted/50 transition-colors min-w-0"
+        className="flex flex-1 items-center gap-2 px-3 py-1.5 hover:bg-muted/50 transition-colors min-w-0"
       >
         <ActionIcon className={cn('h-3.5 w-3.5 shrink-0', actionType.colorClass)} />
         <span className="flex-1 text-sm truncate">{getTaskLabel(task)}</span>
@@ -196,11 +197,11 @@ function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, 
   };
 
   return (
-    <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+    <div className="rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-sm">
       <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">{formatStepName(processName)}</h3>
-          <span className="text-xs text-muted-foreground">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-base font-semibold truncate">{formatStepName(processName)}</h3>
+          <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground font-medium">
             {totalCount} {totalCount === 1 ? 'task' : 'tasks'}
           </span>
         </div>
@@ -255,12 +256,16 @@ function ActionGroup({
   const hasMore = allTasks.length > VISIBLE_TASK_LIMIT;
 
   return (
-    <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+    <div className="rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-sm">
       <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
-        <div className="flex items-center gap-2">
-          <ActionIcon className={cn('h-4 w-4', actionType.colorClass)} />
-          <h3 className="text-sm font-semibold">{actionType.label}</h3>
-          <span className="text-xs text-muted-foreground">({allTasks.length})</span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <ActionIcon className={cn('h-4 w-4 shrink-0', actionType.colorClass)} />
+            <h3 className="text-base font-semibold truncate">{actionType.label}</h3>
+          </div>
+          <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground font-medium">
+            {allTasks.length} {allTasks.length === 1 ? 'task' : 'tasks'}
+          </span>
         </div>
       </div>
       <div className={cn(expanded && 'max-h-[400px] overflow-y-auto')}>
@@ -331,11 +336,15 @@ function LoadingSkeleton() {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {Array.from({ length: 2 }).map((_, index) => (
-        <div key={index} className="rounded-lg border p-4 space-y-3 animate-pulse">
-          <div className="h-4 bg-muted rounded w-1/2" />
-          <div className="space-y-2">
-            <div className="h-3 bg-muted rounded w-full" />
-            <div className="h-3 bg-muted rounded w-3/4" />
+        <div key={index} className="rounded-lg border bg-card overflow-hidden animate-pulse">
+          <div className="px-4 py-4 border-b border-border/50 bg-muted/20 flex items-center justify-between gap-2">
+            <div className="h-4 bg-muted rounded w-1/2" />
+            <div className="h-5 bg-muted rounded-full w-14" />
+          </div>
+          <div className="p-3 space-y-2">
+            <div className="h-8 bg-muted rounded w-full" />
+            <div className="h-8 bg-muted rounded w-full" />
+            <div className="h-8 bg-muted rounded w-3/4" />
           </div>
         </div>
       ))}
@@ -345,8 +354,14 @@ function LoadingSkeleton() {
 
 function EmptyState() {
   return (
-    <div className="py-16 text-center text-sm text-muted-foreground">
-      No tasks assigned to your role
+    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border bg-card py-16 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <CheckSquare className="h-6 w-6 text-muted-foreground" />
+      </div>
+      <div>
+        <p className="font-medium text-sm">All caught up</p>
+        <p className="text-sm text-muted-foreground mt-0.5">No tasks assigned to your role</p>
+      </div>
     </div>
   );
 }

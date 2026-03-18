@@ -3,17 +3,16 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CheckSquare, Play, GitBranch, Bot, ScanSearch, Activity, LogOut, Menu, X } from 'lucide-react';
+import { CheckSquare, LayoutDashboard, GitBranch, Bot, Activity, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { ThemeToggle } from './theme-toggle';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { href: '/tasks', label: 'My Tasks', icon: CheckSquare },
-  { href: '/runs', label: 'My Runs', icon: Play },
-  { href: '/processes', label: 'Processes', icon: GitBranch },
-  { href: '/catalog', label: 'Agent Catalog', icon: Bot },
-  { href: '/agents', label: 'Agent Oversight', icon: ScanSearch },
+  { href: '/tasks', label: 'My Tasks', icon: CheckSquare, badge: null },
+  { href: '/work', label: 'My Work', icon: LayoutDashboard, badge: 'beta' },
+  { href: '/processes', label: 'Processes', icon: GitBranch, badge: null },
+  { href: '/agents', label: 'Agents', icon: Bot, badge: null },
 ] as const;
 
 const MONITORING_ITEM = { href: '/monitoring', label: 'Monitoring', icon: Activity } as const;
@@ -23,11 +22,13 @@ function NavItem({
   label,
   icon: Icon,
   active,
+  badge,
 }: {
   href: string;
   label: string;
   icon: React.ElementType;
   active: boolean;
+  badge?: string | null;
 }) {
   return (
     <Link
@@ -40,7 +41,12 @@ function NavItem({
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      {label}
+      <span className="flex-1">{label}</span>
+      {badge !== null && badge !== undefined && (
+        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground leading-none">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -65,13 +71,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {NAV_ITEMS.map((item) => (
           <NavItem
             key={item.href}
-            {...item}
+            href={item.href}
+            label={item.label}
+            icon={item.icon}
+            badge={item.badge}
             active={pathname.startsWith(item.href)}
           />
         ))}
         <div className="my-2 border-t" />
         <NavItem
-          {...MONITORING_ITEM}
+          href={MONITORING_ITEM.href}
+          label={MONITORING_ITEM.label}
+          icon={MONITORING_ITEM.icon}
+          badge={null}
           active={pathname.startsWith(MONITORING_ITEM.href)}
         />
       </nav>
