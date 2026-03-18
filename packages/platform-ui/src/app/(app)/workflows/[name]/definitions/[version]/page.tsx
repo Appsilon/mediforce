@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Edit, Play } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
@@ -97,6 +98,11 @@ export default function WorkflowDefinitionVersionPage() {
 
       {/* Content */}
       <div className="flex-1 p-6 space-y-8">
+        {/* Diagram */}
+        <section>
+          <WorkflowDiagram definition={definition} />
+        </section>
+
         {/* Steps */}
         <section>
           <h2 className="text-sm font-semibold mb-3">
