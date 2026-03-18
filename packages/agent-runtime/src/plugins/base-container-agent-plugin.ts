@@ -1,6 +1,6 @@
 import { spawn, execSync } from 'node:child_process';
 import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath, cp } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
@@ -12,6 +12,13 @@ const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
 
 export const DEFAULT_TIMEOUT_MS = 20 * 60_000;
+
+/** Resolve a path relative to MEDIFORCE_ROOT (if set) or CWD. */
+function resolveProjectPath(relativePath: string): string {
+  if (isAbsolute(relativePath)) return relativePath;
+  const root = process.env.MEDIFORCE_ROOT ?? process.cwd();
+  return resolve(root, relativePath);
+}
 
 /**
  * Check whether local (non-Docker) agent execution is allowed.
@@ -252,7 +259,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
    *  Returns null if skillsDir is not set. */
   protected getMockFixturesDir(): string | null {
     if (!this.agentConfig.skillsDir) return null;
-    return join(this.agentConfig.skillsDir, '..', 'mock-fixtures');
+    return join(resolveProjectPath(this.agentConfig.skillsDir), '..', 'mock-fixtures');
   }
 
   /** Resolve the host path to the mock data directory from _config.json.
@@ -389,7 +396,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
 
       // Mount skill directory so reference files are available inside the container
       if (this.agentConfig.skill && this.agentConfig.skillsDir) {
-        options.skillDir = join(this.agentConfig.skillsDir, this.agentConfig.skill);
+        options.skillDir = join(resolveProjectPath(this.agentConfig.skillsDir), this.agentConfig.skill);
       }
 
       // Create activity log file for observability
@@ -600,7 +607,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
     // 1. Skill prompt from SKILL.md
     if (this.agentConfig.skill && this.agentConfig.skillsDir) {
       const skillContent = await this.readSkillFile(
-        this.agentConfig.skillsDir,
+        resolveProjectPath(this.agentConfig.skillsDir),
         this.agentConfig.skill,
       );
       parts.push(skillContent);
