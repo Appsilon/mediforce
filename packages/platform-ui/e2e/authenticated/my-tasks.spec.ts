@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 test.describe('My Tasks', () => {
   test('[RENDER] page loads and shows heading', async ({ page }) => {
     await page.goto('/tasks');
-    await expect(page.getByRole('heading', { name: 'My Tasks' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Human Actions' })).toBeVisible();
   });
 
   test('[RENDER] shows task cards grouped by process definition', async ({ page }) => {
@@ -33,7 +33,7 @@ test.describe('My Tasks', () => {
     // Click the Display button
     await page.getByRole('button', { name: /display/i }).click();
     // Group by options with checkmarks — use exact match to avoid matching task labels
-    await expect(page.getByText('Process', { exact: true })).toBeVisible();
+    await expect(page.getByText('Workflow', { exact: true })).toBeVisible();
     await expect(page.getByText('Action', { exact: true })).toBeVisible();
   });
 

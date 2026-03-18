@@ -9,7 +9,7 @@ import { TaskGroupedView, type GroupByField } from '@/components/tasks/task-grou
 import { cn } from '@/lib/utils';
 
 const GROUP_FIELDS: { value: GroupByField; label: string }[] = [
-  { value: 'process', label: 'Process' },
+  { value: 'process', label: 'Workflow' },
   { value: 'action', label: 'Action' },
 ];
 
@@ -98,14 +98,36 @@ export default function TasksPage() {
   const { data: completedTasks, loading: completedLoading } = useCompletedTasks(role);
   const currentUserId = firebaseUser?.uid ?? '';
 
+  const totalTaskCount = activeTasks.length + completedTasks.length;
+  const processCount = React.useMemo(() => {
+    const ids = new Set([
+      ...activeTasks.map((t) => t.processInstanceId),
+      ...completedTasks.map((t) => t.processInstanceId),
+    ]);
+    return ids.size;
+  }, [activeTasks, completedTasks]);
+
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-1 flex-col gap-6 p-6">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-headline font-semibold">My Tasks</h1>
+          <h1 className="text-xl font-headline font-semibold">Human Actions</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {role ? `Tasks assigned to role: ${role}` : 'All tasks'}
+            {role ? (
+              <>
+                Tasks assigned to role:{' '}
+                <span className="font-medium text-foreground">{role}</span>
+              </>
+            ) : (
+              'All tasks'
+            )}
           </p>
+          {!activeLoading && !completedLoading && totalTaskCount > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {totalTaskCount} {totalTaskCount === 1 ? 'task' : 'tasks'} across {processCount}{' '}
+              {processCount === 1 ? 'workflow' : 'workflows'}
+            </p>
+          )}
         </div>
         <DisplayPopover activeFields={groupByFields} onToggle={toggleField} />
       </div>
@@ -115,6 +137,7 @@ export default function TasksPage() {
         completedTasks={completedTasks}
         loading={activeLoading || completedLoading}
         currentUserId={currentUserId}
+        currentUserName={firebaseUser?.displayName}
         groupByFields={groupByFields}
       />
     </div>

@@ -93,14 +93,14 @@ function NewConfigContent() {
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <Link
-          href="/processes"
+          href="/workflows"
           className="hover:text-foreground transition-colors"
         >
           Processes
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
         <Link
-          href={`/processes/${encodeURIComponent(processName)}`}
+          href={`/workflows/${encodeURIComponent(processName)}`}
           className="hover:text-foreground transition-colors"
         >
           {processName}

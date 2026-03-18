@@ -51,7 +51,7 @@ export function AgentRunListTable({
       <table className="w-full text-sm">
         <thead className="bg-muted/50">
           <tr>
-            {['Agent', 'Autonomy', 'Process', 'Status', 'Confidence', 'Model', 'Duration', 'Started'].map((h) => (
+            {['Agent', 'Autonomy', 'Workflow', 'Status', 'Confidence', 'Model', 'Duration', 'Started'].map((h) => (
               <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                 {h}
               </th>
@@ -80,7 +80,7 @@ export function AgentRunListTable({
                   <AutonomyBadge level={run.autonomyLevel} />
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/processes/${run.processInstanceId}`} className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                  <Link href={`/workflows/${run.processInstanceId}`} className="text-xs text-muted-foreground hover:text-primary transition-colors">
                     {processNameMap?.get(run.processInstanceId) ?? `${run.processInstanceId.slice(0, 8)}...`}
                   </Link>
                 </td>

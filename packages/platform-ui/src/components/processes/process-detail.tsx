@@ -35,7 +35,7 @@ export function ProcessDetail({
   definitionSteps = [],
   agentEvents = [],
   backHref = '/processes',
-  backLabel = 'Processes',
+  backLabel = 'Workflows',
   stepConfigMap,
   runDetailHref,
 }: {

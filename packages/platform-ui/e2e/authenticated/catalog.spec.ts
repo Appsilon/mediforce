@@ -1,24 +1,21 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Agent Catalog', () => {
-  test('[RENDER] Catalog page loads and shows page title', async ({ page }) => {
-    await page.goto('/catalog');
+test.describe('Agents', () => {
+  test('[RENDER] Agents page loads and shows page title', async ({ page }) => {
+    await page.goto('/agents');
     await expect(
-      page.getByRole('heading', { name: 'Agent Catalog' }),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Available AI capabilities for process configuration'),
+      page.getByRole('heading', { name: 'Agents' }),
     ).toBeVisible();
   });
 
-  test('[RENDER] Catalog page displays plugin cards', async ({ page }) => {
-    await page.goto('/catalog');
+  test('[RENDER] Agents page displays plugin cards', async ({ page }) => {
+    await page.goto('/agents');
     // Wait for at least one plugin card to appear (cards have rounded-lg border)
     await expect(page.getByText('Risk Detection')).toBeVisible({ timeout: 10_000 });
   });
 
   test('[RENDER] Plugin cards show namespace group headings', async ({ page }) => {
-    await page.goto('/catalog');
+    await page.goto('/agents');
     await expect(page.getByRole('heading', { name: 'Supply Intelligence' })).toBeVisible({
       timeout: 10_000,
     });
@@ -26,7 +23,7 @@ test.describe('Agent Catalog', () => {
   });
 
   test('[RENDER] Plugin cards display metadata', async ({ page }) => {
-    await page.goto('/catalog');
+    await page.goto('/agents');
     // Check that a plugin name and its description are visible
     await expect(page.getByText('Risk Detection')).toBeVisible({ timeout: 10_000 });
     // Check for Input/Output labels
@@ -36,12 +33,12 @@ test.describe('Agent Catalog', () => {
     await expect(page.getByText('Executor').first()).toBeVisible();
   });
 
-  test('[CLICK] Sidebar Agent Catalog link navigates to /catalog', async ({ page }) => {
+  test('[CLICK] Sidebar Agents link navigates to /agents', async ({ page }) => {
     await page.goto('/tasks');
-    await page.getByRole('link', { name: /agent catalog/i }).click();
-    await expect(page).toHaveURL(/\/catalog/);
+    await page.getByRole('link', { name: /^agents$/i }).click();
+    await expect(page).toHaveURL(/\/agents/);
     await expect(
-      page.getByRole('heading', { name: 'Agent Catalog' }),
+      page.getByRole('heading', { name: 'Agents' }),
     ).toBeVisible();
   });
 });

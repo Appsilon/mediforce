@@ -68,7 +68,7 @@ export function StartRunDialog({
     if (result.success && result.instanceId) {
       onClose();
       router.push(
-        `/processes/${encodeURIComponent(processName)}/runs/${result.instanceId}`,
+        `/workflows/${encodeURIComponent(processName)}/runs/${result.instanceId}`,
       );
     } else {
       setError(result.error ?? 'Failed to start run');

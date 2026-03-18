@@ -197,7 +197,7 @@ export function TaskDetail({
           </div>
           {processInstance ? (
             <Link
-              href={`/processes/${encodeURIComponent(processInstance.definitionName)}/runs/${task.processInstanceId}`}
+              href={`/workflows/${encodeURIComponent(processInstance.definitionName)}/runs/${task.processInstanceId}`}
               className="text-primary hover:underline font-mono text-xs"
             >
               {task.processInstanceId.slice(0, 12)}&hellip;
