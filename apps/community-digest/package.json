@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "build:gather": "tsc -p tsconfig.json",
-    "docker:build": "docker build -t mediforce-agent:community-digest -f container/Dockerfile ."
+    "docker:build": "docker build -t mediforce-agent:community-digest -f apps/community-digest/container/Dockerfile ../../"
   },
   "dependencies": {
     "@mediforce/platform-core": "workspace:*"
