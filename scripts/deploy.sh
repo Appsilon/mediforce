@@ -18,6 +18,10 @@ log "Pulling latest changes from main"
 git fetch origin main
 git reset --hard origin/main
 
+# Export git SHA for build-time inlining
+export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)
+log "Git SHA: $NEXT_PUBLIC_GIT_SHA"
+
 # Build and restart only changed services
 log "Building images"
 docker compose -f "$COMPOSE_FILE" build

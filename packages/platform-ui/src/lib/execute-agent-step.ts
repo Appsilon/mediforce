@@ -22,8 +22,9 @@ import type { AgentContext, AgentPlugin, ReviewPlugin, AgentRunResult } from '@m
 import type { StepConfig, AgentOutputEnvelope, ProcessInstance, ProcessConfig } from '@mediforce/platform-core';
 import type { PlatformServices } from './platform-services';
 
-/** Walk up from cwd to find the monorepo root (contains pnpm-workspace.yaml). */
+/** Find monorepo root: MEDIFORCE_ROOT env var (production) or walk up from cwd (dev). */
 function findWorkspaceRoot(): string {
+  if (process.env.MEDIFORCE_ROOT) return process.env.MEDIFORCE_ROOT;
   let dir = process.cwd();
   while (dir !== dirname(dir)) {
     if (existsSync(join(dir, 'pnpm-workspace.yaml'))) {
