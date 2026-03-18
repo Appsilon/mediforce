@@ -58,7 +58,7 @@ const EXECUTOR_STYLES: Record<string, { icon: typeof User; color: string; bg: st
 };
 
 // ---------------------------------------------------------------------------
-// Custom node — clean, consistent sizing
+// Custom nodes
 // ---------------------------------------------------------------------------
 
 type StepNodeData = {
@@ -73,17 +73,40 @@ const NODE_WIDTH = 240;
 const NODE_INNER_HEIGHT = 72;
 const ROW_GAP = 48;
 
+const HANDLE_CLASS = '!bg-transparent !border-0 !w-px !h-px';
+
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
-  const style = STEP_STYLES[data.stepType] ?? STEP_STYLES.terminal;
+  const isTerminal = data.stepType === 'terminal';
+
+  if (isTerminal) {
+    return (
+      <>
+        <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
+        <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
+        <Handle id="right-out" type="source" position={Position.Right} className={HANDLE_CLASS} />
+        <Handle id="right-in" type="target" position={Position.Right} className={HANDLE_CLASS} />
+        <div style={{ width: NODE_WIDTH }} className="flex flex-col items-center gap-2 cursor-default">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center border-[3px] border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/30">
+            <div className="w-5 h-5 rounded-full bg-emerald-400 dark:bg-emerald-600" />
+          </div>
+          <span className="text-[11px] font-medium text-emerald-500 dark:text-emerald-400">
+            {data.label}
+          </span>
+        </div>
+      </>
+    );
+  }
+
+  const style = STEP_STYLES[data.stepType] ?? STEP_STYLES.creation;
   const exec = EXECUTOR_STYLES[data.executor] ?? EXECUTOR_STYLES.human;
   const Icon = exec.icon;
 
   return (
     <>
-      <Handle id="top" type="target" position={Position.Top} className="!bg-transparent !border-0 !w-px !h-px" />
-      <Handle id="bottom" type="source" position={Position.Bottom} className="!bg-transparent !border-0 !w-px !h-px" />
-      <Handle id="right-out" type="source" position={Position.Right} className="!bg-transparent !border-0 !w-px !h-px" />
-      <Handle id="right-in" type="target" position={Position.Right} className="!bg-transparent !border-0 !w-px !h-px" />
+      <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
+      <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
+      <Handle id="right-out" type="source" position={Position.Right} className={HANDLE_CLASS} />
+      <Handle id="right-in" type="target" position={Position.Right} className={HANDLE_CLASS} />
 
       <div
         style={{ width: NODE_WIDTH, minHeight: NODE_INNER_HEIGHT }}
@@ -104,7 +127,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             </p>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                {data.executor}
+                {data.executor === 'human' ? 'Human' : data.executor === 'agent' ? 'Agent' : 'Script'}
               </span>
               {data.autonomyLevel && (
                 <span className="text-[10px] font-mono text-muted-foreground/70">
@@ -128,7 +151,6 @@ const nodeTypes = { step: StepNode };
 function buildLayout(definition: WorkflowDefinition): { nodes: Node<StepNodeData>[]; edges: Edge[]; height: number } {
   const stepMap = new Map(definition.steps.map((s) => [s.id, s]));
 
-  // Adjacency from explicit transitions + verdicts
   const children = new Map<string, string[]>();
   const parents = new Map<string, string[]>();
 
@@ -149,7 +171,6 @@ function buildLayout(definition: WorkflowDefinition): { nodes: Node<StepNodeData
     }
   }
 
-  // BFS layering — first visit wins (ignores back-edges)
   const roots = definition.steps.filter((s) => !parents.has(s.id) || parents.get(s.id)!.length === 0);
   if (roots.length === 0 && definition.steps.length > 0) roots.push(definition.steps[0]);
 
@@ -169,20 +190,17 @@ function buildLayout(definition: WorkflowDefinition): { nodes: Node<StepNodeData
     }
   }
 
-  // Unreachable steps go after the last layer
   const maxBfsLayer = Math.max(...layer.values(), -1);
   let nextLayer = maxBfsLayer + 1;
   for (const step of definition.steps) {
     if (!layer.has(step.id)) layer.set(step.id, nextLayer++);
   }
 
-  // Group into rows
   const rows = new Map<number, string[]>();
   for (const [stepId, row] of layer) {
     rows.set(row, [...(rows.get(row) ?? []), stepId]);
   }
 
-  // Position nodes — consistent vertical spacing
   const ROW_HEIGHT = NODE_INNER_HEIGHT + ROW_GAP;
   const H_GAP = 24;
 
@@ -206,7 +224,7 @@ function buildLayout(definition: WorkflowDefinition): { nodes: Node<StepNodeData
     }
   }
 
-  // --- Edges ---
+  // Edges
   const edgeSet = new Set<string>();
   const edges: Edge[] = [];
   let backIdx = 0;
@@ -221,7 +239,6 @@ function buildLayout(definition: WorkflowDefinition): { nodes: Node<StepNodeData
     const isBack = toLayer <= fromLayer;
     const idx = isBack ? backIdx++ : 0;
 
-    // Shorten verbose labels
     const shortLabel = label
       ?.replace(/^when:\s*/, '')
       .replace(/output\./g, '')
@@ -241,10 +258,7 @@ function buildLayout(definition: WorkflowDefinition): { nodes: Node<StepNodeData
         strokeWidth: isBack ? 1.5 : 2,
         strokeDasharray: isBack ? '5 4' : undefined,
       },
-      labelBgStyle: {
-        fill: 'white',
-        fillOpacity: 0.85,
-      },
+      labelBgStyle: { fill: 'white', fillOpacity: 0.85 },
       labelBgPadding: [4, 6] as [number, number],
       labelBgBorderRadius: 4,
       labelStyle: {
@@ -305,7 +319,9 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, sel
   const [edges] = useEdgesState(initialEdges);
 
   const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node<StepNodeData>) => onNodeClick?.(node.id),
+    (_: React.MouseEvent, node: Node<StepNodeData>) => {
+      if (node.data.stepType !== 'terminal') onNodeClick?.(node.id);
+    },
     [onNodeClick],
   );
 

@@ -9,7 +9,7 @@ import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
 import { RunsTable } from '@/components/processes/runs-table';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
-import { StartRunDialog } from '@/components/processes/start-run-dialog';
+import { StartRunButton } from '@/components/processes/start-run-button';
 import { setProcessArchived } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 
@@ -24,7 +24,6 @@ export default function ProcessDefinitionPage() {
 
   const [archiving, setArchiving] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const [startRunOpen, setStartRunOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -178,13 +177,7 @@ export default function ProcessDefinitionPage() {
           <div className="flex items-center justify-between mb-4">
             <div />
             {hasManualTrigger ? (
-              <button
-                onClick={() => setStartRunOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                <Play className="h-3.5 w-3.5" />
-                Start Run
-              </button>
+              <StartRunButton workflowName={decodedName} showVersionPicker />
             ) : (
               <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Info className="h-3.5 w-3.5" />
@@ -192,12 +185,6 @@ export default function ProcessDefinitionPage() {
               </span>
             )}
           </div>
-
-          <StartRunDialog
-            workflowName={decodedName}
-            open={startRunOpen}
-            onClose={() => setStartRunOpen(false)}
-          />
 
           <RunsTable
             runs={runs}

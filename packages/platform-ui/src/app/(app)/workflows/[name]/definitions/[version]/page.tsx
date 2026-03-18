@@ -3,10 +3,11 @@
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Pencil, Play, X, Save, User, Bot, Terminal } from 'lucide-react';
+import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { StartRunButton } from '@/components/processes/start-run-button';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -160,23 +161,19 @@ export default function WorkflowDefinitionVersionPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Edit toggle */}
-            <button
-              onClick={editing ? cancelEditing : enableEditing}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap',
-                editing
-                  ? 'border-amber-500 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/30'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              {editing ? 'Editing' : 'Edit'}
-            </button>
-
-            {/* Save (visible in edit mode) */}
-            {editing && (
+            {editing ? (
               <>
+                {/* Cancel — ghost button, clearly "discard" */}
+                <button
+                  onClick={() => {
+                    if (confirm('Discard unsaved changes?')) cancelEditing();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+                >
+                  Cancel
+                </button>
+
+                {/* Save — primary action */}
                 <button
                   onClick={handleSave}
                   disabled={saveState.status === 'saving'}
@@ -188,6 +185,7 @@ export default function WorkflowDefinitionVersionPage() {
                   <Save className="h-3.5 w-3.5" />
                   {saveState.status === 'saving' ? 'Saving...' : 'Save new version'}
                 </button>
+
                 {saveState.status === 'saved' && (
                   <span className="text-sm text-green-600 dark:text-green-400">Saved v{saveState.version}</span>
                 )}
@@ -195,14 +193,20 @@ export default function WorkflowDefinitionVersionPage() {
                   <span className="text-sm text-destructive">{saveState.message}</span>
                 )}
               </>
-            )}
+            ) : (
+              <>
+                {/* Edit — enters edit mode */}
+                <button
+                  onClick={enableEditing}
+                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </button>
 
-            {/* Start Run (visible when not editing) */}
-            {!editing && (
-              <button className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap">
-                <Play className="h-3.5 w-3.5" />
-                Start Run
-              </button>
+                {/* Start Run */}
+                <StartRunButton workflowName={decodedName} version={definition.version} />
+              </>
             )}
           </div>
         </div>
@@ -254,38 +258,60 @@ export default function WorkflowDefinitionVersionPage() {
 // Step editor (edit mode side panel)
 // ---------------------------------------------------------------------------
 
+const STEP_TYPES = ['creation', 'review', 'decision', 'terminal'] as const;
+const FALLBACK_OPTIONS = [
+  { value: '', label: 'Default' },
+  { value: 'escalate_to_human', label: 'Escalate to human' },
+  { value: 'continue_with_flag', label: 'Continue with flag' },
+  { value: 'pause', label: 'Pause' },
+] as const;
+
 function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: Partial<WorkflowStep>) => void }) {
+  const inlineInput = 'w-full bg-transparent border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0.5 focus:outline-none transition-colors';
+  const fieldInput = 'bg-transparent text-xs text-right border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-24';
+
+  const isAgent = step.executor === 'agent' && step.type !== 'terminal';
+  const isHuman = step.executor === 'human' && step.type !== 'terminal';
+  const isReview = step.type === 'review';
+  const hasAgent = step.agent && Object.values(step.agent).some((v) => v !== undefined);
+
   return (
-    <div className="space-y-4">
-      {/* Name */}
+    <div className="space-y-5">
+      {/* ─── Identity — mirrors StepDetail header ─── */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground">Name</label>
         <input
           value={step.name}
           onChange={(e) => onChange({ name: e.target.value })}
-          className="mt-1 w-full rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className={cn(inlineInput, 'text-[15px] font-semibold text-foreground')}
+        />
+        <p className="font-mono text-xs text-muted-foreground mt-0.5">{step.id}</p>
+        <textarea
+          value={step.description ?? ''}
+          onChange={(e) => onChange({ description: e.target.value || undefined })}
+          placeholder="Add description..."
+          rows={2}
+          className={cn(inlineInput, 'mt-2 text-sm text-muted-foreground resize-y leading-relaxed placeholder:italic')}
         />
       </div>
 
-      {/* Executor */}
-      {step.type !== 'terminal' && (
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Executor</label>
-          <div className="flex gap-1 mt-1 p-1 rounded-lg bg-muted">
-            {EXECUTOR_TYPES.map((ex) => {
-              const Icon = ex === 'human' ? User : ex === 'agent' ? Bot : Terminal;
-              const colors: Record<string, string> = {
-                human: 'bg-blue-500 text-white',
-                agent: 'bg-violet-500 text-white',
-                script: 'bg-amber-500 text-white',
+      {/* ─── Badges row — executor is a toggle, type + autonomy are clickable ─── */}
+      <div className="space-y-2">
+        {/* Executor — Human/Agent toggle (script steps show agent/human options too) */}
+        {step.type !== 'terminal' && step.executor !== 'script' && (
+          <div className="flex gap-1 p-0.5 rounded-lg bg-muted">
+            {(['human', 'agent'] as const).map((ex) => {
+              const Icon = ex === 'human' ? User : Bot;
+              const activeColors: Record<string, string> = {
+                human: 'bg-blue-500 text-white shadow-sm',
+                agent: 'bg-violet-500 text-white shadow-sm',
               };
               return (
                 <button
                   key={ex}
                   onClick={() => onChange({ executor: ex })}
                   className={cn(
-                    'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-all',
-                    step.executor === ex ? colors[ex] : 'text-muted-foreground hover:text-foreground',
+                    'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium capitalize transition-all',
+                    step.executor === ex ? activeColors[ex] : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -294,14 +320,11 @@ function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: 
               );
             })}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Autonomy level */}
-      {step.executor === 'agent' && step.type !== 'terminal' && (
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Autonomy</label>
-          <div className="flex flex-col gap-1 mt-1">
+        {/* Autonomy — the #1 tunable */}
+        {isAgent && (
+          <div className="flex flex-col gap-0.5">
             {AUTONOMY_LEVELS.map((level) => (
               <button
                 key={level.value}
@@ -309,112 +332,240 @@ function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: 
                 className={cn(
                   'rounded-md px-3 py-1.5 text-xs text-left transition-all border',
                   step.autonomyLevel === level.value
-                    ? 'border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300'
-                    : 'border-transparent bg-muted/50 text-muted-foreground hover:text-foreground',
+                    ? 'border-violet-400 bg-violet-50 text-violet-700 font-medium dark:bg-violet-900/20 dark:text-violet-300'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50',
                 )}
               >
                 {level.label}
               </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Plugin */}
-      {step.executor === 'agent' && (
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Plugin</label>
-          <input
-            value={step.plugin ?? ''}
-            onChange={(e) => onChange({ plugin: e.target.value || undefined })}
-            placeholder="e.g. supply-data-collector"
-            className="mt-1 w-full rounded-md border bg-background px-3 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </div>
-      )}
+      {/* ─── Core config — mirrors StepDetail fields, but editable ─── */}
+      <div className="space-y-1.5">
+        {isAgent && (
+          <EditableField label="Plugin" value={step.plugin ?? ''} mono placeholder="e.g. supply-data-collector"
+            onChange={(v) => onChange({ plugin: v || undefined })} />
+        )}
+        {step.executor === 'script' && step.type !== 'terminal' && (
+          <EditableField label="Plugin" value={step.plugin ?? ''} mono placeholder="e.g. script-container"
+            onChange={(v) => onChange({ plugin: v || undefined })} />
+        )}
+        {isHuman && (
+          <EditableField label="Roles" value={step.allowedRoles?.join(', ') ?? ''} placeholder="e.g. qa-lead, analyst"
+            onChange={(v) => onChange({ allowedRoles: v ? v.split(',').map((r) => r.trim()).filter(Boolean) : undefined })} />
+        )}
+      </div>
 
-      {/* Allowed roles */}
-      {step.executor === 'human' && (
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Allowed roles</label>
-          <input
-            value={step.allowedRoles?.join(', ') ?? ''}
-            onChange={(e) => onChange({
-              allowedRoles: e.target.value ? e.target.value.split(',').map((r) => r.trim()).filter(Boolean) : undefined,
-            })}
-            placeholder="e.g. qa-lead, analyst"
-            className="mt-1 w-full rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </div>
-      )}
-
-      {/* Agent advanced */}
-      {step.executor === 'agent' && (
-        <details className="group">
-          <summary className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-            Advanced agent settings
-          </summary>
-          <div className="mt-2 space-y-2 pl-2 border-l-2 border-muted">
-            <div>
-              <label className="text-xs text-muted-foreground">Model</label>
-              <input
-                value={step.agent?.model ?? ''}
-                onChange={(e) => onChange({ agent: { ...step.agent, model: e.target.value || undefined } })}
-                placeholder="claude-sonnet-4-6"
-                className="mt-0.5 w-full rounded-md border bg-background px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Timeout (min)</label>
-              <input
-                type="number"
-                value={step.agent?.timeoutMinutes ?? ''}
-                onChange={(e) => onChange({ agent: { ...step.agent, timeoutMinutes: e.target.value ? Number(e.target.value) : undefined } })}
-                className="mt-0.5 w-full rounded-md border bg-background px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Confidence threshold</label>
-              <input
-                type="number"
-                step="0.05"
-                min="0"
-                max="1"
-                value={step.agent?.confidenceThreshold ?? ''}
-                onChange={(e) => onChange({ agent: { ...step.agent, confidenceThreshold: e.target.value ? Number(e.target.value) : undefined } })}
-                className="mt-0.5 w-full rounded-md border bg-background px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Skill</label>
-              <input
-                value={step.agent?.skill ?? ''}
-                onChange={(e) => onChange({ agent: { ...step.agent, skill: e.target.value || undefined } })}
-                className="mt-0.5 w-full rounded-md border bg-background px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Prompt</label>
+      {/* ─── Agent section — mirrors StepDetail "Agent" section ─── */}
+      {isAgent && (
+        <Section title="Agent">
+          <EditableField label="Model" value={step.agent?.model ?? ''} mono placeholder="claude-sonnet-4-6"
+            onChange={(v) => onChange({ agent: { ...step.agent, model: v || undefined } })} />
+          <EditableField label="Skill" value={step.agent?.skill ?? ''} mono placeholder="skill-name"
+            onChange={(v) => onChange({ agent: { ...step.agent, skill: v || undefined } })} />
+          <EditableField label="Timeout" value={step.agent?.timeoutMinutes !== undefined ? `${step.agent.timeoutMinutes}` : ''} placeholder="30"
+            onChange={(v) => onChange({ agent: { ...step.agent, timeoutMinutes: v ? Number(v) : undefined } })} suffix="min" />
+          <EditableField label="Confidence" value={step.agent?.confidenceThreshold !== undefined ? `${step.agent.confidenceThreshold}` : ''} placeholder="0.85"
+            onChange={(v) => onChange({ agent: { ...step.agent, confidenceThreshold: v ? Number(v) : undefined } })} />
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-xs text-muted-foreground shrink-0">Fallback</span>
+            <select
+              value={step.agent?.fallbackBehavior ?? ''}
+              onChange={(e) => onChange({ agent: { ...step.agent, fallbackBehavior: (e.target.value || undefined) as 'escalate_to_human' | 'continue_with_flag' | 'pause' | undefined } })}
+              className="bg-transparent text-xs text-right border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors cursor-pointer"
+            >
+              {FALLBACK_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          {(hasAgent || true) && (
+            <div className="mt-2">
+              <p className="text-[11px] text-muted-foreground mb-1">Prompt</p>
               <textarea
                 value={step.agent?.prompt ?? ''}
                 onChange={(e) => onChange({ agent: { ...step.agent, prompt: e.target.value || undefined } })}
                 rows={3}
-                className="mt-0.5 w-full rounded-md border bg-background px-2 py-1 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="Instructions for the agent..."
+                className="w-full text-xs bg-muted/50 rounded-md p-2.5 leading-relaxed border-0 focus:outline-none focus:ring-1 focus:ring-primary resize-y"
               />
             </div>
-          </div>
-        </details>
+          )}
+        </Section>
       )}
 
-      {/* Description */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground">Description</label>
+      {/* ─── Review section ─── */}
+      {isReview && (
+        <Section title="Review">
+          <div className="flex gap-1 mb-2">
+            {(['human', 'agent', 'none'] as const).map((rt) => (
+              <button
+                key={rt}
+                onClick={() => onChange({ review: { ...step.review, type: rt } })}
+                className={cn(
+                  'flex-1 rounded-md py-1 text-[11px] font-medium capitalize transition-all border',
+                  step.review?.type === rt
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : 'border-transparent bg-muted/50 text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {rt}
+              </button>
+            ))}
+          </div>
+          <EditableField label="Plugin" value={step.review?.plugin ?? ''} mono placeholder="review-plugin"
+            onChange={(v) => onChange({ review: { ...step.review, plugin: v || undefined } })} />
+          <EditableField label="Max iterations" value={step.review?.maxIterations !== undefined ? `${step.review.maxIterations}` : ''} placeholder="3"
+            onChange={(v) => onChange({ review: { ...step.review, maxIterations: v ? Number(v) : undefined } })} />
+          <EditableField label="Time box" value={step.review?.timeBoxDays !== undefined ? `${step.review.timeBoxDays}` : ''} placeholder="5"
+            onChange={(v) => onChange({ review: { ...step.review, timeBoxDays: v ? Number(v) : undefined } })} suffix="days" />
+        </Section>
+      )}
+
+      {/* ─── Verdicts (review steps) ─── */}
+      {isReview && (
+        <Section title="Verdicts">
+          <div className="space-y-1.5">
+            {Object.entries(step.verdicts ?? {}).map(([verdictName, verdict]) => (
+              <div key={verdictName} className="flex items-center gap-2">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{verdictName}</span>
+                <span className="text-xs text-muted-foreground">→</span>
+                <input
+                  value={verdict.target}
+                  onChange={(e) => {
+                    const newVerdicts = { ...step.verdicts, [verdictName]: { ...verdict, target: e.target.value } };
+                    onChange({ verdicts: newVerdicts });
+                  }}
+                  className="bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-24"
+                />
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                const name = `verdict-${Object.keys(step.verdicts ?? {}).length + 1}`;
+                onChange({ verdicts: { ...step.verdicts, [name]: { target: '' } } });
+              }}
+              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              + Add verdict
+            </button>
+          </div>
+        </Section>
+      )}
+
+      {/* ─── Runtime — for script/agent steps with runtime config ─── */}
+      {(step.executor === 'script' || step.executor === 'agent') && step.type !== 'terminal' && (
+        <Section title="Runtime">
+          <EditableField label="Runtime" value={step.agent?.runtime ?? ''} placeholder="javascript"
+            onChange={(v) => onChange({ agent: { ...step.agent, runtime: (v || undefined) as 'javascript' | 'python' | 'r' | 'bash' | undefined } })} />
+          <EditableField label="Command" value={step.agent?.command ?? ''} mono placeholder="run.sh"
+            onChange={(v) => onChange({ agent: { ...step.agent, command: v || undefined } })} />
+          <EditableField label="Image" value={step.agent?.image ?? ''} mono placeholder="docker-image:tag"
+            onChange={(v) => onChange({ agent: { ...step.agent, image: v || undefined } })} />
+          <div>
+            <p className="text-[11px] text-muted-foreground mb-1">Inline script</p>
+            <textarea
+              value={step.agent?.inlineScript ?? ''}
+              onChange={(e) => onChange({ agent: { ...step.agent, inlineScript: e.target.value || undefined } })}
+              rows={3}
+              placeholder="Script code..."
+              className="w-full text-[11px] font-mono bg-muted/50 rounded-md p-2 leading-relaxed border-0 focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+            />
+          </div>
+        </Section>
+      )}
+
+      {/* ─── Environment variables ─── */}
+      {step.type !== 'terminal' && (
+        <Section title="Environment">
+          {Object.entries(step.env ?? {}).map(([key, val]) => (
+            <EditableField key={key} label={key} value={val} mono
+              onChange={(v) => {
+                const newEnv = { ...step.env };
+                if (v) { newEnv[key] = v; } else { delete newEnv[key]; }
+                onChange({ env: Object.keys(newEnv).length > 0 ? newEnv : undefined });
+              }} />
+          ))}
+          <button
+            onClick={() => {
+              const key = `VAR_${Object.keys(step.env ?? {}).length + 1}`;
+              onChange({ env: { ...step.env, [key]: '' } });
+            }}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            + Add variable
+          </button>
+        </Section>
+      )}
+
+      {/* ─── Step definition (collapsed — rarely changed) ─── */}
+      <details className="group">
+        <summary className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/40 cursor-pointer hover:text-muted-foreground transition-colors select-none">
+          Step definition
+        </summary>
+        <div className="mt-2 space-y-2.5">
+          <div className="flex gap-1">
+            {STEP_TYPES.map((t) => (
+              <button
+                key={t}
+                onClick={() => onChange({ type: t })}
+                className={cn(
+                  'flex-1 rounded-md py-1 text-[11px] font-medium capitalize transition-all border',
+                  step.type === t
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : 'border-transparent bg-muted/50 text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <EditableField label="Step ID" value={step.id} mono onChange={(v) => onChange({ id: v })} />
+          {step.type !== 'terminal' && (
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-muted-foreground">Automated step</span>
+              <button
+                onClick={() => onChange({ executor: step.executor === 'script' ? 'human' : 'script' })}
+                className={cn(
+                  'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors',
+                  step.executor === 'script' ? 'bg-amber-500' : 'bg-muted',
+                )}
+              >
+                <span className={cn(
+                  'pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+                  step.executor === 'script' ? 'translate-x-4' : 'translate-x-0',
+                )} />
+              </button>
+            </div>
+          )}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function EditableField({ label, value, onChange, mono, placeholder, suffix }: {
+  label: string; value: string; onChange: (v: string) => void;
+  mono?: boolean; placeholder?: string; suffix?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+      <div className="flex items-baseline gap-1">
         <input
-          value={step.description ?? ''}
-          onChange={(e) => onChange({ description: e.target.value || undefined })}
-          placeholder="What does this step do?"
-          className="mt-1 w-full rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={cn(
+            'bg-transparent text-xs text-right border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-28',
+            mono && 'font-mono',
+            !value && 'placeholder:text-muted-foreground/40 placeholder:italic',
+          )}
         />
+        {suffix && <span className="text-[10px] text-muted-foreground">{suffix}</span>}
       </div>
     </div>
   );
@@ -424,83 +575,142 @@ function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: 
 // Step detail (read-only side panel)
 // ---------------------------------------------------------------------------
 
+const FALLBACK_LABELS: Record<string, string> = {
+  escalate_to_human: 'Escalate to human',
+  continue_with_flag: 'Continue with flag',
+  pause: 'Pause',
+};
+
 function StepDetail({ step }: { step: WorkflowStep }) {
+  const hasAgent = step.agent && Object.values(step.agent).some((v) => v !== undefined);
+  const hasReview = step.review && Object.values(step.review).some((v) => v !== undefined);
+  const hasVerdicts = step.verdicts && Object.keys(step.verdicts).length > 0;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Identity */}
       <div>
-        <p className="font-medium">{step.name}</p>
+        <p className="text-[15px] font-semibold">{step.name}</p>
         <p className="font-mono text-xs text-muted-foreground mt-0.5">{step.id}</p>
+        {step.description && (
+          <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{step.description}</p>
+        )}
       </div>
 
+      {/* Badges */}
       <div className="flex flex-wrap gap-1.5">
         <StepTypeBadge type={step.type} />
-        <ExecutorBadge executor={step.executor} />
-        {step.autonomyLevel && (
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        {step.type !== 'terminal' && <ExecutorBadge executor={step.executor} />}
+        {step.type !== 'terminal' && step.autonomyLevel && (
+          <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
             {step.autonomyLevel}
           </span>
         )}
       </div>
 
-      {step.description && (
-        <p className="text-sm text-muted-foreground">{step.description}</p>
-      )}
+      {/* Core config */}
+      <div className="space-y-1.5">
+        {step.plugin && <Field label="Plugin" value={step.plugin} mono />}
+        {step.allowedRoles && step.allowedRoles.length > 0 && (
+          <Field label="Roles" value={step.allowedRoles.join(', ')} />
+        )}
+      </div>
 
-      {step.plugin && <Field label="Plugin" value={step.plugin} mono />}
-
-      {step.allowedRoles && step.allowedRoles.length > 0 && (
-        <Field label="Allowed roles" value={step.allowedRoles.join(', ')} />
-      )}
-
-      {step.agent && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agent config</p>
-          {step.agent.model && <Field label="Model" value={step.agent.model} mono />}
-          {step.agent.skill && <Field label="Skill" value={step.agent.skill} mono />}
-          {step.agent.timeoutMinutes !== undefined && <Field label="Timeout" value={`${step.agent.timeoutMinutes} min`} />}
-          {step.agent.confidenceThreshold !== undefined && <Field label="Confidence" value={String(step.agent.confidenceThreshold)} />}
-          {step.agent.fallbackBehavior && <Field label="Fallback" value={step.agent.fallbackBehavior} />}
-          {step.agent.prompt && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Prompt</p>
-              <p className="text-xs bg-muted rounded p-2 whitespace-pre-wrap">{step.agent.prompt}</p>
+      {/* Agent config */}
+      {hasAgent && step.executor === 'agent' && (
+        <Section title="Agent">
+          {step.agent!.model && <Field label="Model" value={step.agent!.model} mono />}
+          {step.agent!.skill && <Field label="Skill" value={step.agent!.skill} mono />}
+          {step.agent!.timeoutMinutes !== undefined && <Field label="Timeout" value={`${step.agent!.timeoutMinutes} min`} />}
+          {step.agent!.confidenceThreshold !== undefined && <Field label="Confidence" value={`${step.agent!.confidenceThreshold}`} />}
+          {step.agent!.fallbackBehavior && (
+            <Field label="Fallback" value={FALLBACK_LABELS[step.agent!.fallbackBehavior] ?? step.agent!.fallbackBehavior} />
+          )}
+          {step.agent!.prompt && (
+            <div className="mt-2">
+              <p className="text-[11px] text-muted-foreground mb-1">Prompt</p>
+              <p className="text-xs bg-muted/50 rounded-md p-2.5 whitespace-pre-wrap leading-relaxed">{step.agent!.prompt}</p>
             </div>
           )}
-        </div>
+        </Section>
       )}
 
-      {step.review && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Review config</p>
-          {step.review.type && <Field label="Reviewer" value={step.review.type} />}
-          {step.review.plugin && <Field label="Plugin" value={step.review.plugin} mono />}
-          {step.review.maxIterations !== undefined && <Field label="Max iterations" value={String(step.review.maxIterations)} />}
-        </div>
+      {/* Review config */}
+      {hasReview && (
+        <Section title="Review">
+          {step.review!.type && <Field label="Reviewer" value={step.review!.type} />}
+          {step.review!.plugin && <Field label="Plugin" value={step.review!.plugin} mono />}
+          {step.review!.maxIterations !== undefined && <Field label="Max iterations" value={String(step.review!.maxIterations)} />}
+          {step.review!.timeBoxDays !== undefined && <Field label="Time box" value={`${step.review!.timeBoxDays} days`} />}
+        </Section>
       )}
 
-      {step.verdicts && Object.keys(step.verdicts).length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Verdicts</p>
-          {Object.entries(step.verdicts).map(([verdictName, verdict]) => (
-            <div key={verdictName} className="flex items-center gap-2 text-xs">
-              <span className="font-medium">{verdictName}</span>
-              <span className="text-muted-foreground">→</span>
-              <span className="font-mono">{verdict.target}</span>
-            </div>
+      {/* Verdicts */}
+      {hasVerdicts && (
+        <Section title="Verdicts">
+          <div className="space-y-1.5">
+            {Object.entries(step.verdicts!).map(([name, verdict]) => (
+              <div key={name} className="flex items-center gap-2 text-xs">
+                <span className="rounded bg-muted px-1.5 py-0.5 font-medium">{name}</span>
+                <span className="text-muted-foreground">→</span>
+                <span className="font-mono text-muted-foreground">{verdict.target}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Env vars */}
+      {step.env && Object.keys(step.env).length > 0 && (
+        <Section title="Environment">
+          {Object.entries(step.env).map(([key, val]) => (
+            <Field key={key} label={key} value={val} mono />
           ))}
-        </div>
+        </Section>
+      )}
+
+      {/* Script & runtime config, step params */}
+      {(step.agent?.command || step.agent?.inlineScript || step.agent?.runtime || step.agent?.image || step.stepParams) && (
+        <Section title="Runtime">
+          {step.agent?.runtime && <Field label="Runtime" value={step.agent.runtime} />}
+          {step.agent?.command && <Field label="Command" value={step.agent.command} mono />}
+          {step.agent?.inlineScript && (
+            <details>
+              <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors">Inline script</summary>
+              <pre className="mt-1 text-[10px] bg-muted/50 rounded-md p-2 overflow-x-auto font-mono">{step.agent.inlineScript}</pre>
+            </details>
+          )}
+          {step.agent?.image && <Field label="Image" value={step.agent.image} mono />}
+          {step.agent?.repo && <Field label="Repo" value={step.agent.repo} mono />}
+          {step.agent?.commit && <Field label="Commit" value={step.agent.commit} mono />}
+          {step.stepParams && Object.keys(step.stepParams).length > 0 && (
+            <div>
+              <p className="text-[11px] text-muted-foreground mb-1">Parameters</p>
+              <pre className="text-[10px] bg-muted/50 rounded-md p-2 overflow-x-auto font-mono">{JSON.stringify(step.stepParams, null, 2)}</pre>
+            </div>
+          )}
+        </Section>
       )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Shared UI helpers
 // ---------------------------------------------------------------------------
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">{title}</p>
+      {children}
+    </div>
+  );
+}
 
 function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-2">
+    <div className="flex items-baseline justify-between gap-3">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
       <span className={cn('text-xs text-right truncate', mono && 'font-mono')}>{value}</span>
     </div>
@@ -520,16 +730,23 @@ function ExecutorBadge({ executor }: { executor: string }) {
   );
 }
 
+const STEP_TYPE_LABELS: Record<string, string> = {
+  creation: 'Task',
+  review: 'Review',
+  decision: 'Decision',
+  terminal: 'End',
+};
+
 function StepTypeBadge({ type }: { type: string }) {
   const colors: Record<string, string> = {
     creation: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400',
-    review: 'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400',
+    review: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400',
     decision: 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400',
-    terminal: 'bg-muted text-muted-foreground',
+    terminal: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
   };
   return (
-    <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', colors[type] ?? 'bg-muted text-muted-foreground')}>
-      {type}
+    <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', colors[type] ?? 'bg-muted text-muted-foreground')}>
+      {STEP_TYPE_LABELS[type] ?? type}
     </span>
   );
 }

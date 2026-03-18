@@ -16,22 +16,22 @@ function mergeDefinitionAndConfig(
       autonomyLevel: stepConfig?.autonomyLevel,
       plugin: stepConfig?.plugin,
       allowedRoles: stepConfig?.allowedRoles,
-      agent: stepConfig?.agentConfig
+      agent: (stepConfig?.agentConfig || stepConfig?.model || stepConfig?.timeoutMinutes || stepConfig?.confidenceThreshold || stepConfig?.fallbackBehavior)
         ? {
-            model: stepConfig.model,
-            skill: stepConfig.agentConfig.skill,
-            prompt: stepConfig.agentConfig.prompt,
-            skillsDir: stepConfig.agentConfig.skillsDir,
-            timeoutMs: stepConfig.agentConfig.timeoutMs,
-            command: stepConfig.agentConfig.command,
-            inlineScript: stepConfig.agentConfig.inlineScript,
-            runtime: stepConfig.agentConfig.runtime,
-            image: stepConfig.agentConfig.image,
-            repo: stepConfig.agentConfig.repo,
-            commit: stepConfig.agentConfig.commit,
-            timeoutMinutes: stepConfig.timeoutMinutes,
-            confidenceThreshold: stepConfig.confidenceThreshold,
-            fallbackBehavior: stepConfig.fallbackBehavior,
+            model: stepConfig?.agentConfig?.model ?? stepConfig?.model,
+            skill: stepConfig?.agentConfig?.skill,
+            prompt: stepConfig?.agentConfig?.prompt,
+            skillsDir: stepConfig?.agentConfig?.skillsDir,
+            timeoutMs: stepConfig?.agentConfig?.timeoutMs,
+            command: stepConfig?.agentConfig?.command,
+            inlineScript: stepConfig?.agentConfig?.inlineScript,
+            runtime: stepConfig?.agentConfig?.runtime,
+            image: stepConfig?.agentConfig?.image,
+            repo: stepConfig?.agentConfig?.repo,
+            commit: stepConfig?.agentConfig?.commit,
+            timeoutMinutes: stepConfig?.timeoutMinutes,
+            confidenceThreshold: stepConfig?.confidenceThreshold,
+            fallbackBehavior: stepConfig?.fallbackBehavior,
           }
         : undefined,
       review:
@@ -84,6 +84,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const url = new URL(request.url);
   const commit = url.searchParams.get('commit') === 'true';
+  const force = url.searchParams.get('force') === 'true';
 
   const { processRepo } = getPlatformServices();
 
@@ -114,7 +115,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   for (const [name, latestDef] of byName) {
     // Check if already migrated
     const existingVersion = await processRepo.getLatestWorkflowVersion(name);
-    if (existingVersion > 0) {
+    if (existingVersion > 0 && !force) {
+
       results.push({
         name,
         legacyVersion: latestDef.version,
@@ -136,7 +138,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       ? pool.sort((a, b) => parseVer(b.configVersion) - parseVer(a.configVersion))[0]
       : null;
 
-    const merged = mergeDefinitionAndConfig(latestDef, latestConfig, 1);
+    const nextVersion = existingVersion + 1;
+    const merged = mergeDefinitionAndConfig(latestDef, latestConfig, nextVersion);
 
     if (commit) {
       try {
@@ -145,7 +148,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           name,
           legacyVersion: latestDef.version,
           configUsed: latestConfig ? `${latestConfig.configName}:${latestConfig.configVersion}` : null,
-          newVersion: 1,
+          newVersion: nextVersion,
           status: 'ok',
         });
       } catch (e) {
@@ -153,7 +156,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           name,
           legacyVersion: latestDef.version,
           configUsed: latestConfig ? `${latestConfig.configName}:${latestConfig.configVersion}` : null,
-          newVersion: 1,
+          newVersion: nextVersion,
           status: 'error',
           error: e instanceof Error ? e.message : 'Unknown error',
         });
