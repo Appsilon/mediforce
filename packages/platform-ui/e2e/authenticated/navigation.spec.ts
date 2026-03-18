@@ -4,7 +4,7 @@ test.describe('Authenticated Navigation', () => {
   test('authenticated user can access tasks page', async ({ page }) => {
     await page.goto('/tasks');
     await expect(page).toHaveURL(/\/tasks/);
-    await expect(page.getByRole('heading', { name: 'My Tasks' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Human Actions' })).toBeVisible();
   });
 
   test('sidebar navigation links are visible', async ({ page }) => {

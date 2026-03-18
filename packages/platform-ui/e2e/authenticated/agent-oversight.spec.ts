@@ -7,23 +7,24 @@ import { test, expect } from '@playwright/test';
 // - processInstances: proc-running-1 (Supply Chain Review), proc-paused-1 (Supply Chain Review)
 
 test.describe('Agent Oversight', () => {
-  test('Agent Oversight page loads and shows heading', async ({ page }) => {
+  test('Agents page loads and shows heading', async ({ page }) => {
     await page.goto('/agents');
     await expect(
-      page.getByRole('heading', { name: 'Agent Oversight' }),
+      page.getByRole('heading', { name: 'Agents' }),
     ).toBeVisible();
   });
 
-  test('Agent Oversight page shows seeded agent runs', async ({ page }) => {
+  test('Agents page shows seeded agent runs in Run History tab', async ({ page }) => {
     await page.goto('/agents');
+    await page.getByRole('tab', { name: 'Run History' }).click();
     // The table should have at least one row with the narrative-summary pluginId
-    await expect(page.getByText('narrative-summary').first()).toBeVisible();
+    await expect(page.getByText('narrative-summary').first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test('Agent Oversight page shows agent runs count', async ({ page }) => {
+  test('Agents page shows total runs stat card', async ({ page }) => {
     await page.goto('/agents');
-    // The subtitle shows "N agent runs" after data loads
-    await expect(page.getByText(/\d+ agent runs/)).toBeVisible({ timeout: 10_000 });
+    // StatCards shows "Total Runs" label after data loads
+    await expect(page.getByText('Total Runs')).toBeVisible({ timeout: 10_000 });
   });
 
   test('Agent run detail page shows model and confidence', async ({ page }) => {
@@ -65,6 +66,7 @@ test.describe('Agent Oversight', () => {
 
   test('[DATA] Autonomy column shows level badges', async ({ page }) => {
     await page.goto('/agents');
+    await page.getByRole('tab', { name: 'Run History' }).click();
     // Verify the table has an 'Autonomy' column header
     await expect(
       page.getByRole('columnheader', { name: 'Autonomy' }),
@@ -77,9 +79,10 @@ test.describe('Agent Oversight', () => {
 
   test('Agent list has links to detail pages', async ({ page }) => {
     await page.goto('/agents');
+    await page.getByRole('tab', { name: 'Run History' }).click();
     // Wait for table to load with seeded data
     const link = page.locator('a[href="/agents/run-completed-1"]');
-    await expect(link).toBeVisible();
+    await expect(link).toBeVisible({ timeout: 10_000 });
     // Verify the link has the correct href pointing to the detail page
     await expect(link).toHaveAttribute('href', '/agents/run-completed-1');
     // Verify the link text is the pluginId
