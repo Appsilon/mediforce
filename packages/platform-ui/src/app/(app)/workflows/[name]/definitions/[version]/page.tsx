@@ -84,7 +84,7 @@ export default function WorkflowDefinitionVersionPage() {
       </div>
 
       {/* Diagram — fills entire area */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1" style={{ minHeight: 'calc(100vh - 120px)' }}>
         <WorkflowDiagram
           definition={definition}
           className="h-full rounded-none border-0"
