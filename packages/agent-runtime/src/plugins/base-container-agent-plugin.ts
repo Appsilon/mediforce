@@ -17,9 +17,18 @@ export const DEFAULT_TIMEOUT_MS = 20 * 60_000;
 function resolveProjectPath(relativePath: string): string {
   if (isAbsolute(relativePath)) return relativePath;
   const root = process.env.MEDIFORCE_ROOT ?? process.cwd();
-  const resolved = resolve(root, relativePath);
-  console.log(`[resolveProjectPath] input="${relativePath}" MEDIFORCE_ROOT="${process.env.MEDIFORCE_ROOT}" cwd="${process.cwd()}" root="${root}" => "${resolved}"`);
-  return resolved;
+  return resolve(root, relativePath);
+}
+
+/** Structured logger for agent runtime. Writes to stderr (captured by Docker). */
+function agentLog(tag: string, message: string, data?: Record<string, unknown>): void {
+  const entry = {
+    ts: new Date().toISOString(),
+    tag,
+    message,
+    ...data,
+  };
+  process.stderr.write(JSON.stringify(entry) + '\n');
 }
 
 /**
@@ -327,6 +336,16 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
     const startTime = Date.now();
     const skillName = this.agentConfig.skill ?? 'custom-prompt';
     const timeoutMs = this.agentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const stepId = this.context.stepId;
+    const instanceId = this.context.processInstanceId;
+
+    agentLog('run.start', `${this.agentName} starting`, {
+      stepId, instanceId, skillName,
+      image: this.agentConfig.image ?? 'local',
+      skillsDir: this.agentConfig.skillsDir ?? null,
+      MEDIFORCE_ROOT: process.env.MEDIFORCE_ROOT ?? 'NOT_SET',
+      cwd: process.cwd(),
+    });
 
     // Resolve env vars from config-level + step-level env
     const stepConfig = this.context.config.stepConfigs.find(
@@ -364,6 +383,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       }
 
       const isLocalMode = !this.agentConfig.image;
+      agentLog('run.mode', `execution mode: ${isLocalMode ? 'local' : 'docker'}`, { stepId });
 
       // Create output dir early so buildPrompt can write large files into it.
       const rawOutputDir = await mkdtemp(join(tmpdir(), `mediforce-${isLocalMode ? 'local' : 'docker'}-output-`));
@@ -381,6 +401,12 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       } else {
         workingDirForPrompt = '/workspace';
       }
+
+      agentLog('run.buildPrompt', 'building prompt', {
+        stepId,
+        skillsDir: this.agentConfig.skillsDir ?? null,
+        resolvedSkillsDir: this.agentConfig.skillsDir ? resolveProjectPath(this.agentConfig.skillsDir) : null,
+      });
 
       const prompt = await this.buildPrompt(updatedInput, timeoutMs, outputDirForPrompt, dockerOutputDir, workingDirForPrompt);
 
@@ -506,6 +532,10 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
     } catch (error) {
       const duration_ms = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
+      agentLog('run.error', errorMessage, {
+        stepId, instanceId, skillName, duration_ms,
+        stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined,
+      });
 
       await emit({
         type: 'result',
@@ -732,7 +762,9 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
 
   protected async readSkillFile(skillsDir: string, skill: string): Promise<string> {
     const skillPath = join(skillsDir, skill, 'SKILL.md');
+    agentLog('readSkillFile', `reading ${skillPath}`, { skillsDir, skill });
     const raw = await readFile(skillPath, 'utf-8');
+    agentLog('readSkillFile', `success — ${raw.length} chars`, { skillPath });
     return stripFrontmatter(raw);
   }
 
