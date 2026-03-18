@@ -56,6 +56,9 @@ services:
       - DOCKER_DEEPSEEK_API_KEY=${DOCKER_DEEPSEEK_API_KEY}
       - DOCKER_OPENROUTER_API_KEY=${DOCKER_OPENROUTER_API_KEY}
       - DOCKER_APP_BASE_URL=http://platform-ui:3000
+    volumes:
+      # Shared /tmp so temp dirs created by platform-ui are visible to agent containers
+      - /tmp:/tmp
     depends_on:
       redis:
         condition: service_healthy
