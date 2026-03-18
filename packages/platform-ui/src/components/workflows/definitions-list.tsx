@@ -28,7 +28,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
           No definitions found.
         </p>
         <Link
-          href={`/workflows/${encodeURIComponent(workflowName)}/edit`}
+          href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Pencil className="h-3.5 w-3.5" />
@@ -45,7 +45,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
           {definitions.length} version{definitions.length !== 1 ? 's' : ''}
         </p>
         <Link
-          href={`/workflows/${encodeURIComponent(workflowName)}/edit`}
+          href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Pencil className="h-3.5 w-3.5" />

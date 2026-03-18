@@ -8,7 +8,7 @@ import { GitBranch, Plus, Layers, Github, ExternalLink, Archive, Play, SlidersHo
 import { useProcessDefinitions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
 import { ProcessInstanceRow } from '@/components/processes/process-run-section';
-import { StartRunDialog } from '@/components/processes/start-run-dialog';
+import { StartRunButton } from '@/components/processes/start-run-button';
 import { formatStepName } from '@/components/tasks/task-utils';
 import { cn } from '@/lib/utils';
 import type { ProcessInstance } from '@mediforce/platform-core';
@@ -109,7 +109,6 @@ function ProcessCard({
   steps?: string[];
 }) {
   const [expanded, setExpanded] = React.useState(false);
-  const [startRunOpen, setStartRunOpen] = React.useState(false);
 
   const filteredInstances = useMemo(() => {
     return instances.filter((instance) => {
@@ -204,13 +203,7 @@ function ProcessCard({
             )}
           </div>
           {definition.hasManualTrigger && !definition.archived && (
-            <button
-              onClick={() => setStartRunOpen(true)}
-              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
-            >
-              <Play className="h-3 w-3" />
-              Start Run
-            </button>
+            <StartRunButton workflowName={definition.name} />
           )}
         </div>
 
@@ -248,13 +241,6 @@ function ProcessCard({
         )}
       </div>
 
-      {startRunOpen && (
-        <StartRunDialog
-          workflowName={definition.name}
-          open={startRunOpen}
-          onClose={() => setStartRunOpen(false)}
-        />
-      )}
     </>
   );
 }
