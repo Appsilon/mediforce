@@ -250,8 +250,7 @@ function ProcessCard({
 
       {startRunOpen && (
         <StartRunDialog
-          processName={definition.name}
-          definitionVersion={definition.latestVersion}
+          workflowName={definition.name}
           open={startRunOpen}
           onClose={() => setStartRunOpen(false)}
         />

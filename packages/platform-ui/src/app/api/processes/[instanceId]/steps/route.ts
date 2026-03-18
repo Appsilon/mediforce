@@ -58,8 +58,8 @@ export async function GET(
 
     const config = await processRepo.getProcessConfig(
       instance.definitionName,
-      instance.configName,
-      instance.configVersion,
+      instance.configName ?? '',
+      instance.configVersion ?? '',
     );
 
     // Fetch all step executions in one query

@@ -4,6 +4,7 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
   InMemoryHumanTaskRepository,
+  buildWorkflowDefinition,
 } from '@mediforce/platform-core';
 import type {
   ProcessDefinition,
@@ -11,6 +12,7 @@ import type {
   ReviewVerdict,
   StepConfig,
   HumanTaskRepository,
+  WorkflowDefinition,
 } from '@mediforce/platform-core';
 import {
   WorkflowEngine,
@@ -797,5 +799,272 @@ describe('WorkflowEngine', () => {
         ),
       ).rejects.toThrow(/options/);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WorkflowDefinition (unified schema) tests
+// ---------------------------------------------------------------------------
+
+const linearWorkflowDef: WorkflowDefinition = {
+  name: 'linear-workflow',
+  version: 1,
+  steps: [
+    { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
+    { id: 'process', name: 'Process', type: 'creation', executor: 'human', allowedRoles: ['operator'] },
+    { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+  ],
+  transitions: [
+    { from: 'start', to: 'process' },
+    { from: 'process', to: 'done' },
+  ],
+  triggers: [{ type: 'manual', name: 'Start Workflow' }],
+  roles: ['operator', 'reviewer'],
+};
+
+const reviewWorkflowDef: WorkflowDefinition = {
+  name: 'review-workflow',
+  version: 1,
+  steps: [
+    { id: 'draft', name: 'Draft', type: 'creation', executor: 'agent' },
+    {
+      id: 'review',
+      name: 'Review',
+      type: 'review',
+      executor: 'human',
+      allowedRoles: ['reviewer'],
+      review: { maxIterations: 3 },
+      verdicts: {
+        approve: { target: 'approved' },
+        revise: { target: 'draft' },
+        reject: { target: 'rejected' },
+      },
+    },
+    { id: 'approved', name: 'Approved', type: 'terminal', executor: 'human' },
+    { id: 'rejected', name: 'Rejected', type: 'terminal', executor: 'human' },
+  ],
+  transitions: [
+    { from: 'draft', to: 'review' },
+    { from: 'review', to: 'approved' },
+    { from: 'review', to: 'draft' },
+    { from: 'review', to: 'rejected' },
+  ],
+  triggers: [{ type: 'manual', name: 'Start Review Workflow' }],
+  roles: ['reviewer'],
+};
+
+describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
+  let processRepo: InMemoryProcessRepository;
+  let instanceRepo: InMemoryProcessInstanceRepository;
+  let auditRepo: InMemoryAuditRepository;
+  let engine: WorkflowEngine;
+
+  beforeEach(async () => {
+    processRepo = new InMemoryProcessRepository();
+    instanceRepo = new InMemoryProcessInstanceRepository();
+    auditRepo = new InMemoryAuditRepository();
+    engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
+
+    await processRepo.saveWorkflowDefinition(linearWorkflowDef);
+    await processRepo.saveWorkflowDefinition(reviewWorkflowDef);
+  });
+
+  // --- createWorkflowInstance ---
+
+  it('createWorkflowInstance returns ProcessInstance with status created and no configName/configVersion', async () => {
+    const instance = await engine.createWorkflowInstance(
+      'linear-workflow',
+      1,
+      'user-1',
+      'manual',
+    );
+    expect(instance.status).toBe('created');
+    expect(instance.definitionName).toBe('linear-workflow');
+    expect(instance.definitionVersion).toBe('1');
+    expect(instance.createdBy).toBe('user-1');
+    expect(instance.triggerType).toBe('manual');
+    expect(instance.currentStepId).toBeNull();
+    expect(instance.id).toBeDefined();
+    // No configName/configVersion on unified instances
+    expect(instance.configName).toBeUndefined();
+    expect(instance.configVersion).toBeUndefined();
+  });
+
+  it('createWorkflowInstance uses definition.roles as assignedRoles', async () => {
+    const instance = await engine.createWorkflowInstance(
+      'linear-workflow',
+      1,
+      'user-1',
+      'manual',
+    );
+    expect(instance.assignedRoles).toEqual(['operator', 'reviewer']);
+  });
+
+  it('createWorkflowInstance uses caller-supplied roles when provided', async () => {
+    const instance = await engine.createWorkflowInstance(
+      'linear-workflow',
+      1,
+      'user-1',
+      'manual',
+      {},
+      ['custom-role'],
+    );
+    expect(instance.assignedRoles).toEqual(['custom-role']);
+  });
+
+  it('createWorkflowInstance throws when definition not found', async () => {
+    await expect(
+      engine.createWorkflowInstance('nonexistent', 99, 'user-1', 'manual'),
+    ).rejects.toThrow("Workflow definition 'nonexistent' version '99' not found");
+  });
+
+  it('createWorkflowInstance uses payload when provided', async () => {
+    const instance = await engine.createWorkflowInstance(
+      'linear-workflow',
+      1,
+      'user-1',
+      'manual',
+      { key: 'value' },
+    );
+    expect(instance.triggerPayload).toEqual({ key: 'value' });
+  });
+
+  it('createWorkflowInstance defaults payload to empty object when omitted', async () => {
+    const instance = await engine.createWorkflowInstance(
+      'linear-workflow',
+      1,
+      'user-1',
+      'cron',
+    );
+    expect(instance.triggerPayload).toEqual({});
+    expect(instance.triggerType).toBe('cron');
+  });
+
+  // --- advanceWorkflowStep ---
+
+  it('advanceWorkflowStep delegates to StepExecutor, advances to next step', async () => {
+    const instance = await engine.createWorkflowInstance('linear-workflow', 1, 'user-1', 'manual');
+    await engine.startInstance(instance.id);
+
+    const advanced = await engine.advanceWorkflowStep(instance.id, { result: 'ok' }, actor);
+    expect(advanced.currentStepId).toBe('process');
+    expect(advanced.status).toBe('running');
+  });
+
+  it('advanceWorkflowStep throws InvalidTransitionError when instance is not running', async () => {
+    const instance = await engine.createWorkflowInstance('linear-workflow', 1, 'user-1', 'manual');
+    // Not started yet — status is 'created'
+    await expect(
+      engine.advanceWorkflowStep(instance.id, {}, actor),
+    ).rejects.toThrow(InvalidTransitionError);
+  });
+
+  // --- full lifecycle with WorkflowDefinition ---
+
+  it('full linear flow with createWorkflowInstance -> startInstance -> advanceWorkflowStep x2 -> completed', async () => {
+    const instance = await engine.createWorkflowInstance('linear-workflow', 1, 'user-1', 'manual');
+    expect(instance.status).toBe('created');
+
+    const started = await engine.startInstance(instance.id);
+    expect(started.status).toBe('running');
+    expect(started.currentStepId).toBe('start');
+
+    // Advance: start -> process
+    const step1 = await engine.advanceWorkflowStep(instance.id, { result: 'step1' }, actor);
+    expect(step1.currentStepId).toBe('process');
+
+    // Advance: process -> done (terminal)
+    const step2 = await engine.advanceWorkflowStep(instance.id, { result: 'step2' }, actor);
+    expect(step2.status).toBe('completed');
+    expect(step2.currentStepId).toBeNull();
+  });
+
+  it('buildWorkflowDefinition factory produces a valid saveable definition', async () => {
+    const def = buildWorkflowDefinition({ name: 'factory-workflow', version: 2 });
+    await processRepo.saveWorkflowDefinition(def);
+
+    const instance = await engine.createWorkflowInstance('factory-workflow', 2, 'user-1', 'manual');
+    expect(instance.definitionName).toBe('factory-workflow');
+    expect(instance.definitionVersion).toBe('2');
+  });
+
+  // --- HumanTask creation with WorkflowDefinition ---
+
+  it('advanceWorkflowStep creates HumanTask for next human executor step', async () => {
+    const humanTaskRepo = new InMemoryHumanTaskRepository();
+    const engineWithTasks = new WorkflowEngine(
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      undefined,
+      undefined,
+      undefined,
+      humanTaskRepo,
+    );
+
+    const instance = await engineWithTasks.createWorkflowInstance(
+      'linear-workflow',
+      1,
+      'user-1',
+      'manual',
+    );
+    await engineWithTasks.startInstance(instance.id);
+
+    // Advance from 'start' (agent) -> 'process' (human)
+    await engineWithTasks.advanceWorkflowStep(
+      instance.id,
+      { result: 'done' },
+      { id: 'user-1', role: 'operator' },
+    );
+
+    const tasks = humanTaskRepo.getAll();
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].processInstanceId).toBe(instance.id);
+    expect(tasks[0].stepId).toBe('process');
+    expect(tasks[0].assignedRole).toBe('operator');
+    expect(tasks[0].status).toBe('pending');
+  });
+
+  it('advanceWorkflowStep pauses instance when advancing to a human step', async () => {
+    const humanTaskRepo = new InMemoryHumanTaskRepository();
+    const engineWithTasks = new WorkflowEngine(
+      processRepo,
+      instanceRepo,
+      auditRepo,
+      undefined,
+      undefined,
+      undefined,
+      humanTaskRepo,
+    );
+
+    const instance = await engineWithTasks.createWorkflowInstance('linear-workflow', 1, 'user-1', 'manual');
+    await engineWithTasks.startInstance(instance.id);
+    await engineWithTasks.advanceWorkflowStep(instance.id, {}, actor);
+
+    const updated = await instanceRepo.getById(instance.id);
+    expect(updated!.status).toBe('paused');
+    expect(updated!.pauseReason).toBe('waiting_for_human');
+  });
+
+  // --- review flow with WorkflowDefinition ---
+
+  it('review flow: advanceWorkflowStep then submitReviewVerdict routes via verdicts', async () => {
+    const instance = await engine.createWorkflowInstance('review-workflow', 1, 'user-1', 'manual');
+    await engine.startInstance(instance.id);
+
+    // Advance: draft -> review
+    await engine.advanceWorkflowStep(instance.id, {}, actor);
+    let current = await instanceRepo.getById(instance.id);
+    expect(current!.currentStepId).toBe('review');
+
+    // Approve: should route to approved (terminal)
+    await engine.submitReviewVerdict(
+      instance.id,
+      'review',
+      makeReviewVerdict('approve'),
+      actor,
+    );
+    current = await instanceRepo.getById(instance.id);
+    expect(current!.status).toBe('completed');
   });
 });

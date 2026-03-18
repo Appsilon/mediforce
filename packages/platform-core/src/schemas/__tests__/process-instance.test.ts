@@ -189,16 +189,16 @@ describe('ProcessInstanceSchema', () => {
     }
   });
 
-  it('[DATA] should reject instance without configName (required field)', () => {
+  it('[DATA] should accept instance without configName (optional field)', () => {
     const { configName: _, ...noConfigName } = validInstance;
     const result = ProcessInstanceSchema.safeParse(noConfigName);
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
-  it('[DATA] should reject instance without configVersion (required field)', () => {
+  it('[DATA] should accept instance without configVersion (optional field)', () => {
     const { configVersion: _, ...noConfigVersion } = validInstance;
     const result = ProcessInstanceSchema.safeParse(noConfigVersion);
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('[DATA] should reject instance with empty configName', () => {

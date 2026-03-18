@@ -107,6 +107,17 @@ export {
 export { NotificationTargetSchema, type NotificationTarget } from './process-config.js';
 
 export {
+  WorkflowAgentConfigSchema,
+  WorkflowReviewConfigSchema,
+  WorkflowStepSchema,
+  WorkflowDefinitionSchema,
+  type WorkflowAgentConfig,
+  type WorkflowReviewConfig,
+  type WorkflowStep,
+  type WorkflowDefinition,
+} from './workflow-definition.js';
+
+export {
   PluginRoleSchema,
   PluginCapabilityMetadataSchema,
   type PluginCapabilityMetadata,

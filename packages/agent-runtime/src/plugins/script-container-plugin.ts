@@ -2,9 +2,13 @@ import { spawn } from 'node:child_process';
 import { readFile, mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
+
+function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
+  return 'step' in ctx && 'workflowDefinition' in ctx;
+}
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
@@ -42,7 +46,7 @@ export class ScriptContainerPlugin implements AgentPlugin {
     roles: ['executor'],
   };
 
-  private context!: AgentContext;
+  private context!: AgentContext | WorkflowAgentContext;
   private image!: string;
   private commandArgs!: string[];
   private commandDisplay!: string;
@@ -50,22 +54,33 @@ export class ScriptContainerPlugin implements AgentPlugin {
   private runtime: string | null = null;
   private resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
 
-  async initialize(context: AgentContext): Promise<void> {
+  async initialize(context: AgentContext | WorkflowAgentContext): Promise<void> {
     this.context = context;
 
-    const stepConfig = context.config.stepConfigs.find(
-      (sc: StepConfig) => sc.stepId === context.stepId,
-    );
+    let agentConfig: AgentConfig | undefined;
+    let stepEnv: Record<string, string> | undefined;
+    let definitionEnv: Record<string, string> | undefined;
 
-    if (!stepConfig) {
-      throw new Error(`Step config not found for stepId '${context.stepId}'`);
+    if (isWorkflowAgentContext(context)) {
+      agentConfig = context.step.agent as AgentConfig | undefined;
+      stepEnv = context.step.env;
+      definitionEnv = context.workflowDefinition.env;
+    } else {
+      const stepConfig = context.config.stepConfigs.find(
+        (sc: StepConfig) => sc.stepId === context.stepId,
+      );
+      if (!stepConfig) {
+        throw new Error(`Step config not found for stepId '${context.stepId}'`);
+      }
+      agentConfig = stepConfig.agentConfig;
+      stepEnv = stepConfig.env;
+      definitionEnv = context.config.env;
     }
 
-    const agentConfig: AgentConfig | undefined = stepConfig.agentConfig;
     if (!agentConfig) {
       throw new Error(
-        `No agentConfig found for step '${context.stepId}'. ` +
-        `ScriptContainerPlugin requires agentConfig with command or inlineScript.`,
+        `No agent config found for step '${context.stepId}'. ` +
+        `ScriptContainerPlugin requires agent config with command or inlineScript.`,
       );
     }
 
@@ -74,7 +89,7 @@ export class ScriptContainerPlugin implements AgentPlugin {
       const runtime = agentConfig.runtime;
       if (!runtime) {
         throw new Error(
-          `agentConfig.runtime is required when using inlineScript for step '${context.stepId}'. ` +
+          `agent.runtime is required when using inlineScript for step '${context.stepId}'. ` +
           `Supported runtimes: ${Object.keys(RUNTIME_CONFIG).join(', ')}`,
         );
       }
@@ -97,8 +112,8 @@ export class ScriptContainerPlugin implements AgentPlugin {
       // Command mode — existing behavior
       if (!agentConfig.image) {
         throw new Error(
-          `No Docker image configured in agentConfig for step '${context.stepId}'. ` +
-          'ScriptContainerPlugin requires agentConfig.image when using command mode.',
+          `No Docker image configured in agent config for step '${context.stepId}'. ` +
+          'ScriptContainerPlugin requires agent.image when using command mode.',
         );
       }
       this.image = agentConfig.image;
@@ -107,12 +122,12 @@ export class ScriptContainerPlugin implements AgentPlugin {
     } else {
       throw new Error(
         `No command or inlineScript configured for step '${context.stepId}'. ` +
-        'ScriptContainerPlugin requires either agentConfig.command or agentConfig.inlineScript.',
+        'ScriptContainerPlugin requires either agent.command or agent.inlineScript.',
       );
     }
 
-    // Resolve env vars from config (same mechanism as BaseContainerAgentPlugin)
-    this.resolvedEnv = resolveStepEnv(context.config.env, stepConfig.env);
+    // Resolve env vars from definition-level + step-level env
+    this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv);
   }
 
   async run(emit: EmitFn): Promise<void> {

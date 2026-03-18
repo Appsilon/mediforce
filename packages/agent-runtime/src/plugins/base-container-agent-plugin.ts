@@ -3,9 +3,13 @@ import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath,
 import { join, dirname } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import type { AgentPlugin, AgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
+
+function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
+  return 'step' in ctx && 'workflowDefinition' in ctx;
+}
 
 const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
@@ -152,7 +156,7 @@ export async function cleanupTempDir(tempDir: string | null): Promise<void> {
 export abstract class BaseContainerAgentPlugin implements AgentPlugin {
   abstract readonly metadata: PluginCapabilityMetadata;
 
-  protected context!: AgentContext;
+  protected context!: AgentContext | WorkflowAgentContext;
   protected agentConfig!: AgentConfig;
 
   /** Human-readable agent name for log/status messages (e.g. "Claude Code", "OpenCode"). */
@@ -271,43 +275,87 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
     return null;
   }
 
-  async initialize(context: AgentContext): Promise<void> {
+  async initialize(context: AgentContext | WorkflowAgentContext): Promise<void> {
     this.context = context;
 
-    const stepConfig = context.config.stepConfigs.find(
-      (sc: StepConfig) => sc.stepId === context.stepId,
-    );
+    let agentConfig: AgentConfig;
 
-    if (!stepConfig) {
-      throw new Error(`Step config not found for stepId '${context.stepId}'`);
-    }
+    if (isWorkflowAgentContext(context)) {
+      const stepAgent = context.step.agent;
+      if (!stepAgent) {
+        throw new Error(
+          `No agent config found in step '${context.stepId}'. ` +
+          `${this.agentName} plugin requires step.agent with at least image and skill or prompt.`,
+        );
+      }
 
-    const agentConfig = stepConfig.agentConfig;
-    if (!agentConfig) {
-      throw new Error(
-        `No agentConfig found for step '${context.stepId}'. ` +
-        `${this.agentName} plugin requires agentConfig with at least image and skill or prompt.`,
+      if (!stepAgent.skill && !stepAgent.prompt) {
+        throw new Error(
+          `Neither skill nor prompt configured in step.agent for step '${context.stepId}'. ` +
+          `${this.agentName} plugin requires at least one of step.agent.skill or step.agent.prompt.`,
+        );
+      }
+
+      if (!stepAgent.image && !isLocalExecutionAllowed()) {
+        throw new Error(
+          `No Docker image configured in step.agent for step '${context.stepId}'. ` +
+          'Local agent execution requires ALLOW_LOCAL_AGENTS=true. ' +
+          'Either set step.agent.image for Docker execution, or enable local execution.',
+        );
+      }
+
+      // Map WorkflowAgentConfig fields to the AgentConfig shape used internally
+      agentConfig = {
+        model: stepAgent.model,
+        skill: stepAgent.skill,
+        prompt: stepAgent.prompt,
+        skillsDir: stepAgent.skillsDir,
+        timeoutMs: stepAgent.timeoutMs ?? (stepAgent.timeoutMinutes ? stepAgent.timeoutMinutes * 60_000 : undefined),
+        command: stepAgent.command,
+        inlineScript: stepAgent.inlineScript,
+        runtime: stepAgent.runtime,
+        image: stepAgent.image,
+        repo: stepAgent.repo,
+        commit: stepAgent.commit,
+      };
+    } else {
+      const stepConfig = context.config.stepConfigs.find(
+        (sc: StepConfig) => sc.stepId === context.stepId,
       );
-    }
 
-    if (!agentConfig.skill && !agentConfig.prompt) {
-      throw new Error(
-        `Neither skill nor prompt configured in agentConfig for step '${context.stepId}'. ` +
-        `${this.agentName} plugin requires at least one of agentConfig.skill or agentConfig.prompt.`,
-      );
-    }
+      if (!stepConfig) {
+        throw new Error(`Step config not found for stepId '${context.stepId}'`);
+      }
 
-    if (!agentConfig.image && !isLocalExecutionAllowed()) {
-      throw new Error(
-        `No Docker image configured in agentConfig for step '${context.stepId}'. ` +
-        'Local agent execution requires ALLOW_LOCAL_AGENTS=true. ' +
-        'Either set agentConfig.image for Docker execution, or enable local execution.',
-      );
-    }
+      const legacyAgentConfig = stepConfig.agentConfig;
+      if (!legacyAgentConfig) {
+        throw new Error(
+          `No agentConfig found for step '${context.stepId}'. ` +
+          `${this.agentName} plugin requires agentConfig with at least image and skill or prompt.`,
+        );
+      }
 
-    // Wire up stepConfig.timeoutMinutes → agentConfig.timeoutMs if not already set
-    if (!agentConfig.timeoutMs && stepConfig.timeoutMinutes) {
-      agentConfig.timeoutMs = stepConfig.timeoutMinutes * 60_000;
+      if (!legacyAgentConfig.skill && !legacyAgentConfig.prompt) {
+        throw new Error(
+          `Neither skill nor prompt configured in agentConfig for step '${context.stepId}'. ` +
+          `${this.agentName} plugin requires at least one of agentConfig.skill or agentConfig.prompt.`,
+        );
+      }
+
+      if (!legacyAgentConfig.image && !isLocalExecutionAllowed()) {
+        throw new Error(
+          `No Docker image configured in agentConfig for step '${context.stepId}'. ` +
+          'Local agent execution requires ALLOW_LOCAL_AGENTS=true. ' +
+          'Either set agentConfig.image for Docker execution, or enable local execution.',
+        );
+      }
+
+      // Wire up stepConfig.timeoutMinutes → agentConfig.timeoutMs if not already set
+      if (!legacyAgentConfig.timeoutMs && stepConfig.timeoutMinutes) {
+        legacyAgentConfig.timeoutMs = stepConfig.timeoutMinutes * 60_000;
+      }
+
+      agentConfig = legacyAgentConfig;
     }
 
     this.agentConfig = agentConfig;
@@ -318,14 +366,21 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
     const skillName = this.agentConfig.skill ?? 'custom-prompt';
     const timeoutMs = this.agentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-    // Resolve env vars from config-level + step-level env
-    const stepConfig = this.context.config.stepConfigs.find(
-      (s) => s.stepId === this.context.stepId,
-    );
-    this.resolvedEnv = resolveStepEnv(
-      this.context.config.env,
-      stepConfig?.env,
-    );
+    // Resolve env vars from definition-level + step-level env
+    if (isWorkflowAgentContext(this.context)) {
+      this.resolvedEnv = resolveStepEnv(
+        this.context.workflowDefinition.env,
+        this.context.step.env,
+      );
+    } else {
+      const stepConfig = this.context.config.stepConfigs.find(
+        (s) => s.stepId === this.context.stepId,
+      );
+      this.resolvedEnv = resolveStepEnv(
+        this.context.config.env,
+        stepConfig?.env,
+      );
+    }
 
     await emit({
       type: 'status',

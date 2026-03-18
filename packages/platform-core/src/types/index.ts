@@ -51,3 +51,10 @@ export type {
   AgentRunStatus,
   AgentRun,
 } from '../schemas/agent-run.js';
+
+export type {
+  WorkflowAgentConfig,
+  WorkflowReviewConfig,
+  WorkflowStep,
+  WorkflowDefinition,
+} from '../schemas/workflow-definition.js';

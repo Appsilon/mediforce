@@ -2,48 +2,39 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, X, Loader2 } from 'lucide-react';
-import { useProcessConfigs } from '@/hooks/use-process-configs';
+import { Play, X, Loader2, ChevronDown } from 'lucide-react';
+import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useAuth } from '@/contexts/auth-context';
-import { startProcessRun } from '@/app/actions/processes';
+import { startWorkflowRun } from '@/app/actions/processes';
 import { cn } from '@/lib/utils';
-import type { ProcessConfig } from '@mediforce/platform-core';
 
 interface StartRunDialogProps {
-  processName: string;
-  definitionVersion: string;
+  workflowName: string;
   open: boolean;
   onClose: () => void;
 }
 
 export function StartRunDialog({
-  processName,
-  definitionVersion,
+  workflowName,
   open,
   onClose,
 }: StartRunDialogProps) {
   const router = useRouter();
   const { firebaseUser } = useAuth();
-  const { configs: allConfigs, loading: configsLoading } = useProcessConfigs(processName);
-  const configs = React.useMemo(
-    () => allConfigs.filter((config) => config.archived !== true),
-    [allConfigs],
-  );
-  const [selectedConfig, setSelectedConfig] = React.useState<ProcessConfig | null>(null);
+  const { definitions, latestVersion, loading } = useWorkflowDefinitions(workflowName);
+  const [selectedVersion, setSelectedVersion] = React.useState<number | null>(null);
+  const [versionPickerOpen, setVersionPickerOpen] = React.useState(false);
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Auto-select when there's only one config
-  React.useEffect(() => {
-    if (configs.length === 1 && selectedConfig === null) {
-      setSelectedConfig(configs[0]);
-    }
-  }, [configs, selectedConfig]);
+  // Derived: the version to use — selected override or latest
+  const effectiveVersion = selectedVersion ?? latestVersion;
 
   // Reset state when dialog opens
   React.useEffect(() => {
     if (open) {
-      setSelectedConfig(configs.length === 1 ? configs[0] : null);
+      setSelectedVersion(null);
+      setVersionPickerOpen(false);
       setStarting(false);
       setError(null);
     }
@@ -52,29 +43,29 @@ export function StartRunDialog({
   if (!open) return null;
 
   async function handleStart() {
-    if (!selectedConfig || !firebaseUser) return;
+    if (!firebaseUser || effectiveVersion === 0) return;
 
     setStarting(true);
     setError(null);
 
-    const result = await startProcessRun({
-      definitionName: processName,
-      definitionVersion,
-      configName: selectedConfig.configName,
-      configVersion: selectedConfig.configVersion,
+    const result = await startWorkflowRun({
+      definitionName: workflowName,
+      definitionVersion: effectiveVersion,
       triggeredBy: firebaseUser.uid,
     });
 
     if (result.success && result.instanceId) {
       onClose();
       router.push(
-        `/workflows/${encodeURIComponent(processName)}/runs/${result.instanceId}`,
+        `/workflows/${encodeURIComponent(workflowName)}/runs/${result.instanceId}`,
       );
     } else {
       setError(result.error ?? 'Failed to start run');
       setStarting(false);
     }
   }
+
+  const canStart = !loading && effectiveVersion > 0 && !starting;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -99,50 +90,61 @@ export function StartRunDialog({
         <div className="px-5 py-4 space-y-4">
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              Process
+              Workflow
             </label>
-            <p className="text-sm mt-0.5">
-              {processName}{' '}
-              <span className="font-mono text-xs text-muted-foreground">
-                v{definitionVersion}
-              </span>
-            </p>
+            <p className="text-sm mt-0.5">{workflowName}</p>
           </div>
 
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              Configuration
+              Version
             </label>
-            {configsLoading ? (
+            {loading ? (
               <div className="mt-1.5 h-10 rounded-md bg-muted animate-pulse" />
-            ) : configs.length === 0 ? (
+            ) : effectiveVersion === 0 ? (
               <p className="mt-1.5 text-sm text-muted-foreground">
-                No configurations available. Create one first.
+                No versions available.
               </p>
             ) : (
-              <div className="mt-1.5 space-y-1.5">
-                {configs.map((config) => {
-                  const isSelected =
-                    selectedConfig?.configName === config.configName &&
-                    selectedConfig?.configVersion === config.configVersion;
-                  return (
-                    <button
-                      key={`${config.configName}:${config.configVersion}`}
-                      onClick={() => setSelectedConfig(config)}
-                      className={cn(
-                        'flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors',
-                        isSelected
-                          ? 'border-primary bg-primary/5'
-                          : 'hover:bg-muted/50',
-                      )}
-                    >
-                      <span className="font-medium">{config.configName}</span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {config.configVersion}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div className="mt-1.5 relative">
+                <button
+                  onClick={() => setVersionPickerOpen((prev) => !prev)}
+                  className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
+                >
+                  <span>
+                    <span className="font-mono">v{effectiveVersion}</span>
+                    {(selectedVersion === null || selectedVersion === latestVersion) && (
+                      <span className="ml-2 text-xs text-muted-foreground">(latest)</span>
+                    )}
+                  </span>
+                  <ChevronDown className={cn(
+                    'h-4 w-4 text-muted-foreground transition-transform',
+                    versionPickerOpen && 'rotate-180',
+                  )} />
+                </button>
+
+                {versionPickerOpen && definitions.length > 1 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover shadow-md">
+                    {definitions.map((def) => (
+                      <button
+                        key={def.version}
+                        onClick={() => {
+                          setSelectedVersion(def.version);
+                          setVersionPickerOpen(false);
+                        }}
+                        className={cn(
+                          'flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
+                          def.version === effectiveVersion && 'bg-primary/5 font-medium',
+                        )}
+                      >
+                        <span className="font-mono">v{def.version}</span>
+                        {def.version === latestVersion && (
+                          <span className="text-xs text-muted-foreground">latest</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -161,7 +163,7 @@ export function StartRunDialog({
           </button>
           <button
             onClick={handleStart}
-            disabled={!selectedConfig || starting || configs.length === 0}
+            disabled={!canStart}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors',
               'hover:bg-primary/90',

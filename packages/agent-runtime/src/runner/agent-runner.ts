@@ -6,9 +6,10 @@ import {
   type AuditRepository,
   type StepConfig,
   type AgentRunRepository,
+  type WorkflowStep,
 } from '@mediforce/platform-core';
 import { randomUUID } from 'crypto';
-import type { AgentPlugin, AgentContext, EmitPayload } from '../interfaces/agent-plugin.js';
+import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitPayload } from '../interfaces/agent-plugin.js';
 import type { AgentEventLog } from './agent-event-log.js';
 import { FallbackHandler } from './fallback-handler.js';
 
@@ -38,6 +39,154 @@ export class AgentRunner {
     this.fallbackHandler = new FallbackHandler(instanceRepository);
   }
 
+  /**
+   * Run an agent plugin using the unified WorkflowDefinition model.
+   * Config is read from step.agent (model, timeoutMinutes, confidenceThreshold,
+   * fallbackBehavior) and step.autonomyLevel / step.plugin.
+   */
+  async runWithWorkflowStep(
+    plugin: AgentPlugin,
+    context: WorkflowAgentContext,
+  ): Promise<AgentRunResult> {
+    const startedAt = Date.now();
+    const { processInstanceId, stepId, autonomyLevel } = context;
+    const runId = randomUUID();
+    const pluginId = context.step.plugin ?? context.stepId;
+
+    if (this.agentRunRepository) {
+      await this.agentRunRepository.create({
+        id: runId,
+        processInstanceId,
+        stepId,
+        pluginId,
+        autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
+        status: 'running',
+        envelope: null,
+        fallbackReason: null,
+        startedAt: new Date(startedAt).toISOString(),
+        completedAt: null,
+      });
+    }
+
+    const emit = async (event: EmitPayload): Promise<void> => {
+      await this.eventLog.write(processInstanceId, stepId, event);
+    };
+
+    await plugin.initialize(context);
+
+    const timeoutMs = (context.step.agent?.timeoutMinutes ?? 30) * 60_000;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new AgentTimeoutError()), timeoutMs);
+    });
+
+    let fallbackReason: 'timeout' | 'low_confidence' | 'error' | null = null;
+    let caughtErrorMessage: string | null = null;
+
+    try {
+      await Promise.race([plugin.run(emit), timeoutPromise]);
+
+      const events = this.eventLog.getEvents(processInstanceId, stepId);
+      const resultEvent = [...events].reverse().find((e) => e.type === 'result');
+
+      if (!resultEvent) {
+        fallbackReason = 'error';
+      } else {
+        const parseResult = AgentOutputEnvelopeSchema.safeParse(resultEvent.payload);
+        if (!parseResult.success) {
+          fallbackReason = 'error';
+        } else {
+          const envelope = parseResult.data;
+
+          const threshold = context.step.agent?.confidenceThreshold ?? 0;
+          if (envelope.confidence < threshold) {
+            fallbackReason = 'low_confidence';
+          }
+
+          if (fallbackReason) {
+            const partialWork = this.eventLog.getPartialWork(processInstanceId, stepId);
+            const fallbackResult = await this.fallbackHandler.handleWithWorkflowStep(
+              fallbackReason,
+              context,
+              partialWork,
+              envelope,
+            );
+            const duration_ms = Date.now() - startedAt;
+            await this.appendAuditEventFromWorkflowStep(context, envelope, fallbackResult.status, duration_ms);
+            if (this.agentRunRepository) {
+              await this.agentRunRepository.create({
+                id: runId,
+                processInstanceId,
+                stepId,
+                pluginId,
+                autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
+                status: fallbackResult.status,
+                envelope: fallbackResult.envelope,
+                fallbackReason: fallbackResult.fallbackReason,
+                startedAt: new Date(startedAt).toISOString(),
+                completedAt: new Date().toISOString(),
+              });
+            }
+            return fallbackResult;
+          }
+
+          const result = await this.applyAutonomyBehaviorForWorkflowStep(autonomyLevel, envelope, context);
+          const duration_ms = Date.now() - startedAt;
+          await this.appendAuditEventFromWorkflowStep(context, envelope, result.status, duration_ms);
+          if (this.agentRunRepository) {
+            await this.agentRunRepository.create({
+              id: runId,
+              processInstanceId,
+              stepId,
+              pluginId,
+              autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
+              status: result.status,
+              envelope: result.envelope,
+              fallbackReason: result.fallbackReason,
+              startedAt: new Date(startedAt).toISOString(),
+              completedAt: new Date().toISOString(),
+            });
+          }
+          return result;
+        }
+      }
+    } catch (err) {
+      if (err instanceof AgentTimeoutError) {
+        fallbackReason = 'timeout';
+      } else {
+        fallbackReason = 'error';
+        caughtErrorMessage = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    const partialWork = this.eventLog.getPartialWork(processInstanceId, stepId);
+    const fallbackResult = await this.fallbackHandler.handleWithWorkflowStep(
+      fallbackReason!,
+      context,
+      partialWork,
+    );
+    const duration_ms = Date.now() - startedAt;
+    await this.appendAuditEventFromWorkflowStep(context, null, fallbackResult.status, duration_ms, caughtErrorMessage);
+    if (this.agentRunRepository) {
+      await this.agentRunRepository.create({
+        id: runId,
+        processInstanceId,
+        stepId,
+        pluginId,
+        autonomyLevel: autonomyLevel as 'L0' | 'L1' | 'L2' | 'L3' | 'L4',
+        status: fallbackResult.status,
+        envelope: fallbackResult.envelope,
+        fallbackReason: fallbackResult.fallbackReason,
+        startedAt: new Date(startedAt).toISOString(),
+        completedAt: new Date().toISOString(),
+      });
+    }
+    return fallbackResult;
+  }
+
+  /**
+   * @deprecated Use runWithWorkflowStep instead. This method relies on the legacy
+   * StepConfig model which is being replaced by WorkflowStep.
+   */
   async run(
     plugin: AgentPlugin,
     context: AgentContext,
@@ -191,6 +340,89 @@ export class AgentRunner {
       });
     }
     return fallbackResult;
+  }
+
+  private async applyAutonomyBehaviorForWorkflowStep(
+    level: string,
+    envelope: AgentOutputEnvelope,
+    context: WorkflowAgentContext,
+  ): Promise<AgentRunResult> {
+    const { processInstanceId, stepId } = context;
+
+    switch (level) {
+      case 'L0':
+        return { status: 'completed', envelope, appliedToWorkflow: false, fallbackReason: null };
+
+      case 'L1':
+        await this.eventLog.write(processInstanceId, stepId, {
+          type: 'shadow_result',
+          payload: envelope,
+          timestamp: new Date().toISOString(),
+        });
+        return { status: 'completed', envelope, appliedToWorkflow: false, fallbackReason: null };
+
+      case 'L2':
+        return { status: 'completed', envelope, appliedToWorkflow: false, fallbackReason: null };
+
+      case 'L3':
+        await this.instanceRepository.update(context.processInstanceId, {
+          status: 'paused',
+          pauseReason: 'awaiting_agent_approval',
+        });
+        return { status: 'paused', envelope, appliedToWorkflow: false, fallbackReason: null };
+
+      case 'L4':
+        return { status: 'completed', envelope, appliedToWorkflow: true, fallbackReason: null };
+
+      default:
+        return { status: 'completed', envelope, appliedToWorkflow: false, fallbackReason: null };
+    }
+  }
+
+  private async appendAuditEventFromWorkflowStep(
+    context: WorkflowAgentContext,
+    envelope: AgentOutputEnvelope | null,
+    runStatus: AgentRunStatus,
+    duration_ms: number,
+    errorMessage: string | null = null,
+  ): Promise<void> {
+    const pluginId = context.step.plugin ?? context.stepId;
+    const reviewerType = context.autonomyLevel === 'L4'
+      ? 'none'
+      : context.autonomyLevel === 'L3'
+        ? (context.step.review?.type ?? 'human')
+        : 'none';
+
+    await this.auditRepository.append({
+      actorId: `agent:${pluginId}`,
+      actorType: 'agent',
+      actorRole: context.autonomyLevel,
+      action: 'agent.run',
+      description: `Agent run completed with status '${runStatus}' at autonomy level ${context.autonomyLevel}`,
+      timestamp: new Date().toISOString(),
+      inputSnapshot: {
+        stepInput: context.stepInput,
+        autonomyLevel: context.autonomyLevel,
+        model: context.step.agent?.model ?? envelope?.model ?? null,
+      },
+      outputSnapshot: {
+        status: runStatus,
+        confidence: envelope?.confidence ?? null,
+        model: envelope?.model ?? null,
+        duration_ms,
+        reasoning_summary: envelope?.reasoning_summary ?? null,
+        result: envelope?.result ?? null,
+        ...(errorMessage !== null ? { error: errorMessage } : {}),
+      },
+      basis: `Autonomy level ${context.autonomyLevel} — ${this.getBasisDescription(context.autonomyLevel)}`,
+      entityType: 'process_instance',
+      entityId: context.processInstanceId,
+      processInstanceId: context.processInstanceId,
+      stepId: context.stepId,
+      processDefinitionVersion: context.definitionVersion,
+      executorType: 'agent',
+      reviewerType,
+    });
   }
 
   private async applyAutonomyBehavior(
