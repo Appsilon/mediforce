@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
+import { stringify as yamlStringify } from 'yaml';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
@@ -66,12 +67,14 @@ export default function WorkflowDefinitionVersionPage() {
   }, []);
 
   const addStepAfter = useCallback((afterStepId: string) => {
+    const stepNum = editedSteps.length + 1;
+    const newId = `new-step-${stepNum}`;
     setEditedSteps((prev) => {
       const idx = prev.findIndex((s) => s.id === afterStepId);
       if (idx === -1) return prev;
       const newStep: WorkflowStep = {
-        id: `step-${Date.now()}`,
-        name: 'New Step',
+        id: newId,
+        name: `New Step ${stepNum}`,
         type: 'creation',
         executor: 'human',
       };
@@ -79,22 +82,26 @@ export default function WorkflowDefinitionVersionPage() {
       next.splice(idx + 1, 0, newStep);
       return next;
     });
+    // Rewire transitions: afterStep→X becomes afterStep→new→X
+    setEditedTransitions((prev) => {
+      const outgoing = prev.filter((t) => t.from === afterStepId);
+      if (outgoing.length === 0) {
+        // No outgoing — just add afterStep→new
+        return [...prev, { from: afterStepId, to: newId }];
+      }
+      // Replace first outgoing with afterStep→new, new→originalTarget
+      const first = outgoing[0];
+      return [
+        ...prev.filter((t) => t !== first),
+        { from: afterStepId, to: newId },
+        { from: newId, to: first.to },
+      ];
+    });
   }, []);
 
   const removeStep = useCallback((stepId: string) => {
     setEditedSteps((prev) => prev.filter((s) => s.id !== stepId));
     setEditedTransitions((prev) => prev.filter((t) => t.from !== stepId && t.to !== stepId));
-  }, []);
-
-  const connectSteps = useCallback((fromId: string, toId: string) => {
-    setEditedTransitions((prev) => {
-      if (prev.some((t) => t.from === fromId && t.to === toId)) return prev;
-      return [...prev, { from: fromId, to: toId }];
-    });
-  }, []);
-
-  const removeEdge = useCallback((fromId: string, toId: string) => {
-    setEditedTransitions((prev) => prev.filter((t) => !(t.from === fromId && t.to === toId)));
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -220,10 +227,14 @@ export default function WorkflowDefinitionVersionPage() {
                 </button>
 
                 {saveState.status === 'saved' && (
-                  <span className="text-sm text-green-600 dark:text-green-400">Saved v{saveState.version}</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
+                    Saved as v{saveState.version}
+                  </span>
                 )}
                 {saveState.status === 'error' && (
-                  <span className="text-sm text-destructive">{saveState.message}</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+                    {saveState.message}
+                  </span>
                 )}
               </>
             ) : (
@@ -257,9 +268,20 @@ export default function WorkflowDefinitionVersionPage() {
             editing={editing}
             onAddStep={editing ? addStepAfter : undefined}
             onRemoveStep={editing ? removeStep : undefined}
-            onConnect={editing ? connectSteps : undefined}
-            onRemoveEdge={editing ? removeEdge : undefined}
           />
+
+          {/* Raw YAML — for devs */}
+          <details className="mt-4">
+            <summary className="text-[11px] font-medium text-muted-foreground/40 cursor-pointer hover:text-muted-foreground transition-colors select-none">
+              View YAML
+            </summary>
+            <pre className="mt-2 text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto max-h-[400px] overflow-y-auto leading-relaxed">
+              {yamlStringify(
+                { ...diagramDefinition, version: undefined, createdAt: undefined },
+                { indent: 2 },
+              )}
+            </pre>
+          </details>
         </div>
 
         {/* Side panel */}
@@ -520,17 +542,42 @@ function StepEditor({ step, onChange }: { step: WorkflowStep; onChange: (patch: 
       {step.type !== 'terminal' && (
         <Section title="Environment">
           {Object.entries(step.env ?? {}).map(([key, val]) => (
-            <EditableField key={key} label={key} value={val} mono
-              onChange={(v) => {
-                const newEnv = { ...step.env };
-                if (v) { newEnv[key] = v; } else { delete newEnv[key]; }
-                onChange({ env: Object.keys(newEnv).length > 0 ? newEnv : undefined });
-              }} />
+            <div key={key} className="flex items-baseline gap-1.5">
+              <input
+                value={key}
+                onChange={(e) => {
+                  const newEnv: Record<string, string> = {};
+                  for (const [k, v] of Object.entries(step.env ?? {})) {
+                    newEnv[k === key ? e.target.value : k] = v;
+                  }
+                  onChange({ env: newEnv });
+                }}
+                className="bg-transparent text-xs font-mono text-muted-foreground border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-24"
+              />
+              <span className="text-xs text-muted-foreground">=</span>
+              <input
+                value={val}
+                onChange={(e) => {
+                  const newEnv = { ...step.env, [key]: e.target.value };
+                  onChange({ env: newEnv });
+                }}
+                className="bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors flex-1"
+              />
+              <button
+                onClick={() => {
+                  const newEnv = { ...step.env };
+                  delete newEnv[key];
+                  onChange({ env: Object.keys(newEnv).length > 0 ? newEnv : undefined });
+                }}
+                className="text-[10px] text-muted-foreground/40 hover:text-red-500 transition-colors"
+              >
+                ×
+              </button>
+            </div>
           ))}
           <button
             onClick={() => {
-              const key = `VAR_${Object.keys(step.env ?? {}).length + 1}`;
-              onChange({ env: { ...step.env, [key]: '' } });
+              onChange({ env: { ...step.env, NEW_VAR: '' } });
             }}
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >

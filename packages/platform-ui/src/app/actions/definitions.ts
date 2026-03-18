@@ -18,8 +18,7 @@ export async function definitionToYaml(definition: Record<string, unknown>): Pro
 
 /**
  * Build a default "all-human" ProcessConfig from a definition.
- * Every non-terminal step gets executorType: "human" — the safest default.
- * Users must explicitly configure agent executors + plugins via the config editor.
+ * @deprecated Legacy — use WorkflowDefinition instead.
  */
 function buildAllHumanConfig(definition: ProcessDefinition): ProcessConfig {
   return {
@@ -32,6 +31,7 @@ function buildAllHumanConfig(definition: ProcessDefinition): ProcessConfig {
   };
 }
 
+/** @deprecated Legacy — saves ProcessDefinition + auto-creates all-human config. */
 export async function saveDefinition(yaml: string): Promise<SaveDefinitionResult> {
   if (!yaml.trim()) {
     return { success: false, error: 'YAML content is required.' };
@@ -46,13 +46,10 @@ export async function saveDefinition(yaml: string): Promise<SaveDefinitionResult
 
   try {
     await processRepo.saveProcessDefinition(result.data);
-
-    // Auto-create "all-human" default config if none exists yet
     const existing = await processRepo.getProcessConfig(result.data.name, 'all-human', 'v1');
     if (!existing) {
       await processRepo.saveProcessConfig(buildAllHumanConfig(result.data));
     }
-
     return { success: true, name: result.data.name, version: result.data.version };
   } catch (e) {
     if (e instanceof DefinitionVersionAlreadyExistsError) {
@@ -64,6 +61,10 @@ export async function saveDefinition(yaml: string): Promise<SaveDefinitionResult
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
   }
 }
+
+// ---------------------------------------------------------------------------
+// WorkflowDefinition (new unified schema)
+// ---------------------------------------------------------------------------
 
 export type SaveWorkflowDefinitionResult =
   | { success: true; name: string; version: number }
@@ -99,98 +100,9 @@ export async function saveWorkflowDefinition(
   }
 }
 
-export type MigrateResult =
-  | { success: true; migrated: number }
-  | { success: false; error: string };
-
-/**
- * Migrate a legacy ProcessDefinition + ProcessConfig into a unified WorkflowDefinition.
- * Merges the latest ProcessDefinition with its latest ProcessConfig (if any).
- */
-export async function migrateToWorkflowDefinition(
-  processName: string,
-): Promise<MigrateResult> {
-  const { processRepo } = getPlatformServices();
-
-  try {
-    const { valid: legacyDefs } = await processRepo.listProcessDefinitions();
-    const matchingDefs = legacyDefs.filter((d: ProcessDefinition) => d.name === processName);
-    if (matchingDefs.length === 0) {
-      return { success: false, error: `No legacy definitions found for "${processName}".` };
-    }
-
-    const configs = await processRepo.listProcessConfigs(processName);
-    const latestConfig = configs[0] ?? null;
-
-    let migrated = 0;
-
-    for (const legacyDef of matchingDefs) {
-      const existingVersion = await processRepo.getLatestWorkflowVersion(processName);
-      const nextVersion = existingVersion + 1;
-
-      const steps = legacyDef.steps.map((step: ProcessDefinition['steps'][number]) => {
-        const stepConfig = latestConfig?.stepConfigs?.find(
-          (sc: { stepId: string }) => sc.stepId === step.id,
-        );
-
-        return {
-          ...step,
-          executor: (stepConfig?.executorType ?? 'human') as 'human' | 'agent' | 'script',
-          autonomyLevel: stepConfig?.autonomyLevel,
-          plugin: stepConfig?.plugin,
-          allowedRoles: stepConfig?.allowedRoles,
-          agent: stepConfig?.agentConfig ? {
-            model: stepConfig.model,
-            skill: stepConfig.agentConfig.skill,
-            prompt: stepConfig.agentConfig.prompt,
-            skillsDir: stepConfig.agentConfig.skillsDir,
-            timeoutMs: stepConfig.agentConfig.timeoutMs,
-            command: stepConfig.agentConfig.command,
-            inlineScript: stepConfig.agentConfig.inlineScript,
-            runtime: stepConfig.agentConfig.runtime,
-            image: stepConfig.agentConfig.image,
-            repo: stepConfig.agentConfig.repo,
-            commit: stepConfig.agentConfig.commit,
-            timeoutMinutes: stepConfig.timeoutMinutes,
-            confidenceThreshold: stepConfig.confidenceThreshold,
-            fallbackBehavior: stepConfig.fallbackBehavior,
-          } : undefined,
-          review: stepConfig?.reviewerType && stepConfig.reviewerType !== 'none' ? {
-            type: stepConfig.reviewerType,
-            plugin: stepConfig.reviewerPlugin,
-            maxIterations: stepConfig.reviewConstraints?.maxIterations,
-            timeBoxDays: stepConfig.reviewConstraints?.timeBoxDays,
-          } : undefined,
-          stepParams: stepConfig?.params,
-          env: stepConfig?.env,
-        };
-      });
-
-      const workflowDef: WorkflowDefinition = {
-        name: legacyDef.name,
-        version: nextVersion,
-        description: legacyDef.description,
-        repo: legacyDef.repo,
-        url: legacyDef.url,
-        roles: latestConfig?.roles,
-        env: latestConfig?.env,
-        notifications: latestConfig?.notifications,
-        steps,
-        transitions: legacyDef.transitions,
-        triggers: legacyDef.triggers,
-        metadata: legacyDef.metadata,
-        createdAt: new Date().toISOString(),
-      };
-
-      await processRepo.saveWorkflowDefinition(workflowDef);
-      migrated++;
-    }
-
-    return { success: true, migrated };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
-  }
-}
+// ---------------------------------------------------------------------------
+// Archive helpers
+// ---------------------------------------------------------------------------
 
 export type ArchiveResult = { success: true } | { success: false; error: string };
 
