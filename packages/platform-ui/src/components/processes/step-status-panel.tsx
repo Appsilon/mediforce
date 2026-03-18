@@ -42,7 +42,7 @@ interface StepStatusPanelProps {
   onStepClick?: (stepId: string) => void;
   stepConfigMap?: Map<string, StepConfigInfo>;
   onAgentLogClick?: (stepId: string) => void;
-  /** Base href for step detail links, e.g. "/processes/foo/runs/abc". Steps link to `{base}/steps/{stepId}`. */
+  /** Base href for step detail links, e.g. "/workflows/foo/runs/abc". Steps link to `{base}/steps/{stepId}`. */
   stepDetailBaseHref?: string;
 }
 

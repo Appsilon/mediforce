@@ -30,7 +30,7 @@ export function ProcessListTable({
       <table className="w-full text-sm">
         <thead className="bg-muted/50">
           <tr>
-            {['Process', 'Version', 'Status', 'Current Step', 'Started', ''].map((h) => (
+            {['Workflow', 'Version', 'Status', 'Current Step', 'Started', ''].map((h) => (
               <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 {h}
               </th>
@@ -44,7 +44,7 @@ export function ProcessListTable({
             ? (
               <tr>
                 <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  No processes found
+                  No workflows found
                 </td>
               </tr>
             )
@@ -58,7 +58,7 @@ export function ProcessListTable({
                   {format(new Date(inst.createdAt), 'MMM d, HH:mm')}
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/processes/${inst.id}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                  <Link href={`/workflows/${inst.id}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
                     Detail <ExternalLink className="h-3 w-3" />
                   </Link>
                 </td>

@@ -28,7 +28,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const skipped: SkippedEntry[] = [];
 
   try {
-    const definitions = await processRepo.listProcessDefinitions();
+    const { valid: definitions } = await processRepo.listProcessDefinitions();
 
     // Filter to non-archived definitions that have at least one cron trigger
     const cronDefinitions = definitions.filter(

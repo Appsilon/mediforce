@@ -79,8 +79,8 @@ export default function ProcessDefinitionPage() {
   if (!versionsLoading && versions.length === 0) {
     return (
       <div className="p-6 text-center text-sm text-muted-foreground">
-        Process &ldquo;{decodedName}&rdquo; not found.{' '}
-        <Link href="/processes" className="underline">Back to catalog</Link>
+        Workflow &ldquo;{decodedName}&rdquo; not found.{' '}
+        <Link href="/workflows" className="underline">Back to catalog</Link>
       </div>
     );
   }
@@ -90,11 +90,11 @@ export default function ProcessDefinitionPage() {
       {/* Header */}
       <div className="border-b px-6 py-4">
         <Link
-          href="/processes"
+          href="/workflows"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Processes
+          Workflows
         </Link>
 
         <div className="flex items-start justify-between gap-4">
@@ -149,7 +149,7 @@ export default function ProcessDefinitionPage() {
                     await setProcessArchived(decodedName, willArchive);
                     setArchiving(false);
                     if (willArchive) {
-                      router.push('/processes');
+                      router.push('/workflows');
                     }
                   }}
                   disabled={archiving}
@@ -211,7 +211,7 @@ export default function ProcessDefinitionPage() {
             ) : (
               <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Info className="h-3.5 w-3.5" />
-                This process does not support manual start
+                This workflow does not support manual start
               </span>
             )}
           </div>
@@ -226,7 +226,7 @@ export default function ProcessDefinitionPage() {
           <RunsTable
             runs={runs}
             loading={runsLoading}
-            emptyMessage="No runs yet for this process."
+            emptyMessage="No runs yet for this workflow."
           />
         </Tabs.Content>
 

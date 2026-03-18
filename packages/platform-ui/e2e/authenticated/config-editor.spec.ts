@@ -9,7 +9,7 @@ test.describe('Config Editor', () => {
   test('[RENDER] Configurations tab visible on process detail page', async ({
     page,
   }) => {
-    await page.goto('/processes/Supply%20Chain%20Review');
+    await page.goto('/workflows/Supply%20Chain%20Review');
     // The process detail page has Runs, Configurations, Definition tabs
     const configsTab = page.getByRole('tab', { name: /configurations/i });
     await expect(configsTab).toBeVisible({ timeout: 10_000 });
@@ -24,7 +24,7 @@ test.describe('Config Editor', () => {
   });
 
   test('[DATA] Config list shows seeded configs', async ({ page }) => {
-    await page.goto('/processes/Supply%20Chain%20Review');
+    await page.goto('/workflows/Supply%20Chain%20Review');
     const configsTab = page.getByRole('tab', { name: /configurations/i });
     await configsTab.click();
 
@@ -106,7 +106,7 @@ test.describe('Config Editor', () => {
 
   test('[CLICK] Clone link opens pre-populated editor', async ({ page }) => {
     // Navigate to process detail and click Configurations tab
-    await page.goto('/processes/Supply%20Chain%20Review');
+    await page.goto('/workflows/Supply%20Chain%20Review');
     const configsTab = page.getByRole('tab', { name: /configurations/i });
     await configsTab.click();
 

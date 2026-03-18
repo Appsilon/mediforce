@@ -1,5 +1,16 @@
+import type { ZodError } from 'zod';
 import type { ProcessDefinition } from '../schemas/process-definition.js';
 import type { ProcessConfig } from '../schemas/process-config.js';
+
+export interface InvalidDefinitionEntry {
+  data: unknown;
+  error: ZodError;
+}
+
+export interface DefinitionListResult {
+  valid: ProcessDefinition[];
+  invalid: InvalidDefinitionEntry[];
+}
 
 export interface ProcessRepository {
   getProcessDefinition(
@@ -7,7 +18,7 @@ export interface ProcessRepository {
     version: string,
   ): Promise<ProcessDefinition | null>;
   saveProcessDefinition(definition: ProcessDefinition): Promise<void>;
-  listProcessDefinitions(): Promise<ProcessDefinition[]>;
+  listProcessDefinitions(): Promise<DefinitionListResult>;
   getProcessConfig(
     processName: string,
     configName: string,

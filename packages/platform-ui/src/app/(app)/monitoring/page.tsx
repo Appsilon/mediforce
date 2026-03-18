@@ -13,14 +13,14 @@ export default function MonitoringPage() {
       <div>
         <h1 className="text-xl font-headline font-semibold">Monitoring</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Real-time view of all process workflows and task assignments
+          Real-time view of all workflows and task assignments
         </p>
       </div>
 
       {/* Status summary */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          Process Status
+          Workflow Status
         </h2>
         <MonitoringSummaryCards
           running={statusCounts.running}
@@ -36,7 +36,7 @@ export default function MonitoringPage() {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Stuck Processes
+              Stuck Workflows
             </h2>
             {stuckProcesses.length > 0 && (
               <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">

@@ -25,7 +25,7 @@ export function StuckProcessesList({
   if (processes.length === 0) {
     return (
       <div className="rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-4 py-3 text-sm text-green-700 dark:text-green-300">
-        No stuck processes — all workflows are advancing normally.
+        No stuck workflows — all workflows are advancing normally.
       </div>
     );
   }
@@ -43,7 +43,7 @@ export function StuckProcessesList({
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-center gap-2">
                 <Link
-                  href={`/processes/${inst.id}`}
+                  href={`/workflows/${inst.id}`}
                   className="font-medium text-sm hover:text-primary transition-colors truncate"
                 >
                   {inst.definitionName}
