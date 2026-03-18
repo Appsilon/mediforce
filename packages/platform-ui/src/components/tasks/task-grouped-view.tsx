@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CheckSquare } from 'lucide-react';
 import type { HumanTask } from '@mediforce/platform-core';
 import { useProcessNameMap } from '@/hooks/use-agent-runs';
+import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
 import { ClaimButton } from './claim-button';
 import { getActionType, getTaskLabel } from './action-type';
@@ -50,7 +51,7 @@ function getInitials(name: string | null | undefined): string {
 }
 
 function AssigneeAvatar({ isCurrentUser, displayName }: { isCurrentUser: boolean; displayName?: string | null }) {
-  const initials = isCurrentUser ? getInitials(displayName) : '?';
+  const initials = displayName ? getInitials(displayName) : '?';
   return (
     <span
       className={cn(
@@ -59,7 +60,7 @@ function AssigneeAvatar({ isCurrentUser, displayName }: { isCurrentUser: boolean
           ? 'bg-primary text-primary-foreground'
           : 'bg-muted-foreground/20 text-muted-foreground',
       )}
-      title={isCurrentUser ? (displayName ?? 'Assigned to you') : 'Assigned to another user'}
+      title={displayName ?? (isCurrentUser ? 'Assigned to you' : 'Assigned to another user')}
     >
       {initials}
     </span>
@@ -72,6 +73,7 @@ function TaskRow({
   task,
   currentUserId,
   currentUserName,
+  userNames,
   showProcess,
   processName,
   muted = false,
@@ -79,6 +81,7 @@ function TaskRow({
   task: HumanTask;
   currentUserId: string;
   currentUserName?: string | null;
+  userNames: Map<string, string>;
   showProcess: boolean;
   processName?: string;
   muted?: boolean;
@@ -114,7 +117,12 @@ function TaskRow({
         )}
       </Link>
       <div className="pr-2 shrink-0">
-        {isClaimed && <AssigneeAvatar isCurrentUser={task.assignedUserId === currentUserId} displayName={currentUserName} />}
+        {isClaimed && (
+          <AssigneeAvatar
+            isCurrentUser={task.assignedUserId === currentUserId}
+            displayName={task.assignedUserId === currentUserId ? currentUserName : userNames.get(task.assignedUserId ?? '')}
+          />
+        )}
         {task.status === 'pending' && <ClaimButton taskId={task.id} currentUserId={currentUserId} variant="inline" />}
       </div>
     </div>
@@ -141,10 +149,11 @@ interface ProcessCardProps {
   completedTasks: HumanTask[];
   currentUserId: string;
   currentUserName?: string | null;
+  userNames: Map<string, string>;
   subGroupByAction: boolean;
 }
 
-function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, currentUserName, subGroupByAction }: ProcessCardProps) {
+function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, currentUserName, userNames, subGroupByAction }: ProcessCardProps) {
   const [expanded, setExpanded] = React.useState(false);
 
   const allTasks = React.useMemo(() => {
@@ -170,6 +179,7 @@ function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, 
           task={task}
           currentUserId={currentUserId}
           currentUserName={currentUserName}
+          userNames={userNames}
           showProcess={false}
           muted={task.status === 'completed' || task.status === 'cancelled'}
         />
@@ -200,6 +210,7 @@ function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, 
               task={task}
               currentUserId={currentUserId}
               currentUserName={currentUserName}
+              userNames={userNames}
               showProcess={false}
               muted={task.status === 'completed' || task.status === 'cancelled'}
             />
@@ -250,12 +261,14 @@ function ActionGroup({
   completedTasks,
   currentUserId,
   currentUserName,
+  userNames,
   processNameMap,
 }: {
   tasks: HumanTask[];
   completedTasks: HumanTask[];
   currentUserId: string;
   currentUserName?: string | null;
+  userNames: Map<string, string>;
   processNameMap: Map<string, string>;
 }) {
   const [expanded, setExpanded] = React.useState(false);
@@ -290,6 +303,7 @@ function ActionGroup({
             task={task}
             currentUserId={currentUserId}
             currentUserName={currentUserName}
+            userNames={userNames}
             showProcess
             processName={processNameMap.get(task.processInstanceId)}
             muted={task.status === 'completed' || task.status === 'cancelled'}
@@ -322,11 +336,13 @@ function FlatList({
   activeTasks,
   currentUserId,
   currentUserName,
+  userNames,
   processNameMap,
 }: {
   activeTasks: HumanTask[];
   currentUserId: string;
   currentUserName?: string | null;
+  userNames: Map<string, string>;
   processNameMap: Map<string, string>;
 }) {
   const sorted = React.useMemo(() => sortTasksForDisplay(activeTasks), [activeTasks]);
@@ -341,6 +357,7 @@ function FlatList({
           task={task}
           currentUserId={currentUserId}
           currentUserName={currentUserName}
+          userNames={userNames}
           showProcess
           processName={processNameMap.get(task.processInstanceId)}
         />
@@ -403,6 +420,7 @@ export function TaskGroupedView({
   groupByFields: Set<GroupByField>;
 }) {
   const processNameMap = useProcessNameMap();
+  const userNames = useUserDisplayNames();
   const groupByProcess = groupByFields.has('process');
   const groupByAction = groupByFields.has('action');
 
@@ -411,7 +429,7 @@ export function TaskGroupedView({
 
   // No grouping — flat list
   if (!groupByProcess && !groupByAction) {
-    return <FlatList activeTasks={activeTasks} currentUserId={currentUserId} currentUserName={currentUserName} processNameMap={processNameMap} />;
+    return <FlatList activeTasks={activeTasks} currentUserId={currentUserId} currentUserName={currentUserName} userNames={userNames} processNameMap={processNameMap} />;
   }
 
   // Group by process (with optional action sub-grouping)
@@ -447,6 +465,7 @@ export function TaskGroupedView({
             completedTasks={group.completed}
             currentUserId={currentUserId}
             currentUserName={currentUserName}
+            userNames={userNames}
             subGroupByAction={groupByAction}
           />
         ))}
@@ -483,6 +502,7 @@ export function TaskGroupedView({
           completedTasks={group.completed}
           currentUserId={currentUserId}
           currentUserName={currentUserName}
+          userNames={userNames}
           processNameMap={processNameMap}
         />
       ))}
