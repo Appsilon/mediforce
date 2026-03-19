@@ -41,36 +41,6 @@ function GeminiLogo({ className, style }: LogoProps) {
   );
 }
 
-function GrokLogo({ className, style }: LogoProps) {
-  return (
-    <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
-
-function MistralLogo({ className, style }: LogoProps) {
-  return (
-    <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <rect x="2" y="2" width="5.5" height="5.5" rx="0.5" />
-      <rect x="9.25" y="2" width="5.5" height="5.5" rx="0.5" />
-      <rect x="16.5" y="2" width="5.5" height="5.5" rx="0.5" />
-      <rect x="9.25" y="9.25" width="5.5" height="5.5" rx="0.5" />
-      <rect x="16.5" y="9.25" width="5.5" height="5.5" rx="0.5" />
-      <rect x="2" y="16.5" width="5.5" height="5.5" rx="0.5" />
-      <rect x="16.5" y="16.5" width="5.5" height="5.5" rx="0.5" />
-    </svg>
-  );
-}
-
-function QwenLogo({ className, style }: LogoProps) {
-  return (
-    <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2C6.477 2 2 6.477 2 12c0 2.136.67 4.116 1.81 5.74L2 22l4.432-1.77A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.952 7.952 0 01-4.017-1.08l-.29-.174-2.99 1.196.958-3.078-.19-.3A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8zm1-11h-2v4H7v2h4v2h2v-2h4v-2h-4z" />
-    </svg>
-  );
-}
-
 function DeepSeekLogo({ className, style }: LogoProps) {
   return (
     <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -90,14 +60,13 @@ interface FoundationModel {
 }
 
 const FOUNDATION_MODELS: FoundationModel[] = [
-  { id: 'claude-opus-4.6',    name: 'Claude Opus 4.6',    provider: 'Anthropic', Logo: AnthropicLogo, logoColor: '#D97757' },
-  { id: 'claude-sonnet-4.6',  name: 'Claude Sonnet 4.6',  provider: 'Anthropic', Logo: AnthropicLogo, logoColor: '#D97757' },
-  { id: 'gpt-5.3',            name: 'OpenAI GPT-5.3',     provider: 'OpenAI',    Logo: OpenAILogo,    logoColor: '#10a37f' },
-  { id: 'gemini-3.1-pro',     name: 'Gemini 3.1 Pro',     provider: 'Google',    Logo: GeminiLogo,    logoColor: '#4285F4' },
-  { id: 'grok-4.20',          name: 'Grok 4.20',          provider: 'xAI',       Logo: GrokLogo,      logoColor: '#000000' },
-  { id: 'mistral-large-3',             name: 'Mistral Large 3',    provider: 'Mistral',   Logo: MistralLogo,   logoColor: '#FF7000' },
-  { id: 'qwen-3.5',                    name: 'Alibaba Qwen 3.5',   provider: 'Alibaba',   Logo: QwenLogo,      logoColor: '#FF6A00' },
-  { id: 'deepseek/deepseek-chat-v3.2', name: 'DeepSeek Chat v3.2', provider: 'DeepSeek',  Logo: DeepSeekLogo,  logoColor: '#4D6BFE' },
+  { id: 'anthropic/claude-opus-4-5',   name: 'Claude Opus 4.5',   provider: 'Anthropic', Logo: AnthropicLogo, logoColor: '#D97757' },
+  { id: 'anthropic/claude-sonnet-4',   name: 'Claude Sonnet 4',   provider: 'Anthropic', Logo: AnthropicLogo, logoColor: '#D97757' },
+  { id: 'anthropic/claude-haiku-4-5',  name: 'Claude Haiku 4.5',  provider: 'Anthropic', Logo: AnthropicLogo, logoColor: '#D97757' },
+  { id: 'openai/gpt-4o',               name: 'GPT-4o',             provider: 'OpenAI',    Logo: OpenAILogo,    logoColor: '#10a37f' },
+  { id: 'openai/gpt-4o-mini',          name: 'GPT-4o mini',        provider: 'OpenAI',    Logo: OpenAILogo,    logoColor: '#10a37f' },
+  { id: 'google/gemini-2.5-pro',       name: 'Gemini 2.5 Pro',     provider: 'Google',    Logo: GeminiLogo,    logoColor: '#4285F4' },
+  { id: 'deepseek/deepseek-chat',      name: 'DeepSeek Chat',      provider: 'DeepSeek',  Logo: DeepSeekLogo,  logoColor: '#4D6BFE' },
 ];
 
 const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [

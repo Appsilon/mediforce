@@ -38,14 +38,13 @@ interface PluginEntry {
 
 
 const FOUNDATION_MODEL_NAMES: Record<string, string> = {
-  'claude-opus-4.6':           'Claude Opus 4.6',
-  'claude-sonnet-4.6':         'Claude Sonnet 4.6',
-  'gpt-5.3':                   'OpenAI GPT-5.3',
-  'gemini-3.1-pro':            'Gemini 3.1 Pro',
-  'grok-4.20':                 'Grok 4.20',
-  'mistral-large-3':           'Mistral Large 3',
-  'qwen-3.5':                  'Alibaba Qwen 3.5',
-  'deepseek/deepseek-chat-v3.2': 'DeepSeek Chat v3.2',
+  'anthropic/claude-opus-4-5':  'Claude Opus 4.5',
+  'anthropic/claude-sonnet-4':  'Claude Sonnet 4',
+  'anthropic/claude-haiku-4-5': 'Claude Haiku 4.5',
+  'openai/gpt-4o':              'GPT-4o',
+  'openai/gpt-4o-mini':         'GPT-4o mini',
+  'google/gemini-2.5-pro':      'Gemini 2.5 Pro',
+  'deepseek/deepseek-chat':     'DeepSeek Chat',
 };
 
 function getModelDisplayName(modelId: string): string {
