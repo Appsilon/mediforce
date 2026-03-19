@@ -2,10 +2,21 @@
 
 import Link from 'next/link';
 import { format, differenceInMilliseconds } from 'date-fns';
+import { Bot, Cpu, Terminal, BarChart3 } from 'lucide-react';
 import type { AgentRun } from '@mediforce/platform-core';
 import { ConfidenceBadge } from './confidence-badge';
 import { AutonomyBadge } from './autonomy-badge';
 import { cn } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
+
+function getPluginDisplay(pluginId: string): { Icon: LucideIcon; colorClass: string; label: string } {
+  const id = pluginId.toLowerCase();
+  if (id.includes('claude')) return { Icon: Bot, colorClass: 'text-violet-500', label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
+  if (id.includes('opencode')) return { Icon: Cpu, colorClass: 'text-blue-500', label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
+  if (id.includes('script')) return { Icon: Terminal, colorClass: 'text-slate-500', label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
+  if (id.includes('risk') || id.includes('driver') || id.includes('supply')) return { Icon: BarChart3, colorClass: 'text-emerald-500', label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
+  return { Icon: Bot, colorClass: 'text-primary', label: pluginId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
+}
 
 const STATUS_STYLES: Record<string, string> = {
   completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
@@ -72,9 +83,15 @@ export function AgentRunListTable({
             : runs.map((run) => (
               <tr key={run.id} className="hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3">
-                  <Link href={`/agents/${run.id}`} className="font-medium font-mono text-xs hover:text-primary transition-colors">
-                    {run.pluginId}
-                  </Link>
+                  {(() => {
+                    const { Icon, colorClass, label } = getPluginDisplay(run.pluginId);
+                    return (
+                      <Link href={`/agents/${run.id}`} className="inline-flex items-center gap-1.5 font-medium text-xs hover:text-primary transition-colors">
+                        <Icon className={cn('h-3.5 w-3.5 shrink-0', colorClass)} />
+                        {label}
+                      </Link>
+                    );
+                  })()}
                 </td>
                 <td className="px-4 py-3">
                   <AutonomyBadge level={run.autonomyLevel} />

@@ -5,6 +5,7 @@ import {
   FirestoreAuditRepository,
   FirestoreAgentRunRepository,
   FirestoreHumanTaskRepository,
+  FirestoreAgentDefinitionRepository,
   initializeFirebase,
   getFirestoreDb,
 } from '@mediforce/platform-infra';
@@ -25,8 +26,10 @@ import {
   ScriptContainerPlugin,
 } from '@mediforce/agent-runtime';
 import { registerSupplyIntelligencePlugins } from '@mediforce/supply-intelligence-plugins';
+import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
 
 let services: PlatformServices | null = null;
+let seedingStarted = false;
 
 export interface PlatformServices {
   engine: WorkflowEngine;
@@ -39,6 +42,7 @@ export interface PlatformServices {
   instanceRepo: FirestoreProcessInstanceRepository;
   auditRepo: FirestoreAuditRepository;
   humanTaskRepo: FirestoreHumanTaskRepository;
+  agentDefinitionRepo: FirestoreAgentDefinitionRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -70,6 +74,7 @@ export function getPlatformServices(): PlatformServices {
   const auditRepo = new FirestoreAuditRepository(db);
   const agentRunRepo = new FirestoreAgentRunRepository(db);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db);
+  const agentDefinitionRepo = new FirestoreAgentDefinitionRepository();
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -128,7 +133,15 @@ export function getPlatformServices(): PlatformServices {
     instanceRepo,
     auditRepo,
     humanTaskRepo,
+    agentDefinitionRepo,
   };
+
+  if (!seedingStarted) {
+    seedingStarted = true;
+    seedBuiltinAgentDefinitions(agentDefinitionRepo).catch((err) => {
+      console.error('[platform-services] Failed to seed built-in agent definitions:', err);
+    });
+  }
 
   return services;
 }

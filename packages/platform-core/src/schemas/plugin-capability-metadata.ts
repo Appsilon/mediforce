@@ -8,6 +8,7 @@ export const PluginCapabilityMetadataSchema = z.object({
   inputDescription: z.string(),
   outputDescription: z.string(),
   roles: z.array(PluginRoleSchema).min(1),
+  foundationModel: z.string().optional(),
 });
 
 export type PluginCapabilityMetadata = z.infer<typeof PluginCapabilityMetadataSchema>;
