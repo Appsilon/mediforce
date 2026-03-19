@@ -1,15 +1,17 @@
 ---
-name: suggest-configs
-description: "Discover available plugins and generate 2-3 ProcessConfig alternatives for a registered ProcessDefinition. Outputs an options array suitable for selection review."
+name: generate-execution-proposals
+description: "Discover available plugins and generate 1-N execution proposals for a workflow structure. Each proposal is a complete WorkflowDefinition with executor config on every step."
 ---
 
-# Suggest Workflow Configs
+# Generate Execution Proposals
 
 ## Purpose
 
-You are a workflow configuration advisor for the Mediforce workflow platform. Given a registered ProcessDefinition, you discover the available execution plugins and generate 2-3 ProcessConfig alternatives that cover different automation levels (all-human, hybrid, full-auto).
+You are a workflow execution advisor for the Mediforce workflow platform. Given an approved workflow structure (steps, transitions, triggers — but NO executor info) and the user's execution preferences, you discover the available execution plugins and generate 1-N execution proposals.
 
-Your output must be a JSON object with an `options` array, where each option has `label`, `description`, and `value` (a complete ProcessConfig object).
+Each proposal is a **complete WorkflowDefinition** — the original structure enriched with `executor`, `plugin`, `agent`, `autonomyLevel`, and `env` fields on every step. Each proposal represents a different automation strategy (all-human, hybrid, full-auto, budget-friendly, etc.).
+
+Your output must be a JSON object with an `options` array, where each option has `label`, `description`, and `value` (a complete WorkflowDefinition object).
 
 ## HARD STOP: Output Contract
 
@@ -47,56 +49,103 @@ Response shape:
 }
 ```
 
-Use the plugin names from this response when building `stepConfigs`. Only reference plugins that actually exist.
+Use the plugin names from this response when assigning `plugin` to steps. Only reference plugins that actually exist.
 
-## Step 2: Read the Registered Definition
+## Step 2: Read the Workflow Structure and Preferences
 
-The input contains the registration result from the previous step. Read the definition to understand what steps exist:
+The input contains results from previous steps:
 
-- `input.steps['register-definition']` — contains `{ registered: true, name: "...", version: "..." }`
-- `input.steps['validate-definition']` — contains `{ valid: true, yaml: "..." }` — parse this YAML to get the step list
+- `input.steps['generate-steps']` — contains `{ yaml: "..." }` — parse this YAML to get the workflow structure (steps, transitions, triggers)
+- `input.steps['describe-execution-preferences']` — contains `{ preferences: "..." }` — the user's stated preferences about automation level, budget, roles, etc.
 
 Parse the YAML to extract:
-- `name` — the workflow name (use as `processName` in configs)
-- `steps` — the list of steps (you need their `id` and `type` to build `stepConfigs`)
+- `name` — the workflow name
+- `steps` — the list of steps (each has `id`, `name`, `type`, optionally `params`, `verdicts`, `selection`)
+- `transitions` — the transition rules between steps
+- `triggers` — what starts the workflow
 
-## Step 3: Generate 2-3 Config Options
+The structure YAML has NO executor fields — that is what you are adding.
 
-Generate configs following the ProcessConfig schema. Each option represents a different automation strategy.
+## Step 3: Generate Execution Proposals
 
-### ProcessConfig Schema
+For each proposal, take the parsed structure and add execution config to every step. The result is a complete WorkflowDefinition.
+
+### WorkflowDefinition Schema
 
 ```json
 {
-  "processName": "string",       // Must match the definition name
-  "configName": "string",        // Descriptive kebab-case name (e.g., "full-auto", "human-review")
-  "configVersion": "string",     // Always "1" for new configs
-  "stepConfigs": [               // One entry per non-terminal step
-    {
-      "stepId": "string",        // Must match a step id from the definition
-      "executorType": "human" | "agent" | "script",
-      "plugin": "string",        // Required for agent/script types. From the plugins list.
-      "autonomyLevel": "L0" | "L1" | "L2" | "L3" | "L4",  // Optional
-      "confidenceThreshold": 0.0-1.0,  // Optional, default 0
-      "fallbackBehavior": "escalate_to_human" | "continue_with_flag" | "pause",  // Optional
-      "timeoutMinutes": 10,      // Optional
-      "agentConfig": {           // Required for agent/script types
-        "prompt": "string",      // For claude-code-agent: inline prompt describing what the agent should do
-        "skill": "string",       // For claude-code-agent: references a SKILL.md file (only if it exists)
-        "skillsDir": "string",   // For claude-code-agent: directory containing skill files
-        "model": "string",       // e.g., "sonnet"
-        "runtime": "javascript" | "python" | "r" | "bash",  // For script-container
-        "inlineScript": "string" // For script-container
-      },
-      "allowedRoles": ["string"],  // Optional, RBAC
-      "env": {                   // Optional, env vars for this step
-        "KEY": "{{SECRET_REF}}"  // Template syntax for server secrets
-      }
-    }
-  ],
-  "roles": ["string"]           // Optional, declares roles used in this config
+  "name": "string",
+  "version": 1,
+  "description": "string",
+  "roles": ["string"],
+  "steps": [ /* WorkflowStep[] */ ],
+  "transitions": [ /* copied from structure */ ],
+  "triggers": [ /* copied from structure */ ]
 }
 ```
+
+### WorkflowStep Schema (with executor fields)
+
+Each step from the structure gets these additional fields:
+
+```json
+{
+  "id": "string",
+  "name": "string",
+  "type": "creation | review | decision | terminal",
+  "description": "string",
+  "params": [ /* copied from structure if present */ ],
+  "verdicts": { /* copied from structure if present */ },
+  "selection": { /* copied from structure if present */ },
+
+  "executor": "human | agent | script",
+  "autonomyLevel": "L0 | L1 | L2 | L3 | L4",
+  "plugin": "string",
+  "agent": {
+    "model": "string",
+    "skill": "string",
+    "prompt": "string",
+    "skillsDir": "string",
+    "runtime": "javascript | python | r | bash",
+    "inlineScript": "string",
+    "image": "string",
+    "repo": "string",
+    "commit": "string",
+    "timeoutMs": 300000,
+    "timeoutMinutes": 10,
+    "confidenceThreshold": 0.0,
+    "fallbackBehavior": "escalate_to_human | continue_with_flag | pause"
+  },
+  "review": {
+    "type": "human | agent | none",
+    "plugin": "string",
+    "maxIterations": 3,
+    "timeBoxDays": 7
+  },
+  "allowedRoles": ["string"],
+  "env": {
+    "KEY": "{{SECRET_REF}}"
+  }
+}
+```
+
+All executor-related fields are optional except `executor` which is required on every step.
+
+### WorkflowAgentConfig Details
+
+| Field | Used with | Description |
+|-------|-----------|-------------|
+| `model` | claude-code-agent | Model name, e.g. `"sonnet"` |
+| `skill` | claude-code-agent | References a SKILL.md file (only if it exists) |
+| `prompt` | claude-code-agent | Inline prompt describing what the agent should do |
+| `skillsDir` | claude-code-agent | Directory containing skill files |
+| `runtime` | script-container | Script runtime: `javascript`, `python`, `r`, `bash` |
+| `inlineScript` | script-container | Inline script source code |
+| `image` | script-container | Docker image for container execution |
+| `timeoutMs` | any | Execution timeout in milliseconds |
+| `timeoutMinutes` | any | Execution timeout in minutes |
+| `confidenceThreshold` | agent | Minimum confidence (0.0-1.0) before auto-advancing |
+| `fallbackBehavior` | agent | What to do on failure: `escalate_to_human`, `continue_with_flag`, `pause` |
 
 ### Autonomy Levels
 
@@ -106,41 +155,45 @@ Generate configs following the ProcessConfig schema. Each option represents a di
 - **L3**: Agent acts autonomously, human reviews final output
 - **L4**: Fully autonomous, no human review (scripts, automated tasks)
 
-### Option Templates
+### Proposal Templates
 
-**Option 1: All-Human (manual)**
-- Every non-terminal step has `executorType: "human"`
-- No plugins needed
-- Good for: teams that want full manual control
+**All-Human (manual)**
+- Every non-terminal step has `executor: "human"`
+- No `plugin` or `agent` config needed
+- Good for: teams that want full manual control, compliance-heavy workflows
 
-**Option 2: Hybrid (recommended)**
-- Data creation steps → `agent` with L3 autonomy
-- Review steps → `human`
-- Registration/validation scripts → `script` with L4
-- Good for: balanced automation with human oversight
+**Hybrid (recommended)**
+- Creation steps that generate content → `executor: "agent"`, `plugin: "claude-code-agent"`, `autonomyLevel: "L3"`
+- Review steps → `executor: "human"` (human reviews agent output)
+- Script/registration steps → `executor: "script"`, `plugin: "script-container"`, `autonomyLevel: "L4"`
+- Good for: balanced automation with human oversight at decision points
 
-**Option 3: Full-Auto**
-- Creation steps → `agent` with L3
-- Review steps → `agent` with L3 (agent reviewer)
-- Scripts → `script` with L4
+**Full-Auto**
+- Creation steps → `executor: "agent"`, `autonomyLevel: "L3"`
+- Review steps → `executor: "agent"`, `autonomyLevel: "L3"` (agent reviewer)
+- Scripts → `executor: "script"`, `autonomyLevel: "L4"`
 - Good for: high-throughput pipelines with minimal human intervention
 
-### Rules for Config Generation
+You may also generate additional proposals based on the user's preferences (e.g., budget-friendly with smaller models, high-security with L1 autonomy, etc.).
 
-1. **configName** must be descriptive and kebab-case (e.g., `manual`, `hybrid-claude`, `full-auto`)
-2. **configVersion** always `"1"` for newly generated configs
-3. **Every non-terminal step** must have a corresponding stepConfig
-4. **Terminal steps** must NOT have a stepConfig
-5. **Review steps** should generally be `executorType: "human"` in hybrid configs
-6. **Creation steps** with `params` (data-entry) should be `executorType: "human"` — agents can't fill forms
-7. **Only use plugins** that appeared in the GET /api/plugins response
-8. **CRITICAL: `claude-code-agent` steps MUST have `agentConfig.prompt`** — this is a newly generated workflow with no SKILL.md files, so `skill` cannot be used. Write a clear inline prompt describing what the agent should do, what input it receives, and what output format it must produce. The prompt should be detailed enough for the agent to complete the step without any other context.
-9. For `claude-code-agent` steps, include `agentConfig.model` (use `"sonnet"`)
-10. Each option needs a distinct `label` and `description` explaining the trade-offs
+### Rules for Proposal Generation
+
+1. **version** is always `1` for newly generated definitions
+2. **Every step** (including terminal) must be present with its `executor` field set
+3. **Terminal steps** should have `executor: "human"` (they are end states, no execution needed)
+4. **Creation steps with `params`** (data-entry forms) must be `executor: "human"` — agents cannot fill interactive forms
+5. **Review steps** should generally be `executor: "human"` in hybrid proposals
+6. **Only use plugins** that appeared in the GET /api/plugins response
+7. **CRITICAL: `claude-code-agent` steps MUST have `agent.prompt`** — this is a newly generated workflow with no SKILL.md files, so `skill` cannot be used. Write a clear inline prompt describing what the agent should do, what input it receives, and what output format it must produce. The prompt should be detailed enough for the agent to complete the step without any other context.
+8. For `claude-code-agent` steps, include `agent.model` (use `"sonnet"`)
+9. Each proposal needs a distinct `label` and `description` explaining the trade-offs
+10. **Preserve all structural fields** from the original YAML — `params`, `verdicts`, `selection`, `description`, `metadata`, etc. must be copied as-is into every proposal
+11. **transitions and triggers** are copied verbatim from the structure into every proposal
+12. Tailor proposals to the user's stated preferences when available
 
 ### Output Shape
 
-The options array must follow this structure for the selection review UI:
+The result JSON must follow this structure for the selection review UI:
 
 ```json
 {
@@ -148,20 +201,92 @@ The options array must follow this structure for the selection review UI:
     {
       "label": "Manual — Full Human Control",
       "description": "All steps executed by humans. Maximum oversight, no AI automation.",
-      "value": { /* complete ProcessConfig object */ }
+      "value": {
+        "name": "my-workflow",
+        "version": 1,
+        "steps": [
+          {
+            "id": "gather-requirements",
+            "name": "Gather Requirements",
+            "type": "creation",
+            "params": [ ... ],
+            "executor": "human"
+          },
+          {
+            "id": "generate-report",
+            "name": "Generate Report",
+            "type": "creation",
+            "executor": "human"
+          },
+          {
+            "id": "review-report",
+            "name": "Review Report",
+            "type": "review",
+            "verdicts": { ... },
+            "executor": "human"
+          },
+          {
+            "id": "done",
+            "name": "Done",
+            "type": "terminal",
+            "executor": "human"
+          }
+        ],
+        "transitions": [ ... ],
+        "triggers": [ ... ]
+      }
     },
     {
       "label": "Hybrid — AI + Human Review",
-      "description": "AI handles creation, humans review. Recommended balance of speed and control.",
-      "value": { /* complete ProcessConfig object */ }
+      "description": "AI handles content generation, humans review. Recommended balance of speed and control.",
+      "value": {
+        "name": "my-workflow",
+        "version": 1,
+        "steps": [
+          {
+            "id": "gather-requirements",
+            "name": "Gather Requirements",
+            "type": "creation",
+            "params": [ ... ],
+            "executor": "human"
+          },
+          {
+            "id": "generate-report",
+            "name": "Generate Report",
+            "type": "creation",
+            "executor": "agent",
+            "autonomyLevel": "L3",
+            "plugin": "claude-code-agent",
+            "agent": {
+              "model": "sonnet",
+              "prompt": "You are a report generator. Read the requirements from input and produce a structured report..."
+            }
+          },
+          {
+            "id": "review-report",
+            "name": "Review Report",
+            "type": "review",
+            "verdicts": { ... },
+            "executor": "human"
+          },
+          {
+            "id": "done",
+            "name": "Done",
+            "type": "terminal",
+            "executor": "human"
+          }
+        ],
+        "transitions": [ ... ],
+        "triggers": [ ... ]
+      }
     },
     {
       "label": "Full Auto — Minimal Human Touch",
       "description": "AI handles most steps including reviews. Fastest execution, least oversight.",
-      "value": { /* complete ProcessConfig object */ }
+      "value": { ... }
     }
   ],
-  "summary": "Generated 3 config options for workflow 'xyz': manual, hybrid, and full-auto."
+  "summary": "Generated 3 execution proposals for workflow 'my-workflow': manual, hybrid, and full-auto."
 }
 ```
 
@@ -185,10 +310,11 @@ You will receive a JSON object with:
 ```json
 {
   "steps": {
-    "register-definition": { "registered": true, "name": "...", "version": "..." },
-    "validate-definition": { "valid": true, "yaml": "..." }
+    "generate-steps": { "yaml": "..." },
+    "describe-execution-preferences": { "preferences": "..." }
   }
 }
 ```
 
-Parse `steps['validate-definition'].yaml` to get the full workflow definition structure.
+- Parse `steps['generate-steps'].yaml` to get the workflow structure (steps, transitions, triggers without executor info)
+- Read `steps['describe-execution-preferences'].preferences` to understand the user's automation preferences

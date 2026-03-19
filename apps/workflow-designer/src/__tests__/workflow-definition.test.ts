@@ -1,29 +1,34 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { parseProcessDefinition, ProcessConfigSchema } from '@mediforce/platform-core';
+import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
 
 describe('workflow-designer', () => {
   const appDir = resolve(import.meta.dirname, '../..');
 
-  describe('workflow-definition.yaml', () => {
-    it('parses and validates against ProcessDefinitionSchema', () => {
-      const yaml = readFileSync(resolve(appDir, 'src/workflow-definition.yaml'), 'utf8');
-      const result = parseProcessDefinition(yaml);
+  function loadDefinition() {
+    const raw = JSON.parse(
+      readFileSync(resolve(appDir, 'src/workflow-designer.wd.json'), 'utf8'),
+    );
+    // Add version (auto-assigned by server, not in source file)
+    return WorkflowDefinitionSchema.safeParse({ ...raw, version: 1 });
+  }
+
+  describe('workflow-designer.wd.json', () => {
+    it('validates against WorkflowDefinitionSchema', () => {
+      const result = loadDefinition();
 
       expect(result.success).toBe(true);
       if (!result.success) return;
 
       expect(result.data.name).toBe('workflow-designer');
-      expect(result.data.version).toBe('5');
       expect(result.data.steps).toHaveLength(9);
       expect(result.data.transitions).toHaveLength(7);
       expect(result.data.triggers).toHaveLength(1);
     });
 
     it('has exactly one terminal step', () => {
-      const yaml = readFileSync(resolve(appDir, 'src/workflow-definition.yaml'), 'utf8');
-      const result = parseProcessDefinition(yaml);
+      const result = loadDefinition();
       expect(result.success).toBe(true);
       if (!result.success) return;
 
@@ -32,9 +37,20 @@ describe('workflow-designer', () => {
       expect(terminals[0].id).toBe('done');
     });
 
+    it('every non-terminal step has an executor', () => {
+      const result = loadDefinition();
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      const nonTerminal = result.data.steps.filter(s => s.type !== 'terminal');
+      for (const step of nonTerminal) {
+        expect(step.executor).toBeDefined();
+        expect(['human', 'agent', 'script']).toContain(step.executor);
+      }
+    });
+
     it('has all transition targets referencing valid step IDs', () => {
-      const yaml = readFileSync(resolve(appDir, 'src/workflow-definition.yaml'), 'utf8');
-      const result = parseProcessDefinition(yaml);
+      const result = loadDefinition();
       expect(result.success).toBe(true);
       if (!result.success) return;
 
@@ -46,8 +62,7 @@ describe('workflow-designer', () => {
     });
 
     it('has review step verdicts pointing to valid step IDs', () => {
-      const yaml = readFileSync(resolve(appDir, 'src/workflow-definition.yaml'), 'utf8');
-      const result = parseProcessDefinition(yaml);
+      const result = loadDefinition();
       expect(result.success).toBe(true);
       if (!result.success) return;
 
@@ -61,43 +76,18 @@ describe('workflow-designer', () => {
         }
       }
     });
-  });
 
-  describe('workflow-config-claude.json', () => {
-    it('validates against ProcessConfigSchema', () => {
-      const raw = JSON.parse(
-        readFileSync(resolve(appDir, 'src/workflow-config-claude.json'), 'utf8'),
-      );
-      const result = ProcessConfigSchema.safeParse(raw);
-
+    it('agent steps have plugin and agent config', () => {
+      const result = loadDefinition();
       expect(result.success).toBe(true);
       if (!result.success) return;
 
-      expect(result.data.processName).toBe('workflow-designer');
-      expect(result.data.configName).toBe('claude');
-      expect(result.data.stepConfigs).toHaveLength(8);
-    });
+      const agentSteps = result.data.steps.filter(s => s.executor === 'agent');
+      expect(agentSteps.length).toBeGreaterThan(0);
 
-    it('has step configs matching all non-terminal definition steps', () => {
-      const yaml = readFileSync(resolve(appDir, 'src/workflow-definition.yaml'), 'utf8');
-      const defResult = parseProcessDefinition(yaml);
-      expect(defResult.success).toBe(true);
-      if (!defResult.success) return;
-
-      const raw = JSON.parse(
-        readFileSync(resolve(appDir, 'src/workflow-config-claude.json'), 'utf8'),
-      );
-      const cfgResult = ProcessConfigSchema.safeParse(raw);
-      expect(cfgResult.success).toBe(true);
-      if (!cfgResult.success) return;
-
-      const nonTerminalStepIds = defResult.data.steps
-        .filter(s => s.type !== 'terminal')
-        .map(s => s.id);
-      const configStepIds = cfgResult.data.stepConfigs.map(s => s.stepId);
-
-      for (const stepId of nonTerminalStepIds) {
-        expect(configStepIds).toContain(stepId);
+      for (const step of agentSteps) {
+        expect(step.plugin).toBeDefined();
+        expect(step.agent).toBeDefined();
       }
     });
   });

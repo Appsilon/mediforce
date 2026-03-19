@@ -1,15 +1,22 @@
 #!/bin/bash
-# Start a workflow-designer instance and resolve the describe-idea step
+# Start a workflow-designer run and resolve the describe-idea step
 # with the idea2blogpost workflow idea.
 #
 # Usage: ./start-workflow-designer.sh [base_url]
 #
-# Requires the dev server running (pnpm dev).
+# Requires:
+#   - Dev server running (pnpm dev)
+#   - workflow-designer WorkflowDefinition registered (use scripts/register-workflow.sh first)
 
 set -euo pipefail
 
 BASE_URL="${1:-http://localhost:9003}"
-API_KEY="${PLATFORM_API_KEY:-aad7fee7cb4c68d2966079ab514d6164120c0b258d74fae8749aae94117ce748}"
+API_KEY="${MEDIFORCE_API_KEY:-${PLATFORM_API_KEY:-}}"
+
+if [ -z "$API_KEY" ]; then
+  echo "ERROR: Set MEDIFORCE_API_KEY or PLATFORM_API_KEY env var" >&2
+  exit 1
+fi
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,43 +39,12 @@ parse_response() {
 
 die() { echo "ERROR: $1" >&2; exit 1; }
 
-# ── 1. Find config ──────────────────────────────────────────────────────────
+# ── 1. Start workflow run ──────────────────────────────────────────────────
 
-echo "Querying workflow-designer configs..."
-
-for attempt in 1 2 3; do
-  RESPONSE=$(api GET "/api/configs?processName=workflow-designer")
-  parse_response "$RESPONSE"
-  [ "$HTTP_CODE" = "200" ] && break
-  echo "  Attempt $attempt: HTTP $HTTP_CODE (retrying in 3s...)"
-  sleep 3
-done
-
-[ "$HTTP_CODE" = "200" ] || die "Failed to query configs (HTTP $HTTP_CODE)"
-
-CONFIG=$(echo "$BODY" | python3 -c "
-import sys, json
-configs = json.load(sys.stdin).get('configs', [])
-if not configs:
-    print('ERROR: no configs found for workflow-designer', file=sys.stderr)
-    sys.exit(1)
-latest = max(configs, key=lambda c: int(c['configVersion']))
-print(latest['configName'] + ':' + latest['configVersion'])
-")
-
-CONFIG_NAME=$(echo "$CONFIG" | cut -d: -f1)
-CONFIG_VERSION=$(echo "$CONFIG" | cut -d: -f2)
-echo "Using config: $CONFIG_NAME v$CONFIG_VERSION"
-
-# ── 2. Start workflow ──────────────────────────────────────────────────────
-
-echo "Starting workflow-designer instance..."
+echo "Starting workflow-designer run..."
 
 RESPONSE=$(api POST /api/processes "{
   \"definitionName\": \"workflow-designer\",
-  \"version\": \"4\",
-  \"configName\": \"$CONFIG_NAME\",
-  \"configVersion\": \"$CONFIG_VERSION\",
   \"triggeredBy\": \"cli-script\",
   \"triggerName\": \"manual\",
   \"payload\": {}
@@ -80,7 +56,7 @@ parse_response "$RESPONSE"
 INSTANCE_ID=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['instanceId'])")
 echo "Workflow started: $INSTANCE_ID"
 
-# ── 3. Wait for describe-idea task ──────────────────────────────────────────
+# ── 2. Wait for describe-idea task ──────────────────────────────────────────
 
 echo "Waiting for describe-idea task..."
 
@@ -110,7 +86,7 @@ done
 [ -n "$TASK_ID" ] || die "describe-idea task not found after 15s"
 echo "Found task: $TASK_ID"
 
-# ── 4. Build resolve body with blog post workflow idea ───────────────────────
+# ── 3. Resolve describe-idea with blog post workflow idea ────────────────────
 
 echo "Resolving describe-idea with idea2blogpost workflow idea..."
 
@@ -142,8 +118,7 @@ Examples of past blog topics: "How we use Claude to automate clinical trial work
 print(json.dumps({
     "paramValues": {
         "idea": idea,
-        "workflowName": "idea2blogpost",
-        "version": "0.1"
+        "workflowName": "idea2blogpost"
     }
 }))
 PYEOF
@@ -157,5 +132,5 @@ parse_response "$RESPONSE"
 echo "$BODY" | python3 -m json.tool 2>/dev/null || echo "$BODY"
 echo ""
 echo "describe-idea resolved. Workflow: $INSTANCE_ID"
-echo "The auto-runner will now execute generate-definition (agent step)."
+echo "The auto-runner will now execute generate-steps (agent step)."
 echo "Monitor at: $BASE_URL"

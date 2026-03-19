@@ -1,15 +1,17 @@
 ---
-name: generate-definition
-description: "Generate a Mediforce workflow definition YAML from a natural language description. Use this skill when given a workflow idea (goal, steps, actors, review loops) and a target process name. Outputs valid YAML conforming to ProcessDefinitionSchema."
+name: generate-steps
+description: "Generate workflow structure (steps, transitions, triggers) from a natural language description. Outputs partial WorkflowDefinition YAML — structural elements only, without execution config (executor, agent, plugin are added later)."
 ---
 
-# Workflow Definition Generator
+# Workflow Structure Generator
 
 ## Purpose
 
-You are a workflow designer for the Mediforce workflow platform. Given a natural language description of a desired workflow, you generate a valid ProcessDefinition YAML file.
+You are a workflow designer for the Mediforce platform. Given a natural language description of a desired workflow, you generate the **structural skeleton** of a WorkflowDefinition YAML file: steps, transitions, and triggers.
 
-Your output must conform exactly to the Mediforce ProcessDefinitionSchema. It will be machine-validated after you produce it — if validation fails, you will be called again with the errors.
+You do NOT assign execution config (executor, agent, plugin, env, autonomyLevel). Those are added in a later step by the execution proposal generator. Your job is purely structural: what are the steps, how are they connected, and what triggers start the workflow.
+
+Your output must conform to the structural subset of the Mediforce WorkflowDefinition schema. It will be machine-validated after you produce it — if validation fails, you will be called again with the errors.
 
 ## HARD STOP: Output Contract
 
@@ -18,25 +20,25 @@ Your output must conform exactly to the Mediforce ProcessDefinitionSchema. It wi
 Your ONLY output as a final message must be a raw JSON object (no markdown fences, no preamble):
 
 ```
-{"output_file": "/absolute/path/to/workflow-definition.yaml", "summary": "1-2 sentence summary of what was generated"}
+{"output_file": "/absolute/path/to/workflow-structure.yaml", "summary": "1-2 sentence summary of what was generated"}
 ```
 
 Where `/absolute/path/to/` is the absolute path from the "Output Directory" section injected below.
 
 Rules:
-- Write the YAML to `{output_directory}/workflow-definition.yaml` using bash, where `{output_directory}` is the absolute path from the "Output Directory" section below
+- Write the YAML to `{output_directory}/workflow-structure.yaml` using bash, where `{output_directory}` is the absolute path from the "Output Directory" section below
 - Your final text response is ONLY the small contract JSON above
 - Do NOT write conversational summaries or next step suggestions
 - Do NOT wrap anything in markdown code fences
 
-## ProcessDefinition Schema
+## WorkflowDefinition Structure Schema (structural fields only)
 
-The YAML must conform to this structure:
+The YAML must conform to this structure. Fields marked "OMIT" are added later by the execution proposal step — do not include them.
 
 ```yaml
 name: string          # Required. kebab-case identifier (e.g., "invoice-review")
-version: string       # Required. Version string (e.g., "1", "2.0")
-description: string   # Optional but recommended. What this process does.
+version: 1            # Required. Integer version number (always 1 for new workflows)
+description: string   # Optional but recommended. What this workflow does.
 
 triggers:             # Required. At least one trigger.
   - type: manual|webhook|event|cron
@@ -81,6 +83,9 @@ steps:                # Required. At least one step.
 
     metadata: {}      # Optional arbitrary metadata
 
+    # OMIT these fields — they are added by the execution proposal step:
+    # executor, autonomyLevel, plugin, agent, review, env, allowedRoles, stepParams
+
 transitions:          # Required. Edges connecting steps.
   - from: step-id
     to: step-id
@@ -105,7 +110,7 @@ Non-review steps route via transitions in the `transitions` list.
 
 Expressions are evaluated against a context with these fields:
 - `output.<field>` — the current step's output data
-- `variables.<field>` — accumulated process instance variables
+- `variables.<field>` — accumulated workflow instance variables
 - `verdict` — the verdict string (for non-review steps that still emit a verdict)
 
 Supported syntax:
@@ -139,10 +144,11 @@ when: 'else'
 8. **`when` expressions** should use `output.<field>` to branch on step output. Use `"else"` as a fallback.
 9. **Step IDs** should be kebab-case and descriptive (e.g., "extract-data", not "step-1")
 10. **Triggers** — always include at least a `manual` trigger. Add `cron` or `webhook` if the user's description implies scheduled or event-driven execution.
+11. **Do NOT include executor, agent, plugin, env, or autonomyLevel** — those are assigned in the execution proposal step
 
 ## Step Type Guide
 
-- **creation**: A step that produces new data or artifacts. Who or what executes it is defined separately in the ProcessConfig.
+- **creation**: A step that produces new data or artifacts. Whether it runs as human input, agent work, or a script is decided separately.
 - **review**: A step that evaluates output and decides what happens next via verdicts. Route targets are defined in the `verdicts` map — no transitions from review steps.
 - **decision**: A routing step that branches the workflow based on `when` expressions on its outgoing transitions.
 - **terminal**: The final step. Marks the workflow as complete. No outgoing transitions or verdicts.
@@ -155,8 +161,8 @@ All transitions are unconditional — one outgoing transition per step.
 
 ```yaml
 name: data-pipeline
-version: "1"
-description: Collect, process, and store data
+version: 1
+description: Collect, transform, and store data
 
 triggers:
   - name: manual
@@ -166,8 +172,8 @@ steps:
   - id: collect
     name: Collect Data
     type: creation
-  - id: process
-    name: Process Data
+  - id: transform
+    name: Transform Data
     type: creation
   - id: store
     name: Store Results
@@ -178,8 +184,8 @@ steps:
 
 transitions:
   - from: collect
-    to: process
-  - from: process
+    to: transform
+  - from: transform
     to: store
   - from: store
     to: done
@@ -191,7 +197,7 @@ Review step routes via verdicts — NO transitions from the review step.
 
 ```yaml
 name: content-review
-version: "1"
+version: 1
 description: Generate content, review, iterate until approved
 
 triggers:
@@ -232,7 +238,7 @@ so the reviewer picks from the options instead of just approving/rejecting.
 
 ```yaml
 name: ad-copy-selector
-version: "1"
+version: 1
 description: Generate ad copy variants, pick the best one
 
 triggers:
@@ -284,7 +290,7 @@ Multiple outgoing transitions — all must have `when`.
 
 ```yaml
 name: triage-pipeline
-version: "1"
+version: 1
 description: Triage incoming items by priority
 
 triggers:
@@ -324,7 +330,7 @@ A creation step validates, then branches on its output.
 
 ```yaml
 name: submission-flow
-version: "1"
+version: 1
 description: Submit, validate, review if valid, retry if not
 
 triggers:
@@ -373,7 +379,7 @@ Multiple review stages, each with their own verdicts.
 
 ```yaml
 name: document-approval
-version: "1"
+version: 1
 description: Draft, technical review, legal review, then publish
 
 triggers:
@@ -422,66 +428,72 @@ transitions:
     to: done
 ```
 
-## Real Examples (production YAMLs in this codebase)
+## Real Examples
 
-### Protocol-to-TFL (linear pipeline with file uploads)
+### Workflow Designer (this workflow — validation branching + review)
 
 ```yaml
-name: protocol-to-tfl
-version: "4"
-description: Transform clinical trial protocol documents into TFLs
+name: workflow-designer
+version: 1
+description: >
+  Turn a natural language idea into a validated workflow definition
 
 triggers:
   - name: manual
     type: manual
 
 steps:
-  - id: upload-documents
-    name: Upload Documents
+  - id: describe-idea
+    name: Describe Workflow Idea
     type: creation
-    ui:
-      component: file-upload
-      config:
-        acceptedTypes: ["application/pdf"]
-        minFiles: 1
-        maxFiles: 5
-  - id: extract-metadata
-    name: Extract Metadata
+    params:
+      - name: idea
+        type: string
+        required: true
+        description: "Natural language description of the workflow"
+      - name: workflowName
+        type: string
+        required: true
+        description: "Machine-friendly name (kebab-case)"
+  - id: generate-steps
+    name: Generate Workflow Structure
     type: creation
-  - id: generate-tlg-shells
-    name: Generate TLG Shells
+  - id: generate-execution-proposals
+    name: Generate Execution Proposals
     type: creation
-  - id: upload-sdtm
-    name: Upload SDTM
+  - id: validate-definition
+    name: Validate Definition
     type: creation
-    ui:
-      component: file-upload
-      config:
-        acceptedTypes: [".xpt", ".sas7bdat", ".csv"]
-        minFiles: 1
-        maxFiles: 200
-  - id: generate-adam
-    name: Generate ADaM
-    type: creation
-  - id: generate-tlg
-    name: Generate TLG
+  - id: review-definition
+    name: Review Definition
+    type: review
+    verdicts:
+      approve:
+        target: register-definition
+      revise:
+        target: generate-steps
+  - id: register-definition
+    name: Register Definition
     type: creation
   - id: done
     name: Done
     type: terminal
 
 transitions:
-  - from: upload-documents
-    to: extract-metadata
-  - from: extract-metadata
-    to: generate-tlg-shells
-  - from: generate-tlg-shells
-    to: upload-sdtm
-  - from: upload-sdtm
-    to: generate-adam
-  - from: generate-adam
-    to: generate-tlg
-  - from: generate-tlg
+  - from: describe-idea
+    to: generate-steps
+  - from: generate-steps
+    to: generate-execution-proposals
+  - from: generate-execution-proposals
+    to: validate-definition
+  - from: validate-definition
+    to: review-definition
+    when: "output.valid == true"
+  - from: validate-definition
+    to: generate-steps
+    when: "output.valid == false"
+  # No transitions from review-definition — verdicts handle it
+  - from: register-definition
     to: done
 ```
 
@@ -489,7 +501,7 @@ transitions:
 
 ```yaml
 name: community-digest
-version: "1"
+version: 1
 description: "Daily GitHub scan, rank changes, draft Discord posts"
 
 triggers:
@@ -549,78 +561,18 @@ transitions:
   # No transitions from review-ranking or review-posts — verdicts handle it
 ```
 
-### Workflow Designer (this workflow — validation branching + review)
-
-```yaml
-name: workflow-designer
-version: "1"
-description: Turn a natural language idea into a validated workflow definition YAML
-
-triggers:
-  - name: manual
-    type: manual
-
-steps:
-  - id: describe-idea
-    name: Describe Workflow Idea
-    type: creation
-    params:
-      - name: idea
-        type: string
-        required: true
-        description: "Natural language description of the workflow"
-      - name: processName
-        type: string
-        required: true
-        description: "Machine-friendly name (kebab-case)"
-  - id: generate-definition
-    name: Generate Workflow Definition
-    type: creation
-  - id: validate-definition
-    name: Validate Definition
-    type: creation
-  - id: review-definition
-    name: Review Definition
-    type: review
-    verdicts:
-      approve:
-        target: register-definition
-      revise:
-        target: generate-definition
-  - id: register-definition
-    name: Register Definition
-    type: creation
-  - id: done
-    name: Done
-    type: terminal
-
-transitions:
-  - from: describe-idea
-    to: generate-definition
-  - from: generate-definition
-    to: validate-definition
-  - from: validate-definition
-    to: review-definition
-    when: "output.valid == true"
-  - from: validate-definition
-    to: generate-definition
-    when: "output.valid == false"
-  # No transitions from review-definition — verdicts handle it
-  - from: register-definition
-    to: done
-```
-
 ## Common Mistakes to Avoid
 
 1. **Adding transitions from review steps** — WRONG. Verdicts handle routing for review steps.
 2. **Using `gate:` on transitions** — WRONG. The `gate` field does not exist. Use `when:` with an expression.
 3. **Mixing conditional and unconditional transitions from the same step** — WRONG. If a step has multiple outgoing transitions, ALL must have `when`.
-4. **Forgetting quotes on version** — WRONG: `version: 1`. RIGHT: `version: "1"`. YAML would parse bare `1` as a number.
+4. **Using a string for version** — WRONG: `version: "1"`. RIGHT: `version: 1`. Version is an integer in the WorkflowDefinition schema.
 5. **Review step without verdicts** — WRONG. Every review step must have a `verdicts` map with at least one entry.
 6. **Verdict target pointing to nonexistent step** — the engine will throw a RoutingError at runtime.
 7. **Selection on a non-review step** — WRONG. `selection` is only valid on review steps. The preceding creation step must output `{ options: [...] }`.
 8. **Forgetting `options` output contract** — if a review step has `selection`, the creation step before it MUST output `{ options: [{ label, description, value }] }`. Without this, the review UI has nothing to display.
 9. **Unquoted strings with special characters** — YAML breaks on bare strings containing `:`, `#`, `{`, `}`, `[`, `]`, `>`, `|`, `*`, `&`, `!`, `%`, `@`, or `` ` ``. Always use `>` block scalar for multi-line descriptions, or wrap in double quotes. WRONG: `description: Generate 3 blog post angles: one technical, one narrative`. RIGHT: use `description: >` followed by indented text on the next line.
+10. **Including executor/agent/plugin/env fields** — WRONG for this step. Those are added by the execution proposal generator, not by you. Output structure only.
 
 ## YAML String Safety
 
@@ -644,8 +596,7 @@ You will receive a JSON object with:
 ```json
 {
   "idea": "Natural language description of the workflow",
-  "processName": "kebab-case-name",
-  "version": "1",
+  "workflowName": "kebab-case-name",
   "previousErrors": ["optional array of validation errors from a previous attempt"],
   "previousYaml": "optional: the YAML from the previous attempt that failed validation"
 }
@@ -658,11 +609,11 @@ If `previousErrors` is present, fix the specific issues listed while preserving 
 Use bash to write the output file. The `{output_directory}` is the absolute path provided in the "Output Directory" section below — use it exactly as given.
 
 ```bash
-cat > {output_directory}/workflow-definition.yaml << 'ENDYAML'
+cat > {output_directory}/workflow-structure.yaml << 'ENDYAML'
 name: my-workflow
-version: "1"
+version: 1
 ...
 ENDYAML
 ```
 
-Always quote the version string in YAML (e.g., `"1"` not `1`) to ensure it's parsed as a string.
+Remember: version is an integer (`1`), not a string (`"1"`).
