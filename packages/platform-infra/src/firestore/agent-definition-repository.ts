@@ -10,24 +10,21 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { getFirestoreDb } from '../config/firebase-init.js';
-import type {
-  AgentDefinitionRepository,
-  CreateAgentDefinitionInput,
-  UpdateAgentDefinitionInput,
+import {
+  AgentDefinitionSchema,
+  type AgentDefinition,
+  type AgentDefinitionRepository,
+  type CreateAgentDefinitionInput,
+  type UpdateAgentDefinitionInput,
 } from '@mediforce/platform-core';
-import type { AgentDefinition } from '@mediforce/platform-core';
 
 function toAgentDefinition(id: string, data: Record<string, unknown>): AgentDefinition {
-  return {
+  return AgentDefinitionSchema.parse({
+    ...data,
     id,
-    name: data.name as string,
-    iconName: data.iconName as string,
-    description: data.description as string,
-    foundationModel: data.foundationModel as string,
-    systemPrompt: data.systemPrompt as string,
-    inputDescription: (data.inputDescription as string) ?? '',
-    outputDescription: (data.outputDescription as string) ?? '',
-    skillFileNames: (data.skillFileNames as string[]) ?? [],
+    inputDescription: data.inputDescription ?? '',
+    outputDescription: data.outputDescription ?? '',
+    skillFileNames: data.skillFileNames ?? [],
     createdAt:
       data.createdAt instanceof Timestamp
         ? data.createdAt.toDate().toISOString()
@@ -36,7 +33,7 @@ function toAgentDefinition(id: string, data: Record<string, unknown>): AgentDefi
       data.updatedAt instanceof Timestamp
         ? data.updatedAt.toDate().toISOString()
         : String(data.updatedAt),
-  };
+  });
 }
 
 export class FirestoreAgentDefinitionRepository implements AgentDefinitionRepository {

@@ -1,7 +1,10 @@
-import type { AgentDefinition } from '../schemas/agent-definition.js';
+import type {
+  AgentDefinition,
+  CreateAgentDefinitionInput,
+  UpdateAgentDefinitionInput,
+} from '../schemas/agent-definition.js';
 
-export type CreateAgentDefinitionInput = Omit<AgentDefinition, 'id' | 'createdAt' | 'updatedAt'>;
-export type UpdateAgentDefinitionInput = Partial<Omit<AgentDefinition, 'id' | 'createdAt' | 'updatedAt'>>;
+export type { CreateAgentDefinitionInput, UpdateAgentDefinitionInput };
 
 export interface AgentDefinitionRepository {
   create(input: CreateAgentDefinitionInput): Promise<AgentDefinition>;

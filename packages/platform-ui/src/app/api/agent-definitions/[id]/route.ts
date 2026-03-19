@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { UpdateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 
 export async function GET(
@@ -19,17 +20,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
-  const body = (await request.json()) as Record<string, unknown>;
+  const body = await request.json();
+  const input = UpdateAgentDefinitionInputSchema.parse(body);
   const { agentDefinitionRepo } = getPlatformServices();
-  const agent = await agentDefinitionRepo.update(id, {
-    name: body.name as string | undefined,
-    iconName: body.iconName as string | undefined,
-    description: body.description as string | undefined,
-    inputDescription: body.inputDescription as string | undefined,
-    outputDescription: body.outputDescription as string | undefined,
-    foundationModel: body.foundationModel as string | undefined,
-    systemPrompt: body.systemPrompt as string | undefined,
-    skillFileNames: body.skillFileNames as string[] | undefined,
-  });
+  const agent = await agentDefinitionRepo.update(id, input);
   return NextResponse.json({ agent });
 }
