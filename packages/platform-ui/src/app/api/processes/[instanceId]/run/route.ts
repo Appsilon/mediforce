@@ -3,25 +3,11 @@ import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { executeWorkflowAgentStep } from '@/lib/execute-workflow-agent-step';
 
+import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '@/lib/loop-guard';
+
 interface RunProcessBody {
   appContext?: Record<string, unknown>;
   triggeredBy?: string;
-}
-
-const MAX_SAME_STEP_ITERATIONS = 3;
-
-/** Tracks consecutive re-executions of the same step. Returns true if stuck. */
-function isStuckLoop(
-  currentStepId: string | null,
-  tracker: { previousStepId: string | null; count: number },
-): boolean {
-  if (currentStepId === tracker.previousStepId) {
-    tracker.count++;
-    return tracker.count >= MAX_SAME_STEP_ITERATIONS;
-  }
-  tracker.count = 0;
-  tracker.previousStepId = currentStepId;
-  return false;
 }
 
 export async function POST(
@@ -98,7 +84,7 @@ export async function POST(
       });
 
       // Execution loop for WorkflowDefinition instances
-      const loopTracker = { previousStepId: null as string | null, count: 0 };
+      const loopTracker = createLoopTracker();
 
       while (true) {
         const instance = await instanceRepo.getById(instanceId);
@@ -309,7 +295,7 @@ export async function POST(
       });
 
       // Execution loop — iterate until paused, completed, failed, or terminal step reached
-      const legacyLoopTracker = { previousStepId: null as string | null, count: 0 };
+      const legacyLoopTracker = createLoopTracker();
 
       while (true) {
         const instance = await instanceRepo.getById(instanceId);
