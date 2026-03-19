@@ -27,16 +27,17 @@ export function getRedisConnection(): ConnectionOptions {
 
 /** Quick health check — connects, PINGs, disconnects. */
 export async function pingRedis(): Promise<{ pong: string; host: string; port: number; tls: boolean }> {
+  const url = process.env.REDIS_URL ?? 'redis://localhost:6379';
+  const parsed = new URL(url);
+  const host = parsed.hostname || 'localhost';
+  const port = parsed.port ? Number(parsed.port) : 6379;
+  const tls = parsed.protocol === 'rediss:';
+
   const connection = getRedisConnection();
   const { Queue } = await import('bullmq');
   const queue = new Queue('redis-health-ping', { connection });
   const client = await queue.client;
   const pong = await client.ping();
   await queue.close();
-  return {
-    pong,
-    host: connection.host ?? 'localhost',
-    port: connection.port ?? 6379,
-    tls: !!connection.tls,
-  };
+  return { pong, host, port, tls };
 }
