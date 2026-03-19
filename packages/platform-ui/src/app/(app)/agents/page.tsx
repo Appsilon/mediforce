@@ -8,6 +8,7 @@ import { useAgentRuns, useProcessNameMap } from '@/hooks/use-agent-runs';
 import { AgentRunListTable } from '@/components/agents/agent-run-list-table';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
+import type { AgentDefinition } from '@mediforce/platform-core';
 
 const ALL_STATUSES = [
   'running',
@@ -32,6 +33,7 @@ interface PluginMetadata {
 interface PluginEntry {
   name: string;
   metadata?: PluginMetadata;
+  definitionId?: string;
 }
 
 
@@ -98,13 +100,23 @@ function PluginCard({ plugin }: { plugin: PluginEntry }) {
             </button>
           )}
         </div>
-        <button
-          className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          onClick={() => {}}
-        >
-          <Settings className="h-3 w-3" />
-          Configure
-        </button>
+        {plugin.definitionId ? (
+          <Link
+            href={`/agents/definitions/${plugin.definitionId}`}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Settings className="h-3 w-3" />
+            Configure
+          </Link>
+        ) : (
+          <button
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            onClick={() => {}}
+          >
+            <Settings className="h-3 w-3" />
+            Configure
+          </button>
+        )}
       </div>
 
       {/* 3-row table: label | value */}
@@ -171,6 +183,21 @@ function pluginMatchesQuery(plugin: PluginEntry, query: string): boolean {
   );
 }
 
+function agentDefinitionToPluginEntry(def: AgentDefinition): PluginEntry {
+  return {
+    name: def.id,
+    definitionId: def.id,
+    metadata: {
+      name: def.name,
+      description: def.description,
+      inputDescription: '',
+      outputDescription: '',
+      roles: [],
+      foundationModel: def.foundationModel,
+    },
+  };
+}
+
 function PluginCatalog() {
   const [plugins, setPlugins] = useState<PluginEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -178,13 +205,20 @@ function PluginCatalog() {
   const [query, setQuery] = useState('');
 
   useEffect(() => {
-    fetch('/api/plugins')
-      .then((res) => {
+    Promise.all([
+      fetch('/api/plugins').then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch plugins: ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
-        setPlugins(data.plugins ?? []);
+        return res.json() as Promise<{ plugins: PluginEntry[] }>;
+      }),
+      fetch('/api/agent-definitions').then((res) => {
+        if (!res.ok) throw new Error(`Failed to fetch agent definitions: ${res.status}`);
+        return res.json() as Promise<{ agents: AgentDefinition[] }>;
+      }),
+    ])
+      .then(([pluginsData, definitionsData]) => {
+        const definitionEntries = (definitionsData.agents ?? []).map(agentDefinitionToPluginEntry);
+        const builtinPlugins = pluginsData.plugins ?? [];
+        setPlugins([...definitionEntries, ...builtinPlugins]);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unknown error');

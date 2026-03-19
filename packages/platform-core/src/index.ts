@@ -111,6 +111,15 @@ export type {
   AgentRunRepository,
 } from './interfaces/index.js';
 
+// Agent definition schema + repository interface
+export { AgentDefinitionSchema } from './schemas/agent-definition.js';
+export type { AgentDefinition } from './schemas/agent-definition.js';
+export type {
+  AgentDefinitionRepository,
+  CreateAgentDefinitionInput,
+  UpdateAgentDefinitionInput,
+} from './repositories/agent-definition-repository.js';
+
 // Parser (YAML process definition parsing)
 export { parseProcessDefinition, type ParseResult } from './parser/index.js';
 export { formatZodErrors } from './parser/index.js';

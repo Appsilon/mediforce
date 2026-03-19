@@ -119,12 +119,13 @@ export default function NewAgentPage() {
   const [skillFiles, setSkillFiles] = useState<File[]>([]);
   const [skillsDragOver, setSkillsDragOver] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const activeModel = FOUNDATION_MODELS.find((m) => m.id === selectedModelId);
-  const canSave = name.trim().length > 0 && selectedModelId !== '';
+  const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
 
   function addSkillFiles(incoming: FileList | File[]) {
     setSkillFiles((prev) => [...prev, ...Array.from(incoming)]);
@@ -136,9 +137,26 @@ export default function NewAgentPage() {
     if (event.dataTransfer.files.length > 0) addSkillFiles(event.dataTransfer.files);
   }
 
-  function handleSave() {
-    // TODO: POST to /api/agents when backend is ready
-    router.push('/agents');
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const payload = {
+        name: name.trim(),
+        iconName: selectedIcon,
+        description,
+        foundationModel: selectedModelId,
+        systemPrompt: prompt,
+        skillFileNames: skillFiles.map((f) => f.name),
+      };
+      await fetch('/api/agent-definitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      router.push('/agents');
+    } finally {
+      setSaving(false);
+    }
   }
 
   // Close dropdown on outside click
@@ -350,7 +368,7 @@ export default function NewAgentPage() {
               !canSave && 'opacity-50 cursor-not-allowed',
             )}
           >
-            Save new agent
+            {saving ? 'Saving…' : 'Save new agent'}
           </button>
         </div>
 

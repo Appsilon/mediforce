@@ -5,6 +5,7 @@ import {
   FirestoreAuditRepository,
   FirestoreAgentRunRepository,
   FirestoreHumanTaskRepository,
+  FirestoreAgentDefinitionRepository,
   initializeFirebase,
   getFirestoreDb,
 } from '@mediforce/platform-infra';
@@ -39,6 +40,7 @@ export interface PlatformServices {
   instanceRepo: FirestoreProcessInstanceRepository;
   auditRepo: FirestoreAuditRepository;
   humanTaskRepo: FirestoreHumanTaskRepository;
+  agentDefinitionRepo: FirestoreAgentDefinitionRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -70,6 +72,7 @@ export function getPlatformServices(): PlatformServices {
   const auditRepo = new FirestoreAuditRepository(db);
   const agentRunRepo = new FirestoreAgentRunRepository(db);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db);
+  const agentDefinitionRepo = new FirestoreAgentDefinitionRepository();
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -128,6 +131,7 @@ export function getPlatformServices(): PlatformServices {
     instanceRepo,
     auditRepo,
     humanTaskRepo,
+    agentDefinitionRepo,
   };
 
   return services;

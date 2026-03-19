@@ -122,3 +122,8 @@ export {
   PluginCapabilityMetadataSchema,
   type PluginCapabilityMetadata,
 } from './plugin-capability-metadata.js';
+
+export {
+  AgentDefinitionSchema,
+  type AgentDefinition,
+} from './agent-definition.js';
