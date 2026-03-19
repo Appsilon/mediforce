@@ -256,10 +256,18 @@ export async function resolveTask(
   });
 
   // ── 7. Advance to next step ─────────────────────────────────────────────
-  await engine.advanceStep(resolvedTask.processInstanceId, stepOutput, {
-    id: actorId,
-    role: 'human',
-  });
+  const isWorkflowInstance = !instance.configName;
+  if (isWorkflowInstance) {
+    await engine.advanceWorkflowStep(resolvedTask.processInstanceId, stepOutput, {
+      id: actorId,
+      role: 'human',
+    });
+  } else {
+    await engine.advanceStep(resolvedTask.processInstanceId, stepOutput, {
+      id: actorId,
+      role: 'human',
+    });
+  }
 
   await auditRepo.append({
     actorId,

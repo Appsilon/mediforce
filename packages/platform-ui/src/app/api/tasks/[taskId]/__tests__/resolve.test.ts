@@ -23,7 +23,7 @@ vi.mock('@/lib/platform-services', () => ({
       getById: mockInstanceGetById,
       update: mockInstanceUpdate,
     },
-    engine: { advanceStep: mockAdvanceStep },
+    engine: { advanceStep: mockAdvanceStep, advanceWorkflowStep: mockAdvanceStep },
   }),
   validateApiKey: () => true,
   getAppBaseUrl: () => 'http://localhost:3000',
