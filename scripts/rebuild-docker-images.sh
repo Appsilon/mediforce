@@ -17,5 +17,12 @@ docker build \
   "$REPO_ROOT/apps/protocol-to-tfl/container"
 
 echo ""
+echo "=== Building community-digest agent image ==="
+docker build \
+  -f "$REPO_ROOT/apps/community-digest/container/Dockerfile" \
+  -t mediforce-agent:community-digest \
+  "$REPO_ROOT"
+
+echo ""
 echo "=== Done ==="
 docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}' | grep mediforce

@@ -22,7 +22,11 @@ git reset --hard origin/main
 export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)
 log "Git SHA: $NEXT_PUBLIC_GIT_SHA"
 
-# Build and restart only changed services
+# Build agent images
+log "Building agent images"
+bash "$DEPLOY_DIR/scripts/rebuild-docker-images.sh"
+
+# Build and restart services
 log "Building images"
 docker compose -f "$COMPOSE_FILE" build
 
