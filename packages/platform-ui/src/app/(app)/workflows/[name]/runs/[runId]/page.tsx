@@ -6,6 +6,7 @@ import type { StepExecution, AuditEvent, Step } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useAuditEvents } from '@/hooks/use-audit-events';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
+import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useProcessConfig } from '@/hooks/use-process-config';
 import { ProcessDetail } from '@/components/processes/process-detail';
 
@@ -29,15 +30,28 @@ export default function RunDetailPage() {
   const { data: auditEvents, loading: auditLoading, error: auditError } = useAuditEvents(runId ?? null);
 
   // Load process definition to get steps for the StepStatusPanel
-  const { versions, loading: definitionLoading } = useProcessDefinitionVersions(decodedName);
+  // Try both legacy processDefinitions and new workflowDefinitions
+  const { versions: legacyVersions } = useProcessDefinitionVersions(decodedName);
+  const { definitions: workflowVersions } = useWorkflowDefinitions(decodedName);
 
-  // Find the definition version matching the instance's definitionVersion
-  // versions are ProcessDefinitionDoc[] which include all ProcessDefinition fields including steps
   const definitionSteps = useMemo((): Step[] => {
-    if (!instance || !versions.length) return [];
-    const matchingVersion = versions.find((v) => v.version === instance.definitionVersion);
-    return matchingVersion?.steps ?? [];
-  }, [instance, versions]);
+    if (!instance) return [];
+
+    // Try legacy processDefinitions first
+    const legacyMatch = legacyVersions.find((v) => v.version === instance.definitionVersion);
+    if (legacyMatch?.steps?.length) return legacyMatch.steps;
+
+    // Fall back to workflowDefinitions (version is number, definitionVersion is string)
+    const versionNum = parseInt(instance.definitionVersion, 10);
+    const workflowMatch = workflowVersions.find((v) => v.version === versionNum);
+    if (workflowMatch?.steps?.length) return workflowMatch.steps;
+
+    // Last resort: return steps from latest available definition
+    if (legacyVersions.length > 0) return legacyVersions[0].steps ?? [];
+    if (workflowVersions.length > 0) return workflowVersions[0].steps;
+
+    return [];
+  }, [instance, legacyVersions, workflowVersions]);
 
   // Load ProcessConfig to get per-step autonomy levels (3-part key)
   const { data: processConfig } = useProcessConfig(
@@ -66,7 +80,6 @@ export default function RunDetailPage() {
     );
   }, [processConfig]);
 
-  void definitionLoading;
 
   if (instanceLoading) {
     return (
