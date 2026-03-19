@@ -29,8 +29,9 @@ docker compose -f "$COMPOSE_FILE" build
 log "Starting services"
 docker compose -f "$COMPOSE_FILE" up -d
 
-# Clean up old images
+# Clean up old images and build cache
 docker image prune -f >> "$LOG_FILE" 2>&1
+docker builder prune -f --keep-storage=5GB >> "$LOG_FILE" 2>&1
 
 log "Deployment complete"
 docker compose -f "$COMPOSE_FILE" ps
