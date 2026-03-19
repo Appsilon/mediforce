@@ -6,6 +6,7 @@ import { Bot, Cpu, Terminal, BarChart3, Settings, Plus, Search } from 'lucide-re
 import Link from 'next/link';
 import { useAgentRuns, useProcessNameMap } from '@/hooks/use-agent-runs';
 import { AgentRunListTable } from '@/components/agents/agent-run-list-table';
+import { getModelDisplayName } from '@/lib/agent-models';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
@@ -37,19 +38,6 @@ interface PluginEntry {
 }
 
 
-const FOUNDATION_MODEL_NAMES: Record<string, string> = {
-  'anthropic/claude-opus-4-5':  'Claude Opus 4.5',
-  'anthropic/claude-sonnet-4':  'Claude Sonnet 4',
-  'anthropic/claude-haiku-4-5': 'Claude Haiku 4.5',
-  'openai/gpt-4o':              'GPT-4o',
-  'openai/gpt-4o-mini':         'GPT-4o mini',
-  'google/gemini-2.5-pro':      'Gemini 2.5 Pro',
-  'deepseek/deepseek-chat':     'DeepSeek Chat',
-};
-
-function getModelDisplayName(modelId: string): string {
-  return FOUNDATION_MODEL_NAMES[modelId] ?? modelId;
-}
 
 function getPluginIcon(pluginId: string): { Icon: LucideIcon; colorClass: string; bgClass: string } {
   const id = pluginId.toLowerCase();
