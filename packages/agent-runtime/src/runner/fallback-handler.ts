@@ -4,7 +4,7 @@ import type {
   AgentEvent,
   AgentOutputEnvelope,
 } from '@mediforce/platform-core';
-import type { AgentContext } from '../interfaces/agent-plugin.js';
+import type { AgentContext, WorkflowAgentContext } from '../interfaces/agent-plugin.js';
 import type { AgentRunResult } from './agent-runner.js';
 
 export class FallbackHandler {
@@ -12,6 +12,19 @@ export class FallbackHandler {
     private readonly instanceRepository: ProcessInstanceRepository,
   ) {}
 
+  async handleWithWorkflowStep(
+    reason: 'timeout' | 'low_confidence' | 'error',
+    context: WorkflowAgentContext,
+    partialWork: AgentEvent[],
+    originalEnvelope?: AgentOutputEnvelope | null,
+  ): Promise<AgentRunResult> {
+    const behavior = context.step.agent?.fallbackBehavior ?? 'escalate_to_human';
+    return this.applyFallbackBehavior(behavior, reason, context.processInstanceId, originalEnvelope);
+  }
+
+  /**
+   * @deprecated Use handleWithWorkflowStep instead. This method relies on the legacy StepConfig model.
+   */
   async handle(
     reason: 'timeout' | 'low_confidence' | 'error',
     context: AgentContext,
@@ -20,10 +33,18 @@ export class FallbackHandler {
     originalEnvelope?: AgentOutputEnvelope | null,
   ): Promise<AgentRunResult> {
     const behavior = stepConfig.fallbackBehavior ?? 'escalate_to_human';
+    return this.applyFallbackBehavior(behavior, reason, context.processInstanceId, originalEnvelope);
+  }
 
+  private async applyFallbackBehavior(
+    behavior: string,
+    reason: 'timeout' | 'low_confidence' | 'error',
+    processInstanceId: string,
+    originalEnvelope?: AgentOutputEnvelope | null,
+  ): Promise<AgentRunResult> {
     switch (behavior) {
       case 'escalate_to_human': {
-        await this.instanceRepository.update(context.processInstanceId, {
+        await this.instanceRepository.update(processInstanceId, {
           status: 'paused',
           pauseReason: 'agent_escalated',
         });
@@ -36,7 +57,6 @@ export class FallbackHandler {
       }
 
       case 'continue_with_flag': {
-        // No instance update — workflow continues
         return {
           status: 'flagged',
           envelope: originalEnvelope ?? null,
@@ -46,7 +66,7 @@ export class FallbackHandler {
       }
 
       case 'pause': {
-        await this.instanceRepository.update(context.processInstanceId, {
+        await this.instanceRepository.update(processInstanceId, {
           status: 'paused',
           pauseReason: 'agent_paused',
         });
@@ -59,8 +79,7 @@ export class FallbackHandler {
       }
 
       default: {
-        // Should never happen given StepConfig type — escalate as safe default
-        await this.instanceRepository.update(context.processInstanceId, {
+        await this.instanceRepository.update(processInstanceId, {
           status: 'paused',
           pauseReason: 'agent_escalated',
         });

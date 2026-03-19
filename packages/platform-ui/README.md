@@ -42,6 +42,10 @@ pnpm dev:test
 MOCK_AGENT=true pnpm dev
 ```
 
+## PR Preview Deployments
+
+`vercel.json` configures automatic preview deployments via Vercel. Each pull request gets a temporary URL so reviewers can click through the UI without running the app locally. Preview deployments connect to the staging Firebase project.
+
 ## Testing
 
 ```bash

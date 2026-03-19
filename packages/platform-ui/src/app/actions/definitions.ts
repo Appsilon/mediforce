@@ -2,9 +2,9 @@
 
 import { stringify as yamlStringify } from 'yaml';
 import { getPlatformServices } from '@/lib/platform-services';
-import { parseProcessDefinition } from '@mediforce/platform-core';
-import type { ProcessDefinition, ProcessConfig } from '@mediforce/platform-core';
-import { DefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
+import { parseProcessDefinition, WorkflowDefinitionSchema } from '@mediforce/platform-core';
+import type { ProcessDefinition, ProcessConfig, WorkflowDefinition } from '@mediforce/platform-core';
+import { DefinitionVersionAlreadyExistsError, WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
 
 export type SaveDefinitionResult =
   | { success: true; name: string; version: string }
@@ -18,8 +18,7 @@ export async function definitionToYaml(definition: Record<string, unknown>): Pro
 
 /**
  * Build a default "all-human" ProcessConfig from a definition.
- * Every non-terminal step gets executorType: "human" — the safest default.
- * Users must explicitly configure agent executors + plugins via the config editor.
+ * @deprecated Legacy — use WorkflowDefinition instead.
  */
 function buildAllHumanConfig(definition: ProcessDefinition): ProcessConfig {
   return {
@@ -32,6 +31,7 @@ function buildAllHumanConfig(definition: ProcessDefinition): ProcessConfig {
   };
 }
 
+/** @deprecated Legacy — saves ProcessDefinition + auto-creates all-human config. */
 export async function saveDefinition(yaml: string): Promise<SaveDefinitionResult> {
   if (!yaml.trim()) {
     return { success: false, error: 'YAML content is required.' };
@@ -46,13 +46,10 @@ export async function saveDefinition(yaml: string): Promise<SaveDefinitionResult
 
   try {
     await processRepo.saveProcessDefinition(result.data);
-
-    // Auto-create "all-human" default config if none exists yet
     const existing = await processRepo.getProcessConfig(result.data.name, 'all-human', 'v1');
     if (!existing) {
       await processRepo.saveProcessConfig(buildAllHumanConfig(result.data));
     }
-
     return { success: true, name: result.data.name, version: result.data.version };
   } catch (e) {
     if (e instanceof DefinitionVersionAlreadyExistsError) {
@@ -64,6 +61,48 @@ export async function saveDefinition(yaml: string): Promise<SaveDefinitionResult
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
   }
 }
+
+// ---------------------------------------------------------------------------
+// WorkflowDefinition (new unified schema)
+// ---------------------------------------------------------------------------
+
+export type SaveWorkflowDefinitionResult =
+  | { success: true; name: string; version: number }
+  | { success: false; error: string };
+
+export async function saveWorkflowDefinition(
+  input: Omit<WorkflowDefinition, 'version' | 'createdAt'>,
+): Promise<SaveWorkflowDefinitionResult> {
+  const parsed = WorkflowDefinitionSchema.omit({ version: true, createdAt: true }).safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues.map((i) => i.message).join(', ') };
+  }
+
+  const { processRepo } = getPlatformServices();
+
+  try {
+    const latestVersion = await processRepo.getLatestWorkflowVersion(parsed.data.name);
+    const nextVersion = latestVersion + 1;
+
+    const definition: WorkflowDefinition = {
+      ...parsed.data,
+      version: nextVersion,
+      createdAt: new Date().toISOString(),
+    };
+
+    await processRepo.saveWorkflowDefinition(definition);
+    return { success: true, name: definition.name, version: definition.version };
+  } catch (e) {
+    if (e instanceof WorkflowDefinitionVersionAlreadyExistsError) {
+      return { success: false, error: 'Version conflict — please retry.' };
+    }
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Archive helpers
+// ---------------------------------------------------------------------------
 
 export type ArchiveResult = { success: true } | { success: false; error: string };
 

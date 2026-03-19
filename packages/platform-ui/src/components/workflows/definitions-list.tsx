@@ -1,0 +1,105 @@
+'use client';
+
+import Link from 'next/link';
+import { ChevronRight, Pencil, Loader2 } from 'lucide-react';
+import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { cn } from '@/lib/utils';
+
+interface DefinitionsListProps {
+  workflowName: string;
+}
+
+export function DefinitionsList({ workflowName }: DefinitionsListProps) {
+  const { definitions, latestVersion, loading } = useWorkflowDefinitions(workflowName);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading...
+      </div>
+    );
+  }
+
+  if (definitions.length === 0) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">
+          No definitions found.
+        </p>
+        <Link
+          href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Create first definition
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {definitions.length} version{definitions.length !== 1 ? 's' : ''}
+        </p>
+        <Link
+          href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </Link>
+      </div>
+
+      <div className="space-y-2">
+        {definitions.map((def) => {
+          const isLatest = def.version === latestVersion;
+          const isArchived = def.archived === true;
+
+          return (
+            <Link
+              key={def.version}
+              href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
+              className={cn(
+                'flex items-center gap-3 w-full rounded-lg border px-4 py-3 transition-colors',
+                'bg-card hover:bg-muted/50',
+                isArchived && 'opacity-60',
+              )}
+            >
+              <span className="font-mono text-sm font-medium">v{def.version}</span>
+
+              {isLatest && (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  latest
+                </span>
+              )}
+              {isArchived && (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                  archived
+                </span>
+              )}
+
+              {def.description && (
+                <span className="text-sm text-muted-foreground truncate">{def.description}</span>
+              )}
+
+              <span className="text-xs text-muted-foreground ml-auto mr-1">
+                {def.steps.length} steps
+              </span>
+
+              {def.createdAt && (
+                <span className="text-xs text-muted-foreground">
+                  {new Date(def.createdAt).toLocaleDateString()}
+                </span>
+              )}
+
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

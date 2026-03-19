@@ -1,9 +1,12 @@
 import {
   ProcessDefinitionSchema,
+  WorkflowDefinitionSchema,
   type ProcessRepository,
   type ProcessDefinition,
   type ProcessConfig,
   type DefinitionListResult,
+  type WorkflowDefinition,
+  type WorkflowDefinitionListResult,
 } from '@mediforce/platform-core';
 import {
   collection,
@@ -29,6 +32,21 @@ export class DefinitionVersionAlreadyExistsError extends Error {
         `Create a new version to change the definition.`,
     );
     this.name = 'DefinitionVersionAlreadyExistsError';
+  }
+}
+
+/**
+ * Error thrown when attempting to save a workflow definition version
+ * that already exists. Workflow definition versions are immutable in Firestore
+ * to prevent stale references from running workflow instances.
+ */
+export class WorkflowDefinitionVersionAlreadyExistsError extends Error {
+  constructor(name: string, version: number) {
+    super(
+      `Workflow definition "${name}" version "${version}" already exists and cannot be overwritten. ` +
+        `Create a new version to change the definition.`,
+    );
+    this.name = 'WorkflowDefinitionVersionAlreadyExistsError';
   }
 }
 
@@ -60,6 +78,7 @@ export class ConfigVersionAlreadyExistsError extends Error {
 export class FirestoreProcessRepository implements ProcessRepository {
   private readonly definitionsCollection = 'processDefinitions';
   private readonly configsCollection = 'processConfigs';
+  private readonly workflowDefinitionsCollection = 'workflowDefinitions';
 
   constructor(private readonly db: Firestore) {}
 
@@ -117,9 +136,8 @@ export class FirestoreProcessRepository implements ProcessRepository {
       if (parsed.success) {
         result.valid.push(parsed.data);
       } else {
-        console.warn(
-          `[process-repository] Invalid definition document ${docSnap.id}:`,
-          parsed.error.format(),
+        console.debug(
+          `[process-repository] Skipping invalid definition document ${docSnap.id}`,
         );
         result.invalid.push({ data: raw, error: parsed.error });
       }
@@ -211,5 +229,96 @@ export class FirestoreProcessRepository implements ProcessRepository {
       this.compositeKey(name, version),
     );
     await updateDoc(docRef, { archived });
+  }
+
+  async getWorkflowDefinition(
+    name: string,
+    version: number,
+  ): Promise<WorkflowDefinition | null> {
+    const docRef = doc(
+      this.db,
+      this.workflowDefinitionsCollection,
+      `${name}:${version}`,
+    );
+    const snapshot = await getDoc(docRef);
+
+    if (!snapshot.exists()) {
+      return null;
+    }
+
+    return WorkflowDefinitionSchema.parse(snapshot.data());
+  }
+
+  async saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void> {
+    const docRef = doc(
+      this.db,
+      this.workflowDefinitionsCollection,
+      `${definition.name}:${definition.version}`,
+    );
+
+    const existing = await getDoc(docRef);
+    if (existing.exists()) {
+      throw new WorkflowDefinitionVersionAlreadyExistsError(
+        definition.name,
+        definition.version,
+      );
+    }
+
+    // Firestore rejects undefined values — strip them before writing
+    const cleaned = JSON.parse(JSON.stringify(definition));
+    await setDoc(docRef, cleaned);
+  }
+
+  async listWorkflowDefinitions(): Promise<WorkflowDefinitionListResult> {
+    const snapshot = await getDocs(
+      collection(this.db, this.workflowDefinitionsCollection),
+    );
+
+    const grouped = new Map<string, WorkflowDefinition[]>();
+
+    for (const docSnap of snapshot.docs) {
+      const raw = docSnap.data();
+      const parsed = WorkflowDefinitionSchema.safeParse(raw);
+      if (!parsed.success) {
+        console.warn(
+          `[process-repository] Invalid workflow definition document ${docSnap.id}:`,
+          parsed.error.format(),
+        );
+        continue;
+      }
+      const definition = parsed.data;
+      const existing = grouped.get(definition.name) ?? [];
+      existing.push(definition);
+      grouped.set(definition.name, existing);
+    }
+
+    const definitions = Array.from(grouped.entries()).map(([name, versions]) => {
+      const latestVersion = Math.max(...versions.map((v) => v.version));
+      return { name, versions, latestVersion };
+    });
+
+    return { definitions };
+  }
+
+  async getLatestWorkflowVersion(name: string): Promise<number> {
+    const q = query(
+      collection(this.db, this.workflowDefinitionsCollection),
+      where('name', '==', name),
+    );
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return 0;
+    }
+
+    let latestVersion = 0;
+    for (const docSnap of snapshot.docs) {
+      const raw = docSnap.data();
+      const parsed = WorkflowDefinitionSchema.safeParse(raw);
+      if (parsed.success && parsed.data.version > latestVersion) {
+        latestVersion = parsed.data.version;
+      }
+    }
+    return latestVersion;
   }
 }

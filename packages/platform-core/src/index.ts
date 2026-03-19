@@ -38,6 +38,10 @@ export {
   NotificationTargetSchema,
   PluginRoleSchema,
   PluginCapabilityMetadataSchema,
+  WorkflowAgentConfigSchema,
+  WorkflowReviewConfigSchema,
+  WorkflowStepSchema,
+  WorkflowDefinitionSchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -81,6 +85,10 @@ export type {
   NotificationTarget,
   ProcessNotificationConfig,
   PluginCapabilityMetadata,
+  WorkflowAgentConfig,
+  WorkflowReviewConfig,
+  WorkflowStep,
+  WorkflowDefinition,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)
@@ -90,6 +98,8 @@ export type {
   AuthUser,
   ProcessRepository,
   DefinitionListResult,
+  WorkflowDefinitionListResult,
+  WorkflowDefinitionGroup,
   InvalidDefinitionEntry,
   ProcessInstanceRepository,
   HumanTaskRepository,
@@ -122,6 +132,7 @@ export {
   buildAgentRun,
   buildAuditEvent,
   buildProcessConfig,
+  buildWorkflowDefinition,
   buildAgentOutputEnvelope,
   buildFileMetadata,
   resetFactorySequence,

@@ -4,6 +4,7 @@ export type {
   LlmResponse,
   LlmClient,
   AgentContext,
+  WorkflowAgentContext,
   EmitPayload,
   EmitFn,
   AgentPlugin,

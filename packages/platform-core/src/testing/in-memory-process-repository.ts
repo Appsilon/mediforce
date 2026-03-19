@@ -3,7 +3,10 @@ import type {
   ProcessDefinition,
   ProcessConfig,
   DefinitionListResult,
+  WorkflowDefinitionListResult,
+  WorkflowDefinitionGroup,
 } from '../index.js';
+import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
 
 /**
  * In-memory implementation of ProcessRepository for testing.
@@ -13,10 +16,57 @@ import type {
 export class InMemoryProcessRepository implements ProcessRepository {
   private definitions = new Map<string, ProcessDefinition>();
   private configs = new Map<string, ProcessConfig>();
+  private workflowDefinitions = new Map<string, WorkflowDefinition>();
 
   private compositeKey(name: string, version: string): string {
     return `${name}:${version}`;
   }
+
+  // ---------------------------------------------------------------------------
+  // WorkflowDefinition methods (new unified schema)
+  // ---------------------------------------------------------------------------
+
+  async getWorkflowDefinition(name: string, version: number): Promise<WorkflowDefinition | null> {
+    return this.workflowDefinitions.get(this.compositeKey(name, String(version))) ?? null;
+  }
+
+  async saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void> {
+    this.workflowDefinitions.set(
+      this.compositeKey(definition.name, String(definition.version)),
+      definition,
+    );
+  }
+
+  async listWorkflowDefinitions(): Promise<WorkflowDefinitionListResult> {
+    const grouped = new Map<string, WorkflowDefinition[]>();
+    for (const definition of this.workflowDefinitions.values()) {
+      const existing = grouped.get(definition.name) ?? [];
+      existing.push(definition);
+      grouped.set(definition.name, existing);
+    }
+    const definitions: WorkflowDefinitionGroup[] = Array.from(grouped.entries()).map(
+      ([name, versions]) => ({
+        name,
+        versions,
+        latestVersion: Math.max(...versions.map((v) => v.version)),
+      }),
+    );
+    return { definitions };
+  }
+
+  async getLatestWorkflowVersion(name: string): Promise<number> {
+    let latest = 0;
+    for (const definition of this.workflowDefinitions.values()) {
+      if (definition.name === name && definition.version > latest) {
+        latest = definition.version;
+      }
+    }
+    return latest;
+  }
+
+  // ---------------------------------------------------------------------------
+  // ProcessDefinition methods (legacy)
+  // ---------------------------------------------------------------------------
 
   async getProcessDefinition(
     name: string,
@@ -58,7 +108,6 @@ export class InMemoryProcessRepository implements ProcessRepository {
   }
 
   async setProcessArchived(name: string, archived: boolean): Promise<void> {
-    // Mark all versions of a definition as archived/unarchived
     for (const [key, def] of this.definitions) {
       if (def.name === name) {
         this.definitions.set(key, { ...def, metadata: { ...def.metadata, archived } });
@@ -74,7 +123,7 @@ export class InMemoryProcessRepository implements ProcessRepository {
   ): Promise<void> {
     const key = `${processName}:${configName}:${configVersion}`;
     const config = this.configs.get(key);
-    if (config) {
+    if (config !== undefined) {
       this.configs.set(key, { ...config, archived });
     }
   }
@@ -86,7 +135,7 @@ export class InMemoryProcessRepository implements ProcessRepository {
   ): Promise<void> {
     const key = this.compositeKey(name, version);
     const def = this.definitions.get(key);
-    if (def) {
+    if (def !== undefined) {
       this.definitions.set(key, { ...def, archived });
     }
   }
@@ -95,13 +144,15 @@ export class InMemoryProcessRepository implements ProcessRepository {
   clear(): void {
     this.definitions.clear();
     this.configs.clear();
+    this.workflowDefinitions.clear();
   }
 
   /** Test helper: get counts of stored items */
-  count(): { definitions: number; configs: number } {
+  count(): { definitions: number; configs: number; workflowDefinitions: number } {
     return {
       definitions: this.definitions.size,
       configs: this.configs.size,
+      workflowDefinitions: this.workflowDefinitions.size,
     };
   }
 }
