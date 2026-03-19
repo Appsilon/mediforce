@@ -82,11 +82,32 @@ export async function POST(
       });
 
       // Execution loop for WorkflowDefinition instances
+      let previousStepId: string | null = null;
+      let sameStepCount = 0;
+      const MAX_SAME_STEP = 3;
+
       while (true) {
         const instance = await instanceRepo.getById(instanceId);
         if (!instance) break;
         if (instance.status !== 'running') break;
         if (instance.currentStepId === null) break;
+
+        // Safety guard: detect stuck loop (same step re-executing without advancing)
+        if (instance.currentStepId === previousStepId) {
+          sameStepCount++;
+          if (sameStepCount >= MAX_SAME_STEP) {
+            console.error(`[auto-runner] Safety guard: step '${instance.currentStepId}' executed ${MAX_SAME_STEP} times without advancing — aborting instance ${instanceId}`);
+            await instanceRepo.update(instanceId, {
+              status: 'failed',
+              error: `Auto-runner stuck: step '${instance.currentStepId}' looped ${MAX_SAME_STEP} times`,
+              updatedAt: new Date().toISOString(),
+            });
+            break;
+          }
+        } else {
+          sameStepCount = 0;
+        }
+        previousStepId = instance.currentStepId;
 
         const currentStep = workflowDefinition.steps.find((s) => s.id === instance.currentStepId);
         if (!currentStep) {
@@ -281,6 +302,9 @@ export async function POST(
       });
 
       // Execution loop — iterate until paused, completed, failed, or terminal step reached
+      let legacyPreviousStepId: string | null = null;
+      let legacySameStepCount = 0;
+
       while (true) {
         // Re-fetch instance to get current state after each advance
         const instance = await instanceRepo.getById(instanceId);
@@ -297,6 +321,23 @@ export async function POST(
         if (instance.currentStepId === null) {
           break;
         }
+
+        // Safety guard: detect stuck loop
+        if (instance.currentStepId === legacyPreviousStepId) {
+          legacySameStepCount++;
+          if (legacySameStepCount >= 3) {
+            console.error(`[auto-runner/legacy] Safety guard: step '${instance.currentStepId}' looped 3 times — aborting instance ${instanceId}`);
+            await instanceRepo.update(instanceId, {
+              status: 'failed',
+              error: `Auto-runner stuck: step '${instance.currentStepId}' looped 3 times`,
+              updatedAt: new Date().toISOString(),
+            });
+            break;
+          }
+        } else {
+          legacySameStepCount = 0;
+        }
+        legacyPreviousStepId = instance.currentStepId;
 
         // Find the current step in the definition
         const currentStep = definition.steps.find((s) => s.id === instance.currentStepId);
