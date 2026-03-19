@@ -9,6 +9,7 @@ import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useProcessConfig } from '@/hooks/use-process-config';
 import { ProcessDetail } from '@/components/processes/process-detail';
+import { resolveDefinitionSteps } from '@/lib/resolve-definition-steps';
 
 type AuditEventWithId = AuditEvent & { id: string };
 type StepExecutionWithId = StepExecution;
@@ -34,24 +35,10 @@ export default function RunDetailPage() {
   const { versions: legacyVersions } = useProcessDefinitionVersions(decodedName);
   const { definitions: workflowVersions } = useWorkflowDefinitions(decodedName);
 
-  const definitionSteps = useMemo((): Step[] => {
-    if (!instance) return [];
-
-    // Try legacy processDefinitions first
-    const legacyMatch = legacyVersions.find((v) => v.version === instance.definitionVersion);
-    if (legacyMatch?.steps?.length) return legacyMatch.steps;
-
-    // Fall back to workflowDefinitions (version is number, definitionVersion is string)
-    const versionNum = parseInt(instance.definitionVersion, 10);
-    const workflowMatch = workflowVersions.find((v) => v.version === versionNum);
-    if (workflowMatch?.steps?.length) return workflowMatch.steps;
-
-    // Last resort: return steps from latest available definition
-    if (legacyVersions.length > 0) return legacyVersions[0].steps ?? [];
-    if (workflowVersions.length > 0) return workflowVersions[0].steps;
-
-    return [];
-  }, [instance, legacyVersions, workflowVersions]);
+  const definitionSteps = useMemo(
+    () => resolveDefinitionSteps(instance, legacyVersions, workflowVersions),
+    [instance, legacyVersions, workflowVersions],
+  );
 
   // Load ProcessConfig to get per-step autonomy levels (3-part key)
   const { data: processConfig } = useProcessConfig(

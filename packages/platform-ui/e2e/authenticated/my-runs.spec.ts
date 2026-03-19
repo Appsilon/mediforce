@@ -26,13 +26,13 @@ test.describe('My Runs', () => {
 
   test('[DATA] Supply Chain Review card shows run count', async ({ page }) => {
     await page.goto('/workflows');
-    await expect(page.getByText('5 runs').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('6 runs').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('[DATA] Supply Chain Review card shows active count badge', async ({ page }) => {
     await page.goto('/workflows');
-    // proc-running-1 (running), proc-paused-1 (paused), proc-human-waiting (paused) = 3 active
-    await expect(page.getByText('3 active')).toBeVisible({ timeout: 10_000 });
+    // proc-running-1, proc-workflow-run-1 (running), proc-paused-1, proc-human-waiting (paused) = 4 active
+    await expect(page.getByText('4 active')).toBeVisible({ timeout: 10_000 });
   });
 
   test('[RENDER] instance rows show short hash identifiers', async ({ page }) => {
@@ -44,7 +44,8 @@ test.describe('My Runs', () => {
   test('[RENDER] instance rows show current step in human-readable format', async ({ page }) => {
     await page.goto('/workflows');
     // proc-running-1 has currentStepId: 'narrative-summary' → "Narrative Summary"
-    await expect(page.getByText('Narrative Summary')).toBeVisible({ timeout: 10_000 });
+    // proc-workflow-run-1 also has currentStepId: 'narrative-summary'
+    await expect(page.getByText('Narrative Summary').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('[CLICK] clicking instance row navigates to detail', async ({ page }) => {
