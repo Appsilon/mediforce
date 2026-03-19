@@ -185,11 +185,29 @@ You may also generate additional proposals based on the user's preferences (e.g.
 5. **Review steps** should generally be `executor: "human"` in hybrid proposals
 6. **Only use plugins** that appeared in the GET /api/plugins response
 7. **CRITICAL: `claude-code-agent` steps MUST have `agent.prompt`** — this is a newly generated workflow with no SKILL.md files, so `skill` cannot be used. Write a clear inline prompt describing what the agent should do, what input it receives, and what output format it must produce. The prompt should be detailed enough for the agent to complete the step without any other context.
-8. For `claude-code-agent` steps, include `agent.model` (use `"sonnet"`)
-9. Each proposal needs a distinct `label` and `description` explaining the trade-offs
-10. **Preserve all structural fields** from the original YAML — `params`, `verdicts`, `selection`, `description`, `metadata`, etc. must be copied as-is into every proposal
-11. **transitions and triggers** are copied verbatim from the structure into every proposal
-12. Tailor proposals to the user's stated preferences when available
+8. **CRITICAL: Every `agent.prompt` MUST include the output contract instructions.** The Mediforce agent runtime parses output from a file, NOT from the conversation. Every prompt must instruct the agent to: (a) write its result as JSON to `{output_directory}/result.json` using bash, and (b) output ONLY a small JSON contract as its final message: `{"output_file": "/absolute/path/to/result.json", "summary": "..."}`. Without this contract, the platform cannot read the agent's output and the step will fail with an empty result. Here is the exact block to include in every agent prompt:
+
+```
+## OUTPUT CONTRACT (MANDATORY)
+
+This is a headless pipeline step. There is no human reading your conversation output.
+
+You MUST:
+1. Write your result as a JSON file using bash:
+   cat > {output_directory}/result.json << 'ENDJSON'
+   { ... your structured output ... }
+   ENDJSON
+2. Your FINAL message must be ONLY this raw JSON (no markdown, no preamble):
+   {"output_file": "{output_directory}/result.json", "summary": "1-2 sentence summary"}
+
+The {output_directory} placeholder will be replaced with the actual path at runtime.
+If you do NOT follow this contract, the platform will receive an empty result.
+```
+9. For `claude-code-agent` steps, include `agent.model` (use `"sonnet"`)
+10. Each proposal needs a distinct `label` and `description` explaining the trade-offs
+11. **Preserve all structural fields** from the original YAML — `params`, `verdicts`, `selection`, `description`, `metadata`, etc. must be copied as-is into every proposal
+12. **transitions and triggers** are copied verbatim from the structure into every proposal
+13. Tailor proposals to the user's stated preferences when available
 
 ### Output Shape
 
