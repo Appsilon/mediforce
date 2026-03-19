@@ -203,6 +203,23 @@ export function buildSeedData(testUserId: string) {
       error: null,
       assignedRoles: ['reviewer'],
     },
+    // New-style run — uses WorkflowDefinition (no configName/configVersion)
+    'proc-workflow-run-1': {
+      id: 'proc-workflow-run-1',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1',
+      status: 'running',
+      currentStepId: 'narrative-summary',
+      variables: { studyId: 'study-wf-001' },
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
     'proc-upload-waiting': {
       id: 'proc-upload-waiting',
       definitionName: 'Protocol to TFL',

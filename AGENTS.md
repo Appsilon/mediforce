@@ -58,20 +58,46 @@ E2E tests live in `packages/platform-ui/e2e/`. Two modes:
 
 The emulator setup (`e2e/auth-setup.ts`) automatically:
 1. Creates a test user (test@mediforce.dev / test123456)
-2. Seeds Firestore with humanTasks, processInstances, agentRuns, auditEvents
+2. Seeds Firestore with humanTasks, processInstances, agentRuns, auditEvents, processDefinitions, processConfigs, **workflowDefinitions**
 3. Authenticates via `/test-login` and saves auth state for all tests
+
+**Seed data** (`e2e/helpers/seed-data.ts`) includes both legacy and new-style data:
+- Legacy: `processDefinitions` + `processConfigs` (old schema)
+- New: `workflowDefinitions` (unified schema) + `proc-workflow-run-1` (instance without configName)
+- This ensures both paths are tested (dual-read engine)
 
 **Test structure:**
 - `e2e/smoke.spec.ts` -- unauthenticated tests (always run)
 - `e2e/authenticated/*.spec.ts` -- tests requiring login (only with emulators)
 - `e2e/helpers/` -- emulator REST API helpers and seed data
 
-The dev server starts automatically on port 9003 via `webServer` in `playwright.config.ts`.
+The dev server starts automatically on port 9007 (emulator mode) or reuses existing on 9003 (smoke mode) via `webServer` in `playwright.config.ts`.
 
 Write E2E tests for:
 - Every new page/route (smoke: page loads, key elements visible)
 - Critical user flows (login redirect, form submission, navigation)
+- **Dual-source data**: when adding features that read from multiple Firestore collections, seed BOTH sources and test that fallback works
 - Visual regressions when UI changes significantly
+
+## Testing Strategy
+
+### Test pyramid
+
+| Layer | Count | What it catches | Where |
+|-------|-------|----------------|-------|
+| **Unit** | ~812 | Schema validation, engine logic, pure functions | `packages/*/src/**/__tests__/` |
+| **Integration** | included above | Hook/utility logic with mocked deps | `packages/platform-ui/src/lib/__tests__/` |
+| **E2E** | ~67 | Full browser flows, rendering, navigation | `packages/platform-ui/e2e/` |
+
+### Key testing patterns
+
+**Dual-source resolution**: When code reads from multiple Firestore collections (e.g., `processDefinitions` + `workflowDefinitions`), extract the resolution logic into a pure function in `lib/` and unit test all paths: exact match, fallback, empty sources.
+
+Example: `src/lib/resolve-definition-steps.ts` + `src/lib/__tests__/resolve-definition-steps.test.ts`
+
+**E2E seed data**: When adding new Firestore collections or document types, update `e2e/helpers/seed-data.ts` and `e2e/auth-setup.ts` to seed them. Always include both legacy and new-style documents.
+
+**Test tags**: Use `[RENDER]`, `[CLICK]`, `[DATA]`, `[ERROR]`, `[AUTH]` tags in test descriptions to categorize failure types.
 
 ### Agent Browser (Vercel)
 

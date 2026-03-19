@@ -205,4 +205,17 @@ test.describe('Process Run Detail', () => {
     await expect(page.locator('[data-step-id="verify-data-quality"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('[data-step-id="review-results"]')).toBeVisible({ timeout: 10_000 });
   });
+
+  // Regression: new-style runs (WorkflowDefinition, no configName) must also show step panel
+  test('[DATA] new-style workflow run shows step status panel', async ({ page }) => {
+    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-workflow-run-1');
+
+    // Should load the run detail page
+    await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
+
+    // Step status panel should render with steps from workflowDefinitions
+    // The seeded workflowDefinition has steps: vendor-assessment, narrative-summary, risk-scoring, human-review, done
+    const stepPanel = page.locator('[data-testid="step-status-panel"]').or(page.locator('text=/Vendor Assessment|Narrative Summary|Risk Scoring/i'));
+    await expect(stepPanel.first()).toBeVisible({ timeout: 10_000 });
+  });
 });
