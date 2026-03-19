@@ -10,6 +10,7 @@ export const AgentDefinitionSchema = z.object({
   inputDescription: z.string(),
   outputDescription: z.string(),
   skillFileNames: z.array(z.string()),
+  pluginId: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

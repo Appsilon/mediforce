@@ -669,6 +669,7 @@ export function buildSeedData(testUserId: string) {
   const agentDefinitions: Record<string, Record<string, unknown>> = {
     'agent-def-driver': {
       id: 'agent-def-driver',
+      pluginId: 'supply-intelligence/driver-agent',
       name: 'Driver Agent',
       iconName: 'Chart',
       description: 'Orchestrates multi-step supply chain review workflows by coordinating data collection, analysis, and reporting agents.',
@@ -682,6 +683,7 @@ export function buildSeedData(testUserId: string) {
     },
     'agent-def-risk-detection': {
       id: 'agent-def-risk-detection',
+      pluginId: 'supply-intelligence/risk-detection',
       name: 'Risk Detection',
       iconName: 'Chart',
       description: 'Analyzes vendor submissions and supply chain data to identify potential risks, anomalies, and compliance issues.',
@@ -695,6 +697,7 @@ export function buildSeedData(testUserId: string) {
     },
     'agent-def-claude-code': {
       id: 'agent-def-claude-code',
+      pluginId: 'claude-code-agent',
       name: 'Claude Code Agent',
       iconName: 'Bot',
       description: 'Executes code generation, analysis, and automated software tasks using Claude\'s advanced coding capabilities.',
@@ -708,6 +711,7 @@ export function buildSeedData(testUserId: string) {
     },
     'agent-def-opencode': {
       id: 'agent-def-opencode',
+      pluginId: 'opencode-agent',
       name: 'OpenCode Agent',
       iconName: 'Cpu',
       description: 'Open-source code execution agent powered by DeepSeek for cost-efficient automated development tasks.',
@@ -721,6 +725,7 @@ export function buildSeedData(testUserId: string) {
     },
     'agent-def-script-container': {
       id: 'agent-def-script-container',
+      pluginId: 'script-container',
       name: 'Script Container',
       iconName: 'Terminal',
       description: 'Sandboxed execution environment for running custom scripts, data transformations, and automation tasks.',

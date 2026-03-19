@@ -25,6 +25,7 @@ function toAgentDefinition(id: string, data: Record<string, unknown>): AgentDefi
     inputDescription: data.inputDescription ?? '',
     outputDescription: data.outputDescription ?? '',
     skillFileNames: data.skillFileNames ?? [],
+    pluginId: typeof data.pluginId === 'string' ? data.pluginId : undefined,
     createdAt:
       data.createdAt instanceof Timestamp
         ? data.createdAt.toDate().toISOString()

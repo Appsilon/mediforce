@@ -179,7 +179,7 @@ function agentMatchesQuery(agent: AgentEntry, query: string): boolean {
 
 function agentDefinitionToEntry(def: AgentDefinition): AgentEntry {
   return {
-    name: def.id,
+    name: def.pluginId ?? def.id,
     definitionId: def.id,
     metadata: {
       name: def.name,
@@ -211,13 +211,17 @@ function AgentCatalog() {
     ])
       .then(([pluginsData, definitionsData]) => {
         const definitionEntries = (definitionsData.agents ?? []).map(agentDefinitionToEntry);
-        const definitionNames = new Set(
-          definitionEntries.map((e) => (e.metadata?.name ?? e.name).toLowerCase()),
+        // Map from pluginId → definition entry (for dedup and Configure link)
+        const definitionByPluginId = new Map(
+          definitionEntries.map((e) => [e.name, e]),
         );
-        const builtinPlugins = (pluginsData.plugins ?? []).filter(
-          (p) => !definitionNames.has((p.metadata?.name ?? p.name).toLowerCase()),
+        // For plugins not covered by a definition, include them as-is
+        // For plugins that have a matching definition, the definition entry (with Configure button) wins
+        const coveredPluginIds = new Set(definitionByPluginId.keys());
+        const uncoveredPlugins = (pluginsData.plugins ?? []).filter(
+          (p) => !coveredPluginIds.has(p.name),
         );
-        setAgents([...definitionEntries, ...builtinPlugins]);
+        setAgents([...definitionEntries, ...uncoveredPlugins]);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unknown error');

@@ -2,6 +2,7 @@ import type { FirestoreAgentDefinitionRepository } from '@mediforce/platform-inf
 
 const BUILTIN_AGENTS = [
   {
+    pluginId: 'supply-intelligence/driver-agent',
     name: 'Driver Agent',
     iconName: 'Chart',
     description:
@@ -13,6 +14,7 @@ const BUILTIN_AGENTS = [
     skillFileNames: [] as string[],
   },
   {
+    pluginId: 'supply-intelligence/risk-detection',
     name: 'Risk Detection',
     iconName: 'Chart',
     description:
@@ -24,6 +26,7 @@ const BUILTIN_AGENTS = [
     skillFileNames: [] as string[],
   },
   {
+    pluginId: 'claude-code-agent',
     name: 'Claude Code Agent',
     iconName: 'Bot',
     description:
@@ -35,6 +38,7 @@ const BUILTIN_AGENTS = [
     skillFileNames: [] as string[],
   },
   {
+    pluginId: 'opencode-agent',
     name: 'OpenCode Agent',
     iconName: 'Cpu',
     description:
@@ -46,6 +50,7 @@ const BUILTIN_AGENTS = [
     skillFileNames: [] as string[],
   },
   {
+    pluginId: 'script-container',
     name: 'Script Container',
     iconName: 'Terminal',
     description:
@@ -58,29 +63,20 @@ const BUILTIN_AGENTS = [
   },
 ];
 
-const EXPECTED_MODEL_BY_NAME = new Map(
-  BUILTIN_AGENTS.map((a) => [a.name, a.foundationModel]),
-);
-
 export async function seedBuiltinAgentDefinitions(
   repo: FirestoreAgentDefinitionRepository,
 ): Promise<void> {
   const existing = await repo.list();
-
-  if (existing.length === 0) {
-    await Promise.all(BUILTIN_AGENTS.map((agent) => repo.create(agent)));
-    return;
-  }
-
-  // Migrate model IDs for existing agents whose foundationModel is out of date.
-  const stale = existing.filter((agent) => {
-    const expected = EXPECTED_MODEL_BY_NAME.get(agent.name);
-    return expected !== undefined && agent.foundationModel !== expected;
-  });
+  const existingByPluginId = new Map(
+    existing.filter((a) => a.pluginId !== undefined).map((a) => [a.pluginId!, a]),
+  );
 
   await Promise.all(
-    stale.map((agent) =>
-      repo.update(agent.id, { foundationModel: EXPECTED_MODEL_BY_NAME.get(agent.name)! }),
-    ),
+    BUILTIN_AGENTS.map(async (agent) => {
+      const existingAgent = existingByPluginId.get(agent.pluginId);
+      if (existingAgent === undefined) {
+        await repo.create(agent);
+      }
+    }),
   );
 }
