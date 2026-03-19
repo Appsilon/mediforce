@@ -34,7 +34,7 @@ async function prepareLocalOutputDir(data: { inputFiles?: Record<string, string>
   // Replace the remote outputDir path in dockerArgs with local path
   const remoteDir = data.outputDir;
   const patchedArgs = data.dockerArgs.map((arg) =>
-    arg === remoteDir ? localOutputDir : arg,
+    arg.includes(remoteDir) ? arg.replace(remoteDir, localOutputDir) : arg,
   );
   console.log(`[worker] Patched outputDir: ${remoteDir} → ${localOutputDir}`);
 
