@@ -37,6 +37,21 @@ interface PluginEntry {
 }
 
 
+const FOUNDATION_MODEL_NAMES: Record<string, string> = {
+  'claude-opus-4.6':           'Claude Opus 4.6',
+  'claude-sonnet-4.6':         'Claude Sonnet 4.6',
+  'gpt-5.3':                   'OpenAI GPT-5.3',
+  'gemini-3.1-pro':            'Gemini 3.1 Pro',
+  'grok-4.20':                 'Grok 4.20',
+  'mistral-large-3':           'Mistral Large 3',
+  'qwen-3.5':                  'Alibaba Qwen 3.5',
+  'deepseek/deepseek-chat-v3.2': 'DeepSeek Chat v3.2',
+};
+
+function getModelDisplayName(modelId: string): string {
+  return FOUNDATION_MODEL_NAMES[modelId] ?? modelId;
+}
+
 function getPluginIcon(pluginId: string): { Icon: LucideIcon; colorClass: string; bgClass: string } {
   const id = pluginId.toLowerCase();
   if (id.includes('claude')) return { Icon: Bot, colorClass: 'text-violet-500', bgClass: 'bg-violet-500/10' };
@@ -125,7 +140,7 @@ function PluginCard({ plugin }: { plugin: PluginEntry }) {
           <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground pt-0.5">Model</span>
           <div>
             {meta.foundationModel ? (
-              <p className="text-xs text-foreground/80">{meta.foundationModel}</p>
+              <p className="text-xs text-foreground/80">{getModelDisplayName(meta.foundationModel)}</p>
             ) : (
               <p className="text-xs text-muted-foreground">—</p>
             )}
@@ -190,8 +205,8 @@ function agentDefinitionToPluginEntry(def: AgentDefinition): PluginEntry {
     metadata: {
       name: def.name,
       description: def.description,
-      inputDescription: '',
-      outputDescription: '',
+      inputDescription: def.inputDescription,
+      outputDescription: def.outputDescription,
       roles: [],
       foundationModel: def.foundationModel,
     },
@@ -217,7 +232,12 @@ function PluginCatalog() {
     ])
       .then(([pluginsData, definitionsData]) => {
         const definitionEntries = (definitionsData.agents ?? []).map(agentDefinitionToPluginEntry);
-        const builtinPlugins = pluginsData.plugins ?? [];
+        const definitionNames = new Set(
+          definitionEntries.map((e) => (e.metadata?.name ?? e.name).toLowerCase()),
+        );
+        const builtinPlugins = (pluginsData.plugins ?? []).filter(
+          (p) => !definitionNames.has((p.metadata?.name ?? p.name).toLowerCase()),
+        );
         setPlugins([...definitionEntries, ...builtinPlugins]);
       })
       .catch((err) => {

@@ -71,6 +71,14 @@ function QwenLogo({ className, style }: LogoProps) {
   );
 }
 
+function DeepSeekLogo({ className, style }: LogoProps) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M22.908 11.43c-.171-.088-.343-.022-.487.088-.057.044-.11.09-.163.137a5.08 5.08 0 01-.125.11c-.38.309-.793.42-1.278.302-.701-.17-1.172-.63-1.562-1.196-.38-.551-.638-1.17-.891-1.786-.087-.214-.175-.427-.268-.637a6.607 6.607 0 00-1.03-1.73c-.639-.794-1.437-1.342-2.46-1.508a4.436 4.436 0 00-.657-.057c-.11 0-.219.004-.328.013-.048.004-.097.01-.145.018a4.26 4.26 0 00-.572.127 4.35 4.35 0 00-1.018.47c-.04.026-.08.053-.119.08a4.418 4.418 0 00-.85.793 4.466 4.466 0 00-.655 1.141 4.438 4.438 0 00-.223.876c-.013.088-.022.177-.028.266v.054c-.004.063-.006.126-.006.189 0 .095.004.19.013.284.009.092.022.184.04.274a4.463 4.463 0 00.397 1.184c.104.212.225.415.361.607a4.47 4.47 0 001.103.993c.204.129.42.24.645.33.225.09.457.158.695.202.118.022.237.038.356.046.12.009.239.011.358.009.12-.003.239-.011.357-.024a4.43 4.43 0 001.342-.432c.209-.107.409-.231.598-.37.19-.14.368-.295.534-.463.165-.168.317-.35.453-.542.136-.193.257-.395.361-.606a4.48 4.48 0 00.397-1.185c.018-.09.031-.182.04-.274.009-.094.013-.189.013-.284 0-.063-.002-.126-.006-.189v-.054a4.37 4.37 0 00-.028-.266 4.463 4.463 0 00-.223-.876 4.465 4.465 0 00-.655-1.14 4.419 4.419 0 00-.85-.794c-.04-.027-.08-.054-.119-.08a4.35 4.35 0 00-1.018-.47 4.26 4.26 0 00-.572-.127c-.048-.008-.097-.014-.145-.018a4.39 4.39 0 00-.328-.013c-.219 0-.439.019-.657.057-1.023.166-1.821.714-2.46 1.508a6.607 6.607 0 00-1.03 1.73c-.093.21-.181.423-.268.637-.253.617-.511 1.235-.891 1.786-.39.566-.861 1.026-1.562 1.196-.485.118-.898.007-1.278-.302a5.124 5.124 0 01-.125-.11 4.04 4.04 0 00-.163-.137c-.144-.11-.316-.176-.487-.088-.195.1-.26.32-.189.524.028.08.066.155.11.225.044.07.095.135.152.193.113.116.247.209.393.276.146.067.303.107.464.117.16.01.321-.009.476-.055.155-.046.301-.12.432-.218.13-.098.243-.218.333-.354.09-.136.157-.285.198-.44.04-.156.053-.317.038-.477-.015-.159-.059-.315-.13-.46a2.33 2.33 0 00-.252-.402c-.102-.13-.221-.247-.353-.348a2.33 2.33 0 00-.428-.232 2.34 2.34 0 00-.479-.112 2.36 2.36 0 00-.493.002 2.344 2.344 0 00-.468.107" />
+    </svg>
+  );
+}
+
 // ── Data ──────────────────────────────────────────────────────────────────────
 
 interface FoundationModel {
@@ -87,8 +95,9 @@ const FOUNDATION_MODELS: FoundationModel[] = [
   { id: 'gpt-5.3',            name: 'OpenAI GPT-5.3',     provider: 'OpenAI',    Logo: OpenAILogo,    logoColor: '#10a37f' },
   { id: 'gemini-3.1-pro',     name: 'Gemini 3.1 Pro',     provider: 'Google',    Logo: GeminiLogo,    logoColor: '#4285F4' },
   { id: 'grok-4.20',          name: 'Grok 4.20',          provider: 'xAI',       Logo: GrokLogo,      logoColor: '#000000' },
-  { id: 'mistral-large-3',    name: 'Mistral Large 3',    provider: 'Mistral',   Logo: MistralLogo,   logoColor: '#FF7000' },
-  { id: 'qwen-3.5',           name: 'Alibaba Qwen 3.5',   provider: 'Alibaba',   Logo: QwenLogo,      logoColor: '#FF6A00' },
+  { id: 'mistral-large-3',             name: 'Mistral Large 3',    provider: 'Mistral',   Logo: MistralLogo,   logoColor: '#FF7000' },
+  { id: 'qwen-3.5',                    name: 'Alibaba Qwen 3.5',   provider: 'Alibaba',   Logo: QwenLogo,      logoColor: '#FF6A00' },
+  { id: 'deepseek/deepseek-chat-v3.2', name: 'DeepSeek Chat v3.2', provider: 'DeepSeek',  Logo: DeepSeekLogo,  logoColor: '#4D6BFE' },
 ];
 
 const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
@@ -114,6 +123,8 @@ export default function NewAgentPage() {
   const [name, setName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('Bot');
   const [description, setDescription] = useState('');
+  const [inputDescription, setInputDescription] = useState('');
+  const [outputDescription, setOutputDescription] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [skillFiles, setSkillFiles] = useState<File[]>([]);
@@ -144,6 +155,8 @@ export default function NewAgentPage() {
         name: name.trim(),
         iconName: selectedIcon,
         description,
+        inputDescription,
+        outputDescription,
         foundationModel: selectedModelId,
         systemPrompt: prompt,
         skillFileNames: skillFiles.map((f) => f.name),
@@ -237,7 +250,31 @@ export default function NewAgentPage() {
           />
         </div>
 
-        {/* 4. Foundation model */}
+        {/* 4. Input / Output descriptions */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Input</label>
+            <input
+              type="text"
+              value={inputDescription}
+              onChange={(e) => setInputDescription(e.target.value)}
+              placeholder="e.g. Vendor submission data"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Output</label>
+            <input
+              type="text"
+              value={outputDescription}
+              onChange={(e) => setOutputDescription(e.target.value)}
+              placeholder="e.g. Risk assessment report"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+        </div>
+
+        {/* 5. Foundation model */}
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Foundation model</label>
           <div className="relative" ref={dropdownRef}>

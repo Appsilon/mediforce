@@ -7,6 +7,8 @@ export const AgentDefinitionSchema = z.object({
   description: z.string(),
   foundationModel: z.string(),
   systemPrompt: z.string(),
+  inputDescription: z.string(),
+  outputDescription: z.string(),
   skillFileNames: z.array(z.string()),
   createdAt: z.string(),
   updatedAt: z.string(),

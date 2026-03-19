@@ -14,6 +14,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     name: body.name as string,
     iconName: body.iconName as string,
     description: body.description as string,
+    inputDescription: (body.inputDescription as string) ?? '',
+    outputDescription: (body.outputDescription as string) ?? '',
     foundationModel: body.foundationModel as string,
     systemPrompt: body.systemPrompt as string,
     skillFileNames: (body.skillFileNames as string[]) ?? [],

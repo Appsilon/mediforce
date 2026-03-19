@@ -25,6 +25,8 @@ export async function PUT(
     name: body.name as string | undefined,
     iconName: body.iconName as string | undefined,
     description: body.description as string | undefined,
+    inputDescription: body.inputDescription as string | undefined,
+    outputDescription: body.outputDescription as string | undefined,
     foundationModel: body.foundationModel as string | undefined,
     systemPrompt: body.systemPrompt as string | undefined,
     skillFileNames: body.skillFileNames as string[] | undefined,

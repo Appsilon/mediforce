@@ -26,8 +26,10 @@ import {
   ScriptContainerPlugin,
 } from '@mediforce/agent-runtime';
 import { registerSupplyIntelligencePlugins } from '@mediforce/supply-intelligence-plugins';
+import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
 
 let services: PlatformServices | null = null;
+let seedingStarted = false;
 
 export interface PlatformServices {
   engine: WorkflowEngine;
@@ -133,6 +135,13 @@ export function getPlatformServices(): PlatformServices {
     humanTaskRepo,
     agentDefinitionRepo,
   };
+
+  if (!seedingStarted) {
+    seedingStarted = true;
+    seedBuiltinAgentDefinitions(agentDefinitionRepo).catch((err) => {
+      console.error('[platform-services] Failed to seed built-in agent definitions:', err);
+    });
+  }
 
   return services;
 }

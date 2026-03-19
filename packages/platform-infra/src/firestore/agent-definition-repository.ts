@@ -25,6 +25,8 @@ function toAgentDefinition(id: string, data: Record<string, unknown>): AgentDefi
     description: data.description as string,
     foundationModel: data.foundationModel as string,
     systemPrompt: data.systemPrompt as string,
+    inputDescription: (data.inputDescription as string) ?? '',
+    outputDescription: (data.outputDescription as string) ?? '',
     skillFileNames: (data.skillFileNames as string[]) ?? [],
     createdAt:
       data.createdAt instanceof Timestamp
