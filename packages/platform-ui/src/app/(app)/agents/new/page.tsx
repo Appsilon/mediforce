@@ -10,6 +10,8 @@ import {
   Shield, Code, Database, Globe, Sparkles, Settings,
   Check, Upload, X, ChevronDown,
 } from 'lucide-react';
+import { ref, uploadBytes } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 
@@ -108,7 +110,8 @@ export default function NewAgentPage() {
   const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
 
   function addSkillFiles(incoming: FileList | File[]) {
-    setSkillFiles((prev) => [...prev, ...Array.from(incoming)]);
+    const files = Array.from(incoming);
+    setSkillFiles((prev) => [...prev, ...files]);
   }
 
   function handleSkillDrop(event: React.DragEvent<HTMLDivElement>) {
@@ -120,6 +123,20 @@ export default function NewAgentPage() {
   async function handleSave() {
     setSaving(true);
     try {
+      let skillFileNames: string[] = [];
+      if (skillFiles.length > 0) {
+        const batchId = crypto.randomUUID();
+        skillFileNames = await Promise.all(
+          skillFiles.map(async (file) => {
+            const storagePath = `agentSkills/new_${batchId}/${file.name}`;
+            await uploadBytes(ref(storage, storagePath), file, {
+              contentType: file.type || 'application/octet-stream',
+            });
+            return storagePath;
+          }),
+        );
+      }
+
       const payload = {
         name: name.trim(),
         iconName: selectedIcon,
@@ -128,7 +145,7 @@ export default function NewAgentPage() {
         outputDescription,
         foundationModel: selectedModelId,
         systemPrompt: prompt,
-        skillFileNames: skillFiles.map((f) => f.name),
+        skillFileNames,
       };
       await fetch('/api/agent-definitions', {
         method: 'POST',

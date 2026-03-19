@@ -10,6 +10,8 @@ import {
   Shield, Code, Database, Globe, Sparkles, Settings,
   Check, Upload, X, ChevronDown,
 } from 'lucide-react';
+import { ref, uploadBytes } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
@@ -116,9 +118,9 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [outputDescription, setOutputDescription] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const [skillFileNames, setSkillFileNames] = useState<string[]>([]);
+  const [existingSkillPaths, setExistingSkillPaths] = useState<string[]>([]);
+  const [newSkillFiles, setNewSkillFiles] = useState<File[]>([]);
   const [skillsDragOver, setSkillsDragOver] = useState(false);
-  const [skillFiles, setSkillFiles] = useState<File[]>([]);
   const [prompt, setPrompt] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -144,7 +146,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         setInputDescription(def.inputDescription);
         setOutputDescription(def.outputDescription);
         setSelectedModelId(def.foundationModel);
-        setSkillFileNames(def.skillFileNames);
+        setExistingSkillPaths(def.skillFileNames);
         setPrompt(def.systemPrompt);
       })
       .finally(() => setLoadingDef(false));
@@ -154,9 +156,8 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
 
   function addSkillFiles(incoming: FileList | File[]) {
-    const newFiles = Array.from(incoming);
-    setSkillFiles((prev) => [...prev, ...newFiles]);
-    setSkillFileNames((prev) => [...prev, ...newFiles.map((f) => f.name)]);
+    const files = Array.from(incoming);
+    setNewSkillFiles((prev) => [...prev, ...files]);
   }
 
   function handleSkillDrop(event: React.DragEvent<HTMLDivElement>) {
@@ -165,14 +166,31 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
     if (event.dataTransfer.files.length > 0) addSkillFiles(event.dataTransfer.files);
   }
 
-  function removeSkillFileName(index: number) {
-    setSkillFileNames((prev) => prev.filter((_, i) => i !== index));
-    setSkillFiles((prev) => prev.filter((_, i) => i !== index));
+  function removeSkillEntry(index: number) {
+    if (index < existingSkillPaths.length) {
+      setExistingSkillPaths((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      const newIdx = index - existingSkillPaths.length;
+      setNewSkillFiles((prev) => prev.filter((_, i) => i !== newIdx));
+    }
   }
 
   async function handleSave() {
     setSaving(true);
     try {
+      let uploadedPaths: string[] = [];
+      if (newSkillFiles.length > 0) {
+        uploadedPaths = await Promise.all(
+          newSkillFiles.map(async (file) => {
+            const storagePath = `agentSkills/${id}/${file.name}`;
+            await uploadBytes(ref(storage, storagePath), file, {
+              contentType: file.type || 'application/octet-stream',
+            });
+            return storagePath;
+          }),
+        );
+      }
+
       const payload = {
         name: name.trim(),
         iconName: selectedIcon,
@@ -181,7 +199,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         outputDescription,
         foundationModel: selectedModelId,
         systemPrompt: prompt,
-        skillFileNames: skillFileNames,
+        skillFileNames: [...existingSkillPaths, ...uploadedPaths],
       };
       await fetch(`/api/agent-definitions/${id}`, {
         method: 'PUT',
@@ -388,19 +406,22 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               />
             </div>
 
-            {skillFileNames.length > 0 && (
+            {(existingSkillPaths.length > 0 || newSkillFiles.length > 0) && (
               <ul className="space-y-1.5">
-                {skillFileNames.map((fileName, index) => (
+                {[
+                  ...existingSkillPaths.map((p) => p.split('/').pop() ?? p),
+                  ...newSkillFiles.map((f) => f.name),
+                ].map((displayName, index) => (
                   <li
-                    key={`${fileName}-${index}`}
+                    key={`${displayName}-${index}`}
                     className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
                   >
-                    <span className="truncate text-foreground/80">{fileName}</span>
+                    <span className="truncate text-foreground/80">{displayName}</span>
                     <button
                       type="button"
-                      onClick={() => removeSkillFileName(index)}
+                      onClick={() => removeSkillEntry(index)}
                       className="ml-2 shrink-0 rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      aria-label={`Remove ${fileName}`}
+                      aria-label={`Remove ${displayName}`}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
