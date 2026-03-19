@@ -1,0 +1,82 @@
+{
+  "processName": "workflow-designer",
+  "configName": "claude",
+  "configVersion": "10",
+  "stepConfigs": [
+    {
+      "stepId": "describe-idea",
+      "executorType": "human"
+    },
+    {
+      "stepId": "generate-steps",
+      "executorType": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.5,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 10,
+      "agentConfig": {
+        "skill": "generate-steps",
+        "skillsDir": "apps/workflow-designer/plugins/workflow-designer/skills",
+        "model": "sonnet"
+      }
+    },
+    {
+      "stepId": "review-steps",
+      "executorType": "human",
+      "allowedRoles": ["workflow-designer"]
+    },
+    {
+      "stepId": "describe-execution-preferences",
+      "executorType": "human"
+    },
+    {
+      "stepId": "generate-execution-proposals",
+      "executorType": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "confidenceThreshold": 0.5,
+      "fallbackBehavior": "escalate_to_human",
+      "timeoutMinutes": 10,
+      "env": {
+        "APP_BASE_URL": "{{APP_BASE_URL}}",
+        "PLATFORM_API_KEY": "{{PLATFORM_API_KEY}}"
+      },
+      "agentConfig": {
+        "skill": "generate-execution-proposals",
+        "skillsDir": "apps/workflow-designer/plugins/workflow-designer/skills",
+        "model": "sonnet"
+      }
+    },
+    {
+      "stepId": "review-execution",
+      "executorType": "human",
+      "allowedRoles": ["workflow-designer"]
+    },
+    {
+      "stepId": "validate",
+      "executorType": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "agentConfig": {
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\nimport { parse } from 'yaml';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n\n// Combine approved steps (from review-steps) with selected execution config (from review-execution)\nconst stepsYaml = input.steps?.['generate-steps']?.yaml || input.steps?.['generate-steps']?.raw || '';\nconst executionConfig = input.steps?.['review-execution'] || {};\n\nconst errors = [];\n\nif (!stepsYaml.trim()) {\n  errors.push('No workflow steps YAML found');\n}\n\nlet parsed;\ntry {\n  parsed = parse(stepsYaml);\n} catch (err) {\n  errors.push(`YAML syntax error: ${err.message}`);\n}\n\nif (parsed && typeof parsed === 'object') {\n  if (!parsed.name || typeof parsed.name !== 'string') errors.push('Missing or invalid: name (string)');\n  if (typeof parsed.version !== 'number') errors.push('Missing or invalid: version (must be integer)');\n  if (!Array.isArray(parsed.triggers) || parsed.triggers.length === 0) errors.push('Missing or empty: triggers (array, min 1)');\n  if (!Array.isArray(parsed.steps) || parsed.steps.length === 0) errors.push('Missing or empty: steps (array, min 1)');\n  if (!Array.isArray(parsed.transitions)) errors.push('Missing: transitions (array)');\n\n  if (Array.isArray(parsed.steps)) {\n    const stepIds = parsed.steps.map(s => s.id);\n    const terminals = parsed.steps.filter(s => s.type === 'terminal');\n    if (terminals.length === 0) errors.push('Must have at least one terminal step');\n\n    parsed.steps.forEach((step, i) => {\n      if (!step.id) errors.push(`steps[${i}]: missing id`);\n      if (!step.name) errors.push(`steps[${i}]: missing name`);\n      if (!step.executor) errors.push(`steps[${i}]: missing executor`);\n      if (step.verdicts) {\n        Object.entries(step.verdicts).forEach(([k, v]) => {\n          if (v.target && !stepIds.includes(v.target)) {\n            errors.push(`steps[${i}].verdicts.${k}.target '${v.target}' references unknown step`);\n          }\n        });\n      }\n    });\n\n    if (Array.isArray(parsed.transitions)) {\n      parsed.transitions.forEach((t, i) => {\n        if (!stepIds.includes(t.from)) errors.push(`transitions[${i}].from '${t.from}' references unknown step`);\n        if (!stepIds.includes(t.to)) errors.push(`transitions[${i}].to '${t.to}' references unknown step`);\n      });\n    }\n  }\n}\n\nwriteFileSync('/output/result.json', JSON.stringify({\n  valid: errors.length === 0,\n  errors,\n  workflowDefinition: parsed || null\n}));\n"
+      }
+    },
+    {
+      "stepId": "register",
+      "executorType": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "env": {
+        "APP_BASE_URL": "{{APP_BASE_URL}}",
+        "PLATFORM_API_KEY": "{{PLATFORM_API_KEY}}"
+      },
+      "agentConfig": {
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst workflowDefinition = input.steps?.['validate']?.workflowDefinition || input.workflowDefinition;\n\nif (!workflowDefinition || !workflowDefinition.name) {\n  writeFileSync('/output/result.json', JSON.stringify({\n    registered: false,\n    error: 'No WorkflowDefinition found in input',\n    debugKeys: Object.keys(input)\n  }));\n  process.exit(0);\n}\n\nconst baseUrl = process.env.APP_BASE_URL;\nconst apiKey = process.env.PLATFORM_API_KEY;\n\nif (!baseUrl || !apiKey) {\n  writeFileSync('/output/result.json', JSON.stringify({\n    registered: false,\n    error: 'Missing APP_BASE_URL or PLATFORM_API_KEY environment variables'\n  }));\n  process.exit(0);\n}\n\ntry {\n  const response = await fetch(`${baseUrl}/api/workflow-definitions`, {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'X-Api-Key': apiKey,\n    },\n    body: JSON.stringify(workflowDefinition),\n  });\n\n  const body = await response.json();\n\n  if (response.ok) {\n    writeFileSync('/output/result.json', JSON.stringify({\n      registered: true,\n      name: body.name,\n      version: body.version,\n      summary: `Workflow '${body.name}' v${body.version} registered successfully`\n    }));\n  } else {\n    writeFileSync('/output/result.json', JSON.stringify({\n      registered: false,\n      status: response.status,\n      error: body.error || 'Registration failed'\n    }));\n  }\n} catch (err) {\n  writeFileSync('/output/result.json', JSON.stringify({\n    registered: false,\n    error: `API call failed: ${err.message}`\n  }));\n}\n"
+      }
+    }
+  ],
+  "roles": ["workflow-designer"]
+}
