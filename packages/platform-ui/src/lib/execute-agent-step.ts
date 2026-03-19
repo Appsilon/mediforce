@@ -83,8 +83,8 @@ export async function executeAgentStep(
   // Resolve ProcessConfig from repository -- single source of truth (3-part key)
   const processConfig = await processRepo.getProcessConfig(
     instance.definitionName,
-    instance.configName,
-    instance.configVersion,
+    instance.configName ?? '',
+    instance.configVersion ?? '',
   );
   if (!processConfig) {
     throw new Error(

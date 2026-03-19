@@ -3,16 +3,14 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Eye, EyeOff, Clock, Zap } from 'lucide-react';
+import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
-import { YamlEditor } from '@/components/processes/yaml-editor';
-import { definitionToYaml } from '@/app/actions/definitions';
-import { ConfigList } from '@/components/configs/config-list';
 import { RunsTable } from '@/components/processes/runs-table';
-import { StartRunDialog } from '@/components/processes/start-run-dialog';
-import { setProcessArchived, setDefinitionVersionArchived } from '@/app/actions/definitions';
+import { DefinitionsList } from '@/components/workflows/definitions-list';
+import { StartRunButton } from '@/components/processes/start-run-button';
+import { setProcessArchived } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 
 
@@ -24,13 +22,8 @@ export default function ProcessDefinitionPage() {
   const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName);
   const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName);
 
-  const [selectedVersion, setSelectedVersion] = React.useState<string | null>(null);
-  const [editorYaml, setEditorYaml] = React.useState('');
   const [archiving, setArchiving] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const [startRunOpen, setStartRunOpen] = React.useState(false);
-  const [showArchivedVersions, setShowArchivedVersions] = React.useState(false);
-  const [archiveOverrides, setArchiveOverrides] = React.useState<Record<string, boolean>>({});
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -48,23 +41,6 @@ export default function ProcessDefinitionPage() {
   const hasManualTrigger = latest?.triggers?.some(
     (trigger: { type: string }) => trigger.type === 'manual',
   ) ?? false;
-  const activeVersion = selectedVersion
-    ? versions.find((v) => v.version === selectedVersion) ?? latest
-    : latest;
-
-  const effectiveVersions = versions.map((v) =>
-    v.version in archiveOverrides ? { ...v, archived: archiveOverrides[v.version] } : v,
-  );
-  const activeVersions = effectiveVersions.filter((v) => v.archived !== true);
-  const archivedVersionCount = effectiveVersions.length - activeVersions.length;
-  const visibleVersions = showArchivedVersions ? effectiveVersions : activeVersions;
-
-  // Reconstruct YAML from stored definition when version is selected
-  React.useEffect(() => {
-    if (!activeVersion) return;
-    // Omit internal Firestore fields, stringify back to YAML
-    definitionToYaml(activeVersion as Record<string, unknown>).then(setEditorYaml);
-  }, [activeVersion?.version]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (versionsLoading) {
     return (
@@ -180,7 +156,7 @@ export default function ProcessDefinitionPage() {
       {/* Tabs */}
       <Tabs.Root defaultValue="runs" className="flex flex-1 flex-col">
         <Tabs.List className="flex border-b px-6 gap-0">
-          {['runs', 'configs', 'definition'].map((tab) => (
+          {['runs', 'definitions'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -191,7 +167,7 @@ export default function ProcessDefinitionPage() {
                 'hover:text-foreground',
               )}
             >
-              {tab === 'runs' ? `Runs${runs.length > 0 ? ` (${runs.length})` : ''}` : tab === 'configs' ? 'Configurations' : 'Definition'}
+              {tab === 'runs' ? `Runs${runs.length > 0 ? ` (${runs.length})` : ''}` : 'Definitions'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -201,13 +177,7 @@ export default function ProcessDefinitionPage() {
           <div className="flex items-center justify-between mb-4">
             <div />
             {hasManualTrigger ? (
-              <button
-                onClick={() => setStartRunOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                <Play className="h-3.5 w-3.5" />
-                Start Run
-              </button>
+              <StartRunButton workflowName={decodedName} showVersionPicker />
             ) : (
               <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Info className="h-3.5 w-3.5" />
@@ -216,13 +186,6 @@ export default function ProcessDefinitionPage() {
             )}
           </div>
 
-          <StartRunDialog
-            processName={decodedName}
-            definitionVersion={latest?.version ?? ''}
-            open={startRunOpen}
-            onClose={() => setStartRunOpen(false)}
-          />
-
           <RunsTable
             runs={runs}
             loading={runsLoading}
@@ -230,88 +193,10 @@ export default function ProcessDefinitionPage() {
           />
         </Tabs.Content>
 
-        {/* Configurations tab */}
-        <Tabs.Content value="configs" className="flex-1 p-6">
+        {/* Definitions tab */}
+        <Tabs.Content value="definitions" className="flex-1 p-6">
           <div className="max-w-2xl">
-            <ConfigList processName={decodedName} />
-          </div>
-        </Tabs.Content>
-
-        {/* Definition tab */}
-        <Tabs.Content value="definition" className="flex-1 p-6">
-          <div className="max-w-3xl space-y-4">
-            {versions.length > 1 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium">Versions</h3>
-                  {archivedVersionCount > 0 && (
-                    <button
-                      onClick={() => setShowArchivedVersions((prev) => !prev)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
-                    >
-                      {showArchivedVersions ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                      {showArchivedVersions ? 'Hide' : 'Show'} archived ({archivedVersionCount})
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  {visibleVersions.map((v) => (
-                    <div
-                      key={v.version}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelectedVersion(v.version)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedVersion(v.version); }}
-                      className={cn(
-                        'flex items-center gap-3 w-full rounded-lg border px-4 py-2.5 text-left transition-colors cursor-pointer',
-                        activeVersion?.version === v.version
-                          ? 'border-primary bg-primary/5'
-                          : 'bg-card hover:bg-muted/50',
-                        v.archived === true && 'opacity-60',
-                      )}
-                    >
-                      <span className="font-mono text-sm font-medium">v{v.version}</span>
-                      {v.version === latest?.version && (
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                          latest
-                        </span>
-                      )}
-                      {v.archived === true && (
-                        <span className="text-xs text-muted-foreground">(archived)</span>
-                      )}
-                      <span className="text-xs text-muted-foreground">{v.steps.length} steps</span>
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const newArchived = v.archived !== true;
-                          setArchiveOverrides((prev) => ({ ...prev, [v.version]: newArchived }));
-                          const result = await setDefinitionVersionArchived(decodedName, v.version, newArchived);
-                          if (!result.success) {
-                            setArchiveOverrides((prev) => {
-                              const next = { ...prev };
-                              delete next[v.version];
-                              return next;
-                            });
-                          }
-                        }}
-                        className="ml-auto text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
-                        title={v.archived ? 'Unarchive version' : 'Archive version'}
-                      >
-                        {v.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Edit and save as a new version — existing runs are unaffected.
-            </p>
-            <YamlEditor
-              key={activeVersion?.version}
-              initialValue={editorYaml}
-              onSaved={(_, version) => setSelectedVersion(version)}
-            />
+            <DefinitionsList workflowName={decodedName} />
           </div>
         </Tabs.Content>
       </Tabs.Root>

@@ -1,7 +1,56 @@
 'use server';
 
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
+import type { WorkflowTriggerContext } from '@mediforce/workflow-engine';
 
+interface StartWorkflowRunInput {
+  definitionName: string;
+  definitionVersion: number;
+  triggeredBy: string;
+}
+
+export async function startWorkflowRun(
+  input: StartWorkflowRunInput,
+): Promise<{ success: boolean; instanceId?: string; error?: string }> {
+  try {
+    const { manualTrigger } = getPlatformServices();
+
+    const context: WorkflowTriggerContext = {
+      definitionName: input.definitionName,
+      definitionVersion: input.definitionVersion,
+      triggerName: 'start',
+      triggeredBy: input.triggeredBy,
+      payload: {},
+    };
+
+    const result = await manualTrigger.fireWorkflow(context);
+
+    // Fire-and-forget: trigger auto-runner asynchronously
+    const baseUrl = getAppBaseUrl();
+    fetch(`${baseUrl}/api/processes/${result.instanceId}/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
+      },
+      body: JSON.stringify({
+        appContext: {},
+        triggeredBy: input.triggeredBy,
+      }),
+    }).catch((err) => {
+      console.error(`[auto-runner] Failed to trigger run for ${result.instanceId}:`, err);
+    });
+
+    return { success: true, instanceId: result.instanceId };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
+}
+
+/** @deprecated Use startWorkflowRun instead */
 interface StartRunInput {
   definitionName: string;
   definitionVersion: string;

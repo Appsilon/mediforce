@@ -4,6 +4,7 @@ export {
   FirestoreProcessRepository,
   DefinitionVersionAlreadyExistsError,
   ConfigVersionAlreadyExistsError,
+  WorkflowDefinitionVersionAlreadyExistsError,
 } from './firestore/process-repository.js';
 export { FirestoreProcessInstanceRepository } from './firestore/process-instance-repository.js';
 export { FirebaseAuthService } from './auth/firebase-auth-service.js';

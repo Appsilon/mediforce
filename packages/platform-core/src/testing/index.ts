@@ -15,6 +15,7 @@ export {
   buildAgentRun,
   buildAuditEvent,
   buildProcessConfig,
+  buildWorkflowDefinition,
   buildAgentOutputEnvelope,
   buildFileMetadata,
   resetFactorySequence,

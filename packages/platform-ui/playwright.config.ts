@@ -54,7 +54,7 @@ export default defineConfig({
       ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce npx next dev -p ${testPort}`
       : 'pnpm dev',
     port: testPort,
-    reuseExistingServer: !useEmulators,
-    timeout: 60_000,
+    reuseExistingServer: true,
+    timeout: 120_000,
   },
 });

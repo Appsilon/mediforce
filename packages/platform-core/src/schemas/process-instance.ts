@@ -12,8 +12,9 @@ export const ProcessInstanceSchema = z.object({
   id: z.string().min(1),
   definitionName: z.string().min(1),
   definitionVersion: z.string().min(1),
-  configName: z.string().min(1),
-  configVersion: z.string().min(1),
+  // Legacy: kept for backward compat with pre-migration instances
+  configName: z.string().min(1).optional(),
+  configVersion: z.string().min(1).optional(),
   status: InstanceStatusSchema,
   currentStepId: z.string().nullable(),
   variables: z.record(z.string(), z.unknown()),

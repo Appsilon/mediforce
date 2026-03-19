@@ -9,6 +9,7 @@ import type {
   AgentOutputEnvelope,
   FileMetadata,
 } from '../index.js';
+import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
 
 // ---------------------------------------------------------------------------
 // Internal counter for deterministic sequential IDs
@@ -88,8 +89,6 @@ export function buildProcessInstance(
     id,
     definitionName: 'supply-chain-review',
     definitionVersion: '1.0',
-    configName: 'default',
-    configVersion: '1.0',
     status: 'running',
     currentStepId: 'step-intake',
     variables: {},
@@ -277,6 +276,48 @@ export function buildProcessConfig(
         executorType: 'human' as const,
         allowedRoles: ['reviewer', 'approver'],
       },
+    ],
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildWorkflowDefinition
+// ---------------------------------------------------------------------------
+
+export function buildWorkflowDefinition(
+  overrides?: Partial<WorkflowDefinition>,
+): WorkflowDefinition {
+  return {
+    name: 'test-workflow',
+    version: 1,
+    steps: [
+      {
+        id: 'intake',
+        name: 'Intake',
+        type: 'creation',
+        executor: 'human',
+      },
+      {
+        id: 'review',
+        name: 'Review',
+        type: 'review',
+        executor: 'agent',
+        autonomyLevel: 'L2',
+      },
+      {
+        id: 'complete',
+        name: 'Complete',
+        type: 'terminal',
+        executor: 'human',
+      },
+    ],
+    transitions: [
+      { from: 'intake', to: 'review' },
+      { from: 'review', to: 'complete' },
+    ],
+    triggers: [
+      { type: 'manual', name: 'Start' },
     ],
     ...overrides,
   };

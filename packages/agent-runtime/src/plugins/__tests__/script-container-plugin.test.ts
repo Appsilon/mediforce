@@ -130,7 +130,7 @@ describe('ScriptContainerPlugin', () => {
           ],
         } satisfies ProcessConfig,
       });
-      await expect(plugin.initialize(context)).rejects.toThrow(/no agentConfig/i);
+      await expect(plugin.initialize(context)).rejects.toThrow(/no agent config/i);
     });
 
     it('[ERROR] throws if no command configured', async () => {

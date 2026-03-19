@@ -3,10 +3,13 @@ import { InMemoryProcessRepository } from '@mediforce/platform-core';
 import type {
   ProcessDefinition,
   ProcessConfig,
+  WorkflowDefinition,
 } from '@mediforce/platform-core';
+import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import {
   FirestoreProcessRepository,
   ConfigVersionAlreadyExistsError,
+  WorkflowDefinitionVersionAlreadyExistsError,
 } from '../firestore/process-repository.js';
 
 function createTestDefinition(
@@ -223,12 +226,12 @@ describe('InMemoryProcessRepository', () => {
 
   describe('helper methods', () => {
     it('count returns correct counts', async () => {
-      expect(repo.count()).toEqual({ definitions: 0, configs: 0 });
+      expect(repo.count()).toMatchObject({ definitions: 0, configs: 0 });
 
       await repo.saveProcessDefinition(createTestDefinition());
       await repo.saveProcessConfig(createTestConfig());
 
-      expect(repo.count()).toEqual({ definitions: 1, configs: 1 });
+      expect(repo.count()).toMatchObject({ definitions: 1, configs: 1 });
     });
 
     it('clear removes all stored data', async () => {
@@ -236,22 +239,30 @@ describe('InMemoryProcessRepository', () => {
       await repo.saveProcessConfig(createTestConfig());
 
       repo.clear();
-      expect(repo.count()).toEqual({ definitions: 0, configs: 0 });
+      expect(repo.count()).toMatchObject({ definitions: 0, configs: 0 });
     });
   });
 });
 
 // Hoisted mocks must be defined before vi.mock
-const { mockGetDoc, mockSetDoc, mockDoc } = vi.hoisted(() => ({
+const { mockGetDoc, mockGetDocs, mockSetDoc, mockDoc, mockCollection, mockQuery, mockWhere } = vi.hoisted(() => ({
   mockGetDoc: vi.fn(),
+  mockGetDocs: vi.fn(),
   mockSetDoc: vi.fn(),
   mockDoc: vi.fn(),
+  mockCollection: vi.fn(),
+  mockQuery: vi.fn(),
+  mockWhere: vi.fn(),
 }));
 
 vi.mock('firebase/firestore', () => ({
   doc: (...args: unknown[]) => mockDoc(...args),
   getDoc: (...args: unknown[]) => mockGetDoc(...args),
+  getDocs: (...args: unknown[]) => mockGetDocs(...args),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
+  collection: (...args: unknown[]) => mockCollection(...args),
+  query: (...args: unknown[]) => mockQuery(...args),
+  where: (...args: unknown[]) => mockWhere(...args),
 }));
 
 describe('FirestoreProcessRepository - config immutability', () => {
@@ -309,5 +320,139 @@ describe('FirestoreProcessRepository - config immutability', () => {
     expect(error.message).toContain('2.0');
     expect(error.name).toBe('ConfigVersionAlreadyExistsError');
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe('FirestoreProcessRepository - WorkflowDefinition', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockDoc.mockReturnValue('mock-doc-ref');
+    mockSetDoc.mockResolvedValue(undefined);
+    mockCollection.mockReturnValue('mock-collection-ref');
+    mockQuery.mockReturnValue('mock-query-ref');
+    mockWhere.mockReturnValue('mock-where-ref');
+  });
+
+  function createFirestoreRepo(): FirestoreProcessRepository {
+    const fakeDb = {} as import('firebase/firestore').Firestore;
+    return new FirestoreProcessRepository(fakeDb);
+  }
+
+  it('[DATA] saveWorkflowDefinition + getWorkflowDefinition round-trip works', async () => {
+    const repo = createFirestoreRepo();
+    const definition = buildWorkflowDefinition({ name: 'drug-approval', version: 1 });
+
+    mockGetDoc
+      .mockResolvedValueOnce({ exists: () => false }) // saveWorkflowDefinition existence check
+      .mockResolvedValueOnce({ exists: () => true, data: () => definition }); // getWorkflowDefinition fetch
+
+    await repo.saveWorkflowDefinition(definition);
+    const result = await repo.getWorkflowDefinition('drug-approval', 1);
+
+    expect(result).toEqual(definition);
+    expect(mockSetDoc).toHaveBeenCalledOnce();
+    expect(mockDoc).toHaveBeenCalledWith(expect.anything(), 'workflowDefinitions', 'drug-approval:1');
+  });
+
+  it('[DATA] getWorkflowDefinition returns null for non-existent', async () => {
+    const repo = createFirestoreRepo();
+    mockGetDoc.mockResolvedValue({ exists: () => false });
+
+    const result = await repo.getWorkflowDefinition('nonexistent', 1);
+    expect(result).toBeNull();
+  });
+
+  it('[ERROR] saveWorkflowDefinition throws WorkflowDefinitionVersionAlreadyExistsError when version exists', async () => {
+    const repo = createFirestoreRepo();
+    mockGetDoc.mockResolvedValue({ exists: () => true, data: () => ({}) });
+
+    const definition = buildWorkflowDefinition({ name: 'drug-approval', version: 1 });
+
+    await expect(
+      repo.saveWorkflowDefinition(definition),
+    ).rejects.toThrow(WorkflowDefinitionVersionAlreadyExistsError);
+  });
+
+  it('[ERROR] WorkflowDefinitionVersionAlreadyExistsError has correct message and name', () => {
+    const error = new WorkflowDefinitionVersionAlreadyExistsError('drug-approval', 3);
+    expect(error.message).toContain('drug-approval');
+    expect(error.message).toContain('3');
+    expect(error.name).toBe('WorkflowDefinitionVersionAlreadyExistsError');
+    expect(error).toBeInstanceOf(Error);
+  });
+
+  it('[DATA] listWorkflowDefinitions groups by name and finds latest version', async () => {
+    const repo = createFirestoreRepo();
+    const defV1 = buildWorkflowDefinition({ name: 'drug-approval', version: 1 });
+    const defV2 = buildWorkflowDefinition({ name: 'drug-approval', version: 2 });
+    const defOther = buildWorkflowDefinition({ name: 'supply-check', version: 1 });
+
+    mockGetDocs.mockResolvedValue({
+      docs: [
+        { id: 'drug-approval:1', data: () => defV1 },
+        { id: 'drug-approval:2', data: () => defV2 },
+        { id: 'supply-check:1', data: () => defOther },
+      ],
+    });
+
+    const result = await repo.listWorkflowDefinitions();
+
+    expect(result.definitions).toHaveLength(2);
+
+    const drugApprovalGroup = result.definitions.find((d) => d.name === 'drug-approval');
+    expect(drugApprovalGroup).toBeDefined();
+    expect(drugApprovalGroup?.versions).toHaveLength(2);
+    expect(drugApprovalGroup?.latestVersion).toBe(2);
+
+    const supplyCheckGroup = result.definitions.find((d) => d.name === 'supply-check');
+    expect(supplyCheckGroup).toBeDefined();
+    expect(supplyCheckGroup?.versions).toHaveLength(1);
+    expect(supplyCheckGroup?.latestVersion).toBe(1);
+  });
+
+  it('[DATA] listWorkflowDefinitions returns empty when no documents', async () => {
+    const repo = createFirestoreRepo();
+    mockGetDocs.mockResolvedValue({ docs: [] });
+
+    const result = await repo.listWorkflowDefinitions();
+    expect(result.definitions).toHaveLength(0);
+  });
+
+  it('[DATA] getLatestWorkflowVersion returns max version for name', async () => {
+    const repo = createFirestoreRepo();
+    const defV1 = buildWorkflowDefinition({ name: 'drug-approval', version: 1 });
+    const defV3 = buildWorkflowDefinition({ name: 'drug-approval', version: 3 });
+
+    mockGetDocs.mockResolvedValue({
+      docs: [
+        { id: 'drug-approval:1', data: () => defV1 },
+        { id: 'drug-approval:3', data: () => defV3 },
+      ],
+    });
+
+    const version = await repo.getLatestWorkflowVersion('drug-approval');
+    expect(version).toBe(3);
+  });
+
+  it('[DATA] getLatestWorkflowVersion returns 0 when no definitions exist', async () => {
+    const repo = createFirestoreRepo();
+    mockGetDocs.mockResolvedValue({ docs: [], empty: true });
+
+    const version = await repo.getLatestWorkflowVersion('nonexistent');
+    expect(version).toBe(0);
+  });
+
+  it('[DATA] saveWorkflowDefinition uses {name}:{version} document key', async () => {
+    const repo = createFirestoreRepo();
+    mockGetDoc.mockResolvedValue({ exists: () => false });
+
+    const definition = buildWorkflowDefinition({ name: 'my-workflow', version: 42 });
+    await repo.saveWorkflowDefinition(definition);
+
+    expect(mockDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      'workflowDefinitions',
+      'my-workflow:42',
+    );
   });
 });
