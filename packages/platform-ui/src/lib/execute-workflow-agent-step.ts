@@ -193,11 +193,17 @@ export async function executeWorkflowAgentStep(
         reviewerType: 'human',
       });
 
-      const currentInstance = await instanceRepo.getById(instanceId);
+      // Pause instance so resolve-task can resume it after human approval
+      await instanceRepo.update(instanceId, {
+        status: 'paused',
+        pauseReason: 'waiting_for_human',
+        updatedAt: new Date().toISOString(),
+      });
+
       return {
         instanceId,
-        status: currentInstance?.status ?? 'paused',
-        currentStepId: currentInstance?.currentStepId ?? null,
+        status: 'paused',
+        currentStepId: stepId,
         agentRunStatus: runResult.status,
       };
     }
