@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getRedisConnection } from '@mediforce/agent-queue';
-import { Queue } from 'bullmq';
 
 export async function GET(): Promise<NextResponse> {
   const url = process.env.REDIS_URL ?? 'not set';
@@ -11,6 +10,9 @@ export async function GET(): Promise<NextResponse> {
 
   try {
     const connection = getRedisConnection();
+
+    // Dynamic import to avoid type issues — bullmq is a transitive dep via agent-queue
+    const { Queue } = await import('bullmq');
     const queue = new Queue('redis-test-ping', { connection });
     const client = await queue.client;
     const pong = await client.ping();
