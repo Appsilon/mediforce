@@ -258,7 +258,26 @@ export async function executeWorkflowAgentStep(
     };
   }
 
-  // L0/L1/L2: no advance, no review task
+  // L0/L1/L2: agent completed but didn't auto-apply — advance to next step.
+  // If the next step is human, advanceWorkflowStep creates a HumanTask and pauses.
+  if (runResult.status === 'completed') {
+    const stepResult = runResult.envelope?.result ?? {};
+    const updatedInstance = await engine.advanceWorkflowStep(
+      instanceId,
+      stepResult,
+      { id: triggeredBy, role: 'agent' },
+      workflowStep,
+    );
+
+    return {
+      instanceId,
+      status: updatedInstance.status,
+      currentStepId: updatedInstance.currentStepId,
+      agentRunStatus: runResult.status,
+    };
+  }
+
+  // Fallback: unknown status — return current state (should not reach here)
   const currentInstance = await instanceRepo.getById(instanceId);
   return {
     instanceId,
