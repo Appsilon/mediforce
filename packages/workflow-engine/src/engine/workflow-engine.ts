@@ -232,6 +232,7 @@ export class WorkflowEngine {
       return this.loadInstance(instanceId);
     }
 
+    console.log(`[advanceWorkflowStep] before executeStep: instanceId=${instanceId}, currentStepId=${instance.currentStepId}, stepOutput keys=${Object.keys(stepOutput)}, hasOptions=${Array.isArray((stepOutput as Record<string,unknown>).options)}`);
     await this.stepExecutor.executeStep(
       instance,
       stepOutput,
@@ -244,11 +245,13 @@ export class WorkflowEngine {
     // HumanTask creation: create task when next step's executor is 'human'
     if (this.humanTaskRepository) {
       const updatedInstance = await this.loadInstance(instanceId);
+      console.log(`[advanceWorkflowStep] after executeStep: currentStepId=${updatedInstance.currentStepId}, status=${updatedInstance.status}`);
       if (updatedInstance.currentStepId !== null) {
         const nextStep = definition.steps.find(
           (s) => s.id === updatedInstance.currentStepId,
         );
 
+        console.log(`[advanceWorkflowStep] nextStep: id=${nextStep?.id}, type=${nextStep?.type}, executor=${nextStep?.executor}`);
         if (nextStep && nextStep.type !== 'terminal' && nextStep.executor === 'human') {
           const assignedRole = nextStep.allowedRoles?.[0] ?? 'unassigned';
           const now = new Date().toISOString();
@@ -259,10 +262,10 @@ export class WorkflowEngine {
             const prevOutput = updatedInstance.variables[instance.currentStepId!] as Record<string, unknown> | undefined;
             const rawOptions = prevOutput?.options;
             if (Array.isArray(rawOptions) && rawOptions.length > 0) {
-              const { min, max } = normalizeSelection(nextStep.selection);
-              if (rawOptions.length < min || rawOptions.length > max) {
+              const { min } = normalizeSelection(nextStep.selection);
+              if (rawOptions.length < min) {
                 throw new Error(
-                  `Step "${nextStep.id}" expects ${min}–${max} options but previous step produced ${rawOptions.length}`,
+                  `Step "${nextStep.id}" requires selecting at least ${min} but only ${rawOptions.length} options available`,
                 );
               }
               selectionFields.options = rawOptions as Record<string, unknown>[];

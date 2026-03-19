@@ -257,11 +257,13 @@ export async function resolveTask(
 
   // ── 7. Advance to next step ─────────────────────────────────────────────
   const isWorkflowInstance = !instance.configName;
+  console.log(`[resolve-task] step 7: advancing instance '${resolvedTask.processInstanceId}' from step '${resolvedTask.stepId}', isWorkflow=${isWorkflowInstance}, instanceStatus=${instance.status}, currentStepId=${instance.currentStepId}`);
   if (isWorkflowInstance) {
-    await engine.advanceWorkflowStep(resolvedTask.processInstanceId, stepOutput, {
+    const advanced = await engine.advanceWorkflowStep(resolvedTask.processInstanceId, stepOutput, {
       id: actorId,
       role: 'human',
     });
+    console.log(`[resolve-task] step 7 done: status=${advanced.status}, currentStepId=${advanced.currentStepId}, pauseReason=${advanced.pauseReason}`);
   } else {
     await engine.advanceStep(resolvedTask.processInstanceId, stepOutput, {
       id: actorId,
