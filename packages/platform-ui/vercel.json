@@ -1,5 +1,4 @@
 {
-  "//": "PR preview deployments — each pull request gets a temporary URL for reviewers to click through the UI",
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "outputDirectory": ".next"
 }
