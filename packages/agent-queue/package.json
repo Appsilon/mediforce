@@ -1,5 +1,5 @@
 {
-  "name": "@mediforce/agent-runtime",
+  "name": "@mediforce/agent-queue",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -17,11 +17,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mediforce/platform-core": "workspace:*",
-    "firebase": "^11.0.0"
-  },
-  "optionalDependencies": {
-    "@mediforce/agent-queue": "workspace:*"
+    "bullmq": "^5.52.0",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",

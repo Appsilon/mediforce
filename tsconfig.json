@@ -20,6 +20,7 @@
     { "path": "packages/platform-infra" },
     { "path": "packages/workflow-engine" },
     { "path": "packages/agent-runtime" },
+    { "path": "packages/agent-queue" },
     { "path": "packages/platform-ui" },
     { "path": "packages/supply-intelligence" }
   ]

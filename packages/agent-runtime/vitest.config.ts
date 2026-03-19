@@ -13,6 +13,10 @@ export default defineConfig({
         '../platform-core/src/index.ts',
       ),
       '@mediforce/agent-runtime': path.resolve(__dirname, './src/index.ts'),
+      '@mediforce/agent-queue': path.resolve(
+        __dirname,
+        '../agent-queue/src/index.ts',
+      ),
     },
   },
 });

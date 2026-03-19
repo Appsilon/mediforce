@@ -22,6 +22,8 @@ export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin.js';
 export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin.js';
 export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin.js';
 export { ScriptContainerPlugin } from './plugins/script-container-plugin.js';
+export { getDockerSpawnStrategy, LocalDockerSpawnStrategy, QueuedDockerSpawnStrategy } from './plugins/docker-spawn-strategy.js';
+export type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from './plugins/docker-spawn-strategy.js';
 
 // Runner
 export type { AgentEventLog } from './runner/agent-event-log.js';

@@ -14,9 +14,11 @@ const nextConfig = {
     '@mediforce/platform-infra',
     '@mediforce/workflow-engine',
     '@mediforce/agent-runtime',
+    '@mediforce/agent-queue',
     '@mediforce/supply-intelligence-plugins',
     '@mediforce/supply-intelligence',
   ],
+  serverExternalPackages: ['bullmq', 'ioredis'],
   webpack: (config) => {
     config.resolve.extensionAlias = {
       '.js': ['.ts', '.tsx', '.js'],
@@ -28,6 +30,7 @@ const nextConfig = {
       '@mediforce/platform-infra': path.join(packagesDir, 'platform-infra/src/index.ts'),
       '@mediforce/workflow-engine': path.join(packagesDir, 'workflow-engine/src/index.ts'),
       '@mediforce/agent-runtime': path.join(packagesDir, 'agent-runtime/src/index.ts'),
+      '@mediforce/agent-queue': path.join(packagesDir, 'agent-queue/src/index.ts'),
       '@mediforce/supply-intelligence-plugins': path.join(packagesDir, 'supply-intelligence-plugins/src/index.ts'),
       '@mediforce/supply-intelligence': path.join(packagesDir, 'supply-intelligence/src/index.ts'),
     };

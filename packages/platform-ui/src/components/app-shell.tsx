@@ -102,6 +102,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           active={pathname.startsWith(MONITORING_ITEM.href)}
         />
       </nav>
+      {process.env.NEXT_PUBLIC_GIT_SHA && (
+        <div className="border-t px-4 py-2">
+          <span className="font-mono text-[10px] text-muted-foreground">
+            {process.env.NEXT_PUBLIC_GIT_SHA}
+          </span>
+        </div>
+      )}
     </div>
   );
 

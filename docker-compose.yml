@@ -1,0 +1,45 @@
+# Docker Compose for local development with BullMQ job queue.
+#
+# Usage:
+#   docker compose up redis        — start Redis only
+#   docker compose up               — start Redis + agent worker
+#
+# The platform-ui dev server connects to Redis when REDIS_URL is set:
+#   REDIS_URL=redis://localhost:6379 pnpm dev:ui
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  bull-board:
+    image: deadly0/bull-board
+    ports:
+      - "3100:3000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  agent-worker:
+    build:
+      context: .
+      dockerfile: packages/agent-queue/Dockerfile.worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      # Worker needs Docker socket to spawn containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Shared /tmp so outputDir paths resolve on both host and worker
+      - /tmp:/tmp
+    depends_on:
+      redis:
+        condition: service_healthy
