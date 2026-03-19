@@ -857,13 +857,21 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
   let processRepo: InMemoryProcessRepository;
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
+  let humanTaskRepo: InMemoryHumanTaskRepository;
   let engine: WorkflowEngine;
 
   beforeEach(async () => {
     processRepo = new InMemoryProcessRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
     auditRepo = new InMemoryAuditRepository();
-    engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo);
+    humanTaskRepo = new InMemoryHumanTaskRepository();
+    engine = new WorkflowEngine(
+      processRepo, instanceRepo, auditRepo,
+      undefined, // rbacService
+      undefined, // handoffRepository
+      undefined, // notificationService
+      humanTaskRepo, // humanTaskRepository — needed for HumanTask creation on human step advance
+    );
 
     await processRepo.saveWorkflowDefinition(linearWorkflowDef);
     await processRepo.saveWorkflowDefinition(reviewWorkflowDef);
@@ -942,13 +950,14 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
 
   // --- advanceWorkflowStep ---
 
-  it('advanceWorkflowStep delegates to StepExecutor, advances to next step', async () => {
+  it('advanceWorkflowStep delegates to StepExecutor, advances to next step and pauses for human', async () => {
     const instance = await engine.createWorkflowInstance('linear-workflow', 1, 'user-1', 'manual');
     await engine.startInstance(instance.id);
 
     const advanced = await engine.advanceWorkflowStep(instance.id, { result: 'ok' }, actor);
     expect(advanced.currentStepId).toBe('process');
-    expect(advanced.status).toBe('running');
+    // Next step is human → engine creates HumanTask and pauses
+    expect(advanced.status).toBe('paused');
   });
 
   it('advanceWorkflowStep throws InvalidTransitionError when instance is not running', async () => {
@@ -961,7 +970,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
 
   // --- full lifecycle with WorkflowDefinition ---
 
-  it('full linear flow with createWorkflowInstance -> startInstance -> advanceWorkflowStep x2 -> completed', async () => {
+  it('full linear flow with createWorkflowInstance -> startInstance -> advanceWorkflowStep -> resume -> advance -> completed', async () => {
     const instance = await engine.createWorkflowInstance('linear-workflow', 1, 'user-1', 'manual');
     expect(instance.status).toBe('created');
 
@@ -969,9 +978,13 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
     expect(started.status).toBe('running');
     expect(started.currentStepId).toBe('start');
 
-    // Advance: start -> process
+    // Advance: start -> process (human step → pauses)
     const step1 = await engine.advanceWorkflowStep(instance.id, { result: 'step1' }, actor);
     expect(step1.currentStepId).toBe('process');
+    expect(step1.status).toBe('paused');
+
+    // Resume (simulates human completing the task)
+    await engine.resumeInstance(instance.id, actor);
 
     // Advance: process -> done (terminal)
     const step2 = await engine.advanceWorkflowStep(instance.id, { result: 'step2' }, actor);
@@ -1052,10 +1065,13 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
     const instance = await engine.createWorkflowInstance('review-workflow', 1, 'user-1', 'manual');
     await engine.startInstance(instance.id);
 
-    // Advance: draft -> review
-    await engine.advanceWorkflowStep(instance.id, {}, actor);
-    let current = await instanceRepo.getById(instance.id);
-    expect(current!.currentStepId).toBe('review');
+    // Advance: draft -> review (human step → pauses)
+    const advanced = await engine.advanceWorkflowStep(instance.id, {}, actor);
+    expect(advanced.currentStepId).toBe('review');
+    expect(advanced.status).toBe('paused');
+
+    // Resume (simulates human picking up the review task)
+    await engine.resumeInstance(instance.id, actor);
 
     // Approve: should route to approved (terminal)
     await engine.submitReviewVerdict(
@@ -1064,7 +1080,111 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
       makeReviewVerdict('approve'),
       actor,
     );
-    current = await instanceRepo.getById(instance.id);
+    const current = await instanceRepo.getById(instance.id);
     expect(current!.status).toBe('completed');
+  });
+
+  // ---- Autonomy level step advancement tests ----
+
+  const autonomyTestDef: WorkflowDefinition = {
+    name: 'autonomy-test',
+    version: 1,
+    steps: [
+      { id: 'agent-step', name: 'Agent Step', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+      { id: 'human-step', name: 'Human Review', type: 'creation', executor: 'human', allowedRoles: ['reviewer'] },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [
+      { from: 'agent-step', to: 'human-step' },
+      { from: 'human-step', to: 'done' },
+    ],
+    triggers: [{ type: 'manual', name: 'Start' }],
+  };
+
+  it('[DATA] advanceWorkflowStep after L2 agent completion routes to next human step and pauses', async () => {
+    await processRepo.saveWorkflowDefinition(autonomyTestDef);
+    const instance = await engine.createWorkflowInstance('autonomy-test', 1, 'user-1', 'manual');
+    await engine.startInstance(instance.id);
+
+    // Simulate: L2 agent completes, then advance is called (this is what the fix does)
+    const agentStep = autonomyTestDef.steps[0];
+    const updated = await engine.advanceWorkflowStep(
+      instance.id,
+      { result: 'agent output' },
+      actor,
+      agentStep,
+    );
+
+    // Should have advanced to human-step and paused
+    expect(updated.currentStepId).toBe('human-step');
+    expect(updated.status).toBe('paused');
+
+    // Should have created a HumanTask for the human step
+    const tasks = await humanTaskRepo.getByInstanceId(instance.id);
+    expect(tasks.length).toBe(1);
+    expect(tasks[0].stepId).toBe('human-step');
+    expect(tasks[0].status).toBe('pending');
+  });
+
+  it('[DATA] advanceWorkflowStep after agent completion to terminal step completes the instance', async () => {
+    const directTerminalDef: WorkflowDefinition = {
+      name: 'direct-terminal',
+      version: 1,
+      steps: [
+        { id: 'agent-step', name: 'Agent Step', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'agent-step', to: 'done' }],
+      triggers: [{ type: 'manual', name: 'Start' }],
+    };
+    await processRepo.saveWorkflowDefinition(directTerminalDef);
+    const instance = await engine.createWorkflowInstance('direct-terminal', 1, 'user-1', 'manual');
+    await engine.startInstance(instance.id);
+
+    const agentStep = directTerminalDef.steps[0];
+    const updated = await engine.advanceWorkflowStep(
+      instance.id,
+      { result: 'done' },
+      actor,
+      agentStep,
+    );
+
+    expect(updated.status).toBe('completed');
+  });
+
+  it('[DATA] advanceWorkflowStep after agent completion to another agent step keeps running', async () => {
+    const chainedAgentDef: WorkflowDefinition = {
+      name: 'chained-agents',
+      version: 1,
+      steps: [
+        { id: 'step-1', name: 'Step 1', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+        { id: 'step-2', name: 'Step 2', type: 'creation', executor: 'agent', autonomyLevel: 'L4' },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [
+        { from: 'step-1', to: 'step-2' },
+        { from: 'step-2', to: 'done' },
+      ],
+      triggers: [{ type: 'manual', name: 'Start' }],
+    };
+    await processRepo.saveWorkflowDefinition(chainedAgentDef);
+    const instance = await engine.createWorkflowInstance('chained-agents', 1, 'user-1', 'manual');
+    await engine.startInstance(instance.id);
+
+    const step1 = chainedAgentDef.steps[0];
+    const updated = await engine.advanceWorkflowStep(
+      instance.id,
+      { result: 'step 1 output' },
+      actor,
+      step1,
+    );
+
+    // Should advance to step-2 and remain running (next step is agent, not human)
+    expect(updated.currentStepId).toBe('step-2');
+    expect(updated.status).toBe('running');
+
+    // No HumanTask should be created
+    const tasks = await humanTaskRepo.getByInstanceId(instance.id);
+    expect(tasks.length).toBe(0);
   });
 });
