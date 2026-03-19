@@ -232,7 +232,6 @@ export class WorkflowEngine {
       return this.loadInstance(instanceId);
     }
 
-    console.log(`[advanceWorkflowStep] before executeStep: instanceId=${instanceId}, currentStepId=${instance.currentStepId}, stepOutput keys=${Object.keys(stepOutput)}, hasOptions=${Array.isArray((stepOutput as Record<string,unknown>).options)}`);
     await this.stepExecutor.executeStep(
       instance,
       stepOutput,
@@ -245,13 +244,11 @@ export class WorkflowEngine {
     // HumanTask creation: create task when next step's executor is 'human'
     if (this.humanTaskRepository) {
       const updatedInstance = await this.loadInstance(instanceId);
-      console.log(`[advanceWorkflowStep] after executeStep: currentStepId=${updatedInstance.currentStepId}, status=${updatedInstance.status}`);
       if (updatedInstance.currentStepId !== null) {
         const nextStep = definition.steps.find(
           (s) => s.id === updatedInstance.currentStepId,
         );
 
-        console.log(`[advanceWorkflowStep] nextStep: id=${nextStep?.id}, type=${nextStep?.type}, executor=${nextStep?.executor}`);
         if (nextStep && nextStep.type !== 'terminal' && nextStep.executor === 'human') {
           const assignedRole = nextStep.allowedRoles?.[0] ?? 'unassigned';
           const now = new Date().toISOString();
