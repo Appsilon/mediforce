@@ -4,13 +4,11 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packagesDir = path.resolve(__dirname, '..');
 
-/** @type {import('next').NextConfig} */
 const isVercel = process.env.VERCEL === '1';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  ...(isVercel ? {} : { output: 'standalone' }),
-  outputFileTracingRoot: path.resolve(__dirname, '../..'),
+  ...(isVercel ? {} : { output: 'standalone', outputFileTracingRoot: path.resolve(__dirname, '../..') }),
   transpilePackages: [
     '@mediforce/platform-core',
     '@mediforce/platform-infra',
