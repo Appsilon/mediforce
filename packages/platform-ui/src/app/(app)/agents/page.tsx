@@ -22,7 +22,7 @@ const ALL_STATUSES = [
   'paused',
 ] as const;
 
-interface PluginMetadata {
+interface AgentMetadata {
   name: string;
   description: string;
   inputDescription: string;
@@ -31,16 +31,16 @@ interface PluginMetadata {
   foundationModel?: string;
 }
 
-interface PluginEntry {
+interface AgentEntry {
   name: string;
-  metadata?: PluginMetadata;
+  metadata?: AgentMetadata;
   definitionId?: string;
 }
 
 
 
-function getPluginIcon(pluginId: string): { Icon: LucideIcon; colorClass: string; bgClass: string } {
-  const id = pluginId.toLowerCase();
+function getAgentIcon(agentId: string): { Icon: LucideIcon; colorClass: string; bgClass: string } {
+  const id = agentId.toLowerCase();
   if (id.includes('claude')) return { Icon: Bot, colorClass: 'text-violet-500', bgClass: 'bg-violet-500/10' };
   if (id.includes('opencode')) return { Icon: Cpu, colorClass: 'text-blue-500', bgClass: 'bg-blue-500/10' };
   if (id.includes('script')) return { Icon: Terminal, colorClass: 'text-slate-500', bgClass: 'bg-slate-500/10' };
@@ -48,9 +48,9 @@ function getPluginIcon(pluginId: string): { Icon: LucideIcon; colorClass: string
   return { Icon: Bot, colorClass: 'text-primary', bgClass: 'bg-primary/10' };
 }
 
-function PluginCard({ plugin }: { plugin: PluginEntry }) {
-  const meta = plugin.metadata;
-  const { Icon, colorClass, bgClass } = getPluginIcon(plugin.name);
+function AgentCard({ agent }: { agent: AgentEntry }) {
+  const meta = agent.metadata;
+  const { Icon, colorClass, bgClass } = getAgentIcon(agent.name);
   const descRef = useRef<HTMLParagraphElement>(null);
   const [isClamped, setIsClamped] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -69,7 +69,7 @@ function PluginCard({ plugin }: { plugin: PluginEntry }) {
           <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', bgClass)}>
             <Icon className={cn('h-3.5 w-3.5', colorClass)} />
           </div>
-          <h3 className="font-semibold text-base">{plugin.name}</h3>
+          <h3 className="font-semibold text-base">{agent.name}</h3>
         </div>
         <div className="border-t border-border/50 px-4 py-3">
           <p className="text-sm text-muted-foreground">No metadata available</p>
@@ -102,22 +102,14 @@ function PluginCard({ plugin }: { plugin: PluginEntry }) {
             </button>
           )}
         </div>
-        {plugin.definitionId ? (
+        {agent.definitionId && (
           <Link
-            href={`/agents/definitions/${plugin.definitionId}`}
+            href={`/agents/definitions/${agent.definitionId}`}
             className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Settings className="h-3 w-3" />
             Configure
           </Link>
-        ) : (
-          <button
-            className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            onClick={() => {}}
-          >
-            <Settings className="h-3 w-3" />
-            Configure
-          </button>
         )}
       </div>
 
@@ -146,7 +138,7 @@ function PluginCard({ plugin }: { plugin: PluginEntry }) {
   );
 }
 
-function PluginSkeletonCard() {
+function AgentSkeletonCard() {
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden animate-pulse flex flex-col">
       <div className="px-4 py-4 flex items-start gap-3">
@@ -172,11 +164,11 @@ function PluginSkeletonCard() {
   );
 }
 
-function pluginMatchesQuery(plugin: PluginEntry, query: string): boolean {
+function agentMatchesQuery(agent: AgentEntry, query: string): boolean {
   const q = query.toLowerCase();
-  const meta = plugin.metadata;
+  const meta = agent.metadata;
   return (
-    plugin.name.toLowerCase().includes(q) ||
+    agent.name.toLowerCase().includes(q) ||
     (meta?.name.toLowerCase().includes(q) ?? false) ||
     (meta?.description.toLowerCase().includes(q) ?? false) ||
     (meta?.foundationModel?.toLowerCase().includes(q) ?? false) ||
@@ -185,7 +177,7 @@ function pluginMatchesQuery(plugin: PluginEntry, query: string): boolean {
   );
 }
 
-function agentDefinitionToPluginEntry(def: AgentDefinition): PluginEntry {
+function agentDefinitionToEntry(def: AgentDefinition): AgentEntry {
   return {
     name: def.id,
     definitionId: def.id,
@@ -200,8 +192,8 @@ function agentDefinitionToPluginEntry(def: AgentDefinition): PluginEntry {
   };
 }
 
-function PluginCatalog() {
-  const [plugins, setPlugins] = useState<PluginEntry[]>([]);
+function AgentCatalog() {
+  const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -210,7 +202,7 @@ function PluginCatalog() {
     Promise.all([
       fetch('/api/plugins').then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch plugins: ${res.status}`);
-        return res.json() as Promise<{ plugins: PluginEntry[] }>;
+        return res.json() as Promise<{ plugins: AgentEntry[] }>;
       }),
       fetch('/api/agent-definitions').then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch agent definitions: ${res.status}`);
@@ -218,14 +210,14 @@ function PluginCatalog() {
       }),
     ])
       .then(([pluginsData, definitionsData]) => {
-        const definitionEntries = (definitionsData.agents ?? []).map(agentDefinitionToPluginEntry);
+        const definitionEntries = (definitionsData.agents ?? []).map(agentDefinitionToEntry);
         const definitionNames = new Set(
           definitionEntries.map((e) => (e.metadata?.name ?? e.name).toLowerCase()),
         );
         const builtinPlugins = (pluginsData.plugins ?? []).filter(
           (p) => !definitionNames.has((p.metadata?.name ?? p.name).toLowerCase()),
         );
-        setPlugins([...definitionEntries, ...builtinPlugins]);
+        setAgents([...definitionEntries, ...builtinPlugins]);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -236,8 +228,8 @@ function PluginCatalog() {
   }, []);
 
   const filtered = useMemo(
-    () => (query.trim() === '' ? plugins : plugins.filter((p) => pluginMatchesQuery(p, query.trim()))),
-    [plugins, query],
+    () => (query.trim() === '' ? agents : agents.filter((a) => agentMatchesQuery(a, query.trim()))),
+    [agents, query],
   );
 
   if (loading) {
@@ -247,9 +239,9 @@ function PluginCatalog() {
           <div className="h-9 rounded-md bg-muted animate-pulse" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <PluginSkeletonCard />
-          <PluginSkeletonCard />
-          <PluginSkeletonCard />
+          <AgentSkeletonCard />
+          <AgentSkeletonCard />
+          <AgentSkeletonCard />
         </div>
       </div>
     );
@@ -258,13 +250,13 @@ function PluginCatalog() {
   if (error) {
     return (
       <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-        Failed to load plugins: {error}
+        Failed to load agents: {error}
       </div>
     );
   }
 
-  if (plugins.length === 0) {
-    return <p className="text-sm text-muted-foreground">No plugins available</p>;
+  if (agents.length === 0) {
+    return <p className="text-sm text-muted-foreground">No agents available</p>;
   }
 
   return (
@@ -284,8 +276,8 @@ function PluginCatalog() {
         <p className="text-sm text-muted-foreground py-8 text-center">No agents match your search.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((plugin) => (
-            <PluginCard key={plugin.name} plugin={plugin} />
+          {filtered.map((agent) => (
+            <AgentCard key={agent.name} agent={agent} />
           ))}
         </div>
       )}
@@ -357,7 +349,7 @@ export default function AgentsPage() {
         </Tabs.List>
 
         <Tabs.Content value="overview" className="space-y-6">
-          <PluginCatalog />
+          <AgentCatalog />
         </Tabs.Content>
 
         <Tabs.Content value="run-history" className="space-y-4">
