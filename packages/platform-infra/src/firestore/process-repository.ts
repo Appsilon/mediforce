@@ -197,13 +197,24 @@ export class FirestoreProcessRepository implements ProcessRepository {
   }
 
   async setProcessArchived(name: string, archived: boolean): Promise<void> {
-    const q = query(
+    // Update legacy processDefinitions
+    const legacyQ = query(
       collection(this.db, this.definitionsCollection),
       where('name', '==', name),
     );
-    const snapshot = await getDocs(q);
-    for (const d of snapshot.docs) {
+    const legacySnapshot = await getDocs(legacyQ);
+    for (const d of legacySnapshot.docs) {
       await updateDoc(doc(this.db, this.definitionsCollection, d.id), { archived });
+    }
+
+    // Also update workflowDefinitions (dual-write)
+    const workflowQ = query(
+      collection(this.db, this.workflowDefinitionsCollection),
+      where('name', '==', name),
+    );
+    const workflowSnapshot = await getDocs(workflowQ);
+    for (const d of workflowSnapshot.docs) {
+      await updateDoc(doc(this.db, this.workflowDefinitionsCollection, d.id), { archived });
     }
   }
 

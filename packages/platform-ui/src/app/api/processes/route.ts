@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
 
+/** @deprecated Legacy — use WorkflowDefinition body (no configName) instead. */
 interface StartProcessBody {
   definitionName: string;
   version: string;
@@ -8,7 +9,15 @@ interface StartProcessBody {
   configVersion: string;
   triggeredBy: string;
   triggerName: string;
-  payload: Record<string, unknown>;  // { studyId, ... }
+  payload: Record<string, unknown>;
+}
+
+interface StartWorkflowBody {
+  definitionName: string;
+  definitionVersion?: number;
+  triggeredBy: string;
+  triggerName?: string;
+  payload?: Record<string, unknown>;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -17,20 +26,47 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const body = await req.json() as StartProcessBody;
+    const body = await req.json();
     const { manualTrigger } = getPlatformServices();
 
-    const result = await manualTrigger.fire({
-      definitionName: body.definitionName,
-      definitionVersion: body.version,
-      configName: body.configName,
-      configVersion: body.configVersion,
-      triggerName: body.triggerName,
-      triggeredBy: body.triggeredBy,
-      payload: body.payload,
-    });
+    // Detect: if configName is present → legacy path; otherwise → workflow path
+    const isLegacy = 'configName' in body && body.configName;
 
-    // Fire-and-forget: trigger auto-runner asynchronously (do not await — start returns immediately)
+    let result;
+    if (isLegacy) {
+      const legacy = body as StartProcessBody;
+      result = await manualTrigger.fire({
+        definitionName: legacy.definitionName,
+        definitionVersion: legacy.version,
+        configName: legacy.configName,
+        configVersion: legacy.configVersion,
+        triggerName: legacy.triggerName,
+        triggeredBy: legacy.triggeredBy,
+        payload: legacy.payload,
+      });
+    } else {
+      const workflow = body as StartWorkflowBody;
+      let version = workflow.definitionVersion;
+      if (!version) {
+        const { processRepo } = getPlatformServices();
+        version = await processRepo.getLatestWorkflowVersion(workflow.definitionName);
+        if (version === 0) {
+          return NextResponse.json(
+            { error: `No workflow definition found for '${workflow.definitionName}'` },
+            { status: 404 },
+          );
+        }
+      }
+      result = await manualTrigger.fireWorkflow({
+        definitionName: workflow.definitionName,
+        definitionVersion: version,
+        triggerName: workflow.triggerName ?? 'manual',
+        triggeredBy: workflow.triggeredBy,
+        payload: workflow.payload ?? {},
+      });
+    }
+
+    // Fire-and-forget: trigger auto-runner asynchronously
     const baseUrl = getAppBaseUrl();
     fetch(`${baseUrl}/api/processes/${result.instanceId}/run`, {
       method: 'POST',
@@ -43,7 +79,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         triggeredBy: body.triggeredBy,
       }),
     }).catch((err) => {
-      // Log but don't fail the start request — run status tracked via Firestore
       console.error(`[auto-runner] Failed to trigger run for ${result.instanceId}:`, err);
     });
 
