@@ -24,3 +24,19 @@ export function getRedisConnection(): ConnectionOptions {
     return { host: 'localhost', port: 6379 };
   }
 }
+
+/** Quick health check — connects, PINGs, disconnects. */
+export async function pingRedis(): Promise<{ pong: string; host: string; port: number; tls: boolean }> {
+  const connection = getRedisConnection();
+  const { Queue } = await import('bullmq');
+  const queue = new Queue('redis-health-ping', { connection });
+  const client = await queue.client;
+  const pong = await client.ping();
+  await queue.close();
+  return {
+    pong,
+    host: connection.host ?? 'localhost',
+    port: connection.port ?? 6379,
+    tls: !!connection.tls,
+  };
+}
