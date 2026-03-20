@@ -494,7 +494,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(prompt).not.toMatch(/\/tmp\/mediforce-agent-/);
     });
 
-    it('[ERROR] handles CLI errors gracefully with low confidence result', async () => {
+    it('[ERROR] re-throws errors and emits error event (not fake result)', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
@@ -504,14 +504,15 @@ describe('ClaudeCodeAgentPlugin', () => {
         new Error('CLI process exited with code 1'),
       );
 
-      await plugin.run(emit);
+      await expect(plugin.run(emit)).rejects.toThrow('CLI process exited with code 1');
 
-      const resultEvent = events.find((e) => e.type === 'result');
-      expect(resultEvent).toBeDefined();
+      // Error event emitted for observability
+      const errorEvent = events.find((e) => e.type === 'error');
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent!.payload as Record<string, unknown>).error).toContain('CLI process exited with code 1');
 
-      const payload = resultEvent!.payload as Record<string, unknown>;
-      expect(payload.confidence).toBe(0);
-      expect(payload.reasoning_summary).toContain('error');
+      // Must NOT emit a result event — that fools the runner into treating failures as success
+      expect(events.find((e) => e.type === 'result')).toBeUndefined();
     });
 
     it('[DATA] includes previous step outputs in prompt context', async () => {

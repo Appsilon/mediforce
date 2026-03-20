@@ -65,11 +65,9 @@ export async function startProcessRun(
   try {
     const { manualTrigger } = getPlatformServices();
 
-    const result = await manualTrigger.fire({
+    const result = await manualTrigger.fireWorkflow({
       definitionName: input.definitionName,
-      definitionVersion: input.definitionVersion,
-      configName: input.configName,
-      configVersion: input.configVersion,
+      definitionVersion: Number(input.definitionVersion),
       triggerName: 'start',
       triggeredBy: input.triggeredBy,
       payload: {},

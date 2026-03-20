@@ -395,7 +395,7 @@ export function TaskDetail({
           <>
             <VerdictForm
               taskId={task.id}
-              disabled={!hasStepContent}
+              disabled={false}
               remainingTaskCount={remainingTaskCount}
             />
             <div className="pt-1 border-t">

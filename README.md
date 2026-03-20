@@ -106,6 +106,20 @@ pnpm test           # unit + integration
 cd packages/platform-ui && pnpm test:e2e  # E2E (Playwright)
 ```
 
+### Building Docker images for script steps
+
+Workflows with `script` executor steps need Docker images built locally:
+
+```bash
+# Community Digest workflow
+docker build -t mediforce-agent:community-digest -f apps/community-digest/container/Dockerfile .
+
+# Protocol to TFL workflow
+docker build -t mediforce-agent:protocol-to-tfl -f apps/protocol-to-tfl/container/Dockerfile .
+```
+
+Skip this if you only use `human` or `agent` executor steps, or run with `MOCK_AGENT=true`.
+
 ### Running agents locally (without Docker)
 
 By default, agents execute inside Docker containers. To run them using your local `claude` CLI instead (useful for development and reducing costs):

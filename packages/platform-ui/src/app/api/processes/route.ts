@@ -20,11 +20,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const body = await req.json() as StartProcessBody;
     const { manualTrigger } = getPlatformServices();
 
-    const result = await manualTrigger.fire({
+    const result = await manualTrigger.fireWorkflow({
       definitionName: body.definitionName,
-      definitionVersion: body.version,
-      configName: body.configName,
-      configVersion: body.configVersion,
+      definitionVersion: Number(body.version),
       triggerName: body.triggerName,
       triggeredBy: body.triggeredBy,
       payload: body.payload,

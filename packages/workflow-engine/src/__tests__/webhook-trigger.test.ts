@@ -5,21 +5,21 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
 } from '@mediforce/platform-core';
-import type { ProcessDefinition } from '@mediforce/platform-core';
+import type { WorkflowDefinition } from '@mediforce/platform-core';
 import {
   WorkflowEngine,
   WebhookTrigger,
   WebhookPayloadValidationError,
 } from '../index.js';
-import type { TriggerContext } from '../index.js';
+import type { WorkflowTriggerContext } from '../index.js';
 
-const webhookDef: ProcessDefinition = {
+const webhookDef: WorkflowDefinition = {
   name: 'webhook-process',
-  version: '1.0',
+  version: 1,
   steps: [
-    { id: 'start', name: 'Start', type: 'creation' },
-    { id: 'process', name: 'Process', type: 'creation' },
-    { id: 'done', name: 'Done', type: 'terminal' },
+    { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
+    { id: 'process', name: 'Process', type: 'creation', executor: 'human' },
+    { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [
     { from: 'start', to: 'process' },
@@ -62,17 +62,15 @@ describe('WebhookTrigger', () => {
     schemaRegistry = new Map();
     trigger = new WebhookTrigger(engine, schemaRegistry);
 
-    await processRepo.saveProcessDefinition(webhookDef);
+    await processRepo.saveWorkflowDefinition(webhookDef);
   });
 
   function makeContext(
-    overrides: Partial<TriggerContext> = {},
-  ): TriggerContext {
+    overrides: Partial<WorkflowTriggerContext> = {},
+  ): WorkflowTriggerContext {
     return {
       definitionName: 'webhook-process',
-      definitionVersion: '1.0',
-      configName: 'default',
-      configVersion: '1.0',
+      definitionVersion: 1,
       triggerName: 'incoming-webhook',
       triggeredBy: 'system-webhook',
       payload: {
@@ -83,9 +81,8 @@ describe('WebhookTrigger', () => {
     };
   }
 
-  it('fire() with no schema registered: creates instance (permissive)', async () => {
-    // No schema registered for 'incoming-webhook'
-    const result = await trigger.fire(makeContext());
+  it('fireWorkflow() with no schema registered: creates instance (permissive)', async () => {
+    const result = await trigger.fireWorkflow(makeContext());
     expect(result.instanceId).toBeDefined();
     expect(result.status).toBe('created');
 
@@ -93,10 +90,10 @@ describe('WebhookTrigger', () => {
     expect(instance).toBeDefined();
   });
 
-  it('fire() with valid schema + valid payload: creates instance', async () => {
+  it('fireWorkflow() with valid schema + valid payload: creates instance', async () => {
     schemaRegistry.set('incoming-webhook', payloadSchema);
 
-    const result = await trigger.fire(makeContext());
+    const result = await trigger.fireWorkflow(makeContext());
     expect(result.instanceId).toBeDefined();
 
     const instance = await instanceRepo.getById(result.instanceId);
@@ -104,21 +101,21 @@ describe('WebhookTrigger', () => {
     expect(instance!.status).toBe('running');
   });
 
-  it('fire() with valid schema + invalid payload: throws WebhookPayloadValidationError, instance NOT created', async () => {
+  it('fireWorkflow() with valid schema + invalid payload: throws WebhookPayloadValidationError, instance NOT created', async () => {
     schemaRegistry.set('incoming-webhook', payloadSchema);
 
     const invalidContext = makeContext({
       payload: { eventType: 123, wrong: 'field' },
     });
 
-    await expect(trigger.fire(invalidContext)).rejects.toThrow(
+    await expect(trigger.fireWorkflow(invalidContext)).rejects.toThrow(
       WebhookPayloadValidationError,
     );
 
     // Verify no instance was created
     const allInstances = await instanceRepo.getByDefinition(
       'webhook-process',
-      '1.0',
+      '1',
     );
     expect(allInstances).toHaveLength(0);
   });
@@ -131,45 +128,44 @@ describe('WebhookTrigger', () => {
     });
 
     try {
-      await trigger.fire(invalidContext);
+      await trigger.fireWorkflow(invalidContext);
       expect.fail('Should have thrown WebhookPayloadValidationError');
     } catch (err) {
       expect(err).toBeInstanceOf(WebhookPayloadValidationError);
       const validationErr = err as WebhookPayloadValidationError;
-      // Should mention the fields that failed
       const errorText = validationErr.errors.join(' ');
       expect(errorText.length).toBeGreaterThan(0);
     }
   });
 
-  it('fire() with valid schema + empty payload when fields required: throws WebhookPayloadValidationError', async () => {
+  it('fireWorkflow() with valid schema + empty payload when fields required: throws WebhookPayloadValidationError', async () => {
     schemaRegistry.set('incoming-webhook', payloadSchema);
 
     const emptyContext = makeContext({ payload: {} });
 
-    await expect(trigger.fire(emptyContext)).rejects.toThrow(
+    await expect(trigger.fireWorkflow(emptyContext)).rejects.toThrow(
       WebhookPayloadValidationError,
     );
   });
 
-  it('fire() creates instance with running status', async () => {
-    const result = await trigger.fire(makeContext());
+  it('fireWorkflow() creates instance with running status', async () => {
+    const result = await trigger.fireWorkflow(makeContext());
     const instance = await instanceRepo.getById(result.instanceId);
     expect(instance!.status).toBe('running');
   });
 
-  it('fire() stores payload in instance.triggerPayload', async () => {
+  it('fireWorkflow() stores payload in instance.triggerPayload', async () => {
     const payload = {
       eventType: 'order.created',
       data: { id: 'order-456', value: 99 },
     };
-    const result = await trigger.fire(makeContext({ payload }));
+    const result = await trigger.fireWorkflow(makeContext({ payload }));
     const instance = await instanceRepo.getById(result.instanceId);
     expect(instance!.triggerPayload).toEqual(payload);
   });
 
-  it('fire() sets instance.triggerType to webhook', async () => {
-    const result = await trigger.fire(makeContext());
+  it('fireWorkflow() sets instance.triggerType to webhook', async () => {
+    const result = await trigger.fireWorkflow(makeContext());
     const instance = await instanceRepo.getById(result.instanceId);
     expect(instance!.triggerType).toBe('webhook');
   });

@@ -7,7 +7,7 @@ import {
   NoopNotificationService,
 } from '@mediforce/platform-core';
 import type {
-  ProcessDefinition,
+  WorkflowDefinition,
   ProcessConfig,
   StepConfig,
   UserDirectoryService,
@@ -31,16 +31,17 @@ class InMemoryUserDirectoryService implements UserDirectoryService {
   }
 }
 
-// A 2-step process: agent-step -> done
-const agentProcessDef: ProcessDefinition = {
+// A 2-step workflow: agent-step -> done
+const agentProcessDef: WorkflowDefinition = {
   name: 'agent-process',
-  version: '1.0',
+  version: 1,
   steps: [
-    { id: 'agent-step', name: 'Agent Step', type: 'creation' },
-    { id: 'done', name: 'Done', type: 'terminal' },
+    { id: 'agent-step', name: 'Agent Step', type: 'creation', executor: 'agent' },
+    { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'agent-step', to: 'done' }],
   triggers: [{ type: 'manual', name: 'Start Agent Process' }],
+  notifications: [{ event: 'agent_escalation', roles: ['reviewer'] }],
 };
 
 const actor: StepActor = { id: 'agent:example-agent', role: 'agent' };
@@ -95,7 +96,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     handoffRepo = new InMemoryHandoffRepository();
     notificationService = new NoopNotificationService();
 
-    await processRepo.saveProcessDefinition(agentProcessDef);
+    await processRepo.saveWorkflowDefinition(agentProcessDef);
   });
 
   /**
@@ -105,7 +106,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
   async function createRunningInstance(engine: WorkflowEngine): Promise<string> {
     const instance = await engine.createInstance(
       'agent-process',
-      '1.0',
+      1,
       'system',
       'manual',
       {},
@@ -345,16 +346,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
 
   it('resolves roles to email targets and sends notification with concrete targets', async () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
-    userDirectoryService.addUser('supervisor', 'uid-s1', 'supervisor@example.com');
-
-    const processConfig: ProcessConfig = {
-      processName: 'agent-process',
-      configName: 'default',
-      configVersion: '1.0',
-      stepConfigs: [],
-      notifications: [{ event: 'agent_escalation', roles: ['supervisor'] }],
-    };
-    await processRepo.saveProcessConfig(processConfig);
+    userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
 
     const engine = new WorkflowEngine(
       processRepo,
@@ -363,25 +355,20 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       undefined,
       handoffRepo,
       notificationService,
-      undefined, // humanTaskRepository
+      undefined,
       userDirectoryService,
     );
 
-    const instanceId = await createRunningInstance(engine);
-    await instanceRepo.update(instanceId, { status: 'running', pauseReason: null });
+    // agentProcessDef has notifications: [{ event: 'agent_escalation', roles: ['reviewer'] }]
+    const instance = await engine.createInstance('agent-process', 1, 'system', 'manual');
+    await engine.startInstance(instance.id);
 
-    await engine.advanceStep(
-      instanceId,
-      {},
-      actor,
-      stepConfigWithRole,
-      escalatedResult,
-    );
+    await engine.advanceStep(instance.id, {}, actor, undefined, escalatedResult);
 
     expect(notificationService.sent).toHaveLength(1);
     expect(notificationService.sent[0].targets).toContainEqual({
       channel: 'email',
-      address: 'supervisor@example.com',
+      address: 'reviewer@example.com',
     });
   });
 
@@ -457,19 +444,17 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
 
   // --- Test 10: No notification when no escalation config in ProcessConfig ---
 
-  it('skips notification gracefully when no agent_escalation config in ProcessConfig', async () => {
+  it('skips notification gracefully when definition has no agent_escalation notifications', async () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
     userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
 
-    // ProcessConfig with empty notifications array — no agent_escalation entry
-    const processConfig: ProcessConfig = {
-      processName: 'agent-process',
-      configName: 'default',
-      configVersion: '1.0',
-      stepConfigs: [],
+    // Definition without notifications
+    const noNotifDef: WorkflowDefinition = {
+      ...agentProcessDef,
+      name: 'no-notif-process',
       notifications: [],
     };
-    await processRepo.saveProcessConfig(processConfig);
+    await processRepo.saveWorkflowDefinition(noNotifDef);
 
     const engine = new WorkflowEngine(
       processRepo,
@@ -482,14 +467,14 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       userDirectoryService,
     );
 
-    const instanceId = await createRunningInstance(engine);
-    await instanceRepo.update(instanceId, { status: 'running', pauseReason: null });
+    const instance = await engine.createInstance('no-notif-process', 1, 'system', 'manual');
+    await engine.startInstance(instance.id);
 
     await engine.advanceStep(
-      instanceId,
+      instance.id,
       {},
       actor,
-      stepConfigWithRole,
+      undefined,
       escalatedResult,
     );
 
