@@ -159,11 +159,20 @@ export default function WorkflowDefinitionVersionPage() {
       return;
     }
 
-    // Validate: steps must have non-empty IDs that don't start with "new-step-"
-    const badIds = editedSteps.filter((s) => !s.id || s.id.startsWith('new-step-'));
-    if (badIds.length > 0) {
-      const names = badIds.map((s) => `"${s.name}" (${s.id})`).join(', ');
-      setSaveState({ status: 'error', message: `Give proper step IDs to: ${names}` });
+    // Validate: steps must have non-empty IDs
+    const emptyIds = editedSteps.filter((s) => !s.id);
+    if (emptyIds.length > 0) {
+      const names = emptyIds.map((s) => `"${s.name}"`).join(', ');
+      setSaveState({ status: 'error', message: `Step ID is empty for: ${names}` });
+      return;
+    }
+
+    // Validate: no duplicate step IDs
+    const idCounts = new Map<string, number>();
+    for (const s of editedSteps) idCounts.set(s.id, (idCounts.get(s.id) ?? 0) + 1);
+    const dupes = [...idCounts.entries()].filter(([, count]) => count > 1).map(([id]) => id);
+    if (dupes.length > 0) {
+      setSaveState({ status: 'error', message: `Duplicate step IDs: ${dupes.join(', ')}` });
       return;
     }
 
