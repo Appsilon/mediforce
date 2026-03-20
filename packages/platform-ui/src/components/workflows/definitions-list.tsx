@@ -70,25 +70,24 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                 isArchived && 'opacity-60',
               )}
             >
-              {/* Default star — clickable */}
-              <button
-                onClick={async (e) => {
-                  e.preventDefault();
-                  if (!isDefault) {
+              {/* Default toggle */}
+              {isDefault ? (
+                <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <Star className="h-3 w-3 fill-current" />
+                  default
+                </span>
+              ) : (
+                <button
+                  onClick={async (e) => {
+                    e.preventDefault();
                     await setDefaultWorkflowVersion(workflowName, def.version);
                     refreshDefault();
-                  }
-                }}
-                className={cn(
-                  'shrink-0 transition-colors',
-                  isDefault
-                    ? 'text-amber-500'
-                    : 'text-muted-foreground/30 hover:text-amber-400',
-                )}
-                title={isDefault ? 'Default version' : 'Set as default'}
-              >
-                <Star className={cn('h-4 w-4', isDefault && 'fill-current')} />
-              </button>
+                  }}
+                  className="shrink-0 text-[11px] text-muted-foreground/50 hover:text-foreground transition-colors"
+                >
+                  Set as default
+                </button>
+              )}
 
               <Link
                 href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
