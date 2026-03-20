@@ -65,16 +65,30 @@ export default function WorkflowDefinitionVersionPage() {
     setEditedSteps((prev) =>
       prev.map((s) => (s.id === stepId ? { ...s, ...patch } : s)),
     );
-    // When step ID changes, update all transitions referencing the old ID
+    // When step ID changes, update all references: transitions + verdict targets in other steps
     if (patch.id && patch.id !== stepId) {
+      const newId = patch.id;
       setEditedTransitions((prev) =>
         prev.map((t) => ({
-          from: t.from === stepId ? patch.id! : t.from,
-          to: t.to === stepId ? patch.id! : t.to,
+          from: t.from === stepId ? newId : t.from,
+          to: t.to === stepId ? newId : t.to,
           ...(t.when ? { when: t.when } : {}),
         })),
       );
-      if (selectedStepId === stepId) setSelectedStepId(patch.id);
+      // Update verdict targets in other steps that point to the renamed step
+      setEditedSteps((prev) =>
+        prev.map((s) => {
+          if (!s.verdicts) return s;
+          const hasRef = Object.values(s.verdicts).some((v) => v.target === stepId);
+          if (!hasRef) return s;
+          const updatedVerdicts: Record<string, { target: string }> = {};
+          for (const [name, v] of Object.entries(s.verdicts)) {
+            updatedVerdicts[name] = { target: v.target === stepId ? newId : v.target };
+          }
+          return { ...s, verdicts: updatedVerdicts };
+        }),
+      );
+      if (selectedStepId === stepId) setSelectedStepId(newId);
     }
   }, [selectedStepId]);
 
@@ -464,7 +478,15 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
           onChange={(e) => onChange({ name: e.target.value })}
           className={cn(inlineInput, 'text-[15px] font-semibold text-foreground')}
         />
-        <p className="font-mono text-xs text-muted-foreground mt-0.5">{step.id}</p>
+        <input
+          value={step.id}
+          onChange={(e) => {
+            const slug = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
+            onChange({ id: slug });
+          }}
+          placeholder="step-id"
+          className={cn(inlineInput, 'font-mono text-xs text-muted-foreground mt-0.5')}
+        />
         <textarea
           value={step.description ?? ''}
           onChange={(e) => onChange({ description: e.target.value || undefined })}
@@ -793,7 +815,7 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
               </button>
             ))}
           </div>
-          <EditableField label="Step ID" value={step.id} mono onChange={(v) => onChange({ id: v })} />
+          {/* Step ID is now editable in the identity section above */}
           {step.type !== 'terminal' && (
             <div className="flex items-center justify-between pt-1">
               <span className="text-xs text-muted-foreground">Automated step</span>
