@@ -214,7 +214,7 @@ export default function WorkflowDefinitionVersionPage() {
     } else {
       setSaveState({ status: 'error', message: result.error });
     }
-  }, [definition, editedSteps, name, router]);
+  }, [definition, editedTitle, editedSteps, editedTransitions, name, router]);
 
   // Build a WorkflowDefinition from edited steps for the diagram
   const diagramDefinition: WorkflowDefinition | null = definition
