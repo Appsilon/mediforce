@@ -136,6 +136,9 @@ export function AgentOutputReviewPanel({
             </>
           )}
         </div>
+        {agentOutput.confidence_rationale && (
+          <p className="text-xs text-muted-foreground italic mb-2">{agentOutput.confidence_rationale}</p>
+        )}
         {agentOutput.reasoning && (
           <p className="text-sm text-muted-foreground mb-2">{agentOutput.reasoning}</p>
         )}

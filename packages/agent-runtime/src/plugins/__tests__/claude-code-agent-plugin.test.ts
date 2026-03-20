@@ -342,6 +342,58 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(payload.result).toBeDefined();
     });
 
+    it('[DATA] includes confidence_rationale from agent output in envelope', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      mockSpawn(plugin).mockResolvedValue(
+        { cliOutput: JSON.stringify({ result: { ok: true }, confidence: 0.72, confidence_rationale: 'Missing supplier X data — interpolated from similar category.' }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
+      );
+
+      await plugin.run(emit);
+
+      const resultEvent = events.find((e) => e.type === 'result');
+      const payload = resultEvent!.payload as Record<string, unknown>;
+      expect(payload.confidence_rationale).toBe('Missing supplier X data — interpolated from similar category.');
+    });
+
+    it('[DATA] omits confidence_rationale from envelope when agent does not provide it', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      mockSpawn(plugin).mockResolvedValue(
+        { cliOutput: JSON.stringify({ result: { ok: true }, confidence: 0.9 }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
+      );
+
+      await plugin.run(emit);
+
+      const resultEvent = events.find((e) => e.type === 'result');
+      const payload = resultEvent!.payload as Record<string, unknown>;
+      expect(payload).not.toHaveProperty('confidence_rationale');
+    });
+
+    it('[DATA] includes confidence self-assessment instructions in prompt', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      const spawnSpy = mockSpawn(plugin).mockResolvedValue(
+        { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
+      );
+
+      await plugin.run(emit);
+
+      const promptArg = spawnSpy.mock.calls[0][0] as string;
+      expect(promptArg).toContain('Confidence Self-Assessment');
+      expect(promptArg).toContain('confidence_rationale');
+      expect(promptArg).toContain('100 cases like this');
+    });
+
     it('[DATA] accepts standalone Docker mode (image only, no repo/commit)', async () => {
       const context = buildMockContext({
         config: {

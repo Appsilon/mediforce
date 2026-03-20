@@ -90,6 +90,9 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
               )}>{confidencePct}%</span>
             </div>
           )}
+          {output.confidence_rationale && (
+            <p className="text-xs text-muted-foreground italic">{output.confidence_rationale}</p>
+          )}
           {output.model && (
             <div className="flex items-center gap-1.5">
               <span className="text-muted-foreground">Model:</span>

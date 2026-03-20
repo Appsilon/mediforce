@@ -33,6 +33,18 @@ test.describe('Agent Oversight', () => {
     await expect(
       page.getByText('Reviewed 12 vendor submissions'),
     ).toBeVisible();
+    // Confidence rationale should be visible below the confidence badge
+    await expect(
+      page.getByText('Routine review of 12 well-structured vendor submissions'),
+    ).toBeVisible();
+  });
+
+  test('[DATA] Agent run detail page shows confidence rationale for escalated run', async ({ page }) => {
+    await page.goto('/agents/run-escalated-1');
+    // Low confidence rationale should explain the uncertainty
+    await expect(
+      page.getByText('Multiple data inconsistencies in lab values'),
+    ).toBeVisible();
   });
 
   test('Agent run detail page shows process name', async ({ page }) => {
