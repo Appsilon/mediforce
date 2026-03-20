@@ -172,4 +172,22 @@ describe('AgentOutputEnvelopeSchema', () => {
     const result = AgentOutputEnvelopeSchema.safeParse(noConfidence);
     expect(result.success).toBe(false);
   });
+
+  it('should accept envelope without confidence_rationale (optional field)', () => {
+    const result = AgentOutputEnvelopeSchema.safeParse(validEnvelope);
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept envelope with confidence_rationale', () => {
+    const result = AgentOutputEnvelopeSchema.safeParse({
+      ...validEnvelope,
+      confidence_rationale: 'Routine case with complete data. Expected error rate below 5 in 100.',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.confidence_rationale).toBe(
+        'Routine case with complete data. Expected error rate below 5 in 100.',
+      );
+    }
+  });
 });

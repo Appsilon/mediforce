@@ -107,7 +107,7 @@ export function AgentRunListTable({
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <ConfidenceBadge confidence={run.envelope?.confidence} />
+                  <ConfidenceBadge confidence={run.envelope?.confidence} rationale={run.envelope?.confidence_rationale} />
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {run.envelope?.model ?? '—'}

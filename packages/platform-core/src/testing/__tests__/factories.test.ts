@@ -195,6 +195,12 @@ describe('buildAgentOutputEnvelope', () => {
     const result = AgentOutputEnvelopeSchema.safeParse(envelope);
     expect(result.success).toBe(true);
   });
+
+  it('should include confidence_rationale in default envelope', () => {
+    const envelope = buildAgentOutputEnvelope();
+    expect(envelope.confidence_rationale).toBeTypeOf('string');
+    expect(envelope.confidence_rationale!.length).toBeGreaterThan(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

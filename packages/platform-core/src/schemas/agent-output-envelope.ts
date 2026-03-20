@@ -15,6 +15,7 @@ export const GitMetadataSchema = z.object({
 
 export const AgentOutputEnvelopeSchema = z.object({
   confidence: z.number().min(0).max(1),
+  confidence_rationale: z.string().optional(),
   reasoning_summary: z.string(),
   reasoning_chain: z.array(z.string()),
   annotations: z.array(AnnotationSchema),

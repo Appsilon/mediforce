@@ -105,6 +105,30 @@ export async function saveWorkflowDefinition(
 }
 
 // ---------------------------------------------------------------------------
+// Default version
+// ---------------------------------------------------------------------------
+
+export type SetDefaultVersionResult = { success: true } | { success: false; error: string };
+
+export async function setDefaultWorkflowVersion(
+  name: string,
+  version: number,
+): Promise<SetDefaultVersionResult> {
+  const { processRepo } = getPlatformServices();
+  try {
+    // Verify version exists
+    const def = await processRepo.getWorkflowDefinition(name, version);
+    if (!def) {
+      return { success: false, error: `Version ${version} not found` };
+    }
+    await processRepo.setDefaultWorkflowVersion(name, version);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Archive helpers
 // ---------------------------------------------------------------------------
 

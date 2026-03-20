@@ -303,12 +303,32 @@ export class FirestoreProcessRepository implements ProcessRepository {
       grouped.set(definition.name, existing);
     }
 
-    const definitions = Array.from(grouped.entries()).map(([name, versions]) => {
-      const latestVersion = Math.max(...versions.map((v) => v.version));
-      return { name, versions, latestVersion };
-    });
+    const definitions = await Promise.all(
+      Array.from(grouped.entries()).map(async ([name, versions]) => {
+        const latestVersion = Math.max(...versions.map((v) => v.version));
+        const defaultVersion = await this.getDefaultWorkflowVersion(name);
+        return { name, versions, latestVersion, defaultVersion };
+      }),
+    );
 
     return { definitions };
+  }
+
+  async getDefaultWorkflowVersion(name: string): Promise<number | null> {
+    try {
+      const metaRef = doc(this.db, 'workflowMeta', name);
+      const snapshot = await getDoc(metaRef);
+      if (!snapshot?.exists()) return null;
+      const data = snapshot.data();
+      return typeof data?.defaultVersion === 'number' ? data.defaultVersion : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async setDefaultWorkflowVersion(name: string, version: number): Promise<void> {
+    const metaRef = doc(this.db, 'workflowMeta', name);
+    await setDoc(metaRef, { defaultVersion: version }, { merge: true });
   }
 
   async getLatestWorkflowVersion(name: string): Promise<number> {

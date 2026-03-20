@@ -17,6 +17,7 @@ export class InMemoryProcessRepository implements ProcessRepository {
   private definitions = new Map<string, ProcessDefinition>();
   private configs = new Map<string, ProcessConfig>();
   private workflowDefinitions = new Map<string, WorkflowDefinition>();
+  private workflowDefaults = new Map<string, number>();
 
   private compositeKey(name: string, version: string): string {
     return `${name}:${version}`;
@@ -49,9 +50,18 @@ export class InMemoryProcessRepository implements ProcessRepository {
         name,
         versions,
         latestVersion: Math.max(...versions.map((v) => v.version)),
+        defaultVersion: this.workflowDefaults.get(name) ?? null,
       }),
     );
     return { definitions };
+  }
+
+  async getDefaultWorkflowVersion(name: string): Promise<number | null> {
+    return this.workflowDefaults.get(name) ?? null;
+  }
+
+  async setDefaultWorkflowVersion(name: string, version: number): Promise<void> {
+    this.workflowDefaults.set(name, version);
   }
 
   async getLatestWorkflowVersion(name: string): Promise<number> {

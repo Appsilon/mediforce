@@ -251,6 +251,7 @@ export function buildSeedData(testUserId: string) {
       envelope: {
         model: 'openrouter/anthropic/claude-sonnet-4',
         confidence: 0.92,
+        confidence_rationale: 'Routine review of 12 well-structured vendor submissions. All fields present, no ambiguities. Expected error rate below 1 in 10.',
         reasoning_summary: 'Reviewed 12 vendor submissions. No issues detected. All items within expected parameters.',
         reasoning_chain: [],
         duration_ms: 1200,
@@ -273,6 +274,7 @@ export function buildSeedData(testUserId: string) {
       envelope: {
         model: 'openrouter/anthropic/claude-sonnet-4',
         confidence: 0.45,
+        confidence_rationale: 'Multiple data inconsistencies in lab values — 3 out of 7 fields required interpolation from incomplete source data. In ~6/10 similar cases, at least one critical issue would be missed.',
         reasoning_summary: 'Multiple data inconsistencies found in lab values. Requires human review.',
         reasoning_chain: [],
         duration_ms: 3500,
@@ -308,6 +310,7 @@ export function buildSeedData(testUserId: string) {
       envelope: {
         model: 'openrouter/anthropic/claude-sonnet-4',
         confidence: 0.97,
+        confidence_rationale: 'Standard vendor assessment with complete metrics. All values within established norms. Fewer than 3 in 100 similar cases would surface an issue.',
         reasoning_summary: 'All metrics within expected range. Auto-approved.',
         reasoning_chain: [],
         duration_ms: 800,
