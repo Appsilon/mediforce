@@ -155,10 +155,10 @@ type AddNodeData = {
   onAdd: (executor: 'human' | 'agent' | 'script') => void;
 };
 
-const ADD_OPTIONS: { executor: 'human' | 'agent' | 'script'; icon: typeof User; label: string; bg: string; hover: string }[] = [
-  { executor: 'human', icon: User, label: 'Human', bg: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800', hover: 'hover:bg-blue-100 dark:hover:bg-blue-900/40' },
-  { executor: 'agent', icon: Bot, label: 'Agent', bg: 'bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800', hover: 'hover:bg-violet-100 dark:hover:bg-violet-900/40' },
-  { executor: 'script', icon: Terminal, label: 'Script', bg: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800', hover: 'hover:bg-amber-100 dark:hover:bg-amber-900/40' },
+const ADD_OPTIONS: { executor: 'human' | 'agent' | 'script'; icon: typeof User; label: string; desc: string; iconBg: string; iconColor: string; ring: string }[] = [
+  { executor: 'human', icon: User, label: 'Human', desc: 'Manual task', iconBg: 'bg-blue-500', iconColor: 'text-white', ring: 'hover:ring-blue-300 dark:hover:ring-blue-700' },
+  { executor: 'agent', icon: Bot, label: 'Agent', desc: 'AI-powered', iconBg: 'bg-violet-500', iconColor: 'text-white', ring: 'hover:ring-violet-300 dark:hover:ring-violet-700' },
+  { executor: 'script', icon: Terminal, label: 'Script', desc: 'Container job', iconBg: 'bg-amber-500', iconColor: 'text-white', ring: 'hover:ring-amber-300 dark:hover:ring-amber-700' },
 ];
 
 function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
@@ -177,23 +177,28 @@ function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
             <span className="text-sm font-bold">+</span>
           </button>
         ) : (
-          <div className="flex items-center gap-0.5 bg-background rounded-lg border shadow-lg p-1 animate-in fade-in zoom-in-95 duration-150">
-            {ADD_OPTIONS.map((opt, i) => {
+          <div className="flex gap-2 bg-background/95 backdrop-blur-sm rounded-2xl border shadow-2xl p-2 animate-in fade-in zoom-in-90 duration-200">
+            {ADD_OPTIONS.map((opt) => {
               const Icon = opt.icon;
               return (
-                <React.Fragment key={opt.executor}>
-                  {i === 2 && <div className="w-px h-5 bg-border mx-0.5" />}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); data.onAdd(opt.executor); setOpen(false); }}
-                    className={cn(
-                      'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-all',
-                      opt.bg, opt.hover,
-                    )}
-                  >
-                    <Icon className="h-3 w-3" />
-                    {opt.label}
-                  </button>
-                </React.Fragment>
+                <button
+                  key={opt.executor}
+                  onClick={(e) => { e.stopPropagation(); data.onAdd(opt.executor); setOpen(false); }}
+                  className={cn(
+                    'flex flex-col items-center gap-1.5 rounded-xl px-4 py-3 transition-all',
+                    'hover:scale-105 hover:shadow-md active:scale-95',
+                    'ring-2 ring-transparent',
+                    opt.ring,
+                  )}
+                >
+                  <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shadow-sm', opt.iconBg)}>
+                    <Icon className={cn('h-4.5 w-4.5', opt.iconColor)} />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-semibold text-foreground leading-none">{opt.label}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{opt.desc}</p>
+                  </div>
+                </button>
               );
             })}
           </div>
