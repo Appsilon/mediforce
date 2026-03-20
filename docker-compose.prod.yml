@@ -37,7 +37,7 @@ services:
       retries: 5
 
   stunnel:
-    image: alpine:3.21
+    image: alpine:3.23
     restart: unless-stopped
     entrypoint: ["sh", "-c", "apk add --no-cache stunnel && exec stunnel /etc/stunnel/stunnel.conf"]
     ports:
