@@ -158,9 +158,6 @@ function ProcessCard({
                   </span>
                 )}
               </div>
-              {definition.title && (
-                <p className="text-xs font-medium mt-0.5">{definition.title}</p>
-              )}
               {definition.description && (
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 max-w-[280px]">
                   {definition.description}
@@ -168,6 +165,12 @@ function ProcessCard({
               )}
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
                 <span className="font-mono">v{definition.latestVersion}</span>
+                {definition.title && (
+                  <>
+                    <span className="text-border">·</span>
+                    <span className="truncate">{definition.title}</span>
+                  </>
+                )}
                 <span className="text-border">·</span>
                 <span className="flex items-center gap-1">
                   <Layers className="h-3 w-3" />
