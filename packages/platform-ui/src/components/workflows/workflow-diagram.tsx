@@ -155,10 +155,10 @@ type AddNodeData = {
   onAdd: (executor: 'human' | 'agent' | 'script') => void;
 };
 
-const ADD_OPTIONS: { executor: 'human' | 'agent' | 'script'; icon: typeof User; label: string; desc: string; iconBg: string; iconColor: string; ring: string }[] = [
-  { executor: 'human', icon: User, label: 'Human', desc: 'Manual task', iconBg: 'bg-blue-500', iconColor: 'text-white', ring: 'hover:ring-blue-300 dark:hover:ring-blue-700' },
-  { executor: 'agent', icon: Bot, label: 'Agent', desc: 'AI-powered', iconBg: 'bg-violet-500', iconColor: 'text-white', ring: 'hover:ring-violet-300 dark:hover:ring-violet-700' },
-  { executor: 'script', icon: Terminal, label: 'Script', desc: 'Container job', iconBg: 'bg-amber-500', iconColor: 'text-white', ring: 'hover:ring-amber-300 dark:hover:ring-amber-700' },
+const ADD_OPTIONS: { executor: 'human' | 'agent' | 'script'; icon: typeof User; label: string; iconBg: string; iconColor: string; hoverBg: string }[] = [
+  { executor: 'human', icon: User, label: 'Human', iconBg: 'bg-blue-100 dark:bg-blue-900/40', iconColor: 'text-blue-600 dark:text-blue-400', hoverBg: 'hover:bg-blue-50 dark:hover:bg-blue-900/20' },
+  { executor: 'agent', icon: Bot, label: 'Agent', iconBg: 'bg-violet-100 dark:bg-violet-900/40', iconColor: 'text-violet-600 dark:text-violet-400', hoverBg: 'hover:bg-violet-50 dark:hover:bg-violet-900/20' },
+  { executor: 'script', icon: Terminal, label: 'Script', iconBg: 'bg-amber-100 dark:bg-amber-900/40', iconColor: 'text-amber-600 dark:text-amber-400', hoverBg: 'hover:bg-amber-50 dark:hover:bg-amber-900/20' },
 ];
 
 function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
@@ -177,28 +177,25 @@ function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
             <span className="text-sm font-bold">+</span>
           </button>
         ) : (
-          <div className="flex gap-2 bg-background/95 backdrop-blur-sm rounded-2xl border shadow-2xl p-2 animate-in fade-in zoom-in-90 duration-200">
-            {ADD_OPTIONS.map((opt) => {
+          <div className="flex items-center gap-1 bg-background rounded-xl border shadow-xl px-1.5 py-1.5 animate-in fade-in zoom-in-95 duration-150">
+            {ADD_OPTIONS.map((opt, i) => {
               const Icon = opt.icon;
               return (
-                <button
-                  key={opt.executor}
-                  onClick={(e) => { e.stopPropagation(); data.onAdd(opt.executor); setOpen(false); }}
-                  className={cn(
-                    'flex flex-col items-center gap-1.5 rounded-xl px-4 py-3 transition-all',
-                    'hover:scale-105 hover:shadow-md active:scale-95',
-                    'ring-2 ring-transparent',
-                    opt.ring,
-                  )}
-                >
-                  <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shadow-sm', opt.iconBg)}>
-                    <Icon className={cn('h-4.5 w-4.5', opt.iconColor)} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-semibold text-foreground leading-none">{opt.label}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{opt.desc}</p>
-                  </div>
-                </button>
+                <React.Fragment key={opt.executor}>
+                  {i === 2 && <div className="w-px h-6 bg-border mx-0.5" />}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); data.onAdd(opt.executor); setOpen(false); }}
+                    className={cn(
+                      'flex items-center gap-2 rounded-lg px-3 py-2 transition-all active:scale-95',
+                      opt.hoverBg,
+                    )}
+                  >
+                    <div className={cn('w-6 h-6 rounded-md flex items-center justify-center', opt.iconBg)}>
+                      <Icon className={cn('h-3.5 w-3.5', opt.iconColor)} />
+                    </div>
+                    <span className="text-xs font-semibold text-foreground">{opt.label}</span>
+                  </button>
+                </React.Fragment>
               );
             })}
           </div>
