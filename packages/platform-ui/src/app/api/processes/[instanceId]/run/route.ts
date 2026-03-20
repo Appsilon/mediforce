@@ -138,6 +138,17 @@ export async function POST(
           const now = new Date().toISOString();
           const taskId = crypto.randomUUID();
 
+          // For selection review steps, pass options from the previous step's output
+          const previousStepId = workflowDefinition.transitions.find(
+            (t) => t.to === instance.currentStepId,
+          )?.from ?? null;
+          const previousOutput = previousStepId
+            ? (instance.variables?.[previousStepId] ?? null)
+            : null;
+          const options = currentStep.selection && previousOutput && Array.isArray((previousOutput as Record<string, unknown>).options)
+            ? (previousOutput as Record<string, unknown>).options as Array<Record<string, unknown>>
+            : undefined;
+
           await humanTaskRepo.create({
             id: taskId,
             processInstanceId: instanceId,
@@ -153,6 +164,7 @@ export async function POST(
             creationReason: 'human_executor',
             ...(currentStep.ui ? { ui: currentStep.ui } : {}),
             ...(currentStep.params?.length ? { params: currentStep.params } : {}),
+            ...(options ? { options } : {}),
           });
 
           await auditRepo.append({

@@ -142,6 +142,12 @@ importers:
         specifier: ^5
         version: 5.7.3
 
+  apps/workflow-designer:
+    dependencies:
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../../packages/platform-core
+
   packages/agent-queue:
     dependencies:
       bullmq:

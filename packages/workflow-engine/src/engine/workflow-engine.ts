@@ -253,10 +253,10 @@ export class WorkflowEngine {
             const prevOutput = updatedInstance.variables[instance.currentStepId!] as Record<string, unknown> | undefined;
             const rawOptions = prevOutput?.options;
             if (Array.isArray(rawOptions) && rawOptions.length > 0) {
-              const { min, max } = normalizeSelection(nextStep.selection);
-              if (rawOptions.length < min || rawOptions.length > max) {
+              const { min } = normalizeSelection(nextStep.selection);
+              if (rawOptions.length < min) {
                 throw new Error(
-                  `Step "${nextStep.id}" expects ${min}–${max} options but previous step produced ${rawOptions.length}`,
+                  `Step "${nextStep.id}" requires selecting at least ${min} but only ${rawOptions.length} options available`,
                 );
               }
               selectionFields.options = rawOptions as Record<string, unknown>[];

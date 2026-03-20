@@ -5,6 +5,8 @@ export const StepExecutionStatusSchema = z.enum([
   'running',
   'completed',
   'failed',
+  'escalated',
+  'paused',
 ]);
 
 export const GateResultSchema = z.object({

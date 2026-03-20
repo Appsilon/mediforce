@@ -31,3 +31,4 @@ test-results/
 blob-report/
 
 coverage/
+.vercel
