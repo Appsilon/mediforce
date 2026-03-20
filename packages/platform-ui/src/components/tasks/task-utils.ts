@@ -66,6 +66,7 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
 
   return {
     confidence: typeof agentOutput.confidence === 'number' ? agentOutput.confidence : null,
+    confidence_rationale: typeof agentOutput.confidence_rationale === 'string' ? agentOutput.confidence_rationale : null,
     reasoning: typeof agentOutput.reasoning === 'string' ? agentOutput.reasoning : null,
     result: (agentOutput.result as Record<string, unknown> | null) ?? null,
     model: typeof agentOutput.model === 'string' ? agentOutput.model : null,
@@ -98,6 +99,7 @@ export interface GitMetadataData {
 
 export interface AgentOutputData {
   confidence: number | null;
+  confidence_rationale: string | null;
   reasoning: string | null;
   result: Record<string, unknown> | null;
   model: string | null;

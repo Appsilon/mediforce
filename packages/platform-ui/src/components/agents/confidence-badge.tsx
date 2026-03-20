@@ -3,9 +3,11 @@ import { confidenceToTrafficLight } from '@/lib/utils';
 
 export function ConfidenceBadge({
   confidence,
+  rationale,
   showLabel = false,
 }: {
   confidence: number | null | undefined;
+  rationale?: string | null;
   showLabel?: boolean;
 }) {
   if (confidence === null || confidence === undefined) {
@@ -16,7 +18,10 @@ export function ConfidenceBadge({
   const { color, label } = confidenceToTrafficLight(confidence);
 
   return (
-    <span className={cn('inline-flex items-center gap-1.5 text-sm font-medium', color)}>
+    <span
+      className={cn('inline-flex items-center gap-1.5 text-sm font-medium', color)}
+      title={rationale ?? undefined}
+    >
       {/* Traffic light dot */}
       <span className={cn('h-2 w-2 rounded-full', {
         'bg-green-500': confidence >= 0.8,

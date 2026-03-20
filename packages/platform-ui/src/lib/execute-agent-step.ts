@@ -118,6 +118,7 @@ export async function executeAgentStep(
       agentOutput: envelope
         ? {
             confidence: envelope.confidence ?? null,
+            confidence_rationale: envelope.confidence_rationale ?? null,
             reasoning: envelope.reasoning_summary ?? null,
             model: envelope.model ?? null,
             duration_ms: envelope.duration_ms ?? null,
@@ -195,11 +196,17 @@ export async function executeAgentStep(
         reviewerType: 'human',
       });
 
-      const currentInstance = await instanceRepo.getById(instanceId);
+      // Pause instance so resolve-task can resume it after human approval
+      await instanceRepo.update(instanceId, {
+        status: 'paused',
+        pauseReason: 'waiting_for_human',
+        updatedAt: new Date().toISOString(),
+      });
+
       return {
         instanceId,
-        status: currentInstance?.status ?? 'paused',
-        currentStepId: currentInstance?.currentStepId ?? null,
+        status: 'paused',
+        currentStepId: stepId,
         agentRunStatus: runResult.status,
       };
     }

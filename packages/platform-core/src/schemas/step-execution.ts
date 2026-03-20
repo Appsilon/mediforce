@@ -5,6 +5,8 @@ export const StepExecutionStatusSchema = z.enum([
   'running',
   'completed',
   'failed',
+  'escalated',
+  'paused',
 ]);
 
 export const GateResultSchema = z.object({
@@ -22,6 +24,7 @@ export const ReviewVerdictSchema = z.object({
 
 export const AgentOutputSnapshotSchema = z.object({
   confidence: z.number().nullable(),
+  confidence_rationale: z.string().nullable(),
   reasoning: z.string().nullable(),
   model: z.string().nullable(),
   duration_ms: z.number().nullable(),

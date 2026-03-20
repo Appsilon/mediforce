@@ -735,18 +735,16 @@ describe('WorkflowEngine', () => {
       );
       await engineWithSelection.startInstance(instance.id);
 
-      // Advance with 3 options but selection is exactly 2 (min=max=2)
-      const tooManyOptions = {
+      // Advance with 1 option but selection requires at least 2 (min=2)
+      const tooFewOptions = {
         options: [
           { id: 'opt-1', label: 'Option A' },
-          { id: 'opt-2', label: 'Option B' },
-          { id: 'opt-3', label: 'Option C' },
         ],
       };
       await expect(
         engineWithSelection.advanceStep(
           instance.id,
-          tooManyOptions,
+          tooFewOptions,
           { id: 'user-1', role: 'operator' },
         ),
       ).rejects.toThrow(/options/);

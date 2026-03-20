@@ -256,10 +256,18 @@ export async function resolveTask(
   });
 
   // ── 7. Advance to next step ─────────────────────────────────────────────
-  await engine.advanceStep(resolvedTask.processInstanceId, stepOutput, {
-    id: actorId,
-    role: 'human',
-  });
+  // L3 agent review with "revise" verdict: do NOT advance — keep instance on
+  // the same step so the auto-runner re-executes the agent with feedback.
+  const isL3Revise =
+    resolvedTask.creationReason === 'agent_review_l3' &&
+    (stepOutput as Record<string, unknown>).verdict === 'revise';
+
+  if (!isL3Revise) {
+    await engine.advanceStep(resolvedTask.processInstanceId, stepOutput, {
+      id: actorId,
+      role: 'human',
+    });
+  }
 
   await auditRepo.append({
     actorId,

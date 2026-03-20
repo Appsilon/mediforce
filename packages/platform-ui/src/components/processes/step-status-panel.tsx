@@ -74,6 +74,7 @@ function getEffectiveStatus(
       return 'running';
     }
     if (exec.status === 'completed') return 'completed';
+    if (exec.status === 'escalated' || exec.status === 'paused') return 'waiting';
     if (exec.status === 'failed') return 'failed';
   }
 

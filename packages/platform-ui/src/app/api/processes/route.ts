@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
 
-interface StartProcessBody {
+interface StartWorkflowBody {
   definitionName: string;
-  version: string;
-  configName: string;
-  configVersion: string;
+  definitionVersion?: number;
+  version?: string | number;
   triggeredBy: string;
-  triggerName: string;
-  payload: Record<string, unknown>;  // { studyId, ... }
+  triggerName?: string;
+  payload?: Record<string, unknown>;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -17,18 +16,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const body = await req.json() as StartProcessBody;
-    const { manualTrigger } = getPlatformServices();
+    const body = (await req.json()) as StartWorkflowBody;
+    const { manualTrigger, processRepo } = getPlatformServices();
+
+    let version = body.definitionVersion ?? (body.version ? Number(body.version) : undefined);
+    if (!version) {
+      version = await processRepo.getLatestWorkflowVersion(body.definitionName);
+      if (version === 0) {
+        return NextResponse.json(
+          { error: `No workflow definition found for '${body.definitionName}'` },
+          { status: 404 },
+        );
+      }
+    }
 
     const result = await manualTrigger.fireWorkflow({
       definitionName: body.definitionName,
-      definitionVersion: Number(body.version),
-      triggerName: body.triggerName,
+      definitionVersion: version,
+      triggerName: body.triggerName ?? 'manual',
       triggeredBy: body.triggeredBy,
-      payload: body.payload,
+      payload: body.payload ?? {},
     });
 
-    // Fire-and-forget: trigger auto-runner asynchronously (do not await — start returns immediately)
+    // Fire-and-forget: trigger auto-runner asynchronously
     const baseUrl = getAppBaseUrl();
     fetch(`${baseUrl}/api/processes/${result.instanceId}/run`, {
       method: 'POST',
@@ -41,7 +51,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         triggeredBy: body.triggeredBy,
       }),
     }).catch((err) => {
-      // Log but don't fail the start request — run status tracked via Firestore
       console.error(`[auto-runner] Failed to trigger run for ${result.instanceId}:`, err);
     });
 
