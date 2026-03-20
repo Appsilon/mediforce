@@ -10,6 +10,7 @@ import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
 import { StartRunButton } from '@/components/processes/start-run-button';
+import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -258,18 +259,13 @@ export default function WorkflowDefinitionVersionPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-headline font-semibold">{decodedName}</h1>
-              <span className="font-mono bg-muted px-2 py-0.5 text-sm rounded">
-                v{definition.version}
-              </span>
+              <VersionLabel version={definition.version} title={!editing ? definition.title : undefined} className="text-sm" />
               {editing && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                   editing
                 </span>
               )}
             </div>
-            {!editing && definition.title && (
-              <p className="text-sm font-medium mt-0.5">{definition.title}</p>
-            )}
             {editing && (
               <input
                 value={editedTitle}
