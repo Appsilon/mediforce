@@ -12,6 +12,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    mem_limit: 128m
     ports:
       - "80:80"
       - "443:443"
@@ -27,6 +28,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    mem_limit: 256m
     command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
@@ -39,6 +41,7 @@ services:
   stunnel:
     image: alpine:3.23
     restart: unless-stopped
+    mem_limit: 64m
     entrypoint: ["sh", "-c", "apk add --no-cache stunnel && exec stunnel /etc/stunnel/stunnel.conf"]
     ports:
       - "6380:6380"
@@ -63,6 +66,7 @@ services:
         - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
         - NEXT_PUBLIC_GIT_SHA
     restart: unless-stopped
+    mem_limit: 2g
     expose:
       - "3000"
     environment:
@@ -86,6 +90,7 @@ services:
       context: .
       dockerfile: packages/agent-queue/Dockerfile.worker
     restart: unless-stopped
+    mem_limit: 1280m
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
     volumes:
