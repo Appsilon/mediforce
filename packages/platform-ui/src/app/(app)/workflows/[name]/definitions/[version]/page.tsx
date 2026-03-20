@@ -484,7 +484,12 @@ const RUNTIME_OPTIONS = [
   { value: 'bash', label: 'Bash' },
 ] as const;
 
+function toSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps: WorkflowStep[]; onChange: (patch: Partial<WorkflowStep>) => void }) {
+  const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
   const inlineInput = 'w-full bg-transparent border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0.5 focus:outline-none transition-colors';
   const selectInline = 'bg-transparent text-xs text-right border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors cursor-pointer';
@@ -501,7 +506,12 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
       <div>
         <input
           value={step.name}
-          onChange={(e) => onChange({ name: e.target.value })}
+          onChange={(e) => {
+            const patch: Partial<WorkflowStep> = { name: e.target.value };
+            // Auto-slug ID for new steps only
+            if (isNewStep) patch.id = toSlug(e.target.value) || step.id;
+            onChange(patch);
+          }}
           className={cn(inlineInput, 'text-[15px] font-semibold text-foreground')}
         />
         <StepIdField currentId={step.id} onChange={(newId) => onChange({ id: newId })} />
