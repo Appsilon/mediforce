@@ -3,12 +3,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
+import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal, Star } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
-import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { saveWorkflowDefinition, setDefaultWorkflowVersion } from '@/app/actions/definitions';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -34,7 +34,8 @@ export default function WorkflowDefinitionVersionPage() {
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
-  const { definitions, loading } = useWorkflowDefinitions(decodedName);
+  const { definitions, defaultVersion, loading, refreshDefault } = useWorkflowDefinitions(decodedName);
+  const isDefault = defaultVersion === versionNumber;
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
   const [editing, setEditing] = useState(false);
@@ -299,6 +300,25 @@ export default function WorkflowDefinitionVersionPage() {
               </>
             ) : (
               <>
+                {/* Set as default */}
+                {isDefault ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200 px-3 py-1.5 text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400 whitespace-nowrap">
+                    <Star className="h-3.5 w-3.5 fill-current" />
+                    Default
+                  </span>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      const result = await setDefaultWorkflowVersion(decodedName, versionNumber);
+                      if (result.success) refreshDefault();
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+                  >
+                    <Star className="h-3.5 w-3.5" />
+                    Set as default
+                  </button>
+                )}
+
                 {/* Edit — enters edit mode */}
                 <button
                   onClick={enableEditing}
