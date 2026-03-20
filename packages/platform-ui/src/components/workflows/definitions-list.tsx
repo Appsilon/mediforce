@@ -68,7 +68,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                 isArchived && 'opacity-50',
               )}
             >
-              {/* Left: version + badges */}
+              {/* Left: version + title + badges */}
               <Link
                 href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
                 className="flex items-center gap-2.5 flex-1 min-w-0"
@@ -93,8 +93,8 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                   )}
                 </div>
 
-                {def.description && (
-                  <span className="text-sm text-muted-foreground truncate ml-1">{def.description}</span>
+                {def.title && (
+                  <span className="text-sm text-muted-foreground truncate ml-1">{def.title}</span>
                 )}
               </Link>
 

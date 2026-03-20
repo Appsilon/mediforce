@@ -83,6 +83,9 @@ export default function ProcessDefinitionPage() {
                 </span>
               )}
             </div>
+            {(latest as unknown as { title?: string })?.title && (
+              <p className="text-sm font-medium mt-0.5">{(latest as unknown as { title: string }).title}</p>
+            )}
             {latest?.description && (
               <p className="text-sm text-muted-foreground mt-0.5">{latest.description}</p>
             )}

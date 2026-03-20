@@ -38,6 +38,7 @@ export default function WorkflowDefinitionVersionPage() {
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
   const [editing, setEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>([]);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>([]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -49,6 +50,7 @@ export default function WorkflowDefinitionVersionPage() {
 
   const enableEditing = useCallback(() => {
     if (!definition) return;
+    setEditedTitle('');
     setEditedSteps(structuredClone(definition.steps));
     setEditedTransitions(structuredClone(definition.transitions));
     setEditing(true);
@@ -191,6 +193,7 @@ export default function WorkflowDefinitionVersionPage() {
 
     const result = await saveWorkflowDefinition({
       name: definition.name,
+      title: editedTitle.trim() || undefined,
       description: definition.description,
       steps: editedSteps,
       transitions,
@@ -264,6 +267,17 @@ export default function WorkflowDefinitionVersionPage() {
                 </span>
               )}
             </div>
+            {!editing && definition.title && (
+              <p className="text-sm font-medium mt-0.5">{definition.title}</p>
+            )}
+            {editing && (
+              <input
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                placeholder="Version title (required) — e.g. &quot;Added automated review step&quot;"
+                className="mt-1 w-full max-w-md text-sm border rounded-md px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            )}
             {definition.description && (
               <p className="text-sm text-muted-foreground mt-0.5">{definition.description}</p>
             )}
@@ -285,10 +299,10 @@ export default function WorkflowDefinitionVersionPage() {
                 {/* Save — primary action */}
                 <button
                   onClick={handleSave}
-                  disabled={saveState.status === 'saving'}
+                  disabled={saveState.status === 'saving' || !editedTitle.trim()}
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                    saveState.status === 'saving' && 'opacity-50 cursor-not-allowed',
+                    (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
                   )}
                 >
                   <Save className="h-3.5 w-3.5" />
