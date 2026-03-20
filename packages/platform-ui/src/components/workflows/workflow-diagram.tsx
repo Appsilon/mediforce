@@ -155,10 +155,10 @@ type AddNodeData = {
   onAdd: (executor: 'human' | 'agent' | 'script') => void;
 };
 
-const ADD_OPTIONS: { executor: 'human' | 'agent' | 'script'; icon: typeof User; label: string; color: string }[] = [
-  { executor: 'human', icon: User, label: 'Human', color: 'hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 dark:hover:bg-blue-900/20 dark:hover:text-blue-400' },
-  { executor: 'agent', icon: Bot, label: 'Agent', color: 'hover:bg-violet-50 hover:text-violet-600 hover:border-violet-200 dark:hover:bg-violet-900/20 dark:hover:text-violet-400' },
-  { executor: 'script', icon: Terminal, label: 'Script', color: 'hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200 dark:hover:bg-amber-900/20 dark:hover:text-amber-400' },
+const ADD_OPTIONS: { executor: 'human' | 'agent' | 'script'; icon: typeof User; label: string; bg: string; hover: string }[] = [
+  { executor: 'human', icon: User, label: 'Human', bg: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800', hover: 'hover:bg-blue-100 dark:hover:bg-blue-900/40' },
+  { executor: 'agent', icon: Bot, label: 'Agent', bg: 'bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800', hover: 'hover:bg-violet-100 dark:hover:bg-violet-900/40' },
+  { executor: 'script', icon: Terminal, label: 'Script', bg: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800', hover: 'hover:bg-amber-100 dark:hover:bg-amber-900/40' },
 ];
 
 function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
@@ -177,21 +177,23 @@ function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
             <span className="text-sm font-bold">+</span>
           </button>
         ) : (
-          <div className="flex gap-1 bg-background rounded-lg border shadow-lg p-1 animate-in fade-in zoom-in-95 duration-150">
-            {ADD_OPTIONS.map((opt) => {
+          <div className="flex items-center gap-0.5 bg-background rounded-lg border shadow-lg p-1 animate-in fade-in zoom-in-95 duration-150">
+            {ADD_OPTIONS.map((opt, i) => {
               const Icon = opt.icon;
               return (
-                <button
-                  key={opt.executor}
-                  onClick={(e) => { e.stopPropagation(); data.onAdd(opt.executor); setOpen(false); }}
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground transition-all',
-                    opt.color,
-                  )}
-                >
-                  <Icon className="h-3 w-3" />
-                  {opt.label}
-                </button>
+                <React.Fragment key={opt.executor}>
+                  {i === 2 && <div className="w-px h-5 bg-border mx-0.5" />}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); data.onAdd(opt.executor); setOpen(false); }}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-all',
+                      opt.bg, opt.hover,
+                    )}
+                  >
+                    <Icon className="h-3 w-3" />
+                    {opt.label}
+                  </button>
+                </React.Fragment>
               );
             })}
           </div>
