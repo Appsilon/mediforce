@@ -114,8 +114,13 @@ export default function WorkflowDefinitionVersionPage() {
     setEditedTransitions((prev) => {
       const targetEdge = prev.find((t) => t.from === afterStepId && t.to === beforeStepId);
       if (!targetEdge) {
-        // Edge not found — just add afterStep→new
-        return [...prev, { from: afterStepId, to: newId }];
+        // Edge not found in explicit transitions — might be a verdict edge.
+        // Insert new step with both connections anyway.
+        return [
+          ...prev,
+          { from: afterStepId, to: newId },
+          { from: newId, to: beforeStepId },
+        ];
       }
       return [
         ...prev.filter((t) => t !== targetEdge),
