@@ -5,18 +5,68 @@
  */
 import { Worker } from 'bullmq';
 import { spawn } from 'node:child_process';
-import { appendFile, mkdir } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { appendFile, mkdir, mkdtemp, writeFile, readdir, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { getRedisConnection } from './connection.js';
 import { QUEUE_NAME, DockerJobDataSchema } from './schemas.js';
 import type { DockerJobResult } from './schemas.js';
 
+/**
+ * If inputFiles are provided (remote caller), create a local temp dir,
+ * write the files, and replace the remote outputDir path in dockerArgs
+ * with the local path. Returns the local outputDir to read results from.
+ */
+async function prepareLocalOutputDir(data: { inputFiles?: Record<string, string>; outputDir: string; dockerArgs: string[] }): Promise<{ localOutputDir: string; patchedArgs: string[] }> {
+  if (!data.inputFiles || Object.keys(data.inputFiles).length === 0) {
+    // Same machine — outputDir already exists locally
+    return { localOutputDir: data.outputDir, patchedArgs: data.dockerArgs };
+  }
+
+  const localOutputDir = await mkdtemp(join(tmpdir(), 'mediforce-worker-'));
+  const fileCount = Object.keys(data.inputFiles).length;
+  console.log(`[worker] Remote caller — recreating ${fileCount} input file(s) in ${localOutputDir}`);
+  for (const [name, content] of Object.entries(data.inputFiles)) {
+    await writeFile(join(localOutputDir, name), content, 'utf-8');
+    console.log(`[worker]   wrote ${name} (${content.length} bytes)`);
+  }
+
+  // Replace the remote outputDir path in dockerArgs with local path
+  const remoteDir = data.outputDir;
+  const patchedArgs = data.dockerArgs.map((arg) =>
+    arg.includes(remoteDir) ? arg.replace(remoteDir, localOutputDir) : arg,
+  );
+  console.log(`[worker] Patched outputDir: ${remoteDir} → ${localOutputDir}`);
+
+  return { localOutputDir, patchedArgs };
+}
+
+/** Collect all files from outputDir after docker run completes. */
+async function collectOutputFiles(outputDir: string): Promise<Record<string, string>> {
+  const files: Record<string, string> = {};
+  try {
+    const entries = await readdir(outputDir);
+    for (const entry of entries) {
+      try {
+        const content = await readFile(join(outputDir, entry), 'utf-8');
+        files[entry] = content;
+      } catch (err) {
+        console.warn(`[worker] Skipping unreadable output file '${entry}': ${err instanceof Error ? err.message : err}`);
+      }
+    }
+  } catch (err) {
+    console.warn(`[worker] Could not read outputDir '${outputDir}': ${err instanceof Error ? err.message : err}`);
+  }
+  return files;
+}
+
 function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
   const data = DockerJobDataSchema.parse(rawData);
   const logFile = data.logFile;
+  const hasInputFiles = data.inputFiles && Object.keys(data.inputFiles).length > 0;
 
-  return new Promise<DockerJobResult>((resolve, reject) => {
-    const child = spawn('docker', data.dockerArgs, {
+  return prepareLocalOutputDir(data).then(({ localOutputDir, patchedArgs }) => new Promise<DockerJobResult>((resolve, reject) => {
+    const child = spawn('docker', patchedArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -92,19 +142,24 @@ function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
         ).catch(() => {});
       }
 
-      resolve({
-        stdout,
-        stderr,
-        exitCode: code,
-        signal: signal ?? null,
-      });
+      // If remote caller sent inputFiles, collect output files to return through Redis
+      if (hasInputFiles) {
+        collectOutputFiles(localOutputDir).then((outputFiles) => {
+          resolve({ stdout, stderr, exitCode: code, signal: signal ?? null, outputFiles });
+        }).catch((err) => {
+          console.warn(`[worker] Failed to collect output files: ${err instanceof Error ? err.message : err}`);
+          resolve({ stdout, stderr, exitCode: code, signal: signal ?? null });
+        });
+      } else {
+        resolve({ stdout, stderr, exitCode: code, signal: signal ?? null });
+      }
     });
 
     if (data.stdinPayload !== null) {
       child.stdin.write(data.stdinPayload);
     }
     child.stdin.end();
-  });
+  }));
 }
 
 const connection = getRedisConnection();

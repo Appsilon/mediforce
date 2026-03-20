@@ -135,6 +135,7 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
       'Skill-dependent structured JSON with confidence scoring. ' +
       'Examples: extracted metadata, generated code, analysis reports.',
     roles: ['executor'],
+    foundationModel: 'Claude Sonnet 4.6',
   };
 
   getAgentCommand(_promptFilePath: string, options?: SpawnCliOptions): AgentCommandSpec {

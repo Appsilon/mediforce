@@ -1,20 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
 
-/** @deprecated Legacy — use WorkflowDefinition body (no configName) instead. */
-interface StartProcessBody {
-  definitionName: string;
-  version: string;
-  configName: string;
-  configVersion: string;
-  triggeredBy: string;
-  triggerName: string;
-  payload: Record<string, unknown>;
-}
-
 interface StartWorkflowBody {
   definitionName: string;
   definitionVersion?: number;
+  version?: string | number;
   triggeredBy: string;
   triggerName?: string;
   payload?: Record<string, unknown>;
@@ -26,45 +16,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const body = await req.json();
-    const { manualTrigger } = getPlatformServices();
+    const body = (await req.json()) as StartWorkflowBody;
+    const { manualTrigger, processRepo } = getPlatformServices();
 
-    // Detect: if configName is present → legacy path; otherwise → workflow path
-    const isLegacy = 'configName' in body && body.configName;
-
-    let result;
-    if (isLegacy) {
-      const legacy = body as StartProcessBody;
-      result = await manualTrigger.fire({
-        definitionName: legacy.definitionName,
-        definitionVersion: legacy.version,
-        configName: legacy.configName,
-        configVersion: legacy.configVersion,
-        triggerName: legacy.triggerName,
-        triggeredBy: legacy.triggeredBy,
-        payload: legacy.payload,
-      });
-    } else {
-      const workflow = body as StartWorkflowBody;
-      let version = workflow.definitionVersion;
-      if (!version) {
-        const { processRepo } = getPlatformServices();
-        version = await processRepo.getLatestWorkflowVersion(workflow.definitionName);
-        if (version === 0) {
-          return NextResponse.json(
-            { error: `No workflow definition found for '${workflow.definitionName}'` },
-            { status: 404 },
-          );
-        }
+    let version = body.definitionVersion ?? (body.version ? Number(body.version) : undefined);
+    if (!version) {
+      version = await processRepo.getLatestWorkflowVersion(body.definitionName);
+      if (version === 0) {
+        return NextResponse.json(
+          { error: `No workflow definition found for '${body.definitionName}'` },
+          { status: 404 },
+        );
       }
-      result = await manualTrigger.fireWorkflow({
-        definitionName: workflow.definitionName,
-        definitionVersion: version,
-        triggerName: workflow.triggerName ?? 'manual',
-        triggeredBy: workflow.triggeredBy,
-        payload: workflow.payload ?? {},
-      });
     }
+
+    const result = await manualTrigger.fireWorkflow({
+      definitionName: body.definitionName,
+      definitionVersion: version,
+      triggerName: body.triggerName ?? 'manual',
+      triggeredBy: body.triggeredBy,
+      payload: body.payload ?? {},
+    });
 
     // Fire-and-forget: trigger auto-runner asynchronously
     const baseUrl = getAppBaseUrl();

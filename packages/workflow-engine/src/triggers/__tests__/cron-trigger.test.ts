@@ -14,26 +14,22 @@ describe('CronTrigger', () => {
     const engine = createMockEngine();
     const trigger = new CronTrigger(engine);
 
-    const result = await trigger.fire({
+    const result = await trigger.fireWorkflow({
       definitionName: 'community-digest',
-      definitionVersion: 'v1',
+      definitionVersion: 1,
       triggerName: 'weekly-cron',
       triggeredBy: 'cron-heartbeat',
       payload: { schedule: '0 9 * * 1' },
-      configName: 'default',
-      configVersion: 'v1',
     });
 
     expect(result).toEqual({ instanceId: 'inst-123', status: 'created' });
 
     expect(engine.createInstance).toHaveBeenCalledWith(
       'community-digest',
-      'v1',
+      1,
       'cron-heartbeat',
       'cron',
       { schedule: '0 9 * * 1' },
-      'default',
-      'v1',
     );
 
     expect(engine.startInstance).toHaveBeenCalledWith('inst-123');

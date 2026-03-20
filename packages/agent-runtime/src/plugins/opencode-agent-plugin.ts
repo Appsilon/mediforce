@@ -35,6 +35,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       'Skill-dependent structured JSON with confidence scoring. ' +
       'Examples: extracted metadata, generated code, analysis reports.',
     roles: ['executor'],
+    foundationModel: 'DeepSeek Chat',
   };
 
   protected override getInternalEnvVars(): Record<string, string> {

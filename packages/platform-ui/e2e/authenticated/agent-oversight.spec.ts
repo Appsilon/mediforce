@@ -17,14 +17,8 @@ test.describe('Agent Oversight', () => {
   test('Agents page shows seeded agent runs in Run History tab', async ({ page }) => {
     await page.goto('/agents');
     await page.getByRole('tab', { name: 'Run History' }).click();
-    // The table should have at least one row with the narrative-summary pluginId
-    await expect(page.getByText('narrative-summary').first()).toBeVisible({ timeout: 10_000 });
-  });
-
-  test('Agents page shows total runs stat card', async ({ page }) => {
-    await page.goto('/agents');
-    // StatCards shows "Total Runs" label after data loads
-    await expect(page.getByText('Total Runs')).toBeVisible({ timeout: 10_000 });
+    // The table should have at least one row — pluginId is now displayed human-readable
+    await expect(page.getByText('Narrative Summary').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('Agent run detail page shows model and confidence', async ({ page }) => {
@@ -85,7 +79,7 @@ test.describe('Agent Oversight', () => {
     await expect(link).toBeVisible({ timeout: 10_000 });
     // Verify the link has the correct href pointing to the detail page
     await expect(link).toHaveAttribute('href', '/agents/run-completed-1');
-    // Verify the link text is the pluginId
-    await expect(link).toHaveText('narrative-summary');
+    // Verify the link text is the human-readable plugin name
+    await expect(link).toContainText('Narrative Summary');
   });
 });

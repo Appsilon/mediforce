@@ -14,23 +14,30 @@ test.describe('Agents', () => {
     await expect(page.getByText('Risk Detection')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('[RENDER] Plugin cards show namespace group headings', async ({ page }) => {
-    await page.goto('/agents');
-    await expect(page.getByRole('heading', { name: 'Supply Intelligence' })).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.getByRole('heading', { name: 'Supply Intelligence' })).toBeVisible();
-  });
-
   test('[RENDER] Plugin cards display metadata', async ({ page }) => {
     await page.goto('/agents');
-    // Check that a plugin name and its description are visible
     await expect(page.getByText('Risk Detection')).toBeVisible({ timeout: 10_000 });
     // Check for Input/Output labels
     await expect(page.getByText('Input').first()).toBeVisible();
     await expect(page.getByText('Output').first()).toBeVisible();
-    // Check for role badges
-    await expect(page.getByText('Executor').first()).toBeVisible();
+  });
+
+  test('[RENDER] Available Agents tab shows search field', async ({ page }) => {
+    await page.goto('/agents');
+    await expect(page.getByPlaceholder(/search agents/i)).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('[RENDER] New Agent button is visible', async ({ page }) => {
+    await page.goto('/agents');
+    await expect(page.getByRole('link', { name: 'New Agent', exact: true })).toBeVisible();
+  });
+
+  test('[RENDER] New Agent page loads with form fields', async ({ page }) => {
+    await page.goto('/agents/new');
+    await expect(page.getByRole('heading', { name: 'New Agent' })).toBeVisible();
+    await expect(page.getByPlaceholder(/e\.g\. Risk Analysis Agent/i)).toBeVisible();
+    await expect(page.getByText('Foundation model')).toBeVisible();
+    await expect(page.getByRole('button', { name: /save new agent/i })).toBeVisible();
   });
 
   test('[CLICK] Sidebar Agents link navigates to /agents', async ({ page }) => {

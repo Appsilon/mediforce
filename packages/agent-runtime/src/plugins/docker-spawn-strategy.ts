@@ -3,11 +3,13 @@
  *
  * Two implementations:
  * - LocalDockerSpawnStrategy: spawns `docker run` as a child process (default)
- * - QueuedDockerSpawnStrategy: enqueues to BullMQ, worker executes on same machine
+ * - QueuedDockerSpawnStrategy: enqueues to BullMQ, worker executes on remote machine
  *
  * The queued strategy is activated when REDIS_URL is set.
  */
 import { spawn } from 'node:child_process';
+import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 
 export interface DockerSpawnRequest {
   dockerArgs: string[];
@@ -102,15 +104,31 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
  * and executes `docker run`. Uses `waitUntilFinished` for a synchronous-feeling
  * API (the caller still awaits a Promise).
  *
+ * Files from outputDir are sent through Redis as inputFiles so the worker can
+ * recreate them locally (caller and worker may not share a filesystem).
+ * Output files produced by the container are returned through Redis and
+ * written back to the caller's outputDir.
+ *
  * Requires REDIS_URL to be set and @mediforce/agent-queue to be installed.
  */
 export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
   async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
-    // Dynamic import — @mediforce/agent-queue is an optional dependency.
-    // This avoids pulling in bullmq/ioredis when running in local mode.
     const { enqueueDockerJob } = await import('@mediforce/agent-queue');
 
-    return enqueueDockerJob({
+    // Collect all files from outputDir to send through Redis
+    const inputFiles: Record<string, string> = {};
+    try {
+      const entries = await readdir(request.outputDir);
+      for (const entry of entries) {
+        const content = await readFile(join(request.outputDir, entry), 'utf-8');
+        inputFiles[entry] = content;
+      }
+      console.log(`[queued-strategy] Collected ${Object.keys(inputFiles).length} input file(s) from ${request.outputDir}: ${Object.keys(inputFiles).join(', ')}`);
+    } catch (err) {
+      console.warn(`[queued-strategy] Could not read outputDir '${request.outputDir}': ${err instanceof Error ? err.message : err}`);
+    }
+
+    const result = await enqueueDockerJob({
       jobType: 'agent-container',
       dockerArgs: request.dockerArgs,
       stdinPayload: request.stdinPayload,
@@ -120,7 +138,18 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       stepId: request.stepId,
       outputDir: request.outputDir,
       logFile: request.logFile,
+      inputFiles,
     });
+
+    // Write output files from worker back to caller's outputDir
+    if (result.outputFiles) {
+      await mkdir(request.outputDir, { recursive: true });
+      for (const [name, content] of Object.entries(result.outputFiles)) {
+        await writeFile(join(request.outputDir, name), content, 'utf-8');
+      }
+    }
+
+    return result;
   }
 }
 

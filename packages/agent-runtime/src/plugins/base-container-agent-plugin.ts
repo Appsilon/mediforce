@@ -17,11 +17,13 @@ const __dirname_base = dirname(__filename_base);
 
 export const DEFAULT_TIMEOUT_MS = 20 * 60_000;
 
-/** Resolve a path relative to MEDIFORCE_ROOT (if set) or CWD. */
+// Monorepo root: this file lives at packages/agent-runtime/src/plugins/
+const MONOREPO_ROOT = process.env.MEDIFORCE_ROOT ?? resolve(__dirname_base, '../../../..');
+
+/** Resolve a path relative to the monorepo root. */
 function resolveProjectPath(relativePath: string): string {
   if (isAbsolute(relativePath)) return relativePath;
-  const root = process.env.MEDIFORCE_ROOT ?? process.cwd();
-  return resolve(root, relativePath);
+  return resolve(MONOREPO_ROOT, relativePath);
 }
 
 /** Structured logger for agent runtime. Writes to stderr (captured by Docker). */
@@ -592,23 +594,20 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
         stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined,
       });
 
+      // Emit an error event for observability (NOT a result — that would fool the runner
+      // into treating a hard failure as a successful completion with confidence 0).
       await emit({
-        type: 'result',
+        type: 'error',
         payload: {
-          confidence: 0,
-          reasoning_summary: `${this.agentName} skill '${skillName}' failed with error: ${errorMessage}`,
-          reasoning_chain: [
-            `Invoked skill: ${skillName}`,
-            `Error: ${errorMessage}`,
-          ],
-          annotations: [],
-          model: this.agentConfig.model ?? `${this.agentName}-cli`,
+          error: errorMessage,
+          skill: skillName,
           duration_ms,
-          result: null,
-          ...(tempDir ? { tempDir } : {}),
         },
         timestamp: new Date().toISOString(),
       });
+
+      // Re-throw so the agent runner's fallback handler deals with the error
+      throw error;
     } finally {
       if (succeeded) {
         await cleanupTempDir(tempDir);
@@ -818,9 +817,21 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
   protected async readSkillFile(skillsDir: string, skill: string): Promise<string> {
     const skillPath = join(skillsDir, skill, 'SKILL.md');
     agentLog('readSkillFile', `reading ${skillPath}`, { skillsDir, skill });
-    const raw = await readFile(skillPath, 'utf-8');
-    agentLog('readSkillFile', `success — ${raw.length} chars`, { skillPath });
-    return stripFrontmatter(raw);
+    try {
+      const raw = await readFile(skillPath, 'utf-8');
+      agentLog('readSkillFile', `success — ${raw.length} chars`, { skillPath });
+      return stripFrontmatter(raw);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        throw new Error(
+          `Skill file not found: ${skillPath}\n` +
+          `Resolved from skillsDir="${skillsDir}", skill="${skill}"\n` +
+          `Project root: ${MONOREPO_ROOT} (MEDIFORCE_ROOT=${process.env.MEDIFORCE_ROOT ?? 'NOT_SET'})`,
+        );
+      }
+      throw err;
+    }
   }
 
   protected async spawnLocalProcess(

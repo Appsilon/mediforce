@@ -50,6 +50,8 @@ ENV PORT=3000
 COPY --from=builder /app/packages/platform-ui/.next/standalone ./
 # Copy static assets
 COPY --from=builder /app/packages/platform-ui/.next/static ./packages/platform-ui/.next/static
+# Copy public assets (PWA icons, manifest, service worker)
+COPY --from=builder /app/packages/platform-ui/public ./packages/platform-ui/public
 
 EXPOSE 3000
 

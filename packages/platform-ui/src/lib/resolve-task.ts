@@ -262,20 +262,11 @@ export async function resolveTask(
     resolvedTask.creationReason === 'agent_review_l3' &&
     (stepOutput as Record<string, unknown>).verdict === 'revise';
 
-  const isWorkflowInstance = !instance.configName;
-
   if (!isL3Revise) {
-    if (isWorkflowInstance) {
-      await engine.advanceWorkflowStep(resolvedTask.processInstanceId, stepOutput, {
-        id: actorId,
-        role: 'human',
-      });
-    } else {
-      await engine.advanceStep(resolvedTask.processInstanceId, stepOutput, {
-        id: actorId,
-        role: 'human',
-      });
-    }
+    await engine.advanceStep(resolvedTask.processInstanceId, stepOutput, {
+      id: actorId,
+      role: 'human',
+    });
   }
 
   await auditRepo.append({
