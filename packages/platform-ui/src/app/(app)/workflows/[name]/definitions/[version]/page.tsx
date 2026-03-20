@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
-import { stringify as yamlStringify } from 'yaml';
+import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
@@ -302,17 +302,28 @@ export default function WorkflowDefinitionVersionPage() {
             onRemoveStep={editing ? removeStep : undefined}
           />
 
-          {/* Raw YAML — for devs */}
+          {/* YAML — readonly preview or editable textarea in edit mode */}
           <details className="mt-4">
             <summary className="text-[11px] font-medium text-muted-foreground/40 cursor-pointer hover:text-muted-foreground transition-colors select-none">
-              View YAML
+              {editing ? 'Edit YAML' : 'View YAML'}
             </summary>
-            <pre className="mt-2 text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto max-h-[400px] overflow-y-auto leading-relaxed">
-              {yamlStringify(
-                { ...diagramDefinition, version: undefined, createdAt: undefined },
-                { indent: 2 },
-              )}
-            </pre>
+            {editing ? (
+              <YamlEditor
+                steps={editedSteps}
+                transitions={editedTransitions}
+                onChange={(steps, transitions) => {
+                  setEditedSteps(steps);
+                  setEditedTransitions(transitions);
+                }}
+              />
+            ) : (
+              <pre className="mt-2 text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto max-h-[400px] overflow-y-auto leading-relaxed">
+                {yamlStringify(
+                  { ...diagramDefinition, version: undefined, createdAt: undefined },
+                  { indent: 2 },
+                )}
+              </pre>
+            )}
           </details>
         </div>
 
@@ -343,6 +354,56 @@ export default function WorkflowDefinitionVersionPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// YAML editor — direct text editing of steps + transitions
+// ---------------------------------------------------------------------------
+
+function YamlEditor({ steps, transitions, onChange }: {
+  steps: WorkflowStep[];
+  transitions: WorkflowDefinition['transitions'];
+  onChange: (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => void;
+}) {
+  const [yamlText, setYamlText] = useState(() =>
+    yamlStringify({ steps, transitions }, { indent: 2 }),
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const applyYaml = useCallback(() => {
+    try {
+      const parsed = yamlParse(yamlText) as { steps?: WorkflowStep[]; transitions?: WorkflowDefinition['transitions'] };
+      if (!parsed?.steps || !Array.isArray(parsed.steps)) {
+        setError('YAML must contain a "steps" array');
+        return;
+      }
+      setError(null);
+      onChange(parsed.steps, parsed.transitions ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid YAML');
+    }
+  }, [yamlText, onChange]);
+
+  return (
+    <div className="mt-2 space-y-2">
+      <textarea
+        value={yamlText}
+        onChange={(e) => setYamlText(e.target.value)}
+        rows={20}
+        spellCheck={false}
+        className="w-full text-[11px] font-mono bg-muted/30 rounded-lg p-4 border-0 focus:outline-none focus:ring-1 focus:ring-primary resize-y leading-relaxed"
+      />
+      {error && (
+        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
+      <button
+        onClick={applyYaml}
+        className="text-xs font-medium text-primary hover:underline"
+      >
+        Apply YAML to diagram
+      </button>
     </div>
   );
 }
