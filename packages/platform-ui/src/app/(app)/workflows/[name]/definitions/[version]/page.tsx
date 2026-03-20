@@ -65,7 +65,18 @@ export default function WorkflowDefinitionVersionPage() {
     setEditedSteps((prev) =>
       prev.map((s) => (s.id === stepId ? { ...s, ...patch } : s)),
     );
-  }, []);
+    // When step ID changes, update all transitions referencing the old ID
+    if (patch.id && patch.id !== stepId) {
+      setEditedTransitions((prev) =>
+        prev.map((t) => ({
+          from: t.from === stepId ? patch.id! : t.from,
+          to: t.to === stepId ? patch.id! : t.to,
+          ...(t.when ? { when: t.when } : {}),
+        })),
+      );
+      if (selectedStepId === stepId) setSelectedStepId(patch.id);
+    }
+  }, [selectedStepId]);
 
   const addStepAfter = useCallback((afterStepId: string) => {
     const stepNum = editedSteps.length + 1;
@@ -78,6 +89,7 @@ export default function WorkflowDefinitionVersionPage() {
         name: `New Step ${stepNum}`,
         type: 'creation',
         executor: 'human',
+        // Note: user MUST change id before save (validated in handleSave)
       };
       const next = [...prev];
       next.splice(idx + 1, 0, newStep);
@@ -107,6 +119,25 @@ export default function WorkflowDefinitionVersionPage() {
 
   const handleSave = useCallback(async () => {
     if (!definition) return;
+
+    // Validate: agent/script steps must have a plugin set
+    const missingPlugin = editedSteps.filter(
+      (s) => s.type !== 'terminal' && (s.executor === 'agent' || s.executor === 'script') && !s.plugin,
+    );
+    if (missingPlugin.length > 0) {
+      const names = missingPlugin.map((s) => `"${s.name}"`).join(', ');
+      setSaveState({ status: 'error', message: `Plugin required for agent/script steps: ${names}` });
+      return;
+    }
+
+    // Validate: steps must have non-empty IDs that don't start with "new-step-"
+    const badIds = editedSteps.filter((s) => !s.id || s.id.startsWith('new-step-'));
+    if (badIds.length > 0) {
+      const names = badIds.map((s) => `"${s.name}" (${s.id})`).join(', ');
+      setSaveState({ status: 'error', message: `Give proper step IDs to: ${names}` });
+      return;
+    }
+
     setSaveState({ status: 'saving' });
 
     // Merge explicit transitions with verdict-based transitions
@@ -388,7 +419,11 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
               return (
                 <button
                   key={ex}
-                  onClick={() => onChange({ executor: ex })}
+                  onClick={() => onChange({
+                    executor: ex,
+                    // Default plugin when switching to agent (prevents "plugin not registered" errors)
+                    ...(ex === 'agent' && !step.plugin ? { plugin: 'opencode-agent' } : {}),
+                  })}
                   className={cn(
                     'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium capitalize transition-all',
                     step.executor === ex ? activeColors[ex] : 'text-muted-foreground hover:text-foreground',
