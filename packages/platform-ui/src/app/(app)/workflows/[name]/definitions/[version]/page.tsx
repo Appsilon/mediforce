@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal, Star } from 'lucide-react';
@@ -870,11 +870,15 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
 function StepIdField({ currentId, onChange }: { currentId: string; onChange: (newId: string) => void }) {
   const [draft, setDraft] = useState(currentId);
   const [dirty, setDirty] = useState(false);
+  const prevIdRef = useRef(currentId);
 
-  // Sync draft when external id changes (e.g. after adding a new step)
-  useEffect(() => {
-    if (!dirty) setDraft(currentId);
-  }, [currentId, dirty]);
+  // Sync draft immediately when external id changes (e.g. auto-slug from name)
+  if (currentId !== prevIdRef.current && !dirty) {
+    prevIdRef.current = currentId;
+    // Direct state set during render — React handles this correctly
+    setDraft(currentId);
+  }
+  prevIdRef.current = currentId;
 
   const commit = useCallback(() => {
     const slug = draft.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
