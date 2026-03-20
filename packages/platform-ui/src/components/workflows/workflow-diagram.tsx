@@ -163,12 +163,22 @@ const ADD_OPTIONS: { executor: 'human' | 'agent' | 'script'; icon: typeof User; 
 
 function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
   const [open, setOpen] = useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
   return (
     <>
       <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
       <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
-      <div style={{ width: NODE_WIDTH }} className="flex justify-center relative">
+      <div ref={ref} style={{ width: NODE_WIDTH }} className="flex justify-center relative">
         {!open ? (
           <button
             onClick={(e) => { e.stopPropagation(); setOpen(true); }}
