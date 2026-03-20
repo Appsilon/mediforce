@@ -3,12 +3,9 @@ import { z } from 'zod';
 /**
  * Payload sent from the API process to the worker via BullMQ.
  *
- * The caller builds the full `docker run` argument list — the worker is a thin
- * executor that spawns the container and returns stdout/stderr/exit info.
- *
- * `outputDir` is a real filesystem path because the worker runs on the same
- * machine (shared /tmp). For multi-machine scaling, this would need to move to
- * a shared volume or object store.
+ * When caller and worker share /tmp (same machine), outputDir paths work directly.
+ * When they run on different machines (e.g. Vercel → VPS worker), `inputFiles`
+ * carries file contents through Redis and the worker recreates them locally.
  */
 export const DockerJobDataSchema = z.object({
   /** Discriminator so the worker can handle future job types. */
@@ -29,6 +26,9 @@ export const DockerJobDataSchema = z.object({
   outputDir: z.string(),
   /** Host-side log file path for realtime activity streaming (null = no logging). */
   logFile: z.string().nullable(),
+  /** Files from outputDir, keyed by filename. Sent through Redis when caller
+   *  and worker don't share a filesystem (e.g. Vercel → VPS). */
+  inputFiles: z.record(z.string()).optional(),
 });
 
 export type DockerJobData = z.infer<typeof DockerJobDataSchema>;
@@ -38,6 +38,9 @@ export const DockerJobResultSchema = z.object({
   stderr: z.string(),
   exitCode: z.number().nullable(),
   signal: z.string().nullable(),
+  /** Files from the worker's outputDir after docker run completes.
+   *  Returned through Redis so the caller can recreate them locally. */
+  outputFiles: z.record(z.string()).optional(),
 });
 
 export type DockerJobResult = z.infer<typeof DockerJobResultSchema>;

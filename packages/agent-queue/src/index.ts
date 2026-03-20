@@ -1,5 +1,5 @@
 export { enqueueDockerJob, closeQueueClient } from './queue-client.js';
-export { getRedisConnection } from './connection.js';
+export { getRedisConnection, pingRedis } from './connection.js';
 export {
   DockerJobDataSchema,
   DockerJobResultSchema,
