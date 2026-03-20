@@ -333,7 +333,7 @@ interface WorkflowDiagramProps {
   onNodeClick?: (stepId: string) => void;
   selectedStepId?: string | null;
   editing?: boolean;
-  onAddStep?: (afterStepId: string) => void;
+  onAddStep?: (afterStepId: string, beforeStepId: string) => void;
   onRemoveStep?: (stepId: string) => void;
 }
 
@@ -366,14 +366,14 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, sel
         const targetNode = styledNodes.find((n) => n.id === edge.target);
         if (!sourceNode || !targetNode) continue;
 
-        const addId = `add-after-${edge.source}`;
+        const addId = `add-${edge.source}-${edge.target}`;
         const midY = (sourceNode.position.y + targetNode.position.y) / 2;
 
         styledNodes.push({
           id: addId,
           type: 'addStep',
           position: { x: sourceNode.position.x, y: midY - 14 },
-          data: { onAdd: () => onAddStep(edge.source) },
+          data: { onAdd: () => onAddStep(edge.source, edge.target) },
         });
 
         // Replace original edge with two edges through the add node

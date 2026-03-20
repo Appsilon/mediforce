@@ -78,7 +78,7 @@ export default function WorkflowDefinitionVersionPage() {
     }
   }, [selectedStepId]);
 
-  const addStepAfter = useCallback((afterStepId: string) => {
+  const addStepAfter = useCallback((afterStepId: string, beforeStepId: string) => {
     const stepNum = editedSteps.length + 1;
     const newId = `new-step-${stepNum}`;
     setEditedSteps((prev) => {
@@ -95,22 +95,20 @@ export default function WorkflowDefinitionVersionPage() {
       next.splice(idx + 1, 0, newStep);
       return next;
     });
-    // Rewire transitions: afterStep→X becomes afterStep→new→X
+    // Rewire the specific edge: afterStep→beforeStep becomes afterStep→new→beforeStep
     setEditedTransitions((prev) => {
-      const outgoing = prev.filter((t) => t.from === afterStepId);
-      if (outgoing.length === 0) {
-        // No outgoing — just add afterStep→new
+      const targetEdge = prev.find((t) => t.from === afterStepId && t.to === beforeStepId);
+      if (!targetEdge) {
+        // Edge not found — just add afterStep→new
         return [...prev, { from: afterStepId, to: newId }];
       }
-      // Replace first outgoing with afterStep→new, new→originalTarget
-      const first = outgoing[0];
       return [
-        ...prev.filter((t) => t !== first),
+        ...prev.filter((t) => t !== targetEdge),
         { from: afterStepId, to: newId },
-        { from: newId, to: first.to },
+        { from: newId, to: beforeStepId },
       ];
     });
-  }, []);
+  }, [editedSteps.length]);
 
   const removeStep = useCallback((stepId: string) => {
     setEditedSteps((prev) => prev.filter((s) => s.id !== stepId));
