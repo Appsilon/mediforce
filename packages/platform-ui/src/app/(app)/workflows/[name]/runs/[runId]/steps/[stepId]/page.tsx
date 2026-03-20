@@ -324,6 +324,9 @@ function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepEx
           </div>
         )}
       </div>
+      {agentOutput.confidence_rationale && (
+        <p className="text-xs text-muted-foreground italic">{agentOutput.confidence_rationale}</p>
+      )}
       {agentOutput.reasoning && (
         <p className="text-sm text-muted-foreground">{agentOutput.reasoning}</p>
       )}

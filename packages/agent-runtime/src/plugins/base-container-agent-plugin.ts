@@ -564,6 +564,9 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
         ? parsedResult.confidence_rationale
         : undefined;
 
+      // Strip envelope-level fields from result to avoid duplication in UI
+      const { confidence: _c, confidence_rationale: _cr, ...cleanResult } = parsedResult;
+
       await emit({
         type: 'result',
         payload: {
@@ -584,7 +587,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
           annotations: [],
           model: this.agentConfig.model ?? `${this.agentName}-cli`,
           duration_ms,
-          result: parsedResult,
+          result: cleanResult,
           ...(spawnResult.gitMetadata ? { gitMetadata: spawnResult.gitMetadata } : {}),
         },
         timestamp: new Date().toISOString(),

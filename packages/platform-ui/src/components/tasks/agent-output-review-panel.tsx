@@ -112,11 +112,6 @@ export function AgentOutputReviewPanel({
               )}>{confidencePct}%</span>
             </span>
           )}
-          {agentOutput.confidence_rationale && (
-            <span className="text-xs text-muted-foreground italic">
-              {agentOutput.confidence_rationale}
-            </span>
-          )}
           {agentOutput.model && (
             <span>Model: <span className="font-mono">{agentOutput.model}</span></span>
           )}
@@ -141,6 +136,9 @@ export function AgentOutputReviewPanel({
             </>
           )}
         </div>
+        {agentOutput.confidence_rationale && (
+          <p className="text-xs text-muted-foreground italic mb-2">{agentOutput.confidence_rationale}</p>
+        )}
         {agentOutput.reasoning && (
           <p className="text-sm text-muted-foreground mb-2">{agentOutput.reasoning}</p>
         )}
