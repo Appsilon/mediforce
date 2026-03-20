@@ -167,6 +167,14 @@ function ParamField({
           placeholder={param.default !== undefined ? String(param.default) : undefined}
           className={inputClasses}
         />
+      ) : param.type === 'date' ? (
+        <input
+          type="date"
+          value={String(value ?? '')}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
+          className={inputClasses}
+        />
       ) : (
         <textarea
           value={String(value ?? '')}
