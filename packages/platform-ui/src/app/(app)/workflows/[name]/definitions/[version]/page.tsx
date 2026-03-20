@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
@@ -484,15 +484,7 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
           onChange={(e) => onChange({ name: e.target.value })}
           className={cn(inlineInput, 'text-[15px] font-semibold text-foreground')}
         />
-        <input
-          value={step.id}
-          onChange={(e) => {
-            const slug = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-            onChange({ id: slug });
-          }}
-          placeholder="step-id"
-          className={cn(inlineInput, 'font-mono text-xs text-muted-foreground mt-0.5')}
-        />
+        <StepIdField currentId={step.id} onChange={(newId) => onChange({ id: newId })} />
         <textarea
           value={step.description ?? ''}
           onChange={(e) => onChange({ description: e.target.value || undefined })}
@@ -842,6 +834,36 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
         </div>
       </details>
     </div>
+  );
+}
+
+function StepIdField({ currentId, onChange }: { currentId: string; onChange: (newId: string) => void }) {
+  const [draft, setDraft] = useState(currentId);
+  const [dirty, setDirty] = useState(false);
+
+  // Sync draft when external id changes (e.g. after adding a new step)
+  useEffect(() => {
+    if (!dirty) setDraft(currentId);
+  }, [currentId, dirty]);
+
+  const commit = useCallback(() => {
+    const slug = draft.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (slug && slug !== currentId) {
+      onChange(slug);
+    }
+    setDraft(slug || currentId);
+    setDirty(false);
+  }, [draft, currentId, onChange]);
+
+  return (
+    <input
+      value={draft}
+      onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
+      placeholder="step-id"
+      className="w-full bg-transparent border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0.5 focus:outline-none transition-colors font-mono text-xs text-muted-foreground mt-0.5"
+    />
   );
 }
 
