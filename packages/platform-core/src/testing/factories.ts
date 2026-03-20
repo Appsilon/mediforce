@@ -163,6 +163,7 @@ export function buildAgentOutputEnvelope(
 ): AgentOutputEnvelope {
   return {
     confidence: 0.92,
+    confidence_rationale: 'Standard analysis with complete input data. All compliance checks passed with no anomalies — expected error rate below 1 in 10.',
     reasoning_summary: 'Analysis completed successfully',
     reasoning_chain: [
       'Loaded supplier data',

@@ -118,6 +118,7 @@ export async function executeAgentStep(
       agentOutput: envelope
         ? {
             confidence: envelope.confidence ?? null,
+            confidence_rationale: envelope.confidence_rationale ?? null,
             reasoning: envelope.reasoning_summary ?? null,
             model: envelope.model ?? null,
             duration_ms: envelope.duration_ms ?? null,

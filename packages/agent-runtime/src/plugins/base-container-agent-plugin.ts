@@ -560,10 +560,15 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
         ? parsedResult.confidence
         : 0.7;
 
+      const confidence_rationale = typeof parsedResult.confidence_rationale === 'string'
+        ? parsedResult.confidence_rationale
+        : undefined;
+
       await emit({
         type: 'result',
         payload: {
           confidence,
+          ...(confidence_rationale ? { confidence_rationale } : {}),
           reasoning_summary: `${this.agentName} skill '${skillName}' completed successfully`,
           reasoning_chain: [
             `Invoked skill: ${skillName}`,
@@ -712,6 +717,26 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       `You have approximately ${budgetMinutes} minutes to complete this task. ` +
       `Budget your time accordingly — prioritize core extraction over validation if time is tight. ` +
       `Do not offer conversational summaries or next steps.`,
+    );
+
+    // 3b. Confidence self-assessment instructions
+    parts.push(
+      `## Confidence Self-Assessment\n` +
+      `After completing the task, you MUST include a \`confidence\` field (0.0–1.0) and a \`confidence_rationale\` field (1–2 sentences) in your output JSON.\n\n` +
+      `To calibrate your confidence, consider:\n` +
+      `- **Input completeness**: Did you receive all necessary data, or were there gaps you had to work around?\n` +
+      `- **Output completeness**: Did you address every part of the task, or did you skip/simplify anything?\n` +
+      `- **Source reliability**: Were the sources clear and unambiguous, or did you have to interpret/guess?\n` +
+      `- **Task difficulty**: Is this a routine case or an edge case with unusual characteristics?\n\n` +
+      `Think of confidence as a frequency: "If I handled 100 cases like this, how many times would my output be correct?"\n` +
+      `- 0.95+ → Routine case, complete data, high certainty. ~5 or fewer errors per 100.\n` +
+      `- 0.80–0.95 → Minor gaps or ambiguities, but overall solid. ~5–20 errors per 100.\n` +
+      `- 0.50–0.80 → Significant uncertainty — missing data, ambiguous sources, or unusual case. ~20–50 errors per 100.\n` +
+      `- Below 0.50 → Major issues — guesswork involved, recommend human review.\n\n` +
+      `The \`confidence_rationale\` must explain WHY you chose that number. Examples:\n` +
+      `- "0.95 — Routine extraction from well-structured data. All required fields present, no ambiguities."\n` +
+      `- "0.72 — Supplier X pricing data was missing; interpolated from similar category. In ~3/10 similar cases this interpolation would be off by >10%."\n` +
+      `- "0.40 — Source document was a low-quality scan with multiple illegible sections. Significant guesswork on 3 out of 8 fields."`,
     );
 
     // 4. Output directory & workspace — depends on whether this is a git-mode step

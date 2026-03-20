@@ -112,6 +112,11 @@ export function AgentOutputReviewPanel({
               )}>{confidencePct}%</span>
             </span>
           )}
+          {agentOutput.confidence_rationale && (
+            <span className="text-xs text-muted-foreground italic">
+              {agentOutput.confidence_rationale}
+            </span>
+          )}
           {agentOutput.model && (
             <span>Model: <span className="font-mono">{agentOutput.model}</span></span>
           )}

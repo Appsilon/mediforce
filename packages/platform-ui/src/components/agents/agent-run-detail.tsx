@@ -164,9 +164,16 @@ export function AgentRunDetail({
 
         {/* Confidence -- always visible in header */}
         {envelope && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Confidence:</span>
-            <ConfidenceBadge confidence={envelope.confidence} showLabel />
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Confidence:</span>
+              <ConfidenceBadge confidence={envelope.confidence} rationale={envelope.confidence_rationale} showLabel />
+            </div>
+            {envelope.confidence_rationale && (
+              <p className="text-xs text-muted-foreground italic pl-0.5">
+                {envelope.confidence_rationale}
+              </p>
+            )}
           </div>
         )}
 
@@ -210,7 +217,7 @@ export function AgentRunDetail({
         <CollapsibleSection
           title="Reasoning"
           defaultOpen={true}
-          badge={envelope ? <ConfidenceBadge confidence={envelope.confidence} /> : undefined}
+          badge={envelope ? <ConfidenceBadge confidence={envelope.confidence} rationale={envelope.confidence_rationale} /> : undefined}
         >
           {envelope?.reasoning_summary ? (
             <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
