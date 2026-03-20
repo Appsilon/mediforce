@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -152,21 +152,50 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
 }
 
 type AddNodeData = {
-  onAdd: () => void;
+  onAdd: (executor: 'human' | 'agent' | 'script') => void;
 };
 
+const ADD_OPTIONS: { executor: 'human' | 'agent' | 'script'; icon: typeof User; label: string; color: string }[] = [
+  { executor: 'human', icon: User, label: 'Human', color: 'hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 dark:hover:bg-blue-900/20 dark:hover:text-blue-400' },
+  { executor: 'agent', icon: Bot, label: 'Agent', color: 'hover:bg-violet-50 hover:text-violet-600 hover:border-violet-200 dark:hover:bg-violet-900/20 dark:hover:text-violet-400' },
+  { executor: 'script', icon: Terminal, label: 'Script', color: 'hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200 dark:hover:bg-amber-900/20 dark:hover:text-amber-400' },
+];
+
 function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
+  const [open, setOpen] = useState(false);
+
   return (
     <>
       <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
       <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
-      <div style={{ width: NODE_WIDTH }} className="flex justify-center">
-        <button
-          onClick={(e) => { e.stopPropagation(); data.onAdd(); }}
-          className="w-7 h-7 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all"
-        >
-          <span className="text-sm font-bold">+</span>
-        </button>
+      <div style={{ width: NODE_WIDTH }} className="flex justify-center relative">
+        {!open ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+            className="w-7 h-7 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all"
+          >
+            <span className="text-sm font-bold">+</span>
+          </button>
+        ) : (
+          <div className="flex gap-1 bg-background rounded-lg border shadow-lg p-1 animate-in fade-in zoom-in-95 duration-150">
+            {ADD_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.executor}
+                  onClick={(e) => { e.stopPropagation(); data.onAdd(opt.executor); setOpen(false); }}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground transition-all',
+                    opt.color,
+                  )}
+                >
+                  <Icon className="h-3 w-3" />
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </>
   );
@@ -333,7 +362,7 @@ interface WorkflowDiagramProps {
   onNodeClick?: (stepId: string) => void;
   selectedStepId?: string | null;
   editing?: boolean;
-  onAddStep?: (afterStepId: string, beforeStepId: string) => void;
+  onAddStep?: (afterStepId: string, beforeStepId: string, executor: 'human' | 'agent' | 'script') => void;
   onRemoveStep?: (stepId: string) => void;
 }
 
@@ -373,7 +402,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, sel
           id: addId,
           type: 'addStep',
           position: { x: sourceNode.position.x, y: midY - 14 },
-          data: { onAdd: () => onAddStep(edge.source, edge.target) },
+          data: { onAdd: (executor: 'human' | 'agent' | 'script') => onAddStep(edge.source, edge.target, executor) },
         });
 
         // Replace original edge with two edges through the add node

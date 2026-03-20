@@ -92,7 +92,7 @@ export default function WorkflowDefinitionVersionPage() {
     }
   }, [selectedStepId]);
 
-  const addStepAfter = useCallback((afterStepId: string, beforeStepId: string) => {
+  const addStepAfter = useCallback((afterStepId: string, beforeStepId: string, executor: 'human' | 'agent' | 'script' = 'human') => {
     const stepNum = editedSteps.length + 1;
     const newId = `new-step-${stepNum}`;
     setEditedSteps((prev) => {
@@ -102,8 +102,9 @@ export default function WorkflowDefinitionVersionPage() {
         id: newId,
         name: `New Step ${stepNum}`,
         type: 'creation',
-        executor: 'human',
-        // Note: user MUST change id before save (validated in handleSave)
+        executor,
+        ...(executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
+        ...(executor === 'script' ? { plugin: 'script-container' } : {}),
       };
       const next = [...prev];
       next.splice(idx + 1, 0, newStep);
