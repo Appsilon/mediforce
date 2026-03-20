@@ -111,7 +111,7 @@ export async function executeWorkflowAgentStep(
   if (stepExecutionId) {
     await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {
       output: envelope?.result ?? null,
-      status: runResult.status === 'completed' || runResult.status === 'paused' ? 'completed' : 'failed',
+      status: (['completed', 'paused', 'escalated'].includes(runResult.status)) ? runResult.status : 'failed',
       completedAt: new Date().toISOString(),
       agentOutput: envelope
         ? {
