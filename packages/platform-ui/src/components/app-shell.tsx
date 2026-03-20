@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus } from 'lucide-react';
@@ -67,7 +68,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex h-16 items-center border-b px-4">
+      <div className="flex h-16 items-center border-b px-4 gap-2.5">
+        <Image src="/logo.png" alt="Mediforce logo" width={32} height={32} className="shrink-0" />
         <span className="font-headline text-lg font-semibold text-primary">Mediforce</span>
       </div>
       {/* Nav */}
