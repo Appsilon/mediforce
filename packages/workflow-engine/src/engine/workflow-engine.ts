@@ -66,16 +66,14 @@ export class WorkflowEngine {
   }
 
   /**
-   * Creates a new process instance from a WorkflowDefinition (unified schema).
-   * All step configuration is embedded in the definition — no separate ProcessConfig needed.
+   * Create a new process instance. Loads WorkflowDefinition to get roles.
    */
-  async createWorkflowInstance(
+  async createInstance(
     definitionName: string,
     version: number,
     triggeredBy: string,
     triggerType: 'manual' | 'webhook' | 'cron',
     payload?: Record<string, unknown>,
-    roles?: string[],
   ): Promise<ProcessInstance> {
     const definition = await this.processRepository.getWorkflowDefinition(definitionName, version);
     if (!definition) {
@@ -99,7 +97,7 @@ export class WorkflowEngine {
       createdBy: triggeredBy,
       pauseReason: null,
       error: null,
-      assignedRoles: roles ?? definition.roles ?? [],
+      assignedRoles: definition.roles ?? [],
     };
 
     await this.instanceRepository.create(instance);
@@ -116,35 +114,31 @@ export class WorkflowEngine {
       basis: `Triggered by ${triggeredBy} via ${triggerType}`,
       entityType: 'processInstance',
       entityId: instance.id,
-      processInstanceId: instance.id,
-      processDefinitionVersion: String(version),
+      processInstanceId: String(version),
     });
 
     return instance;
   }
 
   /**
-   * Advances a step in a workflow instance using embedded WorkflowStep config.
-   * Works like advanceStep but reads executor/allowedRoles/review constraints
-   * directly from the WorkflowStep rather than from a separate ProcessConfig.
+   * Advance the current step — works with any instance.
+   * Loads definition via loadDefinitionUnified (WorkflowDefinition only).
    */
-  async advanceWorkflowStep(
+  async advanceStep(
     instanceId: string,
     stepOutput: Record<string, unknown>,
     actor: StepActor,
-    workflowStep?: WorkflowStep,
+    _stepConfig?: StepConfig,       // ignored — kept for backward compat with callers
     agentRunResult?: AgentRunResult,
   ): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
 
     if (instance.status !== 'running') {
-      throw new InvalidTransitionError(instance.status, 'advanceWorkflowStep');
+      throw new InvalidTransitionError(instance.status, 'advanceStep');
     }
 
-    const definition = await this.loadWorkflowDefinition(
-      instance.definitionName,
-      Number(instance.definitionVersion),
-    );
+    const definition = await this.loadDefinitionUnified(instance);
+    const workflowStep = definition.steps.find((s) => s.id === instance.currentStepId);
 
     // RBAC enforcement: check step access before executing
     if (this.rbacService && workflowStep?.allowedRoles) {
@@ -288,6 +282,22 @@ export class WorkflowEngine {
           };
           await this.humanTaskRepository.create(task);
 
+          await this.auditRepository.append({
+            actorId: 'engine',
+            actorType: 'system',
+            actorRole: 'orchestrator',
+            action: 'task.created',
+            description: `Human task created for step '${nextStep.id}' (reason: human_executor)`,
+            timestamp: now,
+            inputSnapshot: { taskId: task.id, stepId: nextStep.id, reason: 'human_executor', assignedRole },
+            outputSnapshot: {},
+            basis: 'advanceStep: next step executor is human',
+            entityType: 'humanTask',
+            entityId: task.id,
+            processInstanceId: instanceId,
+            processDefinitionVersion: String(definition.version),
+          });
+
           await this.instanceRepository.update(instanceId, {
             status: 'paused',
             pauseReason: 'waiting_for_human',
@@ -300,77 +310,6 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
-  /** @deprecated Use createWorkflowInstance instead */
-  async createInstance(
-    definitionName: string,
-    version: string,
-    triggeredBy: string,
-    triggerType: 'manual' | 'webhook' | 'cron',
-    payload: Record<string, unknown>,
-    configName = 'default',
-    configVersion = '1.0',
-  ): Promise<ProcessInstance> {
-    // Load and validate definition
-    const definition = await this.processRepository.getProcessDefinition(
-      definitionName,
-      version,
-    );
-    if (!definition) {
-      throw new Error(
-        `Process definition '${definitionName}' version '${version}' not found`,
-      );
-    }
-
-    const validation = validateStepGraph(definition);
-    if (!validation.valid) {
-      throw new Error(
-        `Invalid process definition: ${validation.errors.join(', ')}`,
-      );
-    }
-
-    const config = await this.processRepository.getProcessConfig(definitionName, configName, configVersion);
-
-    const now = new Date().toISOString();
-    const instance: ProcessInstance = {
-      id: crypto.randomUUID(),
-      definitionName,
-      definitionVersion: version,
-      configName,
-      configVersion,
-      status: 'created',
-      currentStepId: null,
-      variables: {},
-      triggerType,
-      triggerPayload: payload,
-      createdAt: now,
-      updatedAt: now,
-      createdBy: triggeredBy,
-      pauseReason: null,
-      error: null,
-      assignedRoles: config?.roles ?? [],
-    };
-
-    await this.instanceRepository.create(instance);
-
-    await this.auditRepository.append({
-      actorId: triggeredBy,
-      actorType: 'user',
-      actorRole: 'trigger',
-      action: 'instance.created',
-      description: `Created instance of '${definitionName}' v${version} @ ${configName}:${configVersion}`,
-      timestamp: now,
-      inputSnapshot: { definitionName, version, triggerType, payload },
-      outputSnapshot: { instanceId: instance.id },
-      basis: `Triggered by ${triggeredBy} via ${triggerType}`,
-      entityType: 'processInstance',
-      entityId: instance.id,
-      processInstanceId: instance.id,
-      processDefinitionVersion: version,
-    });
-
-    return instance;
-  }
-
   async startInstance(instanceId: string): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
 
@@ -378,17 +317,8 @@ export class WorkflowEngine {
       throw new InvalidTransitionError(instance.status, 'startInstance');
     }
 
-    // Support both legacy ProcessDefinition and unified WorkflowDefinition
-    const legacyDef = await this.processRepository.getProcessDefinition(
-      instance.definitionName,
-      instance.definitionVersion,
-    );
-    const firstStepId = legacyDef
-      ? legacyDef.steps[0].id
-      : (await this.loadWorkflowDefinition(
-          instance.definitionName,
-          Number(instance.definitionVersion),
-        )).steps[0].id;
+    const definition = await this.loadDefinitionUnified(instance);
+    const firstStepId = definition.steps[0].id;
     const now = new Date().toISOString();
 
     await this.instanceRepository.update(instanceId, {
@@ -416,204 +346,6 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
-  /** @deprecated Use advanceWorkflowStep instead */
-  async advanceStep(
-    instanceId: string,
-    stepOutput: Record<string, unknown>,
-    actor: StepActor,
-    stepConfig?: StepConfig,       // optional: provides allowedRoles for RBAC check
-    agentRunResult?: AgentRunResult, // optional: when caller ran an agent and result is 'escalated'
-  ): Promise<ProcessInstance> {
-    const instance = await this.loadInstance(instanceId);
-
-    if (instance.status !== 'running') {
-      throw new InvalidTransitionError(instance.status, 'advanceStep');
-    }
-
-    const definition = await this.loadDefinition(
-      instance.definitionName,
-      instance.definitionVersion,
-    );
-
-    // RBAC enforcement (Phase 4): check step access before executing
-    if (this.rbacService && stepConfig) {
-      try {
-        await this.rbacService.requireStepAccess(
-          stepConfig.allowedRoles,
-          instance.currentStepId!,
-        );
-      } catch (err) {
-        if (err instanceof RbacError) {
-          await this.auditRepository.append({
-            actorId: err.userId,
-            actorType: 'user',
-            actorRole: 'unknown',
-            action: 'rbac.access_denied',
-            description: `Unauthorized access attempt on step '${err.stepId}'`,
-            timestamp: new Date().toISOString(),
-            inputSnapshot: { stepId: err.stepId, requiredRoles: err.requiredRoles },
-            outputSnapshot: { userRoles: err.userRoles },
-            basis: 'RBAC enforcement: user lacks required role',
-            entityType: 'processInstance',
-            entityId: instanceId,
-            processInstanceId: instanceId,
-            stepId: err.stepId,
-          });
-          throw err;
-        }
-        throw err;
-      }
-    }
-
-    // Handoff creation (Phase 4): when agent escalates, create HandoffEntity before pausing
-    if (agentRunResult?.status === 'escalated' && this.handoffRepository) {
-      const handoff: HandoffEntity = {
-        id: crypto.randomUUID(),
-        type: 'agent_escalation',
-        processInstanceId: instanceId,
-        stepId: instance.currentStepId!,
-        agentRunId: agentRunResult.agentRunId ?? 'unknown',
-        assignedRole: stepConfig?.allowedRoles?.[0] ?? 'reviewer',
-        assignedUserId: null,
-        status: 'created',
-        agentWork: (agentRunResult.envelope?.result ?? {}) as Record<string, unknown>,
-        agentReasoning: agentRunResult.envelope?.reasoning_summary ?? '',
-        agentQuestion: agentRunResult.fallbackReason === 'low_confidence'
-          ? 'Agent confidence below threshold — please review'
-          : agentRunResult.fallbackReason === 'timeout'
-            ? 'Agent timed out — please complete this step manually'
-            : 'Agent escalated — please review',
-        payload: {},
-        resolution: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        resolvedAt: null,
-      };
-      await this.handoffRepository.create(handoff);
-
-      // Fatal notification with resolved targets: failure propagates to caller
-      if (this.notificationService && this.userDirectoryService) {
-        const config = await this.processRepository.getProcessConfig(
-          instance.definitionName,
-          instance.configName ?? '',
-          instance.configVersion ?? '',
-        );
-        const escalationConfig = config?.notifications?.find(
-          (n) => n.event === 'agent_escalation',
-        );
-        // Graceful skip: no escalation config means no notification
-        if (escalationConfig) {
-          const targets: NotificationTarget[] = [];
-          for (const role of escalationConfig.roles) {
-            const users = await this.userDirectoryService.getUsersByRole(role);
-            for (const user of users) {
-              targets.push({ channel: 'email', address: user.email });
-            }
-          }
-          // FATAL: notification failure propagates — no .catch()
-          await this.notificationService.send(
-            {
-              type: 'agent_escalation',
-              processInstanceId: instanceId,
-              stepId: instance.currentStepId!,
-              assignedRole: handoff.assignedRole,
-              entityId: handoff.id,
-              timestamp: new Date().toISOString(),
-            },
-            targets,
-          );
-        }
-      }
-
-      // Return current instance (FallbackHandler already set status='paused', pauseReason='agent_escalated')
-      return this.loadInstance(instanceId);
-    }
-
-    await this.stepExecutor.executeStep(
-      instance,
-      stepOutput,
-      actor,
-      definition,
-    );
-
-    // HumanTask creation: create task when next step's executor is 'human'.
-    // Checks executorType from ProcessConfig (not step type from definition),
-    // so both 'creation' and 'review' steps with human executors get tasks.
-    // Agent steps handle their own task creation (e.g. L3 review tasks in executeAgentStep).
-    if (this.humanTaskRepository) {
-      const updatedInstance = await this.loadInstance(instanceId);
-      if (updatedInstance.currentStepId !== null) {
-        const nextStep = definition.steps.find(
-          (s) => s.id === updatedInstance.currentStepId,
-        );
-        if (nextStep && nextStep.type !== 'terminal') {
-          const config = await this.processRepository.getProcessConfig(
-            updatedInstance.definitionName,
-            updatedInstance.configName ?? '',
-            updatedInstance.configVersion ?? '',
-          );
-          const nextStepConfig = config?.stepConfigs.find(
-            (sc) => sc.stepId === nextStep.id,
-          );
-
-          // Only create task for human executor steps — agent steps create their own tasks.
-          // Requires explicit executorType='human' in config; no config = no auto-task.
-          if (nextStepConfig?.executorType === 'human') {
-            const assignedRole = nextStepConfig?.allowedRoles?.[0] ?? 'unassigned';
-
-            const now = new Date().toISOString();
-
-            // Selection review: copy selection constraint + extract options from previous step output
-            const selectionFields: { selection?: Selection; options?: Record<string, unknown>[] } = {};
-            if (nextStep.selection !== undefined) {
-              selectionFields.selection = nextStep.selection;
-              // Previous step output is in instance.variables[currentStepId]
-              const prevOutput = updatedInstance.variables[instance.currentStepId!] as Record<string, unknown> | undefined;
-              const rawOptions = prevOutput?.options;
-              if (Array.isArray(rawOptions) && rawOptions.length > 0) {
-                const { min, max } = normalizeSelection(nextStep.selection);
-                if (rawOptions.length < min || rawOptions.length > max) {
-                  throw new Error(
-                    `Step "${nextStep.id}" expects ${min}–${max} options but previous step produced ${rawOptions.length}`,
-                  );
-                }
-                selectionFields.options = rawOptions as Record<string, unknown>[];
-              }
-            }
-
-            const task: HumanTask = {
-              id: crypto.randomUUID(),
-              processInstanceId: instanceId,
-              stepId: nextStep.id,
-              assignedRole,
-              assignedUserId: null,
-              status: 'pending',
-              deadline: null,
-              createdAt: now,
-              updatedAt: now,
-              completedAt: null,
-              completionData: null,
-              creationReason: 'human_executor',
-              ...(nextStep.ui ? { ui: nextStep.ui } : {}),
-              ...(nextStep.params?.length ? { params: nextStep.params } : {}),
-              ...selectionFields,
-            };
-            await this.humanTaskRepository.create(task);
-
-            // Pause instance to wait for human input
-            await this.instanceRepository.update(instanceId, {
-              status: 'paused',
-              pauseReason: 'waiting_for_human',
-              updatedAt: now,
-            });
-          }
-        }
-      }
-    }
-
-    return this.loadInstance(instanceId);
-  }
-
   async submitReviewVerdict(
     instanceId: string,
     stepId: string,
@@ -626,34 +358,10 @@ export class WorkflowEngine {
       throw new InvalidTransitionError(instance.status, 'submitReviewVerdict');
     }
 
-    // Load definition: try legacy ProcessDefinition first, then WorkflowDefinition
-    let definition: import('@mediforce/platform-core').ProcessDefinition;
-    let maxIterations: number | undefined;
-
-    const legacyDef = await this.processRepository.getProcessDefinition(
-      instance.definitionName,
-      instance.definitionVersion,
-    );
-    if (legacyDef) {
-      definition = legacyDef;
-      // Read maxIterations from ProcessConfig (legacy path)
-      const config = await this.processRepository.getProcessConfig(
-        instance.definitionName,
-        instance.configName ?? '',
-        instance.configVersion ?? '',
-      );
-      const stepConfig = config?.stepConfigs.find((sc) => sc.stepId === stepId);
-      maxIterations = stepConfig?.reviewConstraints?.maxIterations;
-    } else {
-      // Unified WorkflowDefinition path
-      const workflowDef = await this.loadWorkflowDefinition(
-        instance.definitionName,
-        Number(instance.definitionVersion),
-      );
-      definition = this.workflowDefinitionToProcessDefinition(workflowDef);
-      const workflowStep = workflowDef.steps.find((s) => s.id === stepId);
-      maxIterations = workflowStep?.review?.maxIterations;
-    }
+    const workflowDef = await this.loadDefinitionUnified(instance);
+    const definition = this.workflowDefinitionToProcessDefinition(workflowDef);
+    const workflowStep = workflowDef.steps.find((s) => s.id === stepId);
+    const maxIterations = workflowStep?.review?.maxIterations;
 
     // Check max iterations BEFORE processing verdict
     if (
@@ -841,33 +549,32 @@ export class WorkflowEngine {
     return instance;
   }
 
-  private async loadDefinition(
-    name: string,
-    version: string,
-  ): Promise<import('@mediforce/platform-core').ProcessDefinition> {
-    const definition = await this.processRepository.getProcessDefinition(
-      name,
-      version,
-    );
-    if (!definition) {
-      throw new Error(
-        `Process definition '${name}' version '${version}' not found`,
-      );
-    }
-    return definition;
-  }
-
-  private async loadWorkflowDefinition(
-    name: string,
-    version: number,
+  /**
+   * Load definition for an instance — always returns WorkflowDefinition.
+   * Tries exact version match first, falls back to latest version by name.
+   */
+  private async loadDefinitionUnified(
+    instance: ProcessInstance,
   ): Promise<WorkflowDefinition> {
-    const definition = await this.processRepository.getWorkflowDefinition(name, version);
-    if (!definition) {
-      throw new Error(
-        `Workflow definition '${name}' version '${version}' not found`,
+    const versionNum = parseInt(instance.definitionVersion, 10);
+    if (!isNaN(versionNum)) {
+      const wd = await this.processRepository.getWorkflowDefinition(
+        instance.definitionName,
+        versionNum,
       );
+      if (wd) return wd;
     }
-    return definition;
+
+    // Fallback: latest version by name (handles legacy instances with string versions like "1.0.0")
+    const latestVersion = await this.processRepository.getLatestWorkflowVersion(instance.definitionName);
+    if (latestVersion > 0) {
+      const wd = await this.processRepository.getWorkflowDefinition(instance.definitionName, latestVersion);
+      if (wd) return wd;
+    }
+
+    throw new Error(
+      `No WorkflowDefinition found for '${instance.definitionName}'. Run the migration endpoint first.`,
+    );
   }
 
   /**

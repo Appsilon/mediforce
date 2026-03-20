@@ -1,22 +1,26 @@
 // packages/platform-ui/src/lib/__tests__/execute-agent-step.test.ts
-// Tests for config-driven executeAgentStep (no autonomyLevel param)
+// Tests for WorkflowDefinition-native executeAgentStep
+// Covers L0/L1/L2 step advancement (the fix for "stuck on first step"), L3 review routing,
+// L4 autonomous execution, escalation/pause handling, and edge cases.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ProcessConfig } from '@mediforce/platform-core';
+import type { WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
 import {
   buildProcessInstance,
-  buildProcessConfig,
   buildAgentOutputEnvelope,
+  buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
 
 // Mock platform-services module
 const mockProcessRepo = {
-  getProcessConfig: vi.fn(),
+  getWorkflowDefinition: vi.fn(),
   getProcessDefinition: vi.fn(),
   saveProcessDefinition: vi.fn(),
   saveProcessConfig: vi.fn(),
   listProcessConfigs: vi.fn(),
   setProcessArchived: vi.fn(),
+  saveWorkflowDefinition: vi.fn(),
+  getProcessConfig: vi.fn(),
 };
 const mockInstanceRepo = {
   getById: vi.fn(),
@@ -27,6 +31,7 @@ const mockInstanceRepo = {
   addStepExecution: vi.fn(),
   getStepExecutions: vi.fn(),
   getLatestStepExecution: vi.fn(),
+  updateStepExecution: vi.fn(),
 };
 const mockPluginRegistry = {
   get: vi.fn(),
@@ -36,6 +41,7 @@ const mockPluginRegistry = {
   names: vi.fn(),
 };
 const mockAgentRunner = {
+  runWithWorkflowStep: vi.fn(),
   run: vi.fn(),
 };
 const mockAuditRepo = {
@@ -74,30 +80,35 @@ vi.mock('@/lib/platform-services', () => ({
 import { executeAgentStep } from '../execute-agent-step';
 
 describe('executeAgentStep', () => {
-  const defaultInstance = buildProcessInstance({
-    id: 'inst-001',
-    definitionName: 'supply-chain-review',
-    definitionVersion: '2.0',
-    configName: 'default',
-    configVersion: '1.0',
-    currentStepId: 'quality-check',
+  const workflowDefinition: WorkflowDefinition = buildWorkflowDefinition({
+    name: 'community-digest',
+    version: 1,
+    steps: [
+      { id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+      { id: 'human-review', name: 'Human Review', type: 'review', executor: 'human', allowedRoles: ['reviewer'] },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [
+      { from: 'gather-data', to: 'human-review' },
+      { from: 'human-review', to: 'done' },
+    ],
   });
 
-  const defaultProcessConfig: ProcessConfig = buildProcessConfig({
-    processName: 'supply-chain-review',
-    configName: 'default',
-    configVersion: '1.0',
-    stepConfigs: [
-      {
-        stepId: 'quality-check',
-        executorType: 'agent',
-        plugin: 'supply-chain-review/vendor-assessment',
-        autonomyLevel: 'L2',
-        confidenceThreshold: 0.8,
-        fallbackBehavior: 'escalate_to_human',
-        timeoutMinutes: 30,
-      },
-    ],
+  const defaultInstance = buildProcessInstance({
+    id: 'inst-wf-001',
+    definitionName: 'community-digest',
+    definitionVersion: '1',
+    currentStepId: 'gather-data',
+    status: 'running',
+    // No configName — this is a WorkflowDefinition instance
+    configName: undefined,
+    configVersion: undefined,
+  });
+
+  const firstStep: WorkflowStep = workflowDefinition.steps[0];
+
+  const defaultEnvelope = buildAgentOutputEnvelope({
+    result: { summary: 'gathered data' },
   });
 
   const mockPlugin = {
@@ -105,598 +116,505 @@ describe('executeAgentStep', () => {
     run: vi.fn(),
   };
 
-  const defaultEnvelope = buildAgentOutputEnvelope();
-
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default happy-path mocks
     mockInstanceRepo.getById.mockResolvedValue(defaultInstance);
-    mockProcessRepo.getProcessConfig.mockResolvedValue(defaultProcessConfig);
+    mockProcessRepo.getWorkflowDefinition.mockResolvedValue(workflowDefinition);
     mockPluginRegistry.get.mockReturnValue(mockPlugin);
-    mockAgentRunner.run.mockResolvedValue({
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
       status: 'completed',
       envelope: defaultEnvelope,
       appliedToWorkflow: false,
       fallbackReason: null,
     });
     mockInstanceRepo.getStepExecutions.mockResolvedValue([]);
-  });
 
-  // ---- Config Resolution ----
-
-  it('[DATA] resolves ProcessConfig from processRepo with 3-part key (processName, configName, configVersion)', async () => {
-    await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-    expect(mockProcessRepo.getProcessConfig).toHaveBeenCalledWith(
-      'supply-chain-review',
-      'default',
-      '1.0',
-    );
-  });
-
-  it('[DATA] uses instance.configName and instance.configVersion for config lookup', async () => {
-    const customInstance = buildProcessInstance({
-      id: 'inst-002',
-      definitionName: 'supply-chain-review',
-      definitionVersion: '2.0',
-      configName: 'full-auto',
-      configVersion: '3.1',
-      currentStepId: 'quality-check',
-    });
-    mockInstanceRepo.getById.mockResolvedValue(customInstance);
-
-    await executeAgentStep('inst-002', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-    expect(mockProcessRepo.getProcessConfig).toHaveBeenCalledWith(
-      'supply-chain-review',
-      'full-auto',
-      '3.1',
-    );
-  });
-
-  it('[ERROR] throws descriptive error when ProcessConfig is missing', async () => {
-    mockProcessRepo.getProcessConfig.mockResolvedValue(null);
-
-    await expect(
-      executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1'),
-    ).rejects.toThrow("ProcessConfig not found for 'supply-chain-review' @ default:1.0");
-  });
-
-  it('[ERROR] throws descriptive error when StepConfig is missing for the step', async () => {
-    mockProcessRepo.getProcessConfig.mockResolvedValue(
-      buildProcessConfig({
-        processName: 'supply-chain-review',
-        configName: 'default',
-        configVersion: '1.0',
-        stepConfigs: [{ stepId: 'other-step', executorType: 'agent' }],
-      }),
-    );
-
-    await expect(
-      executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1'),
-    ).rejects.toThrow(
-      "StepConfig not found for step 'quality-check' in ProcessConfig 'supply-chain-review'",
-    );
-  });
-
-  // ---- Plugin Resolution ----
-
-  it('[DATA] uses stepConfig.plugin for plugin lookup when set', async () => {
-    await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-    expect(mockPluginRegistry.get).toHaveBeenCalledWith('supply-chain-review/vendor-assessment');
-  });
-
-  it('[DATA] falls back to stepId for plugin lookup when stepConfig.plugin not set', async () => {
-    mockProcessRepo.getProcessConfig.mockResolvedValue(
-      buildProcessConfig({
-        processName: 'supply-chain-review',
-        configName: 'default',
-        configVersion: '1.0',
-        stepConfigs: [
-          {
-            stepId: 'quality-check',
-            executorType: 'agent',
-            autonomyLevel: 'L2',
-          },
-        ],
-      }),
-    );
-
-    await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-    expect(mockPluginRegistry.get).toHaveBeenCalledWith('quality-check');
-  });
-
-  // ---- AgentRunner receives correct config ----
-
-  it('[DATA] passes resolved autonomyLevel from stepConfig to AgentRunner', async () => {
-    mockProcessRepo.getProcessConfig.mockResolvedValue(
-      buildProcessConfig({
-        processName: 'supply-chain-review',
-        configName: 'default',
-        configVersion: '1.0',
-        stepConfigs: [
-          {
-            stepId: 'quality-check',
-            executorType: 'agent',
-            plugin: 'supply-chain-review/vendor-assessment',
-            autonomyLevel: 'L3',
-          },
-        ],
-      }),
-    );
-
-    await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-    // AgentContext should have the resolved autonomyLevel
-    const agentContext = mockAgentRunner.run.mock.calls[0][1];
-    expect(agentContext.autonomyLevel).toBe('L3');
-  });
-
-  // ---- L4 behavior ----
-
-  it('[DATA] L4 calls engine.advanceStep when appliedToWorkflow=true', async () => {
-    mockProcessRepo.getProcessConfig.mockResolvedValue(
-      buildProcessConfig({
-        processName: 'supply-chain-review',
-        configName: 'default',
-        configVersion: '1.0',
-        stepConfigs: [
-          {
-            stepId: 'quality-check',
-            executorType: 'agent',
-            plugin: 'supply-chain-review/vendor-assessment',
-            autonomyLevel: 'L4',
-          },
-        ],
-      }),
-    );
-
+    // Default: L0/L1/L2 completed path needs advanceStep mock
     const updatedInstance = buildProcessInstance({
-      id: 'inst-001',
+      id: 'inst-wf-001',
       status: 'running',
-      currentStepId: 'next-step',
+      currentStepId: 'human-review',
     });
     mockEngine.advanceStep.mockResolvedValue(updatedInstance);
-    mockAgentRunner.run.mockResolvedValue({
-      status: 'completed',
-      envelope: defaultEnvelope,
-      appliedToWorkflow: true,
-      fallbackReason: null,
-    });
-
-    const result = await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-    expect(mockEngine.advanceStep).toHaveBeenCalled();
-    expect(result.status).toBe('running');
   });
 
-  // ---- L0/L1/L2 behavior ----
+  // ---- Instance & definition loading ----
 
-  it('[DATA] L0/L1/L2 do NOT call engine.advanceStep', async () => {
+  it('[ERROR] throws when instance not found', async () => {
+    mockInstanceRepo.getById.mockResolvedValue(null);
+
+    await expect(
+      executeAgentStep('missing-id', 'gather-data', firstStep, {}, 'user-1'),
+    ).rejects.toThrow('Instance not found: missing-id');
+  });
+
+  it('[ERROR] throws when WorkflowDefinition not found', async () => {
+    mockProcessRepo.getWorkflowDefinition.mockResolvedValue(null);
+
+    await expect(
+      executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1'),
+    ).rejects.toThrow('WorkflowDefinition not found: community-digest v1');
+  });
+
+  // ---- Plugin resolution ----
+
+  it('[DATA] uses workflowStep.plugin for plugin lookup when set', async () => {
+    const stepWithPlugin: WorkflowStep = { ...firstStep, plugin: 'custom-plugin' };
+
+    await executeAgentStep('inst-wf-001', 'gather-data', stepWithPlugin, {}, 'user-1');
+
+    expect(mockPluginRegistry.get).toHaveBeenCalledWith('custom-plugin');
+  });
+
+  it('[DATA] falls back to stepId for plugin lookup when plugin not set', async () => {
+    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+    expect(mockPluginRegistry.get).toHaveBeenCalledWith('gather-data');
+  });
+
+  // ---- Autonomy level resolution ----
+
+  it('[DATA] resolves autonomy level from workflowStep', async () => {
+    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+    const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+    expect(contextArg.autonomyLevel).toBe('L2');
+  });
+
+  it('[DATA] defaults autonomyLevel to L2 when not set on step', async () => {
+    const stepNoLevel: WorkflowStep = { id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'agent' };
+
+    await executeAgentStep('inst-wf-001', 'gather-data', stepNoLevel, {}, 'user-1');
+
+    const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+    expect(contextArg.autonomyLevel).toBe('L2');
+  });
+
+  it('[DATA] script executor always uses L4 autonomy', async () => {
+    const scriptStep: WorkflowStep = {
+      id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'script', autonomyLevel: 'L1',
+    };
+
+    await executeAgentStep('inst-wf-001', 'gather-data', scriptStep, {}, 'user-1');
+
+    const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+    expect(contextArg.autonomyLevel).toBe('L4');
+  });
+
+  // ---- L0/L1/L2 step advancement (THE FIX for "stuck on first step") ----
+
+  describe('L0/L1/L2 step advancement', () => {
     for (const level of ['L0', 'L1', 'L2'] as const) {
-      vi.clearAllMocks();
-      mockInstanceRepo.getById.mockResolvedValue(defaultInstance);
-      mockProcessRepo.getProcessConfig.mockResolvedValue(
-        buildProcessConfig({
-          processName: 'supply-chain-review',
-          configName: 'default',
-          configVersion: '1.0',
-          stepConfigs: [
-            {
-              stepId: 'quality-check',
-              executorType: 'agent',
-              plugin: 'supply-chain-review/vendor-assessment',
-              autonomyLevel: level,
-            },
-          ],
-        }),
-      );
-      mockPluginRegistry.get.mockReturnValue(mockPlugin);
-      mockAgentRunner.run.mockResolvedValue({
+      it(`[DATA] ${level} agent completion calls advanceStep`, async () => {
+        const step: WorkflowStep = { ...firstStep, autonomyLevel: level };
+        const updatedInstance = buildProcessInstance({
+          id: 'inst-wf-001',
+          status: 'paused',
+          currentStepId: 'human-review',
+        });
+        mockEngine.advanceStep.mockResolvedValue(updatedInstance);
+
+        const result = await executeAgentStep('inst-wf-001', 'gather-data', step, {}, 'user-1');
+
+        expect(mockEngine.advanceStep).toHaveBeenCalledWith(
+          'inst-wf-001',
+          { summary: 'gathered data' },
+          { id: 'user-1', role: 'agent' },
+          undefined,
+        );
+        expect(result.currentStepId).toBe('human-review');
+        expect(result.status).toBe('paused');
+      });
+    }
+
+    it('[DATA] L2 agent with null result uses empty object as stepResult', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
         status: 'completed',
+        envelope: { ...defaultEnvelope, result: null },
+        appliedToWorkflow: false,
+        fallbackReason: null,
+      });
+      const updatedInstance = buildProcessInstance({
+        id: 'inst-wf-001',
+        status: 'running',
+        currentStepId: 'human-review',
+      });
+      mockEngine.advanceStep.mockResolvedValue(updatedInstance);
+
+      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
+        'inst-wf-001',
+        {},
+        expect.any(Object),
+        undefined,
+      );
+    });
+
+    it('[DATA] L2 agent with no envelope uses empty object as stepResult', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'completed',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: null,
+      });
+      const updatedInstance = buildProcessInstance({
+        id: 'inst-wf-001',
+        status: 'running',
+        currentStepId: 'human-review',
+      });
+      mockEngine.advanceStep.mockResolvedValue(updatedInstance);
+
+      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
+        'inst-wf-001',
+        {},
+        expect.any(Object),
+        undefined,
+      );
+    });
+  });
+
+  // ---- L4 autonomous execution ----
+
+  describe('L4 autonomous execution', () => {
+    const l4Step: WorkflowStep = { ...firstStep, autonomyLevel: 'L4' };
+
+    it('[DATA] L4 appliedToWorkflow=true calls advanceStep with agentRunResult', async () => {
+      const runResult = {
+        status: 'completed' as const,
+        envelope: defaultEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue(runResult);
+      const updatedInstance = buildProcessInstance({
+        id: 'inst-wf-001',
+        status: 'running',
+        currentStepId: 'human-review',
+      });
+      mockEngine.advanceStep.mockResolvedValue(updatedInstance);
+
+      const result = await executeAgentStep('inst-wf-001', 'gather-data', l4Step, {}, 'user-1');
+
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
+        'inst-wf-001',
+        { summary: 'gathered data' },
+        { id: 'user-1', role: 'agent' },
+        undefined,
+        runResult,
+      );
+      expect(result.status).toBe('running');
+    });
+
+    it('[ERROR] L4 with null result throws descriptive error', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'completed',
+        envelope: { ...defaultEnvelope, result: null },
+        appliedToWorkflow: true,
+        fallbackReason: 'low_confidence',
+      });
+
+      await expect(
+        executeAgentStep('inst-wf-001', 'gather-data', l4Step, {}, 'user-1'),
+      ).rejects.toThrow("completed with null result");
+    });
+  });
+
+  // ---- L3 review routing ----
+
+  describe('L3 review routing', () => {
+    const l3Step: WorkflowStep = {
+      ...firstStep,
+      autonomyLevel: 'L3',
+      allowedRoles: ['senior-reviewer'],
+    };
+
+    it('[DATA] L3 paused creates HumanTask for review', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
         envelope: defaultEnvelope,
         appliedToWorkflow: false,
         fallbackReason: null,
       });
-      mockInstanceRepo.getStepExecutions.mockResolvedValue([]);
 
-      await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-      expect(mockEngine.advanceStep).not.toHaveBeenCalled();
-    }
-  });
-
-  // ---- Audit events ----
-
-  it('[DATA] escalated/paused result writes audit event with executorType as top-level field', async () => {
-    mockAgentRunner.run.mockResolvedValue({
-      status: 'escalated',
-      envelope: null,
-      appliedToWorkflow: false,
-      fallbackReason: 'error',
-    });
-
-    await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-    expect(mockAuditRepo.append).toHaveBeenCalledWith(
-      expect.objectContaining({
-        executorType: 'agent',
-      }),
-    );
-  });
-
-  // ---- Signature ----
-
-  it('[DATA] has no autonomyLevel param (4 required + optional stepExecutionId)', () => {
-    // executeAgentStep should accept 4 required params + optional stepExecutionId
-    // Function.length only counts params before the first optional one
-    expect(executeAgentStep.length).toBeLessThanOrEqual(5);
-  });
-
-  // ---- L3 Review Routing ----
-
-  describe('L3 review routing', () => {
-    const l3Config = buildProcessConfig({
-      processName: 'supply-chain-review',
-      configName: 'default',
-      configVersion: '1.0',
-      stepConfigs: [
-        {
-          stepId: 'quality-check',
-          executorType: 'agent',
-          plugin: 'supply-chain-review/vendor-assessment',
-          autonomyLevel: 'L3',
-          allowedRoles: ['reviewer', 'approver'],
-        },
-      ],
-    });
-
-    const l3PausedResult = {
-      status: 'paused' as const,
-      envelope: defaultEnvelope,
-      appliedToWorkflow: false,
-      fallbackReason: null,
-    };
-
-    beforeEach(() => {
-      mockProcessRepo.getProcessConfig.mockResolvedValue(l3Config);
-      mockAgentRunner.run.mockResolvedValue(l3PausedResult);
-    });
-
-    it('[DATA] L3 + reviewerType undefined (default human) creates HumanTask', async () => {
-      await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1');
 
       expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          processInstanceId: 'inst-001',
-          stepId: 'quality-check',
-          assignedRole: 'reviewer',
-          status: 'pending',
-          completionData: expect.objectContaining({
-            reviewType: 'agent_output_review',
-            agentOutput: expect.objectContaining({
-              confidence: expect.any(Number),
-              reasoning: expect.any(String),
-            }),
-          }),
-        }),
-      );
-    });
-
-    it('[DATA] L3 + reviewerType=human creates HumanTask with agentOutput', async () => {
-      mockProcessRepo.getProcessConfig.mockResolvedValue(
-        buildProcessConfig({
-          processName: 'supply-chain-review',
-          configName: 'default',
-          configVersion: '1.0',
-          stepConfigs: [
-            {
-              stepId: 'quality-check',
-              executorType: 'agent',
-              plugin: 'supply-chain-review/vendor-assessment',
-              autonomyLevel: 'L3',
-              reviewerType: 'human',
-              allowedRoles: ['senior-reviewer'],
-            },
-          ],
-        }),
-      );
-
-      await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
+          processInstanceId: 'inst-wf-001',
+          stepId: 'gather-data',
           assignedRole: 'senior-reviewer',
+          status: 'pending',
           completionData: expect.objectContaining({
             reviewType: 'agent_output_review',
             agentOutput: expect.objectContaining({
               confidence: defaultEnvelope.confidence,
               reasoning: defaultEnvelope.reasoning_summary,
               result: defaultEnvelope.result,
-              model: defaultEnvelope.model,
             }),
           }),
+          creationReason: 'agent_review_l3',
         }),
       );
     });
 
-    it('[DATA] L3 + reviewerType=agent invokes review plugin', async () => {
-      const mockReviewPlugin = {
-        review: vi.fn().mockResolvedValue({
-          verdict: 'approve',
-          reasoning: 'Looks good',
-          confidence: 0.95,
-        }),
-      };
-      mockPluginRegistry.get.mockImplementation((name: string) => {
-        if (name === 'quality-reviewer') return mockReviewPlugin;
-        return mockPlugin;
-      });
-
-      mockProcessRepo.getProcessConfig.mockResolvedValue(
-        buildProcessConfig({
-          processName: 'supply-chain-review',
-          configName: 'default',
-          configVersion: '1.0',
-          stepConfigs: [
-            {
-              stepId: 'quality-check',
-              executorType: 'agent',
-              plugin: 'supply-chain-review/vendor-assessment',
-              autonomyLevel: 'L3',
-              reviewerType: 'agent',
-              reviewerPlugin: 'quality-reviewer',
-            },
-          ],
-        }),
-      );
-
-      await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-      expect(mockReviewPlugin.review).toHaveBeenCalledWith(
-        expect.objectContaining({
-          stepId: 'quality-check',
-          processInstanceId: 'inst-001',
-          executorOutput: defaultEnvelope,
-          iterationNumber: 0,
-        }),
-      );
-    });
-
-    it('[DATA] L3 + agent reviewer approves -> engine.advanceStep called', async () => {
-      const mockReviewPlugin = {
-        review: vi.fn().mockResolvedValue({
-          verdict: 'approve',
-          reasoning: 'Approved',
-          confidence: 0.95,
-        }),
-      };
-      mockPluginRegistry.get.mockImplementation((name: string) => {
-        if (name === 'quality-reviewer') return mockReviewPlugin;
-        return mockPlugin;
-      });
-
-      mockProcessRepo.getProcessConfig.mockResolvedValue(
-        buildProcessConfig({
-          processName: 'supply-chain-review',
-          configName: 'default',
-          configVersion: '1.0',
-          stepConfigs: [
-            {
-              stepId: 'quality-check',
-              executorType: 'agent',
-              plugin: 'supply-chain-review/vendor-assessment',
-              autonomyLevel: 'L3',
-              reviewerType: 'agent',
-              reviewerPlugin: 'quality-reviewer',
-            },
-          ],
-        }),
-      );
-
-      const updatedInstance = buildProcessInstance({
-        id: 'inst-001',
-        status: 'running',
-        currentStepId: 'next-step',
-      });
-      mockEngine.advanceStep.mockResolvedValue(updatedInstance);
-
-      const result = await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-      expect(mockEngine.advanceStep).toHaveBeenCalled();
-      expect(result.status).toBe('running');
-    });
-
-    it('[DATA] L3 + agent reviewer rejects -> executor re-invoked with feedback', async () => {
-      const mockReviewPlugin = {
-        review: vi.fn()
-          .mockResolvedValueOnce({
-            verdict: 'reject',
-            reasoning: 'Missing data',
-            feedback: 'Please include vendor certifications',
-            confidence: 0.4,
-          })
-          .mockResolvedValueOnce({
-            verdict: 'approve',
-            reasoning: 'Now complete',
-            confidence: 0.95,
-          }),
-      };
-      mockPluginRegistry.get.mockImplementation((name: string) => {
-        if (name === 'quality-reviewer') return mockReviewPlugin;
-        return mockPlugin;
-      });
-
-      const retryEnvelope = buildAgentOutputEnvelope({ confidence: 0.95 });
-      mockAgentRunner.run
-        .mockResolvedValueOnce(l3PausedResult) // initial run
-        .mockResolvedValueOnce({
-          // retry after rejection
-          status: 'paused',
-          envelope: retryEnvelope,
-          appliedToWorkflow: false,
-          fallbackReason: null,
-        });
-
-      mockProcessRepo.getProcessConfig.mockResolvedValue(
-        buildProcessConfig({
-          processName: 'supply-chain-review',
-          configName: 'default',
-          configVersion: '1.0',
-          stepConfigs: [
-            {
-              stepId: 'quality-check',
-              executorType: 'agent',
-              plugin: 'supply-chain-review/vendor-assessment',
-              autonomyLevel: 'L3',
-              reviewerType: 'agent',
-              reviewerPlugin: 'quality-reviewer',
-              reviewConstraints: { maxIterations: 3 },
-            },
-          ],
-        }),
-      );
-
-      const updatedInstance = buildProcessInstance({
-        id: 'inst-001',
-        status: 'running',
-        currentStepId: 'next-step',
-      });
-      mockEngine.advanceStep.mockResolvedValue(updatedInstance);
-
-      await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-      // Agent runner should have been called twice (initial + retry)
-      expect(mockAgentRunner.run).toHaveBeenCalledTimes(2);
-      // Second call should include reviewFeedback in stepInput
-      const retryContext = mockAgentRunner.run.mock.calls[1][1];
-      expect(retryContext.stepInput).toEqual(
-        expect.objectContaining({
-          reviewFeedback: 'Please include vendor certifications',
-        }),
-      );
-    });
-
-    it('[ERROR] L3 + agent reviewer rejects + maxIterations exhausted -> throws', async () => {
-      const mockReviewPlugin = {
-        review: vi.fn().mockResolvedValue({
-          verdict: 'reject',
-          reasoning: 'Still not good',
-          feedback: 'Try again',
-          confidence: 0.3,
-        }),
-      };
-      mockPluginRegistry.get.mockImplementation((name: string) => {
-        if (name === 'quality-reviewer') return mockReviewPlugin;
-        return mockPlugin;
-      });
-
-      // All retries also return paused
-      mockAgentRunner.run.mockResolvedValue(l3PausedResult);
-
-      mockProcessRepo.getProcessConfig.mockResolvedValue(
-        buildProcessConfig({
-          processName: 'supply-chain-review',
-          configName: 'default',
-          configVersion: '1.0',
-          stepConfigs: [
-            {
-              stepId: 'quality-check',
-              executorType: 'agent',
-              plugin: 'supply-chain-review/vendor-assessment',
-              autonomyLevel: 'L3',
-              reviewerType: 'agent',
-              reviewerPlugin: 'quality-reviewer',
-              reviewConstraints: { maxIterations: 2 },
-            },
-          ],
-        }),
-      );
-
-      await expect(
-        executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1'),
-      ).rejects.toThrow("Max review iterations (2) exhausted for step 'quality-check'");
-    });
-
-    it('[DATA] L3 + agent review emits audit event with action=review.completed', async () => {
-      const mockReviewPlugin = {
-        review: vi.fn().mockResolvedValue({
-          verdict: 'approve',
-          reasoning: 'Approved',
-          confidence: 0.95,
-        }),
-      };
-      mockPluginRegistry.get.mockImplementation((name: string) => {
-        if (name === 'quality-reviewer') return mockReviewPlugin;
-        return mockPlugin;
-      });
-
-      mockProcessRepo.getProcessConfig.mockResolvedValue(
-        buildProcessConfig({
-          processName: 'supply-chain-review',
-          configName: 'default',
-          configVersion: '1.0',
-          stepConfigs: [
-            {
-              stepId: 'quality-check',
-              executorType: 'agent',
-              plugin: 'supply-chain-review/vendor-assessment',
-              autonomyLevel: 'L3',
-              reviewerType: 'agent',
-              reviewerPlugin: 'quality-reviewer',
-            },
-          ],
-        }),
-      );
-
-      const updatedInstance = buildProcessInstance({ id: 'inst-001', status: 'running' });
-      mockEngine.advanceStep.mockResolvedValue(updatedInstance);
-
-      await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
-
-      expect(mockAuditRepo.append).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'review.completed',
-          executorType: 'agent',
-          reviewerType: 'agent',
-        }),
-      );
-    });
-
-    it('[DATA] L4 has no review task and reviewerType=none in audit', async () => {
-      mockProcessRepo.getProcessConfig.mockResolvedValue(
-        buildProcessConfig({
-          processName: 'supply-chain-review',
-          configName: 'default',
-          configVersion: '1.0',
-          stepConfigs: [
-            {
-              stepId: 'quality-check',
-              executorType: 'agent',
-              plugin: 'supply-chain-review/vendor-assessment',
-              autonomyLevel: 'L4',
-            },
-          ],
-        }),
-      );
-
-      const updatedInstance = buildProcessInstance({ id: 'inst-001', status: 'running' });
-      mockEngine.advanceStep.mockResolvedValue(updatedInstance);
-      mockAgentRunner.run.mockResolvedValue({
-        status: 'completed',
+    it('[DATA] L3 escalated also creates HumanTask', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
         envelope: defaultEnvelope,
-        appliedToWorkflow: true,
+        appliedToWorkflow: false,
+        fallbackReason: 'low_confidence',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creationReason: 'agent_review_l3',
+        }),
+      );
+    });
+
+    it('[DATA] L3 with review.type=human creates HumanTask', async () => {
+      const l3WithReview: WorkflowStep = { ...l3Step, review: { type: 'human' } };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
         fallbackReason: null,
       });
 
-      await executeAgentStep('inst-001', 'quality-check', { studyId: 'S1' }, 'user-1');
+      await executeAgentStep('inst-wf-001', 'gather-data', l3WithReview, {}, 'user-1');
 
-      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
-      // L4 should not create review tasks
-      expect(mockEngine.advanceStep).toHaveBeenCalled();
+      expect(mockHumanTaskRepo.create).toHaveBeenCalled();
     });
+  });
+
+  // ---- Escalation/Pause (non-L3) ----
+
+  describe('escalation and pause for non-L3', () => {
+    it('[DATA] escalated L2 agent does NOT call advanceStep', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'error',
+      });
+
+      const result = await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+      expect(mockEngine.advanceStep).not.toHaveBeenCalled();
+      expect(result.agentRunStatus).toBe('escalated');
+    });
+
+    it('[DATA] paused L2 agent does NOT call advanceStep', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'timeout',
+      });
+
+      const result = await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+      expect(mockEngine.advanceStep).not.toHaveBeenCalled();
+      expect(result.agentRunStatus).toBe('paused');
+    });
+
+    it('[DATA] escalation audit event includes fallback reason', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'low_confidence',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+      // Second audit call is the escalation event (first is agent.step.started)
+      const escalationAudit = mockAuditRepo.append.mock.calls.find(
+        (call: unknown[]) => (call[0] as Record<string, unknown>).action === 'agent.escalated',
+      );
+      expect(escalationAudit).toBeDefined();
+      expect((escalationAudit![0] as Record<string, unknown>).inputSnapshot).toEqual(
+        expect.objectContaining({ fallbackReason: 'low_confidence' }),
+      );
+    });
+  });
+
+  // ---- Step execution persistence ----
+
+  it('[DATA] persists agent output to step execution when stepExecutionId provided', async () => {
+    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', 'exec-001');
+
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith('inst-wf-001', 'exec-001', expect.objectContaining({
+      output: { summary: 'gathered data' },
+      status: 'completed',
+    }));
+  });
+
+  it('[DATA] does not call updateStepExecution when no stepExecutionId', async () => {
+    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+    expect(mockInstanceRepo.updateStepExecution).not.toHaveBeenCalled();
+  });
+
+  // ---- Output persistence to instance.variables ----
+
+  it('[DATA] persists agent output to instance.variables for subsequent steps', async () => {
+    // After the agent runs, getById is called again to merge variables
+    mockInstanceRepo.getById
+      .mockResolvedValueOnce(defaultInstance) // initial load
+      .mockResolvedValueOnce(defaultInstance); // for variable merge
+
+    const updatedInstance = buildProcessInstance({ id: 'inst-wf-001', status: 'running', currentStepId: 'human-review' });
+    mockEngine.advanceStep.mockResolvedValue(updatedInstance);
+
+    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+    expect(mockInstanceRepo.update).toHaveBeenCalledWith('inst-wf-001', {
+      variables: expect.objectContaining({
+        'gather-data': { summary: 'gathered data' },
+      }),
+    });
+  });
+
+  // ---- stepParams merging ----
+
+  it('[DATA] merges stepParams with appContext (appContext wins on conflict)', async () => {
+    const stepWithParams: WorkflowStep = {
+      ...firstStep,
+      stepParams: { defaultParam: 'from-step', shared: 'step-value' },
+    };
+
+    const updatedInstance = buildProcessInstance({ id: 'inst-wf-001', status: 'running' });
+    mockEngine.advanceStep.mockResolvedValue(updatedInstance);
+
+    await executeAgentStep(
+      'inst-wf-001', 'gather-data', stepWithParams,
+      { shared: 'app-value', extra: 'from-app' },
+      'user-1',
+    );
+
+    const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+    expect(contextArg.stepInput).toEqual({
+      defaultParam: 'from-step',
+      shared: 'app-value', // appContext wins
+      extra: 'from-app',
+    });
+  });
+
+  // ---- Error-fallback must not masquerade as success ----
+
+  describe('error-fallback step execution status', () => {
+    it('[ERROR] L3 paused with fallbackReason=error marks step execution as failed, not completed', async () => {
+      const l3Step: WorkflowStep = { ...firstStep, autonomyLevel: 'L3', allowedRoles: ['reviewer'] };
+
+      // Agent runner returns paused (L3 behavior) but WITH a fallback reason (e.g. ENOENT)
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'error',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-001');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-001',
+        expect.objectContaining({ status: 'failed' }),
+      );
+    });
+
+    it('[ERROR] L2 paused with fallbackReason=timeout marks step execution as failed', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'timeout',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', 'exec-001');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-001',
+        expect.objectContaining({ status: 'failed' }),
+      );
+    });
+
+    it('[ERROR] escalated with fallbackReason=error marks step execution as failed', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'error',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', 'exec-001');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-001',
+        expect.objectContaining({ status: 'failed' }),
+      );
+    });
+
+    it('[ERROR] L3 paused with fallbackReason does NOT create review HumanTask', async () => {
+      const l3Step: WorkflowStep = { ...firstStep, autonomyLevel: 'L3', allowedRoles: ['reviewer'] };
+
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'error',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1');
+
+      // Should NOT create a review task — there's nothing to review, it errored
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] paused with NO fallbackReason (normal L3) marks step execution as completed', async () => {
+      const l3Step: WorkflowStep = { ...firstStep, autonomyLevel: 'L3', allowedRoles: ['reviewer'] };
+
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: null,
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-001');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-001',
+        expect.objectContaining({ status: 'completed' }),
+      );
+    });
+  });
+
+  // ---- Audit events ----
+
+  it('[DATA] emits agent.step.started audit event', async () => {
+    const updatedInstance = buildProcessInstance({ id: 'inst-wf-001', status: 'running' });
+    mockEngine.advanceStep.mockResolvedValue(updatedInstance);
+
+    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, { topic: 'test' }, 'user-1');
+
+    expect(mockAuditRepo.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'agent.step.started',
+        actorId: 'agent:gather-data',
+        entityId: 'inst-wf-001',
+        processInstanceId: 'inst-wf-001',
+      }),
+    );
   });
 });
