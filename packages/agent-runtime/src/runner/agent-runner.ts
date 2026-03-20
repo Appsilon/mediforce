@@ -18,6 +18,7 @@ export interface AgentRunResult {
   envelope: AgentOutputEnvelope | null;
   appliedToWorkflow: boolean; // true only for L4; false for L0/L1/L2/L3 and fallbacks
   fallbackReason: 'timeout' | 'low_confidence' | 'error' | null;
+  errorMessage?: string | null;
 }
 
 class AgentTimeoutError extends Error {
@@ -180,7 +181,7 @@ export class AgentRunner {
         completedAt: new Date().toISOString(),
       });
     }
-    return fallbackResult;
+    return { ...fallbackResult, errorMessage: caughtErrorMessage };
   }
 
   /**

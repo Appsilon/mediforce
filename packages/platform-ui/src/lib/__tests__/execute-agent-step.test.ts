@@ -507,6 +507,99 @@ describe('executeAgentStep', () => {
     });
   });
 
+  // ---- Error-fallback must not masquerade as success ----
+
+  describe('error-fallback step execution status', () => {
+    it('[ERROR] L3 paused with fallbackReason=error marks step execution as failed, not completed', async () => {
+      const l3Step: WorkflowStep = { ...firstStep, autonomyLevel: 'L3', allowedRoles: ['reviewer'] };
+
+      // Agent runner returns paused (L3 behavior) but WITH a fallback reason (e.g. ENOENT)
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'error',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-001');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-001',
+        expect.objectContaining({ status: 'failed' }),
+      );
+    });
+
+    it('[ERROR] L2 paused with fallbackReason=timeout marks step execution as failed', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'timeout',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', 'exec-001');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-001',
+        expect.objectContaining({ status: 'failed' }),
+      );
+    });
+
+    it('[ERROR] escalated with fallbackReason=error marks step execution as failed', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'error',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', 'exec-001');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-001',
+        expect.objectContaining({ status: 'failed' }),
+      );
+    });
+
+    it('[ERROR] L3 paused with fallbackReason does NOT create review HumanTask', async () => {
+      const l3Step: WorkflowStep = { ...firstStep, autonomyLevel: 'L3', allowedRoles: ['reviewer'] };
+
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: null,
+        appliedToWorkflow: false,
+        fallbackReason: 'error',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1');
+
+      // Should NOT create a review task — there's nothing to review, it errored
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] paused with NO fallbackReason (normal L3) marks step execution as completed', async () => {
+      const l3Step: WorkflowStep = { ...firstStep, autonomyLevel: 'L3', allowedRoles: ['reviewer'] };
+
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: null,
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-001');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-001',
+        expect.objectContaining({ status: 'completed' }),
+      );
+    });
+  });
+
   // ---- Audit events ----
 
   it('[DATA] emits agent.step.started audit event', async () => {

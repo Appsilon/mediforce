@@ -109,10 +109,12 @@ export async function executeAgentStep(
   // Persist agent output to step execution
   const envelope = runResult.envelope;
   if (stepExecutionId) {
+    const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
     await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {
       output: envelope?.result ?? null,
-      status: runResult.status === 'completed' || runResult.status === 'paused' ? 'completed' : 'failed',
+      status: !isFailed && (runResult.status === 'completed' || runResult.status === 'paused') ? 'completed' : 'failed',
       completedAt: new Date().toISOString(),
+      ...(isFailed && runResult.errorMessage ? { error: runResult.errorMessage } : {}),
       agentOutput: envelope
         ? {
             confidence: envelope.confidence ?? null,
@@ -139,8 +141,8 @@ export async function executeAgentStep(
     }
   }
 
-  // ---- L3 Review Routing ----
-  if ((runResult.status === 'paused' || runResult.status === 'escalated') && autonomyLevel === 'L3') {
+  // ---- L3 Review Routing (skip when agent errored — nothing to review) ----
+  if ((runResult.status === 'paused' || runResult.status === 'escalated') && autonomyLevel === 'L3' && runResult.fallbackReason !== 'error') {
     const reviewerType = workflowStep.review?.type ?? 'human';
 
     if (reviewerType === 'human' || reviewerType === 'none') {

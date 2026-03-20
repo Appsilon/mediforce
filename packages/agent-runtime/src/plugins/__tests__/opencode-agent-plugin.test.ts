@@ -434,7 +434,7 @@ describe('OpenCodeAgentPlugin', () => {
       await rm(hostOutputDir, { recursive: true, force: true });
     });
 
-    it('[ERROR] handles errors gracefully with zero confidence', async () => {
+    it('[ERROR] re-throws errors and emits error event (not fake result)', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
@@ -442,12 +442,15 @@ describe('OpenCodeAgentPlugin', () => {
       mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockRejectedValue(new Error('Docker container failed'));
 
-      await plugin.run(emit);
+      await expect(plugin.run(emit)).rejects.toThrow('Docker container failed');
 
-      const resultEvent = events.find((e) => e.type === 'result');
-      const payload = resultEvent!.payload as Record<string, unknown>;
-      expect(payload.confidence).toBe(0);
-      expect(payload.reasoning_summary).toContain('error');
+      // Error event emitted for observability
+      const errorEvent = events.find((e) => e.type === 'error');
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent!.payload as Record<string, unknown>).error).toContain('Docker container failed');
+
+      // Must NOT emit a result event — that fools the runner into treating failures as success
+      expect(events.find((e) => e.type === 'result')).toBeUndefined();
     });
   });
 

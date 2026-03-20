@@ -37,13 +37,7 @@ vi.mock('@/lib/platform-services', () => ({
   validateApiKey: () => true,
 }));
 
-// Mock executeWorkflowAgentStep — this is what advances the step
-const mockExecuteWorkflowAgentStep = vi.fn();
-vi.mock('@/lib/execute-agent-step', () => ({
-  executeWorkflowAgentStep: (...args: unknown[]) => mockExecuteWorkflowAgentStep(...args),
-}));
-
-// Mock executeAgentStep for legacy path
+// Mock executeAgentStep — the unified agent step executor
 const mockExecuteAgentStep = vi.fn();
 vi.mock('@/lib/execute-agent-step', () => ({
   executeAgentStep: (...args: unknown[]) => mockExecuteAgentStep(...args),
@@ -121,7 +115,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       });
 
       mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
-      mockExecuteWorkflowAgentStep.mockResolvedValue({
+      mockExecuteAgentStep.mockResolvedValue({
         instanceId: 'inst-1',
         status: 'paused',
         currentStepId: 'human-review',
@@ -132,7 +126,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       const json = await res.json();
 
       // Agent step should have been executed exactly once
-      expect(mockExecuteWorkflowAgentStep).toHaveBeenCalledTimes(1);
+      expect(mockExecuteAgentStep).toHaveBeenCalledTimes(1);
       // Instance should end paused (waiting for human)
       expect(json.status).toBe('paused');
       expect(json.stepsExecuted).toBe(1);
@@ -152,7 +146,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       });
 
       mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
-      mockExecuteWorkflowAgentStep.mockResolvedValue({
+      mockExecuteAgentStep.mockResolvedValue({
         instanceId: 'inst-1',
         status: 'running',
         currentStepId: 'gather-data', // Stuck! Same step
@@ -170,7 +164,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       // Agent should have been called at most 2 times (first call doesn't count as stuck,
       // second call increments to 1, third call at count=2 would trigger, but isStuckLoop
       // is checked BEFORE execution so it runs 2 times then detects on 3rd check)
-      expect(mockExecuteWorkflowAgentStep.mock.calls.length).toBeLessThanOrEqual(3);
+      expect(mockExecuteAgentStep.mock.calls.length).toBeLessThanOrEqual(3);
     });
 
     it('[DATA] first step is human — creates task and pauses without executing agent', async () => {
@@ -202,7 +196,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       const json = await res.json();
 
       // No agent step should have been called
-      expect(mockExecuteWorkflowAgentStep).not.toHaveBeenCalled();
+      expect(mockExecuteAgentStep).not.toHaveBeenCalled();
       // Human task should have been created
       expect(mockHumanTaskCreate).toHaveBeenCalledWith(expect.objectContaining({
         stepId: 'fill-form',
@@ -258,7 +252,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       });
 
       mockGetWorkflowDefinition.mockResolvedValue(chainedWorkflow);
-      mockExecuteWorkflowAgentStep.mockImplementation(() => {
+      mockExecuteAgentStep.mockImplementation(() => {
         agentCallCount++;
         return Promise.resolve({
           instanceId: 'inst-1',
@@ -272,7 +266,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       const json = await res.json();
 
       // Both agent steps should have been executed
-      expect(mockExecuteWorkflowAgentStep).toHaveBeenCalledTimes(2);
+      expect(mockExecuteAgentStep).toHaveBeenCalledTimes(2);
       expect(json.stepsExecuted).toBe(2);
       expect(json.status).toBe('paused');
     });
@@ -295,7 +289,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
       const json = await res.json();
 
-      expect(mockExecuteWorkflowAgentStep).not.toHaveBeenCalled();
+      expect(mockExecuteAgentStep).not.toHaveBeenCalled();
       expect(json.stepsExecuted).toBe(0);
     });
 
@@ -350,7 +344,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
 
       // Should not execute the agent step
-      expect(mockExecuteWorkflowAgentStep).not.toHaveBeenCalled();
+      expect(mockExecuteAgentStep).not.toHaveBeenCalled();
       // Should pause the instance
       expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
         status: 'paused',
