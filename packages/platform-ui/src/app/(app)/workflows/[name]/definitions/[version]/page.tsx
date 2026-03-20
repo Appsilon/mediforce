@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal, Star } from 'lucide-react';
+import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { usePlugins } from '@/hooks/use-plugins';
@@ -34,8 +34,7 @@ export default function WorkflowDefinitionVersionPage() {
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
-  const { definitions, defaultVersion, loading, refreshDefault } = useWorkflowDefinitions(decodedName);
-  const isDefault = defaultVersion === versionNumber;
+  const { definitions, loading } = useWorkflowDefinitions(decodedName);
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
   const [editing, setEditing] = useState(false);
@@ -309,14 +308,6 @@ export default function WorkflowDefinitionVersionPage() {
               </>
             ) : (
               <>
-                {/* Default badge (read-only — set from definitions list) */}
-                {isDefault && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200 px-3 py-1.5 text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400 whitespace-nowrap">
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                    Default
-                  </span>
-                )}
-
                 {/* Edit — enters edit mode */}
                 <button
                   onClick={enableEditing}
