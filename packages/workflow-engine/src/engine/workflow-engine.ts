@@ -416,7 +416,10 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
-  /** @deprecated Use advanceWorkflowStep instead */
+  /**
+   * Advance a step — auto-detects legacy (ProcessConfig) vs unified (WorkflowDefinition)
+   * instances based on whether configName is present.
+   */
   async advanceStep(
     instanceId: string,
     stepOutput: Record<string, unknown>,
@@ -428,6 +431,17 @@ export class WorkflowEngine {
 
     if (instance.status !== 'running') {
       throw new InvalidTransitionError(instance.status, 'advanceStep');
+    }
+
+    // Auto-detect: if no configName, this is a WorkflowDefinition instance → delegate
+    if (!instance.configName) {
+      // Find matching WorkflowStep for RBAC/HumanTask handling
+      const workflowDef = await this.loadWorkflowDefinition(
+        instance.definitionName,
+        Number(instance.definitionVersion),
+      );
+      const currentStep = workflowDef.steps.find((s) => s.id === instance.currentStepId);
+      return this.advanceWorkflowStep(instanceId, stepOutput, actor, currentStep, agentRunResult);
     }
 
     const definition = await this.loadDefinition(
