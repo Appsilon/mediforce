@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ChevronRight, Pencil, Loader2 } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 
 interface DefinitionsListProps {
@@ -68,23 +69,17 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                 isArchived && 'opacity-60',
               )}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="font-mono text-sm font-medium shrink-0">v{def.version}</span>
+              <VersionLabel version={def.version} title={def.title} className="text-sm" />
 
-                {isLatest && (
-                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 shrink-0">
-                    latest
-                  </span>
-                )}
-                {isArchived && (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground shrink-0">
-                    archived
-                  </span>
-                )}
-              </div>
-
-              {def.title && (
-                <span className="text-sm text-foreground truncate">{def.title}</span>
+              {isLatest && (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 shrink-0">
+                  latest
+                </span>
+              )}
+              {isArchived && (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground shrink-0">
+                  archived
+                </span>
               )}
 
               <span className="text-xs text-muted-foreground ml-auto mr-1">

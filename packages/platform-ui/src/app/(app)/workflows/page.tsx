@@ -10,6 +10,7 @@ import { useProcessInstances } from '@/hooks/use-process-instances';
 import { ProcessInstanceRow } from '@/components/processes/process-run-section';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { formatStepName } from '@/components/tasks/task-utils';
+import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import type { DefinitionGroup } from '@/hooks/use-process-definitions';
@@ -164,13 +165,7 @@ function ProcessCard({
                 </p>
               )}
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
-                <span className="font-mono">v{definition.latestVersion}</span>
-                {definition.title && (
-                  <>
-                    <span className="text-border">·</span>
-                    <span className="truncate">{definition.title}</span>
-                  </>
-                )}
+                <VersionLabel version={definition.latestVersion} title={definition.title} variant="inline" />
                 <span className="text-border">·</span>
                 <span className="flex items-center gap-1">
                   <Layers className="h-3 w-3" />
