@@ -39,7 +39,7 @@ vi.mock('@/lib/platform-services', () => ({
 
 // Mock executeWorkflowAgentStep — this is what advances the step
 const mockExecuteWorkflowAgentStep = vi.fn();
-vi.mock('@/lib/execute-workflow-agent-step', () => ({
+vi.mock('@/lib/execute-agent-step', () => ({
   executeWorkflowAgentStep: (...args: unknown[]) => mockExecuteWorkflowAgentStep(...args),
 }));
 
