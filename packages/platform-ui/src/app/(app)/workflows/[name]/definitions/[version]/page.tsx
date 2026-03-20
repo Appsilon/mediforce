@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
-import { stringify as yamlStringify } from 'yaml';
+import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
@@ -65,9 +65,34 @@ export default function WorkflowDefinitionVersionPage() {
     setEditedSteps((prev) =>
       prev.map((s) => (s.id === stepId ? { ...s, ...patch } : s)),
     );
-  }, []);
+    // When step ID changes, update all references: transitions + verdict targets in other steps
+    if (patch.id && patch.id !== stepId) {
+      const newId = patch.id;
+      setEditedTransitions((prev) =>
+        prev.map((t) => ({
+          from: t.from === stepId ? newId : t.from,
+          to: t.to === stepId ? newId : t.to,
+          ...(t.when ? { when: t.when } : {}),
+        })),
+      );
+      // Update verdict targets in other steps that point to the renamed step
+      setEditedSteps((prev) =>
+        prev.map((s) => {
+          if (!s.verdicts) return s;
+          const hasRef = Object.values(s.verdicts).some((v) => v.target === stepId);
+          if (!hasRef) return s;
+          const updatedVerdicts: Record<string, { target: string }> = {};
+          for (const [name, v] of Object.entries(s.verdicts)) {
+            updatedVerdicts[name] = { target: v.target === stepId ? newId : v.target };
+          }
+          return { ...s, verdicts: updatedVerdicts };
+        }),
+      );
+      if (selectedStepId === stepId) setSelectedStepId(newId);
+    }
+  }, [selectedStepId]);
 
-  const addStepAfter = useCallback((afterStepId: string) => {
+  const addStepAfter = useCallback((afterStepId: string, beforeStepId: string, executor: 'human' | 'agent' | 'script' = 'human') => {
     const stepNum = editedSteps.length + 1;
     const newId = `new-step-${stepNum}`;
     setEditedSteps((prev) => {
@@ -77,36 +102,79 @@ export default function WorkflowDefinitionVersionPage() {
         id: newId,
         name: `New Step ${stepNum}`,
         type: 'creation',
-        executor: 'human',
+        executor,
+        ...(executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
+        ...(executor === 'script' ? { plugin: 'script-container' } : {}),
       };
       const next = [...prev];
       next.splice(idx + 1, 0, newStep);
       return next;
     });
-    // Rewire transitions: afterStep→X becomes afterStep→new→X
+    // Rewire the specific edge: afterStep→beforeStep becomes afterStep→new→beforeStep
     setEditedTransitions((prev) => {
-      const outgoing = prev.filter((t) => t.from === afterStepId);
-      if (outgoing.length === 0) {
-        // No outgoing — just add afterStep→new
-        return [...prev, { from: afterStepId, to: newId }];
+      const targetEdge = prev.find((t) => t.from === afterStepId && t.to === beforeStepId);
+      if (!targetEdge) {
+        // Edge not found in explicit transitions — might be a verdict edge.
+        // Insert new step with both connections anyway.
+        return [
+          ...prev,
+          { from: afterStepId, to: newId },
+          { from: newId, to: beforeStepId },
+        ];
       }
-      // Replace first outgoing with afterStep→new, new→originalTarget
-      const first = outgoing[0];
       return [
-        ...prev.filter((t) => t !== first),
+        ...prev.filter((t) => t !== targetEdge),
         { from: afterStepId, to: newId },
-        { from: newId, to: first.to },
+        { from: newId, to: beforeStepId },
       ];
     });
-  }, []);
+  }, [editedSteps.length]);
 
   const removeStep = useCallback((stepId: string) => {
     setEditedSteps((prev) => prev.filter((s) => s.id !== stepId));
-    setEditedTransitions((prev) => prev.filter((t) => t.from !== stepId && t.to !== stepId));
-  }, []);
+    // Rewire transitions: if A→removed→B, create A→B
+    setEditedTransitions((prev) => {
+      const incoming = prev.filter((t) => t.to === stepId);
+      const outgoing = prev.filter((t) => t.from === stepId);
+      const unrelated = prev.filter((t) => t.from !== stepId && t.to !== stepId);
+      const rewired = incoming.flatMap((inc) =>
+        outgoing.map((out) => ({ from: inc.from, to: out.to })),
+      );
+      return [...unrelated, ...rewired];
+    });
+    if (selectedStepId === stepId) setSelectedStepId(null);
+  }, [selectedStepId]);
 
   const handleSave = useCallback(async () => {
     if (!definition) return;
+
+    // Validate: agent/script steps must have a plugin set
+    const missingPlugin = editedSteps.filter(
+      (s) => s.type !== 'terminal' && (s.executor === 'agent' || s.executor === 'script') && !s.plugin,
+    );
+    if (missingPlugin.length > 0) {
+      const names = missingPlugin.map((s) => `"${s.name}"`).join(', ');
+      setSaveState({ status: 'error', message: `Plugin required for agent/script steps: ${names}` });
+      return;
+    }
+
+    // Validate: steps must have non-empty IDs
+    const emptyIds = editedSteps.filter((s) => !s.id);
+    if (emptyIds.length > 0) {
+      const names = emptyIds.map((s) => `"${s.name}"`).join(', ');
+      setSaveState({ status: 'error', message: `Step ID is empty for: ${names}` });
+      return;
+    }
+
+    // Validate: no duplicate step IDs
+    const idCounts = new Map<string, number>();
+    for (const s of editedSteps) idCounts.set(s.id, (idCounts.get(s.id) ?? 0) + 1);
+    const dupes = [...idCounts.entries()].filter(([, count]) => count > 1).map(([id]) => id);
+    if (dupes.length > 0) {
+      setSaveState({ status: 'error', message: `Duplicate step IDs: ${dupes.join(', ')}` });
+      return;
+    }
+
     setSaveState({ status: 'saving' });
 
     // Merge explicit transitions with verdict-based transitions
@@ -271,17 +339,28 @@ export default function WorkflowDefinitionVersionPage() {
             onRemoveStep={editing ? removeStep : undefined}
           />
 
-          {/* Raw YAML — for devs */}
+          {/* YAML — readonly preview or editable textarea in edit mode */}
           <details className="mt-4">
             <summary className="text-[11px] font-medium text-muted-foreground/40 cursor-pointer hover:text-muted-foreground transition-colors select-none">
-              View YAML
+              {editing ? 'Edit YAML' : 'View YAML'}
             </summary>
-            <pre className="mt-2 text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto max-h-[400px] overflow-y-auto leading-relaxed">
-              {yamlStringify(
-                { ...diagramDefinition, version: undefined, createdAt: undefined },
-                { indent: 2 },
-              )}
-            </pre>
+            {editing ? (
+              <YamlEditor
+                steps={editedSteps}
+                transitions={editedTransitions}
+                onChange={(steps, transitions) => {
+                  setEditedSteps(steps);
+                  setEditedTransitions(transitions);
+                }}
+              />
+            ) : (
+              <pre className="mt-2 text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto max-h-[400px] overflow-y-auto leading-relaxed">
+                {yamlStringify(
+                  { ...diagramDefinition, version: undefined, createdAt: undefined },
+                  { indent: 2 },
+                )}
+              </pre>
+            )}
           </details>
         </div>
 
@@ -317,6 +396,56 @@ export default function WorkflowDefinitionVersionPage() {
 }
 
 // ---------------------------------------------------------------------------
+// YAML editor — direct text editing of steps + transitions
+// ---------------------------------------------------------------------------
+
+function YamlEditor({ steps, transitions, onChange }: {
+  steps: WorkflowStep[];
+  transitions: WorkflowDefinition['transitions'];
+  onChange: (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => void;
+}) {
+  const [yamlText, setYamlText] = useState(() =>
+    yamlStringify({ steps, transitions }, { indent: 2 }),
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const applyYaml = useCallback(() => {
+    try {
+      const parsed = yamlParse(yamlText) as { steps?: WorkflowStep[]; transitions?: WorkflowDefinition['transitions'] };
+      if (!parsed?.steps || !Array.isArray(parsed.steps)) {
+        setError('YAML must contain a "steps" array');
+        return;
+      }
+      setError(null);
+      onChange(parsed.steps, parsed.transitions ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid YAML');
+    }
+  }, [yamlText, onChange]);
+
+  return (
+    <div className="mt-2 space-y-2">
+      <textarea
+        value={yamlText}
+        onChange={(e) => setYamlText(e.target.value)}
+        rows={20}
+        spellCheck={false}
+        className="w-full text-[11px] font-mono bg-muted/30 rounded-lg p-4 border-0 focus:outline-none focus:ring-1 focus:ring-primary resize-y leading-relaxed"
+      />
+      {error && (
+        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
+      <button
+        onClick={applyYaml}
+        className="text-xs font-medium text-primary hover:underline"
+      >
+        Apply YAML to diagram
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Step editor (edit mode side panel)
 // ---------------------------------------------------------------------------
 
@@ -344,7 +473,12 @@ const RUNTIME_OPTIONS = [
   { value: 'bash', label: 'Bash' },
 ] as const;
 
+function toSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps: WorkflowStep[]; onChange: (patch: Partial<WorkflowStep>) => void }) {
+  const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
   const inlineInput = 'w-full bg-transparent border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0.5 focus:outline-none transition-colors';
   const selectInline = 'bg-transparent text-xs text-right border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors cursor-pointer';
@@ -361,10 +495,15 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
       <div>
         <input
           value={step.name}
-          onChange={(e) => onChange({ name: e.target.value })}
+          onChange={(e) => {
+            const patch: Partial<WorkflowStep> = { name: e.target.value };
+            // Auto-slug ID for new steps only
+            if (isNewStep) patch.id = toSlug(e.target.value) || step.id;
+            onChange(patch);
+          }}
           className={cn(inlineInput, 'text-[15px] font-semibold text-foreground')}
         />
-        <p className="font-mono text-xs text-muted-foreground mt-0.5">{step.id}</p>
+        <StepIdField currentId={step.id} onChange={(newId) => onChange({ id: newId })} />
         <textarea
           value={step.description ?? ''}
           onChange={(e) => onChange({ description: e.target.value || undefined })}
@@ -388,7 +527,11 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
               return (
                 <button
                   key={ex}
-                  onClick={() => onChange({ executor: ex })}
+                  onClick={() => onChange({
+                    executor: ex,
+                    // Default plugin when switching to agent (prevents "plugin not registered" errors)
+                    ...(ex === 'agent' && !step.plugin ? { plugin: 'opencode-agent' } : {}),
+                  })}
                   className={cn(
                     'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium capitalize transition-all',
                     step.executor === ex ? activeColors[ex] : 'text-muted-foreground hover:text-foreground',
@@ -689,7 +832,7 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
               </button>
             ))}
           </div>
-          <EditableField label="Step ID" value={step.id} mono onChange={(v) => onChange({ id: v })} />
+          {/* Step ID is now editable in the identity section above */}
           {step.type !== 'terminal' && (
             <div className="flex items-center justify-between pt-1">
               <span className="text-xs text-muted-foreground">Automated step</span>
@@ -710,6 +853,40 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
         </div>
       </details>
     </div>
+  );
+}
+
+function StepIdField({ currentId, onChange }: { currentId: string; onChange: (newId: string) => void }) {
+  const [draft, setDraft] = useState(currentId);
+  const [dirty, setDirty] = useState(false);
+  const prevIdRef = useRef(currentId);
+
+  // Sync draft immediately when external id changes (e.g. auto-slug from name)
+  if (currentId !== prevIdRef.current && !dirty) {
+    prevIdRef.current = currentId;
+    // Direct state set during render — React handles this correctly
+    setDraft(currentId);
+  }
+  prevIdRef.current = currentId;
+
+  const commit = useCallback(() => {
+    const slug = draft.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (slug && slug !== currentId) {
+      onChange(slug);
+    }
+    setDraft(slug || currentId);
+    setDirty(false);
+  }, [draft, currentId, onChange]);
+
+  return (
+    <input
+      value={draft}
+      onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
+      placeholder="step-id"
+      className="w-full bg-transparent border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0.5 focus:outline-none transition-colors font-mono text-xs text-muted-foreground mt-0.5"
+    />
   );
 }
 

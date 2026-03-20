@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
-import { where } from 'firebase/firestore';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { where, doc, getDoc } from 'firebase/firestore';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { useCollection } from './use-collection';
+import { getFirestore } from 'firebase/firestore';
+import { getApp } from 'firebase/app';
 
 type WorkflowDefinitionDoc = WorkflowDefinition & { id: string };
 
@@ -24,5 +26,30 @@ export function useWorkflowDefinitions(name: string) {
 
   const latestVersion = definitions[0]?.version ?? 0;
 
-  return { definitions, latestVersion, loading, error };
+  // Default version from workflowMeta/{name}
+  const [defaultVersion, setDefaultVersionState] = useState<number | null>(null);
+
+  const refreshDefault = useCallback(async () => {
+    if (!name) return;
+    try {
+      const db = getFirestore(getApp());
+      const metaRef = doc(db, 'workflowMeta', name);
+      const snap = await getDoc(metaRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        setDefaultVersionState(typeof data.defaultVersion === 'number' ? data.defaultVersion : null);
+      } else {
+        setDefaultVersionState(null);
+      }
+    } catch {
+      setDefaultVersionState(null);
+    }
+  }, [name]);
+
+  useEffect(() => { refreshDefault(); }, [refreshDefault]);
+
+  // Effective version for running: default if set, otherwise latest
+  const effectiveVersion = defaultVersion ?? latestVersion;
+
+  return { definitions, latestVersion, defaultVersion, effectiveVersion, loading, error, refreshDefault };
 }

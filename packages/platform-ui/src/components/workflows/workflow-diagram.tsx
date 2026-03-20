@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -152,21 +152,64 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
 }
 
 type AddNodeData = {
-  onAdd: () => void;
+  onAdd: (executor: 'human' | 'agent' | 'script') => void;
 };
 
+const ADD_OPTIONS: { executor: 'human' | 'agent' | 'script'; icon: typeof User; label: string; iconBg: string; iconColor: string; hoverBg: string }[] = [
+  { executor: 'human', icon: User, label: 'Human', iconBg: 'bg-blue-100 dark:bg-blue-900/40', iconColor: 'text-blue-600 dark:text-blue-400', hoverBg: 'hover:bg-blue-50 dark:hover:bg-blue-900/20' },
+  { executor: 'agent', icon: Bot, label: 'Agent', iconBg: 'bg-violet-100 dark:bg-violet-900/40', iconColor: 'text-violet-600 dark:text-violet-400', hoverBg: 'hover:bg-violet-50 dark:hover:bg-violet-900/20' },
+  { executor: 'script', icon: Terminal, label: 'Script', iconBg: 'bg-amber-100 dark:bg-amber-900/40', iconColor: 'text-amber-600 dark:text-amber-400', hoverBg: 'hover:bg-amber-50 dark:hover:bg-amber-900/20' },
+];
+
 function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as HTMLElement)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
   return (
     <>
       <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
       <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
-      <div style={{ width: NODE_WIDTH }} className="flex justify-center">
-        <button
-          onClick={(e) => { e.stopPropagation(); data.onAdd(); }}
-          className="w-7 h-7 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all"
-        >
-          <span className="text-sm font-bold">+</span>
-        </button>
+      <div ref={ref} style={{ width: NODE_WIDTH }} className="flex justify-center relative">
+        {!open ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+            className="w-7 h-7 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all"
+          >
+            <span className="text-sm font-bold">+</span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-1 bg-background rounded-xl border shadow-xl px-1.5 py-1.5 animate-in fade-in zoom-in-95 duration-150">
+            {ADD_OPTIONS.map((opt, i) => {
+              const Icon = opt.icon;
+              return (
+                <React.Fragment key={opt.executor}>
+                  {i === 2 && <div className="w-px h-6 bg-border mx-0.5" />}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); data.onAdd(opt.executor); setOpen(false); }}
+                    className={cn(
+                      'flex items-center gap-2 rounded-lg px-3 py-2 transition-all active:scale-95',
+                      opt.hoverBg,
+                    )}
+                  >
+                    <div className={cn('w-6 h-6 rounded-md flex items-center justify-center', opt.iconBg)}>
+                      <Icon className={cn('h-3.5 w-3.5', opt.iconColor)} />
+                    </div>
+                    <span className="text-xs font-semibold text-foreground">{opt.label}</span>
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        )}
       </div>
     </>
   );
@@ -333,7 +376,7 @@ interface WorkflowDiagramProps {
   onNodeClick?: (stepId: string) => void;
   selectedStepId?: string | null;
   editing?: boolean;
-  onAddStep?: (afterStepId: string) => void;
+  onAddStep?: (afterStepId: string, beforeStepId: string, executor: 'human' | 'agent' | 'script') => void;
   onRemoveStep?: (stepId: string) => void;
 }
 
@@ -366,14 +409,14 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, sel
         const targetNode = styledNodes.find((n) => n.id === edge.target);
         if (!sourceNode || !targetNode) continue;
 
-        const addId = `add-after-${edge.source}`;
+        const addId = `add-${edge.source}-${edge.target}`;
         const midY = (sourceNode.position.y + targetNode.position.y) / 2;
 
         styledNodes.push({
           id: addId,
           type: 'addStep',
           position: { x: sourceNode.position.x, y: midY - 14 },
-          data: { onAdd: () => onAddStep(edge.source) },
+          data: { onAdd: (executor: 'human' | 'agent' | 'script') => onAddStep(edge.source, edge.target, executor) },
         });
 
         // Replace original edge with two edges through the add node
