@@ -114,8 +114,18 @@ export default function WorkflowDefinitionVersionPage() {
 
   const removeStep = useCallback((stepId: string) => {
     setEditedSteps((prev) => prev.filter((s) => s.id !== stepId));
-    setEditedTransitions((prev) => prev.filter((t) => t.from !== stepId && t.to !== stepId));
-  }, []);
+    // Rewire transitions: if A→removed→B, create A→B
+    setEditedTransitions((prev) => {
+      const incoming = prev.filter((t) => t.to === stepId);
+      const outgoing = prev.filter((t) => t.from === stepId);
+      const unrelated = prev.filter((t) => t.from !== stepId && t.to !== stepId);
+      const rewired = incoming.flatMap((inc) =>
+        outgoing.map((out) => ({ from: inc.from, to: out.to })),
+      );
+      return [...unrelated, ...rewired];
+    });
+    if (selectedStepId === stepId) setSelectedStepId(null);
+  }, [selectedStepId]);
 
   const handleSave = useCallback(async () => {
     if (!definition) return;
