@@ -158,6 +158,9 @@ function ProcessCard({
                   </span>
                 )}
               </div>
+              {definition.title && (
+                <p className="text-xs font-medium mt-0.5">{definition.title}</p>
+              )}
               {definition.description && (
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 max-w-[280px]">
                   {definition.description}

@@ -68,21 +68,23 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                 isArchived && 'opacity-60',
               )}
             >
-              <span className="font-mono text-sm font-medium">v{def.version}</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-mono text-sm font-medium shrink-0">v{def.version}</span>
 
-              {isLatest && (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                  latest
-                </span>
-              )}
-              {isArchived && (
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                  archived
-                </span>
-              )}
+                {isLatest && (
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 shrink-0">
+                    latest
+                  </span>
+                )}
+                {isArchived && (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground shrink-0">
+                    archived
+                  </span>
+                )}
+              </div>
 
-              {def.description && (
-                <span className="text-sm text-muted-foreground truncate">{def.description}</span>
+              {def.title && (
+                <span className="text-sm text-foreground truncate">{def.title}</span>
               )}
 
               <span className="text-xs text-muted-foreground ml-auto mr-1">

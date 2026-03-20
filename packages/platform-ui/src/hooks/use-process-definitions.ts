@@ -13,11 +13,13 @@ export interface DefinitionVersion {
   version: string;
   stepCount: number;
   triggerCount: number;
+  title?: string;
   description?: string;
 }
 
 export interface DefinitionGroup {
   name: string;
+  title?: string;
   description?: string;
   latestVersion: string;
   versions: DefinitionVersion[];
@@ -97,6 +99,7 @@ export function useProcessDefinitions() {
         version: def.version,
         stepCount: def.steps.length,
         triggerCount: def.triggers.length,
+        title: (def as unknown as { title?: string }).title,
         description: def.description,
       });
       entry.docs.push(def);
@@ -110,6 +113,7 @@ export function useProcessDefinitions() {
       const hasManualTrigger = latestDoc.triggers.some((trigger) => trigger.type === 'manual');
       return {
         name,
+        title: latest.title,
         description: latest.description,
         latestVersion: latest.version,
         versions: sorted,

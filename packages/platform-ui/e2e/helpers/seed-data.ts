@@ -648,6 +648,7 @@ export function buildSeedData(testUserId: string) {
     'Supply Chain Review:1': {
       name: 'Supply Chain Review',
       version: 1,
+      title: 'Initial vendor assessment workflow',
       description: 'End-to-end supply chain review process',
       steps: [
         { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector' },
