@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, Pencil, Loader2, Star } from 'lucide-react';
+import { ChevronRight, Pencil, Loader2 } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { setDefaultWorkflowVersion } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
@@ -77,8 +77,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
 
                 <div className="flex items-center gap-1.5">
                   {isDefault && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                      <Star className="h-2.5 w-2.5 fill-current" />
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                       default
                     </span>
                   )}
