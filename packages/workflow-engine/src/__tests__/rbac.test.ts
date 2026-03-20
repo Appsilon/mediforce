@@ -17,7 +17,7 @@ const simpleDefinition: WorkflowDefinition = {
   name: 'rbac-test-process',
   version: 1,
   steps: [
-    { id: 'start', name: 'Start', type: 'creation', executor: 'human', allowedRoles: ['admin', 'operator'] },
+    { id: 'start', name: 'Start', type: 'creation', executor: 'human', allowedRoles: ['approver'] },
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
   ],
   transitions: [{ from: 'start', to: 'done' }],
@@ -152,7 +152,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       uid: 'approver-user',
       email: 'approver@example.com',
       displayName: 'Approver User',
-      roles: ['admin', 'reader'], // 'admin' matches step's allowedRoles
+      roles: ['approver', 'reader'], // 'approver' matches step's allowedRoles
     });
 
     const instanceId = await startFreshInstance();
@@ -207,7 +207,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
     expect(deniedEvent!.stepId).toBe('start');
     expect(deniedEvent!.inputSnapshot).toMatchObject({
       stepId: 'start',
-      requiredRoles: ['admin', 'operator'],
+      requiredRoles: ['approver'],
     });
     expect(deniedEvent!.outputSnapshot).toMatchObject({
       userRoles: ['reader'],
