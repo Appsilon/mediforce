@@ -2,7 +2,7 @@
 set -euo pipefail
 
 cd /opt/mediforce
-COMPOSE="docker compose -f docker-compose.prod.yml"
+COMPOSE="docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml"
 
 echo "==> Pulling latest code"
 git fetch origin
