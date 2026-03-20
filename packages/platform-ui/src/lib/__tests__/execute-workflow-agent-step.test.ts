@@ -48,7 +48,7 @@ const mockAuditRepo = {
   append: vi.fn(),
 };
 const mockEngine = {
-  advanceWorkflowStep: vi.fn(),
+  advanceStep: vi.fn(),
 };
 const mockHumanTaskRepo = {
   create: vi.fn(),
@@ -130,13 +130,13 @@ describe('executeWorkflowAgentStep', () => {
     });
     mockInstanceRepo.getStepExecutions.mockResolvedValue([]);
 
-    // Default: L0/L1/L2 completed path needs advanceWorkflowStep mock
+    // Default: L0/L1/L2 completed path needs advanceStep mock
     const updatedInstance = buildProcessInstance({
       id: 'inst-wf-001',
       status: 'running',
       currentStepId: 'human-review',
     });
-    mockEngine.advanceWorkflowStep.mockResolvedValue(updatedInstance);
+    mockEngine.advanceStep.mockResolvedValue(updatedInstance);
   });
 
   // ---- Instance & definition loading ----
@@ -206,22 +206,22 @@ describe('executeWorkflowAgentStep', () => {
 
   describe('L0/L1/L2 step advancement', () => {
     for (const level of ['L0', 'L1', 'L2'] as const) {
-      it(`[DATA] ${level} agent completion calls advanceWorkflowStep`, async () => {
+      it(`[DATA] ${level} agent completion calls advanceStep`, async () => {
         const step: WorkflowStep = { ...firstStep, autonomyLevel: level };
         const updatedInstance = buildProcessInstance({
           id: 'inst-wf-001',
           status: 'paused',
           currentStepId: 'human-review',
         });
-        mockEngine.advanceWorkflowStep.mockResolvedValue(updatedInstance);
+        mockEngine.advanceStep.mockResolvedValue(updatedInstance);
 
         const result = await executeWorkflowAgentStep('inst-wf-001', 'gather-data', step, {}, 'user-1');
 
-        expect(mockEngine.advanceWorkflowStep).toHaveBeenCalledWith(
+        expect(mockEngine.advanceStep).toHaveBeenCalledWith(
           'inst-wf-001',
           { summary: 'gathered data' },
           { id: 'user-1', role: 'agent' },
-          step,
+          undefined,
         );
         expect(result.currentStepId).toBe('human-review');
         expect(result.status).toBe('paused');
@@ -240,15 +240,15 @@ describe('executeWorkflowAgentStep', () => {
         status: 'running',
         currentStepId: 'human-review',
       });
-      mockEngine.advanceWorkflowStep.mockResolvedValue(updatedInstance);
+      mockEngine.advanceStep.mockResolvedValue(updatedInstance);
 
       await executeWorkflowAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
 
-      expect(mockEngine.advanceWorkflowStep).toHaveBeenCalledWith(
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
         'inst-wf-001',
         {},
         expect.any(Object),
-        firstStep,
+        undefined,
       );
     });
 
@@ -264,15 +264,15 @@ describe('executeWorkflowAgentStep', () => {
         status: 'running',
         currentStepId: 'human-review',
       });
-      mockEngine.advanceWorkflowStep.mockResolvedValue(updatedInstance);
+      mockEngine.advanceStep.mockResolvedValue(updatedInstance);
 
       await executeWorkflowAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
 
-      expect(mockEngine.advanceWorkflowStep).toHaveBeenCalledWith(
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
         'inst-wf-001',
         {},
         expect.any(Object),
-        firstStep,
+        undefined,
       );
     });
   });
@@ -282,7 +282,7 @@ describe('executeWorkflowAgentStep', () => {
   describe('L4 autonomous execution', () => {
     const l4Step: WorkflowStep = { ...firstStep, autonomyLevel: 'L4' };
 
-    it('[DATA] L4 appliedToWorkflow=true calls advanceWorkflowStep with agentRunResult', async () => {
+    it('[DATA] L4 appliedToWorkflow=true calls advanceStep with agentRunResult', async () => {
       const runResult = {
         status: 'completed' as const,
         envelope: defaultEnvelope,
@@ -295,15 +295,15 @@ describe('executeWorkflowAgentStep', () => {
         status: 'running',
         currentStepId: 'human-review',
       });
-      mockEngine.advanceWorkflowStep.mockResolvedValue(updatedInstance);
+      mockEngine.advanceStep.mockResolvedValue(updatedInstance);
 
       const result = await executeWorkflowAgentStep('inst-wf-001', 'gather-data', l4Step, {}, 'user-1');
 
-      expect(mockEngine.advanceWorkflowStep).toHaveBeenCalledWith(
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
         'inst-wf-001',
         { summary: 'gathered data' },
         { id: 'user-1', role: 'agent' },
-        l4Step,
+        undefined,
         runResult,
       );
       expect(result.status).toBe('running');
@@ -396,7 +396,7 @@ describe('executeWorkflowAgentStep', () => {
   // ---- Escalation/Pause (non-L3) ----
 
   describe('escalation and pause for non-L3', () => {
-    it('[DATA] escalated L2 agent does NOT call advanceWorkflowStep', async () => {
+    it('[DATA] escalated L2 agent does NOT call advanceStep', async () => {
       mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
         status: 'escalated',
         envelope: null,
@@ -406,11 +406,11 @@ describe('executeWorkflowAgentStep', () => {
 
       const result = await executeWorkflowAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
 
-      expect(mockEngine.advanceWorkflowStep).not.toHaveBeenCalled();
+      expect(mockEngine.advanceStep).not.toHaveBeenCalled();
       expect(result.agentRunStatus).toBe('escalated');
     });
 
-    it('[DATA] paused L2 agent does NOT call advanceWorkflowStep', async () => {
+    it('[DATA] paused L2 agent does NOT call advanceStep', async () => {
       mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
         status: 'paused',
         envelope: null,
@@ -420,7 +420,7 @@ describe('executeWorkflowAgentStep', () => {
 
       const result = await executeWorkflowAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
 
-      expect(mockEngine.advanceWorkflowStep).not.toHaveBeenCalled();
+      expect(mockEngine.advanceStep).not.toHaveBeenCalled();
       expect(result.agentRunStatus).toBe('paused');
     });
 
@@ -471,7 +471,7 @@ describe('executeWorkflowAgentStep', () => {
       .mockResolvedValueOnce(defaultInstance); // for variable merge
 
     const updatedInstance = buildProcessInstance({ id: 'inst-wf-001', status: 'running', currentStepId: 'human-review' });
-    mockEngine.advanceWorkflowStep.mockResolvedValue(updatedInstance);
+    mockEngine.advanceStep.mockResolvedValue(updatedInstance);
 
     await executeWorkflowAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
 
@@ -491,7 +491,7 @@ describe('executeWorkflowAgentStep', () => {
     };
 
     const updatedInstance = buildProcessInstance({ id: 'inst-wf-001', status: 'running' });
-    mockEngine.advanceWorkflowStep.mockResolvedValue(updatedInstance);
+    mockEngine.advanceStep.mockResolvedValue(updatedInstance);
 
     await executeWorkflowAgentStep(
       'inst-wf-001', 'gather-data', stepWithParams,
@@ -511,7 +511,7 @@ describe('executeWorkflowAgentStep', () => {
 
   it('[DATA] emits agent.step.started audit event', async () => {
     const updatedInstance = buildProcessInstance({ id: 'inst-wf-001', status: 'running' });
-    mockEngine.advanceWorkflowStep.mockResolvedValue(updatedInstance);
+    mockEngine.advanceStep.mockResolvedValue(updatedInstance);
 
     await executeWorkflowAgentStep('inst-wf-001', 'gather-data', firstStep, { topic: 'test' }, 'user-1');
 

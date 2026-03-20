@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { formatZodErrors } from '@mediforce/platform-core';
 import type { WorkflowEngine } from '../engine/workflow-engine.js';
-import type { TriggerContext, TriggerResult, WorkflowTriggerContext } from './trigger-types.js';
+import type { TriggerResult, WorkflowTriggerContext } from './trigger-types.js';
 import { WebhookPayloadValidationError } from './trigger-errors.js';
 
 /**
@@ -36,40 +36,12 @@ export class WebhookTrigger {
       }
     }
 
-    const instance = await this.engine.createWorkflowInstance(
-      context.definitionName,
-      context.definitionVersion,
-      context.triggeredBy,
-      'webhook',
-      context.payload,
-      context.roles,
-    );
-
-    await this.engine.startInstance(instance.id);
-
-    return { instanceId: instance.id, status: 'created' };
-  }
-
-  /** @deprecated Use fireWorkflow instead */
-  async fire(context: TriggerContext): Promise<TriggerResult> {
-    const schema = this.schemaRegistry.get(context.triggerName);
-
-    if (schema) {
-      const result = schema.safeParse(context.payload);
-      if (!result.success) {
-        const formatted = formatZodErrors(result.error);
-        throw new WebhookPayloadValidationError(formatted.split('\n'));
-      }
-    }
-
     const instance = await this.engine.createInstance(
       context.definitionName,
       context.definitionVersion,
       context.triggeredBy,
       'webhook',
       context.payload,
-      context.configName,
-      context.configVersion,
     );
 
     await this.engine.startInstance(instance.id);

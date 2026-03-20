@@ -242,11 +242,11 @@ export async function executeWorkflowAgentStep(
       );
     }
 
-    const updatedInstance = await engine.advanceWorkflowStep(
+    const updatedInstance = await engine.advanceStep(
       instanceId,
       stepResult,
       { id: triggeredBy, role: 'agent' },
-      workflowStep,
+      undefined,
       runResult,
     );
 
@@ -259,14 +259,14 @@ export async function executeWorkflowAgentStep(
   }
 
   // L0/L1/L2: agent completed but didn't auto-apply — advance to next step.
-  // If the next step is human, advanceWorkflowStep creates a HumanTask and pauses.
+  // If the next step is human, advanceStep creates a HumanTask and pauses.
   if (runResult.status === 'completed') {
     const stepResult = runResult.envelope?.result ?? {};
-    const updatedInstance = await engine.advanceWorkflowStep(
+    const updatedInstance = await engine.advanceStep(
       instanceId,
       stepResult,
       { id: triggeredBy, role: 'agent' },
-      workflowStep,
+      undefined,
     );
 
     return {

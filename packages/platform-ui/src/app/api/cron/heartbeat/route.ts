@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
-import type { ProcessDefinition, Trigger } from '@mediforce/platform-core';
+import type { WorkflowDefinition, Trigger } from '@mediforce/platform-core';
 
 interface TriggeredEntry {
   definitionName: string;
-  definitionVersion: string;
+  definitionVersion: number;
   triggerName: string;
   instanceId: string;
 }
 
 interface SkippedEntry {
   definitionName: string;
-  definitionVersion: string;
+  definitionVersion: number;
   triggerName: string;
   reason: string;
 }
@@ -28,14 +28,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const skipped: SkippedEntry[] = [];
 
   try {
-    const { valid: definitions } = await processRepo.listProcessDefinitions();
+    const { definitions: definitionGroups } = await processRepo.listWorkflowDefinitions();
 
-    // Filter to non-archived definitions that have at least one cron trigger
-    const cronDefinitions = definitions.filter(
-      (def: ProcessDefinition) =>
-        def.archived !== true &&
-        def.triggers.some((t: Trigger) => t.type === 'cron'),
-    );
+    // Flatten to latest version of each definition that has at least one cron trigger
+    const cronDefinitions = definitionGroups
+      .map((group) => group.versions.find((v) => v.version === group.latestVersion))
+      .filter((def): def is WorkflowDefinition => def !== undefined)
+      .filter(
+        (def: WorkflowDefinition) =>
+          def.archived !== true &&
+          def.triggers.some((t: Trigger) => t.type === 'cron'),
+      );
 
     for (const def of cronDefinitions) {
       const cronTriggers = def.triggers.filter((t: Trigger) => t.type === 'cron');
@@ -73,28 +76,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           continue;
         }
 
-        // Find the default config for this definition
-        const configs = await processRepo.listProcessConfigs(def.name);
-        const config = configs.find((c) => c.archived !== true);
-        if (!config) {
-          skipped.push({
-            definitionName: def.name,
-            definitionVersion: def.version,
-            triggerName: trigger.name,
-            reason: 'No active config found',
-          });
-          continue;
-        }
-
         // Fire the cron trigger to create and start an instance
-        const result = await cronTrigger.fire({
+        const result = await cronTrigger.fireWorkflow({
           definitionName: def.name,
           definitionVersion: def.version,
           triggerName: trigger.name,
           triggeredBy: 'cron-heartbeat',
           payload: { schedule, firedAt: now.toISOString() },
-          configName: config.configName,
-          configVersion: config.configVersion,
         });
 
         // Kick off the run loop by calling the run endpoint
