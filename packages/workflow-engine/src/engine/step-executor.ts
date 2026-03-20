@@ -134,11 +134,27 @@ export class StepExecutor {
     const isTerminal = nextStep.type === 'terminal';
 
     if (isTerminal) {
+      const now = new Date().toISOString();
       await this.instanceRepository.update(instance.id, {
         status: 'completed',
         currentStepId: null,
         variables: { ...instance.variables, [currentStepId]: stepOutput },
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
+      });
+      await this.auditRepository.append({
+        actorId: actor.id,
+        actorType: 'user',
+        actorRole: actor.role,
+        action: 'instance.completed',
+        description: `Instance '${instance.id}' completed (terminal step '${nextStepId}' reached)`,
+        timestamp: now,
+        inputSnapshot: { lastStepId: currentStepId, terminalStepId: nextStepId },
+        outputSnapshot: {},
+        basis: 'Terminal step reached — workflow complete',
+        entityType: 'processInstance',
+        entityId: instance.id,
+        processInstanceId: instance.id,
+        processDefinitionVersion: definition.version,
       });
     } else {
       await this.instanceRepository.update(instance.id, {

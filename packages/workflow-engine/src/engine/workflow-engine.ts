@@ -282,6 +282,22 @@ export class WorkflowEngine {
           };
           await this.humanTaskRepository.create(task);
 
+          await this.auditRepository.append({
+            actorId: 'engine',
+            actorType: 'system',
+            actorRole: 'orchestrator',
+            action: 'task.created',
+            description: `Human task created for step '${nextStep.id}' (reason: human_executor)`,
+            timestamp: now,
+            inputSnapshot: { taskId: task.id, stepId: nextStep.id, reason: 'human_executor', assignedRole },
+            outputSnapshot: {},
+            basis: 'advanceStep: next step executor is human',
+            entityType: 'humanTask',
+            entityId: task.id,
+            processInstanceId: instanceId,
+            processDefinitionVersion: String(definition.version),
+          });
+
           await this.instanceRepository.update(instanceId, {
             status: 'paused',
             pauseReason: 'waiting_for_human',
