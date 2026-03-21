@@ -1,0 +1,32 @@
+# Staging overlay — adds Redis auth + stunnel for Vercel preview access.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml up -d
+
+services:
+  redis:
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+
+  stunnel:
+    image: alpine:3.23
+    restart: unless-stopped
+    mem_limit: ${STUNNEL_MEM_LIMIT:-64m}
+    entrypoint: ["sh", "-c", "apk add --no-cache stunnel && exec stunnel /etc/stunnel/stunnel.conf"]
+    ports:
+      - "6380:6380"
+    volumes:
+      - ./stunnel.conf:/etc/stunnel/stunnel.conf:ro
+      - ./stunnel-combined.pem:/etc/stunnel/stunnel-combined.pem:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  platform-ui:
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+
+  agent-worker:
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
