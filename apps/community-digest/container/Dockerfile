@@ -1,4 +1,4 @@
-FROM node:20-slim AS builder
+FROM node:24-slim AS builder
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
@@ -19,7 +19,7 @@ COPY tsconfig.json ./
 RUN pnpm --filter @mediforce/community-digest build:gather
 
 # --- Runner ---
-FROM node:20-slim
+FROM node:24-slim
 
 WORKDIR /app
 
