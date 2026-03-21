@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "zod": "^4.0.0",
-    "date-fns": "^3.6.0",
+    "date-fns": "^4.0.0",
     "firebase": "^11.9.1"
   },
   "devDependencies": {
