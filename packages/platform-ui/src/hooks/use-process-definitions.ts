@@ -68,16 +68,18 @@ export function useProcessDefinitions() {
     const seen = new Set<string>();
     const result: ProcessDefinitionDoc[] = [];
 
-    // Workflow definitions take priority
+    // Workflow definitions take priority; skip soft-deleted
     for (const doc of workflowData) {
+      if (doc.deleted) continue;
       const key = `${doc.name}:${doc.version}`;
       if (!seen.has(key)) {
         seen.add(key);
         result.push(normalizeWorkflow(doc));
       }
     }
-    // Then legacy
+    // Then legacy; skip soft-deleted
     for (const doc of legacyData) {
+      if ((doc as ProcessDefinitionDoc & { deleted?: boolean }).deleted) continue;
       const key = `${doc.name}:${doc.version}`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -170,6 +172,7 @@ export function useProcessDefinitionVersions(name: string) {
     const seen = new Set<string>();
     const result: ProcessDefinitionDoc[] = [];
     for (const doc of workflowData) {
+      if (doc.deleted) continue;
       const key = String(doc.version);
       if (!seen.has(key)) {
         seen.add(key);
@@ -177,6 +180,7 @@ export function useProcessDefinitionVersions(name: string) {
       }
     }
     for (const doc of legacyData) {
+      if ((doc as ProcessDefinitionDoc & { deleted?: boolean }).deleted) continue;
       if (!seen.has(doc.version)) {
         seen.add(doc.version);
         result.push(doc);

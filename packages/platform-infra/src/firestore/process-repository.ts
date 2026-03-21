@@ -352,4 +352,52 @@ export class FirestoreProcessRepository implements ProcessRepository {
     }
     return latestVersion;
   }
+
+  async setWorkflowDeleted(name: string, deleted: boolean): Promise<void> {
+    // Update legacy processDefinitions
+    const legacyQ = query(
+      collection(this.db, this.definitionsCollection),
+      where('name', '==', name),
+    );
+    const legacySnapshot = await getDocs(legacyQ);
+    for (const d of legacySnapshot.docs) {
+      await updateDoc(doc(this.db, this.definitionsCollection, d.id), { deleted });
+    }
+
+    // Update workflowDefinitions (dual-write)
+    const workflowQ = query(
+      collection(this.db, this.workflowDefinitionsCollection),
+      where('name', '==', name),
+    );
+    const workflowSnapshot = await getDocs(workflowQ);
+    for (const d of workflowSnapshot.docs) {
+      await updateDoc(doc(this.db, this.workflowDefinitionsCollection, d.id), { deleted });
+    }
+
+    // Update workflowMeta
+    const metaRef = doc(this.db, 'workflowMeta', name);
+    const metaSnap = await getDoc(metaRef);
+    if (metaSnap.exists()) {
+      await updateDoc(metaRef, { deleted });
+    }
+  }
+
+  async isWorkflowNameDeleted(name: string): Promise<boolean> {
+    const q = query(
+      collection(this.db, this.workflowDefinitionsCollection),
+      where('name', '==', name),
+      where('deleted', '==', true),
+    );
+    const snapshot = await getDocs(q);
+    return !snapshot.empty;
+  }
+
+  async countInstancesByDefinitionName(name: string): Promise<number> {
+    const q = query(
+      collection(this.db, 'processInstances'),
+      where('definitionName', '==', name),
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.size;
+  }
 }

@@ -71,4 +71,8 @@ export interface ProcessRepository {
   setConfigArchived(processName: string, configName: string, configVersion: string, archived: boolean): Promise<void>;
 
   setDefinitionVersionArchived(name: string, version: string, archived: boolean): Promise<void>;
+
+  setWorkflowDeleted(name: string, deleted: boolean): Promise<void>;
+  isWorkflowNameDeleted(name: string): Promise<boolean>;
+  countInstancesByDefinitionName(name: string): Promise<number>;
 }

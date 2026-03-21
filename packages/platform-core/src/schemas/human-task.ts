@@ -27,6 +27,7 @@ export const HumanTaskSchema = z.object({
   creationReason: CreationReasonSchema.optional(),  // why this task was created
   selection: SelectionSchema.optional(),  // copied from step definition — enables "pick one" review mode
   options: z.array(z.record(z.string(), z.unknown())).optional(),  // options from previous step output
+  deleted: z.boolean().optional(),
 });
 
 export type HumanTaskStatus = z.infer<typeof HumanTaskStatusSchema>;
