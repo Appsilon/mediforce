@@ -68,6 +68,7 @@ export const WorkflowDefinitionSchema = z.object({
   triggers: z.array(TriggerSchema).min(1),
   metadata: z.record(z.string(), z.unknown()).optional(),
   archived: z.boolean().optional(),
+  deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
 });
 

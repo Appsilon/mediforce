@@ -81,6 +81,14 @@ export async function saveWorkflowDefinition(
   const { processRepo } = getPlatformServices();
 
   try {
+    const isDeleted = await processRepo.isWorkflowNameDeleted(parsed.data.name);
+    if (isDeleted) {
+      return {
+        success: false,
+        error: `The name "${parsed.data.name}" was previously used by a deleted workflow. Please choose a different name.`,
+      };
+    }
+
     const latestVersion = await processRepo.getLatestWorkflowVersion(parsed.data.name);
     const nextVersion = latestVersion + 1;
 
@@ -167,6 +175,64 @@ export async function setDefinitionVersionArchived(
   try {
     await processRepo.setDefinitionVersionArchived(name, version, archived);
     return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Delete helpers (soft-delete)
+// ---------------------------------------------------------------------------
+
+export type DeleteResult = { success: true; deletedRuns: number } | { success: false; error: string };
+
+export async function getWorkflowRunCount(workflowName: string): Promise<number> {
+  const { processRepo } = getPlatformServices();
+  return processRepo.countInstancesByDefinitionName(workflowName);
+}
+
+export async function deleteWorkflow(
+  workflowName: string,
+  expectedRunCount: number,
+): Promise<DeleteResult> {
+  const { processRepo, instanceRepo, auditRepo, humanTaskRepo } = getPlatformServices();
+
+  try {
+    // Verify run count still matches to prevent stale confirmations
+    const actualRunCount = await processRepo.countInstancesByDefinitionName(workflowName);
+    if (actualRunCount !== expectedRunCount) {
+      return {
+        success: false,
+        error: `Run count changed (expected ${expectedRunCount}, found ${actualRunCount}). Please try again.`,
+      };
+    }
+
+    // Create audit event before soft-deleting
+    await auditRepo.append({
+      actorId: 'system',
+      actorType: 'system',
+      actorRole: 'admin',
+      action: 'workflow.delete',
+      description: `Workflow "${workflowName}" soft-deleted with ${actualRunCount} associated runs`,
+      timestamp: new Date().toISOString(),
+      inputSnapshot: { workflowName, runCount: actualRunCount },
+      outputSnapshot: {},
+      basis: 'User-initiated workflow deletion',
+      entityType: 'workflow_definition',
+      entityId: workflowName,
+    });
+
+    // Soft-delete workflow definitions (all versions + meta)
+    await processRepo.setWorkflowDeleted(workflowName, true);
+
+    // Soft-delete all associated process instances and their human tasks
+    if (actualRunCount > 0) {
+      const instanceIds = await instanceRepo.getIdsByDefinitionName(workflowName);
+      await instanceRepo.setDeletedByDefinitionName(workflowName, true);
+      await humanTaskRepo.setDeletedByInstanceIds(instanceIds, true);
+    }
+
+    return { success: true, deletedRuns: actualRunCount };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
   }

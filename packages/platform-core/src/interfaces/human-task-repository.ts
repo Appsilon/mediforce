@@ -8,4 +8,5 @@ export interface HumanTaskRepository {
   claim(taskId: string, userId: string): Promise<HumanTask>; // sets assignedUserId + status: 'claimed'
   complete(taskId: string, completionData: Record<string, unknown>): Promise<HumanTask>;
   cancel(taskId: string): Promise<HumanTask>;
+  setDeletedByInstanceIds(instanceIds: string[], deleted: boolean): Promise<void>;
 }
