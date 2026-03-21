@@ -87,8 +87,8 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       date-fns:
-        specifier: ^3.6.0
-        version: 3.6.0
+        specifier: ^4.0.0
+        version: 4.1.0
       firebase:
         specifier: ^11.9.1
         version: 11.10.0
@@ -327,8 +327,8 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2
       date-fns:
-        specifier: ^3.6.0
-        version: 3.6.0
+        specifier: ^4.0.0
+        version: 4.1.0
       firebase:
         specifier: ^11.9.1
         version: 11.10.0
@@ -413,8 +413,8 @@ importers:
   packages/supply-intelligence:
     dependencies:
       date-fns:
-        specifier: ^3.6.0
-        version: 3.6.0
+        specifier: ^4.0.0
+        version: 4.1.0
       firebase:
         specifier: ^11.9.1
         version: 11.10.0
@@ -447,8 +447,8 @@ importers:
         specifier: workspace:*
         version: link:../supply-intelligence
       date-fns:
-        specifier: ^3.6.0
-        version: 3.6.0
+        specifier: ^4.0.0
+        version: 4.1.0
       firebase:
         specifier: ^11.9.1
         version: 11.10.0
@@ -2579,8 +2579,8 @@ packages:
     resolution: {integrity: sha512-ZYP5VBHshaDAiVZxjbRVcFJpc+4xGgT0bK3vzy1HLN8jTO975HEbuYzZJcHoQEY5K1a0z8YayJkyVETa08eNTg==}
     engines: {node: '>=18'}
 
-  date-fns@3.6.0:
-    resolution: {integrity: sha512-fRHTG8g/Gif+kSh50gaGEdToemgfj74aRX3swtiouboip5JDLAyDE9F11nHMIcvOaXeOC6D7SpNhi7uFyB7Uww==}
+  date-fns@4.1.0:
+    resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -6232,7 +6232,7 @@ snapshots:
       whatwg-mimetype: 4.0.0
       whatwg-url: 14.2.0
 
-  date-fns@3.6.0: {}
+  date-fns@4.1.0: {}
 
   debug@4.4.3:
     dependencies:
