@@ -22,10 +22,11 @@ else
 fi
 
 # Pull latest code (checkout -f handles stale local changes)
-log "Pulling latest changes from main"
-git fetch origin main
-git checkout -f main
-git reset --hard origin/main
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+log "Pulling latest changes from $BRANCH"
+git fetch origin "$BRANCH"
+git checkout -f "$BRANCH"
+git reset --hard "origin/$BRANCH"
 
 # Export git SHA for build-time inlining
 export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)
