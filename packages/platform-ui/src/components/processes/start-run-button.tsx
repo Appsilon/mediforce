@@ -6,6 +6,7 @@ import { Play, ChevronDown, Loader2 } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useAuth } from '@/contexts/auth-context';
 import { startWorkflowRun } from '@/app/actions/processes';
+import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 
 interface StartRunButtonProps {
@@ -116,13 +117,13 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
                 key={def.version}
                 onClick={() => handleStart(def.version)}
                 className={cn(
-                  'flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
+                  'flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
                   def.version === latestVersion && 'font-medium',
                 )}
               >
-                <span className="font-mono">v{def.version}</span>
+                <VersionLabel version={def.version} title={def.title} variant="inline" />
                 {def.version === latestVersion && (
-                  <span className="text-xs text-muted-foreground">latest</span>
+                  <span className="text-xs text-muted-foreground ml-auto shrink-0">latest</span>
                 )}
               </button>
             ))}

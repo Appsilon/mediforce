@@ -11,6 +11,7 @@ import { RunsTable } from '@/components/processes/runs-table';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { setProcessArchived } from '@/app/actions/definitions';
+import { VersionLabel } from '@/components/ui/version-label';
 import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
 import { cn } from '@/lib/utils';
 
@@ -89,7 +90,7 @@ export default function ProcessDefinitionPage() {
               <p className="text-sm text-muted-foreground mt-0.5">{latest.description}</p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              <span className="font-mono bg-muted px-1.5 py-0.5 rounded">v{latest?.version}</span>
+              {latest && <VersionLabel version={latest.version} title={(latest as unknown as { title?: string }).title} />}
               <span className="flex items-center gap-1">
                 <Layers className="h-3 w-3" />
                 {latest?.steps.length} steps

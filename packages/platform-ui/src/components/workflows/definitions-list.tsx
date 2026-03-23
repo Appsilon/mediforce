@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ChevronRight, Pencil, Loader2 } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { VersionLabel } from '@/components/ui/version-label';
 import { setDefaultWorkflowVersion } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 
@@ -68,12 +69,12 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                 isArchived && 'opacity-50',
               )}
             >
-              {/* Left: version + badges */}
+              {/* Left: version + title + badges */}
               <Link
                 href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
                 className="flex items-center gap-2.5 flex-1 min-w-0"
               >
-                <span className="font-mono text-sm font-semibold w-8 shrink-0">v{def.version}</span>
+                <VersionLabel version={def.version} title={def.title} className="text-sm shrink-0" />
 
                 <div className="flex items-center gap-1.5">
                   {isDefault && (
@@ -92,10 +93,6 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                     </span>
                   )}
                 </div>
-
-                {def.description && (
-                  <span className="text-sm text-muted-foreground truncate ml-1">{def.description}</span>
-                )}
               </Link>
 
               {/* Right: metadata + actions */}

@@ -10,6 +10,7 @@ import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
 import { StartRunButton } from '@/components/processes/start-run-button';
+import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -38,6 +39,7 @@ export default function WorkflowDefinitionVersionPage() {
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
   const [editing, setEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>([]);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>([]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -49,6 +51,7 @@ export default function WorkflowDefinitionVersionPage() {
 
   const enableEditing = useCallback(() => {
     if (!definition) return;
+    setEditedTitle('');
     setEditedSteps(structuredClone(definition.steps));
     setEditedTransitions(structuredClone(definition.transitions));
     setEditing(true);
@@ -191,6 +194,7 @@ export default function WorkflowDefinitionVersionPage() {
 
     const result = await saveWorkflowDefinition({
       name: definition.name,
+      title: editedTitle.trim() || undefined,
       description: definition.description,
       steps: editedSteps,
       transitions,
@@ -211,7 +215,7 @@ export default function WorkflowDefinitionVersionPage() {
     } else {
       setSaveState({ status: 'error', message: result.error });
     }
-  }, [definition, editedSteps, name, router]);
+  }, [definition, editedTitle, editedSteps, editedTransitions, name, router]);
 
   // Build a WorkflowDefinition from edited steps for the diagram
   const diagramDefinition: WorkflowDefinition | null = definition
@@ -255,15 +259,21 @@ export default function WorkflowDefinitionVersionPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-headline font-semibold">{decodedName}</h1>
-              <span className="font-mono bg-muted px-2 py-0.5 text-sm rounded">
-                v{definition.version}
-              </span>
+              <VersionLabel version={definition.version} title={!editing ? definition.title : undefined} className="text-sm" />
               {editing && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                   editing
                 </span>
               )}
             </div>
+            {editing && (
+              <input
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                placeholder="Version title (required) — e.g. &quot;Added automated review step&quot;"
+                className="mt-1 w-full max-w-md text-sm border rounded-md px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            )}
             {definition.description && (
               <p className="text-sm text-muted-foreground mt-0.5">{definition.description}</p>
             )}
@@ -285,10 +295,10 @@ export default function WorkflowDefinitionVersionPage() {
                 {/* Save — primary action */}
                 <button
                   onClick={handleSave}
-                  disabled={saveState.status === 'saving'}
+                  disabled={saveState.status === 'saving' || !editedTitle.trim()}
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                    saveState.status === 'saving' && 'opacity-50 cursor-not-allowed',
+                    (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
                   )}
                 >
                   <Save className="h-3.5 w-3.5" />
