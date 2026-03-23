@@ -60,12 +60,13 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
           const isLatest = def.version === latestVersion;
           const isDefault = def.version === defaultVersion;
           const isArchived = def.archived === true;
+          const canSetDefault = !isDefault && !isArchived;
 
           return (
             <div
               key={def.version}
               className={cn(
-                'flex items-center px-4 py-3 transition-colors hover:bg-muted/50',
+                'group flex items-center px-4 py-3 transition-colors hover:bg-muted/50',
                 isArchived && 'opacity-50',
               )}
             >
@@ -107,19 +108,17 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                   </span>
                 )}
 
-                {!isDefault && !isArchived ? (
+                {canSetDefault && (
                   <button
                     onClick={async (e) => {
                       e.preventDefault();
                       await setDefaultWorkflowVersion(workflowName, def.version);
                       refreshDefault();
                     }}
-                    className="text-[11px] text-muted-foreground/50 hover:text-foreground transition-colors whitespace-nowrap"
+                    className="text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors whitespace-nowrap opacity-0 group-hover:opacity-100"
                   >
-                    Set as default
+                    Make default
                   </button>
-                ) : (
-                  <span className="w-[85px]" /> // spacer for alignment
                 )}
 
                 <Link
