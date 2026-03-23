@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap } from 'lucide-react';
+import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2 } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
@@ -12,6 +12,7 @@ import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { setProcessArchived } from '@/app/actions/definitions';
 import { VersionLabel } from '@/components/ui/version-label';
+import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
 import { cn } from '@/lib/utils';
 
 
@@ -25,6 +26,7 @@ export default function ProcessDefinitionPage() {
 
   const [archiving, setArchiving] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -148,6 +150,22 @@ export default function ProcessDefinitionPage() {
                     </>
                   )}
                 </button>
+
+                <div className="my-1 border-t" />
+
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setDeleteDialogOpen(true);
+                  }}
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors',
+                    'text-destructive hover:bg-destructive/10',
+                  )}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
               </div>
             )}
           </div>
@@ -201,6 +219,13 @@ export default function ProcessDefinitionPage() {
           </div>
         </Tabs.Content>
       </Tabs.Root>
+
+      <DeleteWorkflowDialog
+        workflowName={decodedName}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onDeleted={() => router.push('/workflows')}
+      />
     </div>
   );
 }

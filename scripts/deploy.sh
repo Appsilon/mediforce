@@ -13,9 +13,18 @@ cd "$DEPLOY_DIR"
 
 log "Starting deployment"
 
-# Pull latest code
+# Ensure deploy user owns .git (root operations can steal ownership)
+if [ -w "$DEPLOY_DIR/.git/HEAD" ]; then
+  log "Git directory permissions OK"
+else
+  log "ERROR: Cannot write to .git/HEAD — fix with: sudo chown -R $(whoami) $DEPLOY_DIR/.git"
+  exit 1
+fi
+
+# Pull latest code (checkout -f handles stale local changes)
 log "Pulling latest changes from main"
 git fetch origin main
+git checkout -f main
 git reset --hard origin/main
 
 # Export git SHA for build-time inlining

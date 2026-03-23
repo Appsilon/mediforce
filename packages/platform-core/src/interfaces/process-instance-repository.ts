@@ -24,4 +24,7 @@ export interface ProcessInstanceRepository {
     executionId: string,
     updates: Partial<StepExecution>,
   ): Promise<void>;
+
+  getIdsByDefinitionName(name: string): Promise<string[]>;
+  setDeletedByDefinitionName(name: string, deleted: boolean): Promise<void>;
 }
