@@ -240,7 +240,7 @@ export function ProcessDetail({
         </Tabs.List>
 
         <Tabs.Content value="history">
-          <StepHistoryTabs steps={stepExecutions} loading={stepExecutionsLoading} />
+          <StepHistoryTabs steps={stepExecutions} loading={stepExecutionsLoading} processInstanceId={instance.id} />
         </Tabs.Content>
 
         <Tabs.Content value="audit">
