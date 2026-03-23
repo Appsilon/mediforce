@@ -108,18 +108,24 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                   </span>
                 )}
 
-                {canSetDefault && (
-                  <button
-                    onClick={async (e) => {
-                      e.preventDefault();
+                <button
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    if (canSetDefault) {
                       await setDefaultWorkflowVersion(workflowName, def.version);
                       refreshDefault();
-                    }}
-                    className="text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors whitespace-nowrap opacity-0 group-hover:opacity-100"
-                  >
-                    Make default
-                  </button>
-                )}
+                    }
+                  }}
+                  disabled={!canSetDefault}
+                  className={cn(
+                    'text-[11px] whitespace-nowrap transition-colors',
+                    canSetDefault
+                      ? 'text-muted-foreground/60 hover:text-foreground opacity-0 group-hover:opacity-100'
+                      : 'invisible',
+                  )}
+                >
+                  Make default
+                </button>
 
                 <Link
                   href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
