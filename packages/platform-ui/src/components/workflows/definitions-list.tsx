@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ChevronRight, Pencil, Loader2 } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { VersionLabel } from '@/components/ui/version-label';
 import { setDefaultWorkflowVersion } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 
@@ -56,45 +57,29 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
 
       <div className="rounded-lg border divide-y">
         {definitions.map((def) => {
-          const isLatest = def.version === latestVersion;
           const isDefault = def.version === defaultVersion;
           const isArchived = def.archived === true;
+          const canSetDefault = !isDefault && !isArchived;
 
           return (
             <div
               key={def.version}
               className={cn(
-                'flex items-center px-4 py-3 transition-colors hover:bg-muted/50',
+                'group flex items-center px-4 py-3 transition-colors hover:bg-muted/50',
                 isArchived && 'opacity-50',
               )}
             >
-              {/* Left: version + badges */}
+              {/* Left: version + title + badges */}
               <Link
                 href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
                 className="flex items-center gap-2.5 flex-1 min-w-0"
               >
-                <span className="font-mono text-sm font-semibold w-8 shrink-0">v{def.version}</span>
+                <VersionLabel version={def.version} title={def.title} className="text-sm shrink-0" />
 
-                <div className="flex items-center gap-1.5">
-                  {isDefault && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                      default
-                    </span>
-                  )}
-                  {isLatest && (
-                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      latest
-                    </span>
-                  )}
-                  {isArchived && (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                      archived
-                    </span>
-                  )}
-                </div>
-
-                {def.description && (
-                  <span className="text-sm text-muted-foreground truncate ml-1">{def.description}</span>
+                {isArchived && (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    archived
+                  </span>
                 )}
               </Link>
 
@@ -110,19 +95,29 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                   </span>
                 )}
 
-                {!isDefault && !isArchived ? (
+                {isDefault ? (
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 whitespace-nowrap">
+                    default
+                  </span>
+                ) : (
                   <button
                     onClick={async (e) => {
                       e.preventDefault();
-                      await setDefaultWorkflowVersion(workflowName, def.version);
-                      refreshDefault();
+                      if (canSetDefault) {
+                        await setDefaultWorkflowVersion(workflowName, def.version);
+                        refreshDefault();
+                      }
                     }}
-                    className="text-[11px] text-muted-foreground/50 hover:text-foreground transition-colors whitespace-nowrap"
+                    disabled={!canSetDefault}
+                    className={cn(
+                      'text-[11px] whitespace-nowrap transition-colors',
+                      canSetDefault
+                        ? 'text-muted-foreground/60 hover:text-foreground md:opacity-0 md:group-hover:opacity-100'
+                        : 'invisible',
+                    )}
                   >
-                    Set as default
+                    Make default
                   </button>
-                ) : (
-                  <span className="w-[85px]" /> // spacer for alignment
                 )}
 
                 <Link

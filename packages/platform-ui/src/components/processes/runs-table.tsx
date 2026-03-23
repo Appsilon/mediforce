@@ -88,10 +88,12 @@ export function RunsTable({
               </td>
               <td className="px-4 py-3 font-mono text-xs">
                 <span title="Definition version">v{run.definitionVersion}</span>
-                <span className="text-muted-foreground">
-                  {' / '}
-                  <span title="Config">{run.configName} v{run.configVersion}</span>
-                </span>
+                {run.configName && (
+                  <span className="text-muted-foreground">
+                    {' / '}
+                    <span title="Config">{run.configName} v{run.configVersion}</span>
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3">
                 <ProcessStatusBadge status={run.status} />

@@ -21,10 +21,12 @@ export function useMyTasks(assignedRole: string | null) {
   const { data, loading, error } = useCollection<HumanTask>('humanTasks', constraints);
 
   const filtered = useMemo(
-    () =>
-      assignedRole
-        ? data
-        : data.filter((task) => task.status !== 'completed'),
+    () => {
+      const notDeleted = data.filter((task) => !task.deleted);
+      return assignedRole
+        ? notDeleted
+        : notDeleted.filter((task) => task.status !== 'completed');
+    },
     [data, assignedRole],
   );
 
@@ -47,10 +49,12 @@ export function useCompletedTasks(assignedRole: string | null) {
   const { data, loading, error } = useCollection<HumanTask>('humanTasks', constraints);
 
   const filtered = useMemo(
-    () =>
-      assignedRole
-        ? data
-        : data.filter((task) => task.status === 'completed'),
+    () => {
+      const notDeleted = data.filter((task) => !task.deleted);
+      return assignedRole
+        ? notDeleted
+        : notDeleted.filter((task) => task.status === 'completed');
+    },
     [data, assignedRole],
   );
 
@@ -59,7 +63,9 @@ export function useCompletedTasks(assignedRole: string | null) {
 
 export function useAllTasks() {
   const constraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
-  return useCollection<HumanTask>('humanTasks', constraints);
+  const result = useCollection<HumanTask>('humanTasks', constraints);
+  const data = useMemo(() => result.data.filter((task) => !task.deleted), [result.data]);
+  return { ...result, data };
 }
 
 export function useActiveTaskForInstance(processInstanceId: string | null) {
@@ -79,5 +85,10 @@ export function useActiveTaskForInstance(processInstanceId: string | null) {
     constraints,
   );
 
-  return { task: data[0] ?? null, loading };
+  const activeTask = useMemo(
+    () => data.find((task) => !task.deleted) ?? null,
+    [data],
+  );
+
+  return { task: activeTask, loading };
 }

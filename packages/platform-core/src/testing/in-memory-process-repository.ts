@@ -150,6 +150,18 @@ export class InMemoryProcessRepository implements ProcessRepository {
     }
   }
 
+  async setWorkflowDeleted(_name: string, _deleted: boolean): Promise<void> {
+    // No-op in test double — Firestore uses untyped updateDoc for the `deleted` field
+  }
+
+  async isWorkflowNameDeleted(_name: string): Promise<boolean> {
+    return false;
+  }
+
+  async countInstancesByDefinitionName(_name: string): Promise<number> {
+    return 0;
+  }
+
   /** Test helper: clear all stored data */
   clear(): void {
     this.definitions.clear();

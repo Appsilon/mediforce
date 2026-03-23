@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap } from 'lucide-react';
+import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2 } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
@@ -11,6 +11,9 @@ import { RunsTable } from '@/components/processes/runs-table';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { setProcessArchived } from '@/app/actions/definitions';
+import { VersionLabel } from '@/components/ui/version-label';
+import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
+import { formatCron } from '@/lib/format-cron';
 import { cn } from '@/lib/utils';
 
 
@@ -24,6 +27,7 @@ export default function ProcessDefinitionPage() {
 
   const [archiving, setArchiving] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -87,7 +91,7 @@ export default function ProcessDefinitionPage() {
               <p className="text-sm text-muted-foreground mt-0.5">{latest.description}</p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              <span className="font-mono bg-muted px-1.5 py-0.5 rounded">v{latest?.version}</span>
+              {latest && <VersionLabel version={latest.version} title={(latest as unknown as { title?: string }).title} />}
               <span className="flex items-center gap-1">
                 <Layers className="h-3 w-3" />
                 {latest?.steps.length} steps
@@ -97,7 +101,7 @@ export default function ProcessDefinitionPage() {
                 <span key={trigger.name} className="inline-flex items-center gap-1">
                   {trigger.type === 'cron' ? <Clock className="h-3 w-3" /> : trigger.type === 'manual' ? <Play className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
                   {trigger.type === 'cron' && trigger.schedule ? (
-                    <span className="font-mono bg-muted px-1.5 py-0.5 rounded" title={`Cron: ${trigger.schedule}`}>{trigger.name}: {trigger.schedule}</span>
+                    <span className="bg-muted px-1.5 py-0.5 rounded" title={trigger.schedule}>Runs automatically · {formatCron(trigger.schedule)}</span>
                   ) : (
                     <span>{trigger.name}</span>
                   )}
@@ -146,6 +150,22 @@ export default function ProcessDefinitionPage() {
                       Archive
                     </>
                   )}
+                </button>
+
+                <div className="my-1 border-t" />
+
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setDeleteDialogOpen(true);
+                  }}
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors',
+                    'text-destructive hover:bg-destructive/10',
+                  )}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
                 </button>
               </div>
             )}
@@ -200,6 +220,13 @@ export default function ProcessDefinitionPage() {
           </div>
         </Tabs.Content>
       </Tabs.Root>
+
+      <DeleteWorkflowDialog
+        workflowName={decodedName}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onDeleted={() => router.push('/workflows')}
+      />
     </div>
   );
 }

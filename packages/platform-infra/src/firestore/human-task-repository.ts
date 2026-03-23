@@ -80,4 +80,18 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     });
     return (await this.getById(taskId))!;
   }
+
+  async setDeletedByInstanceIds(instanceIds: string[], deleted: boolean): Promise<void> {
+    if (instanceIds.length === 0) return;
+    // Firestore 'in' queries support max 30 values per batch
+    for (let i = 0; i < instanceIds.length; i += 30) {
+      const batch = instanceIds.slice(i, i + 30);
+      const colRef = collection(this.db, this.collectionName);
+      const q = query(colRef, where('processInstanceId', 'in', batch));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        await updateDoc(doc(this.db, this.collectionName, d.id), { deleted });
+      }
+    }
+  }
 }

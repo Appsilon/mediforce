@@ -57,6 +57,7 @@ export const WorkflowStepSchema = z.object({
 export const WorkflowDefinitionSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
+  title: z.string().min(1).optional(),
   description: z.string().optional(),
   repo: RepoSchema.optional(),
   url: z.string().url().optional(),
@@ -68,6 +69,7 @@ export const WorkflowDefinitionSchema = z.object({
   triggers: z.array(TriggerSchema).min(1),
   metadata: z.record(z.string(), z.unknown()).optional(),
   archived: z.boolean().optional(),
+  deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
 });
 

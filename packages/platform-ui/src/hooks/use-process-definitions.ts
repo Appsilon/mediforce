@@ -13,11 +13,13 @@ export interface DefinitionVersion {
   version: string;
   stepCount: number;
   triggerCount: number;
+  title?: string;
   description?: string;
 }
 
 export interface DefinitionGroup {
   name: string;
+  title?: string;
   description?: string;
   latestVersion: string;
   versions: DefinitionVersion[];
@@ -68,16 +70,18 @@ export function useProcessDefinitions() {
     const seen = new Set<string>();
     const result: ProcessDefinitionDoc[] = [];
 
-    // Workflow definitions take priority
+    // Workflow definitions take priority; skip soft-deleted
     for (const doc of workflowData) {
+      if (doc.deleted) continue;
       const key = `${doc.name}:${doc.version}`;
       if (!seen.has(key)) {
         seen.add(key);
         result.push(normalizeWorkflow(doc));
       }
     }
-    // Then legacy
+    // Then legacy; skip soft-deleted
     for (const doc of legacyData) {
+      if ((doc as ProcessDefinitionDoc & { deleted?: boolean }).deleted) continue;
       const key = `${doc.name}:${doc.version}`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -97,6 +101,7 @@ export function useProcessDefinitions() {
         version: def.version,
         stepCount: def.steps.length,
         triggerCount: def.triggers.length,
+        title: (def as unknown as { title?: string }).title,
         description: def.description,
       });
       entry.docs.push(def);
@@ -110,6 +115,7 @@ export function useProcessDefinitions() {
       const hasManualTrigger = latestDoc.triggers.some((trigger) => trigger.type === 'manual');
       return {
         name,
+        title: latest.title,
         description: latest.description,
         latestVersion: latest.version,
         versions: sorted,
@@ -170,6 +176,7 @@ export function useProcessDefinitionVersions(name: string) {
     const seen = new Set<string>();
     const result: ProcessDefinitionDoc[] = [];
     for (const doc of workflowData) {
+      if (doc.deleted) continue;
       const key = String(doc.version);
       if (!seen.has(key)) {
         seen.add(key);
@@ -177,6 +184,7 @@ export function useProcessDefinitionVersions(name: string) {
       }
     }
     for (const doc of legacyData) {
+      if ((doc as ProcessDefinitionDoc & { deleted?: boolean }).deleted) continue;
       if (!seen.has(doc.version)) {
         seen.add(doc.version);
         result.push(doc);

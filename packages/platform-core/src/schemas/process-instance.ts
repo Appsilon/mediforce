@@ -26,6 +26,7 @@ export const ProcessInstanceSchema = z.object({
   pauseReason: z.string().nullable(),
   error: z.string().nullable(),
   assignedRoles: z.array(z.string()).default([]),
+  deleted: z.boolean().optional(),
 });
 
 export type InstanceStatus = z.infer<typeof InstanceStatusSchema>;
