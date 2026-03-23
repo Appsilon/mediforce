@@ -76,18 +76,11 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
               >
                 <VersionLabel version={def.version} title={def.title} className="text-sm shrink-0" />
 
-                <div className="flex items-center gap-1.5">
-                  {isDefault && (
-                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      default
-                    </span>
-                  )}
-                  {isArchived && (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                      archived
-                    </span>
-                  )}
-                </div>
+                {isArchived && (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    archived
+                  </span>
+                )}
               </Link>
 
               {/* Right: metadata + actions */}
@@ -102,24 +95,30 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                   </span>
                 )}
 
-                <button
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    if (canSetDefault) {
-                      await setDefaultWorkflowVersion(workflowName, def.version);
-                      refreshDefault();
-                    }
-                  }}
-                  disabled={!canSetDefault}
-                  className={cn(
-                    'text-[11px] whitespace-nowrap transition-colors',
-                    canSetDefault
-                      ? 'text-muted-foreground/60 hover:text-foreground opacity-0 group-hover:opacity-100'
-                      : 'invisible',
-                  )}
-                >
-                  Make default
-                </button>
+                {isDefault ? (
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 whitespace-nowrap">
+                    default
+                  </span>
+                ) : (
+                  <button
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      if (canSetDefault) {
+                        await setDefaultWorkflowVersion(workflowName, def.version);
+                        refreshDefault();
+                      }
+                    }}
+                    disabled={!canSetDefault}
+                    className={cn(
+                      'text-[11px] whitespace-nowrap transition-colors',
+                      canSetDefault
+                        ? 'text-muted-foreground/60 hover:text-foreground md:opacity-0 md:group-hover:opacity-100'
+                        : 'invisible',
+                    )}
+                  >
+                    Make default
+                  </button>
+                )}
 
                 <Link
                   href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
