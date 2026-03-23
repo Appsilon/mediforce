@@ -1,12 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle2, ExternalLink, Gauge, GitBranch, Clock, FileText } from 'lucide-react';
+import Link from 'next/link';
+import { CheckCircle2, ExternalLink, Gauge, GitBranch, Clock, FileText, FileBarChart } from 'lucide-react';
 import type { StepExecution, AgentOutputSnapshot } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
+import { formatDuration, formatStepName } from '@/lib/format';
 
 interface RunResultsPanelProps {
   stepExecutions: StepExecution[];
+  workflowName: string;
+  runId: string;
 }
 
 function findFinalAgentOutput(stepExecutions: StepExecution[]): {
@@ -14,7 +18,6 @@ function findFinalAgentOutput(stepExecutions: StepExecution[]): {
   output: AgentOutputSnapshot;
   result: Record<string, unknown> | null;
 } | null {
-  // Find the last completed step execution that has agentOutput, sorted by completedAt desc
   const withAgent = stepExecutions
     .filter((exec) => exec.status === 'completed' && exec.agentOutput !== undefined)
     .sort((a, b) => {
@@ -33,22 +36,7 @@ function findFinalAgentOutput(stepExecutions: StepExecution[]): {
   };
 }
 
-function formatStepName(stepId: string): string {
-  return stepId
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
-}
-
-export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
+export function RunResultsPanel({ stepExecutions, workflowName, runId }: RunResultsPanelProps) {
   const finalOutput = React.useMemo(
     () => findFinalAgentOutput(stepExecutions),
     [stepExecutions],
@@ -173,6 +161,16 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
             </pre>
           </div>
         )}
+        {/* View Report link */}
+        <div className="pt-2 border-t">
+          <Link
+            href={`/workflows/${encodeURIComponent(workflowName)}/runs/${runId}/report`}
+            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
+          >
+            <FileBarChart className="h-3.5 w-3.5" />
+            View Report
+          </Link>
+        </div>
       </div>
     </div>
   );

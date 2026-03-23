@@ -218,7 +218,7 @@ export function ProcessDetail({
 
       {/* Results — shown for completed runs with agent output */}
       {instance.status === 'completed' && (
-        <RunResultsPanel stepExecutions={stepExecutions} />
+        <RunResultsPanel stepExecutions={stepExecutions} workflowName={instance.definitionName} runId={instance.id} />
       )}
 
       {/* Tabs: Step History | Audit Log */}
