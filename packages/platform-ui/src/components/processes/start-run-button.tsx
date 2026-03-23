@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, ChevronDown, Loader2 } from 'lucide-react';
+import { Play, ChevronDown, Loader2, Check } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useAuth } from '@/contexts/auth-context';
 import { startWorkflowRun } from '@/app/actions/processes';
@@ -11,22 +11,22 @@ import { cn } from '@/lib/utils';
 
 interface StartRunButtonProps {
   workflowName: string;
-  /** If provided, starts this specific version. Otherwise uses latest. */
+  /** If provided, starts this specific version. Otherwise uses default/latest. */
   version?: number;
-  /** Show version dropdown (split button). Only on workflow overview page. */
+  /** Show version dropdown (split button). */
   showVersionPicker?: boolean;
 }
 
 export function StartRunButton({ workflowName, version, showVersionPicker }: StartRunButtonProps) {
   const router = useRouter();
   const { firebaseUser } = useAuth();
-  const { definitions, latestVersion } = useWorkflowDefinitions(workflowName);
+  const { definitions, latestVersion, defaultVersion, effectiveVersion: hookEffectiveVersion } = useWorkflowDefinitions(workflowName);
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
-  const effectiveVersion = version ?? latestVersion;
+  const effectiveVersion = version ?? hookEffectiveVersion;
 
   React.useEffect(() => {
     if (!dropdownOpen) return;
@@ -111,22 +111,36 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
         </button>
 
         {dropdownOpen && (
-          <div className="absolute right-0 top-full mt-1 z-10 min-w-[160px] rounded-md border bg-popover shadow-md">
-            {definitions.map((def) => (
-              <button
-                key={def.version}
-                onClick={() => handleStart(def.version)}
-                className={cn(
-                  'flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
-                  def.version === latestVersion && 'font-medium',
-                )}
-              >
-                <VersionLabel version={def.version} title={def.title} variant="inline" />
-                {def.version === latestVersion && (
-                  <span className="text-xs text-muted-foreground ml-auto shrink-0">latest</span>
-                )}
-              </button>
-            ))}
+          <div className="absolute right-0 top-full mt-1 z-10 min-w-[200px] rounded-md border bg-popover shadow-md">
+            {definitions.filter((def) => def.archived !== true).map((def) => {
+              const isEffective = def.version === effectiveVersion;
+              const isLatest = def.version === latestVersion;
+              const isExplicitDefault = def.version === defaultVersion;
+
+              return (
+                <button
+                  key={def.version}
+                  onClick={() => handleStart(def.version)}
+                  className={cn(
+                    'flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-md last:rounded-b-md',
+                    isEffective && 'bg-muted/30 font-medium',
+                  )}
+                >
+                  <Check className={cn('h-3.5 w-3.5 shrink-0', isEffective ? 'text-primary' : 'invisible')} />
+                  <VersionLabel version={def.version} title={def.title} variant="inline" />
+                  <span className="flex items-center gap-1.5 ml-auto shrink-0">
+                    {isEffective && (
+                      <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        default
+                      </span>
+                    )}
+                    {isLatest && !isExplicitDefault && (
+                      <span className="text-[10px] text-muted-foreground">latest</span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
