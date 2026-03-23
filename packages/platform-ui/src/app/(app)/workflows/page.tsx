@@ -204,7 +204,7 @@ function ProcessCard({
             )}
           </div>
           {definition.hasManualTrigger && !definition.archived && (
-            <StartRunButton workflowName={definition.name} />
+            <StartRunButton workflowName={definition.name} showVersionPicker />
           )}
         </div>
 

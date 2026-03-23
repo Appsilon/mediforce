@@ -13,6 +13,7 @@ import { StartRunButton } from '@/components/processes/start-run-button';
 import { setProcessArchived } from '@/app/actions/definitions';
 import { VersionLabel } from '@/components/ui/version-label';
 import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
+import { formatCron } from '@/lib/format-cron';
 import { cn } from '@/lib/utils';
 
 
@@ -100,7 +101,7 @@ export default function ProcessDefinitionPage() {
                 <span key={trigger.name} className="inline-flex items-center gap-1">
                   {trigger.type === 'cron' ? <Clock className="h-3 w-3" /> : trigger.type === 'manual' ? <Play className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
                   {trigger.type === 'cron' && trigger.schedule ? (
-                    <span className="font-mono bg-muted px-1.5 py-0.5 rounded" title={`Cron: ${trigger.schedule}`}>{trigger.name}: {trigger.schedule}</span>
+                    <span className="bg-muted px-1.5 py-0.5 rounded" title={trigger.schedule}>Runs automatically · {formatCron(trigger.schedule)}</span>
                   ) : (
                     <span>{trigger.name}</span>
                   )}
