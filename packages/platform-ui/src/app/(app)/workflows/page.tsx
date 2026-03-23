@@ -322,7 +322,7 @@ export default function ProcessCatalogPage() {
           <Link
             href="/workflows/new"
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap shrink-0',
               'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
             )}
           >
