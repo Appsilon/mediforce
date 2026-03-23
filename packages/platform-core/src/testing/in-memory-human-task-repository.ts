@@ -73,6 +73,10 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
     return { ...updated };
   }
 
+  async setDeletedByInstanceIds(_instanceIds: string[], _deleted: boolean): Promise<void> {
+    // No-op in test double
+  }
+
   /** Test helper: clear all stored data */
   clear(): void {
     this.tasks.clear();
