@@ -20,7 +20,7 @@ interface StartRunButtonProps {
 export function StartRunButton({ workflowName, version, showVersionPicker }: StartRunButtonProps) {
   const router = useRouter();
   const { firebaseUser } = useAuth();
-  const { definitions, latestVersion, defaultVersion, effectiveVersion: hookEffectiveVersion } = useWorkflowDefinitions(workflowName);
+  const { definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowDefinitions(workflowName);
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
@@ -114,8 +114,6 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
           <div className="absolute right-0 top-full mt-1 z-10 min-w-[200px] rounded-md border bg-popover shadow-md">
             {definitions.filter((def) => def.archived !== true).map((def) => {
               const isEffective = def.version === effectiveVersion;
-              const isLatest = def.version === latestVersion;
-              const isExplicitDefault = def.version === defaultVersion;
 
               return (
                 <button
@@ -128,16 +126,11 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
                 >
                   <Check className={cn('h-3.5 w-3.5 shrink-0', isEffective ? 'text-primary' : 'invisible')} />
                   <VersionLabel version={def.version} title={def.title} variant="inline" />
-                  <span className="flex items-center gap-1.5 ml-auto shrink-0">
-                    {isEffective && (
-                      <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                        default
-                      </span>
-                    )}
-                    {isLatest && !isExplicitDefault && (
-                      <span className="text-[10px] text-muted-foreground">latest</span>
-                    )}
-                  </span>
+                  {isEffective && (
+                    <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 ml-auto shrink-0">
+                      default
+                    </span>
+                  )}
                 </button>
               );
             })}

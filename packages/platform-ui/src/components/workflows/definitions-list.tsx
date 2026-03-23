@@ -57,7 +57,6 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
 
       <div className="rounded-lg border divide-y">
         {definitions.map((def) => {
-          const isLatest = def.version === latestVersion;
           const isDefault = def.version === defaultVersion;
           const isArchived = def.archived === true;
           const canSetDefault = !isDefault && !isArchived;
@@ -79,13 +78,8 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
 
                 <div className="flex items-center gap-1.5">
                   {isDefault && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                      default
-                    </span>
-                  )}
-                  {isLatest && (
                     <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      latest
+                      default
                     </span>
                   )}
                   {isArchived && (
