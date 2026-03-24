@@ -139,9 +139,6 @@ export function ProcessDetail({
             <span>Config: <span className="font-mono text-foreground">{instance.configName} v{instance.configVersion}</span></span>
           )}
           <span title={instance.id}>ID: <span className="font-mono text-foreground text-xs">{instance.id.slice(0, 8)}</span></span>
-          {instance.currentStepId && (
-            <span>Current step: <span className="font-medium text-foreground">{resolveStepLabel(instance.currentStepId, definitionSteps)}</span></span>
-          )}
           <span>Created: <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span></span>
         </div>
         {needsHumanAction && blockingTask && (
