@@ -4,9 +4,10 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, ChevronDown, Building2, Check } from 'lucide-react';
+import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
-import { useUserNamespace } from '@/hooks/use-user-namespace';
+import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { ThemeToggle } from './theme-toggle';
 import { cn } from '@/lib/utils';
 
@@ -60,7 +61,8 @@ function NavItem({
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { firebaseUser, signOut } = useAuth();
-  const { namespace: userNamespace } = useUserNamespace(firebaseUser?.uid);
+  const { namespaces } = useAllUserNamespaces(firebaseUser?.uid);
+  const personalNamespace = namespaces.find((ns) => ns.type === 'personal') ?? null;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   const currentLabel =
@@ -108,26 +110,77 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
       {/* Namespace context switcher */}
       <div className="border-t px-3 py-3">
-        <button
-          type="button"
-          className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent transition-colors"
-          aria-label="Switch namespace"
-        >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
-            {firebaseUser?.displayName
-              ? firebaseUser.displayName
-                  .split(' ')
-                  .slice(0, 2)
-                  .map((part) => part[0]?.toUpperCase() ?? '')
-                  .join('')
-              : '?'}
-          </div>
-          <span className="flex-1 truncate text-left text-sm font-medium">
-            {userNamespace !== null
-              ? `@${userNamespace.handle}`
-              : (firebaseUser?.email ?? 'Set up profile')}
-          </span>
-        </button>
+        <Popover.Root>
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent transition-colors"
+              aria-label="Switch namespace"
+            >
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
+                {firebaseUser?.displayName
+                  ? firebaseUser.displayName
+                      .split(' ')
+                      .slice(0, 2)
+                      .map((part) => part[0]?.toUpperCase() ?? '')
+                      .join('')
+                  : '?'}
+              </div>
+              <span className="flex-1 truncate text-left text-sm font-medium">
+                {personalNamespace !== null
+                  ? `@${personalNamespace.handle}`
+                  : (firebaseUser?.email ?? 'Set up profile')}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              side="top"
+              align="start"
+              sideOffset={4}
+              className="z-50 w-[260px] rounded-md border bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+            >
+              <div className="py-1">
+                {namespaces.map((ns) => {
+                  const isActive = pathname.startsWith(`/${ns.handle}`);
+                  return (
+                    <Popover.Close asChild key={ns.handle}>
+                      <Link
+                        href={`/${ns.handle}`}
+                        className={cn(
+                          'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+                          isActive ? 'text-foreground' : 'text-muted-foreground',
+                        )}
+                      >
+                        {ns.type === 'organization' ? (
+                          <Building2 className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <User className="h-4 w-4 shrink-0" />
+                        )}
+                        <span className="flex-1 truncate">
+                          <span className="block font-medium text-foreground">{ns.displayName}</span>
+                          <span className="block text-xs text-muted-foreground">{`@${ns.handle}`}</span>
+                        </span>
+                        {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                      </Link>
+                    </Popover.Close>
+                  );
+                })}
+                <div className="my-1 border-t" />
+                <Popover.Close asChild>
+                  <Link
+                    href="/orgs/new"
+                    className="flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <Building2 className="h-4 w-4 shrink-0" />
+                    <span>Create organization</span>
+                  </Link>
+                </Popover.Close>
+              </div>
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
       </div>
       {process.env.NEXT_PUBLIC_GIT_SHA && (
         <div className="border-t px-4 py-2">
