@@ -104,6 +104,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           active={pathname.startsWith(MONITORING_ITEM.href)}
         />
       </nav>
+      {/* Namespace context switcher */}
+      <div className="border-t px-3 py-3">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent transition-colors"
+          aria-label="Switch namespace"
+        >
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
+            {firebaseUser?.displayName
+              ? firebaseUser.displayName
+                  .split(' ')
+                  .slice(0, 2)
+                  .map((part) => part[0]?.toUpperCase() ?? '')
+                  .join('')
+              : '?'}
+          </div>
+          <span className="flex-1 truncate text-left text-sm font-medium">
+            {firebaseUser?.email ?? 'Set up profile'}
+          </span>
+        </button>
+      </div>
       {process.env.NEXT_PUBLIC_GIT_SHA && (
         <div className="border-t px-4 py-2">
           <span className="font-mono text-[10px] text-muted-foreground">

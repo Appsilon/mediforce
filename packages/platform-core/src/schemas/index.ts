@@ -124,6 +124,15 @@ export {
 } from './plugin-capability-metadata.js';
 
 export {
+  NamespaceTypeSchema,
+  NamespaceSchema,
+  NamespaceMemberSchema,
+  type NamespaceType,
+  type Namespace,
+  type NamespaceMember,
+} from './namespace.js';
+
+export {
   AgentDefinitionSchema,
   type AgentDefinition,
 } from './agent-definition.js';

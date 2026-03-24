@@ -42,6 +42,9 @@ export {
   WorkflowReviewConfigSchema,
   WorkflowStepSchema,
   WorkflowDefinitionSchema,
+  NamespaceTypeSchema,
+  NamespaceSchema,
+  NamespaceMemberSchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -89,6 +92,9 @@ export type {
   WorkflowReviewConfig,
   WorkflowStep,
   WorkflowDefinition,
+  NamespaceType,
+  Namespace,
+  NamespaceMember,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)
