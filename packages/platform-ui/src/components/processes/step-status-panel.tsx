@@ -150,7 +150,7 @@ function TypeBadge({ type, executorType }: { type: Step['type']; executorType?: 
       </span>
     );
   }
-  // Fallback: show the behavioral step type
+  // Fallback: show the behavioral step type only for review (meaningful)
   if (type === 'review') {
     return (
       <span className="inline-flex items-center gap-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full px-1.5 py-0.5">
@@ -159,12 +159,8 @@ function TypeBadge({ type, executorType }: { type: Step['type']; executorType?: 
       </span>
     );
   }
-  return (
-    <span className="inline-flex items-center gap-0.5 text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5">
-      <Cog className="h-3 w-3" />
-      {type}
-    </span>
-  );
+  // Hide generic types like "creation" — they add no signal
+  return null;
 }
 
 function StepProgress({ stepId, agentEvents }: { stepId: string; agentEvents: AgentEventItem[] }) {
@@ -410,7 +406,7 @@ export function StepStatusPanel({
                       : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
                 </div>
-                <div className="text-xs font-mono text-muted-foreground mt-0.5">{step.id}</div>
+                {/* Step ID hidden — shown only on hover for debugging */}
                 {status === 'running' && stepConfigMap?.get(step.id)?.executorType === 'agent' && (
                   <StepProgress stepId={step.id} agentEvents={agentEvents} />
                 )}

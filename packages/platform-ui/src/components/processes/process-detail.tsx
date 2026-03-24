@@ -17,6 +17,11 @@ import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 
 type AuditEventWithId = AuditEvent & { id: string };
 
+function resolveStepLabel(stepId: string, steps: Step[]): string {
+  const found = steps.find((s) => s.id === stepId);
+  return found?.name ?? stepId.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export interface AgentEventItem {
   id: string;
   stepId: string;
@@ -135,27 +140,29 @@ export function ProcessDetail({
           )}
           <span>ID: <span className="font-mono text-foreground text-xs">{instance.id}</span></span>
           {instance.currentStepId && (
-            <span>Current step: <span className="font-mono text-foreground">{instance.currentStepId}</span></span>
+            <span>Current step: <span className="font-medium text-foreground">{resolveStepLabel(instance.currentStepId, definitionSteps)}</span></span>
           )}
           <span>Created: <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span></span>
         </div>
-        {instance.pauseReason && (
-          <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-            <span>Paused: {instance.pauseReason}</span>
-            {blockingTask && (
-              <span className="ml-2">
-                — waiting on{' '}
-                <Link
-                  href={`/tasks/${blockingTask.id}`}
-                  className="font-medium underline hover:text-amber-900 dark:hover:text-amber-200"
-                >
-                  {blockingTask.stepId}
-                </Link>
-                {blockingTask.status === 'claimed' && blockingTask.assignedUserId && (
-                  <span className="ml-1 text-amber-600 dark:text-amber-400">(claimed)</span>
-                )}
+        {needsHumanAction && blockingTask && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+            <div className="text-sm">
+              <span className="font-medium">Waiting for your input</span>
+              <span className="text-muted-foreground ml-1.5">
+                — {resolveStepLabel(blockingTask.stepId, definitionSteps)}
               </span>
-            )}
+            </div>
+            <Link
+              href={`/tasks/${blockingTask.id}`}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+            >
+              Open task
+            </Link>
+          </div>
+        )}
+        {instance.pauseReason && !needsHumanAction && (
+          <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+            Paused
           </div>
         )}
         {instance.error && (
