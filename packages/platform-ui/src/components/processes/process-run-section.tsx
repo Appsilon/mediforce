@@ -203,10 +203,10 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
                       event.stopPropagation();
                       window.location.href = `/tasks/${activeTaskId}`;
                     }}
-                    className="group/step inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
+                    className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
                   >
                     {toHumanLabel(instance.currentStepId)}
-                    <ExternalLink className="h-3 w-3 shrink-0 opacity-0 group-hover/step:opacity-100 transition-opacity" />
+                    <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
                   </span>
                 ) : (
                   <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium">
