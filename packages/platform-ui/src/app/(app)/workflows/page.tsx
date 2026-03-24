@@ -7,6 +7,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { GitBranch, Plus, Layers, Github, ExternalLink, Archive, Play, SlidersHorizontal, Check, ChevronRight } from 'lucide-react';
 import { useProcessDefinitions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
+import { useMyTasks } from '@/hooks/use-tasks';
 import { ProcessInstanceRow } from '@/components/processes/process-run-section';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { formatStepName } from '@/components/tasks/task-utils';
@@ -95,11 +96,13 @@ function ProcessCard({
   instances,
   showCompleted,
   steps,
+  activeTaskByInstance,
 }: {
   definition: DefinitionGroup;
   instances: ProcessInstance[];
   showCompleted: boolean;
   steps?: string[];
+  activeTaskByInstance: Map<string, string>;
 }) {
   const filteredInstances = useMemo(() => {
     return instances.filter((instance) => {
@@ -206,6 +209,7 @@ function ProcessCard({
                 key={instance.id}
                 instance={instance}
                 steps={steps}
+                activeTaskId={activeTaskByInstance.get(instance.id)}
               />
             ))}
           </div>
@@ -269,8 +273,20 @@ export default function ProcessCatalogPage() {
 
   const { definitions, stepsByDefinition, loading: defsLoading } = useProcessDefinitions();
   const { data: allInstances, loading: instancesLoading } = useProcessInstances('all');
+  const { data: activeTasks } = useMyTasks(null);
 
   const loading = defsLoading || instancesLoading;
+
+  // Map instanceId → first active task id (for quick "View task" links on paused runs)
+  const activeTaskByInstance = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const task of activeTasks) {
+      if (!map.has(task.processInstanceId)) {
+        map.set(task.processInstanceId, task.id);
+      }
+    }
+    return map;
+  }, [activeTasks]);
 
   const hasArchivedDefinitions = definitions.some((d) => d.archived === true);
 
@@ -387,6 +403,7 @@ export default function ProcessCatalogPage() {
               instances={instancesByDefinition.get(definition.name) ?? []}
               showCompleted={showCompleted}
               steps={stepsByDefinition.get(definition.name)}
+              activeTaskByInstance={activeTaskByInstance}
             />
           ))}
         </div>
