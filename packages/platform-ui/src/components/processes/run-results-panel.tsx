@@ -1,16 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
-import { CheckCircle2, ExternalLink, Gauge, GitBranch, Clock, FileText, FileBarChart } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Gauge, GitBranch, Clock, FileText } from 'lucide-react';
 import type { StepExecution, AgentOutputSnapshot } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { formatDuration, formatStepName } from '@/lib/format';
 
 interface RunResultsPanelProps {
   stepExecutions: StepExecution[];
-  workflowName: string;
-  runId: string;
 }
 
 function findFinalAgentOutput(stepExecutions: StepExecution[]): {
@@ -36,7 +33,7 @@ function findFinalAgentOutput(stepExecutions: StepExecution[]): {
   };
 }
 
-export function RunResultsPanel({ stepExecutions, workflowName, runId }: RunResultsPanelProps) {
+export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
   const finalOutput = React.useMemo(
     () => findFinalAgentOutput(stepExecutions),
     [stepExecutions],
@@ -161,16 +158,6 @@ export function RunResultsPanel({ stepExecutions, workflowName, runId }: RunResu
             </pre>
           </div>
         )}
-        {/* View Report link */}
-        <div className="pt-2 border-t">
-          <Link
-            href={`/workflows/${encodeURIComponent(workflowName)}/runs/${runId}/report`}
-            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
-          >
-            <FileBarChart className="h-3.5 w-3.5" />
-            View Report
-          </Link>
-        </div>
       </div>
     </div>
   );
