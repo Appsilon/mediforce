@@ -460,8 +460,8 @@ describe('WorkflowEngine', () => {
       expect(tasks).toHaveLength(1);
       expect(tasks[0].processInstanceId).toBe(instance.id);
       expect(tasks[0].stepId).toBe('process');
-      expect(tasks[0].status).toBe('pending');
-      expect(tasks[0].assignedUserId).toBeNull();
+      expect(tasks[0].status).toBe('claimed');
+      expect(tasks[0].assignedUserId).toBe('user-1');
     });
 
     it('does not create HumanTask when humanTaskRepository is not injected', async () => {
@@ -984,7 +984,8 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
     expect(tasks[0].processInstanceId).toBe(instance.id);
     expect(tasks[0].stepId).toBe('process');
     expect(tasks[0].assignedRole).toBe('operator');
-    expect(tasks[0].status).toBe('pending');
+    expect(tasks[0].status).toBe('claimed');
+    expect(tasks[0].assignedUserId).toBe('user-1');
   });
 
   it('advanceStep pauses instance when advancing to a human step', async () => {
@@ -1070,7 +1071,8 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
     const tasks = await humanTaskRepo.getByInstanceId(instance.id);
     expect(tasks.length).toBe(1);
     expect(tasks[0].stepId).toBe('human-step');
-    expect(tasks[0].status).toBe('pending');
+    expect(tasks[0].status).toBe('claimed');
+    expect(tasks[0].assignedUserId).toBe('user-1');
   });
 
   it('[DATA] advanceStep after agent completion to terminal step completes the instance', async () => {

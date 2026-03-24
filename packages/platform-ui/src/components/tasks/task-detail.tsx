@@ -4,11 +4,10 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { format } from 'date-fns';
-import { ArrowLeft, Lock, FileText, CheckCircle, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle, Download, Loader2 } from 'lucide-react';
 import { where, orderBy } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import type { HumanTask, ProcessInstance } from '@mediforce/platform-core';
-import { ClaimButton, UnclaimButton } from './claim-button';
 import { TaskContextPanel } from './task-context-panel';
 import { AgentOutputReviewPanel } from './agent-output-review-panel';
 import { FileUploadZone } from './file-upload-zone';
@@ -156,10 +155,8 @@ export function TaskDetail({
     siblingConstraints,
   );
 
-  const isClaimedByMe = task.status === 'claimed' && task.assignedUserId === currentUserId;
-  const isClaimedByOther = task.status === 'claimed' && task.assignedUserId !== currentUserId;
+  const isActionable = task.status === 'claimed' || task.status === 'pending';
   const isCompleted = task.status === 'completed';
-  const isPending = task.status === 'pending';
 
   return (
     <div className="p-6 max-w-3xl space-y-6">
@@ -244,11 +241,6 @@ export function TaskDetail({
         )}
       </div>
 
-      {/* Quick claim — visible at the top so users don't need to scroll */}
-      {isPending && (
-        <ClaimButton taskId={task.id} currentUserId={currentUserId} fullWidth />
-      )}
-
       {/* All tasks in this run */}
       {siblingTasks.length > 1 && (
         <div className="rounded-lg border p-4">
@@ -312,13 +304,8 @@ export function TaskDetail({
 
       {/* Action section — conditional on task status */}
       <div className="space-y-3">
-        {/* Pending: show claim button */}
-        {isPending && (
-          <ClaimButton taskId={task.id} currentUserId={currentUserId} />
-        )}
-
-        {/* Claimed by current user: show upload zone OR verdict form */}
-        {isClaimedByMe && isFileUploadTask && !uploadComplete && (
+        {/* Actionable: show upload zone OR verdict/selection/params form */}
+        {isActionable && isFileUploadTask && !uploadComplete && (
           <>
             {uploading ? (
               <div className="space-y-3 rounded-lg border p-6">
@@ -349,15 +336,10 @@ export function TaskDetail({
             {uploadError && (
               <p className="text-sm text-destructive">{uploadError}</p>
             )}
-            {!uploading && (
-              <div className="pt-1 border-t">
-                <UnclaimButton taskId={task.id} currentUserId={currentUserId} />
-              </div>
-            )}
           </>
         )}
 
-        {isClaimedByMe && isFileUploadTask && uploadComplete && (
+        {isActionable && isFileUploadTask && uploadComplete && (
           <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:bg-green-900/20 dark:border-green-800">
             <p className="text-sm font-medium text-green-800 dark:text-green-300">
               Files uploaded successfully
@@ -365,59 +347,28 @@ export function TaskDetail({
           </div>
         )}
 
-        {isClaimedByMe && !isFileUploadTask && isSelectionTask && (
-          <>
-            <SelectionForm
-              taskId={task.id}
-              options={task.options!}
-              remainingTaskCount={remainingTaskCount}
-            />
-            <div className="pt-1 border-t">
-              <UnclaimButton taskId={task.id} currentUserId={currentUserId} />
-            </div>
-          </>
+        {isActionable && !isFileUploadTask && isSelectionTask && (
+          <SelectionForm
+            taskId={task.id}
+            options={task.options!}
+            remainingTaskCount={remainingTaskCount}
+          />
         )}
 
-        {isClaimedByMe && !isFileUploadTask && !isSelectionTask && isParamsTask && (
-          <>
-            <ParamsForm
-              taskId={task.id}
-              params={task.params!}
-              remainingTaskCount={remainingTaskCount}
-            />
-            <div className="pt-1 border-t">
-              <UnclaimButton taskId={task.id} currentUserId={currentUserId} />
-            </div>
-          </>
+        {isActionable && !isFileUploadTask && !isSelectionTask && isParamsTask && (
+          <ParamsForm
+            taskId={task.id}
+            params={task.params!}
+            remainingTaskCount={remainingTaskCount}
+          />
         )}
 
-        {isClaimedByMe && !isFileUploadTask && !isSelectionTask && !isParamsTask && (
-          <>
-            <VerdictForm
-              taskId={task.id}
-              disabled={false}
-              remainingTaskCount={remainingTaskCount}
-            />
-            <div className="pt-1 border-t">
-              <UnclaimButton taskId={task.id} currentUserId={currentUserId} />
-            </div>
-          </>
-        )}
-
-        {/* Claimed by another user: locked state */}
-        {isClaimedByOther && (
-          <div className="rounded-lg border border-dashed p-4 flex items-center gap-3">
-            <Lock className="h-5 w-5 text-muted-foreground shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Task is locked
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Claimed by{' '}
-                <span className="font-mono">{task.assignedUserId}</span>
-              </p>
-            </div>
-          </div>
+        {isActionable && !isFileUploadTask && !isSelectionTask && !isParamsTask && (
+          <VerdictForm
+            taskId={task.id}
+            disabled={false}
+            remainingTaskCount={remainingTaskCount}
+          />
         )}
 
         {/* Completed: upload confirmation or verdict confirmation */}

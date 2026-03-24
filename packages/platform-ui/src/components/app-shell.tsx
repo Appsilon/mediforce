@@ -17,7 +17,7 @@ const ACTION_ITEMS = [
 const NAV_ITEMS = [
   { href: '/workflows', label: 'Workflows', icon: GitBranch, badge: null },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null },
-  { href: '/tasks', label: 'Human Actions', icon: User, badge: null },
+  { href: '/tasks', label: 'New actions', icon: User, badge: null },
 ] as const;
 
 const MONITORING_ITEM = { href: '/monitoring', label: 'Monitoring', icon: Activity } as const;

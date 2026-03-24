@@ -15,14 +15,6 @@ import { cn } from '@/lib/utils';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import type { DefinitionGroup } from '@/hooks/use-process-definitions';
 
-const STATUS_ORDER: Record<string, number> = {
-  running: 0,
-  created: 1,
-  paused: 2,
-  completed: 3,
-  failed: 4,
-};
-
 function isActiveStatus(status: string): boolean {
   return status === 'running' || status === 'created' || status === 'paused';
 }
@@ -109,8 +101,6 @@ function ProcessCard({
   showCompleted: boolean;
   steps?: string[];
 }) {
-  const [expanded, setExpanded] = React.useState(false);
-
   const filteredInstances = useMemo(() => {
     return instances.filter((instance) => {
       if (!showCompleted && isTerminalStatus(instance.status)) return false;
@@ -120,15 +110,13 @@ function ProcessCard({
 
   const sortedInstances = useMemo(() => {
     return [...filteredInstances].sort((instanceA, instanceB) => {
-      const statusDiff = (STATUS_ORDER[instanceA.status] ?? 99) - (STATUS_ORDER[instanceB.status] ?? 99);
-      if (statusDiff !== 0) return statusDiff;
       return new Date(instanceB.createdAt).getTime() - new Date(instanceA.createdAt).getTime();
     });
   }, [filteredInstances]);
 
   const activeCount = sortedInstances.filter((instance) => isActiveStatus(instance.status)).length;
   const totalCount = sortedInstances.length;
-  const previewInstances = expanded ? sortedInstances : sortedInstances.slice(0, PREVIEW_LIMIT);
+  const previewInstances = sortedInstances.slice(0, PREVIEW_LIMIT);
   const hasMore = totalCount > PREVIEW_LIMIT;
 
   return (
@@ -212,7 +200,7 @@ function ProcessCard({
         {previewInstances.length > 0 && (
         <div className="border-t">
 
-          <div className={cn(expanded && 'max-h-[300px] overflow-y-auto')}>
+          <div>
             {previewInstances.map((instance) => (
               <ProcessInstanceRow
                 key={instance.id}
@@ -222,21 +210,13 @@ function ProcessCard({
             ))}
           </div>
 
-          {hasMore && !expanded && (
-            <button
-              onClick={() => setExpanded(true)}
-              className="w-full px-4 py-2 text-xs font-medium text-primary hover:bg-muted/30 transition-colors border-t border-border/30"
+          {hasMore && (
+            <Link
+              href={`/runs?workflow=${encodeURIComponent(definition.name)}`}
+              className="block w-full px-4 py-2 text-xs font-medium text-primary hover:bg-muted/30 transition-colors border-t border-border/30 text-center"
             >
               Show all {totalCount} runs
-            </button>
-          )}
-          {expanded && (
-            <button
-              onClick={() => setExpanded(false)}
-              className="w-full px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/30 transition-colors border-t border-border/30"
-            >
-              Show less
-            </button>
+            </Link>
           )}
         </div>
         )}
@@ -342,7 +322,7 @@ export default function ProcessCatalogPage() {
           <Link
             href="/workflows/new"
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap shrink-0',
               'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
             )}
           >

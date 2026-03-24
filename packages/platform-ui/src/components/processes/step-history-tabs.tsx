@@ -1,7 +1,11 @@
 'use client';
 
+import { useMemo } from 'react';
+import Link from 'next/link';
 import { format } from 'date-fns';
-import type { StepExecution } from '@mediforce/platform-core';
+import { where } from 'firebase/firestore';
+import type { StepExecution, HumanTask } from '@mediforce/platform-core';
+import { useCollection } from '@/hooks/use-collection';
 import { cn } from '@/lib/utils';
 
 function statusBadgeClass(status: string) {
@@ -10,7 +14,7 @@ function statusBadgeClass(status: string) {
   return 'bg-muted text-muted-foreground';
 }
 
-export function StepHistoryTabs({ steps, loading }: { steps: StepExecution[]; loading: boolean }) {
+export function StepHistoryTabs({ steps, loading, processInstanceId }: { steps: StepExecution[]; loading: boolean; processInstanceId?: string }) {
   if (loading) {
     return <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 rounded-md bg-muted animate-pulse" />)}</div>;
   }
@@ -18,6 +22,28 @@ export function StepHistoryTabs({ steps, loading }: { steps: StepExecution[]; lo
   if (steps.length === 0) {
     return <div className="py-8 text-center text-sm text-muted-foreground">No step history yet</div>;
   }
+
+  const taskConstraints = useMemo(
+    () =>
+      processInstanceId
+        ? [where('processInstanceId', '==', processInstanceId)]
+        : [],
+    [processInstanceId],
+  );
+  const { data: tasks } = useCollection<HumanTask>(
+    processInstanceId ? 'humanTasks' : '',
+    taskConstraints,
+  );
+
+  const taskByStepId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const task of tasks) {
+      if (!task.deleted) {
+        map.set(task.stepId, task.id);
+      }
+    }
+    return map;
+  }, [tasks]);
 
   const sorted = [...steps].sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
   const seenStepIds = new Set<string>();
@@ -36,6 +62,7 @@ export function StepHistoryTabs({ steps, loading }: { steps: StepExecution[]; lo
           {sorted.map((step) => {
             const isFirstOccurrence = !seenStepIds.has(step.stepId);
             seenStepIds.add(step.stepId);
+            const taskId = taskByStepId.get(step.stepId);
             return (
               <tr
                 key={step.id}
@@ -43,7 +70,15 @@ export function StepHistoryTabs({ steps, loading }: { steps: StepExecution[]; lo
                 data-step-id={step.stepId}
                 {...(isFirstOccurrence ? { id: `step-history-${step.stepId}` } : {})}
               >
-                <td className="px-4 py-2.5 font-mono text-xs">{step.stepId}</td>
+                <td className="px-4 py-2.5 font-mono text-xs">
+                  {taskId ? (
+                    <Link href={`/tasks/${taskId}`} className="text-primary hover:underline">
+                      {step.stepId}
+                    </Link>
+                  ) : (
+                    step.stepId
+                  )}
+                </td>
                 <td className="px-4 py-2.5">
                   <span className={cn('capitalize text-xs rounded-full px-2 py-0.5', statusBadgeClass(step.status))}>
                     {step.status}

@@ -16,4 +16,4 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy@${{ secrets.STAGING_SERVER_IP }} "/opt/mediforce/scripts/deploy.sh"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy@${{ secrets.STAGING_SERVER_IP }} "/opt/mediforce/scripts/deploy-staging.sh"
