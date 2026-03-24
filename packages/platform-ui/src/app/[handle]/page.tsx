@@ -2,7 +2,29 @@
 
 import * as React from 'react';
 import { useParams } from 'next/navigation';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useNamespace } from '@/hooks/use-namespace';
+import type { Namespace } from '@mediforce/platform-core';
+
+function useMemberCount(handle: string, enabled: boolean): number | null {
+  const [count, setCount] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (!enabled || !handle) return;
+
+    const membersRef = collection(db, 'namespaces', handle, 'members');
+    getDocs(membersRef)
+      .then((snapshot) => {
+        setCount(snapshot.size);
+      })
+      .catch(() => {
+        setCount(null);
+      });
+  }, [handle, enabled]);
+
+  return count;
+}
 
 function InitialsAvatar({ displayName }: { displayName: string }) {
   const initials = displayName
@@ -15,6 +37,22 @@ function InitialsAvatar({ displayName }: { displayName: string }) {
     <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary text-2xl font-semibold shrink-0">
       {initials}
     </div>
+  );
+}
+
+function MemberCountBadge({ namespace }: { namespace: Namespace }) {
+  const memberCount = useMemberCount(
+    namespace.handle,
+    namespace.type === 'organization',
+  );
+
+  if (namespace.type !== 'organization') return null;
+  if (memberCount === null) return null;
+
+  return (
+    <p className="text-sm text-muted-foreground mt-2">
+      {memberCount} {memberCount === 1 ? 'member' : 'members'}
+    </p>
   );
 }
 
@@ -88,6 +126,8 @@ export default function ProfilePage() {
             {namespace.bio !== undefined && namespace.bio !== '' && (
               <p className="text-sm text-foreground mt-3">{namespace.bio}</p>
             )}
+
+            <MemberCountBadge namespace={namespace} />
           </div>
         </div>
       </div>

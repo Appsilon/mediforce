@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { useUserNamespace } from '@/hooks/use-user-namespace';
 import { ThemeToggle } from './theme-toggle';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +60,7 @@ function NavItem({
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { firebaseUser, signOut } = useAuth();
+  const { namespace: userNamespace } = useUserNamespace(firebaseUser?.uid);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   const currentLabel =
@@ -121,7 +123,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               : '?'}
           </div>
           <span className="flex-1 truncate text-left text-sm font-medium">
-            {firebaseUser?.email ?? 'Set up profile'}
+            {userNamespace !== null
+              ? `@${userNamespace.handle}`
+              : (firebaseUser?.email ?? 'Set up profile')}
           </span>
         </button>
       </div>
