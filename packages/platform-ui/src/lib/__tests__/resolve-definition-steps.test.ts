@@ -58,12 +58,12 @@ describe('resolveDefinitionSteps', () => {
     expect(result[0].id).toBe('wf-step-1');
   });
 
-  it('[DATA] prefers legacy when both sources have matching versions', () => {
+  it('[DATA] prefers workflow when both sources have matching versions', () => {
     const instance = makeInstance('1', 'config');
     const legacy = [makeLegacy('1', ['legacy-step'])];
     const workflow = [makeWorkflow(1, ['wf-step'])];
     const result = resolveDefinitionSteps(instance, legacy, workflow);
-    expect(result[0].id).toBe('legacy-step');
+    expect(result[0].id).toBe('wf-step');
   });
 
   it('[DATA] falls back to workflow when legacy version does not match', () => {

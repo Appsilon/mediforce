@@ -3,8 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowLeft, FileBarChart, MoreVertical } from 'lucide-react';
-import * as Popover from '@radix-ui/react-popover';
+import { ArrowLeft, FileBarChart } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import type { ProcessInstance, StepExecution, AuditEvent, Step } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
@@ -131,59 +130,38 @@ export function ProcessDetail({
 
       {/* Header */}
       <div className="space-y-2">
-        <div className="flex items-start gap-3">
+        <div className="flex items-center gap-3">
           <h1 className="text-2xl font-headline font-semibold flex-1">{formatStepName(instance.definitionName)}</h1>
           <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
-          {canCancel && (
-            <Popover.Root>
-              <Popover.Trigger
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted transition-colors shrink-0"
-                aria-label="Run actions"
+          {canCancel && cancelStep === 0 && (
+            <button
+              onClick={() => setCancelStep(1)}
+              className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors shrink-0"
+            >
+              Cancel
+            </button>
+          )}
+          {canCancel && cancelStep === 1 && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={handleConfirmCancel}
+                className="rounded-md bg-destructive px-2.5 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
               >
-                <MoreVertical className="h-4 w-4" />
-              </Popover.Trigger>
-              <Popover.Portal>
-                <Popover.Content
-                  align="end"
-                  sideOffset={4}
-                  className="z-50 w-48 rounded-lg border bg-popover p-1 shadow-md animate-in fade-in-0 zoom-in-95"
-                >
-                  {cancelStep === 0 && (
-                    <button
-                      onClick={() => setCancelStep(1)}
-                      className="flex w-full items-center rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                    >
-                      Cancel run
-                    </button>
-                  )}
-                  {cancelStep === 1 && (
-                    <div className="p-2 space-y-2">
-                      <p className="text-xs text-destructive font-medium">This cannot be undone.</p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleConfirmCancel}
-                          className="flex-1 rounded-md bg-destructive px-2 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                        >
-                          Confirm
-                        </button>
-                        <button
-                          onClick={() => { setCancelStep(0); setCancelError(null); }}
-                          className="flex-1 rounded-md border px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
-                        >
-                          Back
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {cancelStep === 2 && (
-                    <p className="px-2 py-1.5 text-sm text-muted-foreground">Cancelling...</p>
-                  )}
-                  {cancelError && (
-                    <p className="px-2 py-1.5 text-xs text-destructive">{cancelError}</p>
-                  )}
-                </Popover.Content>
-              </Popover.Portal>
-            </Popover.Root>
+                Confirm cancel
+              </button>
+              <button
+                onClick={() => { setCancelStep(0); setCancelError(null); }}
+                className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
+              >
+                Back
+              </button>
+            </div>
+          )}
+          {canCancel && cancelStep === 2 && (
+            <span className="text-xs text-muted-foreground shrink-0">Cancelling...</span>
+          )}
+          {cancelError && (
+            <span className="text-xs text-destructive shrink-0">{cancelError}</span>
           )}
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
