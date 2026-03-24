@@ -10,15 +10,15 @@ import { test, expect } from '@playwright/test';
 test.describe('My Tasks', () => {
   test('[RENDER] page loads and shows heading', async ({ page }) => {
     await page.goto('/tasks');
-    await expect(page.getByRole('heading', { name: 'Human Actions' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'New actions' })).toBeVisible();
   });
 
-  test('[RENDER] shows task cards grouped by process definition', async ({ page }) => {
+  test('[RENDER] shows tasks in flat list by default', async ({ page }) => {
     await page.goto('/tasks');
-    // Supply Chain Review should appear as a card header (tasks from multiple instances)
-    await expect(page.getByText('Supply Chain Review').first()).toBeVisible({ timeout: 10_000 });
-    // Protocol to TFL should appear as another card (task-upload-docs)
-    await expect(page.getByText('Protocol to TFL')).toBeVisible();
+    // Tasks are shown in a flat list by default (no grouping)
+    await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
+    // Process names appear inline on each task row
+    await expect(page.getByText('Supply Chain Review').first()).toBeVisible();
   });
 
   test('[RENDER] shows pending tasks with formatted step names', async ({ page }) => {
@@ -61,9 +61,10 @@ test.describe('My Tasks', () => {
     await expect(page.getByText('unassigned')).not.toBeVisible();
   });
 
-  test('task detail page shows claim button for pending task', async ({ page }) => {
+  test('task detail page shows action form for pending task (auto-assigned)', async ({ page }) => {
     await page.goto('/tasks/task-human-review');
-    await expect(page.getByRole('button', { name: /claim/i }).first()).toBeVisible({ timeout: 10_000 });
+    // Claiming removed — pending tasks show action forms directly
+    await expect(page.getByRole('button', { name: /approve/i })).toBeVisible({ timeout: 10_000 });
   });
 
   test('task detail page shows previous step output', async ({ page }) => {

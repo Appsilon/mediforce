@@ -7,7 +7,6 @@ import type { HumanTask } from '@mediforce/platform-core';
 import { useProcessNameMap } from '@/hooks/use-agent-runs';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
-import { ClaimButton } from './claim-button';
 import { getActionType, getTaskLabel } from './action-type';
 import { formatStepName } from './task-utils';
 
@@ -24,6 +23,20 @@ function formatDeadline(deadline: string | null): string | null {
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Tomorrow';
   if (diffDays <= 7) return `in ${diffDays}d`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatRelativeTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
@@ -105,6 +118,9 @@ function TaskRow({
             {formatStepName(processName)}
           </span>
         )}
+        <span className="text-xs text-muted-foreground/70 tabular-nums shrink-0">
+          {formatRelativeTime(task.createdAt)}
+        </span>
         {deadline && (
           <span
             className={cn(
@@ -117,13 +133,12 @@ function TaskRow({
         )}
       </Link>
       <div className="pr-2 shrink-0">
-        {isClaimed && (
+        {task.assignedUserId && (
           <AssigneeAvatar
             isCurrentUser={task.assignedUserId === currentUserId}
             displayName={task.assignedUserId === currentUserId ? currentUserName : userNames.get(task.assignedUserId ?? '')}
           />
         )}
-        {task.status === 'pending' && <ClaimButton taskId={task.id} currentUserId={currentUserId} variant="inline" />}
       </div>
     </div>
   );
@@ -345,7 +360,10 @@ function FlatList({
   userNames: Map<string, string>;
   processNameMap: Map<string, string>;
 }) {
-  const sorted = React.useMemo(() => sortTasksForDisplay(activeTasks), [activeTasks]);
+  const sorted = React.useMemo(
+    () => [...activeTasks].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [activeTasks],
+  );
 
   if (sorted.length === 0) return <EmptyState />;
 

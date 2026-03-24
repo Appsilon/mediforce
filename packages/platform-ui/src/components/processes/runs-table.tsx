@@ -5,6 +5,7 @@ import { ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
+import { useUserDisplayNames } from '@/hooks/use-users';
 
 interface RunsTableProps {
   runs: ProcessInstance[];
@@ -27,11 +28,13 @@ export function RunsTable({
   runHref = defaultRunHref,
   emptyMessage = 'No runs found.',
 }: RunsTableProps) {
+  const userNames = useUserDisplayNames();
   const headers = [
     ...(showProcess ? ['Workflow'] : []),
     'Run ID',
     'Version',
     'Status',
+    'Started by',
     'Current Step',
     'Started',
     '', // View link
@@ -97,6 +100,9 @@ export function RunsTable({
               </td>
               <td className="px-4 py-3">
                 <ProcessStatusBadge status={run.status} />
+              </td>
+              <td className="px-4 py-3 text-xs text-muted-foreground">
+                {run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy.slice(0, 8)) : '—'}
               </td>
               <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                 {run.currentStepId ?? '—'}

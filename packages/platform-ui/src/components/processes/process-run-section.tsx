@@ -164,7 +164,7 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
   return (
     <Link
       href={detailHref}
-      className="group flex items-center gap-2 px-4 py-1.5 hover:bg-muted/50 transition-colors border-b border-border/40 last:border-b-0"
+      className="group flex items-center gap-2 px-4 py-1.5 min-h-[36px] hover:bg-muted/50 transition-colors border-b border-border/40 last:border-b-0"
     >
       <StatusDot status={instance.status} />
       <span className="font-mono text-xs text-muted-foreground w-[52px] shrink-0">

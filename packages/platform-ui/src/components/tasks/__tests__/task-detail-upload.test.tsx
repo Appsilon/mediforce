@@ -125,11 +125,11 @@ describe('TaskDetail — selection task rendering', () => {
     expect(approveButtons).toHaveLength(0);
   });
 
-  it('[RENDER] does not show selection form when task is pending', () => {
+  it('[RENDER] shows selection form even when task is pending (auto-assign)', () => {
     const task = createSelectionTask({ status: 'pending', assignedUserId: null });
     render(<TaskDetail task={task} currentUserId="user-1" />);
 
-    expect(screen.queryByText('All-human')).not.toBeInTheDocument();
+    expect(screen.getByText('All-human')).toBeInTheDocument();
   });
 
   it('[RENDER] shows completed state for selection task', () => {
@@ -179,13 +179,13 @@ describe('TaskDetail — file upload integration', () => {
     expect(screen.getByText(/approve/i)).toBeInTheDocument();
   });
 
-  it('[RENDER] does not show FileUploadZone when task is pending', () => {
+  it('[RENDER] shows FileUploadZone even when task is pending (auto-assign)', () => {
     const task = createUploadTask({ status: 'pending', assignedUserId: null });
 
     render(<TaskDetail task={task} currentUserId="user-1" />);
 
-    // Should show claim button, not upload zone
-    expect(screen.queryByText(/drop files here/i)).not.toBeInTheDocument();
+    // Forms are shown for pending tasks (claiming removed, auto-assign enabled)
+    expect(screen.getByText(/drop files here/i)).toBeInTheDocument();
   });
 
   it('[RENDER] does not show verdict form when upload UI is active', () => {
