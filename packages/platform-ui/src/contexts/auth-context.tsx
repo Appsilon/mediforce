@@ -9,7 +9,8 @@ import {
   signOut as firebaseSignOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 
 interface AuthContextValue {
   firebaseUser: FirebaseUser | null;
@@ -29,6 +30,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
       setLoading(false);
+      if (user) {
+        setDoc(
+          doc(db, 'users', user.uid),
+          {
+            uid: user.uid,
+            displayName: user.displayName ?? null,
+            email: user.email ?? null,
+          },
+          { merge: true },
+        ).catch(() => {});
+      }
     });
     return unsub;
   }, []);
