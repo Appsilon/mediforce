@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, ExternalLink } from 'lucide-react';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { StatusDot } from '@/components/ui/status-dot';
 
@@ -203,9 +203,10 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
                       event.stopPropagation();
                       window.location.href = `/tasks/${activeTaskId}`;
                     }}
-                    className="inline-flex bg-primary/10 text-primary rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/20 transition-colors"
+                    className="inline-flex items-center gap-1 bg-primary/10 text-primary rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/20 transition-colors"
                   >
                     {toHumanLabel(instance.currentStepId)}
+                    <ExternalLink className="h-3 w-3 shrink-0" />
                   </span>
                 ) : (
                   <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium">
