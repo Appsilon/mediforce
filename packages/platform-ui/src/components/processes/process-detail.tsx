@@ -3,7 +3,8 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowLeft, FileBarChart } from 'lucide-react';
+import { ArrowLeft, FileBarChart, MoreVertical } from 'lucide-react';
+import * as Popover from '@radix-ui/react-popover';
 import * as Tabs from '@radix-ui/react-tabs';
 import type { ProcessInstance, StepExecution, AuditEvent, Step } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
@@ -133,6 +134,57 @@ export function ProcessDetail({
         <div className="flex items-start gap-3">
           <h1 className="text-2xl font-headline font-semibold flex-1">{formatStepName(instance.definitionName)}</h1>
           <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
+          {canCancel && (
+            <Popover.Root>
+              <Popover.Trigger
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted transition-colors shrink-0"
+                aria-label="Run actions"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  align="end"
+                  sideOffset={4}
+                  className="z-50 w-48 rounded-lg border bg-popover p-1 shadow-md animate-in fade-in-0 zoom-in-95"
+                >
+                  {cancelStep === 0 && (
+                    <button
+                      onClick={() => setCancelStep(1)}
+                      className="flex w-full items-center rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      Cancel run
+                    </button>
+                  )}
+                  {cancelStep === 1 && (
+                    <div className="p-2 space-y-2">
+                      <p className="text-xs text-destructive font-medium">This cannot be undone.</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleConfirmCancel}
+                          className="flex-1 rounded-md bg-destructive px-2 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => { setCancelStep(0); setCancelError(null); }}
+                          className="flex-1 rounded-md border px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                        >
+                          Back
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {cancelStep === 2 && (
+                    <p className="px-2 py-1.5 text-sm text-muted-foreground">Cancelling...</p>
+                  )}
+                  {cancelError && (
+                    <p className="px-2 py-1.5 text-xs text-destructive">{cancelError}</p>
+                  )}
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+          )}
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <span>Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span></span>
@@ -169,42 +221,6 @@ export function ProcessDetail({
           </div>
         )}
 
-        {/* Cancel button — double-confirm pattern */}
-        {canCancel && (
-          <div className="flex items-center gap-2 pt-1">
-            {cancelStep === 0 && (
-              <button
-                onClick={() => setCancelStep(1)}
-                className="text-sm text-muted-foreground hover:text-destructive transition-colors"
-              >
-                Cancel run
-              </button>
-            )}
-            {cancelStep === 1 && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-destructive font-medium">Are you sure? This cannot be undone.</span>
-                <button
-                  onClick={handleConfirmCancel}
-                  className="text-destructive hover:underline font-medium"
-                >
-                  Yes, cancel run
-                </button>
-                <button
-                  onClick={() => { setCancelStep(0); setCancelError(null); }}
-                  className="text-muted-foreground hover:underline"
-                >
-                  No
-                </button>
-              </div>
-            )}
-            {cancelStep === 2 && (
-              <span className="text-sm text-muted-foreground">Cancelling...</span>
-            )}
-            {cancelError && (
-              <span className="text-sm text-destructive">{cancelError}</span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Step Status Panel — shows all definition steps with live status */}
