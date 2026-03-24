@@ -137,7 +137,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main content area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 print:hidden">
           <div className="flex items-center gap-3">
             {/* Mobile menu toggle */}
             <button
