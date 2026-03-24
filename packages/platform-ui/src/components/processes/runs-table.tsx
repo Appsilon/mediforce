@@ -107,20 +107,22 @@ export function RunsTable({
               <td className="px-4 py-3 text-xs text-muted-foreground">
                 {run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy.slice(0, 8)) : '—'}
               </td>
-              <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+              <td className="px-4 py-3 text-xs">
                 {run.currentStepId ? (
                   activeTaskByInstance?.get(run.id) ? (
                     <Link
                       href={`/tasks/${activeTaskByInstance.get(run.id)}`}
-                      className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+                      className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
                     >
                       {run.currentStepId}
-                      <ExternalLink className="h-3 w-3 shrink-0" />
+                      <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
                     </Link>
                   ) : (
-                    run.currentStepId
+                    <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 font-medium text-muted-foreground">
+                      {run.currentStepId}
+                    </span>
                   )
-                ) : '—'}
+                ) : <span className="text-muted-foreground">—</span>}
               </td>
               <td className="px-4 py-3 text-xs text-muted-foreground">
                 {formatDistanceToNow(new Date(run.createdAt), {
