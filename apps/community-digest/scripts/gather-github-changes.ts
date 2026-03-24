@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 interface GatherInput {
   repo: string;
   lookbackHours?: number;
+  sinceDate?: string;
 }
 
 interface GitHubCommit {
@@ -207,7 +208,9 @@ async function main(): Promise<void> {
   const lookbackHours = input.lookbackHours ?? 24;
 
   const until = new Date();
-  const since = new Date(until.getTime() - lookbackHours * 60 * 60 * 1000);
+  const since = input.sinceDate
+    ? new Date(input.sinceDate)
+    : new Date(until.getTime() - lookbackHours * 60 * 60 * 1000);
 
   const sinceIso = since.toISOString();
   const untilIso = until.toISOString();

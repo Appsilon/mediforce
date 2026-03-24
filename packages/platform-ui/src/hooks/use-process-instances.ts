@@ -30,8 +30,10 @@ export function useProcessInstances(
   const result = useCollection<ProcessInstance>('processInstances', constraints);
 
   const data = useMemo(() => {
-    if (!definitionName) return result.data;
-    return [...result.data].sort(
+    // Filter out soft-deleted instances
+    const filtered = result.data.filter((instance) => !instance.deleted);
+    if (!definitionName) return filtered;
+    return [...filtered].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }, [result.data, definitionName]);

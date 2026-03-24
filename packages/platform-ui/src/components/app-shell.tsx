@@ -17,7 +17,7 @@ const ACTION_ITEMS = [
 const NAV_ITEMS = [
   { href: '/workflows', label: 'Workflows', icon: GitBranch, badge: null },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null },
-  { href: '/tasks', label: 'Human Actions', icon: User, badge: null },
+  { href: '/tasks', label: 'New actions', icon: User, badge: null },
 ] as const;
 
 const MONITORING_ITEM = { href: '/monitoring', label: 'Monitoring', icon: Activity } as const;
@@ -137,7 +137,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main content area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 print:hidden">
           <div className="flex items-center gap-3">
             {/* Mobile menu toggle */}
             <button

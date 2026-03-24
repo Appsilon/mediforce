@@ -50,7 +50,9 @@ test.describe('My Runs', () => {
 
   test('[CLICK] clicking instance row navigates to detail', async ({ page }) => {
     await page.goto('/workflows');
-    await page.getByText('#proc-r').first().click({ timeout: 10_000 });
+    const row = page.getByRole('link', { name: /#proc-r/ });
+    await row.first().waitFor({ state: 'visible', timeout: 10_000 });
+    await row.first().click();
     await expect(page).toHaveURL(/\/workflows\/Supply%20Chain%20Review\/runs\/proc-running-1/);
   });
 

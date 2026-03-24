@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileBarChart } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import type { ProcessInstance, StepExecution, AuditEvent, Step } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
@@ -130,7 +130,9 @@ export function ProcessDetail({
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <span>Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span></span>
-          <span>Config: <span className="font-mono text-foreground">{instance.configName} v{instance.configVersion}</span></span>
+          {instance.configName && (
+            <span>Config: <span className="font-mono text-foreground">{instance.configName} v{instance.configVersion}</span></span>
+          )}
           <span>ID: <span className="font-mono text-foreground text-xs">{instance.id}</span></span>
           {instance.currentStepId && (
             <span>Current step: <span className="font-mono text-foreground">{instance.currentStepId}</span></span>
@@ -219,6 +221,17 @@ export function ProcessDetail({
         <RunResultsPanel stepExecutions={stepExecutions} />
       )}
 
+      {/* View Report — available for all completed runs */}
+      {instance.status === 'completed' && (
+        <Link
+          href={`/workflows/${encodeURIComponent(instance.definitionName)}/runs/${instance.id}/report`}
+          className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
+        >
+          <FileBarChart className="h-3.5 w-3.5" />
+          View Report
+        </Link>
+      )}
+
       {/* Tabs: Step History | Audit Log */}
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
         <Tabs.List className="flex gap-1 border-b mb-6">
@@ -238,7 +251,7 @@ export function ProcessDetail({
         </Tabs.List>
 
         <Tabs.Content value="history">
-          <StepHistoryTabs steps={stepExecutions} loading={stepExecutionsLoading} />
+          <StepHistoryTabs steps={stepExecutions} loading={stepExecutionsLoading} processInstanceId={instance.id} />
         </Tabs.Content>
 
         <Tabs.Content value="audit">

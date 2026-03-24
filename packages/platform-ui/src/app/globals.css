@@ -109,3 +109,40 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  [data-sidebar],
+  nav {
+    display: none !important;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Remove viewport height lock and overflow constraints from app shell */
+  [class*="h-screen"],
+  [class*="overflow-hidden"],
+  [class*="overflow-auto"] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  main {
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+  }
+
+  * {
+    box-shadow: none !important;
+  }
+
+  .report-step {
+    break-inside: avoid;
+  }
+}

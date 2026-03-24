@@ -147,4 +147,20 @@ export class FirestoreProcessInstanceRepository
 
     return StepExecutionSchema.parse(snapshot.docs[0].data());
   }
+
+  async getIdsByDefinitionName(name: string): Promise<string[]> {
+    const colRef = collection(this.db, this.collectionName);
+    const q = query(colRef, where('definitionName', '==', name));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => d.id);
+  }
+
+  async setDeletedByDefinitionName(name: string, deleted: boolean): Promise<void> {
+    const colRef = collection(this.db, this.collectionName);
+    const q = query(colRef, where('definitionName', '==', name));
+    const snapshot = await getDocs(q);
+    for (const d of snapshot.docs) {
+      await updateDoc(doc(this.db, this.collectionName, d.id), { deleted });
+    }
+  }
 }

@@ -96,6 +96,14 @@ export class InMemoryProcessInstanceRepository
     };
   }
 
+  async getIdsByDefinitionName(_name: string): Promise<string[]> {
+    return [];
+  }
+
+  async setDeletedByDefinitionName(_name: string, _deleted: boolean): Promise<void> {
+    // No-op in test double — Firestore uses untyped updateDoc for the `deleted` field
+  }
+
   /** Test helper: clear all stored data */
   clear(): void {
     this.instances.clear();

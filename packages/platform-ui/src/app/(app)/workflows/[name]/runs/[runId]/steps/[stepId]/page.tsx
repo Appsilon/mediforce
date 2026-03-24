@@ -9,21 +9,7 @@ import type { StepExecution, Step, AgentEvent } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { cn } from '@/lib/utils';
-
-function formatStepName(stepId: string): string {
-  return stepId
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
-}
+import { formatDuration, formatStepName } from '@/lib/format';
 
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
