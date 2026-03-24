@@ -14,6 +14,7 @@ import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
 import { cancelProcessRun } from '@/app/actions/processes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
+import { formatStepName } from '@/components/tasks/task-utils';
 
 type AuditEventWithId = AuditEvent & { id: string };
 
@@ -130,7 +131,7 @@ export function ProcessDetail({
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-start gap-3">
-          <h1 className="text-2xl font-headline font-semibold flex-1">{instance.definitionName}</h1>
+          <h1 className="text-2xl font-headline font-semibold flex-1">{formatStepName(instance.definitionName)}</h1>
           <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
