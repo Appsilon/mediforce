@@ -193,25 +193,26 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
               {instance.status === 'failed' ? 'Failed' : 'Completed'}
             </span>
           ) : (
-            <span className="text-xs truncate flex-1 flex items-center gap-1.5">
+            <span className="text-xs truncate flex-1">
               {instance.currentStepId ? (
-                <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium">
-                  {toHumanLabel(instance.currentStepId)}
-                </span>
+                activeTaskId ? (
+                  <span
+                    role="link"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      window.location.href = `/tasks/${activeTaskId}`;
+                    }}
+                    className="inline-flex bg-primary/10 text-primary rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/20 transition-colors"
+                  >
+                    {toHumanLabel(instance.currentStepId)}
+                  </span>
+                ) : (
+                  <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium">
+                    {toHumanLabel(instance.currentStepId)}
+                  </span>
+                )
               ) : 'Starting...'}
-              {activeTaskId && instance.status === 'paused' && (
-                <span
-                  role="link"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    window.location.href = `/tasks/${activeTaskId}`;
-                  }}
-                  className="inline-flex items-center text-[11px] text-primary hover:underline cursor-pointer shrink-0"
-                >
-                  View task
-                </span>
-              )}
             </span>
           )}
         </>
