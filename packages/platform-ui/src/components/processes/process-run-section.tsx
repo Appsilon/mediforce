@@ -155,7 +155,7 @@ function shortTimeAgo(date: Date): string {
   return `${Math.floor(diffDays / 7)}w ago`;
 }
 
-export function ProcessInstanceRow({ instance, showProcess = false, steps, stepStyle = 'dots' }: { instance: ProcessInstance; showProcess?: boolean; steps?: string[]; stepStyle?: 'dots' | 'bar' }) {
+export function ProcessInstanceRow({ instance, showProcess = false, steps, stepStyle = 'dots', activeTaskId }: { instance: ProcessInstance; showProcess?: boolean; steps?: string[]; stepStyle?: 'dots' | 'bar'; activeTaskId?: string }) {
   const shortHash = `#${instance.id.slice(0, 6)}`;
   const timeAgo = shortTimeAgo(new Date(instance.createdAt));
   const fullTimeAgo = formatDistanceToNow(new Date(instance.createdAt), { addSuffix: true });
@@ -193,12 +193,25 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
               {instance.status === 'failed' ? 'Failed' : 'Completed'}
             </span>
           ) : (
-            <span className="text-xs truncate flex-1">
+            <span className="text-xs truncate flex-1 flex items-center gap-1.5">
               {instance.currentStepId ? (
                 <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium">
                   {toHumanLabel(instance.currentStepId)}
                 </span>
               ) : 'Starting...'}
+              {activeTaskId && instance.status === 'paused' && (
+                <span
+                  role="link"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.location.href = `/tasks/${activeTaskId}`;
+                  }}
+                  className="inline-flex items-center text-[11px] text-primary hover:underline cursor-pointer shrink-0"
+                >
+                  View task
+                </span>
+              )}
             </span>
           )}
         </>
