@@ -9,7 +9,7 @@ import { Pencil, Check, X } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
-import { useUserDisplayNames } from '@/hooks/use-users';
+import { useUserProfiles } from '@/hooks/use-users';
 import type { Namespace } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ function formatDate(iso: string): string {
 
 const ROLE_LABELS: Record<string, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' };
 
-function MemberTooltipAvatar({ member, resolvedName }: { member: MemberPreview; resolvedName: string }) {
+function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member: MemberPreview; resolvedName: string; resolvedAvatar: string | undefined }) {
   const parts = resolvedName.split(' ');
   const initials = parts.length >= 2
     ? `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
@@ -120,10 +120,10 @@ function MemberTooltipAvatar({ member, resolvedName }: { member: MemberPreview; 
   return (
     <Tooltip.Root delayDuration={200}>
       <Tooltip.Trigger asChild>
-        {member.avatarUrl !== undefined ? (
+        {resolvedAvatar !== undefined ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={member.avatarUrl}
+            src={resolvedAvatar}
             alt={resolvedName}
             className="h-7 w-7 rounded-full border-2 border-background object-cover cursor-pointer"
           />
@@ -156,13 +156,17 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
     namespace.handle,
     namespace.type === 'organization',
   );
-  const displayNames = useUserDisplayNames();
+  const userProfiles = useUserProfiles();
 
   if (namespace.type !== 'organization') return null;
   if (totalCount === null) return null;
 
   function resolveName(member: MemberPreview): string {
-    return member.displayName ?? displayNames.get(member.uid) ?? member.uid;
+    return member.displayName ?? userProfiles.get(member.uid)?.displayName ?? member.uid;
+  }
+
+  function resolveAvatar(member: MemberPreview): string | undefined {
+    return member.avatarUrl ?? userProfiles.get(member.uid)?.photoURL;
   }
 
   return (
@@ -175,7 +179,7 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
           <Tooltip.Provider>
             <div className="flex -space-x-2" onClick={(e) => e.stopPropagation()}>
               {members.map((member) => (
-                <MemberTooltipAvatar key={member.uid} member={member} resolvedName={resolveName(member)} />
+                <MemberTooltipAvatar key={member.uid} member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
               ))}
             </div>
           </Tooltip.Provider>
