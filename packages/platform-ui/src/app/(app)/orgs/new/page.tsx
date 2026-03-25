@@ -105,6 +105,8 @@ export default function NewOrgPage() {
       await setDoc(doc(db, 'namespaces', handle, 'members', currentUid), {
         uid: currentUid,
         role: 'owner',
+        ...(firebaseUser.displayName !== null ? { displayName: firebaseUser.displayName } : {}),
+        ...(firebaseUser.photoURL !== null ? { avatarUrl: firebaseUser.photoURL } : {}),
         joinedAt: now,
       });
 

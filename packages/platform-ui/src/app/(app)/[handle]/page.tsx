@@ -2,28 +2,55 @@
 
 import * as React from 'react';
 import { useParams } from 'next/navigation';
-import { collection, getDocs } from 'firebase/firestore';
+import Link from 'next/link';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useNamespace } from '@/hooks/use-namespace';
 import type { Namespace } from '@mediforce/platform-core';
 
-function useMemberCount(handle: string, enabled: boolean): number | null {
-  const [count, setCount] = React.useState<number | null>(null);
+type MemberPreview = {
+  uid: string;
+  displayName?: string;
+  avatarUrl?: string;
+  role: string;
+};
+
+const MAX_AVATAR_MEMBERS = 20;
+
+function useOrgMembers(handle: string, enabled: boolean): { members: MemberPreview[]; totalCount: number | null } {
+  const [members, setMembers] = React.useState<MemberPreview[]>([]);
+  const [totalCount, setTotalCount] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     if (!enabled || !handle) return;
 
     const membersRef = collection(db, 'namespaces', handle, 'members');
-    getDocs(membersRef)
-      .then((snapshot) => {
-        setCount(snapshot.size);
+    const previewQuery = query(membersRef, orderBy('joinedAt', 'asc'), limit(MAX_AVATAR_MEMBERS));
+
+    Promise.all([getDocs(previewQuery), getDocs(membersRef)])
+      .then(([previewSnapshot, fullSnapshot]) => {
+        const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
+        const previews = previewSnapshot.docs
+          .map((docSnap) => {
+            const data = docSnap.data();
+            return {
+              uid: docSnap.id,
+              displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
+              avatarUrl: typeof data.avatarUrl === 'string' ? data.avatarUrl : undefined,
+              role: typeof data.role === 'string' ? data.role : 'member',
+            };
+          })
+          .sort((memberA, memberB) => (roleOrder[memberA.role] ?? 3) - (roleOrder[memberB.role] ?? 3));
+        setMembers(previews);
+        setTotalCount(fullSnapshot.size);
       })
       .catch(() => {
-        setCount(null);
+        setMembers([]);
+        setTotalCount(null);
       });
   }, [handle, enabled]);
 
-  return count;
+  return { members, totalCount };
 }
 
 function InitialsAvatar({ displayName }: { displayName: string }) {
@@ -40,19 +67,50 @@ function InitialsAvatar({ displayName }: { displayName: string }) {
   );
 }
 
-function MemberCountBadge({ namespace }: { namespace: Namespace }) {
-  const memberCount = useMemberCount(
+function MemberAvatars({ namespace }: { namespace: Namespace }) {
+  const { members, totalCount } = useOrgMembers(
     namespace.handle,
     namespace.type === 'organization',
   );
 
   if (namespace.type !== 'organization') return null;
-  if (memberCount === null) return null;
+  if (totalCount === null) return null;
 
   return (
-    <p className="text-sm text-muted-foreground mt-2">
-      {memberCount} {memberCount === 1 ? 'member' : 'members'}
-    </p>
+    <div className="mt-4">
+      <Link
+        href={`/${namespace.handle}/members`}
+        className="group inline-flex items-center gap-2.5"
+      >
+        {members.length > 0 && (
+          <div className="flex -space-x-2">
+            {members.map((member) =>
+              member.avatarUrl !== undefined ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={member.uid}
+                  src={member.avatarUrl}
+                  alt={member.displayName ?? ''}
+                  title={member.displayName ?? member.uid}
+                  className="h-7 w-7 rounded-full border-2 border-background object-cover"
+                />
+              ) : (
+                <div
+                  key={member.uid}
+                  title={member.displayName ?? member.uid}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-primary/10 text-primary text-[10px] font-semibold"
+                >
+                  {(member.displayName ?? member.uid).slice(0, 2).toUpperCase()}
+                </div>
+              ),
+            )}
+          </div>
+        )}
+        <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+          {totalCount} {totalCount === 1 ? 'member' : 'members'}
+        </span>
+      </Link>
+    </div>
   );
 }
 
@@ -127,7 +185,7 @@ export default function ProfilePage() {
               <p className="text-sm text-foreground mt-3">{namespace.bio}</p>
             )}
 
-            <MemberCountBadge namespace={namespace} />
+            <MemberAvatars namespace={namespace} />
           </div>
         </div>
       </div>

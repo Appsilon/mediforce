@@ -15,6 +15,8 @@ export const NamespaceSchema = z.object({
 export const NamespaceMemberSchema = z.object({
   uid: z.string().min(1),
   role: z.enum(['owner', 'admin', 'member']),
+  displayName: z.string().optional(),
+  avatarUrl: z.string().url().optional(),
   joinedAt: z.string().datetime(),
 });
 

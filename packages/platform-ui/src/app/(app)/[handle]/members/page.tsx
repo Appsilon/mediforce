@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
@@ -94,9 +94,14 @@ export default function MembersPage() {
     setAdding(true);
 
     try {
+      const userDoc = await getDoc(doc(db, 'users', trimmedUid));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+
       await setDoc(doc(db, 'namespaces', handle, 'members', trimmedUid), {
         uid: trimmedUid,
         role: newRole,
+        ...(typeof userData.displayName === 'string' ? { displayName: userData.displayName } : {}),
+        ...(typeof userData.avatarUrl === 'string' ? { avatarUrl: userData.avatarUrl } : {}),
         joinedAt: new Date().toISOString(),
       });
       setNewUid('');
@@ -155,12 +160,17 @@ export default function MembersPage() {
                 key={member.id}
                 className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3"
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                  <Users className="h-4 w-4 text-primary" />
-                </div>
+                {member.avatarUrl !== undefined ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={member.avatarUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                ) : (
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                    {(member.displayName ?? member.uid).slice(0, 2).toUpperCase()}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-sm truncate">{member.uid}</span>
+                    <span className="text-sm font-medium truncate">{member.displayName ?? member.uid}</span>
                     <RoleBadge role={member.role} />
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
