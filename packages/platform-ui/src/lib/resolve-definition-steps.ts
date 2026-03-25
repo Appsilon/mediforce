@@ -16,20 +16,37 @@ export function resolveDefinitionSteps(
 ): Step[] {
   if (!instance) return [];
 
-  // Try legacy processDefinitions first (exact version match)
-  const legacyMatch = legacyVersions.find((v) => v.version === instance.definitionVersion);
-  if (legacyMatch?.steps?.length) return legacyMatch.steps;
+  const defVersion = instance.definitionVersion;
 
-  // Fall back to workflowDefinitions (version is number, definitionVersion is string)
-  const versionNum = parseInt(instance.definitionVersion, 10);
-  if (!isNaN(versionNum)) {
+  // New-style runs use integer versions (e.g. "1", "2") without dots.
+  // Legacy runs use semver (e.g. "1.0.0").
+  const isNewStyleVersion = /^\d+$/.test(defVersion);
+
+  if (isNewStyleVersion) {
+    // Prefer workflowDefinitions for new-style versions
+    const versionNum = parseInt(defVersion, 10);
     const workflowMatch = workflowVersions.find((v) => v.version === versionNum);
     if (workflowMatch?.steps?.length) return workflowMatch.steps;
+
+    // Fall back to legacy
+    const legacyMatch = legacyVersions.find((v) => v.version === defVersion);
+    if (legacyMatch?.steps?.length) return legacyMatch.steps;
+  } else {
+    // Legacy semver — prefer legacy processDefinitions
+    const legacyMatch = legacyVersions.find((v) => v.version === defVersion);
+    if (legacyMatch?.steps?.length) return legacyMatch.steps;
+
+    // Fall back to workflow (unlikely but safe)
+    const versionNum = parseInt(defVersion, 10);
+    if (!isNaN(versionNum)) {
+      const workflowMatch = workflowVersions.find((v) => v.version === versionNum);
+      if (workflowMatch?.steps?.length) return workflowMatch.steps;
+    }
   }
 
   // Last resort: return steps from latest available definition
-  if (legacyVersions.length > 0) return legacyVersions[0].steps ?? [];
   if (workflowVersions.length > 0) return workflowVersions[0].steps;
+  if (legacyVersions.length > 0) return legacyVersions[0].steps ?? [];
 
   return [];
 }

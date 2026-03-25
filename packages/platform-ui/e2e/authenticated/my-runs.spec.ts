@@ -48,11 +48,11 @@ test.describe('My Runs', () => {
     await expect(page.getByText('Narrative Summary').first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test('[CLICK] clicking instance row navigates to detail', async ({ page }) => {
+  test('[CLICK] clicking instance hash navigates to run detail', async ({ page }) => {
     await page.goto('/workflows');
-    const row = page.getByRole('link', { name: /#proc-r/ });
-    await row.first().waitFor({ state: 'visible', timeout: 10_000 });
-    await row.first().click();
+    const hash = page.getByText('#proc-r').first();
+    await hash.waitFor({ state: 'visible', timeout: 10_000 });
+    await hash.click();
     await expect(page).toHaveURL(/\/workflows\/Supply%20Chain%20Review\/runs\/proc-running-1/);
   });
 

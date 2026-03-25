@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { ThemeToggle } from './theme-toggle';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ const ACTION_ITEMS = [
 
 const NAV_ITEMS = [
   { href: '/workflows', label: 'Workflows', icon: GitBranch, badge: null },
+  { href: '/runs', label: 'All runs', icon: Play, badge: null },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null },
   { href: '/tasks', label: 'New actions', icon: User, badge: null },
 ] as const;

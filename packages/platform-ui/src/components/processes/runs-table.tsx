@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, ExternalLink } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
@@ -15,6 +15,8 @@ interface RunsTableProps {
   /** Build the href for the "View" link. Defaults to process-scoped route. */
   runHref?: (run: ProcessInstance) => string;
   emptyMessage?: string;
+  /** Map of instanceId → active task ID for direct task links. */
+  activeTaskByInstance?: Map<string, string>;
 }
 
 function defaultRunHref(run: ProcessInstance): string {
@@ -27,6 +29,7 @@ export function RunsTable({
   showProcess = false,
   runHref = defaultRunHref,
   emptyMessage = 'No runs found.',
+  activeTaskByInstance,
 }: RunsTableProps) {
   const userNames = useUserDisplayNames();
   const headers = [
@@ -104,8 +107,22 @@ export function RunsTable({
               <td className="px-4 py-3 text-xs text-muted-foreground">
                 {run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy.slice(0, 8)) : '—'}
               </td>
-              <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                {run.currentStepId ?? '—'}
+              <td className="px-4 py-3 text-xs">
+                {run.currentStepId ? (
+                  activeTaskByInstance?.get(run.id) ? (
+                    <Link
+                      href={`/tasks/${activeTaskByInstance.get(run.id)}`}
+                      className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
+                    >
+                      {run.currentStepId}
+                      <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    </Link>
+                  ) : (
+                    <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 font-medium text-muted-foreground">
+                      {run.currentStepId}
+                    </span>
+                  )
+                ) : <span className="text-muted-foreground">—</span>}
               </td>
               <td className="px-4 py-3 text-xs text-muted-foreground">
                 {formatDistanceToNow(new Date(run.createdAt), {
