@@ -365,12 +365,8 @@ function useNamespaceWorkflows(handle: string, enabled: boolean) {
 }
 
 function NamespaceWorkflows({ namespace }: { namespace: Namespace }) {
-  const { workflows, loading } = useNamespaceWorkflows(
-    namespace.handle,
-    namespace.type === 'organization',
-  );
+  const { workflows, loading } = useNamespaceWorkflows(namespace.handle, true);
 
-  if (namespace.type !== 'organization') return null;
   if (loading) return null;
 
   return (
