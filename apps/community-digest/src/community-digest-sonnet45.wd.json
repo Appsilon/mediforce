@@ -1,0 +1,123 @@
+{
+  "name": "community-digest-sonnet45",
+  "description": "Daily GitHub scan → rank changes → draft Discord posts (Claude Sonnet 4.5)",
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "roles": ["community-lead"],
+  "env": {
+    "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}"
+  },
+  "steps": [
+    {
+      "id": "select-period",
+      "name": "Select Time Period",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["community-lead"],
+      "description": "Choose how far back to scan for changes",
+      "params": [
+        {
+          "name": "sinceDate",
+          "type": "date",
+          "required": true,
+          "description": "Show changes from this date onward"
+        }
+      ]
+    },
+    {
+      "id": "gather-changes",
+      "name": "Gather GitHub Changes",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "description": "Fetch commits, PRs, and issues from GitHub API",
+      "stepParams": {
+        "repo": "Appsilon/mediforce",
+        "lookbackHours": 48
+      },
+      "agent": {
+        "image": "mediforce-agent:community-digest",
+        "command": "node /app/gather-github-changes.js"
+      }
+    },
+    {
+      "id": "rank-changes",
+      "name": "Rank Changes",
+      "type": "creation",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "claude-code-agent",
+      "description": "AI ranks changes by community interest",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "agent": {
+        "skill": "rank-changes",
+        "skillsDir": "apps/community-digest/plugins/community-digest/skills",
+        "image": "mediforce-golden-image",
+        "model": "anthropic/claude-sonnet-4.5"
+      }
+    },
+    {
+      "id": "review-ranking",
+      "name": "Review Ranking",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["community-lead"],
+      "description": "Human reviews and adjusts the ranking",
+      "verdicts": {
+        "approve": { "target": "draft-posts" },
+        "revise": { "target": "rank-changes" }
+      }
+    },
+    {
+      "id": "draft-posts",
+      "name": "Draft Discord Posts",
+      "type": "creation",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "claude-code-agent",
+      "description": "AI drafts Discord posts from ranked changes",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "agent": {
+        "skill": "draft-discord-posts",
+        "skillsDir": "apps/community-digest/plugins/community-digest/skills",
+        "image": "mediforce-golden-image",
+        "model": "anthropic/claude-sonnet-4.5",
+        "prompt": "## Community Tone Rules\n\n- No marketing language. No \"exciting\", \"thrilled\", \"game-changing\". State what was done, why it matters, what's next.\n- Be specific. Mention the actual thing: the component, the step, the problem solved.\n- Keep it short. 3-8 sentences max.\n- Sound like an engineer talking to peers, not a company talking to customers.\n- End with a real question or ask that invites an answer worth reading.\n- No hashtags, no emojis in headers. One or two emojis inline are fine if natural.\n- If the update is small, the post should be small.\n- Don't explain what MediForce is in every post. The audience already knows.\n- It's OK to share problems, not just wins.\n- It's OK to think out loud."
+      }
+    },
+    {
+      "id": "review-posts",
+      "name": "Review Posts",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["community-lead"],
+      "description": "Human approves or revises the drafted posts",
+      "verdicts": {
+        "approve": { "target": "done" },
+        "revise": { "target": "draft-posts" }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "select-period", "to": "gather-changes" },
+    { "from": "gather-changes", "to": "rank-changes" },
+    { "from": "rank-changes", "to": "review-ranking" },
+    { "from": "draft-posts", "to": "review-posts" }
+  ]
+}
