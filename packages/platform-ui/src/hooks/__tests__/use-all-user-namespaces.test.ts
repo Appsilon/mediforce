@@ -5,14 +5,12 @@ import { renderHook, waitFor } from '@testing-library/react';
 const mockGetDocs = vi.fn();
 const mockGetDoc = vi.fn();
 const mockCollection = vi.fn();
-const mockCollectionGroup = vi.fn();
 const mockQuery = vi.fn();
 const mockWhere = vi.fn();
 const mockDoc = vi.fn();
 
 vi.mock('firebase/firestore', () => ({
   collection: (...args: unknown[]) => mockCollection(...args),
-  collectionGroup: (...args: unknown[]) => mockCollectionGroup(...args),
   query: (...args: unknown[]) => mockQuery(...args),
   where: (...args: unknown[]) => mockWhere(...args),
   getDocs: (...args: unknown[]) => mockGetDocs(...args),
@@ -27,26 +25,12 @@ vi.mock('@/lib/firebase', () => ({
 
 import { useAllUserNamespaces } from '../use-all-user-namespaces';
 
-// Helper to build a fake Firestore doc snapshot
-function makeFakeDoc(data: Record<string, unknown>) {
-  return { data: () => data, exists: () => true };
+function makeFakeDoc(data: Record<string, unknown>, exists = true) {
+  return { data: () => data, exists: () => exists };
 }
 
-// Helper to build a fake Firestore query snapshot
 function makeFakeSnapshot(docs: ReturnType<typeof makeFakeDoc>[]) {
-  return { docs };
-}
-
-// Helper to build a fake member doc with a parent.parent ref pointing to a path
-function makeFakeMemberDoc(parentPath: string) {
-  return {
-    data: () => ({ uid: 'uid-1', role: 'member', joinedAt: '2024-01-01T00:00:00.000Z' }),
-    ref: {
-      parent: {
-        parent: { path: parentPath },
-      },
-    },
-  };
+  return { docs, empty: docs.length === 0 };
 }
 
 const personalNamespace = {
@@ -67,9 +51,7 @@ const orgNamespace = {
 describe('useAllUserNamespaces', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: query/collection/where return stable sentinel values
     mockCollection.mockReturnValue('namespaces-ref');
-    mockCollectionGroup.mockReturnValue('members-group-ref');
     mockQuery.mockImplementation((ref: unknown) => ref);
     mockWhere.mockReturnValue('where-clause');
     mockDoc.mockReturnValue('doc-ref');
@@ -86,10 +68,11 @@ describe('useAllUserNamespaces', () => {
     expect(mockGetDocs).not.toHaveBeenCalled();
   });
 
-  it('[DATA] returns personal namespace when linkedUserId matches', async () => {
-    mockGetDocs
-      .mockResolvedValueOnce(makeFakeSnapshot([makeFakeDoc(personalNamespace)])) // personal query
-      .mockResolvedValueOnce(makeFakeSnapshot([])); // members query
+  it('[DATA] returns personal namespace when user has no organizations', async () => {
+    // getDocs for personal query
+    mockGetDocs.mockResolvedValueOnce(makeFakeSnapshot([makeFakeDoc(personalNamespace)]));
+    // getDoc for users/{uid} — no organizations field
+    mockGetDoc.mockResolvedValueOnce(makeFakeDoc({ email: 'alice@test.com' }));
 
     const { result } = renderHook(() => useAllUserNamespaces('uid-1'));
 
@@ -102,23 +85,14 @@ describe('useAllUserNamespaces', () => {
     expect(result.current.namespaces[0].type).toBe('personal');
   });
 
-  it('[DATA] merges personal and org namespaces, deduplicates by handle', async () => {
-    // personal query returns alice
-    // members query returns two memberships: acme-corp (new) and alice (duplicate)
-    mockGetDocs
-      .mockResolvedValueOnce(makeFakeSnapshot([makeFakeDoc(personalNamespace)])) // personal
-      .mockResolvedValueOnce(
-        makeFakeSnapshot([
-          makeFakeMemberDoc('namespaces/acme-corp'),
-          makeFakeMemberDoc('namespaces/alice'), // duplicate handle
-        ]),
-      ); // members
-
-    // First org doc: acme-corp
+  it('[DATA] merges personal and org namespaces from user doc', async () => {
+    // getDocs for personal query
+    mockGetDocs.mockResolvedValueOnce(makeFakeSnapshot([makeFakeDoc(personalNamespace)]));
+    // getDoc for users/{uid} with organizations array
     mockGetDoc
-      .mockResolvedValueOnce(makeFakeDoc(orgNamespace))
-      // Second org doc: alice (duplicate)
-      .mockResolvedValueOnce(makeFakeDoc(personalNamespace));
+      .mockResolvedValueOnce(makeFakeDoc({ organizations: ['acme-corp', 'alice'] }))
+      // getDoc for namespaces/acme-corp (alice already seen from personal)
+      .mockResolvedValueOnce(makeFakeDoc(orgNamespace));
 
     const { result } = renderHook(() => useAllUserNamespaces('uid-1'));
 
@@ -126,7 +100,6 @@ describe('useAllUserNamespaces', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    // alice from personal + acme-corp from org — alice duplicate from org is deduped
     expect(result.current.namespaces).toHaveLength(2);
     const handles = result.current.namespaces.map((ns) => ns.handle);
     expect(handles).toContain('alice');
@@ -134,11 +107,13 @@ describe('useAllUserNamespaces', () => {
   });
 
   it('[DATA] returns only org namespaces when no personal namespace found', async () => {
-    mockGetDocs
-      .mockResolvedValueOnce(makeFakeSnapshot([])) // personal: empty
-      .mockResolvedValueOnce(makeFakeSnapshot([makeFakeMemberDoc('namespaces/acme-corp')])); // members
-
-    mockGetDoc.mockResolvedValueOnce(makeFakeDoc(orgNamespace));
+    // getDocs for personal query — empty
+    mockGetDocs.mockResolvedValueOnce(makeFakeSnapshot([]));
+    // getDoc for users/{uid} with organizations array
+    mockGetDoc
+      .mockResolvedValueOnce(makeFakeDoc({ organizations: ['acme-corp'] }))
+      // getDoc for namespaces/acme-corp
+      .mockResolvedValueOnce(makeFakeDoc(orgNamespace));
 
     const { result } = renderHook(() => useAllUserNamespaces('uid-1'));
 

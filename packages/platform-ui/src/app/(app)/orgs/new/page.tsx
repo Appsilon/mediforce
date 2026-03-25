@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { arrayUnion, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -108,6 +108,10 @@ export default function NewOrgPage() {
         ...(firebaseUser.displayName !== null ? { displayName: firebaseUser.displayName } : {}),
         ...(firebaseUser.photoURL !== null ? { avatarUrl: firebaseUser.photoURL } : {}),
         joinedAt: now,
+      });
+
+      await updateDoc(doc(db, 'users', currentUid), {
+        organizations: arrayUnion(handle),
       });
 
       router.push(`/${handle}`);

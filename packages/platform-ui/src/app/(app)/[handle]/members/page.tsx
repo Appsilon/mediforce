@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import { arrayUnion, collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import Link from 'next/link';
 import { ArrowLeft, Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -124,6 +124,11 @@ export default function MembersPage() {
         ...(typeof userData.photoURL === 'string' ? { avatarUrl: userData.photoURL } : {}),
         joinedAt: new Date().toISOString(),
       });
+
+      await updateDoc(doc(db, 'users', uid), {
+        organizations: arrayUnion(handle),
+      });
+
       setNewEmail('');
       setNewRole('member');
     } catch (err: unknown) {
