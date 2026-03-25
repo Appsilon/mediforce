@@ -19,20 +19,20 @@ export default function RedirectPage() {
       : null;
 
     if (lastNamespace !== null && lastNamespace !== '') {
-      router.replace(`/${lastNamespace}/workflows`);
+      router.replace(`/${lastNamespace}`);
       return;
     }
 
     // Fall back to personal namespace
     const personalNamespace = namespaces.find((ns) => ns.type === 'personal');
     if (personalNamespace !== undefined) {
-      router.replace(`/${personalNamespace.handle}/workflows`);
+      router.replace(`/${personalNamespace.handle}`);
       return;
     }
 
     // Fall back to first available namespace
     if (namespaces.length > 0) {
-      router.replace(`/${namespaces[0].handle}/workflows`);
+      router.replace(`/${namespaces[0].handle}`);
       return;
     }
 

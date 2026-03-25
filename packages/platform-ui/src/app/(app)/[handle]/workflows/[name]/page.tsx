@@ -69,7 +69,7 @@ export default function ProcessDefinitionPage() {
     return (
       <div className="p-6 text-center text-sm text-muted-foreground">
         Workflow &ldquo;{decodedName}&rdquo; not found.{' '}
-        <Link href={`/${handle}/workflows`} className="underline">Back to catalog</Link>
+        <Link href={`/${handle}`} className="underline">Back to catalog</Link>
       </div>
     );
   }
@@ -79,7 +79,7 @@ export default function ProcessDefinitionPage() {
       {/* Header */}
       <div className="border-b px-6 py-4">
         <Link
-          href={`/${handle}/workflows`}
+          href={`/${handle}`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -152,7 +152,7 @@ export default function ProcessDefinitionPage() {
                     await setProcessArchived(decodedName, willArchive);
                     setArchiving(false);
                     if (willArchive) {
-                      router.push(`/${handle}/workflows`);
+                      router.push(`/${handle}`);
                     }
                   }}
                   disabled={archiving}
@@ -262,7 +262,7 @@ export default function ProcessDefinitionPage() {
         workflowName={decodedName}
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        onDeleted={() => router.push(`/${handle}/workflows`)}
+        onDeleted={() => router.push(`/${handle}`)}
       />
 
       {/* Transfer namespace dialog */}

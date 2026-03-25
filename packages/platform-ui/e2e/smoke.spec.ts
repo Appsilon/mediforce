@@ -20,8 +20,8 @@ test.describe('Smoke Tests', () => {
     expect(response?.status()).toBeGreaterThanOrEqual(200);
   });
 
-  test('[RENDER] /{handle}/workflows page route exists and responds', async ({ page }) => {
-    const response = await page.goto('/unknown-test-handle-xyz/workflows');
+  test('[RENDER] /{handle} profile+workflows page route exists and responds', async ({ page }) => {
+    const response = await page.goto('/unknown-test-handle-xyz');
     // Route must exist — any HTTP response confirms routing works.
     expect(response?.status()).toBeGreaterThanOrEqual(200);
   });

@@ -12,9 +12,9 @@ import { ThemeToggle } from './theme-toggle';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { path: '/workflows', label: 'Workflows', icon: GitBranch, badge: null },
-  { path: '/agents', label: 'Agents', icon: Bot, badge: null },
-  { path: '/tasks', label: 'New actions', icon: User, badge: null },
+  { path: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
+  { path: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
+  { path: '/tasks', label: 'New actions', icon: User, badge: null, exact: false },
 ] as const;
 
 const ACTION_ITEMS = [
@@ -98,19 +98,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent transition-colors"
               aria-label="Switch namespace"
             >
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
-                {activeNamespace !== null && activeNamespace.type === 'organization' ? (
-                  <Building2 className="h-3.5 w-3.5" />
-                ) : (
-                  firebaseUser?.displayName
-                    ? firebaseUser.displayName
-                        .split(' ')
-                        .slice(0, 2)
-                        .map((part) => part[0]?.toUpperCase() ?? '')
-                        .join('')
-                    : '?'
-                )}
-              </div>
+              {(() => {
+                const avatarSrc = activeNamespace?.avatarUrl ?? (activeNamespace?.type === 'personal' ? firebaseUser?.photoURL : undefined) ?? undefined;
+                if (avatarSrc) {
+                  // eslint-disable-next-line @next/next/no-img-element
+                  return <img src={avatarSrc} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />;
+                }
+                return (
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
+                    {activeNamespace !== null && activeNamespace.type === 'organization' ? (
+                      <Building2 className="h-3.5 w-3.5" />
+                    ) : (
+                      firebaseUser?.displayName
+                        ? firebaseUser.displayName
+                            .split(' ')
+                            .slice(0, 2)
+                            .map((part) => part[0]?.toUpperCase() ?? '')
+                            .join('')
+                        : '?'
+                    )}
+                  </div>
+                );
+              })()}
               <span className="flex-1 truncate text-left text-sm font-medium">
                 {activeDisplayName}
               </span>
@@ -129,13 +138,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <>
                     <Popover.Close asChild>
                       <Link
-                        href={`/${personalNamespace.handle}/workflows`}
+                        href={`/${personalNamespace.handle}`}
                         className={cn(
                           'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
                           handleFromPath === personalNamespace.handle ? 'text-foreground' : 'text-muted-foreground',
                         )}
                       >
-                        <User className="h-4 w-4 shrink-0" />
+                        {firebaseUser?.photoURL ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={firebaseUser.photoURL} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                        ) : (
+                          <User className="h-4 w-4 shrink-0" />
+                        )}
                         <span className="flex-1 truncate">
                           <span className="block font-medium text-foreground">My profile</span>
                           <span className="block text-xs text-muted-foreground">@{personalNamespace.handle}</span>
@@ -151,13 +165,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   return (
                     <Popover.Close asChild key={ns.handle}>
                       <Link
-                        href={`/${ns.handle}/workflows`}
+                        href={`/${ns.handle}`}
                         className={cn(
                           'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
                           isActive ? 'text-foreground' : 'text-muted-foreground',
                         )}
                       >
-                        <Building2 className="h-4 w-4 shrink-0" />
+                        {ns.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={ns.avatarUrl} alt="" className="h-5 w-5 shrink-0 rounded object-cover" />
+                        ) : (
+                          <Building2 className="h-4 w-4 shrink-0" />
+                        )}
                         <span className="flex-1 truncate">
                           <span className="block font-medium text-foreground">{ns.displayName}</span>
                           <span className="block text-xs text-muted-foreground">@{ns.handle}</span>
@@ -196,16 +215,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
         ))}
         <div className="my-2 border-t" />
-        {NAV_ITEMS.map((item) => (
-          <NavItem
-            key={item.path}
-            href={`${handlePrefix}${item.path}`}
-            label={item.label}
-            icon={item.icon}
-            badge={item.badge}
-            active={pathname.startsWith(`${handlePrefix}${item.path}`)}
-          />
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const fullHref = `${handlePrefix}${item.path}`;
+          const isActive = item.exact
+            ? pathname === fullHref || pathname === `${fullHref}/`
+            : pathname.startsWith(fullHref);
+          return (
+            <NavItem
+              key={item.label}
+              href={fullHref}
+              label={item.label}
+              icon={item.icon}
+              badge={item.badge}
+              active={isActive}
+            />
+          );
+        })}
         <div className="my-2 border-t" />
         <NavItem
           href={`${handlePrefix}${MONITORING_ITEM.path}`}

@@ -94,7 +94,7 @@ function NewConfigContent() {
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <Link
-          href={`/${handle}/workflows`}
+          href={`/${handle}`}
           className="hover:text-foreground transition-colors"
         >
           Processes

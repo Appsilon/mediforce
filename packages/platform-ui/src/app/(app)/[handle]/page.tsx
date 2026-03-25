@@ -188,8 +188,10 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
         {members.length > 0 && (
           <Tooltip.Provider>
             <div className="flex -space-x-2" onClick={(e) => e.stopPropagation()}>
-              {members.map((member) => (
-                <MemberTooltipAvatar key={member.uid} member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
+              {members.map((member, index) => (
+                <div key={member.uid} className="relative" style={{ zIndex: members.length - index }}>
+                  <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
+                </div>
               ))}
             </div>
           </Tooltip.Provider>
@@ -264,7 +266,7 @@ function InlineEditableBio({
           rows={3}
           disabled={saving}
           className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none disabled:opacity-50"
-          placeholder="Describe this organization…"
+          placeholder={namespace.type === 'organization' ? 'Describe this organization…' : 'Write a bio…'}
         />
         <div className="flex items-center gap-2 mt-1.5">
           <button
@@ -300,7 +302,7 @@ function InlineEditableBio({
         onClick={() => setEditing(true)}
         className="mt-2 text-sm text-muted-foreground hover:text-foreground transition-colors italic"
       >
-        Add a description…
+        {namespace.type === 'organization' ? 'Add a description…' : 'Add a bio…'}
       </button>
     );
   }
@@ -549,16 +551,19 @@ export default function ProfilePage() {
     <div className="flex flex-1 flex-col gap-6 p-6">
       {/* Profile header */}
       <div className="flex items-start gap-4">
-        {namespace.avatarUrl !== undefined && namespace.avatarUrl !== '' ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={namespace.avatarUrl}
-            alt={namespace.displayName}
-            className="h-14 w-14 rounded-full object-cover shrink-0"
-          />
-        ) : (
-          <InitialsAvatar displayName={namespace.displayName} />
-        )}
+        {(() => {
+          const avatarSrc = namespace.avatarUrl ?? (namespace.type === 'personal' ? firebaseUser?.photoURL : undefined) ?? undefined;
+          return avatarSrc !== undefined && avatarSrc !== '' ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarSrc}
+              alt={namespace.displayName}
+              className="h-14 w-14 rounded-full object-cover shrink-0"
+            />
+          ) : (
+            <InitialsAvatar displayName={namespace.displayName} />
+          );
+        })()}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">

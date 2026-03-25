@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { arrayRemove, collection, deleteDoc, doc, getDocs, updateDoc, writeBatch } from 'firebase/firestore';
+import { arrayRemove, collection, deleteDoc, deleteField, doc, getDocs, updateDoc, writeBatch } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Link from 'next/link';
-import { ArrowLeft, LogOut, Trash2 } from 'lucide-react';
-import { db } from '@/lib/firebase';
+import { ArrowLeft, LogOut, Trash2, Upload, X, Building2 } from 'lucide-react';
+import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useCollection } from '@/hooks/use-collection';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -39,6 +40,10 @@ export default function OrgSettingsPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [removingLogo, setRemovingLogo] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   async function handleDeleteOrg() {
     if (!confirmDelete) {
@@ -65,7 +70,7 @@ export default function OrgSettingsPage() {
         ),
       );
 
-      router.push(`/${handle}/workflows`);
+      router.push(`/${handle}`);
     } catch {
       setDeleting(false);
     }
@@ -79,9 +84,40 @@ export default function OrgSettingsPage() {
       await updateDoc(doc(db, 'users', firebaseUser.uid), {
         organizations: arrayRemove(handle),
       });
-      router.push(`/${handle}/workflows`);
+      router.push(`/${handle}`);
     } catch {
       setLeaving(false);
+    }
+  }
+
+  async function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+    setLogoError(null);
+    try {
+      const storagePath = `namespaces/${handle}/logo/${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      await uploadBytes(storageRef, file, { contentType: file.type });
+      const downloadUrl = await getDownloadURL(storageRef);
+      await updateDoc(doc(db, 'namespaces', handle), { avatarUrl: downloadUrl });
+    } catch {
+      setLogoError('Failed to upload logo. Make sure the file is an image under 2MB.');
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  }
+
+  async function handleRemoveLogo() {
+    setRemovingLogo(true);
+    try {
+      await updateDoc(doc(db, 'namespaces', handle), { avatarUrl: deleteField() });
+    } catch {
+      // silently fail
+    } finally {
+      setRemovingLogo(false);
     }
   }
 
@@ -127,6 +163,58 @@ export default function OrgSettingsPage() {
             Manage organization settings for <span className="font-semibold">@{handle}</span>.
           </p>
         </div>
+
+        {/* Logo */}
+        {(isOwner || currentUserMember?.role === 'admin') && (
+          <div className="rounded-lg border bg-card px-4 py-5 mb-6">
+            <h2 className="text-sm font-semibold mb-3">Organization logo</h2>
+            <div className="flex items-center gap-4">
+              {namespace.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={namespace.avatarUrl}
+                  alt={namespace.displayName}
+                  className="h-16 w-16 rounded-lg object-cover border"
+                />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-lg border bg-muted">
+                  <Building2 className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50 transition-colors"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  {uploadingLogo ? 'Uploading…' : 'Upload logo'}
+                </button>
+                {namespace.avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    disabled={removingLogo}
+                    className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50 transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    {removingLogo ? 'Removing…' : 'Remove logo'}
+                  </button>
+                )}
+                <p className="text-[11px] text-muted-foreground">Recommended: square image, at least 128×128px</p>
+                {logoError !== null && <p className="text-[11px] text-destructive">{logoError}</p>}
+              </div>
+            </div>
+          </div>
+        )}
 
         {!isOwner && (
           <div className="rounded-lg border border-destructive/30 bg-card px-4 py-5">

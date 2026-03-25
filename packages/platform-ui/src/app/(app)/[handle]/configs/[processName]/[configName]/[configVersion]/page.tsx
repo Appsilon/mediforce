@@ -78,7 +78,7 @@ export default function ConfigViewPage({ params }: ConfigViewPageProps) {
     <div className="p-6 space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Link href={`/${handle}/workflows`} className="hover:text-foreground transition-colors">
+        <Link href={`/${handle}`} className="hover:text-foreground transition-colors">
           Processes
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
