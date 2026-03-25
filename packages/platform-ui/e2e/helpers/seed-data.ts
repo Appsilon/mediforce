@@ -436,6 +436,7 @@ export function buildSeedData(testUserId: string) {
   const processDefinitions: Record<string, Record<string, unknown>> = {
     'def-supply-chain-review': {
       name: 'Supply Chain Review',
+      namespace: 'test',
       version: '1.0.0',
       description: 'End-to-end supply chain review process',
       steps: [
@@ -461,6 +462,7 @@ export function buildSeedData(testUserId: string) {
     },
     'def-data-quality-review': {
       name: 'Data Quality Review',
+      namespace: 'test',
       version: '2.1.0',
       description: 'Data quality check workflow',
       steps: [
@@ -642,6 +644,8 @@ export function buildSeedData(testUserId: string) {
       uid: testUserId,
       email: 'test@mediforce.dev',
       displayName: 'Test User',
+      handle: 'test',
+      organizations: [],
       role: 'admin',
       roles: ['reviewer', 'analyst', 'operator'],
     },
@@ -650,6 +654,7 @@ export function buildSeedData(testUserId: string) {
   const workflowDefinitions: Record<string, Record<string, unknown>> = {
     'Supply Chain Review:1': {
       name: 'Supply Chain Review',
+      namespace: 'test',
       version: 1,
       title: 'Initial vendor assessment workflow',
       description: 'End-to-end supply chain review process',
@@ -743,5 +748,25 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions };
+  const namespaces: Record<string, Record<string, unknown>> = {
+    test: {
+      id: 'test',
+      handle: 'test',
+      type: 'personal',
+      displayName: 'Test User',
+      linkedUserId: testUserId,
+      createdAt: '2024-01-01T00:00:00.000Z',
+    },
+  };
+
+  const namespaceMembers: Record<string, Record<string, unknown>> = {
+    [testUserId]: {
+      id: testUserId,
+      uid: testUserId,
+      role: 'owner',
+      joinedAt: '2024-01-01T00:00:00.000Z',
+    },
+  };
+
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions, namespaces, namespaceMembers };
 }

@@ -26,6 +26,8 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedCollection('processConfigs', data.processConfigs);
   await seedCollection('workflowDefinitions', data.workflowDefinitions);
   await seedCollection('agentDefinitions', data.agentDefinitions);
+  await seedCollection('namespaces', data.namespaces);
+  await seedSubcollection('namespaces', 'test', 'members', data.namespaceMembers);
   await seedSubcollection('processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions);
   await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);
 
@@ -34,7 +36,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', TEST_PASSWORD);
   await page.click('button[type="submit"]');
-  await page.waitForURL('**/workflows**', { timeout: 30_000 });
+  await page.waitForURL('**/test/workflows**', { timeout: 30_000 });
 
   // 5. Save auth state for reuse by authenticated tests
   await page.context().storageState({ path: 'e2e/.auth/user.json' });

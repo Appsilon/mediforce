@@ -9,12 +9,12 @@ import { test, expect } from '@playwright/test';
 
 test.describe('My Tasks', () => {
   test('[RENDER] page loads and shows heading', async ({ page }) => {
-    await page.goto('/tasks');
+    await page.goto('/test/tasks');
     await expect(page.getByRole('heading', { name: 'New actions' })).toBeVisible();
   });
 
   test('[RENDER] shows tasks in flat list by default', async ({ page }) => {
-    await page.goto('/tasks');
+    await page.goto('/test/tasks');
     // Tasks are shown in a flat list by default (no grouping)
     await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
     // Process names appear inline on each task row
@@ -22,13 +22,13 @@ test.describe('My Tasks', () => {
   });
 
   test('[RENDER] shows pending tasks with formatted step names', async ({ page }) => {
-    await page.goto('/tasks');
+    await page.goto('/test/tasks');
     // task-pending-1 has stepId 'review-intake-data' → "Review Intake Data" in label
     await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
   });
 
   test('[RENDER] Display popover opens and shows multi-select grouping', async ({ page }) => {
-    await page.goto('/tasks');
+    await page.goto('/test/tasks');
     await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
     // Click the Display button
     await page.getByRole('button', { name: /display/i }).click();
@@ -38,7 +38,7 @@ test.describe('My Tasks', () => {
   });
 
   test('[CLICK] toggling action grouping adds sub-groups within process cards', async ({ page }) => {
-    await page.goto('/tasks');
+    await page.goto('/test/tasks');
     await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
     // Enable action sub-grouping — use exact match
     await page.getByRole('button', { name: /display/i }).click();
@@ -48,13 +48,13 @@ test.describe('My Tasks', () => {
   });
 
   test('[CLICK] clicking task navigates to detail', async ({ page }) => {
-    await page.goto('/tasks');
+    await page.goto('/test/tasks');
     await page.getByText('Review Intake Data').click({ timeout: 10_000 });
     await expect(page).toHaveURL(/\/tasks\/task-pending-1/);
   });
 
   test('task detail page loads for pending task', async ({ page }) => {
-    await page.goto('/tasks/task-human-review');
+    await page.goto('/test/tasks/task-human-review');
     await expect(page.getByText(/Human Review/)).toBeVisible();
     await expect(page.getByText(/pending/i)).toBeVisible();
     await expect(page.getByText('reviewer')).toBeVisible();
@@ -62,26 +62,26 @@ test.describe('My Tasks', () => {
   });
 
   test('task detail page shows action form for pending task (auto-assigned)', async ({ page }) => {
-    await page.goto('/tasks/task-human-review');
+    await page.goto('/test/tasks/task-human-review');
     // Claiming removed — pending tasks show action forms directly
     await expect(page.getByRole('button', { name: /approve/i })).toBeVisible({ timeout: 10_000 });
   });
 
   test('task detail page shows previous step output', async ({ page }) => {
-    await page.goto('/tasks/task-human-review');
+    await page.goto('/test/tasks/task-human-review');
     await page.getByText(/previous step output/i).click();
     await expect(page.getByRole('tab', { name: /summary/i })).toBeVisible();
     await expect(page.getByRole('tab', { name: /full output/i })).toBeVisible();
   });
 
   test('claimed task shows verdict buttons', async ({ page }) => {
-    await page.goto('/tasks/task-claimed-1');
+    await page.goto('/test/tasks/task-claimed-1');
     await expect(page.getByRole('button', { name: /approve/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /revise/i })).toBeVisible();
   });
 
   test('completed task shows completion record', async ({ page }) => {
-    await page.goto('/tasks/task-completed-1');
+    await page.goto('/test/tasks/task-completed-1');
     await expect(page.getByText(/completed/i).first()).toBeVisible();
   });
 });

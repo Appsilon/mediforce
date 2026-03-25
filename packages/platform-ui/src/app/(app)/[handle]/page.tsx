@@ -3,16 +3,20 @@
 import * as React from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc, where } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { useMemo } from 'react';
-import { Pencil, Check, X, Settings, GitBranch, Building2 } from 'lucide-react';
+import { Pencil, Check, X, Settings, GitBranch, Building2, Plus } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useUserProfiles } from '@/hooks/use-users';
+import { useProcessDefinitions } from '@/hooks/use-process-definitions';
+import { useProcessInstances } from '@/hooks/use-process-instances';
+import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus } from '@/components/processes/process-card';
+import { cn } from '@/lib/utils';
 import { NamespaceSchema } from '@mediforce/platform-core';
-import type { Namespace } from '@mediforce/platform-core';
+import type { Namespace, ProcessInstance } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
 // Hooks
@@ -92,15 +96,19 @@ function useCurrentUserRole(handle: string, uid: string | undefined): string | n
 // Components
 // ---------------------------------------------------------------------------
 
-function InitialsAvatar({ displayName }: { displayName: string }) {
+function InitialsAvatar({ displayName, size = 'large' }: { displayName: string; size?: 'large' | 'small' }) {
   const initials = displayName
     .split(' ')
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('');
 
+  const sizeClasses = size === 'large'
+    ? 'h-14 w-14 text-xl'
+    : 'h-10 w-10 text-sm';
+
   return (
-    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary text-2xl font-semibold shrink-0">
+    <div className={`flex items-center justify-center rounded-full bg-primary/10 text-primary font-semibold shrink-0 ${sizeClasses}`}>
       {initials}
     </div>
   );
@@ -172,7 +180,7 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
   }
 
   return (
-    <div className="mt-4">
+    <div className="mt-3">
       <Link
         href={`/${namespace.handle}/members`}
         className="group inline-flex items-center gap-2.5"
@@ -246,7 +254,7 @@ function InlineEditableBio({
 
   if (editing) {
     return (
-      <div className="mt-3">
+      <div className="mt-2">
         <textarea
           ref={textareaRef}
           value={value}
@@ -290,7 +298,7 @@ function InlineEditableBio({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="mt-3 text-sm text-muted-foreground hover:text-foreground transition-colors italic"
+        className="mt-2 text-sm text-muted-foreground hover:text-foreground transition-colors italic"
       >
         Add a description…
       </button>
@@ -300,7 +308,7 @@ function InlineEditableBio({
   if (!hasBio) return null;
 
   return (
-    <div className="group/bio mt-3 flex items-start gap-1.5">
+    <div className="group/bio mt-2 flex items-start gap-1.5">
       <p className="text-sm text-foreground flex-1">{namespace.bio}</p>
       {canEdit && (
         <button
@@ -311,92 +319,6 @@ function InlineEditableBio({
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Namespace workflows
-// ---------------------------------------------------------------------------
-
-type WorkflowSummary = { name: string; title?: string; version: number };
-
-function useNamespaceWorkflows(handle: string, enabled: boolean) {
-  const [workflows, setWorkflows] = React.useState<WorkflowSummary[]>([]);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    if (!enabled || !handle) {
-      setWorkflows([]);
-      setLoading(false);
-      return;
-    }
-
-    const workflowsQuery = query(
-      collection(db, 'workflowDefinitions'),
-      where('namespace', '==', handle),
-    );
-    getDocs(workflowsQuery)
-      .then((snapshot) => {
-        const byName = new Map<string, WorkflowSummary>();
-        for (const docSnap of snapshot.docs) {
-          const data = docSnap.data();
-          const name = typeof data.name === 'string' ? data.name : '';
-          const version = typeof data.version === 'number' ? data.version : 0;
-          const existing = byName.get(name);
-          if (existing === undefined || version > existing.version) {
-            byName.set(name, {
-              name,
-              title: typeof data.title === 'string' ? data.title : undefined,
-              version,
-            });
-          }
-        }
-        setWorkflows([...byName.values()].sort((a, b) => a.name.localeCompare(b.name)));
-        setLoading(false);
-      })
-      .catch(() => {
-        setWorkflows([]);
-        setLoading(false);
-      });
-  }, [handle, enabled]);
-
-  return { workflows, loading };
-}
-
-function NamespaceWorkflows({ namespace }: { namespace: Namespace }) {
-  const { workflows, loading } = useNamespaceWorkflows(namespace.handle, true);
-
-  if (loading) return null;
-
-  return (
-    <div className="mt-8">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold">Workflows</h2>
-        <Link
-          href={`/${namespace.handle}/workflows`}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          View all
-        </Link>
-      </div>
-      {workflows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No workflows yet.</p>
-      ) : (
-        <div className="space-y-1">
-          {workflows.map((workflow) => (
-            <Link
-              key={workflow.name}
-              href={`/${namespace.handle}/workflows/${encodeURIComponent(workflow.name)}`}
-              className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
-            >
-              <GitBranch className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="font-medium truncate">{workflow.title ?? workflow.name}</span>
-              <span className="text-xs text-muted-foreground ml-auto shrink-0">v{workflow.version}</span>
-            </Link>
-          ))}
-        </div>
       )}
     </div>
   );
@@ -447,7 +369,7 @@ function UserOrganizations({ namespace }: { namespace: Namespace }) {
   if (namespace.type !== 'personal' || orgs.length === 0) return null;
 
   return (
-    <div className="mt-8">
+    <div className="mt-6">
       <h2 className="text-sm font-semibold mb-3">Organizations</h2>
       <div className="space-y-1">
         {orgs.map((org) => (
@@ -462,6 +384,121 @@ function UserOrganizations({ namespace }: { namespace: Namespace }) {
           </Link>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Workflow catalog section
+// ---------------------------------------------------------------------------
+
+function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Namespace }) {
+  const [showCompleted, setShowCompleted] = React.useState(true);
+  const [showArchived, setShowArchived] = React.useState(false);
+
+  const { definitions, stepsByDefinition, loading: defsLoading } = useProcessDefinitions();
+  const { data: allInstances, loading: instancesLoading } = useProcessInstances('all');
+
+  const loading = defsLoading || instancesLoading;
+
+  const namespacedDefinitions = useMemo(() => definitions.filter((d) => d.namespace === handle), [definitions, handle]);
+  const hasArchivedDefinitions = namespacedDefinitions.some((d) => d.archived === true);
+
+  const visibleDefinitions = useMemo(() => {
+    return definitions
+      .filter((d) => d.namespace === handle)
+      .filter((d) => showArchived || d.archived !== true);
+  }, [definitions, showArchived, handle]);
+
+  const instancesByDefinition = useMemo((): Map<string, ProcessInstance[]> => {
+    const map = new Map<string, ProcessInstance[]>();
+    for (const instance of allInstances) {
+      const existing = map.get(instance.definitionName) ?? [];
+      existing.push(instance);
+      map.set(instance.definitionName, existing);
+    }
+    return map;
+  }, [allInstances]);
+
+  const sortedDefinitions = useMemo(() => {
+    return [...visibleDefinitions].sort((defA, defB) => {
+      const instancesA = instancesByDefinition.get(defA.name) ?? [];
+      const instancesB = instancesByDefinition.get(defB.name) ?? [];
+      const activeA = instancesA.some((instance) => isActiveStatus(instance.status));
+      const activeB = instancesB.some((instance) => isActiveStatus(instance.status));
+      if (activeA && !activeB) return -1;
+      if (!activeA && activeB) return 1;
+      return defA.name.localeCompare(defB.name);
+    });
+  }, [visibleDefinitions, instancesByDefinition]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Workflows</h2>
+        <div className="flex items-center gap-2">
+          <DisplayPopover
+            showCompleted={showCompleted}
+            onToggleCompleted={() => setShowCompleted((prev) => !prev)}
+            showArchived={showArchived}
+            onToggleArchived={() => setShowArchived((prev) => !prev)}
+            hasArchivedDefinitions={hasArchivedDefinitions}
+          />
+          <Link
+            href={`/${handle}/workflows/new`}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap shrink-0',
+              'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
+            )}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New Workflow
+          </Link>
+        </div>
+      </div>
+
+      {loading ? (
+        <WorkflowCatalogSkeletons />
+      ) : namespacedDefinitions.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-4 text-center py-16">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <GitBranch className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-medium">No workflows defined yet</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Create your first workflow to start orchestrating agents and humans.
+            </p>
+          </div>
+          <Link
+            href={`/${handle}/workflows/new`}
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New Workflow
+          </Link>
+        </div>
+      ) : sortedDefinitions.length === 0 ? (
+        <div className="text-center py-16 text-sm text-muted-foreground">
+          All workflows are archived.{' '}
+          <button onClick={() => setShowArchived(true)} className="text-primary hover:underline">
+            Show archived
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {sortedDefinitions.map((definition) => (
+            <ProcessCard
+              key={definition.name}
+              definition={definition}
+              instances={instancesByDefinition.get(definition.name) ?? []}
+              showCompleted={showCompleted}
+              steps={stepsByDefinition.get(definition.name)}
+              handle={handle}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -509,58 +546,55 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col p-6">
-      <div className="mx-auto w-full max-w-xl">
-        <div className="flex items-start gap-5">
-          {namespace.avatarUrl !== undefined && namespace.avatarUrl !== '' ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={namespace.avatarUrl}
-              alt={namespace.displayName}
-              className="h-20 w-20 rounded-full object-cover shrink-0"
-            />
-          ) : (
-            <InitialsAvatar displayName={namespace.displayName} />
-          )}
+    <div className="flex flex-1 flex-col gap-6 p-6">
+      {/* Profile header */}
+      <div className="flex items-start gap-4">
+        {namespace.avatarUrl !== undefined && namespace.avatarUrl !== '' ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={namespace.avatarUrl}
+            alt={namespace.displayName}
+            className="h-14 w-14 rounded-full object-cover shrink-0"
+          />
+        ) : (
+          <InitialsAvatar displayName={namespace.displayName} />
+        )}
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-semibold">{namespace.displayName}</h1>
-              <span
-                className={[
-                  'rounded-full px-2 py-0.5 text-[11px] font-medium',
-                  namespace.type === 'organization'
-                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                    : 'bg-muted text-muted-foreground',
-                ].join(' ')}
-              >
-                {namespace.type === 'organization' ? 'Organization' : 'Personal'}
-              </span>
-            </div>
-
-            <p className="text-sm text-muted-foreground mt-0.5">@{namespace.handle}</p>
-
-            <InlineEditableBio namespace={namespace} canEdit={canEdit} />
-
-            <MemberAvatars namespace={namespace} />
-
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl font-semibold">{namespace.displayName}</h1>
+            <span
+              className={cn(
+                'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                namespace.type === 'organization'
+                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                  : 'bg-muted text-muted-foreground',
+              )}
+            >
+              {namespace.type === 'organization' ? 'Organization' : 'Personal'}
+            </span>
             {canEdit && namespace.type === 'organization' && (
-              <div className="mt-4">
-                <Link
-                  href={`/${namespace.handle}/settings`}
-                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  Settings
-                </Link>
-              </div>
+              <Link
+                href={`/${namespace.handle}/settings`}
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Settings className="h-3.5 w-3.5" />
+              </Link>
             )}
           </div>
-        </div>
 
-        <NamespaceWorkflows namespace={namespace} />
-        <UserOrganizations namespace={namespace} />
+          <p className="text-sm text-muted-foreground mt-0.5">@{namespace.handle}</p>
+
+          <InlineEditableBio namespace={namespace} canEdit={canEdit} />
+
+          <MemberAvatars namespace={namespace} />
+        </div>
       </div>
+
+      <UserOrganizations namespace={namespace} />
+
+      {/* Workflow catalog */}
+      <WorkflowCatalog handle={handle ?? ''} namespace={namespace} />
     </div>
   );
 }
