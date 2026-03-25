@@ -15,8 +15,14 @@ import { RunResultsPanel } from './run-results-panel';
 import { cancelProcessRun } from '@/app/actions/processes';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
+import { formatStepName } from '@/components/tasks/task-utils';
 
 type AuditEventWithId = AuditEvent & { id: string };
+
+function resolveStepLabel(stepId: string, steps: Step[]): string {
+  const found = steps.find((s) => s.id === stepId);
+  return found?.name ?? stepId.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export interface AgentEventItem {
   id: string;
@@ -126,38 +132,68 @@ export function ProcessDetail({
 
       {/* Header */}
       <div className="space-y-2">
-        <div className="flex items-start gap-3">
-          <h1 className="text-2xl font-headline font-semibold flex-1">{instance.definitionName}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-headline font-semibold flex-1">{formatStepName(instance.definitionName)}</h1>
           <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
+          {canCancel && cancelStep === 0 && (
+            <button
+              onClick={() => setCancelStep(1)}
+              className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors shrink-0"
+            >
+              Cancel
+            </button>
+          )}
+          {canCancel && cancelStep === 1 && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-xs text-destructive">This cannot be undone.</span>
+              <button
+                onClick={handleConfirmCancel}
+                className="rounded-md bg-destructive px-2.5 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
+              >
+                Confirm cancel
+              </button>
+              <button
+                onClick={() => { setCancelStep(0); setCancelError(null); }}
+                className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
+              >
+                Back
+              </button>
+            </div>
+          )}
+          {canCancel && cancelStep === 2 && (
+            <span className="text-xs text-muted-foreground shrink-0">Cancelling...</span>
+          )}
+          {cancelError && (
+            <span className="text-xs text-destructive shrink-0">{cancelError}</span>
+          )}
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <span>Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span></span>
           {instance.configName && (
             <span>Config: <span className="font-mono text-foreground">{instance.configName} v{instance.configVersion}</span></span>
           )}
-          <span>ID: <span className="font-mono text-foreground text-xs">{instance.id}</span></span>
-          {instance.currentStepId && (
-            <span>Current step: <span className="font-mono text-foreground">{instance.currentStepId}</span></span>
-          )}
+          <span title={instance.id}>ID: <span className="font-mono text-foreground text-xs">{instance.id.slice(0, 8)}</span></span>
           <span>Created: <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span></span>
         </div>
-        {instance.pauseReason && (
-          <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-            <span>Paused: {instance.pauseReason}</span>
-            {blockingTask && (
-              <span className="ml-2">
-                — waiting on{' '}
-                <Link
-                  href={`/tasks/${blockingTask.id}`}
-                  className="font-medium underline hover:text-amber-900 dark:hover:text-amber-200"
-                >
-                  {blockingTask.stepId}
-                </Link>
-                {blockingTask.status === 'claimed' && blockingTask.assignedUserId && (
-                  <span className="ml-1 text-amber-600 dark:text-amber-400">(claimed)</span>
-                )}
+        {needsHumanAction && blockingTask && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+            <div className="text-sm">
+              <span className="font-medium">Waiting for your input</span>
+              <span className="text-muted-foreground ml-1.5">
+                — {resolveStepLabel(blockingTask.stepId, definitionSteps)}
               </span>
-            )}
+            </div>
+            <Link
+              href={`/tasks/${blockingTask.id}`}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+            >
+              Open task
+            </Link>
+          </div>
+        )}
+        {instance.pauseReason && !needsHumanAction && (
+          <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+            Paused
           </div>
         )}
         {instance.error && (
@@ -166,42 +202,6 @@ export function ProcessDetail({
           </div>
         )}
 
-        {/* Cancel button — double-confirm pattern */}
-        {canCancel && (
-          <div className="flex items-center gap-2 pt-1">
-            {cancelStep === 0 && (
-              <button
-                onClick={() => setCancelStep(1)}
-                className="text-sm text-muted-foreground hover:text-destructive transition-colors"
-              >
-                Cancel run
-              </button>
-            )}
-            {cancelStep === 1 && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-destructive font-medium">Are you sure? This cannot be undone.</span>
-                <button
-                  onClick={handleConfirmCancel}
-                  className="text-destructive hover:underline font-medium"
-                >
-                  Yes, cancel run
-                </button>
-                <button
-                  onClick={() => { setCancelStep(0); setCancelError(null); }}
-                  className="text-muted-foreground hover:underline"
-                >
-                  No
-                </button>
-              </div>
-            )}
-            {cancelStep === 2 && (
-              <span className="text-sm text-muted-foreground">Cancelling...</span>
-            )}
-            {cancelError && (
-              <span className="text-sm text-destructive">{cancelError}</span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Step Status Panel — shows all definition steps with live status */}

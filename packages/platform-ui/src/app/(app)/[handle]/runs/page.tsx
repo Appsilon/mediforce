@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useProcessInstances } from '@/hooks/use-process-instances';
+import { useMyTasks } from '@/hooks/use-tasks';
 import { RunsTable } from '@/components/processes/runs-table';
 import { formatStepName } from '@/components/tasks/task-utils';
 import { cn } from '@/lib/utils';
@@ -16,6 +17,17 @@ export default function RunsPage() {
     'all',
     workflowFilter ?? undefined,
   );
+  const { data: activeTasks } = useMyTasks(null);
+
+  const activeTaskByInstance = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const task of activeTasks) {
+      if (!map.has(task.processInstanceId)) {
+        map.set(task.processInstanceId, task.id);
+      }
+    }
+    return map;
+  }, [activeTasks]);
 
   const sorted = React.useMemo(
     () =>
@@ -64,6 +76,7 @@ export default function RunsPage() {
         runs={sorted}
         loading={loading}
         showProcess={!workflowFilter}
+        activeTaskByInstance={activeTaskByInstance}
         emptyMessage={
           workflowFilter
             ? `No runs found for "${formatStepName(workflowFilter)}".`

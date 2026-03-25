@@ -13,6 +13,7 @@ import { useNamespace } from '@/hooks/use-namespace';
 import { useUserProfiles } from '@/hooks/use-users';
 import { useProcessDefinitions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
+import { useMyTasks } from '@/hooks/use-tasks';
 import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus } from '@/components/processes/process-card';
 import { cn } from '@/lib/utils';
 import { NamespaceSchema } from '@mediforce/platform-core';
@@ -400,8 +401,19 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
 
   const { definitions, stepsByDefinition, loading: defsLoading } = useProcessDefinitions();
   const { data: allInstances, loading: instancesLoading } = useProcessInstances('all');
+  const { data: activeTasks } = useMyTasks(null);
 
   const loading = defsLoading || instancesLoading;
+
+  const activeTaskByInstance = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const task of activeTasks) {
+      if (!map.has(task.processInstanceId)) {
+        map.set(task.processInstanceId, task.id);
+      }
+    }
+    return map;
+  }, [activeTasks]);
 
   const namespacedDefinitions = useMemo(() => definitions.filter((d) => d.namespace === handle), [definitions, handle]);
   const hasArchivedDefinitions = namespacedDefinitions.some((d) => d.archived === true);
@@ -497,6 +509,7 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
               showCompleted={showCompleted}
               steps={stepsByDefinition.get(definition.name)}
               handle={handle}
+              activeTaskByInstance={activeTaskByInstance}
             />
           ))}
         </div>

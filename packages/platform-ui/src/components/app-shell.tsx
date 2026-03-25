@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, ChevronDown, Building2, Check } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check } from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
@@ -12,9 +12,10 @@ import { ThemeToggle } from './theme-toggle';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { path: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
-  { path: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
-  { path: '/tasks', label: 'New actions', icon: User, badge: null, exact: false },
+  { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
+  { href: '/runs', label: 'All runs', icon: Play, badge: null, exact: false },
+  { href: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
+  { href: '/tasks', label: 'New actions', icon: User, badge: null, exact: false },
 ] as const;
 
 const ACTION_ITEMS = [
@@ -78,8 +79,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handlePrefix = handleFromPath !== '' ? `/${handleFromPath}` : '';
 
   const currentLabel =
-    [...NAV_ITEMS, MONITORING_ITEM].find((item) => pathname.includes(item.path))?.label ??
-    'Mediforce';
+    [...NAV_ITEMS, MONITORING_ITEM].find((item) => {
+      const path = 'href' in item ? item.href : item.path;
+      return path !== '' && pathname.includes(path);
+    })?.label ?? 'Mediforce';
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
@@ -216,7 +219,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ))}
         <div className="my-2 border-t" />
         {NAV_ITEMS.map((item) => {
-          const fullHref = `${handlePrefix}${item.path}`;
+          const fullHref = `${handlePrefix}${item.href}`;
           const isActive = item.exact
             ? pathname === fullHref || pathname === `${fullHref}/`
             : pathname.startsWith(fullHref);

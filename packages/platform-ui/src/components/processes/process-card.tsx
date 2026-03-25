@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useMemo } from 'react';
 import Link from 'next/link';
 import * as Popover from '@radix-ui/react-popover';
-import { GitBranch, Layers, Github, ExternalLink, SlidersHorizontal, Check, ChevronRight, Plus } from 'lucide-react';
+import { GitBranch, Plus, Layers, Github, ExternalLink, SlidersHorizontal, Check, ChevronRight } from 'lucide-react';
 import { ProcessInstanceRow } from '@/components/processes/process-run-section';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { formatStepName } from '@/components/tasks/task-utils';
@@ -94,12 +94,14 @@ export function ProcessCard({
   showCompleted,
   steps,
   handle,
+  activeTaskByInstance,
 }: {
   definition: DefinitionGroup;
   instances: ProcessInstance[];
   showCompleted: boolean;
   steps?: string[];
   handle: string;
+  activeTaskByInstance: Map<string, string>;
 }) {
   const filteredInstances = useMemo(() => {
     return instances.filter((instance) => {
@@ -211,6 +213,7 @@ export function ProcessCard({
                 key={instance.id}
                 instance={instance}
                 steps={steps}
+                activeTaskId={activeTaskByInstance.get(instance.id)}
               />
             ))}
           </div>

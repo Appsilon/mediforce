@@ -98,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (user.displayName !== null) profile.displayName = user.displayName;
         if (user.photoURL !== null) profile.photoURL = user.photoURL;
         if (user.email !== null) profile.email = user.email;
+        profile.uid = user.uid;
         if (Object.keys(profile).length > 0) {
           setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch(() => {});
         }

@@ -7,6 +7,7 @@ import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreV
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
+import { useMyTasks } from '@/hooks/use-tasks';
 import { RunsTable } from '@/components/processes/runs-table';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
@@ -26,6 +27,17 @@ export default function ProcessDefinitionPage() {
 
   const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName);
   const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName);
+  const { data: activeTasks } = useMyTasks(null);
+
+  const activeTaskByInstance = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const task of activeTasks) {
+      if (!map.has(task.processInstanceId)) {
+        map.set(task.processInstanceId, task.id);
+      }
+    }
+    return map;
+  }, [activeTasks]);
 
   const { firebaseUser } = useAuth();
   const { namespaces } = useAllUserNamespaces(firebaseUser?.uid);
@@ -246,6 +258,7 @@ export default function ProcessDefinitionPage() {
           <RunsTable
             runs={runs}
             loading={runsLoading}
+            activeTaskByInstance={activeTaskByInstance}
             emptyMessage="No runs yet for this workflow."
           />
         </Tabs.Content>

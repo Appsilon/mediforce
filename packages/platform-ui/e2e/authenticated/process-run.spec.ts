@@ -29,24 +29,24 @@ test.describe('Process Run Detail', () => {
 
   test('run detail page shows cancel button for running instance', async ({ page }) => {
     await page.goto('/test/workflows/Supply%20Chain%20Review/runs/proc-running-1');
-    await expect(page.getByRole('button', { name: /cancel run/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^cancel$/i })).toBeVisible();
   });
 
   test('cancel button shows double-confirm on first click', async ({ page }) => {
     await page.goto('/test/workflows/Supply%20Chain%20Review/runs/proc-running-1');
-    await page.getByRole('button', { name: /cancel run/i }).click();
+    await page.getByRole('button', { name: /^cancel$/i }).click();
     // After first click, a confirmation prompt should appear
-    await expect(page.getByText(/are you sure/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /yes, cancel run/i })).toBeVisible();
+    await expect(page.getByText(/cannot be undone/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /confirm cancel/i })).toBeVisible();
   });
 
-  test('cancel confirm can be dismissed with No button', async ({ page }) => {
+  test('cancel confirm can be dismissed with Back button', async ({ page }) => {
     await page.goto('/test/workflows/Supply%20Chain%20Review/runs/proc-running-1');
-    await page.getByRole('button', { name: /cancel run/i }).click();
-    await expect(page.getByText(/are you sure/i)).toBeVisible();
-    await page.getByRole('button', { name: /^no$/i }).click();
-    // Returns to idle state — cancel run button visible again
-    await expect(page.getByRole('button', { name: /cancel run/i })).toBeVisible();
+    await page.getByRole('button', { name: /^cancel$/i }).click();
+    await expect(page.getByText(/cannot be undone/i)).toBeVisible();
+    await page.getByRole('button', { name: /^back$/i }).click();
+    // Returns to idle state — cancel button visible again
+    await expect(page.getByRole('button', { name: /^cancel$/i })).toBeVisible();
   });
 
   // --- Step graph visualization tests (10-02) ---
