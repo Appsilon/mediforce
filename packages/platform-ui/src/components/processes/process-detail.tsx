@@ -143,6 +143,7 @@ export function ProcessDetail({
           )}
           {canCancel && cancelStep === 1 && (
             <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-xs text-destructive">This cannot be undone.</span>
               <button
                 onClick={handleConfirmCancel}
                 className="rounded-md bg-destructive px-2.5 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
