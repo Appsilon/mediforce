@@ -141,6 +141,15 @@ function ProcessCard({
                 <span className="font-semibold text-base group-hover:text-primary transition-colors">
                   {formatStepName(definition.name)}
                 </span>
+                {definition.namespace && (
+                  <Link
+                    href={`/${definition.namespace}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-500/20 transition-colors"
+                  >
+                    @{definition.namespace}
+                  </Link>
+                )}
                 {definition.archived && (
                   <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                     Archived

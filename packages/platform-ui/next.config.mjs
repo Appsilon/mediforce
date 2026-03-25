@@ -42,6 +42,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  devIndicators: {
+    position: 'bottom-right',
+  },
 };
 
 export default nextConfig;

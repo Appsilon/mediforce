@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -7,6 +8,7 @@ import { YamlEditor } from '@/components/processes/yaml-editor';
 
 export default function NewProcessPage() {
   const router = useRouter();
+  const [namespace, setNamespace] = React.useState('');
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-3xl">
@@ -25,6 +27,8 @@ export default function NewProcessPage() {
       </div>
 
       <YamlEditor
+        namespace={namespace}
+        onNamespaceChange={setNamespace}
         onSaved={(name) => router.push(`/workflows/${encodeURIComponent(name)}`)}
       />
     </div>

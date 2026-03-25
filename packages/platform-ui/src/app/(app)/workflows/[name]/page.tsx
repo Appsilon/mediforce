@@ -3,18 +3,20 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2 } from 'lucide-react';
+import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2, ArrowRightLeft } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
 import { RunsTable } from '@/components/processes/runs-table';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { setProcessArchived } from '@/app/actions/definitions';
+import { setProcessArchived, transferWorkflowNamespace } from '@/app/actions/definitions';
 import { VersionLabel } from '@/components/ui/version-label';
 import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
 import { formatCron } from '@/lib/format-cron';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/auth-context';
+import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 
 
 export default function ProcessDefinitionPage() {
@@ -25,9 +27,15 @@ export default function ProcessDefinitionPage() {
   const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName);
   const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName);
 
+  const { firebaseUser } = useAuth();
+  const { namespaces } = useAllUserNamespaces(firebaseUser?.uid);
+
   const [archiving, setArchiving] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [transferOpen, setTransferOpen] = React.useState(false);
+  const [transferTarget, setTransferTarget] = React.useState('');
+  const [transferring, setTransferring] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -91,6 +99,20 @@ export default function ProcessDefinitionPage() {
               <p className="text-sm text-muted-foreground mt-0.5">{latest.description}</p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              {(latest as unknown as { namespace?: string }).namespace && (
+                <>
+                  <span className="flex items-center gap-1">
+                    Owned by{' '}
+                    <Link
+                      href={`/${(latest as unknown as { namespace?: string }).namespace}`}
+                      className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-500/20 transition-colors"
+                    >
+                      @{(latest as unknown as { namespace?: string }).namespace}
+                    </Link>
+                  </span>
+                  <span className="text-border">·</span>
+                </>
+              )}
               {latest && <VersionLabel version={latest.version} title={(latest as unknown as { title?: string }).title} />}
               <span className="flex items-center gap-1">
                 <Layers className="h-3 w-3" />
@@ -150,6 +172,20 @@ export default function ProcessDefinitionPage() {
                       Archive
                     </>
                   )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setTransferOpen(true);
+                  }}
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors',
+                    'hover:bg-accent hover:text-accent-foreground',
+                  )}
+                >
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                  Transfer
                 </button>
 
                 <div className="my-1 border-t" />
@@ -227,6 +263,65 @@ export default function ProcessDefinitionPage() {
         onOpenChange={setDeleteDialogOpen}
         onDeleted={() => router.push('/workflows')}
       />
+
+      {/* Transfer namespace dialog */}
+      {transferOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-sm rounded-lg border bg-popover p-6 shadow-lg">
+            <h3 className="text-base font-semibold mb-1">Transfer ownership</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Transfer <span className="font-mono">{decodedName}</span> to a different namespace.
+            </p>
+            <select
+              value={transferTarget}
+              onChange={(e) => setTransferTarget(e.target.value)}
+              className={cn(
+                'w-full rounded-md border bg-background px-3 py-1.5 text-sm outline-none mb-4',
+                'focus:ring-1 focus:ring-ring focus:border-ring',
+              )}
+            >
+              <option value="">Select namespace...</option>
+              {namespaces.map((ns) => (
+                <option key={ns.handle} value={ns.handle}>
+                  {ns.displayName ?? ns.handle} (@{ns.handle})
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => {
+                  setTransferOpen(false);
+                  setTransferTarget('');
+                }}
+                className="rounded-md px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!transferTarget) return;
+                  setTransferring(true);
+                  const result = await transferWorkflowNamespace(decodedName, transferTarget);
+                  setTransferring(false);
+                  if (result.success) {
+                    setTransferOpen(false);
+                    setTransferTarget('');
+                    router.refresh();
+                  }
+                }}
+                disabled={!transferTarget || transferring}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  'bg-primary text-primary-foreground hover:bg-primary/90',
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                )}
+              >
+                {transferring ? 'Transferring...' : 'Transfer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
