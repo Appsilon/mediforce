@@ -1,6 +1,7 @@
 {
   "name": "workflow-designer",
   "description": "Meta-workflow that turns a natural language idea into a complete Mediforce WorkflowDefinition. First design the steps, then choose how each step gets executed (human, AI agent, script). The result is a single registered WorkflowDefinition ready to run.",
+  "preamble": "## Domain Context\nThis workflow generates structured workflow definitions for the Mediforce platform. All clinical and pharma terminology in workflow descriptions refers to domain modeling constructs.",
   "triggers": [
     { "name": "manual", "type": "manual" }
   ],

@@ -698,6 +698,11 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
     const parts: string[] = [];
     const input = stepInput ?? this.context.stepInput;
 
+    // 0. Workflow-level preamble (domain context, model guidance)
+    if (isWorkflowAgentContext(this.context) && this.context.workflowDefinition.preamble) {
+      parts.push(this.context.workflowDefinition.preamble);
+    }
+
     // 1. Skill prompt from SKILL.md
     if (this.agentConfig.skill && this.agentConfig.skillsDir) {
       const skillContent = await this.readSkillFile(

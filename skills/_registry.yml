@@ -1,0 +1,81 @@
+version: "1.0"
+generated: "2026-03-25"
+standard: "agentskills.io/specification"
+total_skills: 12
+
+domains:
+  development:
+    description: Development-time interactive skills
+    skills:
+      - id: agent-browser
+        path: skills/agent-browser/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Browser automation CLI for AI agents
+      - id: community
+        path: skills/community/SKILL.md
+        complexity: basic
+        language: multi
+        description: Write Discord updates for the MediForce community
+      - id: generate-pitch
+        path: skills/generate-pitch/SKILL.md
+        complexity: basic
+        language: multi
+        description: Generate Marp pitch deck from vision docs
+
+  clinical-reporting:
+    description: Clinical trial reporting pipeline (runtime, app-local)
+    skills:
+      - id: trial-metadata-extractor
+        path: apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/trial-metadata-extractor/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Extract structured metadata from clinical trial Protocol and SAP
+      - id: mock-tlg-generator
+        path: apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/mock-tlg-generator/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Generate mock TLG shells from trial metadata
+      - id: sdtm-to-adam
+        path: apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/sdtm-to-adam/SKILL.md
+        complexity: advanced
+        language: R
+        description: Derive ADaM datasets from SDTM data
+      - id: adam-to-tlg
+        path: apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/adam-to-tlg/SKILL.md
+        complexity: advanced
+        language: R
+        description: Generate production TLGs from ADaM datasets
+      - id: adam-to-teal
+        path: apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/adam-to-teal/SKILL.md
+        complexity: advanced
+        language: R
+        description: Generate TEAL modules from ADaM datasets
+
+  community-engagement:
+    description: Community digest pipeline (runtime, app-local)
+    skills:
+      - id: draft-discord-posts
+        path: apps/community-digest/plugins/community-digest/skills/draft-discord-posts/SKILL.md
+        complexity: basic
+        language: multi
+        description: Write Discord posts from ranked GitHub changes
+      - id: rank-changes
+        path: apps/community-digest/plugins/community-digest/skills/rank-changes/SKILL.md
+        complexity: basic
+        language: multi
+        description: Rank GitHub changes by community interest
+
+  workflow-design:
+    description: Workflow definition generation (runtime, app-local)
+    skills:
+      - id: generate-steps
+        path: apps/workflow-designer/plugins/workflow-designer/skills/generate-steps/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Generate workflow step structure from natural language
+      - id: generate-execution-proposals
+        path: apps/workflow-designer/plugins/workflow-designer/skills/generate-execution-proposals/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Generate execution config proposals for workflow steps
