@@ -3,9 +3,10 @@
 import * as React from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc, where } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Pencil, Check, X, Settings } from 'lucide-react';
+import { useMemo } from 'react';
+import { Pencil, Check, X, Settings, GitBranch } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -315,6 +316,96 @@ function InlineEditableBio({
 }
 
 // ---------------------------------------------------------------------------
+// Namespace workflows
+// ---------------------------------------------------------------------------
+
+type WorkflowSummary = { name: string; title?: string; version: number };
+
+function useNamespaceWorkflows(handle: string, enabled: boolean) {
+  const [workflows, setWorkflows] = React.useState<WorkflowSummary[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!enabled || !handle) {
+      setWorkflows([]);
+      setLoading(false);
+      return;
+    }
+
+    const workflowsQuery = query(
+      collection(db, 'workflowDefinitions'),
+      where('namespace', '==', handle),
+    );
+    getDocs(workflowsQuery)
+      .then((snapshot) => {
+        const byName = new Map<string, WorkflowSummary>();
+        for (const docSnap of snapshot.docs) {
+          const data = docSnap.data();
+          const name = typeof data.name === 'string' ? data.name : '';
+          const version = typeof data.version === 'number' ? data.version : 0;
+          const existing = byName.get(name);
+          if (existing === undefined || version > existing.version) {
+            byName.set(name, {
+              name,
+              title: typeof data.title === 'string' ? data.title : undefined,
+              version,
+            });
+          }
+        }
+        setWorkflows([...byName.values()].sort((a, b) => a.name.localeCompare(b.name)));
+        setLoading(false);
+      })
+      .catch(() => {
+        setWorkflows([]);
+        setLoading(false);
+      });
+  }, [handle, enabled]);
+
+  return { workflows, loading };
+}
+
+function NamespaceWorkflows({ namespace }: { namespace: Namespace }) {
+  const { workflows, loading } = useNamespaceWorkflows(
+    namespace.handle,
+    namespace.type === 'organization',
+  );
+
+  if (namespace.type !== 'organization') return null;
+  if (loading) return null;
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold">Workflows</h2>
+        <Link
+          href={`/${namespace.handle}/workflows`}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          View all
+        </Link>
+      </div>
+      {workflows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No workflows yet.</p>
+      ) : (
+        <div className="space-y-1">
+          {workflows.map((workflow) => (
+            <Link
+              key={workflow.name}
+              href={`/workflows/${encodeURIComponent(workflow.name)}`}
+              className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
+            >
+              <GitBranch className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="font-medium truncate">{workflow.title ?? workflow.name}</span>
+              <span className="text-xs text-muted-foreground ml-auto shrink-0">v{workflow.version}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -405,6 +496,8 @@ export default function ProfilePage() {
             )}
           </div>
         </div>
+
+        <NamespaceWorkflows namespace={namespace} />
       </div>
     </div>
   );
