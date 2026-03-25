@@ -36,6 +36,7 @@ export default function ProcessDefinitionPage() {
   const [transferOpen, setTransferOpen] = React.useState(false);
   const [transferTarget, setTransferTarget] = React.useState('');
   const [transferring, setTransferring] = React.useState(false);
+  const [namespaceOverride, setNamespaceOverride] = React.useState<string | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -99,15 +100,15 @@ export default function ProcessDefinitionPage() {
               <p className="text-sm text-muted-foreground mt-0.5">{latest.description}</p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              {(latest as unknown as { namespace?: string }).namespace && (
+              {(namespaceOverride ?? (latest as unknown as { namespace?: string }).namespace) && (
                 <>
                   <span className="flex items-center gap-1">
                     Owned by{' '}
                     <Link
-                      href={`/${(latest as unknown as { namespace?: string }).namespace}`}
+                      href={`/${namespaceOverride ?? (latest as unknown as { namespace?: string }).namespace}`}
                       className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-500/20 transition-colors"
                     >
-                      @{(latest as unknown as { namespace?: string }).namespace}
+                      @{namespaceOverride ?? (latest as unknown as { namespace?: string }).namespace}
                     </Link>
                   </span>
                   <span className="text-border">·</span>
@@ -304,9 +305,9 @@ export default function ProcessDefinitionPage() {
                   const result = await transferWorkflowNamespace(decodedName, transferTarget);
                   setTransferring(false);
                   if (result.success) {
+                    setNamespaceOverride(transferTarget);
                     setTransferOpen(false);
                     setTransferTarget('');
-                    router.refresh();
                   }
                 }}
                 disabled={!transferTarget || transferring}
