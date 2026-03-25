@@ -173,7 +173,9 @@ export default function MembersPage() {
                   <img src={member.avatarUrl} alt={name} className="h-8 w-8 shrink-0 rounded-full object-cover" />
                 ) : (
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                    {name.slice(0, 2).toUpperCase()}
+                    {name.includes(' ')
+                      ? `${name.split(' ')[0]?.[0] ?? ''}${name.split(' ')[1]?.[0] ?? ''}`.toUpperCase()
+                      : name.slice(0, 2).toUpperCase()}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">

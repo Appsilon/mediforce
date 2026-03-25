@@ -112,7 +112,10 @@ function formatDate(iso: string): string {
 const ROLE_LABELS: Record<string, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' };
 
 function MemberTooltipAvatar({ member, resolvedName }: { member: MemberPreview; resolvedName: string }) {
-  const initials = resolvedName.slice(0, 2).toUpperCase();
+  const parts = resolvedName.split(' ');
+  const initials = parts.length >= 2
+    ? `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
+    : resolvedName.slice(0, 2).toUpperCase();
 
   return (
     <Tooltip.Root delayDuration={200}>
