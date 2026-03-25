@@ -127,9 +127,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   : '?'}
               </div>
               <span className="flex-1 truncate text-left text-sm font-medium">
-                {personalNamespace !== null
-                  ? `@${personalNamespace.handle}`
-                  : (firebaseUser?.email ?? 'Set up profile')}
+                {firebaseUser?.displayName ?? firebaseUser?.email ?? 'Set up profile'}
               </span>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             </button>
