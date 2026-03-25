@@ -142,7 +142,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="z-50 w-[260px] rounded-md border bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
             >
               <div className="py-1">
-                {namespaces.map((ns) => {
+                {personalNamespace !== null && (
+                  <>
+                    <Popover.Close asChild>
+                      <Link
+                        href={`/${personalNamespace.handle}`}
+                        className="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <User className="h-4 w-4 shrink-0" />
+                        <span className="flex-1 truncate">
+                          <span className="block font-medium text-foreground">My profile</span>
+                          <span className="block text-xs text-muted-foreground">@{personalNamespace.handle}</span>
+                        </span>
+                      </Link>
+                    </Popover.Close>
+                    <div className="my-1 border-t" />
+                  </>
+                )}
+                {namespaces.filter((ns) => ns.type === 'organization').map((ns) => {
                   const isActive = pathname.startsWith(`/${ns.handle}`);
                   return (
                     <Popover.Close asChild key={ns.handle}>
@@ -153,14 +170,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           isActive ? 'text-foreground' : 'text-muted-foreground',
                         )}
                       >
-                        {ns.type === 'organization' ? (
-                          <Building2 className="h-4 w-4 shrink-0" />
-                        ) : (
-                          <User className="h-4 w-4 shrink-0" />
-                        )}
+                        <Building2 className="h-4 w-4 shrink-0" />
                         <span className="flex-1 truncate">
                           <span className="block font-medium text-foreground">{ns.displayName}</span>
-                          <span className="block text-xs text-muted-foreground">{`@${ns.handle}`}</span>
+                          <span className="block text-xs text-muted-foreground">@{ns.handle}</span>
                         </span>
                         {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
                       </Link>
