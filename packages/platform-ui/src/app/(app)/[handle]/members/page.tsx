@@ -9,6 +9,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useCollection } from '@/hooks/use-collection';
 import { useNamespace } from '@/hooks/use-namespace';
+import { useUserDisplayNames } from '@/hooks/use-users';
 import { NamespaceMemberSchema } from '@mediforce/platform-core';
 import type { NamespaceMember } from '@mediforce/platform-core';
 
@@ -51,6 +52,7 @@ export default function MembersPage() {
   const { firebaseUser } = useAuth();
   const { namespace, loading: namespaceLoading } = useNamespace(handle);
 
+  const displayNames = useUserDisplayNames();
   const collectionPath = handle !== '' ? `namespaces/${handle}/members` : '';
   const { data: rawMembers, loading: membersLoading } = useCollection<NamespaceMemberWithId>(
     collectionPath,
@@ -159,22 +161,24 @@ export default function MembersPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {members.map((member) => (
+            {members.map((member) => {
+              const name = member.displayName ?? displayNames.get(member.uid) ?? member.uid;
+              return (
               <div
                 key={member.id}
                 className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3"
               >
                 {member.avatarUrl !== undefined ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={member.avatarUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                  <img src={member.avatarUrl} alt={name} className="h-8 w-8 shrink-0 rounded-full object-cover" />
                 ) : (
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                    {(member.displayName ?? member.uid).slice(0, 2).toUpperCase()}
+                    {name.slice(0, 2).toUpperCase()}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium truncate">{member.displayName ?? member.uid}</span>
+                    <span className="text-sm font-medium truncate">{name}</span>
                     <RoleBadge role={member.role} />
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -182,7 +186,8 @@ export default function MembersPage() {
                   </p>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

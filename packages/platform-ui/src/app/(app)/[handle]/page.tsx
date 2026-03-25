@@ -9,6 +9,7 @@ import { Pencil, Check, X } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
+import { useUserDisplayNames } from '@/hooks/use-users';
 import type { Namespace } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -110,8 +111,8 @@ function formatDate(iso: string): string {
 
 const ROLE_LABELS: Record<string, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' };
 
-function MemberTooltipAvatar({ member }: { member: MemberPreview }) {
-  const initials = (member.displayName ?? member.uid).slice(0, 2).toUpperCase();
+function MemberTooltipAvatar({ member, resolvedName }: { member: MemberPreview; resolvedName: string }) {
+  const initials = resolvedName.slice(0, 2).toUpperCase();
 
   return (
     <Tooltip.Root delayDuration={200}>
@@ -120,7 +121,7 @@ function MemberTooltipAvatar({ member }: { member: MemberPreview }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={member.avatarUrl}
-            alt={member.displayName ?? ''}
+            alt={resolvedName}
             className="h-7 w-7 rounded-full border-2 border-background object-cover cursor-pointer"
           />
         ) : (
@@ -135,7 +136,7 @@ function MemberTooltipAvatar({ member }: { member: MemberPreview }) {
           sideOffset={6}
           className="z-50 rounded-lg border bg-popover px-3 py-2 shadow-md animate-in fade-in-0 zoom-in-95"
         >
-          <p className="text-sm font-medium">{member.displayName ?? member.uid}</p>
+          <p className="text-sm font-medium">{resolvedName}</p>
           <p className="text-xs text-muted-foreground">
             {ROLE_LABELS[member.role] ?? member.role}
             {member.joinedAt !== '' && <> &middot; Joined {formatDate(member.joinedAt)}</>}
@@ -152,9 +153,14 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
     namespace.handle,
     namespace.type === 'organization',
   );
+  const displayNames = useUserDisplayNames();
 
   if (namespace.type !== 'organization') return null;
   if (totalCount === null) return null;
+
+  function resolveName(member: MemberPreview): string {
+    return member.displayName ?? displayNames.get(member.uid) ?? member.uid;
+  }
 
   return (
     <div className="mt-4">
@@ -166,7 +172,7 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
           <Tooltip.Provider>
             <div className="flex -space-x-2" onClick={(e) => e.stopPropagation()}>
               {members.map((member) => (
-                <MemberTooltipAvatar key={member.uid} member={member} />
+                <MemberTooltipAvatar key={member.uid} member={member} resolvedName={resolveName(member)} />
               ))}
             </div>
           </Tooltip.Provider>
