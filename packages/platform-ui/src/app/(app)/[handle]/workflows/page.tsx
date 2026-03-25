@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { where } from 'firebase/firestore';
-import { GitBranch } from 'lucide-react';
+import { ArrowLeft, GitBranch } from 'lucide-react';
 import { useCollection } from '@/hooks/use-collection';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 
@@ -56,11 +56,14 @@ export default function NamespaceWorkflowsPage() {
     <div className="min-h-screen bg-background px-4 py-12">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8">
-          <h1 className="text-xl font-semibold">
-            <span className="text-muted-foreground font-normal">@{handle}</span>
-            {' / '}
-            Workflows
-          </h1>
+          <Link
+            href={`/${handle}`}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            @{handle}
+          </Link>
+          <h1 className="text-xl font-semibold">Workflows</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Workflows published in this namespace.
           </p>
