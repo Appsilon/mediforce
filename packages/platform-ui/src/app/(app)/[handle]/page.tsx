@@ -6,11 +6,12 @@ import Link from 'next/link';
 import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc, where } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useMemo } from 'react';
-import { Pencil, Check, X, Settings, GitBranch } from 'lucide-react';
+import { Pencil, Check, X, Settings, GitBranch, Building2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useUserProfiles } from '@/hooks/use-users';
+import { NamespaceSchema } from '@mediforce/platform-core';
 import type { Namespace } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -402,6 +403,70 @@ function NamespaceWorkflows({ namespace }: { namespace: Namespace }) {
 }
 
 // ---------------------------------------------------------------------------
+// User organizations
+// ---------------------------------------------------------------------------
+
+function useUserOrganizations(namespace: Namespace) {
+  const [orgs, setOrgs] = React.useState<Namespace[]>([]);
+
+  React.useEffect(() => {
+    if (namespace.type !== 'personal' || namespace.linkedUserId === undefined) {
+      setOrgs([]);
+      return;
+    }
+
+    getDoc(doc(db, 'users', namespace.linkedUserId))
+      .then(async (userSnap) => {
+        if (!userSnap.exists()) return;
+        const data = userSnap.data();
+        const handles = Array.isArray(data.organizations) ? data.organizations : [];
+        const orgDocs = await Promise.all(
+          handles
+            .filter((h: unknown): h is string => typeof h === 'string')
+            .map((h) => getDoc(doc(db, 'namespaces', h))),
+        );
+        setOrgs(
+          orgDocs
+            .filter((d) => d.exists())
+            .map((d) => {
+              const parsed = NamespaceSchema.safeParse(d.data());
+              return parsed.success ? parsed.data : null;
+            })
+            .filter((ns): ns is Namespace => ns !== null),
+        );
+      })
+      .catch(() => setOrgs([]));
+  }, [namespace]);
+
+  return orgs;
+}
+
+function UserOrganizations({ namespace }: { namespace: Namespace }) {
+  const orgs = useUserOrganizations(namespace);
+
+  if (namespace.type !== 'personal' || orgs.length === 0) return null;
+
+  return (
+    <div className="mt-8">
+      <h2 className="text-sm font-semibold mb-3">Organizations</h2>
+      <div className="space-y-1">
+        {orgs.map((org) => (
+          <Link
+            key={org.handle}
+            href={`/${org.handle}`}
+            className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
+          >
+            <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="font-medium truncate">{org.displayName}</span>
+            <span className="text-xs text-muted-foreground ml-auto shrink-0">@{org.handle}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -494,6 +559,7 @@ export default function ProfilePage() {
         </div>
 
         <NamespaceWorkflows namespace={namespace} />
+        <UserOrganizations namespace={namespace} />
       </div>
     </div>
   );
