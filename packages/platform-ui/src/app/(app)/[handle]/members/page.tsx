@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import Link from 'next/link';
 import { ArrowLeft, Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -79,7 +79,7 @@ export default function MembersPage() {
     currentUserMember !== undefined &&
     (currentUserMember.role === 'owner' || currentUserMember.role === 'admin');
 
-  const [newUid, setNewUid] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<MemberRole>('member');
   const [addError, setAddError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -88,26 +88,43 @@ export default function MembersPage() {
     event.preventDefault();
     setAddError(null);
 
-    const trimmedUid = newUid.trim();
-    if (trimmedUid === '') {
-      setAddError('User UID is required.');
+    const trimmedEmail = newEmail.trim().toLowerCase();
+    if (trimmedEmail === '') {
+      setAddError('Email is required.');
       return;
     }
 
     setAdding(true);
 
     try {
-      const userDoc = await getDoc(doc(db, 'users', trimmedUid));
-      const userData = userDoc.exists() ? userDoc.data() : {};
+      const usersQuery = query(collection(db, 'users'), where('email', '==', trimmedEmail));
+      const usersSnapshot = await getDocs(usersQuery);
 
-      await setDoc(doc(db, 'namespaces', handle, 'members', trimmedUid), {
-        uid: trimmedUid,
+      if (usersSnapshot.empty) {
+        setAddError('No user found with this email. They need to sign in at least once first.');
+        setAdding(false);
+        return;
+      }
+
+      const userDoc = usersSnapshot.docs[0];
+      const uid = userDoc.id;
+      const userData = userDoc.data();
+
+      const existingMember = members.find((member) => member.uid === uid);
+      if (existingMember !== undefined) {
+        setAddError('This user is already a member.');
+        setAdding(false);
+        return;
+      }
+
+      await setDoc(doc(db, 'namespaces', handle, 'members', uid), {
+        uid,
         role: newRole,
         ...(typeof userData.displayName === 'string' ? { displayName: userData.displayName } : {}),
-        ...(typeof userData.avatarUrl === 'string' ? { avatarUrl: userData.avatarUrl } : {}),
+        ...(typeof userData.photoURL === 'string' ? { avatarUrl: userData.photoURL } : {}),
         joinedAt: new Date().toISOString(),
       });
-      setNewUid('');
+      setNewEmail('');
       setNewRole('member');
     } catch (err: unknown) {
       setAddError(err instanceof Error ? err.message : 'Failed to add member.');
@@ -200,15 +217,15 @@ export default function MembersPage() {
             <h2 className="text-sm font-semibold mb-4">Add member</h2>
             <form onSubmit={handleAddMember} className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="newUid" className="text-sm font-medium">
-                  User UID
+                <label htmlFor="newEmail" className="text-sm font-medium">
+                  Email
                 </label>
                 <input
-                  id="newUid"
-                  type="text"
-                  value={newUid}
-                  onChange={(e) => setNewUid(e.target.value)}
-                  placeholder="firebase-user-uid"
+                  id="newEmail"
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="colleague@example.com"
                   className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
                   disabled={adding}
                 />
