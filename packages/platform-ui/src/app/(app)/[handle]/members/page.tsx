@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where, type DocumentReference } from 'firebase/firestore';
 import Link from 'next/link';
 import { ArrowLeft, Trash2, Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -75,6 +75,7 @@ export default function MembersPage() {
     [members, firebaseUser],
   );
 
+  const isOwner = currentUserMember?.role === 'owner';
   const canManageMembers =
     currentUserMember !== undefined &&
     (currentUserMember.role === 'owner' || currentUserMember.role === 'admin');
@@ -149,6 +150,15 @@ export default function MembersPage() {
     }
   }
 
+  async function handleToggleRole(memberUid: string, currentRole: string) {
+    const newRole = currentRole === 'admin' ? 'member' : 'admin';
+    try {
+      await updateDoc(doc(db, 'namespaces', handle, 'members', memberUid), { role: newRole });
+    } catch {
+      // useCollection will reflect actual state
+    }
+  }
+
   const loading = namespaceLoading || membersLoading;
 
   return (
@@ -216,7 +226,18 @@ export default function MembersPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium truncate">{name}</span>
-                    <RoleBadge role={member.role} />
+                    {isOwner && member.role !== 'owner' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleRole(member.uid, member.role)}
+                        title={`Click to change to ${member.role === 'admin' ? 'member' : 'admin'}`}
+                        className="cursor-pointer"
+                      >
+                        <RoleBadge role={member.role} />
+                      </button>
+                    ) : (
+                      <RoleBadge role={member.role} />
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Joined {formatDate(member.joinedAt)}
