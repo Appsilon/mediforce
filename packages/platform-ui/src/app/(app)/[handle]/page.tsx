@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Pencil, Check, X } from 'lucide-react';
+import { Pencil, Check, X, Settings } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -391,6 +391,18 @@ export default function ProfilePage() {
             <InlineEditableBio namespace={namespace} canEdit={canEdit} />
 
             <MemberAvatars namespace={namespace} />
+
+            {canEdit && namespace.type === 'organization' && (
+              <div className="mt-4">
+                <Link
+                  href={`/${namespace.handle}/settings`}
+                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  Settings
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
