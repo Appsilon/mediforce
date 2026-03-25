@@ -57,6 +57,7 @@ export const WorkflowStepSchema = z.object({
 export const WorkflowDefinitionSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
+  namespace: z.string().optional(),
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   repo: RepoSchema.optional(),

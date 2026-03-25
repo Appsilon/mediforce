@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Plus, Copy, ChevronRight, FileText, Archive, ArchiveRestore, Eye, EyeOff } from 'lucide-react';
 import { useProcessConfigs } from '@/hooks/use-process-configs';
 import { setConfigArchived } from '@/app/actions/definitions';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 
 interface ConfigListProps {
@@ -13,6 +15,7 @@ interface ConfigListProps {
 
 export function ConfigList({ processName }: ConfigListProps) {
   const { configs, loading } = useProcessConfigs(processName);
+  const handle = useHandleFromPath();
   const [showArchived, setShowArchived] = useState(false);
 
   if (loading) {
@@ -67,7 +70,7 @@ export function ConfigList({ processName }: ConfigListProps) {
             </button>
           )}
           <Link
-            href={`/configs/new?process=${encodeURIComponent(processName)}`}
+            href={routes.configNew(handle, { process: processName })}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -88,8 +91,8 @@ export function ConfigList({ processName }: ConfigListProps) {
         <div className="space-y-2">
           {sortedConfigs.map((config) => {
             const stepCount = config.stepConfigs.length;
-            const href = `/configs/${encodeURIComponent(processName)}/${encodeURIComponent(config.configName)}/${encodeURIComponent(config.configVersion)}`;
-            const cloneHref = `/configs/new?process=${encodeURIComponent(processName)}&cloneConfig=${encodeURIComponent(config.configName)}&cloneVersion=${encodeURIComponent(config.configVersion)}`;
+            const href = routes.config(handle, processName, config.configName, config.configVersion);
+            const cloneHref = routes.configNew(handle, { process: processName, cloneConfig: config.configName, cloneVersion: String(config.configVersion) });
             const isArchived = config.archived === true;
 
             return (

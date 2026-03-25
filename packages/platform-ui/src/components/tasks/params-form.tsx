@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { CheckCircle, Loader2, Send } from 'lucide-react';
 import { completeParamsTask } from '@/app/actions/tasks';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { StepParam } from '@mediforce/platform-core';
 
 interface ParamsFormProps {
@@ -26,6 +27,7 @@ export function ParamsForm({
   remainingTaskCount,
   onCompleted,
 }: ParamsFormProps) {
+  const handle = useHandleFromPath();
   const [values, setValues] = React.useState<Record<string, unknown>>(() => {
     const initial: Record<string, unknown> = {};
     for (const param of params) {
@@ -200,6 +202,7 @@ function ParamsConfirmation({
   params: StepParam[];
   remainingTaskCount?: number;
 }) {
+  const handle = useHandleFromPath();
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:bg-green-900/20 dark:border-green-800">
@@ -236,12 +239,12 @@ function ParamsConfirmation({
         {remainingTaskCount !== undefined && remainingTaskCount > 0 ? (
           <span>
             You have {remainingTaskCount} more {remainingTaskCount === 1 ? 'task' : 'tasks'} &mdash;{' '}
-            <Link href="/tasks" className="text-primary hover:underline font-medium">
+            <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
               View next task
             </Link>
           </span>
         ) : (
-          <Link href="/tasks" className="text-primary hover:underline font-medium">
+          <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
             Back to tasks
           </Link>
         )}

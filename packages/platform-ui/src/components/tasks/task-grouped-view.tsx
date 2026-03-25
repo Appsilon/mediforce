@@ -7,6 +7,8 @@ import type { HumanTask } from '@mediforce/platform-core';
 import { useProcessNameMap } from '@/hooks/use-agent-runs';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 import { getActionType, getTaskLabel } from './action-type';
 import { formatStepName } from './task-utils';
 
@@ -99,6 +101,7 @@ function TaskRow({
   processName?: string;
   muted?: boolean;
 }) {
+  const handle = useHandleFromPath();
   const actionType = getActionType(task);
   const ActionIcon = actionType.icon;
   const deadline = formatDeadline(task.deadline);
@@ -108,7 +111,7 @@ function TaskRow({
   return (
     <div className={cn('group flex items-center border-b border-border/30 last:border-b-0', muted && 'opacity-60')}>
       <Link
-        href={`/tasks/${task.id}`}
+        href={routes.task(handle, task.id)}
         className="flex flex-1 items-center gap-2 px-3 py-1.5 hover:bg-muted/50 transition-colors min-w-0"
       >
         <ActionIcon className={cn('h-3.5 w-3.5 shrink-0', actionType.colorClass)} />

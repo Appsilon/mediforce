@@ -1,10 +1,11 @@
 'use server';
 
 import { stringify as yamlStringify } from 'yaml';
+import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { getPlatformServices } from '@/lib/platform-services';
 import { parseProcessDefinition, WorkflowDefinitionSchema } from '@mediforce/platform-core';
 import type { ProcessDefinition, ProcessConfig, WorkflowDefinition } from '@mediforce/platform-core';
-import { DefinitionVersionAlreadyExistsError, WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
+import { DefinitionVersionAlreadyExistsError, WorkflowDefinitionVersionAlreadyExistsError, getFirestoreDb } from '@mediforce/platform-infra';
 
 export type SaveDefinitionResult =
   | { success: true; name: string; version: string }
@@ -32,7 +33,7 @@ function buildAllHumanConfig(definition: ProcessDefinition): ProcessConfig {
 }
 
 /** @deprecated Legacy — saves ProcessDefinition + auto-creates all-human config. */
-export async function saveDefinition(yaml: string): Promise<SaveDefinitionResult> {
+export async function saveDefinition(yaml: string, namespace?: string): Promise<SaveDefinitionResult> {
   if (!yaml.trim()) {
     return { success: false, error: 'YAML content is required.' };
   }
@@ -40,6 +41,10 @@ export async function saveDefinition(yaml: string): Promise<SaveDefinitionResult
   const result = parseProcessDefinition(yaml);
   if (!result.success) {
     return { success: false, error: result.error };
+  }
+
+  if (namespace) {
+    (result.data as Record<string, unknown>).namespace = namespace;
   }
 
   const { processRepo } = getPlatformServices();
@@ -237,6 +242,47 @@ export async function deleteWorkflow(
     }
 
     return { success: true, deletedRuns: actualRunCount };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Transfer workflow namespace
+// ---------------------------------------------------------------------------
+
+export type TransferNamespaceResult = { success: true } | { success: false; error: string };
+
+export async function transferWorkflowNamespace(
+  workflowName: string,
+  newNamespace: string,
+): Promise<TransferNamespaceResult> {
+  if (!workflowName.trim() || !newNamespace.trim()) {
+    return { success: false, error: 'Workflow name and namespace are required.' };
+  }
+
+  try {
+    // Ensure platform services are initialized (this also initializes Firebase)
+    getPlatformServices();
+    const db = getFirestoreDb();
+
+    // Query all versions of this workflow
+    const workflowQ = query(
+      collection(db, 'workflowDefinitions'),
+      where('name', '==', workflowName),
+    );
+    const snapshot = await getDocs(workflowQ);
+
+    if (snapshot.empty) {
+      return { success: false, error: `No workflow found with name "${workflowName}".` };
+    }
+
+    // Update each version with the new namespace
+    for (const docSnap of snapshot.docs) {
+      await updateDoc(doc(db, 'workflowDefinitions', docSnap.id), { namespace: newNamespace });
+    }
+
+    return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
   }

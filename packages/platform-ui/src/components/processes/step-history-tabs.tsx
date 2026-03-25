@@ -7,6 +7,8 @@ import { where } from 'firebase/firestore';
 import type { StepExecution, HumanTask } from '@mediforce/platform-core';
 import { useCollection } from '@/hooks/use-collection';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 
 function statusBadgeClass(status: string) {
   if (status === 'completed') return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
@@ -15,6 +17,8 @@ function statusBadgeClass(status: string) {
 }
 
 export function StepHistoryTabs({ steps, loading, processInstanceId }: { steps: StepExecution[]; loading: boolean; processInstanceId?: string }) {
+  const handle = useHandleFromPath();
+
   if (loading) {
     return <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 rounded-md bg-muted animate-pulse" />)}</div>;
   }
@@ -72,7 +76,7 @@ export function StepHistoryTabs({ steps, loading, processInstanceId }: { steps: 
               >
                 <td className="px-4 py-2.5 font-mono text-xs">
                   {taskId ? (
-                    <Link href={`/tasks/${taskId}`} className="text-primary hover:underline">
+                    <Link href={routes.task(handle, taskId)} className="text-primary hover:underline">
                       {step.stepId}
                     </Link>
                   ) : (

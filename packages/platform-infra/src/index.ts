@@ -21,4 +21,5 @@ export { FirestoreHandoffRepository } from './firestore/handoff-repository.js';
 export { SendGridNotificationService } from './notifications/sendgrid-notification-service.js';
 export { WebhookNotificationService } from './notifications/webhook-notification-service.js';
 export { FirestoreAgentDefinitionRepository } from './firestore/agent-definition-repository.js';
+export { FirestoreNamespaceRepository } from './firestore/namespace-repository.js';
 

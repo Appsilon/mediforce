@@ -28,6 +28,7 @@ export interface DefinitionGroup {
   repo?: { url: string; branch?: string; directory?: string };
   url?: string;
   archived?: boolean;
+  namespace?: string;
 }
 
 function compareSemver(a: string, b: string): number {
@@ -124,6 +125,7 @@ export function useProcessDefinitions() {
         repo: latestDoc.repo,
         url: latestDoc.url,
         archived: latestDoc.archived,
+        namespace: (latestDoc as unknown as { namespace?: string }).namespace,
       };
     });
   }, [allDocs]);

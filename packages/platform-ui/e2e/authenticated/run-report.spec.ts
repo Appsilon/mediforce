@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { TEST_ORG_HANDLE } from '../helpers/constants';
 
 // Uses seeded data from auth-setup.ts:
 // - 'proc-completed-1' is a completed instance with stepExecutions subcollection seeded
@@ -6,8 +7,8 @@ import { test, expect } from '@playwright/test';
 // - stepExecutions: 'exec-dq-verify' (completed), 'exec-dq-review' (completed)
 
 test.describe('Run Report', () => {
-  const reportUrl = '/workflows/Data%20Quality%20Review/runs/proc-completed-1/report';
-  const runUrl = '/workflows/Data%20Quality%20Review/runs/proc-completed-1';
+  const reportUrl = `/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1/report`;
+  const runUrl = `/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`;
 
   test('[RENDER] report page loads for completed run', async ({ page }) => {
     await page.goto(reportUrl);
@@ -63,7 +64,7 @@ test.describe('Run Report', () => {
 
   test('[RENDER] report shows not available for non-completed runs', async ({ page }) => {
     // proc-running-1 is a running instance
-    await page.goto('/workflows/Supply%20Chain%20Review/runs/proc-running-1/report');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1/report`);
     await expect(page.getByText(/only available for completed runs/i)).toBeVisible();
   });
 });

@@ -6,6 +6,8 @@ import { formatDistanceToNow } from 'date-fns';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { useUserDisplayNames } from '@/hooks/use-users';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 
 interface RunsTableProps {
   runs: ProcessInstance[];
@@ -19,19 +21,19 @@ interface RunsTableProps {
   activeTaskByInstance?: Map<string, string>;
 }
 
-function defaultRunHref(run: ProcessInstance): string {
-  return `/workflows/${encodeURIComponent(run.definitionName)}/runs/${run.id}`;
-}
-
 export function RunsTable({
   runs,
   loading,
   showProcess = false,
-  runHref = defaultRunHref,
+  runHref,
   emptyMessage = 'No runs found.',
   activeTaskByInstance,
 }: RunsTableProps) {
+  const handle = useHandleFromPath();
   const userNames = useUserDisplayNames();
+  const effectiveRunHref = runHref ?? ((run: ProcessInstance) =>
+    `/${handle}/workflows/${encodeURIComponent(run.definitionName)}/runs/${run.id}`
+  );
   const headers = [
     ...(showProcess ? ['Workflow'] : []),
     'Run ID',
@@ -82,7 +84,7 @@ export function RunsTable({
               {showProcess && (
                 <td className="px-4 py-3 font-medium">
                   <Link
-                    href={`/workflows/${encodeURIComponent(run.definitionName)}`}
+                    href={`/${handle}/workflows/${encodeURIComponent(run.definitionName)}`}
                     className="hover:underline text-primary"
                   >
                     {run.definitionName}
@@ -111,7 +113,7 @@ export function RunsTable({
                 {run.currentStepId ? (
                   activeTaskByInstance?.get(run.id) ? (
                     <Link
-                      href={`/tasks/${activeTaskByInstance.get(run.id)}`}
+                      href={routes.task(handle, activeTaskByInstance.get(run.id)!)}
                       className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
                     >
                       {run.currentStepId}
@@ -131,7 +133,7 @@ export function RunsTable({
               </td>
               <td className="px-4 py-3">
                 <Link
-                  href={runHref(run)}
+                  href={effectiveRunHref(run)}
                   className="text-primary hover:underline inline-flex items-center gap-0.5 text-xs"
                 >
                   View <ChevronRight className="h-3 w-3" />

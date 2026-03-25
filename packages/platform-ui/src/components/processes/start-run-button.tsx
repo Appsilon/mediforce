@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { startWorkflowRun } from '@/app/actions/processes';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
 interface StartRunButtonProps {
   workflowName: string;
@@ -19,6 +20,7 @@ interface StartRunButtonProps {
 
 export function StartRunButton({ workflowName, version, showVersionPicker }: StartRunButtonProps) {
   const router = useRouter();
+  const handle = useHandleFromPath();
   const { firebaseUser } = useAuth();
   const { definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowDefinitions(workflowName);
   const [starting, setStarting] = React.useState(false);
@@ -54,7 +56,7 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
     });
 
     if (result.success && result.instanceId) {
-      router.push(`/workflows/${encodeURIComponent(workflowName)}/runs/${result.instanceId}`);
+      router.push(`/${handle}/workflows/${encodeURIComponent(workflowName)}/runs/${result.instanceId}`);
     } else {
       console.error('[StartRunButton] Failed to start run:', result.error);
       setError(result.error ?? 'Failed to start run');
