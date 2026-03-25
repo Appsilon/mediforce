@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { TEST_ORG_HANDLE } from './helpers/constants';
 
 test.describe('Smoke Tests', () => {
   test('login page loads and shows sign-in button', async ({ page }) => {
@@ -8,7 +9,7 @@ test.describe('Smoke Tests', () => {
   });
 
   test('unauthenticated user is redirected to login', async ({ page }) => {
-    await page.goto('/test/tasks');
+    await page.goto(`/${TEST_ORG_HANDLE}/tasks`);
     await page.waitForURL('**/login**');
     await expect(page).toHaveURL(/\/login/);
   });

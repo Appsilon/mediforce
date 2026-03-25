@@ -1,26 +1,27 @@
 import { test, expect } from '@playwright/test';
+import { TEST_ORG_HANDLE } from '../helpers/constants';
 
 test.describe('Workflow Definitions', () => {
   test('[RENDER] workflow detail page has Runs and Definitions tabs', async ({ page }) => {
-    await page.goto('/test/workflows/Supply%20Chain%20Review');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review`);
     await expect(page.getByRole('tab', { name: /runs/i })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('tab', { name: /definitions/i })).toBeVisible();
   });
 
   test('[RENDER] Runs tab is the default tab', async ({ page }) => {
-    await page.goto('/test/workflows/Supply%20Chain%20Review');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review`);
     const runsTab = page.getByRole('tab', { name: /runs/i });
     await expect(runsTab).toBeVisible({ timeout: 10_000 });
     await expect(runsTab).toHaveAttribute('data-state', 'active');
   });
 
   test('[RENDER] Configurations tab no longer exists', async ({ page }) => {
-    await page.goto('/test/workflows/Supply%20Chain%20Review');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review`);
     await expect(page.getByRole('tab', { name: /configurations/i })).not.toBeVisible();
   });
 
   test('[RENDER] Definitions tab shows seeded version', async ({ page }) => {
-    await page.goto('/test/workflows/Supply%20Chain%20Review');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review`);
     await page.getByRole('tab', { name: /definitions/i }).click();
     // Should show content from seeded workflowDefinitions (version link or empty state)
     await expect(
@@ -29,7 +30,7 @@ test.describe('Workflow Definitions', () => {
   });
 
   test('[RENDER] definition version page shows diagram', async ({ page }) => {
-    await page.goto('/test/workflows/Supply%20Chain%20Review/definitions/1');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`);
     // Should show version badge
     await expect(page.locator('text=v1')).toBeVisible({ timeout: 10_000 });
     // Should show diagram nodes
@@ -39,7 +40,7 @@ test.describe('Workflow Definitions', () => {
   });
 
   test('[CLICK] Edit button enables edit mode with Cancel and Save', async ({ page }) => {
-    await page.goto('/test/workflows/Supply%20Chain%20Review/definitions/1');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`);
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 5_000 });
 
     // Click Edit
@@ -52,7 +53,7 @@ test.describe('Workflow Definitions', () => {
   });
 
   test('[CLICK] clicking a step node opens detail panel', async ({ page }) => {
-    await page.goto('/test/workflows/Supply%20Chain%20Review/definitions/1');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`);
     await page.locator('.react-flow__node').first().waitFor({ timeout: 5_000 });
 
     // Click first node
@@ -63,7 +64,7 @@ test.describe('Workflow Definitions', () => {
   });
 
   test('[CLICK] Edit mode: clicking a step opens editable panel', async ({ page }) => {
-    await page.goto('/test/workflows/Supply%20Chain%20Review/definitions/1');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`);
     await page.locator('.react-flow__node').first().waitFor({ timeout: 10_000 });
 
     // Enable edit mode
@@ -78,7 +79,7 @@ test.describe('Workflow Definitions', () => {
   });
 
   test('[CLICK] Edit mode: "+" button adds a new step', async ({ page }) => {
-    await page.goto('/test/workflows/Supply%20Chain%20Review/definitions/1');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`);
     await page.locator('.react-flow__node').first().waitFor({ timeout: 5_000 });
 
     // Count initial nodes
@@ -98,7 +99,7 @@ test.describe('Workflow Definitions', () => {
   });
 
   test('[CLICK] Cancel editing discards changes', async ({ page }) => {
-    await page.goto('/test/workflows/Supply%20Chain%20Review/definitions/1');
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`);
     await page.locator('.react-flow__node').first().waitFor({ timeout: 5_000 });
 
     // Enable edit mode
