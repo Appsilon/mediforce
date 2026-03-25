@@ -285,11 +285,14 @@ export default function ProcessCatalogPage() {
 
   const loading = defsLoading || instancesLoading;
 
-  const hasArchivedDefinitions = definitions.some((d) => d.archived === true);
+  const namespacedDefinitions = useMemo(() => definitions.filter((d) => d.namespace === handle), [definitions, handle]);
+  const hasArchivedDefinitions = namespacedDefinitions.some((d) => d.archived === true);
 
   const visibleDefinitions = useMemo(() => {
-    return definitions.filter((d) => showArchived || d.archived !== true);
-  }, [definitions, showArchived]);
+    return definitions
+      .filter((d) => d.namespace === handle)
+      .filter((d) => showArchived || d.archived !== true);
+  }, [definitions, showArchived, handle]);
 
   // Group instances by definition name
   const instancesByDefinition = useMemo((): Map<string, ProcessInstance[]> => {
@@ -365,7 +368,7 @@ export default function ProcessCatalogPage() {
             </div>
           ))}
         </div>
-      ) : definitions.length === 0 ? (
+      ) : namespacedDefinitions.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center py-24">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
             <GitBranch className="h-7 w-7 text-muted-foreground" />
