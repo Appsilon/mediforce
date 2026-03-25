@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ExternalLink } from 'lucide-react';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 
@@ -25,6 +26,7 @@ export function ProcessListTable({
   instances: ProcessInstance[];
   loading: boolean;
 }) {
+  const handle = useHandleFromPath();
   return (
     <div className="rounded-md border overflow-hidden">
       <table className="w-full text-sm">
@@ -58,7 +60,7 @@ export function ProcessListTable({
                   {format(new Date(inst.createdAt), 'MMM d, HH:mm')}
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/workflows/${inst.id}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                  <Link href={`/${handle}/workflows/${inst.id}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
                     Detail <ExternalLink className="h-3 w-3" />
                   </Link>
                 </td>

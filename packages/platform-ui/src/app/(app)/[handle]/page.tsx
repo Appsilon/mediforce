@@ -388,7 +388,7 @@ function NamespaceWorkflows({ namespace }: { namespace: Namespace }) {
           {workflows.map((workflow) => (
             <Link
               key={workflow.name}
-              href={`/workflows/${encodeURIComponent(workflow.name)}`}
+              href={`/${namespace.handle}/workflows/${encodeURIComponent(workflow.name)}`}
               className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
             >
               <GitBranch className="h-3.5 w-3.5 text-muted-foreground shrink-0" />

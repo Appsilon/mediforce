@@ -65,7 +65,7 @@ export default function OrgSettingsPage() {
         ),
       );
 
-      router.push('/workflows');
+      router.push(`/${handle}/workflows`);
     } catch {
       setDeleting(false);
     }
@@ -79,7 +79,7 @@ export default function OrgSettingsPage() {
       await updateDoc(doc(db, 'users', firebaseUser.uid), {
         organizations: arrayRemove(handle),
       });
-      router.push('/workflows');
+      router.push(`/${handle}/workflows`);
     } catch {
       setLeaving(false);
     }

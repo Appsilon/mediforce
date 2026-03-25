@@ -1,0 +1,75 @@
+'use client';
+
+import * as React from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { useProcessInstances } from '@/hooks/use-process-instances';
+import { RunsTable } from '@/components/processes/runs-table';
+import { formatStepName } from '@/components/tasks/task-utils';
+import { cn } from '@/lib/utils';
+
+export default function RunsPage() {
+  const { handle } = useParams<{ handle: string }>();
+  const searchParams = useSearchParams();
+  const workflowFilter = searchParams.get('workflow');
+
+  const { data: allInstances, loading } = useProcessInstances(
+    'all',
+    workflowFilter ?? undefined,
+  );
+
+  const sorted = React.useMemo(
+    () =>
+      [...allInstances].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
+    [allInstances],
+  );
+
+  return (
+    <div className="flex flex-1 flex-col gap-6 p-6">
+      <div>
+        <h1 className="text-xl font-headline font-semibold">
+          {workflowFilter
+            ? `Runs — ${formatStepName(workflowFilter)}`
+            : 'All Runs'}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          {workflowFilter
+            ? 'All runs for this workflow.'
+            : 'All workflow runs across the platform.'}
+        </p>
+      </div>
+
+      {workflowFilter && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            Filtered by:{' '}
+            <span className="font-medium text-foreground">
+              {formatStepName(workflowFilter)}
+            </span>
+          </span>
+          <a
+            href={`/${handle}/runs`}
+            className={cn(
+              'text-xs text-primary hover:underline',
+            )}
+          >
+            Clear filter
+          </a>
+        </div>
+      )}
+
+      <RunsTable
+        runs={sorted}
+        loading={loading}
+        showProcess={!workflowFilter}
+        emptyMessage={
+          workflowFilter
+            ? `No runs found for "${formatStepName(workflowFilter)}".`
+            : 'No runs found.'
+        }
+      />
+    </div>
+  );
+}

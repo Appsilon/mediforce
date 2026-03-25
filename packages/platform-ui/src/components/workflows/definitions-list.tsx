@@ -6,12 +6,14 @@ import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { VersionLabel } from '@/components/ui/version-label';
 import { setDefaultWorkflowVersion } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
 interface DefinitionsListProps {
   workflowName: string;
 }
 
 export function DefinitionsList({ workflowName }: DefinitionsListProps) {
+  const handle = useHandleFromPath();
   const { definitions, latestVersion, defaultVersion, loading, refreshDefault } = useWorkflowDefinitions(workflowName);
 
   if (loading) {
@@ -30,7 +32,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
           No definitions found.
         </p>
         <Link
-          href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
+          href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Pencil className="h-3.5 w-3.5" />
@@ -47,7 +49,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
           {definitions.length} version{definitions.length !== 1 ? 's' : ''}
         </p>
         <Link
-          href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
+          href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Pencil className="h-3.5 w-3.5" />
@@ -71,7 +73,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
             >
               {/* Left: version + title + badges */}
               <Link
-                href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
+                href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
                 className="flex items-center gap-2.5 flex-1 min-w-0"
               >
                 <VersionLabel version={def.version} title={def.title} className="text-sm shrink-0" />
@@ -121,7 +123,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                 )}
 
                 <Link
-                  href={`/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
+                  href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <ChevronRight className="h-4 w-4" />

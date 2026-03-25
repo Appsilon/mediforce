@@ -13,6 +13,7 @@ import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
 import { cancelProcessRun } from '@/app/actions/processes';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 
 type AuditEventWithId = AuditEvent & { id: string };
@@ -53,6 +54,7 @@ export function ProcessDetail({
   /** Href for this run's detail page, used to build step detail links. */
   runDetailHref?: string;
 }) {
+  const handle = useHandleFromPath();
   const needsHumanAction = instance.pauseReason === 'waiting_for_human'
     || instance.pauseReason === 'awaiting_agent_approval';
   const { task: blockingTask } = useActiveTaskForInstance(
@@ -224,7 +226,7 @@ export function ProcessDetail({
       {/* View Report — available for all completed runs */}
       {instance.status === 'completed' && (
         <Link
-          href={`/workflows/${encodeURIComponent(instance.definitionName)}/runs/${instance.id}/report`}
+          href={`/${handle}/workflows/${encodeURIComponent(instance.definitionName)}/runs/${instance.id}/report`}
           className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
         >
           <FileBarChart className="h-3.5 w-3.5" />

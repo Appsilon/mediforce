@@ -11,18 +11,18 @@ import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { ThemeToggle } from './theme-toggle';
 import { cn } from '@/lib/utils';
 
-const ACTION_ITEMS = [
-  { href: '/agents/new', label: 'Add new Agent', icon: Plus, badge: null },
-  { href: '/workflows/new', label: 'Add new Workflow', icon: Plus, badge: null },
-] as const;
-
 const NAV_ITEMS = [
-  { href: '/workflows', label: 'Workflows', icon: GitBranch, badge: null },
-  { href: '/agents', label: 'Agents', icon: Bot, badge: null },
-  { href: '/tasks', label: 'New actions', icon: User, badge: null },
+  { path: '/workflows', label: 'Workflows', icon: GitBranch, badge: null },
+  { path: '/agents', label: 'Agents', icon: Bot, badge: null },
+  { path: '/tasks', label: 'New actions', icon: User, badge: null },
 ] as const;
 
-const MONITORING_ITEM = { href: '/monitoring', label: 'Monitoring', icon: Activity } as const;
+const ACTION_ITEMS = [
+  { path: '/agents/new', label: 'Add new Agent', icon: Plus, badge: null },
+  { path: '/workflows/new', label: 'Add new Workflow', icon: Plus, badge: null },
+] as const;
+
+const MONITORING_ITEM = { path: '/monitoring', label: 'Monitoring', icon: Activity } as const;
 
 function NavItem({
   href,
@@ -65,8 +65,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const personalNamespace = namespaces.find((ns) => ns.type === 'personal') ?? null;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
+  // Extract handle from URL: /{handle}/workflows/... -> handle
+  const handleFromPath = pathname.split('/')[1] ?? '';
+
+  // Find the active namespace by matching the handle from the URL
+  const activeNamespace = namespaces.find((ns) => ns.handle === handleFromPath) ?? null;
+  const activeDisplayName = activeNamespace !== null
+    ? (activeNamespace.type === 'personal' ? 'My profile' : activeNamespace.displayName)
+    : handleFromPath;
+
+  // Build handle-prefixed href
+  const handlePrefix = handleFromPath !== '' ? `/${handleFromPath}` : '';
+
   const currentLabel =
-    [...NAV_ITEMS, MONITORING_ITEM].find((item) => pathname.startsWith(item.href))?.label ??
+    [...NAV_ITEMS, MONITORING_ITEM].find((item) => pathname.includes(item.path))?.label ??
     'Mediforce';
 
   const SidebarContent = () => (
@@ -76,40 +88,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Image src="/logo.png" alt="Mediforce logo" width={32} height={32} className="shrink-0" />
         <span className="font-headline text-lg font-semibold text-primary">Mediforce</span>
       </div>
-      {/* Nav */}
-      <nav className="flex-1 space-y-1 p-3">
-        {ACTION_ITEMS.map((item) => (
-          <NavItem
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            icon={item.icon}
-            badge={item.badge}
-            active={pathname.startsWith(item.href)}
-          />
-        ))}
-        <div className="my-2 border-t" />
-        {NAV_ITEMS.map((item) => (
-          <NavItem
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            icon={item.icon}
-            badge={item.badge}
-            active={pathname.startsWith(item.href)}
-          />
-        ))}
-        <div className="my-2 border-t" />
-        <NavItem
-          href={MONITORING_ITEM.href}
-          label={MONITORING_ITEM.label}
-          icon={MONITORING_ITEM.icon}
-          badge={null}
-          active={pathname.startsWith(MONITORING_ITEM.href)}
-        />
-      </nav>
-      {/* Namespace context switcher */}
-      <div className="border-t px-3 py-3">
+
+      {/* Namespace context switcher — below logo */}
+      <div className="border-b px-3 py-3">
         <Popover.Root>
           <Popover.Trigger asChild>
             <button
@@ -118,23 +99,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label="Switch namespace"
             >
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
-                {firebaseUser?.displayName
-                  ? firebaseUser.displayName
-                      .split(' ')
-                      .slice(0, 2)
-                      .map((part) => part[0]?.toUpperCase() ?? '')
-                      .join('')
-                  : '?'}
+                {activeNamespace !== null && activeNamespace.type === 'organization' ? (
+                  <Building2 className="h-3.5 w-3.5" />
+                ) : (
+                  firebaseUser?.displayName
+                    ? firebaseUser.displayName
+                        .split(' ')
+                        .slice(0, 2)
+                        .map((part) => part[0]?.toUpperCase() ?? '')
+                        .join('')
+                    : '?'
+                )}
               </div>
               <span className="flex-1 truncate text-left text-sm font-medium">
-                {firebaseUser?.displayName ?? firebaseUser?.email ?? 'Set up profile'}
+                {activeDisplayName}
               </span>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             </button>
           </Popover.Trigger>
           <Popover.Portal>
             <Popover.Content
-              side="top"
+              side="bottom"
               align="start"
               sideOffset={4}
               className="z-50 w-[260px] rounded-md border bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
@@ -144,25 +129,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <>
                     <Popover.Close asChild>
                       <Link
-                        href={`/${personalNamespace.handle}`}
-                        className="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                        href={`/${personalNamespace.handle}/workflows`}
+                        className={cn(
+                          'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+                          handleFromPath === personalNamespace.handle ? 'text-foreground' : 'text-muted-foreground',
+                        )}
                       >
                         <User className="h-4 w-4 shrink-0" />
                         <span className="flex-1 truncate">
                           <span className="block font-medium text-foreground">My profile</span>
                           <span className="block text-xs text-muted-foreground">@{personalNamespace.handle}</span>
                         </span>
+                        {handleFromPath === personalNamespace.handle && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
                       </Link>
                     </Popover.Close>
                     <div className="my-1 border-t" />
                   </>
                 )}
                 {namespaces.filter((ns) => ns.type === 'organization').map((ns) => {
-                  const isActive = pathname.startsWith(`/${ns.handle}`);
+                  const isActive = handleFromPath === ns.handle;
                   return (
                     <Popover.Close asChild key={ns.handle}>
                       <Link
-                        href={`/${ns.handle}`}
+                        href={`/${ns.handle}/workflows`}
                         className={cn(
                           'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
                           isActive ? 'text-foreground' : 'text-muted-foreground',
@@ -193,6 +182,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Popover.Portal>
         </Popover.Root>
       </div>
+
+      {/* Nav */}
+      <nav className="flex-1 space-y-1 p-3">
+        {ACTION_ITEMS.map((item) => (
+          <NavItem
+            key={item.path}
+            href={`${handlePrefix}${item.path}`}
+            label={item.label}
+            icon={item.icon}
+            badge={item.badge}
+            active={pathname.startsWith(`${handlePrefix}${item.path}`)}
+          />
+        ))}
+        <div className="my-2 border-t" />
+        {NAV_ITEMS.map((item) => (
+          <NavItem
+            key={item.path}
+            href={`${handlePrefix}${item.path}`}
+            label={item.label}
+            icon={item.icon}
+            badge={item.badge}
+            active={pathname.startsWith(`${handlePrefix}${item.path}`)}
+          />
+        ))}
+        <div className="my-2 border-t" />
+        <NavItem
+          href={`${handlePrefix}${MONITORING_ITEM.path}`}
+          label={MONITORING_ITEM.label}
+          icon={MONITORING_ITEM.icon}
+          badge={null}
+          active={pathname.startsWith(`${handlePrefix}${MONITORING_ITEM.path}`)}
+        />
+      </nav>
+
+      {/* Bottom — git SHA only */}
       {process.env.NEXT_PUBLIC_GIT_SHA && (
         <div className="border-t px-4 py-2">
           <span className="font-mono text-[10px] text-muted-foreground">

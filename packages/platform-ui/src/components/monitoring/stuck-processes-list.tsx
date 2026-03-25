@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
 import type { ProcessInstance } from '@mediforce/platform-core';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
 export function StuckProcessesList({
   processes,
@@ -12,6 +13,7 @@ export function StuckProcessesList({
   processes: ProcessInstance[];
   loading: boolean;
 }) {
+  const handle = useHandleFromPath();
   if (loading) {
     return (
       <div className="space-y-2">
@@ -43,7 +45,7 @@ export function StuckProcessesList({
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-center gap-2">
                 <Link
-                  href={`/workflows/${inst.id}`}
+                  href={`/${handle}/workflows/${inst.id}`}
                   className="font-medium text-sm hover:text-primary transition-colors truncate"
                 >
                   {inst.definitionName}

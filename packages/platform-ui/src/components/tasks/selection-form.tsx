@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { CheckCircle, MessageSquare, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { completeTask } from '@/app/actions/tasks';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
 interface SelectionFormProps {
   taskId: string;
@@ -28,6 +29,7 @@ export function SelectionForm({
   remainingTaskCount,
   onCompleted,
 }: SelectionFormProps) {
+  const handle = useHandleFromPath();
   const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
   const [mode, setMode] = React.useState<'select' | 'revise' | null>(null);
   const [comment, setComment] = React.useState('');
@@ -280,6 +282,7 @@ function SelectionConfirmation({
   data: SubmittedData;
   remainingTaskCount?: number;
 }) {
+  const handle = useHandleFromPath();
   const isApprove = data.verdict === 'approve';
 
   return (
@@ -341,12 +344,12 @@ function SelectionConfirmation({
         {remainingTaskCount !== undefined && remainingTaskCount > 0 ? (
           <span>
             You have {remainingTaskCount} more {remainingTaskCount === 1 ? 'task' : 'tasks'} &mdash;{' '}
-            <Link href="/tasks" className="text-primary hover:underline font-medium">
+            <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
               View next task
             </Link>
           </span>
         ) : (
-          <Link href="/tasks" className="text-primary hover:underline font-medium">
+          <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
             Back to tasks
           </Link>
         )}

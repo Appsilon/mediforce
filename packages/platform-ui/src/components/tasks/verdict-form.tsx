@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { CheckCircle, MessageSquare, X, Loader2 } from 'lucide-react';
 import { completeTask } from '@/app/actions/tasks';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
 interface VerdictFormProps {
   taskId: string;
@@ -32,6 +33,7 @@ export function VerdictForm({
   remainingTaskCount,
   onCompleted,
 }: VerdictFormProps) {
+  const handle = useHandleFromPath();
   const [verdict, setVerdict] = React.useState<'approve' | 'revise' | null>(null);
   const [comment, setComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
@@ -180,6 +182,7 @@ function VerdictConfirmation({
   data: SubmittedData;
   remainingTaskCount?: number;
 }) {
+  const handle = useHandleFromPath();
   const isApprove = data.verdict === 'approve';
 
   return (
@@ -241,12 +244,12 @@ function VerdictConfirmation({
         {remainingTaskCount !== undefined && remainingTaskCount > 0 ? (
           <span>
             You have {remainingTaskCount} more {remainingTaskCount === 1 ? 'task' : 'tasks'} &mdash;{' '}
-            <Link href="/tasks" className="text-primary hover:underline font-medium">
+            <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
               View next task
             </Link>
           </span>
         ) : (
-          <Link href="/tasks" className="text-primary hover:underline font-medium">
+          <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
             Back to tasks
           </Link>
         )}

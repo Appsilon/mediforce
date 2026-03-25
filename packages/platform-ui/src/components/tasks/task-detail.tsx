@@ -21,6 +21,7 @@ import { useCollection } from '@/hooks/use-collection';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { storage } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -42,6 +43,7 @@ export function TaskDetail({
   task: HumanTask;
   currentUserId: string;
 }) {
+  const handle = useHandleFromPath();
   const { data: processInstance } = useProcessInstance(task.processInstanceId);
   const [hasStepContent, setHasStepContent] = React.useState(false);
   const [uploadComplete, setUploadComplete] = React.useState(false);
@@ -162,7 +164,7 @@ export function TaskDetail({
     <div className="p-6 max-w-3xl space-y-6">
       {/* Back */}
       <Link
-        href="/tasks"
+        href={`/${handle}/tasks`}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -194,7 +196,7 @@ export function TaskDetail({
           </div>
           {processInstance ? (
             <Link
-              href={`/workflows/${encodeURIComponent(processInstance.definitionName)}/runs/${task.processInstanceId}`}
+              href={`/${handle}/workflows/${encodeURIComponent(processInstance.definitionName)}/runs/${task.processInstanceId}`}
               className="text-primary hover:underline font-mono text-xs"
             >
               {task.processInstanceId.slice(0, 12)}&hellip;
@@ -456,6 +458,7 @@ function UploadConfirmationReadOnly({
 }: {
   completionData: Record<string, unknown>;
 }) {
+  const handle = useHandleFromPath();
   interface UploadedFile {
     name?: string;
     size?: number;
@@ -523,7 +526,7 @@ function UploadConfirmationReadOnly({
       </div>
 
       <div className="text-sm text-muted-foreground">
-        <Link href="/tasks" className="text-primary hover:underline font-medium">
+        <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
           Back to tasks
         </Link>
       </div>
