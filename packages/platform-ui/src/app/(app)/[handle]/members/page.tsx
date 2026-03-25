@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { arrayUnion, collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
+import { arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
 import Link from 'next/link';
-import { ArrowLeft, Users } from 'lucide-react';
+import { ArrowLeft, LogOut, Trash2, Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useCollection } from '@/hooks/use-collection';
@@ -138,6 +139,72 @@ export default function MembersPage() {
     }
   }
 
+  const router = useRouter();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  const isOwner = currentUserMember?.role === 'owner';
+  const isMember = currentUserMember !== undefined;
+
+  async function handleDeleteOrg() {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      // Delete all member docs and remove org from each user's organizations[]
+      const membersSnapshot = await getDocs(collection(db, 'namespaces', handle, 'members'));
+      const batch = writeBatch(db);
+
+      for (const memberDoc of membersSnapshot.docs) {
+        batch.delete(memberDoc.ref);
+      }
+      batch.delete(doc(db, 'namespaces', handle));
+      await batch.commit();
+
+      // Remove org from all members' users/{uid}.organizations
+      await Promise.all(
+        membersSnapshot.docs.map((memberDoc) =>
+          updateDoc(doc(db, 'users', memberDoc.id), {
+            organizations: arrayRemove(handle),
+          }),
+        ),
+      );
+
+      router.push('/workflows');
+    } catch {
+      setDeleting(false);
+    }
+  }
+
+  async function handleLeaveOrg() {
+    if (firebaseUser === null) return;
+    setLeaving(true);
+    try {
+      await deleteDoc(doc(db, 'namespaces', handle, 'members', firebaseUser.uid));
+      await updateDoc(doc(db, 'users', firebaseUser.uid), {
+        organizations: arrayRemove(handle),
+      });
+      router.push('/workflows');
+    } catch {
+      setLeaving(false);
+    }
+  }
+
+  async function handleRemoveMember(memberUid: string) {
+    try {
+      await deleteDoc(doc(db, 'namespaces', handle, 'members', memberUid));
+      await updateDoc(doc(db, 'users', memberUid), {
+        organizations: arrayRemove(handle),
+      });
+    } catch {
+      // silently fail — useCollection will update the list
+    }
+  }
+
   const loading = namespaceLoading || membersLoading;
 
   return (
@@ -211,6 +278,16 @@ export default function MembersPage() {
                     Joined {formatDate(member.joinedAt)}
                   </p>
                 </div>
+                {canManageMembers && member.role !== 'owner' && member.uid !== firebaseUser?.uid && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveMember(member.uid)}
+                    className="shrink-0 rounded p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    aria-label={`Remove ${name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
               );
             })}
@@ -266,6 +343,62 @@ export default function MembersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        )}
+        {isMember && !isOwner && (
+          <div className="mt-8 rounded-lg border border-destructive/30 bg-card px-4 py-5">
+            <h2 className="text-sm font-semibold mb-1">Leave organization</h2>
+            <p className="text-xs text-muted-foreground mb-3">
+              You will lose access to this organization&apos;s resources.
+            </p>
+            <button
+              type="button"
+              onClick={handleLeaveOrg}
+              disabled={leaving}
+              className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              {leaving ? 'Leaving…' : 'Leave organization'}
+            </button>
+          </div>
+        )}
+
+        {isOwner && (
+          <div className="mt-8 rounded-lg border border-destructive/30 bg-card px-4 py-5">
+            <h2 className="text-sm font-semibold mb-1 text-destructive">Delete organization</h2>
+            <p className="text-xs text-muted-foreground mb-3">
+              This will permanently delete <span className="font-semibold">@{handle}</span>, remove all members, and cannot be undone.
+            </p>
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDeleteOrg}
+                  disabled={deleting}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {deleting ? 'Deleting…' : 'Yes, delete permanently'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                  className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleDeleteOrg}
+                className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete organization
+              </button>
+            )}
           </div>
         )}
       </div>
