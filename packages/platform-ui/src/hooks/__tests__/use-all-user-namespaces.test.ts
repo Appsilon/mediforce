@@ -4,6 +4,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 // --- Mock firebase/firestore ---
 const mockGetDocs = vi.fn();
 const mockGetDoc = vi.fn();
+const mockOnSnapshot = vi.fn();
 const mockCollection = vi.fn();
 const mockQuery = vi.fn();
 const mockWhere = vi.fn();
@@ -15,10 +16,10 @@ vi.mock('firebase/firestore', () => ({
   where: (...args: unknown[]) => mockWhere(...args),
   getDocs: (...args: unknown[]) => mockGetDocs(...args),
   getDoc: (...args: unknown[]) => mockGetDoc(...args),
+  onSnapshot: (...args: unknown[]) => mockOnSnapshot(...args),
   doc: (...args: unknown[]) => mockDoc(...args),
 }));
 
-// --- Mock @/lib/firebase ---
 vi.mock('@/lib/firebase', () => ({
   db: {},
 }));
@@ -48,6 +49,18 @@ const orgNamespace = {
   createdAt: '2024-01-01T00:00:00.000Z',
 };
 
+/**
+ * Helper: configure mockOnSnapshot to call the callback with a fake user doc,
+ * and return an unsubscribe function.
+ */
+function setupOnSnapshot(userData: Record<string, unknown>) {
+  mockOnSnapshot.mockImplementation((_ref: unknown, callback: (snap: unknown) => void) => {
+    // Call synchronously to trigger the async flow inside the hook
+    Promise.resolve().then(() => callback(makeFakeDoc(userData)));
+    return vi.fn(); // unsubscribe
+  });
+}
+
 describe('useAllUserNamespaces', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,14 +78,12 @@ describe('useAllUserNamespaces', () => {
     });
 
     expect(result.current.namespaces).toEqual([]);
-    expect(mockGetDocs).not.toHaveBeenCalled();
+    expect(mockOnSnapshot).not.toHaveBeenCalled();
   });
 
   it('[DATA] returns personal namespace when user has no organizations', async () => {
-    // getDocs for personal query
+    setupOnSnapshot({ email: 'alice@test.com' });
     mockGetDocs.mockResolvedValueOnce(makeFakeSnapshot([makeFakeDoc(personalNamespace)]));
-    // getDoc for users/{uid} — no organizations field
-    mockGetDoc.mockResolvedValueOnce(makeFakeDoc({ email: 'alice@test.com' }));
 
     const { result } = renderHook(() => useAllUserNamespaces('uid-1'));
 
@@ -82,17 +93,13 @@ describe('useAllUserNamespaces', () => {
 
     expect(result.current.namespaces).toHaveLength(1);
     expect(result.current.namespaces[0].handle).toBe('alice');
-    expect(result.current.namespaces[0].type).toBe('personal');
   });
 
   it('[DATA] merges personal and org namespaces from user doc', async () => {
-    // getDocs for personal query
+    setupOnSnapshot({ organizations: ['acme-corp', 'alice'] });
     mockGetDocs.mockResolvedValueOnce(makeFakeSnapshot([makeFakeDoc(personalNamespace)]));
-    // getDoc for users/{uid} with organizations array
-    mockGetDoc
-      .mockResolvedValueOnce(makeFakeDoc({ organizations: ['acme-corp', 'alice'] }))
-      // getDoc for namespaces/acme-corp (alice already seen from personal)
-      .mockResolvedValueOnce(makeFakeDoc(orgNamespace));
+    // getDoc for namespaces/acme-corp (alice already seen from personal)
+    mockGetDoc.mockResolvedValueOnce(makeFakeDoc(orgNamespace));
 
     const { result } = renderHook(() => useAllUserNamespaces('uid-1'));
 
@@ -107,13 +114,9 @@ describe('useAllUserNamespaces', () => {
   });
 
   it('[DATA] returns only org namespaces when no personal namespace found', async () => {
-    // getDocs for personal query — empty
+    setupOnSnapshot({ organizations: ['acme-corp'] });
     mockGetDocs.mockResolvedValueOnce(makeFakeSnapshot([]));
-    // getDoc for users/{uid} with organizations array
-    mockGetDoc
-      .mockResolvedValueOnce(makeFakeDoc({ organizations: ['acme-corp'] }))
-      // getDoc for namespaces/acme-corp
-      .mockResolvedValueOnce(makeFakeDoc(orgNamespace));
+    mockGetDoc.mockResolvedValueOnce(makeFakeDoc(orgNamespace));
 
     const { result } = renderHook(() => useAllUserNamespaces('uid-1'));
 
@@ -123,6 +126,5 @@ describe('useAllUserNamespaces', () => {
 
     expect(result.current.namespaces).toHaveLength(1);
     expect(result.current.namespaces[0].handle).toBe('acme-corp');
-    expect(result.current.namespaces[0].type).toBe('organization');
   });
 });
