@@ -14,6 +14,7 @@ import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
 import { cancelProcessRun } from '@/app/actions/processes';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { formatStepName } from '@/components/tasks/task-utils';
 
@@ -184,7 +185,7 @@ export function ProcessDetail({
               </span>
             </div>
             <Link
-              href={`/tasks/${blockingTask.id}`}
+              href={routes.task(handle, blockingTask.id)}
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
             >
               Open task

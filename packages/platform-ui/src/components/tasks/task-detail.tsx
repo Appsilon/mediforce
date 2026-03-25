@@ -22,6 +22,7 @@ import { useProcessInstance } from '@/hooks/use-process-instances';
 import { storage } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -274,7 +275,7 @@ export function TaskDetail({
                     </span>
                   ) : (
                     <Link
-                      href={`/tasks/${sibling.id}`}
+                      href={routes.task(handle, sibling.id)}
                       className="text-primary hover:underline truncate"
                     >
                       {getTaskDisplayTitle(sibling, processInstance)}

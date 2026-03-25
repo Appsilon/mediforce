@@ -7,6 +7,7 @@ import type { ProcessInstance } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 
 interface RunsTableProps {
   runs: ProcessInstance[];
@@ -112,7 +113,7 @@ export function RunsTable({
                 {run.currentStepId ? (
                   activeTaskByInstance?.get(run.id) ? (
                     <Link
-                      href={`/tasks/${activeTaskByInstance.get(run.id)}`}
+                      href={routes.task(handle, activeTaskByInstance.get(run.id)!)}
                       className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
                     >
                       {run.currentStepId}

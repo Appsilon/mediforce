@@ -83,11 +83,11 @@ describe('ConfigList', () => {
     const viewLinks = screen.getAllByRole('link', { name: /view/i });
     expect(viewLinks[0]).toHaveAttribute(
       'href',
-      '/configs/supply-chain-review/default/1.0',
+      '/test-org/configs/supply-chain-review/default/1.0',
     );
     expect(viewLinks[1]).toHaveAttribute(
       'href',
-      '/configs/supply-chain-review/pilot/2.0',
+      '/test-org/configs/supply-chain-review/pilot/2.0',
     );
   });
 
@@ -99,7 +99,7 @@ describe('ConfigList', () => {
     const newLink = screen.getByRole('link', { name: /new configuration/i });
     expect(newLink).toHaveAttribute(
       'href',
-      '/configs/new?process=supply-chain-review',
+      '/test-org/configs/new?process=supply-chain-review',
     );
   });
 
@@ -111,7 +111,7 @@ describe('ConfigList', () => {
     const cloneLinks = screen.getAllByRole('link', { name: /clone/i });
     expect(cloneLinks[0]).toHaveAttribute(
       'href',
-      '/configs/new?process=supply-chain-review&cloneConfig=default&cloneVersion=1.0',
+      '/test-org/configs/new?process=supply-chain-review&cloneConfig=default&cloneVersion=1.0',
     );
   });
 });

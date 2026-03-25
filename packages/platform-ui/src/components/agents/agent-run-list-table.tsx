@@ -8,6 +8,7 @@ import { ConfidenceBadge } from './confidence-badge';
 import { AutonomyBadge } from './autonomy-badge';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 import type { LucideIcon } from 'lucide-react';
 
 function getPluginDisplay(pluginId: string): { Icon: LucideIcon; colorClass: string; label: string } {
@@ -88,7 +89,7 @@ export function AgentRunListTable({
                   {(() => {
                     const { Icon, colorClass, label } = getPluginDisplay(run.pluginId);
                     return (
-                      <Link href={`/agents/${run.id}`} className="inline-flex items-center gap-1.5 font-medium text-xs hover:text-primary transition-colors">
+                      <Link href={routes.agent(handle, run.id)} className="inline-flex items-center gap-1.5 font-medium text-xs hover:text-primary transition-colors">
                         <Icon className={cn('h-3.5 w-3.5 shrink-0', colorClass)} />
                         {label}
                       </Link>

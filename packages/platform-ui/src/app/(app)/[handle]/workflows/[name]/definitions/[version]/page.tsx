@@ -12,6 +12,7 @@ import { saveWorkflowDefinition } from '@/app/actions/definitions';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
+import { routes } from '@/lib/routes';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 const EXECUTOR_TYPES = ['human', 'agent', 'script'] as const;
@@ -236,7 +237,7 @@ export default function WorkflowDefinitionVersionPage() {
     return (
       <div className="p-6 text-center text-sm text-muted-foreground">
         Definition v{version} for &ldquo;{decodedName}&rdquo; not found.{' '}
-        <Link href={`/workflows/${name}`} className="underline">Back to workflow</Link>
+        <Link href={routes.workflow(handle, decodedName)} className="underline">Back to workflow</Link>
       </div>
     );
   }
@@ -248,7 +249,7 @@ export default function WorkflowDefinitionVersionPage() {
       {/* Header */}
       <div className="border-b px-6 py-4 sticky top-0 z-30 bg-background">
         <Link
-          href={`/workflows/${name}`}
+          href={routes.workflow(handle, decodedName)}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
