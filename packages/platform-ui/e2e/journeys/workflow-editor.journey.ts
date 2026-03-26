@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Workflow Editor Journey', () => {
   test('workflow detail shows tabs, definitions, and diagram', async ({ page }) => {
@@ -66,5 +66,6 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.locator('text=editing')).not.toBeVisible();
     await expect(page.getByRole('button', { name: /^edit$/i })).toBeVisible();
     await showResult(page);
+    await endRecording(page);
   });
 });

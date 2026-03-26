@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Agent Oversight Journey', () => {
   test('agents page shows catalog, run history, and detail navigation', async ({ page }) => {
@@ -65,5 +65,6 @@ test.describe('Agent Oversight Journey', () => {
     await expect(page.getByText('Foundation model')).toBeVisible();
     await expect(page.getByRole('button', { name: /save new agent/i })).toBeVisible();
     await showResult(page);
+    await endRecording(page);
   });
 });

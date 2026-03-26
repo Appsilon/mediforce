@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Run Detail Journey', () => {
   test('running process shows step graph, step history, and tabs', async ({ page }) => {
@@ -92,5 +92,6 @@ test.describe('Run Detail Journey', () => {
       .or(page.locator('text=/Vendor Assessment|Narrative Summary|Risk Scoring/i'));
     await expect(stepPanel.first()).toBeVisible({ timeout: 10_000 });
     await showResult(page);
+    await endRecording(page);
   });
 });

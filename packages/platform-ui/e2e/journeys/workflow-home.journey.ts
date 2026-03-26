@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Workflow Home Journey', () => {
   test('browse workflows, check run data, and navigate to run detail', async ({ page }) => {
@@ -33,5 +33,6 @@ test.describe('Workflow Home Journey', () => {
     await click(page, hash);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
     await showResult(page);
+    await endRecording(page);
   });
 });

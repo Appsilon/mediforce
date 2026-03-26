@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Task Review Journey', () => {
   test('browse tasks, interact with grouping, and view task details', async ({ page }) => {
@@ -24,9 +24,11 @@ test.describe('Task Review Journey', () => {
     await expect(page.getByText('Action needed').first()).toBeVisible();
     await showResult(page);
 
-    // Navigate to task detail
-    await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-pending-1`);
-    await expect(page.getByRole('heading', { name: 'Review Intake Data' })).toBeVisible({ timeout: 10_000 });
+    // Navigate to task detail via sidebar
+    await click(page, page.getByRole('link', { name: /new actions/i }));
+    await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
+    await click(page, page.getByText('Review Intake Data'));
+    await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
     await showResult(page);
   });
 
@@ -59,5 +61,6 @@ test.describe('Task Review Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-completed-1`);
     await expect(page.getByText(/completed/i).first()).toBeVisible({ timeout: 10_000 });
     await showResult(page);
+    await endRecording(page);
   });
 });

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, click, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Run Report Journey', () => {
   test('completed run report shows timeline, toggles detail level, and has branding', async ({ page }) => {
@@ -49,5 +49,6 @@ test.describe('Run Report Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1/report`);
     await expect(page.getByText(/only available for completed runs/i)).toBeVisible({ timeout: 10_000 });
     await showResult(page);
+    await endRecording(page);
   });
 });
