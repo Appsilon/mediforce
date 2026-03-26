@@ -1,10 +1,10 @@
 ---
 name: e2e-record
-description: Record E2E journey tests as GIFs for feature documentation and PRs. Use when the user asks to record a feature demo, generate a GIF for a PR, or update the feature gallery.
+description: Record E2E journey tests as GIFs for feature documentation and PRs. Use after implementing UI features, when updating the feature gallery, or when the user asks for a feature demo. MUST be used after any UI feature implementation.
 allowed-tools: Bash, Read, Write, Glob, Grep
 metadata:
   author: Appsilon
-  version: "1.0"
+  version: "1.1"
   domain: testing
   complexity: basic
   tags: e2e, playwright, recording, gif, testing
@@ -14,77 +14,70 @@ metadata:
 
 ## When to Use
 
-- After implementing a feature and its journey test passes
+- **After implementing any UI feature** — this is mandatory, not optional
 - When the user asks to record a demo or generate a GIF
 - When updating `docs/features/FEATURES.md` with new feature recordings
 
-## Prerequisites
+## Step 1: Ensure emulators are running
 
-- Firebase Emulators running: `pnpm emulators` (in separate terminal or tmux)
-- ffmpeg installed: `brew install ffmpeg` (for GIF conversion)
+```bash
+# Check if emulators are up
+curl -s http://127.0.0.1:9099 >/dev/null 2>&1 && echo "Auth emulator: OK" || echo "Auth emulator: NOT RUNNING"
+curl -s http://127.0.0.1:8080 >/dev/null 2>&1 && echo "Firestore emulator: OK" || echo "Firestore emulator: NOT RUNNING"
+```
 
-## Recording a Journey Test
+If not running, start them:
+```bash
+cd packages/platform-ui && pnpm emulators &
+sleep 10  # wait for Java startup
+```
 
-### Step 1: Run with video recording
+## Step 2: Run tests with recording
 
+Record a specific journey:
 ```bash
 cd packages/platform-ui
-E2E_RECORD=true npx playwright test --project=authenticated --grep "<test-name-pattern>"
+NEXT_PUBLIC_USE_EMULATORS=true E2E_RECORD=true npx playwright test --project=authenticated --workers=1 --grep "<test-name-pattern>"
 ```
 
-This runs the matching journey test with Playwright video recording enabled (`slowMo: 300ms` for readable output).
+Record all journeys:
+```bash
+cd packages/platform-ui
+pnpm test:e2e:record
+```
 
-Videos land in `test-results/` as `.webm` files.
+Videos land in `packages/platform-ui/test-results/*/video.webm`.
 
-### Step 2: Convert to GIF
+## Step 3: Convert to GIF
 
 ```bash
-# Find the recorded video
-VIDEO=$(find test-results -name "*.webm" -newer /tmp/e2e-record-marker | head -1)
-
-# Convert to GIF (960px wide, 10fps, looping)
-ffmpeg -i "$VIDEO" -vf "fps=10,scale=960:-1:flags=lanczos" -loop 0 output.gif
+VIDEO=$(find packages/platform-ui/test-results -name "video.webm" -newer /tmp/e2e-marker | head -1)
+ffmpeg -y -i "$VIDEO" -vf "fps=10,scale=960:-1:flags=lanczos" -loop 0 docs/features/<feature-name>.gif
 ```
 
-### Step 3: Add to feature gallery
+For multiple features, loop over the test-results directories.
 
-```bash
-# Copy GIF to docs
-cp output.gif docs/features/<feature-name>.gif
-```
+## Step 4: Update feature gallery
 
-Then update `docs/features/FEATURES.md`:
+Edit `docs/features/FEATURES.md`:
 
 ```markdown
 ## <Feature Name>
 
-<Short description of what the feature does.>
+<One-line description.>
 
 ![<feature-name>](<feature-name>.gif)
 ```
 
-### Step 4: Commit with PR
+## Step 5: Commit
 
 ```bash
 git add docs/features/<feature-name>.gif docs/features/FEATURES.md
 ```
 
-## All-in-one command
+## Troubleshooting
 
-Record all journey tests and generate GIFs:
-
-```bash
-cd packages/platform-ui && pnpm test:e2e:gif
-```
-
-Record a specific test:
-
-```bash
-cd packages/platform-ui && pnpm test:e2e:gif -- --grep "reviewer approves"
-```
-
-## Notes
-
-- GIFs are typically 2-5MB each. Keep under 10MB.
-- If a feature changes significantly, re-record and replace the old GIF.
-- The `FEATURES.md` gallery serves as living documentation of what the app does.
+- **"connection refused 9099"** — emulators not running. Start with `pnpm emulators`
+- **Empty GIF** — test might have failed. Check `pnpm test:e2e:auth` first
+- **GIF too large (>5MB)** — reduce fps: `fps=6` instead of `fps=10`
+- **ffmpeg not found** — install with `brew install ffmpeg`

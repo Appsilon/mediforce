@@ -112,12 +112,14 @@ In practice: receive a task → break it down → dispatch subagents → verify 
 
 | Layer | What it catches | Where |
 |-------|----------------|-------|
-| **Unit** | Schema validation, engine logic, pure functions | `packages/*/src/**/__tests__/` |
+| **Unit** | Schema validation, pure functions, expression eval | `packages/*/src/**/__tests__/` |
+| **Engine integration** | Full workflow loops, transitions, step routing | `packages/workflow-engine/src/__tests__/` |
 | **E2E journeys** | Full user flows with state changes | `packages/platform-ui/e2e/journeys/` |
 | **E2E smoke** | Login page, auth redirect (no emulators) | `packages/platform-ui/e2e/smoke.spec.ts` |
 
-Full E2E strategy: [`packages/platform-ui/e2e/E2E-STRATEGY.md`](packages/platform-ui/e2e/E2E-STRATEGY.md)
-Engine testing strategy: [`packages/workflow-engine/TESTING.md`](packages/workflow-engine/TESTING.md)
+Testing strategies:
+- E2E: [`docs/E2E-STRATEGY.md`](docs/E2E-STRATEGY.md)
+- Engine: [`packages/workflow-engine/TESTING.md`](packages/workflow-engine/TESTING.md)
 
 ### Commands
 
@@ -143,10 +145,10 @@ Engine testing strategy: [`packages/workflow-engine/TESTING.md`](packages/workfl
 
 1. **RED** — Write or update the journey test in `e2e/journeys/`. It describes the expected behavior.
 2. **GREEN** — Implement until the test passes.
-3. **Record** — Run `pnpm test:e2e:gif -- --grep "<feature>"` to capture a GIF.
-4. **PR** — Commit the GIF to `docs/features/` and update `docs/features/FEATURES.md`.
+3. **Record** — Use the `/e2e-record` skill to record the GIF and update the feature gallery.
+4. **PR** — Commit the GIF to `docs/features/` with the PR.
 
-Executors MUST write or update journey tests as part of any task that adds or modifies UI features.
+Executors MUST write or update journey tests and record GIFs as part of any task that adds or modifies UI features.
 
 ### Unit testing by package
 
