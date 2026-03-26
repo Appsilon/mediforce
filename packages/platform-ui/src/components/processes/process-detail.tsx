@@ -157,7 +157,7 @@ export function ProcessDetail({
                 onClick={() => { setCancelStep(0); setCancelError(null); }}
                 className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
               >
-                Back
+                Keep running
               </button>
             </div>
           )}
