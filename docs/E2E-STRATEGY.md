@@ -100,10 +100,8 @@ Every journey test produces a GIF recording that lives in `docs/features/`. The 
 
 ### Adding to the gallery
 
-Use the `/e2e-record` skill, or manually:
-
-1. Record: `pnpm test:e2e:record -- --grep "<feature>"`
-2. Convert: `ffmpeg -y -i <video.webm> -vf "fps=10,scale=960:-1:flags=lanczos" -loop 0 docs/features/<name>.gif`
-3. Add entry to `docs/features/FEATURES.md` under the right section with description and `![name](name.gif)`
-4. Add the GIF filename to the summary table at the top of FEATURES.md
-5. Commit the GIF and FEATURES.md with the PR
+1. Record + convert: `cd packages/platform-ui && pnpm test:e2e:gif`
+   - Records all journey tests with video, then runs `scripts/e2e-to-gif.sh` to convert to GIFs in `docs/features/`
+   - To convert only specific tests: `bash scripts/e2e-to-gif.sh <filter>`
+2. Add entry to `docs/features/FEATURES.md` under the right section with description and `![name](name.gif)`
+3. Commit the GIF and FEATURES.md with the PR

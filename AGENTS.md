@@ -134,21 +134,30 @@ Testing strategies:
 | `cd packages/platform-ui && pnpm test:e2e:record` | ~3min | Journey tests with video recording |
 | `cd packages/platform-ui && pnpm test:e2e:gif` | ~3min | Record + convert to GIF for docs |
 
-### Agent workflow (fastest first)
+### Agent workflow
 
-1. `pnpm typecheck` — catches type errors
+**After every code change (always):**
+1. `pnpm typecheck`
 2. `pnpm test:affected` — tests for changed files only
 3. `pnpm test` — all unit tests
-4. E2E journey tests if UI was changed
 
-### TDD workflow for features and bug fixes
+**Before pushing (if UI or E2E tests changed):**
+4. Check if any `packages/platform-ui/src/` or `e2e/journeys/` files changed:
+   ```bash
+   git diff --name-only origin/main...HEAD | grep -qE 'platform-ui/src/|e2e/journeys/' && echo "E2E needed"
+   ```
+5. If yes: ensure Firebase emulators are running (`curl -s http://127.0.0.1:9099 >/dev/null || (cd packages/platform-ui && pnpm emulators &; sleep 10)`)
+6. `cd packages/platform-ui && pnpm test:e2e:auth` — all E2E journey + smoke tests (34s)
 
-1. **RED** — Write or update the journey test in `e2e/journeys/`. It describes the expected behavior.
+**When adding/modifying UI features (TDD):**
+1. **RED** — Write the journey test first in `e2e/journeys/<feature>.journey.ts`. Use `showStep`/`showResult` from `helpers/recording.ts` at key moments for pacing during recordings.
 2. **GREEN** — Implement until the test passes.
-3. **Record** — Use the `/e2e-record` skill to record the GIF and update the feature gallery.
-4. **PR** — Commit the GIF to `docs/features/` with the PR.
+3. **Record + GIF** — `cd packages/platform-ui && pnpm test:e2e:gif` (records, then converts all videos to GIFs in `docs/features/`)
+   - To convert only specific tests: `bash scripts/e2e-to-gif.sh <filter>`
+4. **Gallery** — add entry to `docs/features/FEATURES.md` under the right section with description and embedded GIF.
+5. **Commit** — GIF + FEATURES.md go into the same PR as the feature.
 
-Executors MUST write or update journey tests and record GIFs as part of any task that adds or modifies UI features.
+Executors MUST write or update journey tests as part of any task that adds or modifies UI features. GIF recordings are part of the deliverable, not an afterthought.
 
 ### Unit testing by package
 
