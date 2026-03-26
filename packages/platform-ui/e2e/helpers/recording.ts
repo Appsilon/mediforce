@@ -14,16 +14,14 @@ async function ensureIndicators(page: Page) {
       style.textContent = `
         #e2e-cursor {
           position: fixed;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          background: rgba(0,0,0,0.5);
-          box-shadow: 0 0 0 3px #fff, 0 0 8px rgba(0,0,0,0.3);
+          width: 20px;
+          height: 20px;
           pointer-events: none;
           z-index: 99999;
-          transform: translate(-50%,-50%);
+          transform: translate(-2px, -2px);
           transition: left 0.15s ease-out, top 0.15s ease-out;
           display: none;
+          background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath d='M5 3l14 9-7 1.5L8 21z' fill='%23000' stroke='%23fff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat;
         }
         .e2e-ripple {
           position: fixed;
