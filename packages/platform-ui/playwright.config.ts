@@ -1,6 +1,7 @@
 import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
 const useEmulators = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
+const recording = process.env.E2E_RECORD === 'true';
 
 // When using emulators, run on a separate port so we don't reuse a dev server
 // that connects to production Firebase. This is the #1 cause of "data not found"
@@ -20,17 +21,22 @@ if (useEmulators) {
 projects.push({
   name: 'chromium',
   use: { ...devices['Desktop Chrome'] },
-  testIgnore: ['auth-setup.ts', '**/authenticated/**'],
+  testMatch: 'smoke.spec.ts',
 });
 
 if (useEmulators) {
   projects.push({
     name: 'authenticated',
-    testDir: './e2e/authenticated',
+    testDir: './e2e/journeys',
+    testMatch: '*.journey.ts',
     dependencies: ['setup'],
     use: {
       ...devices['Desktop Chrome'],
       storageState: 'e2e/.auth/user.json',
+      ...(recording ? {
+        video: { mode: 'on', size: { width: 1280, height: 720 } },
+        launchOptions: { slowMo: 300 },
+      } : {}),
     },
   });
 }
