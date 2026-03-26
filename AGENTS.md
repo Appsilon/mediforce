@@ -93,6 +93,7 @@ All packages use `@mediforce/source` custom TypeScript condition. During dev, im
 - No one-letter variable names; self-documenting code over inline comments
 - Don't add docstrings/comments/type annotations to code you didn't change
 - Boolean: explicit comparisons, no truthy/falsy shortcuts for non-booleans
+- **Scripts in Python** — all project scripts (build, convert, check) in Python, not bash
 
 ## Agent Delegation Model
 
