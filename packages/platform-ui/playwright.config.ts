@@ -29,6 +29,7 @@ if (useEmulators) {
     name: 'authenticated',
     testDir: './e2e/journeys',
     testMatch: '*.journey.ts',
+    fullyParallel: false,
     dependencies: ['setup'],
     use: {
       ...devices['Desktop Chrome'],
@@ -61,7 +62,7 @@ export default defineConfig({
       ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce npx next dev -p ${testPort}`
       : 'pnpm dev',
     port: testPort,
-    reuseExistingServer: true,
+    reuseExistingServer: !useEmulators,
     timeout: 120_000,
   },
 });
