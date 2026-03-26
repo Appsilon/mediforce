@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Convert E2E test recordings (webm) to GIFs in docs/features/."""
+"""Convert E2E test recordings (webm) to GIFs in docs/features/.
+
+Auto-detects and trims loading screens from the beginning.
+"""
 
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 FEATURES_DIR = Path("../../docs/features")
@@ -12,18 +16,26 @@ RESULTS_DIR = Path("test-results")
 
 
 def clean_name(dirname: str) -> str:
-    """Extract clean GIF name from Playwright test result directory name.
-
-    Input:  "task-review.journey.ts-Tas-9acde-uping-and-view-task-details-authenticated"
-    Output: "task-review-uping-and-view-task-details"
-    """
+    """Extract clean GIF name from Playwright test result directory name."""
     dirname = re.sub(r"-authenticated$", "", dirname)
     file_prefix = re.sub(r"\.journey\.ts-.*", "", dirname)
     description = re.sub(r"^[^-]+-[^-]+-[a-f0-9]+-", "", dirname)
     combined = f"{file_prefix}-{description}"
     combined = re.sub(r"-+", "-", combined)
-    combined = combined.strip("-")
-    return combined
+    return combined.strip("-")
+
+
+def find_content_start(video: Path) -> float:
+    """Find when loading ends by checking frame complexity (file size as proxy)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", str(video), "-vf", "fps=2,scale=320:-1", f"{tmpdir}/f%04d.png"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        for i, frame in enumerate(sorted(Path(tmpdir).glob("f*.png"))):
+            if frame.stat().st_size > 2000:
+                return i * 0.5
+    return 0
 
 
 def main() -> None:
@@ -42,16 +54,18 @@ def main() -> None:
 
     for video in sorted(RESULTS_DIR.glob("*/video.webm")):
         dirname = video.parent.name
-
         if filter_arg and filter_arg not in dirname:
             continue
 
         name = clean_name(dirname)
         output = FEATURES_DIR / f"{name}.gif"
+        trim = find_content_start(video)
 
         subprocess.run(
             [
-                "ffmpeg", "-y", "-i", str(video),
+                "ffmpeg", "-y",
+                *(["-ss", str(trim)] if trim > 0 else []),
+                "-i", str(video),
                 "-vf",
                 "fps=10,scale=960:-1:flags=lanczos,"
                 "split[s0][s1];"
@@ -60,22 +74,17 @@ def main() -> None:
                 "-loop", "0",
                 str(output),
             ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
         )
 
         size = output.stat().st_size
-        if size >= 1_048_576:
-            human_size = f"{size / 1_048_576:.1f}M"
-        else:
-            human_size = f"{size / 1024:.0f}K"
+        human_size = f"{size / 1_048_576:.1f}M" if size >= 1_048_576 else f"{size / 1024:.0f}K"
+        trim_note = f", trimmed {trim:.1f}s" if trim > 0 else ""
 
-        print(f"\u2713 {name}.gif ({human_size})")
+        print(f"\u2713 {name}.gif ({human_size}{trim_note})")
         count += 1
 
-    print()
-    print(f"Converted {count} recordings to {FEATURES_DIR}/")
+    print(f"\nConverted {count} recordings to {FEATURES_DIR}/")
     if count > 0:
         print(f"Update {FEATURES_DIR}/FEATURES.md if new features were added.")
 

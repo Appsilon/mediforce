@@ -14,14 +14,14 @@ async function ensureIndicators(page: Page) {
       style.textContent = `
         #e2e-cursor {
           position: fixed;
-          width: 32px;
-          height: 32px;
+          width: 40px;
+          height: 40px;
           pointer-events: none;
           z-index: 99999;
           transform: translate(-3px, -2px);
           transition: left 0.15s ease-out, top 0.15s ease-out;
           display: none;
-          background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24'%3E%3Cpath d='M5 3l14 9-7 1.5L8 21z' fill='%23000' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat;
+          background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24'%3E%3Cpath d='M5 3l14 9-7 1.5L8 21z' fill='%23fff' stroke='%23000' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat;
         }
         .e2e-ripple {
           position: fixed;
@@ -50,10 +50,25 @@ async function ensureIndicators(page: Page) {
 }
 
 /**
- * Setup recording mode. Call at the start of each test (no-op in normal mode).
+ * Setup recording mode. Call at the start of each test.
+ * Shows cursor at center of screen from the beginning.
  */
-export async function setupRecording(_page: Page) {
-  // indicators injected lazily by click()
+export async function setupRecording(page: Page) {
+  if (!isRecording) return;
+  // Inject indicators early and show cursor at center
+  page.on('load', async () => {
+    try {
+      await ensureIndicators(page);
+      await page.evaluate(() => {
+        const c = document.getElementById('e2e-cursor');
+        if (c) {
+          c.style.display = 'block';
+          c.style.left = '640px';
+          c.style.top = '360px';
+        }
+      });
+    } catch { /* page might have navigated */ }
+  });
 }
 
 /**
