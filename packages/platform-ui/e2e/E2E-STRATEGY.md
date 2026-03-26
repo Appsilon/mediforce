@@ -2,7 +2,7 @@
 
 ## Principles
 
-1. **One navigation per test** — a journey test navigates to a page once and walks through the feature, asserting along the way.
+1. **One test per feature** — a journey test clicks through a complete user flow, across as many pages as needed. No splitting one flow into 10 separate tests.
 2. **End with state change** — every journey test verifies that a user action changed something (task completed, run cancelled, definition saved), not just that a button exists.
 3. **The test IS the spec** — reading the test tells you what the feature does. The GIF recording is the visual proof.
 4. **No CSS class assertions** — test user-visible behavior, not Tailwind implementation details.
