@@ -6,6 +6,7 @@
 2. **End with state change** — every journey test verifies that a user action changed something (task completed, run cancelled, definition saved), not just that a button exists.
 3. **The test IS the spec** — reading the test tells you what the feature does. The GIF recording is the visual proof.
 4. **Assert what the user sees, not how it's styled** — checking that a badge says "failed" and looks red is good. Checking that a div has `border-l-4 border-blue-500` is brittle — it breaks on any Tailwind refactor without catching real bugs.
+5. **Tests are protected** — E2E tests define expected behavior. Modifying a test to make it pass is only allowed when the feature itself intentionally changed. See [Modifying Existing Tests](#modifying-existing-tests).
 
 ## Test Types
 
@@ -40,27 +41,40 @@ A journey test covers one feature or use case end-to-end. Example:
 
 ```typescript
 test('reviewer approves a human task', async ({ page }) => {
-  // Navigate once
   await page.goto(`/${TEST_ORG_HANDLE}/tasks`);
 
-  // Walk through the feature
   await page.getByText('Review Intake Data').click();
   await expect(page.getByRole('button', { name: /approve/i })).toBeVisible();
   await page.getByRole('button', { name: /approve/i }).click();
 
-  // Verify state changed
   await expect(page.getByText(/completed/i)).toBeVisible();
 });
 ```
 
 When adding a new feature or fixing a bug, write or update the journey test that covers it. Update `seed-data.ts` if new Firestore fixtures are needed.
 
+## Modifying Existing Tests
+
+E2E tests are the source of truth for expected behavior. **Do not modify a test just to make CI green.**
+
+When an E2E test fails, the correct response is:
+
+1. **Fix the code** — the test caught a regression. Fix the bug, not the test.
+2. **Only modify the test if the feature intentionally changed** — e.g., a button was renamed, a flow was redesigned, a page was removed.
+
+When modifying a test IS justified, the agent MUST:
+- State explicitly in the PR description: "E2E test `<name>` updated because `<what changed and why>`"
+- Never silently adjust assertions, selectors, or expected values
+- Never weaken a test (e.g., removing an assertion, loosening a check) without explicit approval
+
+If you're unsure whether the test or the code is wrong — ask. Don't guess.
+
 ## TDD Workflow
 
 1. **RED** — Write the journey test first. It describes the expected behavior. It fails because the feature doesn't exist yet.
 2. **GREEN** — Implement until the test passes.
 3. **Record** — Run `pnpm test:e2e:gif -- --grep "<feature>"` to capture a GIF.
-4. **PR** — Attach the GIF to the pull request.
+4. **PR** — Commit the GIF to `docs/features/` and update `docs/features/FEATURES.md`.
 
 ## Commands
 
@@ -101,3 +115,7 @@ docs/features/
 2. Copy the GIF to `docs/features/<feature>.gif`
 3. Update `docs/features/FEATURES.md` with a description and `![](feature.gif)`
 4. Commit with the PR — the GIF is the proof the feature works
+
+## Migration
+
+Delete old tests in `e2e/authenticated/`, write new journey tests in `e2e/journeys/`. One PR, clean swap. Verify each journey test locally before pushing.
