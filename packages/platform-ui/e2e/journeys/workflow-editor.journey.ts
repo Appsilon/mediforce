@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { recordingReady, showStep, showResult } from '../helpers/recording';
+import { setupRecording, showStep, showResult } from '../helpers/recording';
 
 test.describe('Workflow Editor Journey', () => {
   test('workflow detail shows tabs, definitions, and diagram', async ({ page }) => {
+    await setupRecording(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review`);
-    await recordingReady(page);
 
     // Runs and Definitions tabs visible
     await expect(page.getByRole('tab', { name: /runs/i })).toBeVisible({ timeout: 10_000 });
@@ -28,8 +28,8 @@ test.describe('Workflow Editor Journey', () => {
   });
 
   test('definition version shows diagram and supports edit mode', async ({ page }) => {
+    await setupRecording(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`);
-    await recordingReady(page);
 
     // Version badge and diagram
     await expect(page.locator('text=v1')).toBeVisible({ timeout: 10_000 });

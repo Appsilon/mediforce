@@ -1,22 +1,20 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { recordingReady, showStep, showResult } from '../helpers/recording';
+import { setupRecording, showStep, showResult } from '../helpers/recording';
 
 test.describe('Run Report Journey', () => {
   test('completed run report shows timeline, toggles detail level, and has branding', async ({ page }) => {
+    await setupRecording(page);
     // First check the View Report link exists on run detail
     const runUrl = `/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`;
     await page.goto(runUrl);
-    await recordingReady(page);
     const reportLink = page.getByRole('link', { name: /View Report/i });
     await expect(reportLink).toBeVisible({ timeout: 10_000 });
     await expect(reportLink).toHaveAttribute('href', /\/report$/);
     await showStep(page);
 
-    // Navigate to report
-    const reportUrl = `${runUrl}/report`;
-    await page.goto(reportUrl);
-    await recordingReady(page);
+    // Navigate to report by clicking the link
+    await reportLink.click();
     await expect(page.getByRole('heading', { name: /Data Quality Review — Run Report/i })).toBeVisible({ timeout: 10_000 });
 
     // Step Timeline and step names
@@ -47,8 +45,8 @@ test.describe('Run Report Journey', () => {
   });
 
   test('report unavailable for non-completed runs', async ({ page }) => {
+    await setupRecording(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1/report`);
-    await recordingReady(page);
     await expect(page.getByText(/only available for completed runs/i)).toBeVisible({ timeout: 10_000 });
     await showResult(page);
   });

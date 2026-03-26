@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { recordingReady, showStep, showResult } from '../helpers/recording';
+import { setupRecording, showStep, showResult } from '../helpers/recording';
 
 test.describe('Workflow Home Journey', () => {
   test('browse workflows, check run data, and navigate to run detail', async ({ page }) => {
+    await setupRecording(page);
     await page.goto(`/${TEST_ORG_HANDLE}`);
-    await recordingReady(page);
     await expect(page.getByRole('heading', { name: 'Workflows' })).toBeVisible({ timeout: 10_000 });
 
     // Workflow cards visible

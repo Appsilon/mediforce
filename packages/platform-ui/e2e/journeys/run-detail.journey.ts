@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { recordingReady, showStep, showResult } from '../helpers/recording';
+import { setupRecording, showStep, showResult } from '../helpers/recording';
 
 test.describe('Run Detail Journey', () => {
   test('running process shows step graph, step history, and tabs', async ({ page }) => {
+    await setupRecording(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
-    await recordingReady(page);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/running/i).first()).toBeVisible();
     await showStep(page);
@@ -48,8 +48,8 @@ test.describe('Run Detail Journey', () => {
   });
 
   test('completed run shows all steps completed and step history', async ({ page }) => {
+    await setupRecording(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`);
-    await recordingReady(page);
 
     // Step names visible
     await expect(page.getByText('Verify Data Quality', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
@@ -70,9 +70,9 @@ test.describe('Run Detail Journey', () => {
   });
 
   test('autonomy badges and new-style workflow run', async ({ page }) => {
+    await setupRecording(page);
     // proc-completed-2 has processConfig with L4, L2
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-completed-2`);
-    await recordingReady(page);
 
     const stepStatusPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Step Status' }) });
     await expect(stepStatusPanel.locator('ol > li')).toHaveCount(7, { timeout: 10_000 });
@@ -84,7 +84,6 @@ test.describe('Run Detail Journey', () => {
 
     // Navigate to new-style workflow run (no configName)
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-workflow-run-1`);
-    await recordingReady(page);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
 
     // Step status panel renders

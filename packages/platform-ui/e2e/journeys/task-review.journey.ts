@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { recordingReady, showStep, showResult } from '../helpers/recording';
+import { setupRecording, showStep, showResult } from '../helpers/recording';
 
 test.describe('Task Review Journey', () => {
   test('browse tasks, interact with grouping, and view task details', async ({ page }) => {
+    await setupRecording(page);
     await page.goto(`/${TEST_ORG_HANDLE}/tasks`);
-    await recordingReady(page);
     await expect(page.getByRole('heading', { name: 'New actions' })).toBeVisible({ timeout: 10_000 });
 
     // Flat list shows task and process name
@@ -26,14 +26,13 @@ test.describe('Task Review Journey', () => {
 
     // Navigate to task detail
     await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-pending-1`);
-    await recordingReady(page);
     await expect(page.getByRole('heading', { name: 'Review Intake Data' })).toBeVisible({ timeout: 10_000 });
     await showResult(page);
   });
 
   test('pending task shows verdict form and previous step output', async ({ page }) => {
+    await setupRecording(page);
     await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-human-review`);
-    await recordingReady(page);
     await expect(page.getByText(/Human Review/)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/pending/i)).toBeVisible();
     await expect(page.getByText('reviewer')).toBeVisible();
@@ -51,14 +50,13 @@ test.describe('Task Review Journey', () => {
   });
 
   test('claimed task shows verdict buttons, completed task shows record', async ({ page }) => {
+    await setupRecording(page);
     await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-claimed-1`);
-    await recordingReady(page);
     await expect(page.getByRole('button', { name: /approve/i })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: /revise/i })).toBeVisible();
     await showResult(page);
 
     await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-completed-1`);
-    await recordingReady(page);
     await expect(page.getByText(/completed/i).first()).toBeVisible({ timeout: 10_000 });
     await showResult(page);
   });

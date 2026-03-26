@@ -3,10 +3,11 @@
 ## Principles
 
 1. **One test per feature** — a journey test clicks through a complete user flow, across as many pages as needed. No splitting one flow into 10 separate tests.
-2. **End with state change** — every journey test verifies that a user action changed something (task completed, run cancelled, definition saved), not just that a button exists.
-3. **The test IS the spec** — reading the test tells you what the feature does. The GIF recording is the visual proof.
-4. **Assert what the user sees, not how it's styled** — checking that a badge says "failed" and looks red is good. Checking that a div has `border-l-4 border-blue-500` is brittle — it breaks on any Tailwind refactor without catching real bugs.
-5. **Tests are protected** — E2E tests define expected behavior. Modifying a test to make it pass is only allowed when the feature itself intentionally changed. See [Modifying Existing Tests](#modifying-existing-tests).
+2. **Navigate like a user** — use `page.goto()` only as the entry point (first page of the test). All subsequent navigation must use clicks on links and buttons — the same way a real user would navigate. This produces realistic recordings and catches broken links.
+3. **End with state change** — every journey test verifies that a user action changed something (task completed, run cancelled, definition saved), not just that a button exists.
+4. **The test IS the spec** — reading the test tells you what the feature does. The GIF recording is the visual proof.
+5. **Assert what the user sees, not how it's styled** — checking that a badge says "failed" and looks red is good. Checking that a div has `border-l-4 border-blue-500` is brittle — it breaks on any Tailwind refactor without catching real bugs.
+6. **Tests are protected** — E2E tests define expected behavior. Modifying a test to make it pass is only allowed when the feature itself intentionally changed. See [Modifying Existing Tests](#modifying-existing-tests).
 
 ## Test Types
 
@@ -40,16 +41,34 @@ e2e/
 A journey test covers one feature or use case end-to-end. Example:
 
 ```typescript
-test('reviewer approves a human task', async ({ page }) => {
-  await page.goto(`/${TEST_ORG_HANDLE}/tasks`);
+import { setupRecording, showStep, showResult } from '../helpers/recording';
 
+test('reviewer approves a human task', async ({ page }) => {
+  await setupRecording(page);
+
+  // Entry point — only page.goto allowed here
+  await page.goto(`/${TEST_ORG_HANDLE}/tasks`);
+  await expect(page.getByRole('heading', { name: 'New actions' })).toBeVisible({ timeout: 10_000 });
+  await showStep(page);
+
+  // Navigate by clicking — like a real user
   await page.getByText('Review Intake Data').click();
   await expect(page.getByRole('button', { name: /approve/i })).toBeVisible();
-  await page.getByRole('button', { name: /approve/i }).click();
+  await showStep(page);
 
+  // Act and verify state change
+  await page.getByRole('button', { name: /approve/i }).click();
   await expect(page.getByText(/completed/i)).toBeVisible();
+  await showResult(page);
 });
 ```
+
+Key patterns:
+- `setupRecording(page)` — first line, enables cursor + click indicators during recording
+- `showStep(page)` — 1.5s pause at intermediate steps (only during recording)
+- `showResult(page)` — 2.5s pause at key outcomes (only during recording)
+- `page.goto` — entry point only, then click links/buttons to navigate
+- `{ timeout: 10_000 }` — on first assertion after page load (data may still be fetching)
 
 When adding a new feature or fixing a bug, write or update the journey test that covers it. Update `seed-data.ts` if new Firestore fixtures are needed.
 
