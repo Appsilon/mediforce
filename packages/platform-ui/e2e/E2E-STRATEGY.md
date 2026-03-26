@@ -5,7 +5,7 @@
 1. **One test per feature** — a journey test clicks through a complete user flow, across as many pages as needed. No splitting one flow into 10 separate tests.
 2. **End with state change** — every journey test verifies that a user action changed something (task completed, run cancelled, definition saved), not just that a button exists.
 3. **The test IS the spec** — reading the test tells you what the feature does. The GIF recording is the visual proof.
-4. **No CSS class assertions** — test user-visible behavior, not Tailwind implementation details.
+4. **Assert what the user sees, not how it's styled** — checking that a badge says "failed" and looks red is good. Checking that a div has `border-l-4 border-blue-500` is brittle — it breaks on any Tailwind refactor without catching real bugs.
 
 ## Test Types
 
