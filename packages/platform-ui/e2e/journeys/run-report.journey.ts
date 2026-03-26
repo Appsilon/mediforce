@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult } from '../helpers/recording';
 
 test.describe('Run Report Journey', () => {
   test('completed run report shows timeline, toggles detail level, and has branding', async ({ page }) => {
@@ -14,7 +14,7 @@ test.describe('Run Report Journey', () => {
     await showStep(page);
 
     // Navigate to report by clicking the link
-    await reportLink.click();
+    await click(page, reportLink);
     await expect(page.getByRole('heading', { name: /Data Quality Review — Run Report/i })).toBeVisible({ timeout: 10_000 });
 
     // Step Timeline and step names
@@ -29,10 +29,10 @@ test.describe('Run Report Journey', () => {
 
     // Toggle detail level: brief -> full -> brief
     await expect(page.getByText(/Executed by/i).first()).toBeVisible();
-    await page.getByRole('button', { name: /full/i }).click();
+    await click(page, page.getByRole('button', { name: /full/i }));
     await expect(page.getByText(/Output/i).first()).toBeVisible();
     await showStep(page);
-    await page.getByRole('button', { name: /brief/i }).click();
+    await click(page, page.getByRole('button', { name: /brief/i }));
     await expect(page.getByText(/Step Timeline/i)).toBeVisible();
 
     // Branding

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult } from '../helpers/recording';
 
 test.describe('Agent Oversight Journey', () => {
   test('agents page shows catalog, run history, and detail navigation', async ({ page }) => {
@@ -17,7 +17,7 @@ test.describe('Agent Oversight Journey', () => {
     await showStep(page);
 
     // Switch to Run History tab
-    await page.getByRole('tab', { name: 'Run History' }).click();
+    await click(page, page.getByRole('tab', { name: 'Run History' }));
     await expect(page.getByText('Narrative Summary').first()).toBeVisible({ timeout: 10_000 });
 
     // Autonomy column and badges
@@ -32,7 +32,7 @@ test.describe('Agent Oversight Journey', () => {
     await showStep(page);
 
     // Navigate to agent run detail by clicking the link
-    await link.click();
+    await click(page, link);
     await expect(page.getByText('openrouter/anthropic/claude-sonnet-4').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('92%').first()).toBeVisible();
     await expect(page.getByText('Reviewed 12 vendor submissions')).toBeVisible();
@@ -59,7 +59,7 @@ test.describe('Agent Oversight Journey', () => {
     await setupRecording(page);
     await page.goto(`/${TEST_ORG_HANDLE}/agents`);
     await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('link', { name: 'New Agent', exact: true }).click();
+    await click(page, page.getByRole('link', { name: 'New Agent', exact: true }));
     await expect(page.getByRole('heading', { name: 'New Agent' })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByPlaceholder(/e\.g\. Risk Analysis Agent/i)).toBeVisible();
     await expect(page.getByText('Foundation model')).toBeVisible();

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult } from '../helpers/recording';
 
 test.describe('Run Detail Journey', () => {
   test('running process shows step graph, step history, and tabs', async ({ page }) => {
@@ -35,7 +35,7 @@ test.describe('Run Detail Journey', () => {
     await showStep(page);
 
     // Click Step History tab
-    await page.getByRole('tab', { name: /step history/i }).click();
+    await click(page, page.getByRole('tab', { name: /step history/i }));
     const historyEntries = page.locator('[data-step-id]');
     await expect(historyEntries).toHaveCount(2, { timeout: 10_000 });
     await expect(page.locator('[data-step-id="vendor-assessment"]')).toBeVisible();
@@ -63,7 +63,7 @@ test.describe('Run Detail Journey', () => {
     await expect(completedSteps).toHaveCount(2);
 
     // Step History tab
-    await page.getByRole('tab', { name: /step history/i }).click();
+    await click(page, page.getByRole('tab', { name: /step history/i }));
     await expect(page.locator('[data-step-id="verify-data-quality"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('[data-step-id="review-results"]')).toBeVisible();
     await showResult(page);

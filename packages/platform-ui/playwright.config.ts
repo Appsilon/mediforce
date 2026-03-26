@@ -34,6 +34,7 @@ if (useEmulators) {
       ...devices['Desktop Chrome'],
       storageState: 'e2e/.auth/user.json',
       ...(recording ? {
+        channel: 'chromium',
         video: { mode: 'on', size: { width: 1280, height: 720 } },
         launchOptions: { slowMo: 500 },
       } : {}),

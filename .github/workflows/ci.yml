@@ -108,4 +108,4 @@ jobs:
         with:
           fetch-depth: 0
       - name: Check journey test changes have matching GIF updates
-        run: cd packages/platform-ui && bash scripts/check-gif-freshness.sh ${{ github.event.pull_request.base.sha }}
+        run: cd packages/platform-ui && python3 scripts/check-gif-freshness.py ${{ github.event.pull_request.base.sha }}

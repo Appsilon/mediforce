@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult } from '../helpers/recording';
 
 test.describe('Workflow Home Journey', () => {
   test('browse workflows, check run data, and navigate to run detail', async ({ page }) => {
@@ -22,7 +22,7 @@ test.describe('Workflow Home Journey', () => {
     await expect(page.getByText('Narrative Summary').first()).toBeVisible();
 
     // Display popover
-    await page.getByRole('button', { name: /display/i }).click();
+    await click(page, page.getByRole('button', { name: /display/i }));
     await expect(page.getByText('Completed runs')).toBeVisible();
     await showStep(page);
     // Close popover
@@ -30,7 +30,7 @@ test.describe('Workflow Home Journey', () => {
 
     // Navigate to run detail
     const hash = page.getByText('#proc-r').first();
-    await hash.click();
+    await click(page, hash);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
     await showResult(page);
   });

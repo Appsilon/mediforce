@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult } from '../helpers/recording';
 
 test.describe('Workflow Editor Journey', () => {
   test('workflow detail shows tabs, definitions, and diagram', async ({ page }) => {
@@ -20,7 +20,7 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByRole('tab', { name: /configurations/i })).not.toBeVisible();
 
     // Click Definitions tab
-    await page.getByRole('tab', { name: /definitions/i }).click();
+    await click(page, page.getByRole('tab', { name: /definitions/i }));
     await expect(
       page.locator('a[href*="/definitions/"]').or(page.locator('text=/No definitions|Create first/i')).first(),
     ).toBeVisible({ timeout: 10_000 });
@@ -38,19 +38,19 @@ test.describe('Workflow Editor Journey', () => {
     await showStep(page);
 
     // Click a step node -> Step details panel appears
-    await page.locator('.react-flow__node').first().click();
+    await click(page, page.locator('.react-flow__node').first());
     await expect(page.locator('text=Step details')).toBeVisible({ timeout: 5_000 });
     await showStep(page);
 
     // Enable edit mode — this should switch the panel to edit mode
-    await page.getByRole('button', { name: /^edit$/i }).click();
+    await click(page, page.getByRole('button', { name: /^edit$/i }));
     await expect(page.locator('text=editing')).toBeVisible();
     await expect(page.getByRole('button', { name: /save new version/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /cancel/i })).toBeVisible();
     await showResult(page);
 
     // Click a step node in edit mode -> Edit step panel
-    await page.locator('.react-flow__node').nth(1).click();
+    await click(page, page.locator('.react-flow__node').nth(1));
     await expect(page.locator('text=Edit step')).toBeVisible({ timeout: 5_000 });
     await showStep(page);
 
@@ -60,7 +60,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Cancel editing (accept dialog)
     page.on('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: /cancel/i }).click();
+    await click(page, page.getByRole('button', { name: /cancel/i }));
 
     // Back to view mode
     await expect(page.locator('text=editing')).not.toBeVisible();

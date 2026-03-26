@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult } from '../helpers/recording';
 
 test.describe('Task Review Journey', () => {
   test('browse tasks, interact with grouping, and view task details', async ({ page }) => {
@@ -14,13 +14,13 @@ test.describe('Task Review Journey', () => {
     await showStep(page);
 
     // Open Display popover, check grouping options
-    await page.getByRole('button', { name: /display/i }).click();
+    await click(page, page.getByRole('button', { name: /display/i }));
     await expect(page.getByText('Workflow', { exact: true })).toBeVisible();
     await expect(page.getByText('Action', { exact: true })).toBeVisible();
     await showStep(page);
 
     // Toggle Action grouping
-    await page.getByText('Action', { exact: true }).click();
+    await click(page, page.getByText('Action', { exact: true }));
     await expect(page.getByText('Action needed').first()).toBeVisible();
     await showResult(page);
 
@@ -43,7 +43,7 @@ test.describe('Task Review Journey', () => {
     await showStep(page);
 
     // Expand previous step output
-    await page.getByText(/previous step output/i).click();
+    await click(page, page.getByText(/previous step output/i));
     await expect(page.getByRole('tab', { name: /summary/i })).toBeVisible();
     await expect(page.getByRole('tab', { name: /full output/i })).toBeVisible();
     await showResult(page);
