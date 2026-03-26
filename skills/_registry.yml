@@ -1,7 +1,7 @@
 version: "1.0"
 generated: "2026-03-25"
 standard: "agentskills.io/specification"
-total_skills: 3
+total_skills: 4
 
 # Runtime skills have their own per-app registries:
 #   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml
@@ -27,3 +27,8 @@ domains:
         complexity: basic
         language: multi
         description: Generate Marp pitch deck from vision docs
+      - id: e2e-record
+        path: skills/e2e-record/SKILL.md
+        complexity: basic
+        language: multi
+        description: Record E2E journey tests as GIFs for feature docs and PRs

@@ -106,110 +106,56 @@ The main Claude thread acts as a **Tech Lead**, not an individual contributor:
 
 In practice: receive a task → break it down → dispatch subagents → verify their output → report back to the user.
 
-## Browser Testing (E2E)
+## Testing
 
-### Playwright
+### Test layers
 
-E2E tests live in `packages/platform-ui/e2e/`. Two modes:
+| Layer | What it catches | Where |
+|-------|----------------|-------|
+| **Unit** | Schema validation, engine logic, pure functions | `packages/*/src/**/__tests__/` |
+| **E2E journeys** | Full user flows with state changes | `packages/platform-ui/e2e/journeys/` |
+| **E2E smoke** | Login page, auth redirect (no emulators) | `packages/platform-ui/e2e/smoke.spec.ts` |
 
-**Smoke tests (no emulators needed):**
-- `cd packages/platform-ui && pnpm test:e2e` -- login page, auth redirect
-- `pnpm test:e2e:headed` -- with visible browser
-- `pnpm test:e2e:ui` -- interactive Playwright UI mode
+Full E2E strategy: [`packages/platform-ui/e2e/E2E-STRATEGY.md`](packages/platform-ui/e2e/E2E-STRATEGY.md)
 
-**Authenticated tests (requires Firebase Emulators):**
-- Terminal 1: `pnpm emulators` -- starts Auth (9099) + Firestore (8080) emulators
-- Terminal 2: `pnpm test:e2e:auth` -- runs smoke + authenticated tests
-- `pnpm test:e2e:auth:headed` -- with visible browser
-
-The emulator setup (`e2e/auth-setup.ts`) automatically:
-1. Creates a test user (test@mediforce.dev / test123456)
-2. Seeds Firestore with humanTasks, processInstances, agentRuns, auditEvents, processDefinitions, processConfigs, **workflowDefinitions**
-3. Authenticates via `/test-login` and saves auth state for all tests
-
-**Seed data** (`e2e/helpers/seed-data.ts`) includes both legacy and new-style data:
-- Legacy: `processDefinitions` + `processConfigs` (old schema)
-- New: `workflowDefinitions` (unified schema) + `proc-workflow-run-1` (instance without configName)
-- This ensures both paths are tested (dual-read engine)
-
-**Test structure:**
-- `e2e/smoke.spec.ts` -- unauthenticated tests (always run)
-- `e2e/authenticated/*.spec.ts` -- tests requiring login (only with emulators)
-- `e2e/helpers/` -- emulator REST API helpers and seed data
-
-The dev server starts automatically on port 9007 (emulator mode) or reuses existing on 9003 (smoke mode) via `webServer` in `playwright.config.ts`.
-
-Write E2E tests for:
-- Every new page/route (smoke: page loads, key elements visible)
-- Critical user flows (login redirect, form submission, navigation)
-- **Dual-source data**: when adding features that read from multiple Firestore collections, seed BOTH sources and test that fallback works
-- Visual regressions when UI changes significantly
-
-## Testing Strategy
-
-### Test pyramid
-
-| Layer | Count | What it catches | Where |
-|-------|-------|----------------|-------|
-| **Unit** | ~812 | Schema validation, engine logic, pure functions | `packages/*/src/**/__tests__/` |
-| **Integration** | included above | Hook/utility logic with mocked deps | `packages/platform-ui/src/lib/__tests__/` |
-| **E2E** | ~67 | Full browser flows, rendering, navigation | `packages/platform-ui/e2e/` |
-
-### Key testing patterns
-
-**Dual-source resolution**: When code reads from multiple Firestore collections (e.g., `processDefinitions` + `workflowDefinitions`), extract the resolution logic into a pure function in `lib/` and unit test all paths: exact match, fallback, empty sources.
-
-Example: `src/lib/resolve-definition-steps.ts` + `src/lib/__tests__/resolve-definition-steps.test.ts`
-
-**E2E seed data**: When adding new Firestore collections or document types, update `e2e/helpers/seed-data.ts` and `e2e/auth-setup.ts` to seed them. Always include both legacy and new-style documents.
-
-**Test tags**: Use `[RENDER]`, `[CLICK]`, `[DATA]`, `[ERROR]`, `[AUTH]` tags in test descriptions to categorize failure types.
-
-### Agent Browser (Vercel)
-
-`agent-browser` is installed globally and its skill is at `.claude/skills/agent-browser/SKILL.md`.
-Refer to the skill for full command reference, workflow patterns, and templates.
-
-Use agent-browser for verification of UI work (after Playwright tests pass).
-The dev server runs on `http://localhost:9003`.
-
-### TDD and E2E Workflow
-
-1. **Write E2E test first** (Red) -- describe expected page behavior in `e2e/`
-2. **Implement the feature** (Green) -- make the test pass
-3. **Use agent-browser** -- visually confirm the result after tests pass
-
-Executors MUST write or update E2E tests as part of any task that adds or modifies UI pages/routes.
-
-## Test Execution Guide
-
-### Running tests
+### Commands
 
 | Command | Speed | When to use |
 |---------|-------|-------------|
 | `pnpm typecheck` | ~5s | After any code change |
-| `pnpm test:fast` | ~9s | Quick verification (dot reporter) |
+| `pnpm test:fast` | ~9s | Quick unit test verification |
 | `pnpm test:affected` | <1s | Only tests for changed files |
 | `pnpm test` | ~9s | Full unit + integration suite |
-| `pnpm test:coverage` | ~15s | See coverage numbers |
 | `cd packages/platform-ui && pnpm test:e2e` | ~15s | Playwright smoke tests |
 | `cd packages/platform-ui && pnpm test:e2e:auth` | ~60s | Full E2E with Firebase emulators |
+| `cd packages/platform-ui && pnpm test:e2e:record` | ~3min | Journey tests with video recording |
+| `cd packages/platform-ui && pnpm test:e2e:gif` | ~3min | Record + convert to GIF for docs |
 
 ### Agent workflow (fastest first)
 
 1. `pnpm typecheck` — catches type errors
 2. `pnpm test:affected` — tests for changed files only
 3. `pnpm test` — all unit tests
-4. E2E tests if UI was changed
+4. E2E journey tests if UI was changed
 
-### Test naming convention
+### TDD workflow for features and bug fixes
 
-Use tags in test descriptions to help identify failure types:
-- `[RENDER]` — component rendering
-- `[CLICK]` — user interaction
-- `[ERROR]` — error handling
-- `[AUTH]` — permission/auth checks
-- `[DATA]` — data fetching/display
+1. **RED** — Write or update the journey test in `e2e/journeys/`. It describes the expected behavior.
+2. **GREEN** — Implement until the test passes.
+3. **Record** — Run `pnpm test:e2e:gif -- --grep "<feature>"` to capture a GIF.
+4. **PR** — Commit the GIF to `docs/features/` and update `docs/features/FEATURES.md`.
+
+Executors MUST write or update journey tests as part of any task that adds or modifies UI features.
+
+### Unit testing by package
+
+**workflow-engine** — test transitions, step execution, expression evaluation, triggers, RBAC. Use in-memory repository doubles from `platform-core/testing`. When adding new transition logic or step types, write unit tests in `packages/workflow-engine/src/__tests__/`.
+
+**agent-runtime** — test plugin dispatch, agent runner orchestration, fallback handling. Mock child processes and Docker. When adding new plugins, write unit tests in `packages/agent-runtime/src/plugins/__tests__/`.
+
+**platform-core** — test schemas with Zod parse/safeParse. When adding new schemas, add tests in `packages/platform-core/src/schemas/__tests__/`.
+
+**platform-infra** — test Firestore repository CRUD. When adding new repositories, add tests in `packages/platform-infra/src/__tests__/`.
 
 ### Test factories
 
@@ -220,6 +166,18 @@ import { buildProcessInstance, buildHumanTask, buildAgentRun } from '@mediforce/
 const instance = buildProcessInstance({ status: 'paused' });
 const task = buildHumanTask({ assignee: 'user-1' });
 ```
+
+### E2E infrastructure
+
+**Firebase Emulators** required for journey tests:
+- `pnpm emulators` starts Auth (9099) + Firestore (8080)
+- `e2e/auth-setup.ts` creates test user, seeds Firestore, saves auth state
+- `e2e/helpers/seed-data.ts` — all fixture data. Update when adding new collections.
+- Dev server starts automatically on port 9007 (emulator mode)
+
+### Agent Browser
+
+`agent-browser` skill at `skills/agent-browser/SKILL.md`. Use for visual verification after Playwright tests pass. Dev server on `http://localhost:9003`.
 
 ## Local API Access
 
