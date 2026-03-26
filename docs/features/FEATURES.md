@@ -6,8 +6,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 
 **Tasks** — human review queue for workflow steps requiring human input
 - [Task Browsing & Grouping](#task-browsing--grouping) — reviewers find their tasks across workflows
-- [Task Detail & Verdict](#task-detail--verdict) — reviewer sees context and submits a decision
-- [Task States](#task-states) — task lifecycle from claimed through completed
+- [Task Approve Flow](#task-approve-flow) — reviewer sees context, submits verdict
 
 **Workflows** — defining and managing automated processes
 - [Workflow Home](#workflow-home) — overview of all workflows and their active runs
@@ -25,7 +24,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 **Agents** — AI agent catalog and execution oversight
 - [Agent Catalog & History](#agent-catalog--history) — discovering agents and reviewing their past runs
 - [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
-- [New Agent Form](#new-agent-form) — registering a new agent definition
+- [New Agent Form](#new-agent-form) — creating a new agent definition
 
 ---
 
@@ -37,17 +36,11 @@ Reviewers land here to see what needs their attention. Tasks from all workflows 
 
 ![task-browse-and-grouping](task-browse-and-grouping.gif)
 
-### Task Detail & Verdict
+### Task Approve Flow
 
-The core review screen. Reviewer sees the task context, previous step's output (what the agent produced), and submits a verdict — approve to continue the workflow or revise to send it back. This is the human-in-the-loop decision point.
+The core review screen. Reviewer sees the task context, previous step's output (what the agent produced), and the verdict buttons. This is the human-in-the-loop decision point.
 
-![task-detail-verdict-form](task-detail-verdict-form.gif)
-
-### Task States
-
-Tasks move through pending → claimed → completed. A claimed task shows the verdict form. A completed task shows what was decided and when. Verifies the full task lifecycle renders correctly.
-
-![task-claimed-and-completed](task-claimed-and-completed.gif)
+![task-approve-flow](task-approve-flow.gif)
 
 ---
 
@@ -95,7 +88,7 @@ Steps display their autonomy level (L1–L4) from the process config. L2 means a
 
 ### Cancel Run
 
-Stopping a running process requires double confirmation to prevent accidental cancellation. First click shows warning ("cannot be undone"), "Keep running" dismisses back to idle. This verifies the safety mechanism works both ways.
+Stopping a running process requires double confirmation to prevent accidental cancellation. First click shows warning ("cannot be undone"), "Keep running" dismisses back to idle. Second attempt confirms and the run status changes.
 
 ![cancel-run](cancel-run.gif)
 
@@ -129,6 +122,6 @@ When an agent reports low confidence (here 0.45), the run is escalated for human
 
 ### New Agent Form
 
-Registration form for new agent definitions. Specify name, foundation model, and capabilities. This is the entry point for adding custom agents to the platform.
+Registration form for new agent definitions. Fill in name, select foundation model. This is the entry point for adding custom agents to the platform.
 
 ![agent-new-form](agent-new-form.gif)
