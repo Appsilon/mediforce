@@ -8,6 +8,7 @@
 4. **The test IS the spec** — reading the test tells you what the feature does. The GIF recording is the visual proof.
 5. **Assert what the user sees, not how it's styled** — checking that a badge says "failed" and looks red is good. Checking that a div has `border-l-4 border-blue-500` is brittle — it breaks on any Tailwind refactor without catching real bugs.
 6. **Tests are protected** — E2E tests define expected behavior. Modifying a test to make it pass is only allowed when the feature itself intentionally changed. See [Modifying Existing Tests](#modifying-existing-tests).
+7. **Isolate mutating tests** — tests that change state (cancel run, approve task, delete) must use their own dedicated seed data instance. Never mutate an instance that other tests read. Add new entries in `seed-data.ts` for each mutating test.
 
 ## Test Types
 
