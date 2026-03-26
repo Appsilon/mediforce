@@ -3,8 +3,8 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Workflow Home Journey', () => {
-  test('browse workflows, check run data, and navigate to run detail', async ({ page }) => {
-    await setupRecording(page);
+  test('browse workflows, check run data, and navigate to run detail', async ({ page }, testInfo) => {
+    await setupRecording(page, 'workflow-home', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}`);
     await expect(page.getByRole('heading', { name: 'Workflows' })).toBeVisible({ timeout: 10_000 });
 

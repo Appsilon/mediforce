@@ -3,8 +3,8 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Cancel Run Journey', () => {
-  test('dismiss cancel, then confirm cancel — run status changes', async ({ page }) => {
-    await setupRecording(page);
+  test('dismiss cancel, then confirm cancel — run status changes', async ({ page }, testInfo) => {
+    await setupRecording(page, 'cancel-run', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
     await expect(page.getByRole('button', { name: /^cancel$/i })).toBeVisible({ timeout: 10_000 });
     await showStep(page);

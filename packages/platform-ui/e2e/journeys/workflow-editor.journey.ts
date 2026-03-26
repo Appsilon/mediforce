@@ -3,8 +3,8 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Workflow Editor Journey', () => {
-  test('workflow detail shows tabs, definitions, and diagram', async ({ page }) => {
-    await setupRecording(page);
+  test('workflow detail shows tabs, definitions, and diagram', async ({ page }, testInfo) => {
+    await setupRecording(page, 'workflow-editor-browse', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review`);
 
     // Runs and Definitions tabs visible
@@ -27,8 +27,8 @@ test.describe('Workflow Editor Journey', () => {
     await showResult(page);
   });
 
-  test('definition version shows diagram and supports edit mode', async ({ page }) => {
-    await setupRecording(page);
+  test('definition version shows diagram and supports edit mode', async ({ page }, testInfo) => {
+    await setupRecording(page, 'workflow-editor-edit-mode', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/definitions/1`);
 
     // Version badge and diagram

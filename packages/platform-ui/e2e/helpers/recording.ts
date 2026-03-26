@@ -1,4 +1,6 @@
-import type { Page, Locator } from '@playwright/test';
+import type { Page, Locator, TestInfo } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const isRecording = process.env.E2E_RECORD === 'true';
 
@@ -51,11 +53,20 @@ async function ensureIndicators(page: Page) {
 
 /**
  * Setup recording mode. Call at the start of each test.
- * Shows cursor at center of screen from the beginning.
+ * @param gifName — clean name for the GIF file (e.g. "task-approve-flow")
+ * @param testInfo — Playwright testInfo to write gif-name.txt into output dir
  */
-export async function setupRecording(page: Page) {
+export async function setupRecording(page: Page, gifName?: string, testInfo?: TestInfo) {
   if (!isRecording) return;
-  // Inject indicators early and show cursor at center
+
+  // Write GIF name for e2e-to-gif.py to pick up
+  if (gifName && testInfo) {
+    const outputDir = testInfo.outputDir;
+    fs.mkdirSync(outputDir, { recursive: true });
+    fs.writeFileSync(path.join(outputDir, 'gif-name.txt'), gifName);
+  }
+
+  // Show cursor at center on page load
   page.on('load', async () => {
     try {
       await ensureIndicators(page);

@@ -3,8 +3,8 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Agent Oversight Journey', () => {
-  test('agents page shows catalog, run history, and detail navigation', async ({ page }) => {
-    await setupRecording(page);
+  test('agents page shows catalog, run history, and detail navigation', async ({ page }, testInfo) => {
+    await setupRecording(page, 'agent-catalog-and-history', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/agents`);
     await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible({ timeout: 10_000 });
 
@@ -48,15 +48,15 @@ test.describe('Agent Oversight Journey', () => {
     await showResult(page);
   });
 
-  test('escalated run shows low confidence rationale', async ({ page }) => {
-    await setupRecording(page);
+  test('escalated run shows low confidence rationale', async ({ page }, testInfo) => {
+    await setupRecording(page, 'agent-escalated-run', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/agents/run-escalated-1`);
     await expect(page.getByText('Multiple data inconsistencies in lab values')).toBeVisible({ timeout: 10_000 });
     await showResult(page);
   });
 
-  test('create a new agent and verify redirect', async ({ page }) => {
-    await setupRecording(page);
+  test('create a new agent and verify redirect', async ({ page }, testInfo) => {
+    await setupRecording(page, 'agent-new-form', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/agents`);
     await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible({ timeout: 10_000 });
     await click(page, page.getByRole('link', { name: 'New Agent', exact: true }));

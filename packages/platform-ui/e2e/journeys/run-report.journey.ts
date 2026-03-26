@@ -3,8 +3,8 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Run Report Journey', () => {
-  test('completed run report shows timeline, toggles detail level, and has branding', async ({ page }) => {
-    await setupRecording(page);
+  test('completed run report shows timeline, toggles detail level, and has branding', async ({ page }, testInfo) => {
+    await setupRecording(page, 'run-report', testInfo);
     // First check the View Report link exists on run detail
     const runUrl = `/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`;
     await page.goto(runUrl);
@@ -44,8 +44,8 @@ test.describe('Run Report Journey', () => {
     await showResult(page);
   });
 
-  test('report unavailable for non-completed runs', async ({ page }) => {
-    await setupRecording(page);
+  test('report unavailable for non-completed runs', async ({ page }, testInfo) => {
+    await setupRecording(page, 'run-report-unavailable', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1/report`);
     await expect(page.getByText(/only available for completed runs/i)).toBeVisible({ timeout: 10_000 });
     await showResult(page);

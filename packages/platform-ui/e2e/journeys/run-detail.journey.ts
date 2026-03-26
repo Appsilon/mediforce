@@ -3,8 +3,8 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Run Detail Journey', () => {
-  test('running process shows step graph, step history, and tabs', async ({ page }) => {
-    await setupRecording(page);
+  test('running process shows step graph, step history, and tabs', async ({ page }, testInfo) => {
+    await setupRecording(page, 'run-detail-step-graph', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/running/i).first()).toBeVisible();
@@ -47,8 +47,8 @@ test.describe('Run Detail Journey', () => {
     await showResult(page);
   });
 
-  test('completed run shows all steps completed and step history', async ({ page }) => {
-    await setupRecording(page);
+  test('completed run shows all steps completed and step history', async ({ page }, testInfo) => {
+    await setupRecording(page, 'run-detail-completed', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`);
 
     // Step names visible
@@ -69,8 +69,8 @@ test.describe('Run Detail Journey', () => {
     await showResult(page);
   });
 
-  test('autonomy badges and new-style workflow run', async ({ page }) => {
-    await setupRecording(page);
+  test('autonomy badges and new-style workflow run', async ({ page }, testInfo) => {
+    await setupRecording(page, 'run-detail-autonomy-badges', testInfo);
     // proc-completed-2 has processConfig with L4, L2
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-completed-2`);
 

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Convert E2E test recordings (webm) to GIFs in docs/features/.
 
-Auto-detects and trims loading screens from the beginning.
-Verifies each GIF has real content before saving.
+Reads gif-name.txt from each test result dir (written by setupRecording).
+Auto-trims loading screens. Verifies each GIF has real content.
 """
 
-import json
 import re
 import shutil
 import subprocess
@@ -15,33 +14,6 @@ from pathlib import Path
 
 FEATURES_DIR = Path("../../docs/features")
 RESULTS_DIR = Path("test-results")
-
-
-# Load name mapping: test file → { test description substring → gif name }
-_GIF_NAMES_PATH = Path(__file__).parent.parent / "e2e" / "helpers" / "gif-names.json"
-_GIF_NAMES: dict[str, dict[str, str]] = {}
-if _GIF_NAMES_PATH.exists():
-    _GIF_NAMES = json.loads(_GIF_NAMES_PATH.read_text())
-
-
-def clean_name(dirname: str) -> str:
-    """Map Playwright result dir to a clean GIF name using gif-names.json.
-
-    Falls back to file-prefix-N if no mapping found.
-    """
-    dirname = re.sub(r"-authenticated$", "", dirname)
-    parts = dirname.split(".journey.ts-", 1)
-    filename = parts[0] + ".journey.ts"
-    slug = parts[1] if len(parts) > 1 else ""
-
-    # Try to match against gif-names.json
-    file_map = _GIF_NAMES.get(filename, {})
-    for substring, gif_name in file_map.items():
-        if substring.lower().replace(" ", "-") in slug.lower().replace(" ", "-"):
-            return gif_name
-
-    # Fallback
-    return parts[0]
 
 
 def find_content_start(video: Path) -> float:
@@ -61,7 +33,6 @@ def find_content_start(video: Path) -> float:
 def verify_gif(gif_path: Path) -> bool:
     """Check GIF has real content (not just login/loading screen)."""
     with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
-        # Check frame at 1s (not 3s — some GIFs are short)
         subprocess.run(
             ["ffmpeg", "-y", "-ss", "1", "-i", str(gif_path),
              "-vframes", "1", tmp.name],
@@ -86,11 +57,18 @@ def main() -> None:
     bad_count = 0
 
     for video in sorted(RESULTS_DIR.glob("*/video.webm")):
-        dirname = video.parent.name
-        if filter_arg and filter_arg not in dirname:
+        result_dir = video.parent
+
+        if filter_arg and filter_arg not in result_dir.name:
             continue
 
-        name = clean_name(dirname)
+        # Read GIF name from file written by setupRecording()
+        name_file = result_dir / "gif-name.txt"
+        if not name_file.exists():
+            print(f"⚠ Skipping {result_dir.name} — no gif-name.txt")
+            continue
+
+        name = name_file.read_text().strip()
         output = FEATURES_DIR / f"{name}.gif"
 
         trim = find_content_start(video)
@@ -119,16 +97,14 @@ def main() -> None:
             print(f"\u2713 {name}.gif ({human_size}{trim_note})")
             ok_count += 1
         else:
-            print(f"\u2717 {name}.gif — FAILED VERIFICATION (login/loading screen?)")
+            print(f"\u2717 {name}.gif — FAILED VERIFICATION (login/loading?)")
             output.unlink()
             bad_count += 1
 
     print(f"\nConverted: {ok_count} OK, {bad_count} failed")
     if bad_count > 0:
-        print("Some GIFs failed verification — re-record with: pnpm test:e2e:record")
+        print("Re-record failed GIFs with: pnpm test:e2e:record")
         sys.exit(1)
-    if ok_count > 0:
-        print(f"Update {FEATURES_DIR}/FEATURES.md if new features were added.")
 
 
 if __name__ == "__main__":

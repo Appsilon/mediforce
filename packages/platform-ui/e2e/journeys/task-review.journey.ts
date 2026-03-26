@@ -3,8 +3,8 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Task Review Journey', () => {
-  test('browse tasks, interact with grouping, and navigate to task detail', async ({ page }) => {
-    await setupRecording(page);
+  test('browse tasks, interact with grouping, and navigate to task detail', async ({ page }, testInfo) => {
+    await setupRecording(page, 'task-browse-and-grouping', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/tasks`);
     await expect(page.getByRole('heading', { name: 'New actions' })).toBeVisible({ timeout: 10_000 });
 
@@ -26,14 +26,15 @@ test.describe('Task Review Journey', () => {
 
     // Navigate to task detail via sidebar
     await click(page, page.getByRole('link', { name: /new actions/i }));
-    await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
-    await click(page, page.getByText('Review Intake Data'));
-    await expect(page.getByText('Review Intake Data')).toBeVisible({ timeout: 10_000 });
+    const taskLink = page.getByText('Review Intake Data').first();
+    await expect(taskLink).toBeVisible({ timeout: 10_000 });
+    await click(page, taskLink);
+    await expect(page.getByRole('heading', { name: 'Review Intake Data' })).toBeVisible({ timeout: 10_000 });
     await showResult(page);
   });
 
-  test('reviewer approves a task and sees confirmation', async ({ page }) => {
-    await setupRecording(page);
+  test('reviewer approves a task and sees confirmation', async ({ page }, testInfo) => {
+    await setupRecording(page, 'task-approve-flow', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-human-review`);
     await expect(page.getByText(/Human Review/)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/pending/i)).toBeVisible();
