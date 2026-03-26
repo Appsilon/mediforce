@@ -14,14 +14,14 @@ async function ensureIndicators(page: Page) {
       style.textContent = `
         #e2e-cursor {
           position: fixed;
-          width: 20px;
-          height: 20px;
+          width: 32px;
+          height: 32px;
           pointer-events: none;
           z-index: 99999;
-          transform: translate(-2px, -2px);
+          transform: translate(-3px, -2px);
           transition: left 0.15s ease-out, top 0.15s ease-out;
           display: none;
-          background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath d='M5 3l14 9-7 1.5L8 21z' fill='%23000' stroke='%23fff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat;
+          background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24'%3E%3Cpath d='M5 3l14 9-7 1.5L8 21z' fill='%23000' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat;
         }
         .e2e-ripple {
           position: fixed;
