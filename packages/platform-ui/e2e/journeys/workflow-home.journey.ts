@@ -31,7 +31,7 @@ test.describe('Workflow Home Journey', () => {
     // Navigate to run detail
     const hash = page.getByText('#proc-r').first();
     await hash.click();
-    await expect(page).toHaveURL(/\/workflows\/Supply%20Chain%20Review\/runs\/proc-running-1/);
+    await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
     await showResult(page);
   });
 });

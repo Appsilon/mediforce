@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
-import { setupRecording, showStep, showResult } from '../helpers/recording';
+import { setupRecording, click, showStep, showResult } from '../helpers/recording';
 
 test.describe('Cancel Run Journey', () => {
   test('cancel flow: confirm appears, dismiss works, cancel button returns', async ({ page }) => {
@@ -10,13 +10,13 @@ test.describe('Cancel Run Journey', () => {
     await showStep(page);
 
     // Click cancel
-    await page.getByRole('button', { name: /^cancel$/i }).click();
+    await click(page, page.getByRole('button', { name: /^cancel$/i }));
     await expect(page.getByText(/cannot be undone/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /confirm cancel/i })).toBeVisible();
     await showStep(page);
 
     // Dismiss with "Keep running"
-    await page.getByRole('button', { name: /keep running/i }).click();
+    await click(page, page.getByRole('button', { name: /keep running/i }));
     await expect(page.getByRole('button', { name: /^cancel$/i })).toBeVisible();
     await showResult(page);
   });

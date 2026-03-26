@@ -15,32 +15,31 @@ export async function setupRecording(page: Page) {
     style.textContent = `
       #e2e-cursor {
         position: fixed;
-        width: 14px;
-        height: 14px;
+        width: 16px;
+        height: 16px;
         border-radius: 50%;
-        background: rgba(220, 38, 38, 0.6);
-        border: 2px solid rgba(220, 38, 38, 0.9);
+        background: rgba(0, 0, 0, 0.45);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(0, 0, 0, 0.2);
         pointer-events: none;
         z-index: 99999;
         transform: translate(-50%, -50%);
-        transition: left 0.08s ease-out, top 0.08s ease-out;
+        transition: left 0.1s ease-out, top 0.1s ease-out;
         display: none;
       }
       .e2e-click-ripple {
         position: fixed;
-        width: 24px;
-        height: 24px;
+        width: 16px;
+        height: 16px;
         border-radius: 50%;
-        background: rgba(220, 38, 38, 0.25);
-        border: 2px solid rgba(220, 38, 38, 0.5);
+        border: 2px solid rgba(0, 0, 0, 0.3);
         pointer-events: none;
         z-index: 99998;
         transform: translate(-50%, -50%);
-        animation: e2e-ripple 0.6s ease-out forwards;
+        animation: e2e-ripple 0.5s ease-out forwards;
       }
       @keyframes e2e-ripple {
-        0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
-        100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+        0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
       }
     `;
     document.documentElement.appendChild(style);
@@ -69,6 +68,22 @@ export async function setupRecording(page: Page) {
       setTimeout(() => ripple.remove(), 700);
     }, true);
   });
+}
+
+/**
+ * Click with visible cursor movement during recording.
+ * Moves mouse to element center before clicking — makes cursor visible in recordings.
+ * In non-recording mode, just clicks normally.
+ */
+export async function click(page: Page, locator: ReturnType<Page['getByText']>) {
+  if (isRecording) {
+    const box = await locator.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 10 });
+      await page.waitForTimeout(200);
+    }
+  }
+  await locator.click();
 }
 
 /** Pause to let the viewer see what just happened. Only during recording. */

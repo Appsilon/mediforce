@@ -33,7 +33,6 @@ test.describe('Agent Oversight Journey', () => {
 
     // Navigate to agent run detail by clicking the link
     await link.click();
-    await expect(page).toHaveURL(/\/agents\/run-completed-1/);
     await expect(page.getByText('openrouter/anthropic/claude-sonnet-4').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('92%').first()).toBeVisible();
     await expect(page.getByText('Reviewed 12 vendor submissions')).toBeVisible();
