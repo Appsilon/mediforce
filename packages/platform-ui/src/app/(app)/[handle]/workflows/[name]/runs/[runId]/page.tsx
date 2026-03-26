@@ -97,7 +97,6 @@ export default function RunDetailPage() {
       definitionSteps={definitionSteps}
       agentEvents={agentEvents}
       backHref={`/${handle}/workflows/${encodeURIComponent(decodedName)}`}
-      backLabel={decodedName}
       stepConfigMap={stepConfigMap}
       runDetailHref={`/${handle}/workflows/${encodeURIComponent(decodedName)}/runs/${runId}`}
     />

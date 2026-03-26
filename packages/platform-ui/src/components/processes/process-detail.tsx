@@ -16,6 +16,7 @@ import { cancelProcessRun } from '@/app/actions/processes';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
+import { useBackNavigation } from '@/hooks/use-back-navigation';
 import { formatStepName } from '@/components/tasks/task-utils';
 
 type AuditEventWithId = AuditEvent & { id: string };
@@ -43,7 +44,6 @@ export function ProcessDetail({
   definitionSteps = [],
   agentEvents = [],
   backHref = '/processes',
-  backLabel = 'Workflows',
   stepConfigMap,
   runDetailHref,
 }: {
@@ -56,12 +56,12 @@ export function ProcessDetail({
   definitionSteps?: Step[];
   agentEvents?: AgentEventItem[];
   backHref?: string;
-  backLabel?: string;
   stepConfigMap?: Map<string, Record<string, unknown>>;
   /** Href for this run's detail page, used to build step detail links. */
   runDetailHref?: string;
 }) {
   const handle = useHandleFromPath();
+  const { goBack } = useBackNavigation(backHref);
   const needsHumanAction = instance.pauseReason === 'waiting_for_human'
     || instance.pauseReason === 'awaiting_agent_approval';
   const { task: blockingTask } = useActiveTaskForInstance(
@@ -126,10 +126,10 @@ export function ProcessDetail({
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       {/* Back */}
-      <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <button onClick={goBack} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="h-4 w-4" />
-        {backLabel}
-      </Link>
+        Back
+      </button>
 
       {/* Header */}
       <div className="space-y-2">
@@ -157,7 +157,7 @@ export function ProcessDetail({
                 onClick={() => { setCancelStep(0); setCancelError(null); }}
                 className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
               >
-                Back
+                Keep running
               </button>
             </div>
           )}

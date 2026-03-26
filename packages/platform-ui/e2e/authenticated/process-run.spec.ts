@@ -45,7 +45,7 @@ test.describe('Process Run Detail', () => {
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
     await page.getByRole('button', { name: /^cancel$/i }).click();
     await expect(page.getByText(/cannot be undone/i)).toBeVisible();
-    await page.getByRole('button', { name: /^back$/i }).click();
+    await page.getByRole('button', { name: /keep running/i }).click();
     // Returns to idle state — cancel button visible again
     await expect(page.getByRole('button', { name: /^cancel$/i })).toBeVisible();
   });

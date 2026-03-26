@@ -22,6 +22,7 @@ import { useProcessInstance } from '@/hooks/use-process-instances';
 import { storage } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { useBackNavigation } from '@/hooks/use-back-navigation';
 import { routes } from '@/lib/routes';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -45,6 +46,7 @@ export function TaskDetail({
   currentUserId: string;
 }) {
   const handle = useHandleFromPath();
+  const { goBack } = useBackNavigation(`/${handle}/tasks`);
   const { data: processInstance } = useProcessInstance(task.processInstanceId);
   const [hasStepContent, setHasStepContent] = React.useState(false);
   const [uploadComplete, setUploadComplete] = React.useState(false);
@@ -164,13 +166,13 @@ export function TaskDetail({
   return (
     <div className="p-6 max-w-3xl space-y-6">
       {/* Back */}
-      <Link
-        href={`/${handle}/tasks`}
+      <button
+        onClick={goBack}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to My Tasks
-      </Link>
+        Back
+      </button>
 
       {/* Title + status */}
       <div className="space-y-2">
