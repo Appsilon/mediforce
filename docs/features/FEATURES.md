@@ -4,28 +4,28 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 
 ## Contents
 
-**Tasks**
-- [Task Browsing & Grouping](#task-browsing--grouping) — list, display options, action grouping
-- [Task Detail & Verdict](#task-detail--verdict) — verdict form, previous step output
-- [Task States](#task-states) — claimed and completed task views
+**Tasks** — human review queue for workflow steps requiring human input
+- [Task Browsing & Grouping](#task-browsing--grouping) — reviewers find their tasks across workflows
+- [Task Detail & Verdict](#task-detail--verdict) — reviewer sees context and submits a decision
+- [Task States](#task-states) — task lifecycle from claimed through completed
 
-**Workflows**
-- [Workflow Home](#workflow-home) — workflow cards, run counts, navigation
-- [Workflow Editor — Browse](#workflow-editor--browse) — tabs, definitions list
-- [Workflow Editor — Edit Mode](#workflow-editor--edit-mode) — diagram, step editing, add/cancel
+**Workflows** — defining and managing automated processes
+- [Workflow Home](#workflow-home) — overview of all workflows and their active runs
+- [Workflow Editor — Browse](#workflow-editor--browse) — navigating workflow definitions and versions
+- [Workflow Editor — Edit Mode](#workflow-editor--edit-mode) — modifying workflow step graph visually
 
-**Process Runs**
-- [Run Detail — Step Graph](#run-detail--step-graph) — step status, verdicts, step history
-- [Run Detail — Completed](#run-detail--completed) — all steps completed
-- [Run Detail — Autonomy Badges](#run-detail--autonomy-badges) — L2/L4 badges, new-style runs
-- [Cancel Run](#cancel-run) — double-confirm cancel flow
-- [Run Report](#run-report) — timeline, detail toggle, branding
-- [Report Unavailable](#report-unavailable) — guard for non-completed runs
+**Process Runs** — monitoring and controlling workflow executions
+- [Run Detail — Step Graph](#run-detail--step-graph) — tracking progress through workflow steps
+- [Run Detail — Completed](#run-detail--completed) — verifying all steps finished successfully
+- [Run Detail — Autonomy Badges](#run-detail--autonomy-badges) — seeing which steps are agent-driven vs human
+- [Cancel Run](#cancel-run) — safely stopping a running process with confirmation
+- [Run Report](#run-report) — post-completion summary with timing and step outputs
+- [Report Unavailable](#report-unavailable) — guard preventing report access on in-progress runs
 
-**Agents**
-- [Agent Catalog & History](#agent-catalog--history) — plugin cards, run history, detail page
-- [Agent Escalated Run](#agent-escalated-run) — low confidence rationale
-- [New Agent Form](#new-agent-form) — creation form
+**Agents** — AI agent catalog and execution oversight
+- [Agent Catalog & History](#agent-catalog--history) — discovering agents and reviewing their past runs
+- [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
+- [New Agent Form](#new-agent-form) — registering a new agent definition
 
 ---
 
@@ -33,19 +33,19 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 
 ### Task Browsing & Grouping
 
-Browse pending tasks in flat list, toggle Display options to group by Action.
+Reviewers land here to see what needs their attention. Tasks from all workflows appear in one list. Display options let you group by workflow or action type so you can prioritize — e.g., see all "approve" tasks together vs all tasks for a specific workflow.
 
 ![task-browse-and-grouping](task-browse-and-grouping.gif)
 
 ### Task Detail & Verdict
 
-Open a pending human review task, see verdict buttons (approve/revise), expand previous step output.
+The core review screen. Reviewer sees the task context, previous step's output (what the agent produced), and submits a verdict — approve to continue the workflow or revise to send it back. This is the human-in-the-loop decision point.
 
 ![task-detail-verdict-form](task-detail-verdict-form.gif)
 
 ### Task States
 
-Claimed task shows approve and revise buttons. Completed task shows completion record.
+Tasks move through pending → claimed → completed. A claimed task shows the verdict form. A completed task shows what was decided and when. Verifies the full task lifecycle renders correctly.
 
 ![task-claimed-and-completed](task-claimed-and-completed.gif)
 
@@ -55,19 +55,19 @@ Claimed task shows approve and revise buttons. Completed task shows completion r
 
 ### Workflow Home
 
-Workflow cards grouped by definition with run counts and active badges. Click hash ID to navigate to run detail.
+The landing page after login. Shows all workflow definitions as cards with run counts and active/paused status. Users click into specific runs from here. Verifies that workflows are grouped correctly and navigation works.
 
 ![workflow-home](workflow-home.gif)
 
 ### Workflow Editor — Browse
 
-Workflow detail page with Runs and Definitions tabs. Switch to Definitions to see versions.
+Workflow detail page with Runs tab (default) showing execution history, and Definitions tab showing version history. This is how you find which version of a workflow is running and access past definitions.
 
 ![workflow-editor-browse](workflow-editor-browse.gif)
 
 ### Workflow Editor — Edit Mode
 
-Definition diagram with step nodes. Edit mode: click steps to edit, "+" to add, Cancel discards changes.
+Visual editor for workflow definitions. Click nodes to inspect step configuration, enter edit mode to modify steps, use "+" to add new steps. Cancel discards without saving. This is how workflow authors iterate on process design.
 
 ![workflow-editor-edit-mode](workflow-editor-edit-mode.gif)
 
@@ -77,37 +77,37 @@ Definition diagram with step nodes. Edit mode: click steps to edit, "+" to add, 
 
 ### Run Detail — Step Graph
 
-Step status panel with all workflow steps, live status, verdict labels, and step history timeline.
+The main monitoring view for a running process. Step status panel shows all workflow steps with their current state (completed, running, pending). Verdict branches show which path a review step can take. Step History tab shows execution timeline with timestamps and executors.
 
 ![run-detail-step-graph](run-detail-step-graph.gif)
 
 ### Run Detail — Completed
 
-Completed process run with all steps showing Completed status.
+A fully completed process run. All steps show Completed status. Step history confirms each step executed successfully. This verifies the happy path renders correctly end-to-end.
 
 ![run-detail-completed](run-detail-completed.gif)
 
 ### Run Detail — Autonomy Badges
 
-Autonomy level badges (L2, L4) from process config. New-style workflow runs render correctly.
+Steps display their autonomy level (L1–L4) from the process config. L2 means agent acts + human approves, L4 means fully autonomous. Also verifies that new-style workflow runs (using workflowDefinitions instead of legacy processDefinitions) render the step panel correctly.
 
 ![run-detail-autonomy-badges](run-detail-autonomy-badges.gif)
 
 ### Cancel Run
 
-Cancel button → double-confirm dialog → dismiss with "Keep running" → back to idle.
+Stopping a running process requires double confirmation to prevent accidental cancellation. First click shows warning ("cannot be undone"), "Keep running" dismisses back to idle. This verifies the safety mechanism works both ways.
 
 ![cancel-run](cancel-run.gif)
 
 ### Run Report
 
-Report with step timeline, timing info, brief/full detail toggle, branding, and print button.
+Post-completion report with step timeline, wall-clock and active processing times, and step outputs. Brief mode shows summary, Full mode shows complete output data. Used for audit trails and stakeholder reviews.
 
 ![run-report](run-report.gif)
 
 ### Report Unavailable
 
-Non-completed runs show "only available for completed runs" message.
+Reports are only available for completed runs. Accessing the report URL for a running process shows a clear message instead of an error. Guards against broken links from in-progress runs.
 
 ![run-report-unavailable](run-report-unavailable.gif)
 
@@ -117,18 +117,18 @@ Non-completed runs show "only available for completed runs" message.
 
 ### Agent Catalog & History
 
-Plugin cards with metadata, Run History tab with autonomy badges, agent run detail with model/confidence/output.
+Browse available agent plugins (Risk Detection, Claude Code, etc.) with their input/output capabilities. Run History tab shows past executions with autonomy levels and status. Click through to individual run detail showing model used, confidence score, reasoning summary, and full output.
 
 ![agent-catalog-and-history](agent-catalog-and-history.gif)
 
 ### Agent Escalated Run
 
-Escalated agent run (low confidence) with detailed rationale for uncertainty.
+When an agent reports low confidence (here 0.45), the run is escalated for human review. The rationale explains what caused uncertainty — e.g., "Multiple data inconsistencies in lab values". This is how reviewers understand why an agent couldn't make an autonomous decision.
 
 ![agent-escalated-run](agent-escalated-run.gif)
 
 ### New Agent Form
 
-Agent creation page with name, foundation model, and save button.
+Registration form for new agent definitions. Specify name, foundation model, and capabilities. This is the entry point for adding custom agents to the platform.
 
 ![agent-new-form](agent-new-form.gif)
