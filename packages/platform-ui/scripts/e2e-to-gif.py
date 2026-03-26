@@ -16,13 +16,25 @@ RESULTS_DIR = Path("test-results")
 
 
 def clean_name(dirname: str) -> str:
-    """Extract clean GIF name from Playwright test result directory name."""
+    """Extract clean GIF name from Playwright test result directory name.
+
+    Takes the file prefix (before .journey.ts). If multiple tests share
+    a prefix, they get numbered: task-review, task-review-2, task-review-3.
+    """
     dirname = re.sub(r"-authenticated$", "", dirname)
-    file_prefix = re.sub(r"\.journey\.ts-.*", "", dirname)
-    description = re.sub(r"^[^-]+-[^-]+-[a-f0-9]+-", "", dirname)
-    combined = f"{file_prefix}-{description}"
-    combined = re.sub(r"-+", "-", combined)
-    return combined.strip("-")
+    return dirname.split(".journey.ts-")[0]
+
+
+# Track how many times each prefix appears to add numbers for duplicates
+_name_counts: dict[str, int] = {}
+
+
+def unique_name(dirname: str) -> str:
+    """Get a unique GIF name, adding -2, -3 etc for duplicates."""
+    base = clean_name(dirname)
+    _name_counts[base] = _name_counts.get(base, 0) + 1
+    count = _name_counts[base]
+    return base if count == 1 else f"{base}-{count}"
 
 
 def find_content_start(video: Path) -> float:
@@ -57,7 +69,7 @@ def main() -> None:
         if filter_arg and filter_arg not in dirname:
             continue
 
-        name = clean_name(dirname)
+        name = unique_name(dirname)
         output = FEATURES_DIR / f"{name}.gif"
         trim = find_content_start(video)
 
