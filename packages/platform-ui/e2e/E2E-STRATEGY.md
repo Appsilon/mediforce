@@ -74,9 +74,30 @@ When adding a new feature or fixing a bug, write or update the journey test that
 
 ## Recording Mode
 
-For PR demos and visual verification. Not on every CI run.
+For feature documentation and PR demos. Not on every CI run.
 
 - Playwright native video (`video: 'on'`) + `slowMo: 300ms` for human-readable speed
 - Post-process `.webm` to GIF via ffmpeg: `ffmpeg -i video.webm -vf "fps=10,scale=960:-1" -loop 0 output.gif`
 - Only journey tests get recorded
-- In CI: separate job gated on `record-e2e` PR label, posts GIF as PR comment
+
+## Feature Gallery
+
+GIF recordings live in the repo as feature documentation:
+
+```
+docs/features/
+  task-review.gif
+  workflow-editor.gif
+  run-report.gif
+  ...
+  FEATURES.md           # gallery with descriptions and GIF embeds
+```
+
+`FEATURES.md` is a visual index of what the app does — short description per feature with the GIF inline. Updated when a feature changes or a new one is added.
+
+### Workflow
+
+1. After a journey test passes, run `pnpm test:e2e:gif -- --grep "<feature>"`
+2. Copy the GIF to `docs/features/<feature>.gif`
+3. Update `docs/features/FEATURES.md` with a description and `![](feature.gif)`
+4. Commit with the PR — the GIF is the proof the feature works
