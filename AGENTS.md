@@ -160,6 +160,14 @@ Testing strategies:
 
 Executors MUST write or update journey tests as part of any task that adds or modifies UI features. GIF recordings are part of the deliverable, not an afterthought.
 
+**PR description must include E2E section** (see `docs/E2E-STRATEGY.md` PR Checklist):
+- Which E2E tests were added/updated
+- What user flows they verify
+- What is NOT covered by E2E and why
+- Links to updated GIFs
+
+**Debugging failed E2E tests**: use `agent-browser` skill on `localhost:9007` (emulator mode) to see what the UI shows and understand failures interactively.
+
 ### Unit testing by package
 
 **workflow-engine** — test transitions, step execution, expression evaluation, triggers, RBAC. Use in-memory repository doubles from `platform-core/testing`. When adding new transition logic or step types, write unit tests in `packages/workflow-engine/src/__tests__/`.
