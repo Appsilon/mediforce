@@ -52,6 +52,11 @@ test.describe('Task Review Journey', () => {
     await click(page, page.getByRole('button', { name: /submit review/i }));
     await expect(page.getByRole('link', { name: /view next task/i })).toBeVisible({ timeout: 15_000 });
     await showResult(page);
+
+    // Revisit the same task — should now show completed record
+    await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-human-review`);
+    await expect(page.getByText(/completed/i).first()).toBeVisible({ timeout: 10_000 });
+    await showResult(page);
     await endRecording(page);
   });
 });
