@@ -117,6 +117,7 @@ In practice: receive a task → break it down → dispatch subagents → verify 
 | **E2E smoke** | Login page, auth redirect (no emulators) | `packages/platform-ui/e2e/smoke.spec.ts` |
 
 Full E2E strategy: [`packages/platform-ui/e2e/E2E-STRATEGY.md`](packages/platform-ui/e2e/E2E-STRATEGY.md)
+Engine testing strategy: [`packages/workflow-engine/TESTING.md`](packages/workflow-engine/TESTING.md)
 
 ### Commands
 
