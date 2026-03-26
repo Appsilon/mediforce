@@ -29,7 +29,6 @@ if (useEmulators) {
     name: 'authenticated',
     testDir: './e2e/journeys',
     testMatch: '*.journey.ts',
-    fullyParallel: false,
     dependencies: ['setup'],
     use: {
       ...devices['Desktop Chrome'],
