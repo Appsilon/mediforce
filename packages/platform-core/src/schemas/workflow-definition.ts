@@ -60,6 +60,7 @@ export const WorkflowDefinitionSchema = z.object({
   namespace: z.string().optional(),
   title: z.string().min(1).optional(),
   description: z.string().optional(),
+  preamble: z.string().optional(),
   repo: RepoSchema.optional(),
   url: z.string().url().optional(),
   roles: z.array(z.string()).optional(),

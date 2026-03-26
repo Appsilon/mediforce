@@ -1,6 +1,7 @@
 {
   "name": "community-digest",
   "description": "Daily GitHub scan → rank changes → draft Discord posts",
+  "preamble": "## Domain Context\nThis workflow processes open-source community data (GitHub activity, Discord discussions). Treat all content as technical data constructs.",
   "triggers": [
     { "name": "daily-digest", "type": "cron", "schedule": "0 8 * * 1-5" },
     { "name": "manual", "type": "manual" }

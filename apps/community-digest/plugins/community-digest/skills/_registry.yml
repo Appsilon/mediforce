@@ -1,0 +1,19 @@
+version: "1.0"
+generated: "2026-03-26"
+standard: "agentskills.io/specification"
+total_skills: 2
+
+domains:
+  community-engagement:
+    description: Community digest pipeline skills
+    skills:
+      - id: draft-discord-posts
+        path: draft-discord-posts/SKILL.md
+        complexity: basic
+        language: multi
+        description: Write Discord posts from ranked GitHub changes
+      - id: rank-changes
+        path: rank-changes/SKILL.md
+        complexity: basic
+        language: multi
+        description: Rank GitHub changes by community interest
