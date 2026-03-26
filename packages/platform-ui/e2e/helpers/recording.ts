@@ -1,86 +1,94 @@
-import type { Page } from '@playwright/test';
+import type { Page, Locator } from '@playwright/test';
 
 const isRecording = process.env.E2E_RECORD === 'true';
 
-/**
- * Inject cursor + click ripple via addInitScript — survives client-side navigations.
- * Call once per test, before the first page.goto().
- */
-export async function setupRecording(page: Page) {
-  if (!isRecording) return;
+const injectedPages = new WeakSet<Page>();
 
-  await page.addInitScript(() => {
-    // Cursor dot — follows mouse
-    const style = document.createElement('style');
-    style.textContent = `
-      #e2e-cursor {
-        position: fixed;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: rgba(0, 0, 0, 0.45);
-        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(0, 0, 0, 0.2);
-        pointer-events: none;
-        z-index: 99999;
-        transform: translate(-50%, -50%);
-        transition: left 0.1s ease-out, top 0.1s ease-out;
-        display: none;
-      }
-      .e2e-click-ripple {
-        position: fixed;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        border: 2px solid rgba(0, 0, 0, 0.3);
-        pointer-events: none;
-        z-index: 99998;
-        transform: translate(-50%, -50%);
-        animation: e2e-ripple 0.5s ease-out forwards;
-      }
-      @keyframes e2e-ripple {
-        0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-        100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
-      }
-    `;
-    document.documentElement.appendChild(style);
+/** Inject click ripple CSS + JS into the page. Called lazily on first click(). */
+async function ensureIndicators(page: Page) {
+  if (injectedPages.has(page)) return;
+  try {
+    await page.evaluate(() => {
+      if (document.getElementById('e2e-recording-style')) return;
+      const style = document.createElement('style');
+      style.id = 'e2e-recording-style';
+      style.textContent = `
+        #e2e-cursor {
+          position: fixed;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: rgba(0, 0, 0, 0.5);
+          box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 0 0 4px rgba(0,0,0,0.15);
+          pointer-events: none;
+          z-index: 99999;
+          transform: translate(-50%, -50%);
+          transition: left 0.05s, top 0.05s;
+          display: none;
+        }
+        .e2e-ripple {
+          position: fixed;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: rgba(59, 130, 246, 0.4);
+          pointer-events: none;
+          z-index: 99998;
+          transform: translate(-50%, -50%);
+          animation: e2e-pop 0.5s ease-out forwards;
+        }
+        @keyframes e2e-pop {
+          0% { transform: translate(-50%,-50%) scale(0.5); opacity: 1; }
+          100% { transform: translate(-50%,-50%) scale(2.5); opacity: 0; }
+        }
+      `;
+      document.head.appendChild(style);
 
-    function ensureCursor() {
-      if (document.getElementById('e2e-cursor')) return;
       const cursor = document.createElement('div');
       cursor.id = 'e2e-cursor';
       document.body.appendChild(cursor);
-    }
 
-    document.addEventListener('mousemove', (e) => {
-      ensureCursor();
-      const cursor = document.getElementById('e2e-cursor')!;
-      cursor.style.display = 'block';
-      cursor.style.left = e.clientX + 'px';
-      cursor.style.top = e.clientY + 'px';
-    }, true);
+      document.addEventListener('mousemove', (e) => {
+        cursor.style.display = 'block';
+        cursor.style.left = e.clientX + 'px';
+        cursor.style.top = e.clientY + 'px';
+      }, true);
 
-    document.addEventListener('mousedown', (e) => {
-      const ripple = document.createElement('div');
-      ripple.className = 'e2e-click-ripple';
-      ripple.style.left = e.clientX + 'px';
-      ripple.style.top = e.clientY + 'px';
-      document.body.appendChild(ripple);
-      setTimeout(() => ripple.remove(), 700);
-    }, true);
-  });
+      document.addEventListener('mousedown', (e) => {
+        const ripple = document.createElement('div');
+        ripple.className = 'e2e-ripple';
+        ripple.style.left = e.clientX + 'px';
+        ripple.style.top = e.clientY + 'px';
+        document.body.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 600);
+      }, true);
+    });
+    injectedPages.add(page);
+  } catch {
+    // Page might have navigated — will retry on next click
+  }
 }
 
 /**
- * Click with visible cursor movement during recording.
- * Moves mouse to element center before clicking — makes cursor visible in recordings.
- * In non-recording mode, just clicks normally.
+ * Setup recording mode. Call at the start of each test.
+ * Currently a no-op — indicators are injected lazily by click().
  */
-export async function click(page: Page, locator: ReturnType<Page['getByText']>) {
+export async function setupRecording(_page: Page) {
+  // Indicators are injected on first click() call after page loads
+}
+
+/**
+ * Click with visible cursor movement. Moves mouse to element center,
+ * pauses briefly, then clicks. Shows cursor dot and click ripple in recordings.
+ * In normal mode: just clicks.
+ */
+export async function click(page: Page, locator: Locator) {
   if (isRecording) {
+    await ensureIndicators(page);
     const box = await locator.boundingBox();
     if (box) {
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 10 });
-      await page.waitForTimeout(200);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 15 });
+      await page.waitForTimeout(150);
     }
   }
   await locator.click();
