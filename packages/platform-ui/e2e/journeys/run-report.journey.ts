@@ -1,18 +1,22 @@
 import { test, expect } from '@playwright/test';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { recordingReady, showStep, showResult } from '../helpers/recording';
 
 test.describe('Run Report Journey', () => {
   test('completed run report shows timeline, toggles detail level, and has branding', async ({ page }) => {
     // First check the View Report link exists on run detail
     const runUrl = `/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`;
     await page.goto(runUrl);
+    await recordingReady(page);
     const reportLink = page.getByRole('link', { name: /View Report/i });
     await expect(reportLink).toBeVisible({ timeout: 10_000 });
     await expect(reportLink).toHaveAttribute('href', /\/report$/);
+    await showStep(page);
 
     // Navigate to report
     const reportUrl = `${runUrl}/report`;
     await page.goto(reportUrl);
+    await recordingReady(page);
     await expect(page.getByRole('heading', { name: /Data Quality Review — Run Report/i })).toBeVisible({ timeout: 10_000 });
 
     // Step Timeline and step names
@@ -23,11 +27,13 @@ test.describe('Run Report Journey', () => {
     // Timing information
     await expect(page.getByText(/Wall-clock/i)).toBeVisible();
     await expect(page.getByText(/Active processing/i)).toBeVisible();
+    await showStep(page);
 
     // Toggle detail level: brief -> full -> brief
     await expect(page.getByText(/Executed by/i).first()).toBeVisible();
     await page.getByRole('button', { name: /full/i }).click();
     await expect(page.getByText(/Output/i).first()).toBeVisible();
+    await showStep(page);
     await page.getByRole('button', { name: /brief/i }).click();
     await expect(page.getByText(/Step Timeline/i)).toBeVisible();
 
@@ -37,10 +43,13 @@ test.describe('Run Report Journey', () => {
 
     // Print button
     await expect(page.getByRole('button', { name: /print/i })).toBeVisible();
+    await showResult(page);
   });
 
   test('report unavailable for non-completed runs', async ({ page }) => {
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1/report`);
+    await recordingReady(page);
     await expect(page.getByText(/only available for completed runs/i)).toBeVisible({ timeout: 10_000 });
+    await showResult(page);
   });
 });

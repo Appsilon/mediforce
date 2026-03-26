@@ -35,7 +35,7 @@ if (useEmulators) {
       storageState: 'e2e/.auth/user.json',
       ...(recording ? {
         video: { mode: 'on', size: { width: 1280, height: 720 } },
-        launchOptions: { slowMo: 300 },
+        launchOptions: { slowMo: 500 },
       } : {}),
     },
   });
@@ -43,7 +43,7 @@ if (useEmulators) {
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
+  timeout: recording ? 120_000 : 30_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
