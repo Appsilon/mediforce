@@ -2,23 +2,30 @@
 
 Visual documentation of Mediforce features, auto-generated from E2E journey tests.
 
-| Feature | GIF | Tests |
-|---------|-----|-------|
-| [Task Browsing & Grouping](#task-browsing--grouping) | ![](task-browse-and-grouping.gif) | 1 |
-| [Task Detail & Verdict](#task-detail--verdict) | ![](task-detail-verdict-form.gif) | 1 |
-| [Task States](#task-states) | ![](task-claimed-and-completed.gif) | 1 |
-| [Workflow Home](#workflow-home) | ![](workflow-home.gif) | 1 |
-| [Run Detail — Step Graph](#run-detail--step-graph) | ![](run-detail-step-graph.gif) | 1 |
-| [Run Detail — Completed](#run-detail--completed) | ![](run-detail-completed.gif) | 1 |
-| [Run Detail — Autonomy Badges](#run-detail--autonomy-badges) | ![](run-detail-autonomy-badges.gif) | 1 |
-| [Cancel Run](#cancel-run) | ![](cancel-run.gif) | 1 |
-| [Run Report](#run-report) | ![](run-report.gif) | 1 |
-| [Report Unavailable](#report-unavailable) | ![](run-report-unavailable.gif) | 1 |
-| [Workflow Editor — Browse](#workflow-editor--browse) | ![](workflow-editor-browse.gif) | 1 |
-| [Workflow Editor — Edit Mode](#workflow-editor--edit-mode) | ![](workflow-editor-edit-mode.gif) | 1 |
-| [Agent Catalog & History](#agent-catalog--history) | ![](agent-catalog-and-history.gif) | 1 |
-| [Agent Escalated Run](#agent-escalated-run) | ![](agent-escalated-run.gif) | 1 |
-| [New Agent Form](#new-agent-form) | ![](agent-new-form.gif) | 1 |
+## Contents
+
+**Tasks**
+- [Task Browsing & Grouping](#task-browsing--grouping) — list, display options, action grouping
+- [Task Detail & Verdict](#task-detail--verdict) — verdict form, previous step output
+- [Task States](#task-states) — claimed and completed task views
+
+**Workflows**
+- [Workflow Home](#workflow-home) — workflow cards, run counts, navigation
+- [Workflow Editor — Browse](#workflow-editor--browse) — tabs, definitions list
+- [Workflow Editor — Edit Mode](#workflow-editor--edit-mode) — diagram, step editing, add/cancel
+
+**Process Runs**
+- [Run Detail — Step Graph](#run-detail--step-graph) — step status, verdicts, step history
+- [Run Detail — Completed](#run-detail--completed) — all steps completed
+- [Run Detail — Autonomy Badges](#run-detail--autonomy-badges) — L2/L4 badges, new-style runs
+- [Cancel Run](#cancel-run) — double-confirm cancel flow
+- [Run Report](#run-report) — timeline, detail toggle, branding
+- [Report Unavailable](#report-unavailable) — guard for non-completed runs
+
+**Agents**
+- [Agent Catalog & History](#agent-catalog--history) — plugin cards, run history, detail page
+- [Agent Escalated Run](#agent-escalated-run) — low confidence rationale
+- [New Agent Form](#new-agent-form) — creation form
 
 ---
 
@@ -26,13 +33,13 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 
 ### Task Browsing & Grouping
 
-Browse pending tasks in flat list, toggle Display options to group by Action, see task counts per workflow.
+Browse pending tasks in flat list, toggle Display options to group by Action.
 
 ![task-browse-and-grouping](task-browse-and-grouping.gif)
 
 ### Task Detail & Verdict
 
-Open a pending human review task, see verdict buttons (approve/revise), expand previous step output with Summary and Full Output tabs.
+Open a pending human review task, see verdict buttons (approve/revise), expand previous step output.
 
 ![task-detail-verdict-form](task-detail-verdict-form.gif)
 
@@ -48,19 +55,19 @@ Claimed task shows approve and revise buttons. Completed task shows completion r
 
 ### Workflow Home
 
-Workflow cards grouped by definition, showing run counts and active badges. Click through hash ID to navigate to run detail.
+Workflow cards grouped by definition with run counts and active badges. Click hash ID to navigate to run detail.
 
 ![workflow-home](workflow-home.gif)
 
 ### Workflow Editor — Browse
 
-Workflow detail page with Runs and Definitions tabs. Switch to Definitions tab to see versions.
+Workflow detail page with Runs and Definitions tabs. Switch to Definitions to see versions.
 
 ![workflow-editor-browse](workflow-editor-browse.gif)
 
 ### Workflow Editor — Edit Mode
 
-Open definition diagram, click step nodes for details, enter edit mode with Save/Cancel. Edit step panel, "+" button to add steps. Cancel discards changes.
+Definition diagram with step nodes. Edit mode: click steps to edit, "+" to add, Cancel discards changes.
 
 ![workflow-editor-edit-mode](workflow-editor-edit-mode.gif)
 
@@ -70,37 +77,37 @@ Open definition diagram, click step nodes for details, enter edit mode with Save
 
 ### Run Detail — Step Graph
 
-Step status panel showing all 7 workflow steps with live status, verdict labels, and step history timeline.
+Step status panel with all workflow steps, live status, verdict labels, and step history timeline.
 
 ![run-detail-step-graph](run-detail-step-graph.gif)
 
 ### Run Detail — Completed
 
-Completed process run with all steps showing Completed status and step history entries.
+Completed process run with all steps showing Completed status.
 
 ![run-detail-completed](run-detail-completed.gif)
 
 ### Run Detail — Autonomy Badges
 
-Autonomy level badges (L2, L4) from process config. Also verifies new-style workflow runs (no configName) render correctly.
+Autonomy level badges (L2, L4) from process config. New-style workflow runs render correctly.
 
 ![run-detail-autonomy-badges](run-detail-autonomy-badges.gif)
 
 ### Cancel Run
 
-Cancel a running process: click Cancel, see double-confirm dialog, dismiss with "Keep running", cancel button returns to idle.
+Cancel button → double-confirm dialog → dismiss with "Keep running" → back to idle.
 
 ![cancel-run](cancel-run.gif)
 
 ### Run Report
 
-View Report link on completed run page. Report shows step timeline, timing info, brief/full detail toggle, Mediforce branding, and print button.
+Report with step timeline, timing info, brief/full detail toggle, branding, and print button.
 
 ![run-report](run-report.gif)
 
 ### Report Unavailable
 
-Report page for non-completed runs shows "only available for completed runs" message.
+Non-completed runs show "only available for completed runs" message.
 
 ![run-report-unavailable](run-report-unavailable.gif)
 
@@ -110,18 +117,18 @@ Report page for non-completed runs shows "only available for completed runs" mes
 
 ### Agent Catalog & History
 
-Agent plugin cards with metadata. Run History tab showing autonomy badges (L2, L4). Agent run detail with model, confidence, reasoning, and output.
+Plugin cards with metadata, Run History tab with autonomy badges, agent run detail with model/confidence/output.
 
 ![agent-catalog-and-history](agent-catalog-and-history.gif)
 
 ### Agent Escalated Run
 
-Escalated agent run (low confidence 0.45) showing detailed rationale for uncertainty.
+Escalated agent run (low confidence) with detailed rationale for uncertainty.
 
 ![agent-escalated-run](agent-escalated-run.gif)
 
 ### New Agent Form
 
-New Agent creation page with name, foundation model, and save button.
+Agent creation page with name, foundation model, and save button.
 
 ![agent-new-form](agent-new-form.gif)
