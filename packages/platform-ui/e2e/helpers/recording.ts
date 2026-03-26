@@ -45,18 +45,34 @@ async function ensureIndicators(page: Page) {
       const cursor = document.createElement('div');
       cursor.id = 'e2e-cursor';
       document.body.appendChild(cursor);
+
+      // Hide Next.js dev error overlay (we catch errors programmatically)
+      const hideOverlay = document.createElement('style');
+      hideOverlay.textContent = 'nextjs-portal { display: none !important; }';
+      document.head.appendChild(hideOverlay);
     });
   } catch {
     // page navigated — will retry
   }
 }
 
+const pageErrors = new WeakMap<Page, string[]>();
+
 /**
- * Setup recording mode. Call at the start of each test.
+ * Setup recording mode and error tracking. Call at the start of each test.
  * @param gifName — clean name for the GIF file (e.g. "task-approve-flow")
  * @param testInfo — Playwright testInfo to write gif-name.txt into output dir
  */
 export async function setupRecording(page: Page, gifName?: string, testInfo?: TestInfo) {
+  // Track page errors (React violations, unhandled exceptions) in all modes
+  const errors: string[] = [];
+  pageErrors.set(page, errors);
+  page.on('pageerror', (err) => errors.push(err.message));
+  page.on('console', (msg) => {
+    if (msg.type() === 'error' && !msg.text().includes('Download the React DevTools')) {
+      errors.push(msg.text());
+    }
+  });
   if (!isRecording) return;
 
   // Write GIF name for e2e-to-gif.py to pick up
@@ -131,4 +147,9 @@ export async function endRecording(page: Page) {
     if (c) { c.style.left = '640px'; c.style.top = '360px'; }
   });
   await page.waitForTimeout(500);
+}
+
+/** Get page errors collected during the test. Empty array = no errors. */
+export function getPageErrors(page: Page): string[] {
+  return pageErrors.get(page) ?? [];
 }
