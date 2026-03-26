@@ -91,7 +91,7 @@ If you're unsure whether the test or the code is wrong — ask. Don't guess.
 For feature documentation and PR demos. Not on every CI run.
 
 - Playwright native video (`video: 'on'`) + `slowMo: 300ms` for human-readable speed
-- Post-process `.webm` to GIF via ffmpeg: `ffmpeg -i video.webm -vf "fps=10,scale=960:-1" -loop 0 output.gif`
+- Post-process `.webm` to GIF via ffmpeg with two-pass palettegen for clean colors (no dithering artifacts)
 - Only journey tests get recorded
 
 ## Feature Gallery

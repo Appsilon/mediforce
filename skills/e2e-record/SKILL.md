@@ -52,7 +52,7 @@ Videos land in `packages/platform-ui/test-results/*/video.webm`.
 
 ```bash
 VIDEO=$(find packages/platform-ui/test-results -name "video.webm" -newer /tmp/e2e-marker | head -1)
-ffmpeg -y -i "$VIDEO" -vf "fps=10,scale=960:-1:flags=lanczos" -loop 0 docs/features/<feature-name>.gif
+ffmpeg -y -i "$VIDEO" -vf "fps=10,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a" -loop 0 docs/features/<feature-name>.gif
 ```
 
 For multiple features, loop over the test-results directories.
