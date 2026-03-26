@@ -111,3 +111,13 @@ export async function showStep(page: Page, ms = 1500) {
 export async function showResult(page: Page, ms = 2500) {
   if (isRecording) await page.waitForTimeout(ms);
 }
+
+/** Move cursor to center and pause. Call as the last line of a test for seamless GIF loop. */
+export async function endRecording(page: Page) {
+  if (!isRecording) return;
+  await page.evaluate(() => {
+    const c = document.getElementById('e2e-cursor');
+    if (c) { c.style.left = '640px'; c.style.top = '360px'; }
+  });
+  await page.waitForTimeout(500);
+}
