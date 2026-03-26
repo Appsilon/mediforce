@@ -397,11 +397,12 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       cwd: process.cwd(),
     });
 
-    // Resolve env vars from definition-level + step-level env
+    // Resolve env vars from definition-level + step-level env + workflow secrets
     if (isWorkflowAgentContext(this.context)) {
       this.resolvedEnv = resolveStepEnv(
         this.context.workflowDefinition.env,
         this.context.step.env,
+        this.context.workflowSecrets,
       );
     } else {
       const stepConfig = this.context.config.stepConfigs.find(

@@ -22,4 +22,5 @@ export { SendGridNotificationService } from './notifications/sendgrid-notificati
 export { WebhookNotificationService } from './notifications/webhook-notification-service.js';
 export { FirestoreAgentDefinitionRepository } from './firestore/agent-definition-repository.js';
 export { FirestoreNamespaceRepository } from './firestore/namespace-repository.js';
+export { FirestoreWorkflowSecretsRepository } from './firestore/workflow-secrets-repository.js';
 

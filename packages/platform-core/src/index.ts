@@ -45,6 +45,7 @@ export {
   NamespaceTypeSchema,
   NamespaceSchema,
   NamespaceMemberSchema,
+  WorkflowSecretsSchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -95,6 +96,7 @@ export type {
   NamespaceType,
   Namespace,
   NamespaceMember,
+  WorkflowSecrets,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)

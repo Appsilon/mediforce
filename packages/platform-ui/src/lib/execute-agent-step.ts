@@ -8,6 +8,7 @@
 import { getPlatformServices } from './platform-services';
 import type { WorkflowAgentContext } from '@mediforce/agent-runtime';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 
 export interface WorkflowAgentStepResult {
   instanceId: string;
@@ -83,6 +84,11 @@ export async function executeAgentStep(
     reviewerType: 'none',
   });
 
+  // Pre-fetch workflow secrets for {{TEMPLATE}} resolution
+  const workflowSecrets = workflowDefinition.namespace
+    ? await getWorkflowSecretsForRuntime(workflowDefinition.namespace, workflowDefinition.name)
+    : {};
+
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
     processInstanceId: instanceId,
@@ -92,6 +98,7 @@ export async function executeAgentStep(
     workflowDefinition,
     step: workflowStep,
     llm: llmClient,
+    workflowSecrets,
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
       const result: Record<string, unknown> = {};
