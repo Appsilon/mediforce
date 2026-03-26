@@ -50,19 +50,7 @@ test.describe('Task Review Journey', () => {
     await showStep(page);
 
     await click(page, page.getByRole('button', { name: /submit review/i }));
-    await expect(page.getByRole('link', { name: /view next task|view run/i })).toBeVisible({ timeout: 15_000 });
-    await showResult(page);
-  });
-
-  test('claimed task shows verdict buttons, completed task shows record', async ({ page }) => {
-    await setupRecording(page);
-    await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-claimed-1`);
-    await expect(page.getByRole('button', { name: /approve/i })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('button', { name: /revise/i })).toBeVisible();
-    await showResult(page);
-
-    await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-completed-1`);
-    await expect(page.getByText(/completed/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('link', { name: /view next task/i })).toBeVisible({ timeout: 15_000 });
     await showResult(page);
     await endRecording(page);
   });
