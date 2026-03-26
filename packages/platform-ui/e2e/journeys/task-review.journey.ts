@@ -44,11 +44,11 @@ test.describe('Task Review Journey', () => {
     await expect(page.getByRole('tab', { name: /summary/i })).toBeVisible();
     await showStep(page);
 
-    // Approve button is actionable
+    // Approve button is enabled and clickable
     await expect(page.getByRole('button', { name: /approve/i })).toBeEnabled();
+    // TODO: Click approve and verify state change — server action fails silently in emulator.
+    // Needs investigation: task #14 in backlog.
     await showResult(page);
     await endRecording(page);
-    // NOTE: Actually clicking approve requires server action with Firestore write.
-    // This is a known gap — server actions in emulator mode may lack auth context.
   });
 });
