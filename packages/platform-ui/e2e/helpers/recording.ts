@@ -14,14 +14,14 @@ async function ensureIndicators(page: Page) {
       style.textContent = `
         #e2e-cursor {
           position: fixed;
-          width: 40px;
-          height: 40px;
+          width: 28px;
+          height: 34px;
           pointer-events: none;
           z-index: 99999;
-          transform: translate(-3px, -2px);
-          transition: left 0.15s ease-out, top 0.15s ease-out;
+          transform: translate(0, 0);
+          transition: left 0.35s cubic-bezier(0.2, 0, 0.2, 1), top 0.35s cubic-bezier(0.2, 0, 0.2, 1);
           display: none;
-          background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24'%3E%3Cpath d='M5 3l14 9-7 1.5L8 21z' fill='%23fff' stroke='%23000' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat;
+          background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='34' viewBox='0 0 28 34'%3E%3Cpath d='M2 1L2 28L9 21L15 32L19 30L13 19L22 19Z' fill='white' stroke='black' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat;
         }
         .e2e-ripple {
           position: fixed;
@@ -82,9 +82,14 @@ export async function click(page: Page, locator: Locator) {
     if (box) {
       const x = Math.round(box.x + box.width / 2);
       const y = Math.round(box.y + box.height / 2);
+      // Move cursor — CSS transition handles the animation
       await page.evaluate(({ x, y }) => {
         const c = document.getElementById('e2e-cursor');
         if (c) { c.style.display = 'block'; c.style.left = x + 'px'; c.style.top = y + 'px'; }
+      }, { x, y });
+      await page.waitForTimeout(400); // wait for CSS transition to finish
+      // Ripple at click position
+      await page.evaluate(({ x, y }) => {
         const r = document.createElement('div');
         r.className = 'e2e-ripple';
         r.style.left = x + 'px';
@@ -92,7 +97,6 @@ export async function click(page: Page, locator: Locator) {
         document.body.appendChild(r);
         setTimeout(() => r.remove(), 600);
       }, { x, y });
-      await page.waitForTimeout(300);
     }
   }
   await locator.click();
