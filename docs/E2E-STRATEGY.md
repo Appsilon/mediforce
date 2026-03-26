@@ -96,26 +96,14 @@ For feature documentation and PR demos. Not on every CI run.
 
 ## Feature Gallery
 
-GIF recordings live in the repo as feature documentation:
+Every journey test produces a GIF recording that lives in `docs/features/`. The gallery at [`docs/features/FEATURES.md`](../features/FEATURES.md) is the visual index of what the app does — grouped by feature area with inline GIFs.
 
-```
-docs/features/
-  task-review.gif
-  workflow-editor.gif
-  run-report.gif
-  ...
-  FEATURES.md           # gallery with descriptions and GIF embeds
-```
+### Adding to the gallery
 
-`FEATURES.md` is a visual index of what the app does — short description per feature with the GIF inline. Updated when a feature changes or a new one is added.
+Use the `/e2e-record` skill, or manually:
 
-### Workflow
-
-1. After a journey test passes, run `pnpm test:e2e:gif -- --grep "<feature>"`
-2. Copy the GIF to `docs/features/<feature>.gif`
-3. Update `docs/features/FEATURES.md` with a description and `![](feature.gif)`
-4. Commit with the PR — the GIF is the proof the feature works
-
-## Migration
-
-Delete old tests in `e2e/authenticated/`, write new journey tests in `e2e/journeys/`. One PR, clean swap. Verify each journey test locally before pushing.
+1. Record: `pnpm test:e2e:record -- --grep "<feature>"`
+2. Convert: `ffmpeg -y -i <video.webm> -vf "fps=10,scale=960:-1:flags=lanczos" -loop 0 docs/features/<name>.gif`
+3. Add entry to `docs/features/FEATURES.md` under the right section with description and `![name](name.gif)`
+4. Add the GIF filename to the summary table at the top of FEATURES.md
+5. Commit the GIF and FEATURES.md with the PR

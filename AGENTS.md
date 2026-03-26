@@ -119,7 +119,7 @@ In practice: receive a task → break it down → dispatch subagents → verify 
 
 Testing strategies:
 - E2E: [`docs/E2E-STRATEGY.md`](docs/E2E-STRATEGY.md)
-- Engine: [`packages/workflow-engine/TESTING.md`](packages/workflow-engine/TESTING.md)
+- Engine: [`docs/ENGINE-TESTING.md`](docs/ENGINE-TESTING.md)
 
 ### Commands
 
