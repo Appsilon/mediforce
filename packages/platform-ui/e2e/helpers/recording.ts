@@ -148,6 +148,59 @@ export async function showResult(page: Page, ms = 3500) {
 }
 
 /**
+ * Show a caption overlay at the bottom of the screen during recording.
+ * Replaces showStep/showResult when you want to annotate what's happening.
+ * Caption fades in, holds for `ms`, then fades out.
+ * In non-recording mode: no-op (zero overhead on normal test runs).
+ */
+export async function showCaption(page: Page, text: string, ms = 2500) {
+  if (!isRecording) return;
+  const holdMs = firstStepDone.has(page) ? ms : Math.min(ms, 500);
+  firstStepDone.add(page);
+
+  await page.evaluate(({ text, holdMs }) => {
+    // Remove previous caption if still present
+    document.getElementById('e2e-caption')?.remove();
+
+    const el = document.createElement('div');
+    el.id = 'e2e-caption';
+    el.textContent = text;
+    Object.assign(el.style, {
+      position: 'fixed',
+      bottom: '32px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      padding: '10px 28px',
+      borderRadius: '8px',
+      background: 'rgba(15, 23, 42, 0.88)',
+      color: '#f1f5f9',
+      fontSize: '15px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontWeight: '500',
+      letterSpacing: '0.01em',
+      lineHeight: '1.4',
+      zIndex: '99997',
+      pointerEvents: 'none',
+      opacity: '0',
+      transition: 'opacity 0.3s ease',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+      maxWidth: '80%',
+      textAlign: 'center',
+    });
+    document.body.appendChild(el);
+
+    // Trigger fade-in on next frame
+    requestAnimationFrame(() => { el.style.opacity = '1'; });
+
+    // Fade out before removal
+    setTimeout(() => { el.style.opacity = '0'; }, holdMs - 300);
+    setTimeout(() => el.remove(), holdMs);
+  }, { text, holdMs });
+
+  await page.waitForTimeout(holdMs);
+}
+
+/**
  * Move cursor to center and pause for seamless GIF loop.
  * Call only in the LAST test of each describe block — all tests in a block
  * share one video recording, so only the final test needs the loop ending.
