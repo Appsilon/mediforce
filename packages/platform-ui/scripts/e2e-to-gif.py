@@ -22,7 +22,7 @@ def find_content_start(video: Path) -> float:
         subprocess.run(
             ["ffmpeg", "-y", "-i", str(video), "-vf", "fps=2,scale=320:-1",
              f"{tmpdir}/f%04d.png"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
         )
         for i, frame in enumerate(sorted(Path(tmpdir).glob("f*.png"))):
             if frame.stat().st_size > 2000:
@@ -36,7 +36,7 @@ def verify_gif(gif_path: Path) -> bool:
         subprocess.run(
             ["ffmpeg", "-y", "-ss", "1", "-i", str(gif_path),
              "-vframes", "1", tmp.name],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
         )
         return Path(tmp.name).stat().st_size > 5000
 
@@ -79,7 +79,7 @@ def main() -> None:
                 *(["-ss", str(trim)] if trim > 0 else []),
                 "-i", str(video),
                 "-vf",
-                "fps=15,scale=960:-1:flags=lanczos,"
+                "fps=12,scale=960:-1:flags=lanczos,"
                 "split[s0][s1];"
                 "[s0]palettegen=max_colors=256:stats_mode=diff[p];"
                 "[s1][p]paletteuse=dither=sierra2_4a",

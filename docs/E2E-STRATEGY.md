@@ -10,6 +10,16 @@
 6. **Tests are protected** — E2E tests define expected behavior. Modifying a test to make it pass is only allowed when the feature itself intentionally changed. See [Modifying Existing Tests](#modifying-existing-tests).
 7. **Isolate mutating tests** — tests that change state (cancel run, approve task, delete) must use their own dedicated seed data instance. Never mutate an instance that other tests read. Add new entries in `seed-data.ts` for each mutating test.
 
+## Parallel Execution & Data Isolation
+
+Tests run with `fullyParallel: true`. This is safe because:
+
+- **Read-only tests** share seed data freely — multiple tests can read the same workflow instance, task, or agent definition without conflict.
+- **Mutating tests** (cancel run, approve task) each get a **dedicated seed data instance** in `seed-data.ts` (e.g., `proc-cancel-target`). No other test reads from or writes to that instance.
+- **Fresh Firestore emulator** is seeded once per test run via `auth-setup.ts`. Tests don't create or delete data — they only read shared fixtures or mutate their isolated ones.
+
+When adding a new test that **changes state**, create a new dedicated entry in `seed-data.ts` with a unique ID. Document which test owns it with a comment. Never mutate an instance that read-only tests depend on.
+
 ## Test Types
 
 | Type | Location | Purpose |
@@ -74,7 +84,7 @@ Key patterns:
 - `click(page, locator)` — use instead of `locator.click()` for visible cursor movement in recordings
 - `showStep(page)` — 1.5s pause at intermediate steps (only during recording)
 - `showResult(page)` — 2.5s pause at key outcomes (only during recording)
-- `endRecording(page)` — last line, moves cursor to center for seamless GIF loop
+- `endRecording(page)` — call only in the **last test** of each `describe` block (all tests in a block share one video, so only the final test needs the loop ending)
 - `page.goto` — entry point only, then click links/buttons to navigate
 - `{ timeout: 10_000 }` — on first assertion after page load (data may still be fetching)
 

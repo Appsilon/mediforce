@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 

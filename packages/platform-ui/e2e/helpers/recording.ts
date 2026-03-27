@@ -130,16 +130,20 @@ export async function click(page: Page, locator: Locator) {
 }
 
 /** Pause to let the viewer see what just happened. Only during recording. */
-export async function showStep(page: Page, ms = 1500) {
+export async function showStep(page: Page, ms = 2000) {
   if (isRecording) await page.waitForTimeout(ms);
 }
 
 /** Longer pause for key moments. Only during recording. */
-export async function showResult(page: Page, ms = 2500) {
+export async function showResult(page: Page, ms = 3500) {
   if (isRecording) await page.waitForTimeout(ms);
 }
 
-/** Move cursor to center and pause. Call as the last line of a test for seamless GIF loop. */
+/**
+ * Move cursor to center and pause for seamless GIF loop.
+ * Call only in the LAST test of each describe block — all tests in a block
+ * share one video recording, so only the final test needs the loop ending.
+ */
 export async function endRecording(page: Page) {
   if (!isRecording) return;
   await page.evaluate(() => {
