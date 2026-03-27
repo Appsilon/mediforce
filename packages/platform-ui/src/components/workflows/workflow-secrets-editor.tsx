@@ -65,18 +65,25 @@ export function WorkflowSecretsEditor({ namespace, workflowName, userId }: Workf
   const handleSave = async () => {
     setSaving(true);
     setSaveMessage(null);
-    const record: Record<string, string> = {};
-    for (const { key, value } of secrets) {
-      const trimmedKey = key.trim();
-      if (trimmedKey !== '') {
-        record[trimmedKey] = value;
+    try {
+      const record: Record<string, string> = {};
+      for (const { key, value } of secrets) {
+        const trimmedKey = key.trim();
+        if (trimmedKey !== '') {
+          record[trimmedKey] = value;
+        }
       }
+      await saveWorkflowSecrets(namespace, workflowName, record, userId);
+      setDirty(false);
+      setSaveMessage('Secrets saved');
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setSaveMessage(`Error: ${message}`);
+      console.error('Failed to save workflow secrets:', error);
+    } finally {
+      setSaving(false);
     }
-    await saveWorkflowSecrets(namespace, workflowName, record, userId);
-    setDirty(false);
-    setSaving(false);
-    setSaveMessage('Secrets saved');
-    setTimeout(() => setSaveMessage(null), 3000);
   };
 
   const addRow = () => {
@@ -272,7 +279,7 @@ export function WorkflowSecretsEditor({ namespace, workflowName, userId }: Workf
         )}
 
         {saveMessage && (
-          <span className="text-sm text-green-600 dark:text-green-400">{saveMessage}</span>
+          <span className={`text-sm ${saveMessage.startsWith('Error:') ? 'text-destructive' : 'text-green-600 dark:text-green-400'}`}>{saveMessage}</span>
         )}
       </div>
     </div>
