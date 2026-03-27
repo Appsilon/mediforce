@@ -136,3 +136,8 @@ export {
   AgentDefinitionSchema,
   type AgentDefinition,
 } from './agent-definition.js';
+
+export {
+  WorkflowSecretsSchema,
+  type WorkflowSecrets,
+} from './workflow-secret.js';

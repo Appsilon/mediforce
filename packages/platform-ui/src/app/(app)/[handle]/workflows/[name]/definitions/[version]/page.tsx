@@ -6,9 +6,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { useAuth } from '@/contexts/auth-context';
 import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
@@ -491,6 +493,16 @@ function toSlug(name: string): string {
 function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps: WorkflowStep[]; onChange: (patch: Partial<WorkflowStep>) => void }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
+  const { firebaseUser } = useAuth();
+  const { handle, name: workflowNameParam } = useParams<{ handle: string; name: string }>();
+  const [secretKeys, setSecretKeys] = useState<string[]>([]);
+  useEffect(() => {
+    if (handle && workflowNameParam && firebaseUser) {
+      getWorkflowSecretKeys(handle, decodeURIComponent(workflowNameParam), firebaseUser.uid)
+        .then(setSecretKeys)
+        .catch((error) => console.error('Failed to load secret keys:', error));
+    }
+  }, [handle, workflowNameParam, firebaseUser]);
   const inlineInput = 'w-full bg-transparent border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0.5 focus:outline-none transition-colors';
   const selectInline = 'bg-transparent text-xs text-right border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors cursor-pointer';
   const otherSteps = allSteps.filter((s) => s.id !== step.id);
@@ -790,14 +802,34 @@ function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps
                 className="bg-transparent text-xs font-mono text-muted-foreground border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-24"
               />
               <span className="text-xs text-muted-foreground">=</span>
-              <input
-                value={val}
-                onChange={(e) => {
-                  const newEnv = { ...step.env, [key]: e.target.value };
-                  onChange({ env: newEnv });
-                }}
-                className="bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors flex-1"
-              />
+              <div className="relative flex-1 group">
+                <input
+                  value={val}
+                  onChange={(e) => {
+                    const newEnv = { ...step.env, [key]: e.target.value };
+                    onChange({ env: newEnv });
+                  }}
+                  className="bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-full"
+                />
+                {secretKeys.length > 0 && !val.startsWith('{{') && (
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const newEnv = { ...step.env, [key]: `{{${e.target.value}}}` };
+                        onChange({ env: newEnv });
+                      }
+                    }}
+                    className="absolute right-0 top-0 h-full opacity-0 group-hover:opacity-100 focus:opacity-100 bg-transparent text-xs cursor-pointer transition-opacity w-5"
+                    title="Insert secret reference"
+                  >
+                    <option value="">🔑</option>
+                    {secretKeys.map((sk) => (
+                      <option key={sk} value={sk}>{sk}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <button
                 onClick={() => {
                   const newEnv = { ...step.env };

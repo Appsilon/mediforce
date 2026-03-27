@@ -42,6 +42,16 @@ service cloud.firestore {
         allow create, update: if request.auth != null;
         allow delete: if request.auth != null;
       }
+
+      // Workflow secrets: only namespace members (server actions enforce this via Admin SDK;
+      // these rules are defense-in-depth for client SDK access)
+      match /workflowSecrets/{workflowName} {
+        allow read: if request.auth != null
+          && exists(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid));
+        allow create, update: if request.auth != null
+          && exists(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid));
+        allow delete: if false;
+      }
     }
 
     // Users: read by authenticated, write by authenticated (org admins add to organizations[])

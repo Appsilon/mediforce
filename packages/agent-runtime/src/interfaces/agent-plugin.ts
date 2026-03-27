@@ -53,6 +53,8 @@ export interface WorkflowAgentContext {
   step: WorkflowStep;
   llm: LlmClient;
   getPreviousStepOutputs: () => Promise<Record<string, unknown>>;
+  /** Pre-fetched workflow secrets for {{TEMPLATE}} resolution */
+  workflowSecrets?: Record<string, string>;
 }
 
 // EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp

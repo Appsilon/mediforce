@@ -126,8 +126,9 @@ export class ScriptContainerPlugin implements AgentPlugin {
       );
     }
 
-    // Resolve env vars from definition-level + step-level env
-    this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv);
+    // Resolve env vars from definition-level + step-level env + workflow secrets
+    const workflowSecrets = isWorkflowAgentContext(context) ? context.workflowSecrets : undefined;
+    this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv, workflowSecrets);
   }
 
   async run(emit: EmitFn): Promise<void> {
