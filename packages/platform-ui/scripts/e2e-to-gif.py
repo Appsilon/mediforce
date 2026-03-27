@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Convert E2E test recordings (webm) to GIFs in docs/features/.
 
-Reads gif-name.txt from each test result dir (written by setupRecording).
-Auto-trims loading screens. Verifies each GIF has real content.
+Reads gif-meta.json from each test result dir (written by setupRecording).
+Uses precise trimStart from metadata. Verifies each GIF has real content.
 """
 
+from __future__ import annotations
+
+import json
 import re
 import shutil
 import subprocess
@@ -14,20 +17,6 @@ from pathlib import Path
 
 FEATURES_DIR = Path("../../docs/features")
 RESULTS_DIR = Path("test-results")
-
-
-def find_content_start(video: Path) -> float:
-    """Find when loading ends by checking frame complexity (PNG file size)."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", str(video), "-vf", "fps=2,scale=320:-1",
-             f"{tmpdir}/f%04d.png"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
-        )
-        for i, frame in enumerate(sorted(Path(tmpdir).glob("f*.png"))):
-            if frame.stat().st_size > 2000:
-                return i * 0.5
-    return 0
 
 
 def verify_gif(gif_path: Path) -> bool:
@@ -74,16 +63,22 @@ def main() -> None:
         if filter_arg and filter_arg not in result_dir.name:
             continue
 
-        # Read GIF name from file written by setupRecording()
+        # Read metadata — prefer gif-meta.json, fall back to gif-name.txt
+        meta_file = result_dir / "gif-meta.json"
         name_file = result_dir / "gif-name.txt"
-        if not name_file.exists():
-            print(f"⚠ Skipping {result_dir.name} — no gif-name.txt")
+
+        if meta_file.exists():
+            meta = json.loads(meta_file.read_text())
+            name = meta["name"]
+            trim = meta.get("trimStart", 0)
+        elif name_file.exists():
+            name = name_file.read_text().strip()
+            trim = 0
+        else:
+            print(f"⚠ Skipping {result_dir.name} — no gif-meta.json or gif-name.txt")
             continue
 
-        name = name_file.read_text().strip()
         output = FEATURES_DIR / f"{name}.gif"
-
-        trim = find_content_start(video)
 
         subprocess.run(
             [

@@ -58,6 +58,8 @@ async function ensureIndicators(page: Page) {
 
 const pageErrors = new WeakMap<Page, string[]>();
 const firstStepDone = new WeakSet<Page>();
+const recordingStartedAt = new WeakMap<Page, number>();
+const metaOutputDir = new WeakMap<Page, string>();
 
 /**
  * Setup recording mode and error tracking. Call at the start of each test.
@@ -76,11 +78,16 @@ export async function setupRecording(page: Page, gifName?: string, testInfo?: Te
   });
   if (!isRecording) return;
 
-  // Write GIF name for e2e-to-gif.py to pick up
+  recordingStartedAt.set(page, Date.now());
+
+  // Write GIF metadata for e2e-to-gif.py
   if (gifName && testInfo) {
     const outputDir = testInfo.outputDir;
     fs.mkdirSync(outputDir, { recursive: true });
+    // Write gif-name.txt for backward compat, gif-meta.json is the source of truth
     fs.writeFileSync(path.join(outputDir, 'gif-name.txt'), gifName);
+    fs.writeFileSync(path.join(outputDir, 'gif-meta.json'), JSON.stringify({ name: gifName }));
+    metaOutputDir.set(page, outputDir);
   }
 
   // Show cursor at center on page load
@@ -99,12 +106,30 @@ export async function setupRecording(page: Page, gifName?: string, testInfo?: Te
   });
 }
 
+/** Write trimStart to gif-meta.json on first interaction (content is ready). */
+function markContentReady(page: Page) {
+  if (firstStepDone.has(page)) return;
+  firstStepDone.add(page);
+
+  const startedAt = recordingStartedAt.get(page);
+  const outputDir = metaOutputDir.get(page);
+  if (!startedAt || !outputDir) return;
+
+  const trimStart = (Date.now() - startedAt) / 1000;
+  const metaPath = path.join(outputDir, 'gif-meta.json');
+  try {
+    const existing = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+    fs.writeFileSync(metaPath, JSON.stringify({ ...existing, trimStart }));
+  } catch { /* first test in describe may not have meta yet */ }
+}
+
 /**
  * Click with visible cursor + ripple. Positions cursor at element center,
  * shows ripple, then clicks. In normal mode: just clicks.
  */
 export async function click(page: Page, locator: Locator) {
   if (isRecording) {
+    markContentReady(page);
     await ensureIndicators(page);
     const box = await locator.boundingBox();
     if (box) {
@@ -134,47 +159,52 @@ export async function click(page: Page, locator: Locator) {
  *  First call per page caps at 500ms so recordings start quickly. */
 export async function showStep(page: Page, ms = 2000) {
   if (!isRecording) return;
-  if (!firstStepDone.has(page)) {
-    firstStepDone.add(page);
-    await page.waitForTimeout(Math.min(ms, 500));
-    return;
-  }
+  markContentReady(page);
   await page.waitForTimeout(ms);
 }
 
 /** Longer pause for key moments. Only during recording. */
 export async function showResult(page: Page, ms = 3500) {
-  if (isRecording) await page.waitForTimeout(ms);
+  if (!isRecording) return;
+  markContentReady(page);
+  await page.waitForTimeout(ms);
 }
 
 /**
  * Show a caption overlay at the bottom of the screen during recording.
- * Replaces showStep/showResult when you want to annotate what's happening.
- * Caption fades in, holds for `ms`, then fades out.
+ * Caption stays visible until replaced by the next showCaption call or
+ * removed by endRecording. Fades in smoothly on appear, crossfades on replace.
  * In non-recording mode: no-op (zero overhead on normal test runs).
  */
 export async function showCaption(page: Page, text: string, ms = 2500) {
   if (!isRecording) return;
-  const holdMs = firstStepDone.has(page) ? ms : Math.min(ms, 500);
-  firstStepDone.add(page);
+  markContentReady(page);
 
-  await page.evaluate(({ text, holdMs }) => {
-    // Remove previous caption if still present
-    document.getElementById('e2e-caption')?.remove();
+  await page.evaluate((captionText) => {
+    const existing = document.getElementById('e2e-caption');
+    if (existing) {
+      // Crossfade: fade out old, update text, fade in
+      existing.style.opacity = '0';
+      setTimeout(() => {
+        existing.textContent = captionText;
+        existing.style.opacity = '1';
+      }, 250);
+      return;
+    }
 
     const el = document.createElement('div');
     el.id = 'e2e-caption';
-    el.textContent = text;
+    el.textContent = captionText;
     Object.assign(el.style, {
       position: 'fixed',
       bottom: '32px',
       left: '50%',
       transform: 'translateX(-50%)',
-      padding: '10px 28px',
-      borderRadius: '8px',
-      background: 'rgba(15, 23, 42, 0.88)',
+      padding: '12px 32px',
+      borderRadius: '10px',
+      background: 'rgba(15, 23, 42, 0.90)',
       color: '#f1f5f9',
-      fontSize: '15px',
+      fontSize: '17px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       fontWeight: '500',
       letterSpacing: '0.01em',
@@ -182,22 +212,16 @@ export async function showCaption(page: Page, text: string, ms = 2500) {
       zIndex: '99997',
       pointerEvents: 'none',
       opacity: '0',
-      transition: 'opacity 0.3s ease',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+      transition: 'opacity 0.25s ease',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
       maxWidth: '80%',
       textAlign: 'center',
     });
     document.body.appendChild(el);
-
-    // Trigger fade-in on next frame
     requestAnimationFrame(() => { el.style.opacity = '1'; });
+  }, text);
 
-    // Fade out before removal
-    setTimeout(() => { el.style.opacity = '0'; }, holdMs - 300);
-    setTimeout(() => el.remove(), holdMs);
-  }, { text, holdMs });
-
-  await page.waitForTimeout(holdMs);
+  await page.waitForTimeout(ms);
 }
 
 /**
@@ -208,6 +232,10 @@ export async function showCaption(page: Page, text: string, ms = 2500) {
 export async function endRecording(page: Page) {
   if (!isRecording) return;
   await page.evaluate(() => {
+    // Fade out caption
+    const caption = document.getElementById('e2e-caption');
+    if (caption) { caption.style.opacity = '0'; }
+    // Move cursor to center
     const c = document.getElementById('e2e-cursor');
     if (c) { c.style.left = '640px'; c.style.top = '360px'; }
   });
