@@ -23,6 +23,7 @@
     "migrate:handles": "tsx scripts/migrate-user-handles.ts"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^25.3.0",
     "@vitest/coverage-v8": "^4.0.18",
     "tsx": "latest",
