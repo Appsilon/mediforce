@@ -1,7 +1,7 @@
 ---
 name: renovate-review
 description: Review and validate Renovate dependency PRs. Assesses risk, runs tests, fixes simple issues, and recommends merge/close/hold. Use when reviewing PRs from Renovate bot.
-allowed-tools: Bash, Read, Glob, Grep
+allowed-tools: Bash, Read, Glob, Grep, WebFetch
 metadata:
   author: Appsilon
   version: "1.0"
@@ -29,7 +29,19 @@ List all open Renovate PRs and triage them:
 gh pr list --author "renovate[bot]" --state open --json number,title,statusCheckRollup
 ```
 
-Group by risk level, show CI status for each. Then process them one by one, starting with Low risk (quick wins). For each PR, follow the single-PR workflow below.
+Group PRs by ecosystem before processing:
+
+| Ecosystem | Packages | Why group |
+|-----------|----------|-----------|
+| **React** | react, react-dom, @types/react, next | Must be compatible; test together |
+| **Radix UI** | @radix-ui/* | Shared versioning, test together |
+| **Firebase** | firebase, firebase-tools, firebase-admin | Shared auth/SDK, test together |
+| **Testing** | vitest, @playwright/test, @testing-library/* | Test infra, validate independently |
+| **Build** | typescript, tailwindcss, postcss, autoprefixer | Build chain, may interact |
+
+PRs in the same ecosystem should be checked out together (stack branches or merge locally) and tested as a group — if one breaks, the others may fix it or depend on it.
+
+Process order: Low risk first (quick wins), then Medium, then High. For each PR (or ecosystem group), follow the single-PR workflow below.
 
 Present a summary table at the end:
 
@@ -37,7 +49,7 @@ Present a summary table at the end:
 | PR | Package | Risk | Verdict |
 |----|---------|------|---------|
 | #77 | recharts 3.7→3.8 | Low | MERGE |
-| #65 | typescript 5→6 | High | HOLD |
+| #65 | typescript 5→6 | High | HOLD — breaking changes, see migration notes |
 ```
 
 ### Single PR mode
@@ -59,6 +71,16 @@ Note the title (package + version), changed files, and CI status.
 | **Low** | devDependencies, Docker tags, tooling (eslint, prettier), lockfile-only |
 | **Medium** | CSS framework (tailwindcss), runtime utils (date-fns, clsx), test libs |
 | **High** | Framework (next, react), core lib (zod, firebase), language (typescript) |
+
+**Major version bumps** (e.g., 5→6, 18→19) are always at least Medium, even for low-risk packages. For High-risk major bumps:
+
+1. Check the package's changelog or release notes for breaking changes:
+   ```bash
+   gh api "repos/{owner}/{repo}/releases/latest" --jq '.body' 2>/dev/null
+   ```
+   Or fetch the changelog/migration guide from the package's docs (use WebFetch if needed).
+2. List breaking changes that affect this codebase — grep for deprecated APIs, removed features, changed defaults.
+3. Include a **Migration notes** section in the report with what needs attention.
 
 ### 3. Check CI status
 
