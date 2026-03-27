@@ -5,9 +5,12 @@ export PATH="$JAVA_HOME/bin:$PATH"
 PORTS=(9099 8080 4000)
 blocked=()
 
+kill_port() {
+  fuser -k "$1/tcp" 2>/dev/null || lsof -ti ":$1" 2>/dev/null | xargs kill -9 2>/dev/null
+}
+
 for port in "${PORTS[@]}"; do
-  pids=$(lsof -ti ":$port" 2>/dev/null)
-  if [ -n "$pids" ]; then
+  if fuser "$port/tcp" 2>/dev/null || lsof -ti ":$port" >/dev/null 2>&1; then
     blocked+=("$port")
   fi
 done
@@ -20,7 +23,7 @@ if [ ${#blocked[@]} -gt 0 ]; then
     exit 1
   fi
   for port in "${blocked[@]}"; do
-    lsof -ti ":$port" 2>/dev/null | xargs kill -9 2>/dev/null
+    kill_port "$port"
   done
   echo "Ports freed."
 fi

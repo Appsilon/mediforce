@@ -6,10 +6,11 @@ const API_KEY = 'fake-api-key';
 export async function clearEmulators() {
   await fetch(`${AUTH_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/accounts`, {
     method: 'DELETE',
+    signal: AbortSignal.timeout(5000),
   });
   await fetch(
     `${FIRESTORE_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/databases/(default)/documents`,
-    { method: 'DELETE' },
+    { method: 'DELETE', signal: AbortSignal.timeout(5000) },
   );
 }
 

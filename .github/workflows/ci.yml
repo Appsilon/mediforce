@@ -98,3 +98,14 @@ jobs:
           name: playwright-report
           path: packages/platform-ui/playwright-report/
           retention-days: 14
+
+  gif-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check journey test changes have matching GIF updates
+        run: cd packages/platform-ui && python3 scripts/check-gif-freshness.py ${{ github.event.pull_request.base.sha }}

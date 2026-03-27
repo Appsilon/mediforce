@@ -19,14 +19,6 @@ function statusBadgeClass(status: string) {
 export function StepHistoryTabs({ steps, loading, processInstanceId }: { steps: StepExecution[]; loading: boolean; processInstanceId?: string }) {
   const handle = useHandleFromPath();
 
-  if (loading) {
-    return <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 rounded-md bg-muted animate-pulse" />)}</div>;
-  }
-
-  if (steps.length === 0) {
-    return <div className="py-8 text-center text-sm text-muted-foreground">No step history yet</div>;
-  }
-
   const taskConstraints = useMemo(
     () =>
       processInstanceId
@@ -48,6 +40,14 @@ export function StepHistoryTabs({ steps, loading, processInstanceId }: { steps: 
     }
     return map;
   }, [tasks]);
+
+  if (loading) {
+    return <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 rounded-md bg-muted animate-pulse" />)}</div>;
+  }
+
+  if (steps.length === 0) {
+    return <div className="py-8 text-center text-sm text-muted-foreground">No step history yet</div>;
+  }
 
   const sorted = [...steps].sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
   const seenStepIds = new Set<string>();
