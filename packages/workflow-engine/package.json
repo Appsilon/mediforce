@@ -15,5 +15,8 @@
   "dependencies": {
     "@mediforce/platform-core": "workspace:*",
     "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0"
   }
 }
