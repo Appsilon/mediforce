@@ -57,6 +57,7 @@ async function ensureIndicators(page: Page) {
 }
 
 const pageErrors = new WeakMap<Page, string[]>();
+const firstStepDone = new WeakSet<Page>();
 
 /**
  * Setup recording mode and error tracking. Call at the start of each test.
@@ -129,9 +130,16 @@ export async function click(page: Page, locator: Locator) {
   await locator.click();
 }
 
-/** Pause to let the viewer see what just happened. Only during recording. */
+/** Pause to let the viewer see what just happened. Only during recording.
+ *  First call per page caps at 500ms so recordings start quickly. */
 export async function showStep(page: Page, ms = 2000) {
-  if (isRecording) await page.waitForTimeout(ms);
+  if (!isRecording) return;
+  if (!firstStepDone.has(page)) {
+    firstStepDone.add(page);
+    await page.waitForTimeout(Math.min(ms, 500));
+    return;
+  }
+  await page.waitForTimeout(ms);
 }
 
 /** Longer pause for key moments. Only during recording. */

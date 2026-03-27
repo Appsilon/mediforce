@@ -31,10 +31,19 @@ def find_content_start(video: Path) -> float:
 
 
 def verify_gif(gif_path: Path) -> bool:
-    """Check GIF has real content (not just login/loading screen)."""
+    """Check GIF has real content (not just login/loading screen).
+    Samples a frame from the middle of the GIF to avoid loading screens."""
+    result = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", str(gif_path)],
+        capture_output=True, text=True,
+    )
+    duration = float(result.stdout.strip()) if result.stdout.strip() else 2.0
+    sample_at = str(max(0.5, duration * 0.75))
+
     with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
         subprocess.run(
-            ["ffmpeg", "-y", "-ss", "1", "-i", str(gif_path),
+            ["ffmpeg", "-y", "-ss", sample_at, "-i", str(gif_path),
              "-vframes", "1", tmp.name],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
         )
