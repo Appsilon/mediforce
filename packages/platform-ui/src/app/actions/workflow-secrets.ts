@@ -14,11 +14,18 @@ function getRepo() {
 
 async function requireNamespaceMember(namespace: string, userId: string): Promise<void> {
   getPlatformServices();
-  const namespaceRepo = new FirestoreNamespaceRepository(getFirestoreDb());
+  const db = getFirestoreDb();
+  const namespaceRepo = new FirestoreNamespaceRepository(db);
+
+  // Check member doc first
   const member = await namespaceRepo.getMember(namespace, userId);
-  if (!member) {
-    throw new Error('Not a member of this namespace');
-  }
+  if (member) return;
+
+  // Fallback: personal namespaces created before members subcollection may lack a member doc
+  const ns = await namespaceRepo.getNamespace(namespace);
+  if (ns?.type === 'personal' && ns.linkedUserId === userId) return;
+
+  throw new Error('Not a member of this namespace');
 }
 
 /** Get secret keys only (safe for client — no values exposed) */

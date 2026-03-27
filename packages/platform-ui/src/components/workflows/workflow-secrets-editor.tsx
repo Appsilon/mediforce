@@ -47,12 +47,18 @@ export function WorkflowSecretsEditor({ namespace, workflowName, userId }: Workf
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getWorkflowSecrets(namespace, workflowName, userId).then((data) => {
-      if (cancelled) return;
-      const entries = Object.entries(data).map(([key, value]) => ({ key, value }));
-      setSecrets(entries);
-      setLoading(false);
-    });
+    getWorkflowSecrets(namespace, workflowName, userId)
+      .then((data) => {
+        if (cancelled) return;
+        const entries = Object.entries(data).map(([key, value]) => ({ key, value }));
+        setSecrets(entries);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Failed to load workflow secrets:', error);
+        setLoading(false);
+      });
     return () => { cancelled = true; };
   }, [namespace, workflowName, userId]);
 
