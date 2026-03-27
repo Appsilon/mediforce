@@ -34,7 +34,7 @@ export function getRedisConnection(): RedisConnectionInfo {
 /** Quick health check — connects, PINGs, disconnects. */
 export async function pingRedis(): Promise<{ pong: string; host: string; port: number; tls: boolean }> {
   const connection = getRedisConnection();
-  const { Queue } = await import('bullmq');
+  const { Queue } = await import(/* webpackIgnore: true */ 'bullmq');
   const queue = new Queue('redis-health-ping', { connection });
   const client = await queue.client;
   const pong = await client.ping();
