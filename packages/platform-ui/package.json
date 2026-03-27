@@ -74,6 +74,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@tailwindcss/postcss": "^4.2.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^14.5.2",
@@ -81,7 +82,6 @@
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^6.0.0",
-    "autoprefixer": "^10.4.20",
     "jsdom": "^29.0.0",
     "postcss": "^8.5.1",
     "tailwindcss": "^4.0.0",
