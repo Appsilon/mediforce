@@ -3,7 +3,7 @@ name: renovate-review
 description: Review and validate Renovate dependency PRs. Assesses risk, runs tests, fixes simple issues, and recommends merge/close/hold. Use when reviewing PRs from Renovate bot.
 allowed-tools: Bash, Read, Glob, Grep, WebFetch
 metadata:
-  author: Filip Stachura
+  author: Appsilon
   version: "1.0"
   domain: devops
   complexity: basic
