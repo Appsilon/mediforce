@@ -84,8 +84,6 @@ export async function setupRecording(page: Page, gifName?: string, testInfo?: Te
   if (gifName && testInfo) {
     const outputDir = testInfo.outputDir;
     fs.mkdirSync(outputDir, { recursive: true });
-    // Write gif-name.txt for backward compat, gif-meta.json is the source of truth
-    fs.writeFileSync(path.join(outputDir, 'gif-name.txt'), gifName);
     fs.writeFileSync(path.join(outputDir, 'gif-meta.json'), JSON.stringify({ name: gifName }));
     metaOutputDir.set(page, outputDir);
   }

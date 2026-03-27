@@ -63,20 +63,15 @@ def main() -> None:
         if filter_arg and filter_arg not in result_dir.name:
             continue
 
-        # Read metadata — prefer gif-meta.json, fall back to gif-name.txt
+        # Read metadata from gif-meta.json (written by setupRecording)
         meta_file = result_dir / "gif-meta.json"
-        name_file = result_dir / "gif-name.txt"
-
-        if meta_file.exists():
-            meta = json.loads(meta_file.read_text())
-            name = meta["name"]
-            trim = meta.get("trimStart", 0)
-        elif name_file.exists():
-            name = name_file.read_text().strip()
-            trim = 0
-        else:
-            print(f"⚠ Skipping {result_dir.name} — no gif-meta.json or gif-name.txt")
+        if not meta_file.exists():
+            print(f"⚠ Skipping {result_dir.name} — no gif-meta.json")
             continue
+
+        meta = json.loads(meta_file.read_text())
+        name = meta["name"]
+        trim = meta.get("trimStart", 0)
 
         output = FEATURES_DIR / f"{name}.gif"
 
