@@ -1,7 +1,7 @@
 version: "1.0"
 generated: "2026-03-25"
 standard: "agentskills.io/specification"
-total_skills: 4
+total_skills: 5
 
 # Runtime skills have their own per-app registries:
 #   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml
@@ -32,3 +32,8 @@ domains:
         complexity: intermediate
         language: multi
         description: Write, run, and record E2E journey tests with TDD workflow
+      - id: renovate-review
+        path: skills/renovate-review/SKILL.md
+        complexity: basic
+        language: multi
+        description: Review and validate Renovate dependency PRs
