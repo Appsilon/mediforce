@@ -218,6 +218,9 @@ importers:
       '@firebase/rules-unit-testing':
         specifier: ^5.0.0
         version: 5.0.0(firebase@11.10.0)
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
 
   packages/platform-infra:
     dependencies:
@@ -233,6 +236,10 @@ importers:
       firebase-admin:
         specifier: ^13.6.1
         version: 13.7.0
+    devDependencies:
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
 
   packages/platform-ui:
     dependencies:
@@ -483,6 +490,10 @@ importers:
       zod:
         specifier: ^4.0.0
         version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
 
 packages:
 
@@ -4574,7 +4585,7 @@ snapshots:
   '@grpc/grpc-js@1.9.15':
     dependencies:
       '@grpc/proto-loader': 0.7.15
-      '@types/node': 24.12.0
+      '@types/node': 25.5.0
 
   '@grpc/proto-loader@0.7.15':
     dependencies:
