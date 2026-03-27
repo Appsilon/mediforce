@@ -1,4 +1,4 @@
-FROM node:22-slim AS base
+FROM node:24-slim AS base
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # --- Dependencies ---
@@ -40,7 +40,7 @@ ARG NEXT_PUBLIC_GIT_SHA
 RUN pnpm --filter @mediforce/platform-ui build
 
 # --- Runner ---
-FROM node:22-slim AS runner
+FROM node:24-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
