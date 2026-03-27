@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Convert E2E test recordings (webm) to GIFs in docs/features/.
 
-Reads gif-name.txt from each test result dir (written by setupRecording).
-Auto-trims loading screens. Verifies each GIF has real content.
+Reads gif-meta.json from each test result dir (written by setupRecording).
+Uses precise trimStart from metadata. Verifies each GIF has real content.
 """
 
+from __future__ import annotations
+
+import json
 import re
 import shutil
 import subprocess
@@ -16,38 +19,27 @@ FEATURES_DIR = Path("../../docs/features")
 RESULTS_DIR = Path("test-results")
 
 
-def find_content_start(video: Path) -> float:
-    """Find when loading ends by checking frame complexity (PNG file size)."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", str(video), "-vf", "fps=2,scale=320:-1",
-             f"{tmpdir}/f%04d.png"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
-        )
-        for i, frame in enumerate(sorted(Path(tmpdir).glob("f*.png"))):
-            if frame.stat().st_size > 2000:
-                return i * 0.5
-    return 0
-
-
 def verify_gif(gif_path: Path) -> bool:
     """Check GIF has real content (not just login/loading screen).
-    Samples a frame from the middle of the GIF to avoid loading screens."""
+    Samples frames at 25%, 50%, and 75% — passes if any has real content."""
     result = subprocess.run(
         ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
          "-of", "default=noprint_wrappers=1:nokey=1", str(gif_path)],
         capture_output=True, text=True,
     )
     duration = float(result.stdout.strip()) if result.stdout.strip() else 2.0
-    sample_at = str(max(0.5, duration * 0.75))
 
-    with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
-        subprocess.run(
-            ["ffmpeg", "-y", "-ss", sample_at, "-i", str(gif_path),
-             "-vframes", "1", tmp.name],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
-        )
-        return Path(tmp.name).stat().st_size > 5000
+    for pct in (0.25, 0.5, 0.75):
+        sample_at = str(max(0.5, duration * pct))
+        with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
+            subprocess.run(
+                ["ffmpeg", "-y", "-ss", sample_at, "-i", str(gif_path),
+                 "-vframes", "1", tmp.name],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
+            )
+            if Path(tmp.name).stat().st_size > 5000:
+                return True
+    return False
 
 
 def main() -> None:
@@ -71,16 +63,17 @@ def main() -> None:
         if filter_arg and filter_arg not in result_dir.name:
             continue
 
-        # Read GIF name from file written by setupRecording()
-        name_file = result_dir / "gif-name.txt"
-        if not name_file.exists():
-            print(f"⚠ Skipping {result_dir.name} — no gif-name.txt")
+        # Read metadata from gif-meta.json (written by setupRecording)
+        meta_file = result_dir / "gif-meta.json"
+        if not meta_file.exists():
+            print(f"⚠ Skipping {result_dir.name} — no gif-meta.json")
             continue
 
-        name = name_file.read_text().strip()
-        output = FEATURES_DIR / f"{name}.gif"
+        meta = json.loads(meta_file.read_text())
+        name = meta["name"]
+        trim = meta.get("trimStart", 0)
 
-        trim = find_content_start(video)
+        output = FEATURES_DIR / f"{name}.gif"
 
         subprocess.run(
             [

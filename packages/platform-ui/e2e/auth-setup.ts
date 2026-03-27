@@ -33,7 +33,8 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);
 
   // 4. Sign in via test-login page to capture auth state
-  await page.goto('/test-login');
+  // First load warms up Next.js compilation — allow extra time
+  await page.goto('/test-login', { timeout: 60_000 });
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', TEST_PASSWORD);
   await page.click('button[type="submit"]');
