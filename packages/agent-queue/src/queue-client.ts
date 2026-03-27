@@ -8,7 +8,7 @@ let sharedQueueEvents: QueueEvents | null = null;
 
 async function getQueue(): Promise<Queue> {
   if (!sharedQueue) {
-    const { Queue } = await import(/* webpackIgnore: true */ 'bullmq');
+    const { Queue } = await import('bullmq');
     sharedQueue = new Queue(QUEUE_NAME, {
       connection: getRedisConnection(),
       defaultJobOptions: {
@@ -22,7 +22,7 @@ async function getQueue(): Promise<Queue> {
 
 async function getQueueEvents(): Promise<QueueEvents> {
   if (!sharedQueueEvents) {
-    const { QueueEvents } = await import(/* webpackIgnore: true */ 'bullmq');
+    const { QueueEvents } = await import('bullmq');
     sharedQueueEvents = new QueueEvents(QUEUE_NAME, {
       connection: getRedisConnection(),
     });

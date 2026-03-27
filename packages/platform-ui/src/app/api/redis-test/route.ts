@@ -24,8 +24,7 @@ export async function GET(): Promise<NextResponse> {
 
   try {
     const connection = parseRedisUrl(process.env.REDIS_URL);
-    // @ts-expect-error — bullmq not in platform-ui deps, resolved at runtime via serverExternalPackages
-    const { Queue } = await import(/* webpackIgnore: true */ 'bullmq');
+    const { Queue } = await import('bullmq');
     const queue = new Queue('redis-health-ping', { connection });
     const client = await queue.client;
     const pong = await client.ping();
