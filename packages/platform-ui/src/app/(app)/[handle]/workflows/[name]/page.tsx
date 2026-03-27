@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, Github, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2, ArrowRightLeft, KeyRound } from 'lucide-react';
+import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2, ArrowRightLeft, KeyRound } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
@@ -375,7 +375,7 @@ function RepoLink({ definition }: { definition: Record<string, unknown> | null }
       className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
       title={[repo.branch, repo.directory].filter(Boolean).join('/') || undefined}
     >
-      <Github className="h-3 w-3" />
+      <GitBranch className="h-3 w-3" />
       Repo
     </a>
   );
