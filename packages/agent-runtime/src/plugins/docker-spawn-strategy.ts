@@ -113,7 +113,8 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
  */
 export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
   async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
-    const { enqueueDockerJob } = await import(/* webpackIgnore: true */ '@mediforce/agent-queue');
+    const pkg = '@mediforce/' + 'agent-queue';
+    const { enqueueDockerJob } = await import(/* webpackIgnore: true */ pkg) as typeof import('@mediforce/agent-queue');
 
     // Collect all files from outputDir to send through Redis
     const inputFiles: Record<string, string> = {};
