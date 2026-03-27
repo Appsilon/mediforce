@@ -25,7 +25,7 @@ services:
       - platform-ui
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     restart: unless-stopped
     mem_limit: ${REDIS_MEM_LIMIT:-256m}
     volumes:
