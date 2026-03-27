@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useMemo } from 'react';
 import Link from 'next/link';
 import * as Popover from '@radix-ui/react-popover';
-import { GitBranch, Plus, Layers, Github, ExternalLink, SlidersHorizontal, Check, ChevronRight } from 'lucide-react';
+import { GitBranch, Plus, Layers, ExternalLink, SlidersHorizontal, Check, ChevronRight } from 'lucide-react';
 import { ProcessInstanceRow } from '@/components/processes/process-run-section';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { formatStepName } from '@/components/tasks/task-utils';
@@ -250,7 +250,7 @@ function CatalogRepoIcon({ repo }: { repo: { url: string; branch?: string; direc
         window.open(href, '_blank', 'noopener,noreferrer');
       }}
     >
-      <Github className="h-3 w-3" />
+      <GitBranch className="h-3 w-3" />
     </button>
   );
 }
