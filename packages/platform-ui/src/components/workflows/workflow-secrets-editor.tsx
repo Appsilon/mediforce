@@ -30,14 +30,15 @@ function parseEnvText(text: string): Array<{ key: string; value: string }> | nul
 interface WorkflowSecretsEditorProps {
   namespace: string;
   workflowName: string;
+  userId: string;
 }
 
-export function WorkflowSecretsEditor({ namespace, workflowName }: WorkflowSecretsEditorProps) {
+export function WorkflowSecretsEditor({ namespace, workflowName, userId }: WorkflowSecretsEditorProps) {
   const [secrets, setSecrets] = React.useState<Array<{ key: string; value: string }>>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
-  const [revealedKeys, setRevealedKeys] = React.useState<Set<string>>(new Set());
+  const [revealedIndices, setRevealedIndices] = React.useState<Set<number>>(new Set());
   const [saveMessage, setSaveMessage] = React.useState<string | null>(null);
   const [bulkMode, setBulkMode] = React.useState(false);
   const [bulkText, setBulkText] = React.useState('');
@@ -46,14 +47,14 @@ export function WorkflowSecretsEditor({ namespace, workflowName }: WorkflowSecre
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getWorkflowSecrets(namespace, workflowName).then((data) => {
+    getWorkflowSecrets(namespace, workflowName, userId).then((data) => {
       if (cancelled) return;
       const entries = Object.entries(data).map(([key, value]) => ({ key, value }));
       setSecrets(entries);
       setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [namespace, workflowName]);
+  }, [namespace, workflowName, userId]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -65,7 +66,7 @@ export function WorkflowSecretsEditor({ namespace, workflowName }: WorkflowSecre
         record[trimmedKey] = value;
       }
     }
-    await saveWorkflowSecrets(namespace, workflowName, record);
+    await saveWorkflowSecrets(namespace, workflowName, record, userId);
     setDirty(false);
     setSaving(false);
     setSaveMessage('Secrets saved');
@@ -87,11 +88,11 @@ export function WorkflowSecretsEditor({ namespace, workflowName }: WorkflowSecre
     setDirty(true);
   };
 
-  const toggleReveal = (key: string) => {
-    setRevealedKeys((prev) => {
+  const toggleReveal = (index: number) => {
+    setRevealedIndices((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
       return next;
     });
   };
@@ -138,7 +139,7 @@ export function WorkflowSecretsEditor({ namespace, workflowName }: WorkflowSecre
               />
               <div className="relative">
                 <input
-                  type={revealedKeys.has(row.key) ? 'text' : 'password'}
+                  type={revealedIndices.has(index) ? 'text' : 'password'}
                   value={row.value}
                   onChange={(event) => updateRow(index, 'value', event.target.value)}
                   placeholder="secret value"
@@ -146,10 +147,10 @@ export function WorkflowSecretsEditor({ namespace, workflowName }: WorkflowSecre
                 />
                 <button
                   type="button"
-                  onClick={() => toggleReveal(row.key)}
+                  onClick={() => toggleReveal(index)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {revealedKeys.has(row.key) ? (
+                  {revealedIndices.has(index) ? (
                     <EyeOff className="h-3.5 w-3.5" />
                   ) : (
                     <Eye className="h-3.5 w-3.5" />

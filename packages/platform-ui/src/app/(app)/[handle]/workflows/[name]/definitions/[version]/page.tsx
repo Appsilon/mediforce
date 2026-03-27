@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { useAuth } from '@/contexts/auth-context';
 import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
@@ -492,13 +493,16 @@ function toSlug(name: string): string {
 function StepEditor({ step, allSteps, onChange }: { step: WorkflowStep; allSteps: WorkflowStep[]; onChange: (patch: Partial<WorkflowStep>) => void }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
+  const { firebaseUser } = useAuth();
   const { handle, name: workflowNameParam } = useParams<{ handle: string; name: string }>();
   const [secretKeys, setSecretKeys] = useState<string[]>([]);
   useEffect(() => {
-    if (handle && workflowNameParam) {
-      getWorkflowSecretKeys(handle, decodeURIComponent(workflowNameParam)).then(setSecretKeys).catch(() => {});
+    if (handle && workflowNameParam && firebaseUser) {
+      getWorkflowSecretKeys(handle, decodeURIComponent(workflowNameParam), firebaseUser.uid)
+        .then(setSecretKeys)
+        .catch((error) => console.error('Failed to load secret keys:', error));
     }
-  }, [handle, workflowNameParam]);
+  }, [handle, workflowNameParam, firebaseUser]);
   const inlineInput = 'w-full bg-transparent border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0.5 focus:outline-none transition-colors';
   const selectInline = 'bg-transparent text-xs text-right border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors cursor-pointer';
   const otherSteps = allSteps.filter((s) => s.id !== step.id);

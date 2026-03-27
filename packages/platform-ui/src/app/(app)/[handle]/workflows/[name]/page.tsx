@@ -279,10 +279,13 @@ export default function ProcessDefinitionPage() {
         {/* Secrets tab */}
         <Tabs.Content value="secrets" className="flex-1 p-6">
           <div className="max-w-2xl">
-            <WorkflowSecretsEditor
-              namespace={handle}
-              workflowName={decodedName}
-            />
+            {firebaseUser && (
+              <WorkflowSecretsEditor
+                namespace={handle}
+                workflowName={decodedName}
+                userId={firebaseUser.uid}
+              />
+            )}
           </div>
         </Tabs.Content>
       </Tabs.Root>
