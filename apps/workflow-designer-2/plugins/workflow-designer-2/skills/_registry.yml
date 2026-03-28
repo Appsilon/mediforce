@@ -1,0 +1,19 @@
+version: "1.0"
+generated: "2026-03-28"
+standard: "agentskills.io/specification"
+total_skills: 2
+
+domains:
+  workflow-design:
+    description: Workflow definition generation skills with visual presentation
+    skills:
+      - id: generate-steps
+        path: generate-steps/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Generate workflow step structure with visual flow presentation
+      - id: generate-execution-proposals
+        path: generate-execution-proposals/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Generate execution proposals with comparison presentation

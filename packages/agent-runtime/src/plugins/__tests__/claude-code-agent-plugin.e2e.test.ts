@@ -58,9 +58,9 @@ class StubClaudeCodeAgentPlugin extends ClaudeCodeAgentPlugin {
   protected override async spawnDockerContainer(
     _prompt: string,
     _options?: { model?: string },
-  ): Promise<{ cliOutput: string; gitMetadata: null; outputDir: string; injectedEnvVars: string[] }> {
+  ): Promise<{ cliOutput: string; gitMetadata: null; presentation: null; outputDir: string; injectedEnvVars: string[] }> {
     const cliOutput = await readFile(this.stubOutputPath, 'utf-8');
-    return { cliOutput, gitMetadata: null, outputDir: '/tmp/stub-output', injectedEnvVars: [] };
+    return { cliOutput, gitMetadata: null, presentation: null, outputDir: '/tmp/stub-output', injectedEnvVars: [] };
   }
 }
 

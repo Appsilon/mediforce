@@ -72,6 +72,7 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
     model: typeof agentOutput.model === 'string' ? agentOutput.model : null,
     duration_ms: typeof agentOutput.duration_ms === 'number' ? agentOutput.duration_ms : null,
     gitMetadata,
+    presentation: typeof agentOutput.presentation === 'string' ? agentOutput.presentation : null,
   };
 }
 
@@ -105,4 +106,5 @@ export interface AgentOutputData {
   model: string | null;
   duration_ms: number | null;
   gitMetadata: GitMetadataData | null;
+  presentation: string | null;
 }

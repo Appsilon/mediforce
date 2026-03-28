@@ -4,15 +4,27 @@ import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform
 import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
 
 /**
- * POST /api/workflow-definitions
+ * POST /api/workflow-definitions?namespace=handle
  *
  * Register a new WorkflowDefinition. Version is auto-incremented from the
  * latest existing version for the given name. Send the definition JSON
  * without `version` or `createdAt` — they are set server-side.
+ *
+ * The `namespace` query parameter is required and sets the owning namespace.
+ * It overrides any `namespace` field in the request body.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   if (!validateApiKey(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const namespace = url.searchParams.get('namespace');
+  if (!namespace) {
+    return NextResponse.json(
+      { error: 'Missing required query parameter: namespace' },
+      { status: 400 },
+    );
   }
 
   const body = await request.json().catch(() => null);
@@ -20,7 +32,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'JSON body is required' }, { status: 400 });
   }
 
-  const parsed = WorkflowDefinitionSchema.omit({ version: true, createdAt: true }).safeParse(body);
+  const parsed = WorkflowDefinitionSchema.omit({ version: true, createdAt: true }).safeParse({
+    ...body,
+    namespace,
+  });
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Validation failed', issues: parsed.error.issues },
