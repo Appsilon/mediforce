@@ -5,8 +5,8 @@ const packagesDir = path.resolve(__dirname, '..', '..', 'packages');
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  turbopack: {},
   webpack: (config) => {
-    // TypeScript ESM sources use .js extensions in imports -- map them to .ts
     config.resolve.extensionAlias = {
       '.js': ['.ts', '.tsx', '.js'],
       '.jsx': ['.tsx', '.jsx'],
@@ -19,9 +19,6 @@ const nextConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
   },
   transpilePackages: ['@mediforce/supply-intelligence'],
 };

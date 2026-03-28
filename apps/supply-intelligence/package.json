@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 9004",
+    "dev": "next dev --webpack -p 9004",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
     "lint": "next lint",
