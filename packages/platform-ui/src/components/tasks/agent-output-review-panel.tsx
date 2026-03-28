@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Bot, Code, ExternalLink, FileText, Gauge, GitBranch, Loader2 } from 'lucide-react';
+import { Bot, Code, ExternalLink, FileText, Gauge, GitBranch, Loader2, MonitorPlay } from 'lucide-react';
 import type { AgentOutputData } from './task-utils';
 import { formatStepName } from './task-utils';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,28 @@ interface AgentOutputReviewPanelProps {
   agentOutput: AgentOutputData;
   stepId?: string;
   onContentLoaded?: (hasContent: boolean) => void;
+}
+
+/** Build a self-contained HTML document for the sandboxed iframe. */
+function buildSrcdoc(presentation: string, result: Record<string, unknown> | null): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@4/dist/tailwind.min.css" rel="stylesheet">
+<style>body { margin: 0; padding: 1rem; }</style>
+<script>window.__data__ = ${JSON.stringify(result ?? {})};</script>
+</head>
+<body>
+${presentation}
+<script>
+const ro = new ResizeObserver(() => {
+  window.parent.postMessage({ type: 'resize', height: document.body.scrollHeight }, '*');
+});
+ro.observe(document.body);
+</script>
+</body>
+</html>`;
 }
 
 /** Try to extract an output_file path from the result's `raw` field. */
@@ -31,6 +53,28 @@ export function AgentOutputReviewPanel({
   stepId,
   onContentLoaded,
 }: AgentOutputReviewPanelProps) {
+  const hasPresentation = typeof agentOutput.presentation === 'string' && agentOutput.presentation.length > 0;
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const [iframeHeight, setIframeHeight] = React.useState(300);
+
+  React.useEffect(() => {
+    if (!hasPresentation) return;
+    const handler = (event: MessageEvent) => {
+      if (
+        event.data &&
+        typeof event.data === 'object' &&
+        event.data.type === 'resize' &&
+        typeof event.data.height === 'number' &&
+        iframeRef.current &&
+        event.source === iframeRef.current.contentWindow
+      ) {
+        setIframeHeight(event.data.height);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [hasPresentation]);
+
   const hasContent = agentOutput.result !== null && Object.keys(agentOutput.result).length > 0;
 
   const outputFilePath = React.useMemo(
@@ -83,7 +127,7 @@ export function AgentOutputReviewPanel({
 
   const hasFileTab = fileContent !== null || fileLoading || outputFilePath !== null;
   const hasGitTab = agentOutput.gitMetadata !== null;
-  const defaultTab = hasGitTab ? 'git' : hasFileTab ? 'content' : 'summary';
+  const defaultTab = hasPresentation ? 'presentation' : hasGitTab ? 'git' : hasFileTab ? 'content' : 'summary';
 
   return (
     <div className="rounded-lg border">
@@ -147,6 +191,7 @@ export function AgentOutputReviewPanel({
       <Tabs.Root defaultValue={defaultTab}>
         <Tabs.List className="flex gap-1 border-b px-4">
           {[
+            ...(hasPresentation ? [{ value: 'presentation', label: 'Presentation', icon: MonitorPlay }] : []),
             ...(hasFileTab ? [{ value: 'content', label: 'Content', icon: FileText }] : []),
             ...(hasGitTab ? [{ value: 'git', label: 'Git', icon: GitBranch }] : []),
             { value: 'summary', label: 'Extracted Data', icon: FileText },
@@ -167,6 +212,18 @@ export function AgentOutputReviewPanel({
             </Tabs.Trigger>
           ))}
         </Tabs.List>
+
+        {hasPresentation && (
+          <Tabs.Content value="presentation" className="p-4">
+            <iframe
+              ref={iframeRef}
+              srcDoc={buildSrcdoc(agentOutput.presentation!, agentOutput.result)}
+              sandbox="allow-scripts"
+              style={{ width: '100%', height: iframeHeight, border: 'none' }}
+              title="Agent presentation"
+            />
+          </Tabs.Content>
+        )}
 
         {hasFileTab && (
           <Tabs.Content value="content" className="p-4">
