@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack -p 9003",
     "dev:test": "NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce next dev --webpack -p 9003",
-    "build": "rm -rf .next && next build",
+    "build": "rm -rf .next && next build --webpack",
     "start": "next start -p ${PORT:-3000}",
     "typecheck": "tsc --noEmit",
     "test:run": "vitest run",
