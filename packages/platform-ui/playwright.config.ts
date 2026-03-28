@@ -58,7 +58,7 @@ export default defineConfig({
   projects,
   webServer: {
     command: useEmulators
-      ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce npx next dev -p ${testPort}`
+      ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce npx next dev --webpack -p ${testPort}`
       : 'pnpm dev',
     port: testPort,
     reuseExistingServer: !useEmulators,
