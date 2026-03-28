@@ -8,6 +8,10 @@ echo "==> Pulling latest code"
 git fetch origin
 git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
 
+echo "==> Pruning Docker build cache"
+docker builder prune -af --filter "until=72h" 2>/dev/null || true
+docker image prune -af --filter "until=72h" 2>/dev/null || true
+
 export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)
 echo "==> Building (SHA: $NEXT_PUBLIC_GIT_SHA)"
 
