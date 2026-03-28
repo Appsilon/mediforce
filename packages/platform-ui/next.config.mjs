@@ -19,7 +19,6 @@ const nextConfig = {
     '@mediforce/supply-intelligence',
   ],
   serverExternalPackages: ['bullmq', 'ioredis'],
-  turbopack: {},
   webpack: (config) => {
     config.resolve.extensionAlias = {
       '.js': ['.ts', '.tsx', '.js'],

@@ -5,7 +5,6 @@ const packagesDir = path.resolve(__dirname, '..', '..', 'packages');
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  turbopack: {},
   webpack: (config) => {
     config.resolve.extensionAlias = {
       '.js': ['.ts', '.tsx', '.js'],
