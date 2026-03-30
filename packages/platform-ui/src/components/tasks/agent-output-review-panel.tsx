@@ -15,13 +15,15 @@ interface AgentOutputReviewPanelProps {
 
 /** Build a self-contained HTML document for the sandboxed iframe. */
 function buildSrcdoc(presentation: string, result: Record<string, unknown> | null): string {
+  // Escape closing script tags in data to prevent XSS breakout
+  const safeData = JSON.stringify(result ?? {}).replace(/<\//g, '<\\/');
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@4/dist/tailwind.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <style>body { margin: 0; padding: 1rem; }</style>
-<script>window.__data__ = ${JSON.stringify(result ?? {})};</script>
+<script>window.__data__ = ${safeData};</script>
 </head>
 <body>
 ${presentation}

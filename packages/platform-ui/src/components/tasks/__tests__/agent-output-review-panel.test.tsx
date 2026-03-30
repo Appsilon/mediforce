@@ -95,4 +95,30 @@ describe('AgentOutputReviewPanel', () => {
     expect(srcdoc).not.toBeNull();
     expect(srcdoc).toContain(`window.__data__ = ${JSON.stringify(result)}`);
   });
+
+  it('uses Tailwind v4 browser script in srcdoc', () => {
+    const agentOutput = buildAgentOutput({
+      presentation: '<p>Report</p>',
+      result: { ok: true },
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
+
+    const srcdoc = document.querySelector('iframe')!.getAttribute('srcdoc')!;
+    expect(srcdoc).toContain('@tailwindcss/browser@4');
+  });
+
+  it('escapes closing script tags in result data', () => {
+    const result = { html: '</script><script>alert(1)</script>' };
+    const agentOutput = buildAgentOutput({
+      presentation: '<p>Test</p>',
+      result,
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
+
+    const srcdoc = document.querySelector('iframe')!.getAttribute('srcdoc')!;
+    expect(srcdoc).not.toContain('</script><script>alert');
+    expect(srcdoc).toContain('<\\/script>');
+  });
 });
