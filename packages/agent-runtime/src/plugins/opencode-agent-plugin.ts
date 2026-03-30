@@ -253,10 +253,21 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
 
   protected override async prepareOutputDir(outputDir: string): Promise<void> {
     // Write OpenCode config with provider configuration.
+    // Register the model in the appropriate provider so OpenCode can find it.
+    const model = this.agentConfig.model ?? DEFAULT_MODEL;
     const config: Record<string, unknown> = {
       $schema: 'https://opencode.ai/config.json',
       permission: 'allow',
     };
+
+    const env = this.resolvedEnv.vars;
+
+    // Auto-register model in the correct provider based on model ID and available keys.
+    if (env.OPENROUTER_API_KEY && model.includes('/')) {
+      config.provider = { openrouter: { models: { [model]: {} } } };
+    } else if (env.DEEPSEEK_API_KEY && model.startsWith('deepseek/')) {
+      config.provider = { deepseek: { models: { [model]: {} } } };
+    }
 
     const configPath = join(outputDir, 'opencode.json');
     await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
@@ -265,7 +276,6 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     // OpenCode stores credentials at $XDG_DATA_HOME/opencode/auth.json.
     // The step config's env should provide DEEPSEEK_API_KEY / OPENROUTER_API_KEY.
     const auth: Record<string, { type: string; key: string }> = {};
-    const env = this.resolvedEnv.vars;
 
     if (env.DEEPSEEK_API_KEY) {
       auth.deepseek = { type: 'api', key: env.DEEPSEEK_API_KEY };

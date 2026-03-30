@@ -15,6 +15,7 @@ export const StepParamSchema = z.object({
   required: z.boolean().default(false),
   description: z.string().optional(),
   default: z.unknown().optional(),
+  options: z.array(z.string()).optional(),
 });
 
 /** Selection constraint for review steps that present multiple options.
