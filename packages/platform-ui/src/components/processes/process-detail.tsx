@@ -19,8 +19,6 @@ import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { useBackNavigation } from '@/hooks/use-back-navigation';
 import { formatStepName } from '@/components/tasks/task-utils';
-import { MissingEnvBanner } from './missing-env-banner';
-
 type AuditEventWithId = AuditEvent & { id: string };
 
 function resolveStepLabel(stepId: string, steps: Step[]): string {
@@ -214,19 +212,12 @@ export function ProcessDetail({
             </Link>
           </div>
         )}
-        {instance.pauseReason === 'missing_env' && instance.error && (
-          <MissingEnvBanner
-            instanceId={instance.id}
-            errorJson={instance.error}
-            workflowName={instance.definitionName}
-          />
-        )}
-        {instance.pauseReason && !needsHumanAction && instance.pauseReason !== 'missing_env' && (
+        {instance.pauseReason && !needsHumanAction && !needsCowork && (
           <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
             Paused
           </div>
         )}
-        {instance.error && instance.pauseReason !== 'missing_env' && (
+        {instance.error && (
           <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-800 dark:text-red-300">
             Error: {instance.error}
           </div>

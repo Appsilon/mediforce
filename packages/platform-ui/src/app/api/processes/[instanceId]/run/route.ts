@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
 import { executeAgentStep } from '@/lib/execute-agent-step';
-import { validateWorkflowEnv } from '@mediforce/agent-runtime';
-import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
-
 import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '@/lib/loop-guard';
 
 interface RunProcessBody {
@@ -59,29 +56,6 @@ export async function POST(
         { error: 'WorkflowDefinition not found — run migration first', definitionName: initialInstance.definitionName },
         { status: 404 },
       );
-    }
-
-    // Pre-flight: validate all env templates are resolvable before executing anything
-    {
-      const namespace = workflowDefinition.namespace ?? '';
-      const secrets = namespace
-        ? await getWorkflowSecretsForRuntime(namespace, workflowDefinition.name)
-        : {};
-      const missingEnv = validateWorkflowEnv(workflowDefinition, secrets);
-      if (missingEnv.length > 0) {
-        const names = missingEnv.map((m) => m.secretName);
-        console.log(`[auto-runner] Missing env vars for '${initialInstance.definitionName}': ${names.join(', ')}`);
-        await instanceRepo.update(instanceId, {
-          status: 'paused',
-          pauseReason: 'missing_env',
-          error: JSON.stringify(missingEnv),
-          updatedAt: new Date().toISOString(),
-        });
-        return NextResponse.json(
-          { error: 'Missing environment variables', missing: missingEnv, instanceId },
-          { status: 422 },
-        );
-      }
     }
 
     {
