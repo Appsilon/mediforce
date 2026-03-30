@@ -1,0 +1,78 @@
+{
+  "name": "cowork-workflow-designer",
+  "namespace": "appsilon",
+  "description": "Collaborative workflow designer — human and AI build a complete WorkflowDefinition together through conversation. The co-work step replaces the multi-step describe→generate→review cycle with real-time collaboration.",
+  "preamble": "## Domain Context\nThis workflow generates structured workflow definitions for the Mediforce platform. All clinical and pharma terminology in workflow descriptions refers to domain modeling constructs.",
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "roles": ["workflow-designer"],
+  "steps": [
+    {
+      "id": "design",
+      "name": "Design Workflow Together",
+      "type": "creation",
+      "executor": "cowork",
+      "allowedRoles": ["workflow-designer"],
+      "description": "Collaboratively build a complete WorkflowDefinition through conversation. The agent asks questions, proposes structure, and iteratively refines the definition based on your feedback. When done, finalize the artifact.",
+      "cowork": {
+        "model": "anthropic/claude-sonnet-4",
+        "systemPrompt": "You are an expert Mediforce workflow designer. Help the user build a complete WorkflowDefinition through conversation.\n\n## What you're building\nA JSON object that defines a workflow with steps, transitions, triggers, and execution config.\n\n## Conversation approach\n1. Ask what the workflow should accomplish (goal, domain, key actors)\n2. Propose an initial set of steps with descriptions\n3. Ask about review/approval loops, branching, and error handling\n4. For each step, determine the executor:\n   - `human` — manual work (forms, uploads, decisions)\n   - `agent` — AI-powered (with plugin, model, autonomyLevel L0-L4)\n   - `script` — deterministic scripts (validation, API calls)\n5. Define transitions between steps (including conditional routing with `when` expressions)\n6. Add triggers (manual, webhook, cron)\n7. Validate completeness and call update_artifact with the final definition\n\n## WorkflowDefinition structure\n```json\n{\n  \"name\": \"kebab-case-name\",\n  \"version\": 1,\n  \"description\": \"What this workflow does\",\n  \"triggers\": [{ \"type\": \"manual\", \"name\": \"Start\" }],\n  \"roles\": [\"role1\", \"role2\"],\n  \"steps\": [\n    {\n      \"id\": \"step-id\",\n      \"name\": \"Human Readable Name\",\n      \"type\": \"creation|review|decision|terminal\",\n      \"executor\": \"human|agent|script\",\n      \"description\": \"What this step does\",\n      \"allowedRoles\": [\"role1\"],\n      \"autonomyLevel\": \"L3\",\n      \"plugin\": \"claude-code-agent\",\n      \"agent\": { \"model\": \"sonnet\", \"prompt\": \"...\" },\n      \"params\": [{ \"name\": \"field\", \"type\": \"string\", \"required\": true }],\n      \"verdicts\": { \"approve\": { \"target\": \"next\" }, \"revise\": { \"target\": \"prev\" } }\n    }\n  ],\n  \"transitions\": [\n    { \"from\": \"step-a\", \"to\": \"step-b\" },\n    { \"from\": \"step-a\", \"to\": \"step-c\", \"when\": \"output.valid == false\" }\n  ]\n}\n```\n\n## Rules\n- Every workflow needs at least one terminal step (type: 'terminal')\n- Review steps route via `verdicts` map, not transitions\n- Non-review steps route via `transitions` array\n- If a step has multiple outgoing transitions, each must have a `when` expression\n- Available plugins: claude-code-agent, opencode-agent, script-container\n- Autonomy levels: L0 (observe) → L1 (suggest) → L2 (act+review) → L3 (act+approve) → L4 (autonomous)\n\nCall `update_artifact` after each significant change so the user can see the definition evolve.",
+        "outputSchema": {
+          "type": "object",
+          "required": ["name", "version", "steps", "transitions", "triggers"],
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "number" },
+            "description": { "type": "string" },
+            "steps": { "type": "array" },
+            "transitions": { "type": "array" },
+            "triggers": { "type": "array" }
+          }
+        }
+      }
+    },
+    {
+      "id": "validate",
+      "name": "Validate WorkflowDefinition",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "description": "Validate the co-worked WorkflowDefinition against the schema. Returns structured errors if invalid.",
+      "agent": {
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst parsed = input.steps?.['design'] || input;\nconst errors = [];\n\nif (!parsed || typeof parsed !== 'object') {\n  errors.push('No WorkflowDefinition found in design step output');\n} else {\n  if (!parsed.name || typeof parsed.name !== 'string') errors.push('Missing or invalid: name (string)');\n  if (typeof parsed.version !== 'number') errors.push('Missing or invalid: version (must be integer)');\n  if (!Array.isArray(parsed.triggers) || parsed.triggers.length === 0) errors.push('Missing or empty: triggers');\n  if (!Array.isArray(parsed.steps) || parsed.steps.length === 0) errors.push('Missing or empty: steps');\n  if (!Array.isArray(parsed.transitions)) errors.push('Missing: transitions');\n\n  if (Array.isArray(parsed.steps)) {\n    const stepIds = parsed.steps.map(s => s.id);\n    const terminals = parsed.steps.filter(s => s.type === 'terminal');\n    if (terminals.length === 0) errors.push('Must have at least one terminal step');\n    parsed.steps.forEach((step, i) => {\n      if (!step.id) errors.push(`steps[${i}]: missing id`);\n      if (!step.name) errors.push(`steps[${i}]: missing name`);\n      if (!step.executor) errors.push(`steps[${i}]: missing executor`);\n      if (step.verdicts) {\n        Object.entries(step.verdicts).forEach(([k, v]) => {\n          if (v.target && !stepIds.includes(v.target)) errors.push(`steps[${i}].verdicts.${k}.target '${v.target}' unknown`);\n        });\n      }\n    });\n    if (Array.isArray(parsed.transitions)) {\n      parsed.transitions.forEach((t, i) => {\n        if (!stepIds.includes(t.from)) errors.push(`transitions[${i}].from '${t.from}' unknown`);\n        if (!stepIds.includes(t.to)) errors.push(`transitions[${i}].to '${t.to}' unknown`);\n      });\n    }\n  }\n}\n\nwriteFileSync('/output/result.json', JSON.stringify({ valid: errors.length === 0, errors, workflowDefinition: errors.length === 0 ? parsed : null }));\n"
+      }
+    },
+    {
+      "id": "register",
+      "name": "Register WorkflowDefinition",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "env": {
+        "APP_BASE_URL": "{{APP_BASE_URL}}",
+        "PLATFORM_API_KEY": "{{PLATFORM_API_KEY}}"
+      },
+      "description": "Register the validated WorkflowDefinition in the Mediforce platform.",
+      "agent": {
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst workflowDefinition = input.steps?.['validate']?.workflowDefinition || input.workflowDefinition;\n\nif (!workflowDefinition || !workflowDefinition.name) {\n  writeFileSync('/output/result.json', JSON.stringify({ registered: false, error: 'No WorkflowDefinition found in input' }));\n  process.exit(0);\n}\n\nconst baseUrl = process.env.APP_BASE_URL;\nconst apiKey = process.env.PLATFORM_API_KEY;\n\nif (!baseUrl || !apiKey) {\n  writeFileSync('/output/result.json', JSON.stringify({ registered: false, error: 'Missing APP_BASE_URL or PLATFORM_API_KEY' }));\n  process.exit(0);\n}\n\ntry {\n  const response = await fetch(`${baseUrl}/api/workflow-definitions`, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },\n    body: JSON.stringify(workflowDefinition),\n  });\n  const body = await response.json();\n  if (response.ok) {\n    writeFileSync('/output/result.json', JSON.stringify({ registered: true, name: body.name, version: body.version, summary: `Workflow '${body.name}' v${body.version} registered` }));\n  } else {\n    writeFileSync('/output/result.json', JSON.stringify({ registered: false, status: response.status, error: body.error || 'Registration failed' }));\n  }\n} catch (err) {\n  writeFileSync('/output/result.json', JSON.stringify({ registered: false, error: `API call failed: ${err.message}` }));\n}\n"
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "design", "to": "validate" },
+    { "from": "validate", "to": "register", "when": "output.valid == true" },
+    { "from": "validate", "to": "design", "when": "output.valid == false" },
+    { "from": "register", "to": "done" }
+  ]
+}

@@ -27,6 +27,12 @@ export const WorkflowAgentConfigSchema = z.object({
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
 });
 
+export const WorkflowCoworkConfigSchema = z.object({
+  model: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  outputSchema: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const WorkflowReviewConfigSchema = z.object({
   type: z.enum(['human', 'agent', 'none']).optional(),
   plugin: z.string().optional(),
@@ -44,12 +50,13 @@ export const WorkflowStepSchema = z.object({
   selection: SelectionSchema.optional(),
   ui: StepUiSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  executor: z.enum(['human', 'agent', 'script']),
+  executor: z.enum(['human', 'agent', 'script', 'cowork']),
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(),
   plugin: z.string().optional(),
   allowedRoles: z.array(z.string()).optional(),
   agent: WorkflowAgentConfigSchema.optional(),
   review: WorkflowReviewConfigSchema.optional(),
+  cowork: WorkflowCoworkConfigSchema.optional(),
   stepParams: z.record(z.string(), z.unknown()).optional(),
   env: z.record(z.string(), z.string()).optional(),
 });
@@ -76,6 +83,7 @@ export const WorkflowDefinitionSchema = z.object({
 });
 
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
+export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;
 export type WorkflowReviewConfig = z.infer<typeof WorkflowReviewConfigSchema>;
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;

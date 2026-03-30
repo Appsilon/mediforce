@@ -54,7 +54,14 @@ export type {
 
 export type {
   WorkflowAgentConfig,
+  WorkflowCoworkConfig,
   WorkflowReviewConfig,
   WorkflowStep,
   WorkflowDefinition,
 } from '../schemas/workflow-definition.js';
+
+export type {
+  ConversationTurn,
+  CoworkSessionStatus,
+  CoworkSession,
+} from '../schemas/cowork-session.js';

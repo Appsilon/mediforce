@@ -6,6 +6,7 @@ import {
   FirestoreAgentRunRepository,
   FirestoreHumanTaskRepository,
   FirestoreAgentDefinitionRepository,
+  FirestoreCoworkSessionRepository,
   initializeFirebase,
   getFirestoreDb,
 } from '@mediforce/platform-infra';
@@ -43,6 +44,7 @@ export interface PlatformServices {
   auditRepo: FirestoreAuditRepository;
   humanTaskRepo: FirestoreHumanTaskRepository;
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
+  coworkSessionRepo: FirestoreCoworkSessionRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -75,6 +77,7 @@ export function getPlatformServices(): PlatformServices {
   const agentRunRepo = new FirestoreAgentRunRepository(db);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository();
+  const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -113,6 +116,7 @@ export function getPlatformServices(): PlatformServices {
     undefined, // handoffRepository
     undefined, // notificationService
     humanTaskRepo, // humanTaskRepository — enables HumanTask creation on human step advance
+    coworkSessionRepo, // coworkSessionRepository — enables CoworkSession creation on cowork step advance
   );
 
   const agentRunner = new AgentRunner(
@@ -134,6 +138,7 @@ export function getPlatformServices(): PlatformServices {
     auditRepo,
     humanTaskRepo,
     agentDefinitionRepo,
+    coworkSessionRepo,
   };
 
   if (!seedingStarted) {

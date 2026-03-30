@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { where, orderBy } from 'firebase/firestore';
-import type { HumanTask } from '@mediforce/platform-core';
+import type { HumanTask, CoworkSession } from '@mediforce/platform-core';
 import { useCollection } from './use-collection';
 
 export function useMyTasks(assignedRole: string | null) {
@@ -91,4 +91,29 @@ export function useActiveTaskForInstance(processInstanceId: string | null) {
   );
 
   return { task: activeTask, loading };
+}
+
+export function useActiveCoworkSession(processInstanceId: string | null) {
+  const constraints = useMemo(
+    () =>
+      processInstanceId
+        ? [
+            where('processInstanceId', '==', processInstanceId),
+            where('status', '==', 'active'),
+          ]
+        : [],
+    [processInstanceId],
+  );
+
+  const { data, loading } = useCollection<CoworkSession>(
+    processInstanceId ? 'coworkSessions' : '',
+    constraints,
+  );
+
+  const session = useMemo(
+    () => data[0] ?? null,
+    [data],
+  );
+
+  return { session, loading };
 }

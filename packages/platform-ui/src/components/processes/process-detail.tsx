@@ -13,11 +13,13 @@ import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
 import { cancelProcessRun } from '@/app/actions/processes';
+import { useActiveCoworkSession } from '@/hooks/use-tasks';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { useBackNavigation } from '@/hooks/use-back-navigation';
 import { formatStepName } from '@/components/tasks/task-utils';
+import { MissingEnvBanner } from './missing-env-banner';
 
 type AuditEventWithId = AuditEvent & { id: string };
 
@@ -66,6 +68,10 @@ export function ProcessDetail({
     || instance.pauseReason === 'awaiting_agent_approval';
   const { task: blockingTask } = useActiveTaskForInstance(
     needsHumanAction ? instance.id : null,
+  );
+  const needsCowork = instance.pauseReason === 'cowork_in_progress';
+  const { session: coworkSession } = useActiveCoworkSession(
+    needsCowork ? instance.id : null,
   );
 
   // Extract all agent log filenames from agent status events
@@ -192,12 +198,35 @@ export function ProcessDetail({
             </Link>
           </div>
         )}
-        {instance.pauseReason && !needsHumanAction && (
+        {needsCowork && coworkSession && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+            <div className="text-sm">
+              <span className="font-medium">Ready to collaborate</span>
+              <span className="text-muted-foreground ml-1.5">
+                — {resolveStepLabel(coworkSession.stepId, definitionSteps)}
+              </span>
+            </div>
+            <Link
+              href={`/${handle}/cowork/${coworkSession.id}`}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+            >
+              Open co-work
+            </Link>
+          </div>
+        )}
+        {instance.pauseReason === 'missing_env' && instance.error && (
+          <MissingEnvBanner
+            instanceId={instance.id}
+            errorJson={instance.error}
+            workflowName={instance.definitionName}
+          />
+        )}
+        {instance.pauseReason && !needsHumanAction && instance.pauseReason !== 'missing_env' && (
           <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
             Paused
           </div>
         )}
-        {instance.error && (
+        {instance.error && instance.pauseReason !== 'missing_env' && (
           <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-800 dark:text-red-300">
             Error: {instance.error}
           </div>

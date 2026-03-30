@@ -39,9 +39,13 @@ export {
   PluginRoleSchema,
   PluginCapabilityMetadataSchema,
   WorkflowAgentConfigSchema,
+  WorkflowCoworkConfigSchema,
   WorkflowReviewConfigSchema,
   WorkflowStepSchema,
   WorkflowDefinitionSchema,
+  ConversationTurnSchema,
+  CoworkSessionStatusSchema,
+  CoworkSessionSchema,
   NamespaceTypeSchema,
   NamespaceSchema,
   NamespaceMemberSchema,
@@ -90,9 +94,13 @@ export type {
   ProcessNotificationConfig,
   PluginCapabilityMetadata,
   WorkflowAgentConfig,
+  WorkflowCoworkConfig,
   WorkflowReviewConfig,
   WorkflowStep,
   WorkflowDefinition,
+  ConversationTurn,
+  CoworkSessionStatus,
+  CoworkSession,
   NamespaceType,
   Namespace,
   NamespaceMember,
@@ -117,6 +125,7 @@ export type {
   UserDirectoryService,
   DirectoryUser,
   AgentRunRepository,
+  CoworkSessionRepository,
 } from './interfaces/index.js';
 
 // Agent definition schema + repository interface
@@ -145,6 +154,7 @@ export {
   InMemoryHumanTaskRepository,
   InMemoryHandoffRepository,
   NoopNotificationService,
+  InMemoryCoworkSessionRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,
@@ -156,6 +166,7 @@ export {
   buildWorkflowDefinition,
   buildAgentOutputEnvelope,
   buildFileMetadata,
+  buildCoworkSession,
   resetFactorySequence,
 } from './testing/index.js';
 
