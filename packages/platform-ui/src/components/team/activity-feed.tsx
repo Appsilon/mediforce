@@ -14,6 +14,7 @@ import {
   ArrowRight,
   RotateCcw,
   Eye,
+  ClipboardCheck,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -35,6 +36,7 @@ interface FeedEntry {
 
 function getAgentColor(pluginId: string | undefined): string {
   const id = (pluginId ?? '').toLowerCase();
+  if (id.includes('manager')) return 'bg-amber-500';
   if (id.includes('claude')) return 'bg-violet-500';
   if (id.includes('opencode')) return 'bg-blue-500';
   if (id.includes('script')) return 'bg-slate-500';
@@ -286,6 +288,54 @@ function ErrorCard({ entry, handle }: { entry: FeedEntry; handle: string }) {
   );
 }
 
+function TeamStatusCard({
+  activeCount,
+  attentionCount,
+  totalAgents,
+}: {
+  activeCount: number;
+  attentionCount: number;
+  totalAgents: number;
+}) {
+  const allOnTrack = attentionCount === 0;
+
+  return (
+    <div className="rounded-xl border bg-gradient-to-r from-amber-50/80 to-orange-50/50 dark:from-amber-500/5 dark:to-orange-500/5 p-4 border-amber-200/40 dark:border-amber-500/15">
+      <div className="flex items-start gap-3">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+          <ClipboardCheck className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground">
+              Project Coordinator
+            </span>
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+              Team Status
+            </span>
+          </div>
+          <p className="mt-1.5 text-[13px] text-muted-foreground leading-relaxed">
+            {activeCount} agent{activeCount !== 1 ? 's' : ''} active
+            {attentionCount > 0 && (
+              <>, <span className="text-amber-600 dark:text-amber-400 font-medium">{attentionCount} need{attentionCount === 1 ? 's' : ''} attention</span></>
+            )}
+            {allOnTrack
+              ? ' — all workflows on track.'
+              : ' — review pending items to keep workflows moving.'}
+          </p>
+          <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground/70">
+            <span>{totalAgents} agents in team</span>
+            <span className="text-border">·</span>
+            <span className={allOnTrack ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}>
+              {allOnTrack ? 'No blockers' : `${attentionCount} blocker${attentionCount !== 1 ? 's' : ''}`}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FeedSkeleton() {
   return (
     <div className="space-y-3">
@@ -489,6 +539,13 @@ export function ActivityFeed({
           </div>
         ) : (
           <div className="space-y-3">
+            {filter === 'all' && (
+              <TeamStatusCard
+                activeCount={entries.filter((e) => e.type === 'working').length}
+                attentionCount={attentionCount}
+                totalAgents={agents.length}
+              />
+            )}
             {filtered.map((entry) => {
               switch (entry.type) {
                 case 'completed':

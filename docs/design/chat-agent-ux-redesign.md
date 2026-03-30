@@ -267,12 +267,38 @@ Instead of `docker run` per step:
 - AG-UI protocol adoption
 - Historical trust metrics per agent
 
+## Market Feedback & Validated Requirements
+
+The following insights are drawn from anonymized enterprise prospect conversations, pharma industry conferences, and internal alignment sessions conducted through Q1 2026.
+
+### Enterprise Pharma Prospect Feedback
+
+- **MCP server support is table stakes.** Multiple prospects expect agents to connect to external tools (LIMS, CTMS, eTMF, custom databases) via standard protocols like MCP. Proprietary integration layers are a non-starter — teams want to bring their own tool servers.
+- **Self-reflecting agents.** Agents should evaluate their own output quality and explicitly flag low-confidence results before presenting to users. This goes beyond confidence scores — prospects want agents that say "I'm not sure about this part" proactively.
+- **Per-study access control.** Access control must be granular at the study level — different teams working on different trials must see only their data. Role-based access alone is insufficient; study-level partitioning is a hard requirement.
+- **Claim flow with human editing.** Users must be able to edit and approve agent output before it becomes an official record. Agent output is a *draft*, never a final artifact — the human approval step is non-negotiable for regulatory submissions.
+- **Validated AI is the #1 selling point.** In regulated pharma, GxP compliance (audit trails, reproducibility, version control of agent behavior) is what closes deals. Every other feature is secondary to this.
+- **Mixed deterministic + AI workflows.** Not everything should be AI-driven. Prospects expect workflows that combine deterministic rule-based steps (calculations, lookups, validations) with AI-powered steps (analysis, summarization, classification). The orchestration layer must support both natively.
+
+### Pharma Industry Conference Insights
+
+- **"Validated AI" resonates strongly.** The combination of audit trails and reproducibility is consistently cited as the minimum bar for adoption in regulated environments. Teams that can demonstrate reproducible agent runs with full provenance have a significant advantage.
+- **Transparency over capability.** In regulated environments, agent transparency matters more than raw agent capability. A less capable agent whose reasoning is fully inspectable will be chosen over a more capable black box every time.
+- **Progressive autonomy matches real adoption patterns.** Starting supervised (L1-L2) and gradually increasing autonomy mirrors how pharma teams actually onboard new tools and new team members. The autonomy dial concept is validated by real-world adoption behavior.
+- **Standard protocol integration is critical.** Integration with existing pharma systems (LIMS, CTMS, eTMF) via standard protocols is a recurring theme. Proprietary APIs create vendor lock-in concerns that slow procurement.
+
+### Internal Team Alignment
+
+- **Core value = UX + standards + security/validation**, not infrastructure. We win by making pharma-specific agent orchestration trustworthy and pleasant to use, not by building better containers or faster LLM inference.
+- **Best-of-breed tooling strategy.** Use DSPy for prompt optimization, Pydantic Logfire for observability, MCP for tool integration — don't rebuild what already exists well. Focus engineering effort on the pharma-specific orchestration and trust layer.
+- **Agent team mental model is validated.** The concept of agents as team members (not tools, not chatbots) was independently validated by multiple enterprise prospects as matching how they think about adding AI to their workflows.
+
 ## Open Questions
 
 1. **Conversation persistence**: Store chat messages as a new Firestore collection, or extend agent run events?
 2. **Supervisor scope**: Start with hardcoded routing rules, or use LLM-based routing from day one?
 3. **Multi-tenant agents**: Can two users chat with the same agent simultaneously? (Probably: separate sessions, same agent definition.)
-4. **Compliance**: Do chat messages with agents need the same audit trail as task completions? (Probably yes in pharma.)
+4. **Compliance**: Do chat messages with agents need the same audit trail as task completions? **Answered: Yes.** Prospect feedback confirms that all agent interactions in pharma require full audit trails — agent output is a draft that goes through a claim flow before becoming official record. GxP compliance is the #1 requirement.
 5. **Cost**: Chat interactions = more LLM calls. Need usage tracking per user/workflow.
 
 ## References

@@ -78,15 +78,17 @@ export function TeamDashboard() {
               ))
             : teamAgents.map((agent) => {
                 const id = (agent.definition.pluginId ?? '').toLowerCase();
-                const color = id.includes('claude')
-                  ? 'bg-violet-500'
-                  : id.includes('opencode')
-                    ? 'bg-blue-500'
-                    : id.includes('script')
-                      ? 'bg-slate-500'
-                      : id.includes('risk') || id.includes('driver') || id.includes('supply')
-                        ? 'bg-emerald-500'
-                        : 'bg-primary';
+                const color = id.includes('manager')
+                  ? 'bg-amber-500'
+                  : id.includes('claude')
+                    ? 'bg-violet-500'
+                    : id.includes('opencode')
+                      ? 'bg-blue-500'
+                      : id.includes('script')
+                        ? 'bg-slate-500'
+                        : id.includes('risk') || id.includes('driver') || id.includes('supply')
+                          ? 'bg-emerald-500'
+                          : 'bg-primary';
                 const initials = agent.definition.name
                   .split(/[\s-_]+/)
                   .slice(0, 2)

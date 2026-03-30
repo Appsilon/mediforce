@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Users, Zap } from 'lucide-react';
+import { Users, Zap, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AgentRun, AgentDefinition, HumanTask } from '@mediforce/platform-core';
 
@@ -15,8 +15,13 @@ export interface TeamAgent {
   latestRun: AgentRun | null;
 }
 
+function isManagerAgent(pluginId: string | undefined): boolean {
+  return (pluginId ?? '').toLowerCase().includes('manager');
+}
+
 function getAgentColor(pluginId: string | undefined): string {
   const id = (pluginId ?? '').toLowerCase();
+  if (id.includes('manager')) return 'bg-amber-500';
   if (id.includes('claude')) return 'bg-violet-500';
   if (id.includes('opencode')) return 'bg-blue-500';
   if (id.includes('script')) return 'bg-slate-500';
@@ -68,6 +73,7 @@ function AgentRow({
 }) {
   const color = getAgentColor(agent.definition.pluginId);
   const initials = getInitials(agent.definition.name);
+  const isManager = isManagerAgent(agent.definition.pluginId);
 
   return (
     <button
@@ -78,6 +84,7 @@ function AgentRow({
         selected
           ? 'bg-primary/8 ring-1 ring-primary/20 shadow-sm'
           : 'hover:bg-muted/60',
+        isManager && 'border border-amber-200/50 dark:border-amber-500/20',
       )}
     >
       {/* Avatar */}
@@ -86,10 +93,16 @@ function AgentRow({
           className={cn(
             'flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold text-white tracking-wide',
             color,
+            isManager && 'ring-2 ring-amber-300/60 dark:ring-amber-500/40',
           )}
         >
           {initials}
         </div>
+        {isManager && (
+          <div className="absolute -top-1.5 -right-1.5">
+            <Crown className="h-3.5 w-3.5 text-amber-500" />
+          </div>
+        )}
         <div className="absolute -bottom-0.5 -right-0.5">
           <StatusDot status={agent.status} />
         </div>
@@ -101,6 +114,11 @@ function AgentRow({
           <span className="text-sm font-semibold text-foreground truncate">
             {agent.definition.name}
           </span>
+          {isManager && (
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+              Coordinator
+            </span>
+          )}
           {agent.pendingCount > 0 && (
             <span className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
               {agent.pendingCount}
@@ -136,7 +154,13 @@ export function deriveTeamAgents(
   runs: AgentRun[],
   tasks: HumanTask[],
 ): TeamAgent[] {
-  return definitions.map((def) => {
+  const sorted = [...definitions].sort((a, b) => {
+    const aManager = isManagerAgent(a.pluginId) ? 0 : 1;
+    const bManager = isManagerAgent(b.pluginId) ? 0 : 1;
+    return aManager - bManager;
+  });
+
+  return sorted.map((def) => {
     const agentRuns = runs.filter(
       (r) => r.pluginId === def.pluginId || r.pluginId === def.id,
     );

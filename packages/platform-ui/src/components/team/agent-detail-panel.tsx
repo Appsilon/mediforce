@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   X,
@@ -16,11 +16,14 @@ import {
   ExternalLink,
   ChevronRight,
   Cpu,
+  Activity,
+  User,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { AgentRun } from '@mediforce/platform-core';
 import type { TeamAgent, AgentStatus } from './agent-team-sidebar';
+import { AgentProfileTab } from './agent-profile-tab';
 
 function getAgentColor(pluginId: string | undefined): string {
   const id = (pluginId ?? '').toLowerCase();
@@ -168,6 +171,8 @@ function RunRow({ run, handle }: { run: AgentRun; handle: string }) {
   );
 }
 
+type TabId = 'activity' | 'profile';
+
 export function AgentDetailPanel({
   agent,
   agentRuns,
@@ -179,6 +184,7 @@ export function AgentDetailPanel({
   handle: string;
   onClose: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<TabId>('activity');
   const def = agent.definition;
   const color = getAgentColor(def.pluginId);
   const initials = getInitials(def.name);
@@ -216,6 +222,11 @@ export function AgentDetailPanel({
   // Determine the latest autonomy level from runs
   const latestAutonomy = agentRuns[0]?.autonomyLevel ?? 'L1';
 
+  const tabs: Array<{ id: TabId; label: string; icon: React.ElementType }> = [
+    { id: 'activity', label: 'Activity', icon: Activity },
+    { id: 'profile', label: 'Profile', icon: User },
+  ];
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -251,103 +262,132 @@ export function AgentDetailPanel({
           </button>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap mb-4">
           <StatusBadge status={agent.status} />
           <AutonomyBadge level={latestAutonomy} />
         </div>
+
+        {/* Tab buttons */}
+        <div className="flex gap-1 rounded-lg bg-muted/50 p-0.5">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-all',
+                activeTab === tab.id
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <tab.icon className="h-3.5 w-3.5" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Stats row */}
-        <div className="px-5 py-4">
-          <div className="grid grid-cols-3 gap-2">
-            <StatCard
-              label="Today"
-              value={String(todayRuns.length)}
-              icon={Clock}
-            />
-            <StatCard
-              label="Success"
-              value={successRate}
-              icon={TrendingUp}
-            />
-            <StatCard
-              label="Confidence"
-              value={avgConfidence}
-              icon={Target}
-            />
-          </div>
-        </div>
-
-        {/* Current work */}
-        {runningRun !== null && (
-          <div className="px-5 pb-4">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              Currently working on
-            </h3>
-            <div className="rounded-xl border border-green-200/50 dark:border-green-500/20 bg-green-50/50 dark:bg-green-500/5 p-3">
-              <div className="flex items-center gap-2 mb-1.5">
-                <Loader2 className="h-3.5 w-3.5 text-green-500 animate-spin" />
-                <span className="text-sm font-medium text-foreground">
-                  {runningRun.stepId}
-                </span>
+      {/* Tab content */}
+      {activeTab === 'activity' ? (
+        <>
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Stats row */}
+            <div className="px-5 py-4">
+              <div className="grid grid-cols-3 gap-2">
+                <StatCard
+                  label="Today"
+                  value={String(todayRuns.length)}
+                  icon={Clock}
+                />
+                <StatCard
+                  label="Success"
+                  value={successRate}
+                  icon={TrendingUp}
+                />
+                <StatCard
+                  label="Confidence"
+                  value={avgConfidence}
+                  icon={Target}
+                />
               </div>
-              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                Started {formatDistanceToNow(new Date(runningRun.startedAt), { addSuffix: true })}
-              </p>
-              {runningRun.envelope?.reasoning_summary !== undefined &&
-                runningRun.envelope.reasoning_summary !== '' && (
-                  <p className="mt-2 text-[12px] text-muted-foreground line-clamp-3 leading-relaxed">
-                    {runningRun.envelope.reasoning_summary}
+            </div>
+
+            {/* Current work */}
+            {runningRun !== null && (
+              <div className="px-5 pb-4">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  Currently working on
+                </h3>
+                <div className="rounded-xl border border-green-200/50 dark:border-green-500/20 bg-green-50/50 dark:bg-green-500/5 p-3">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Loader2 className="h-3.5 w-3.5 text-green-500 animate-spin" />
+                    <span className="text-sm font-medium text-foreground">
+                      {runningRun.stepId}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Started {formatDistanceToNow(new Date(runningRun.startedAt), { addSuffix: true })}
                   </p>
-                )}
+                  {runningRun.envelope?.reasoning_summary !== undefined &&
+                    runningRun.envelope.reasoning_summary !== '' && (
+                      <p className="mt-2 text-[12px] text-muted-foreground line-clamp-3 leading-relaxed">
+                        {runningRun.envelope.reasoning_summary}
+                      </p>
+                    )}
+                </div>
+              </div>
+            )}
+
+            {/* Recent runs */}
+            <div className="px-5 pb-4">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                Recent runs
+              </h3>
+              {recentRuns.length === 0 ? (
+                <div className="flex flex-col items-center py-8 text-center">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted mb-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-[12px] text-muted-foreground">No runs yet</p>
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {recentRuns.map((run) => (
+                    <RunRow key={run.id} run={run} handle={handle} />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        )}
 
-        {/* Recent runs */}
-        <div className="px-5 pb-4">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Recent runs
-          </h3>
-          {recentRuns.length === 0 ? (
-            <div className="flex flex-col items-center py-8 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted mb-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <p className="text-[12px] text-muted-foreground">No runs yet</p>
-            </div>
-          ) : (
-            <div className="space-y-0.5">
-              {recentRuns.map((run) => (
-                <RunRow key={run.id} run={run} handle={handle} />
-              ))}
-            </div>
-          )}
+          {/* Action buttons */}
+          <div className="shrink-0 border-t px-5 py-4 space-y-2">
+            <button
+              type="button"
+              disabled
+              className="flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium text-muted-foreground opacity-50 cursor-not-allowed transition-colors"
+              title="Coming soon"
+            >
+              <MessageSquare className="h-4 w-4" />
+              Chat with Agent
+            </button>
+            <Link
+              href={`/${handle}/agents`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              View all runs
+            </Link>
+          </div>
+        </>
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          <AgentProfileTab agent={agent} />
         </div>
-      </div>
-
-      {/* Action buttons */}
-      <div className="shrink-0 border-t px-5 py-4 space-y-2">
-        <button
-          type="button"
-          disabled
-          className="flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium text-muted-foreground opacity-50 cursor-not-allowed transition-colors"
-          title="Coming soon"
-        >
-          <MessageSquare className="h-4 w-4" />
-          Chat with Agent
-        </button>
-        <Link
-          href={`/${handle}/agents`}
-          className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        >
-          <ExternalLink className="h-4 w-4" />
-          View all runs
-        </Link>
-      </div>
+      )}
     </div>
   );
 }
