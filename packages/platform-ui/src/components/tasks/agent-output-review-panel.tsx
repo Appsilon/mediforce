@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
+import { useTheme } from 'next-themes';
 import { Bot, Code, ExternalLink, FileText, Gauge, GitBranch, Loader2, MonitorPlay } from 'lucide-react';
 import type { AgentOutputData } from './task-utils';
 import { formatStepName } from './task-utils';
@@ -14,15 +15,36 @@ interface AgentOutputReviewPanelProps {
 }
 
 /** Build a self-contained HTML document for the sandboxed iframe. */
-function buildSrcdoc(presentation: string, result: Record<string, unknown> | null): string {
+function buildSrcdoc(presentation: string, result: Record<string, unknown> | null, isDark: boolean): string {
   // Escape closing script tags in data to prevent XSS breakout
   const safeData = JSON.stringify(result ?? {}).replace(/<\//g, '<\\/');
   return `<!DOCTYPE html>
-<html>
+<html class="${isDark ? 'dark' : ''}">
 <head>
 <meta charset="utf-8">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-<style>body { margin: 0; padding: 1rem; }</style>
+<style type="text/tailwindcss">
+@theme {
+  --color-surface: #ffffff;
+  --color-surface-dark: #0f1117;
+  --color-text: #1a1a2e;
+  --color-text-dark: #e2e4e9;
+  --color-muted: #6b7280;
+  --color-muted-dark: #9ca3af;
+  --color-border: #e5e7eb;
+  --color-border-dark: #2d2f36;
+}
+body {
+  margin: 0;
+  padding: 1rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.dark body {
+  background: var(--color-surface-dark);
+  color: var(--color-text-dark);
+}
+</style>
 <script>window.__data__ = ${safeData};</script>
 </head>
 <body>
@@ -32,6 +54,11 @@ const ro = new ResizeObserver(() => {
   window.parent.postMessage({ type: 'resize', height: document.body.scrollHeight }, '*');
 });
 ro.observe(document.body);
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'theme') {
+    document.documentElement.classList.toggle('dark', e.data.dark);
+  }
+});
 </script>
 </body>
 </html>`;
@@ -58,6 +85,8 @@ export function AgentOutputReviewPanel({
   const hasPresentation = typeof agentOutput.presentation === 'string' && agentOutput.presentation.length > 0;
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = React.useState(300);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   React.useEffect(() => {
     if (!hasPresentation) return;
@@ -76,6 +105,12 @@ export function AgentOutputReviewPanel({
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
   }, [hasPresentation]);
+
+  // Sync theme changes to iframe
+  React.useEffect(() => {
+    if (!hasPresentation) return;
+    iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
+  }, [isDark, hasPresentation]);
 
   const hasContent = agentOutput.result !== null && Object.keys(agentOutput.result).length > 0;
 
@@ -219,7 +254,7 @@ export function AgentOutputReviewPanel({
           <Tabs.Content value="presentation" className="p-4">
             <iframe
               ref={iframeRef}
-              srcDoc={buildSrcdoc(agentOutput.presentation!, agentOutput.result)}
+              srcDoc={buildSrcdoc(agentOutput.presentation!, agentOutput.result, isDark)}
               sandbox="allow-scripts"
               style={{ width: '100%', height: iframeHeight, border: 'none' }}
               title="Agent presentation"
