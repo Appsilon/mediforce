@@ -40,7 +40,7 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
     const colRef = collection(this.db, this.collectionName);
     const q = query(
       colRef,
-      where('instanceId', '==', instanceId),
+      where('processInstanceId', '==', instanceId),
       orderBy('createdAt', 'asc'),
     );
     const snap = await getDocs(q);

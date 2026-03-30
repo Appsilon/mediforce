@@ -117,3 +117,41 @@ export function useActiveCoworkSession(processInstanceId: string | null) {
 
   return { session, loading };
 }
+
+export function useMyCoworkSessions(assignedRole: string | null) {
+  const constraints = useMemo(
+    () =>
+      assignedRole
+        ? [
+            where('assignedRole', '==', assignedRole),
+            where('status', '==', 'active'),
+            orderBy('createdAt', 'asc'),
+          ]
+        : [
+            where('status', '==', 'active'),
+            orderBy('createdAt', 'asc'),
+          ],
+    [assignedRole],
+  );
+
+  return useCollection<CoworkSession>('coworkSessions', constraints);
+}
+
+export function useFinalizedCoworkSessions(assignedRole: string | null) {
+  const constraints = useMemo(
+    () =>
+      assignedRole
+        ? [
+            where('assignedRole', '==', assignedRole),
+            where('status', '==', 'finalized'),
+            orderBy('finalizedAt', 'desc'),
+          ]
+        : [
+            where('status', '==', 'finalized'),
+            orderBy('finalizedAt', 'desc'),
+          ],
+    [assignedRole],
+  );
+
+  return useCollection<CoworkSession>('coworkSessions', constraints);
+}
