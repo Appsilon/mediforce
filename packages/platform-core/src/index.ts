@@ -46,6 +46,7 @@ export {
   NamespaceSchema,
   NamespaceMemberSchema,
   WorkflowSecretsSchema,
+  McpServerConfigSchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -97,6 +98,7 @@ export type {
   Namespace,
   NamespaceMember,
   WorkflowSecrets,
+  McpServerConfig,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)

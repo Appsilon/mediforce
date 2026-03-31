@@ -115,7 +115,7 @@ function ToolAllowedToolsBadge({ tools }: { tools: string[] }) {
 
 function ToolCard({ tool, handle }: { tool: typeof TOOL_CATALOG[number]; handle: string }) {
   const categoryColor = getCategoryColor(tool.category);
-  const secrets = tool.env ? Object.values(tool.env).filter((v) => v.startsWith('{{')) : [];
+  const secrets = tool.env ? Object.values(tool.env).filter((v): v is string => typeof v === 'string' && v.startsWith('{{')) : [];
 
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-md flex flex-col">
@@ -192,7 +192,7 @@ export default function ToolsPage() {
     return TOOL_CATALOG.filter(
       (t) =>
         t.name.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q) ||
+        (t.description ?? '').toLowerCase().includes(q) ||
         t.category.toLowerCase().includes(q),
     );
   }, [query]);
