@@ -787,5 +787,123 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions, namespaces, namespaceMembers };
+  // -------------------------------------------------------------------------
+  // Cowork sessions — collaborative human+AI artifact building
+  // -------------------------------------------------------------------------
+
+  const coworkSessions: Record<string, Record<string, unknown>> = {
+    'cowork-active-1': {
+      id: 'cowork-active-1',
+      processInstanceId: 'proc-cowork-paused',
+      stepId: 'design',
+      assignedRole: 'analyst',
+      assignedUserId: testUserId,
+      status: 'active',
+      agent: 'chat',
+      model: 'anthropic/claude-sonnet-4',
+      systemPrompt: 'You are a workflow design assistant.',
+      outputSchema: {
+        type: 'object',
+        required: ['name', 'description', 'steps'],
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string' },
+          steps: { type: 'array' },
+        },
+      },
+      voiceConfig: null,
+      artifact: {
+        name: 'data-quality-review',
+        description: 'Automated data quality review workflow',
+        steps: [
+          { id: 'collect', name: 'Collect Data', executor: 'script' },
+          { id: 'analyze', name: 'Analyze Quality', executor: 'agent' },
+          { id: 'review', name: 'Human Review', executor: 'human' },
+        ],
+      },
+      turns: [
+        {
+          id: 'turn-1',
+          role: 'human',
+          content: 'I need a workflow for automated data quality review with 3 steps: collect data, analyze quality, and human review.',
+          timestamp: oneHourAgo,
+          artifactDelta: null,
+        },
+        {
+          id: 'turn-2',
+          role: 'agent',
+          content: 'I\'ve drafted a 3-step workflow: data collection via script, AI-powered quality analysis, and a final human review gate. The artifact has been updated with the full structure.',
+          timestamp: oneHourAgo,
+          artifactDelta: {
+            name: 'data-quality-review',
+            description: 'Automated data quality review workflow',
+            steps: [
+              { id: 'collect', name: 'Collect Data', executor: 'script' },
+              { id: 'analyze', name: 'Analyze Quality', executor: 'agent' },
+              { id: 'review', name: 'Human Review', executor: 'human' },
+            ],
+          },
+        },
+      ],
+      createdAt: oneHourAgo,
+      updatedAt: oneHourAgo,
+      finalizedAt: null,
+    },
+  };
+
+  // Process instance paused for cowork
+  processInstances['proc-cowork-paused'] = {
+    id: 'proc-cowork-paused',
+    definitionName: 'Workflow Designer',
+    definitionVersion: '1',
+    status: 'paused',
+    currentStepId: 'design',
+    variables: {},
+    triggerType: 'manual',
+    triggerPayload: {},
+    createdAt: oneHourAgo,
+    updatedAt: oneHourAgo,
+    createdBy: testUserId,
+    pauseReason: 'cowork_in_progress',
+    error: null,
+    assignedRoles: ['analyst'],
+  };
+
+  // Workflow definition with a cowork step
+  workflowDefinitions['Workflow Designer:1'] = {
+    name: 'Workflow Designer',
+    namespace: 'test',
+    version: 1,
+    description: 'Collaboratively design workflows with AI',
+    steps: [
+      {
+        id: 'design',
+        name: 'Design Workflow',
+        type: 'creation',
+        executor: 'cowork',
+        description: 'Collaboratively build a workflow definition with AI assistance. Describe your requirements and iterate on the design.',
+        allowedRoles: ['analyst'],
+        cowork: {
+          agent: 'chat',
+          systemPrompt: 'You are a workflow design assistant.',
+          outputSchema: {
+            type: 'object',
+            required: ['name', 'description', 'steps'],
+            properties: {
+              name: { type: 'string' },
+              description: { type: 'string' },
+              steps: { type: 'array' },
+            },
+          },
+          chat: { model: 'anthropic/claude-sonnet-4' },
+        },
+      },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'design', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start-design' }],
+    createdAt: twoDaysAgo,
+  };
+
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions, namespaces, namespaceMembers, coworkSessions };
 }

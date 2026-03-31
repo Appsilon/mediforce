@@ -21,6 +21,10 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Run Report](#run-report) — post-completion summary with timing and step outputs
 - [Report Unavailable](#report-unavailable) — guard preventing report access on in-progress runs
 
+**Co-work** — collaborative human+AI artifact building
+- [Cowork Chat Session](#cowork-chat-session) — real-time conversation workspace with artifact panel
+- [Cowork Finalize Flow](#cowork-finalize-flow) — locking the artifact and advancing the workflow
+
 **Agents** — AI agent catalog and execution oversight
 - [Agent Catalog & History](#agent-catalog--history) — discovering agents and reviewing their past runs
 - [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
@@ -103,6 +107,22 @@ Post-completion report with step timeline, wall-clock and active processing time
 Reports are only available for completed runs. Accessing the report URL for a running process shows a clear message instead of an error. Guards against broken links from in-progress runs.
 
 ![run-report-unavailable](run-report-unavailable.gif)
+
+---
+
+## Co-work
+
+### Cowork Chat Session
+
+The cowork workspace where a human and AI agent collaborate to build an artifact. The left panel shows the conversation with step description context, and the right panel displays the artifact preview with a requirements checklist tracking which required fields have been fulfilled.
+
+![cowork-chat-session](cowork-chat-session.gif)
+
+### Cowork Finalize Flow
+
+When all required fields are present, the user clicks "Finalize Artifact" to lock the result and advance the workflow. The artifact badge changes from Draft to Finalized, the input is disabled, and a success banner confirms the workflow has moved to the next step with a "View run" link.
+
+![cowork-finalize-flow](cowork-finalize-flow.gif)
 
 ---
 
