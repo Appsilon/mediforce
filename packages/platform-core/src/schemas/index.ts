@@ -107,6 +107,11 @@ export {
 export { NotificationTargetSchema, type NotificationTarget } from './process-config.js';
 
 export {
+  McpServerConfigSchema,
+  type McpServerConfig,
+} from './mcp-server-config.js';
+
+export {
   WorkflowAgentConfigSchema,
   WorkflowReviewConfigSchema,
   WorkflowStepSchema,

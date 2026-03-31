@@ -584,5 +584,90 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(prompt).toContain('file1.pdf');
       expect(prompt).toContain('file2.pdf');
     });
+
+    it('[DATA] emits MCP servers status event when mcpServers configured', async () => {
+      const context = buildMockContext({
+        config: {
+          processName: 'protocol-to-tfl',
+          configName: 'default',
+          configVersion: 'v1',
+          stepConfigs: [
+            {
+              stepId: 'extract',
+              executorType: 'agent',
+              plugin: 'claude-code-agent',
+              agentConfig: {
+                skill: 'trial-metadata-extractor',
+                skillsDir: '/plugins/protocol-to-tfl/skills',
+                image: 'mediforce-agent:protocol-to-tfl',
+                mcpServers: [
+                  { name: 'cdisc-library', command: 'node', args: ['/opt/mcp/cdisc.js'] },
+                  { name: 'postgres-ro', command: 'npx', args: ['-y', '@mcp/server-postgres'] },
+                ],
+              },
+            },
+          ],
+        },
+      });
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Skill');
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: 'ok' }),
+        gitMetadata: null,
+        outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const mcpEvent = events.find(
+        (e) => e.type === 'status' && typeof e.payload === 'string' && e.payload.includes('MCP servers'),
+      );
+      expect(mcpEvent).toBeDefined();
+      expect(mcpEvent!.payload).toContain('cdisc-library');
+      expect(mcpEvent!.payload).toContain('postgres-ro');
+    });
+  });
+
+  describe('getAgentCommand', () => {
+    it('[DATA] includes --mcp-config flag when mcpServers configured', async () => {
+      const context = buildMockContext({
+        config: {
+          processName: 'protocol-to-tfl',
+          configName: 'default',
+          configVersion: 'v1',
+          stepConfigs: [
+            {
+              stepId: 'extract',
+              executorType: 'agent',
+              plugin: 'claude-code-agent',
+              agentConfig: {
+                skill: 'trial-metadata-extractor',
+                skillsDir: '/plugins/protocol-to-tfl/skills',
+                image: 'mediforce-agent:protocol-to-tfl',
+                mcpServers: [
+                  { name: 'github', command: 'npx', args: ['-y', '@mcp/server-github'] },
+                ],
+              },
+            },
+          ],
+        },
+      });
+      await plugin.initialize(context);
+
+      const spec = plugin.getAgentCommand('/output/prompt.txt');
+      expect(spec.args).toContain('--mcp-config');
+      expect(spec.args).toContain('/output/mcp-config.json');
+    });
+
+    it('[DATA] omits --mcp-config flag when no mcpServers configured', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const spec = plugin.getAgentCommand('/output/prompt.txt');
+      expect(spec.args).not.toContain('--mcp-config');
+    });
   });
 });

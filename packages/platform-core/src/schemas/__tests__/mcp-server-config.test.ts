@@ -1,0 +1,119 @@
+import { describe, it, expect } from 'vitest';
+import { McpServerConfigSchema } from '../mcp-server-config.js';
+import { WorkflowAgentConfigSchema } from '../workflow-definition.js';
+
+describe('McpServerConfigSchema', () => {
+  it('should parse a valid MCP server config', () => {
+    const result = McpServerConfigSchema.safeParse({
+      name: 'cdisc-library',
+      command: 'npx',
+      args: ['-y', '@cdisc/mcp-server'],
+      env: { API_KEY: '{{CDISC_API_KEY}}' },
+      description: 'CDISC Library API',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBe('cdisc-library');
+      expect(result.data.args).toEqual(['-y', '@cdisc/mcp-server']);
+    }
+  });
+
+  it('should parse minimal config (name + command only)', () => {
+    const result = McpServerConfigSchema.safeParse({
+      name: 'filesystem',
+      command: 'node',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.args).toEqual([]);
+      expect(result.data.env).toBeUndefined();
+    }
+  });
+
+  it('should reject empty name', () => {
+    const result = McpServerConfigSchema.safeParse({
+      name: '',
+      command: 'npx',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing command', () => {
+    const result = McpServerConfigSchema.safeParse({
+      name: 'test',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should parse allowedTools for tool-level filtering', () => {
+    const result = McpServerConfigSchema.safeParse({
+      name: 'github',
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-github'],
+      allowedTools: ['search_code', 'get_file_contents'],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.allowedTools).toEqual(['search_code', 'get_file_contents']);
+    }
+  });
+
+  it('should allow omitting allowedTools (all tools available)', () => {
+    const result = McpServerConfigSchema.safeParse({
+      name: 'github',
+      command: 'npx',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.allowedTools).toBeUndefined();
+    }
+  });
+});
+
+describe('WorkflowAgentConfigSchema with mcpServers', () => {
+  it('should accept mcpServers array', () => {
+    const result = WorkflowAgentConfigSchema.safeParse({
+      model: 'sonnet',
+      skill: 'extract-data',
+      mcpServers: [
+        {
+          name: 'cdisc-library',
+          command: 'node',
+          args: ['/opt/mcp/cdisc/index.js'],
+          env: { API_KEY: '{{CDISC_API_KEY}}' },
+          description: 'CDISC Library API',
+        },
+        {
+          name: 'postgres-readonly',
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-postgres', 'postgresql://ro@host/db'],
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.mcpServers).toHaveLength(2);
+      expect(result.data.mcpServers![0].name).toBe('cdisc-library');
+      expect(result.data.mcpServers![1].name).toBe('postgres-readonly');
+    }
+  });
+
+  it('should accept agent config without mcpServers', () => {
+    const result = WorkflowAgentConfigSchema.safeParse({
+      model: 'sonnet',
+      skill: 'extract-data',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.mcpServers).toBeUndefined();
+    }
+  });
+
+  it('should reject invalid mcpServers entries', () => {
+    const result = WorkflowAgentConfigSchema.safeParse({
+      model: 'sonnet',
+      mcpServers: [{ name: '' }],
+    });
+    expect(result.success).toBe(false);
+  });
+});
