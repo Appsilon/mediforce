@@ -21,6 +21,9 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Run Report](#run-report) — post-completion summary with timing and step outputs
 - [Report Unavailable](#report-unavailable) — guard preventing report access on in-progress runs
 
+**Tools** — MCP server catalog with per-step access control
+- [Tool Catalog](#tool-catalog) — browsing, searching, and inspecting MCP tools
+
 **Agents** — AI agent catalog and execution oversight
 - [Agent Catalog & History](#agent-catalog--history) — discovering agents and reviewing their past runs
 - [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
@@ -103,6 +106,16 @@ Post-completion report with step timeline, wall-clock and active processing time
 Reports are only available for completed runs. Accessing the report URL for a running process shows a clear message instead of an error. Guards against broken links from in-progress runs.
 
 ![run-report-unavailable](run-report-unavailable.gif)
+
+---
+
+## Tools
+
+### Tool Catalog
+
+Organization-level MCP server catalog with three-layer access control. Browse tools by category (Development, Data Access, Clinical Data, etc.), search by name, and inspect tool details including connection info, required secrets, and per-tool allowlists. Each tool shows which operations are available vs restricted — workflow authors assign tools to specific steps, and agents only see tools explicitly granted to their step.
+
+![tool-catalog](tool-catalog.gif)
 
 ---
 

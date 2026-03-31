@@ -37,10 +37,9 @@ export default function TestLoginPage() {
     const password = form.get('password') as string;
     try {
       await signInWithEmail(email, password);
-      router.replace('/redirect');
+      // Navigation is handled by the useEffect watching firebaseUser
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
-    } finally {
       setPending(false);
     }
   }
