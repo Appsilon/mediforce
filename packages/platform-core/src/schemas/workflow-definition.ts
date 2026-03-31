@@ -27,6 +27,26 @@ export const WorkflowAgentConfigSchema = z.object({
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
 });
 
+export const CoworkChatConfigSchema = z.object({
+  model: z.string().optional(),
+});
+
+export const CoworkVoiceRealtimeConfigSchema = z.object({
+  model: z.string().optional(),
+  voice: z.string().optional(),
+  synthesisModel: z.string().optional(),
+  maxDurationSeconds: z.number().positive().optional(),
+  idleTimeoutSeconds: z.number().positive().optional(),
+});
+
+export const WorkflowCoworkConfigSchema = z.object({
+  agent: z.enum(['chat', 'voice-realtime']),
+  systemPrompt: z.string().optional(),
+  outputSchema: z.record(z.string(), z.unknown()).optional(),
+  chat: CoworkChatConfigSchema.optional(),
+  voiceRealtime: CoworkVoiceRealtimeConfigSchema.optional(),
+});
+
 export const WorkflowReviewConfigSchema = z.object({
   type: z.enum(['human', 'agent', 'none']).optional(),
   plugin: z.string().optional(),
@@ -44,12 +64,13 @@ export const WorkflowStepSchema = z.object({
   selection: SelectionSchema.optional(),
   ui: StepUiSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  executor: z.enum(['human', 'agent', 'script']),
+  executor: z.enum(['human', 'agent', 'script', 'cowork']),
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(),
   plugin: z.string().optional(),
   allowedRoles: z.array(z.string()).optional(),
   agent: WorkflowAgentConfigSchema.optional(),
   review: WorkflowReviewConfigSchema.optional(),
+  cowork: WorkflowCoworkConfigSchema.optional(),
   stepParams: z.record(z.string(), z.unknown()).optional(),
   env: z.record(z.string(), z.string()).optional(),
 });
@@ -76,6 +97,7 @@ export const WorkflowDefinitionSchema = z.object({
 });
 
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
+export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;
 export type WorkflowReviewConfig = z.infer<typeof WorkflowReviewConfigSchema>;
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;

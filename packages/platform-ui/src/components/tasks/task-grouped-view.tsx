@@ -3,18 +3,27 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { CheckSquare } from 'lucide-react';
-import type { HumanTask } from '@mediforce/platform-core';
 import { useProcessNameMap } from '@/hooks/use-agent-runs';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
-import { getActionType, getTaskLabel } from './action-type';
+import {
+  type ActionItem,
+  getActionType,
+  getItemLabel,
+  getItemId,
+  getItemProcessInstanceId,
+  getItemCreatedAt,
+  getItemAssignedUserId,
+  getItemDeadline,
+  isItemCompleted,
+} from './action-type';
 import { formatStepName } from './task-utils';
 
 export type GroupByField = 'process' | 'action';
 
-const VISIBLE_TASK_LIMIT = 5;
+const VISIBLE_ITEM_LIMIT = 5;
 
 function formatDeadline(deadline: string | null): string | null {
   if (!deadline) return null;
@@ -42,17 +51,17 @@ function formatRelativeTime(iso: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function sortTasksForDisplay(tasks: HumanTask[]): HumanTask[] {
-  return [...tasks].sort((taskA, taskB) => {
-    const deadlineA = taskA.deadline ?? '';
-    const deadlineB = taskB.deadline ?? '';
+function sortItemsForDisplay(items: ActionItem[]): ActionItem[] {
+  return [...items].sort((itemA, itemB) => {
+    const deadlineA = getItemDeadline(itemA) ?? '';
+    const deadlineB = getItemDeadline(itemB) ?? '';
     if (deadlineA !== deadlineB) {
       if (deadlineA === '' && deadlineB === '') return 0;
       if (deadlineA === '') return 1;
       if (deadlineB === '') return -1;
       return deadlineA.localeCompare(deadlineB);
     }
-    return taskA.createdAt.localeCompare(taskB.createdAt);
+    return getItemCreatedAt(itemA).localeCompare(getItemCreatedAt(itemB));
   });
 }
 
@@ -82,10 +91,10 @@ function AssigneeAvatar({ isCurrentUser, displayName }: { isCurrentUser: boolean
   );
 }
 
-// --- Task Row ---
+// --- Action Item Row ---
 
-function TaskRow({
-  task,
+function ActionItemRow({
+  item,
   currentUserId,
   currentUserName,
   userNames,
@@ -93,7 +102,7 @@ function TaskRow({
   processName,
   muted = false,
 }: {
-  task: HumanTask;
+  item: ActionItem;
   currentUserId: string;
   currentUserName?: string | null;
   userNames: Map<string, string>;
@@ -102,27 +111,31 @@ function TaskRow({
   muted?: boolean;
 }) {
   const handle = useHandleFromPath();
-  const actionType = getActionType(task);
+  const actionType = getActionType(item);
   const ActionIcon = actionType.icon;
-  const deadline = formatDeadline(task.deadline);
+  const deadline = formatDeadline(getItemDeadline(item));
   const isOverdue = deadline?.includes('overdue') ?? false;
-  const isClaimed = task.status === 'claimed';
+  const assignedUserId = getItemAssignedUserId(item);
+
+  const href = item.kind === 'cowork'
+    ? routes.cowork(handle, item.data.id)
+    : routes.task(handle, item.data.id);
 
   return (
     <div className={cn('group flex items-center border-b border-border/30 last:border-b-0', muted && 'opacity-60')}>
       <Link
-        href={routes.task(handle, task.id)}
+        href={href}
         className="flex flex-1 items-center gap-2 px-3 py-1.5 hover:bg-muted/50 transition-colors min-w-0"
       >
         <ActionIcon className={cn('h-3.5 w-3.5 shrink-0', actionType.colorClass)} />
-        <span className="flex-1 text-sm truncate">{getTaskLabel(task)}</span>
+        <span className="flex-1 text-sm truncate">{getItemLabel(item)}</span>
         {showProcess && processName && (
           <span className="hidden sm:inline text-xs text-muted-foreground truncate max-w-[160px]">
             {formatStepName(processName)}
           </span>
         )}
         <span className="text-xs text-muted-foreground/70 tabular-nums shrink-0">
-          {formatRelativeTime(task.createdAt)}
+          {formatRelativeTime(getItemCreatedAt(item))}
         </span>
         {deadline && (
           <span
@@ -136,10 +149,10 @@ function TaskRow({
         )}
       </Link>
       <div className="pr-2 shrink-0">
-        {task.assignedUserId && (
+        {assignedUserId && (
           <AssigneeAvatar
-            isCurrentUser={task.assignedUserId === currentUserId}
-            displayName={task.assignedUserId === currentUserId ? currentUserName : userNames.get(task.assignedUserId ?? '')}
+            isCurrentUser={assignedUserId === currentUserId}
+            displayName={assignedUserId === currentUserId ? currentUserName : userNames.get(assignedUserId)}
           />
         )}
       </div>
@@ -163,74 +176,74 @@ function SubGroupHeader({ title, icon, count }: { title: string; icon?: React.Re
 
 interface ProcessCardProps {
   processName: string;
-  activeTasks: HumanTask[];
-  completedTasks: HumanTask[];
+  activeItems: ActionItem[];
+  completedItems: ActionItem[];
   currentUserId: string;
   currentUserName?: string | null;
   userNames: Map<string, string>;
   subGroupByAction: boolean;
 }
 
-function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, currentUserName, userNames, subGroupByAction }: ProcessCardProps) {
+function ProcessCard({ processName, activeItems, completedItems, currentUserId, currentUserName, userNames, subGroupByAction }: ProcessCardProps) {
   const [expanded, setExpanded] = React.useState(false);
 
-  const allTasks = React.useMemo(() => {
-    const claimed = sortTasksForDisplay(
-      activeTasks.filter((t) => t.status === 'claimed' && t.assignedUserId === currentUserId),
+  const allItems = React.useMemo(() => {
+    const claimed = sortItemsForDisplay(
+      activeItems.filter((item) => item.kind === 'task' && item.data.status === 'claimed' && item.data.assignedUserId === currentUserId),
     );
-    const available = sortTasksForDisplay(
-      activeTasks.filter((t) => !(t.status === 'claimed' && t.assignedUserId === currentUserId)),
+    const available = sortItemsForDisplay(
+      activeItems.filter((item) => !(item.kind === 'task' && item.data.status === 'claimed' && item.data.assignedUserId === currentUserId)),
     );
-    const completed = sortTasksForDisplay(completedTasks);
+    const completed = sortItemsForDisplay(completedItems);
     return [...claimed, ...available, ...completed];
-  }, [activeTasks, completedTasks, currentUserId]);
+  }, [activeItems, completedItems, currentUserId]);
 
-  const visibleTasks = expanded ? allTasks : allTasks.slice(0, VISIBLE_TASK_LIMIT);
-  const hasMore = allTasks.length > VISIBLE_TASK_LIMIT;
-  const totalCount = activeTasks.length + completedTasks.length;
+  const visibleItems = expanded ? allItems : allItems.slice(0, VISIBLE_ITEM_LIMIT);
+  const hasMore = allItems.length > VISIBLE_ITEM_LIMIT;
+  const totalCount = activeItems.length + completedItems.length;
 
-  const renderTasks = (tasks: HumanTask[]) => {
+  const renderItems = (items: ActionItem[]) => {
     if (!subGroupByAction) {
-      return tasks.map((task) => (
-        <TaskRow
-          key={task.id}
-          task={task}
+      return items.map((item) => (
+        <ActionItemRow
+          key={getItemId(item)}
+          item={item}
           currentUserId={currentUserId}
           currentUserName={currentUserName}
           userNames={userNames}
           showProcess={false}
-          muted={task.status === 'completed' || task.status === 'cancelled'}
+          muted={isItemCompleted(item)}
         />
       ));
     }
 
-    const byAction = new Map<string, HumanTask[]>();
-    for (const task of tasks) {
-      const action = getActionType(task);
+    const byAction = new Map<string, ActionItem[]>();
+    for (const item of items) {
+      const action = getActionType(item);
       const group = byAction.get(action.type) ?? [];
-      group.push(task);
+      group.push(item);
       byAction.set(action.type, group);
     }
 
-    return Array.from(byAction.entries()).map(([type, groupTasks]) => {
-      const sampleAction = getActionType(groupTasks[0]);
+    return Array.from(byAction.entries()).map(([type, groupItems]) => {
+      const sampleAction = getActionType(groupItems[0]);
       const Icon = sampleAction.icon;
       return (
         <div key={type}>
           <SubGroupHeader
             title={sampleAction.label}
             icon={<Icon className={cn('h-3 w-3', sampleAction.colorClass)} />}
-            count={groupTasks.length}
+            count={groupItems.length}
           />
-          {groupTasks.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
+          {groupItems.map((item) => (
+            <ActionItemRow
+              key={getItemId(item)}
+              item={item}
               currentUserId={currentUserId}
               currentUserName={currentUserName}
               userNames={userNames}
               showProcess={false}
-              muted={task.status === 'completed' || task.status === 'cancelled'}
+              muted={isItemCompleted(item)}
             />
           ))}
         </div>
@@ -244,20 +257,20 @@ function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, 
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-base font-semibold truncate">{formatStepName(processName)}</h3>
           <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground font-medium">
-            {totalCount} {totalCount === 1 ? 'task' : 'tasks'}
+            {totalCount} {totalCount === 1 ? 'item' : 'items'}
           </span>
         </div>
       </div>
 
       <div className={cn(expanded && 'max-h-[400px] overflow-y-auto')}>
-        {renderTasks(visibleTasks)}
+        {renderItems(visibleItems)}
       </div>
       {hasMore && !expanded && (
         <button
           onClick={() => setExpanded(true)}
           className="w-full px-4 py-2 text-xs font-medium text-primary hover:bg-muted/30 transition-colors border-t border-border/30"
         >
-          Show all {allTasks.length} tasks
+          Show all {allItems.length} items
         </button>
       )}
       {expanded && (
@@ -275,15 +288,15 @@ function ProcessCard({ processName, activeTasks, completedTasks, currentUserId, 
 // --- Action Group (flat, no cards) ---
 
 function ActionGroup({
-  tasks,
-  completedTasks,
+  items,
+  completedItems,
   currentUserId,
   currentUserName,
   userNames,
   processNameMap,
 }: {
-  tasks: HumanTask[];
-  completedTasks: HumanTask[];
+  items: ActionItem[];
+  completedItems: ActionItem[];
   currentUserId: string;
   currentUserName?: string | null;
   userNames: Map<string, string>;
@@ -291,15 +304,15 @@ function ActionGroup({
 }) {
   const [expanded, setExpanded] = React.useState(false);
 
-  const actionType = getActionType(tasks[0]);
+  const actionType = getActionType(items[0]);
   const ActionIcon = actionType.icon;
-  const allTasks = React.useMemo(
-    () => [...sortTasksForDisplay(tasks), ...sortTasksForDisplay(completedTasks)],
-    [tasks, completedTasks],
+  const allItems = React.useMemo(
+    () => [...sortItemsForDisplay(items), ...sortItemsForDisplay(completedItems)],
+    [items, completedItems],
   );
 
-  const visibleTasks = expanded ? allTasks : allTasks.slice(0, VISIBLE_TASK_LIMIT);
-  const hasMore = allTasks.length > VISIBLE_TASK_LIMIT;
+  const visibleItems = expanded ? allItems : allItems.slice(0, VISIBLE_ITEM_LIMIT);
+  const hasMore = allItems.length > VISIBLE_ITEM_LIMIT;
 
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-sm">
@@ -310,21 +323,21 @@ function ActionGroup({
             <h3 className="text-base font-semibold truncate">{actionType.label}</h3>
           </div>
           <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground font-medium">
-            {allTasks.length} {allTasks.length === 1 ? 'task' : 'tasks'}
+            {allItems.length} {allItems.length === 1 ? 'item' : 'items'}
           </span>
         </div>
       </div>
       <div className={cn(expanded && 'max-h-[400px] overflow-y-auto')}>
-        {visibleTasks.map((task) => (
-          <TaskRow
-            key={task.id}
-            task={task}
+        {visibleItems.map((item) => (
+          <ActionItemRow
+            key={getItemId(item)}
+            item={item}
             currentUserId={currentUserId}
             currentUserName={currentUserName}
             userNames={userNames}
             showProcess
-            processName={processNameMap.get(task.processInstanceId)}
-            muted={task.status === 'completed' || task.status === 'cancelled'}
+            processName={processNameMap.get(getItemProcessInstanceId(item))}
+            muted={isItemCompleted(item)}
           />
         ))}
       </div>
@@ -333,7 +346,7 @@ function ActionGroup({
           onClick={() => setExpanded(true)}
           className="w-full px-4 py-2 text-xs font-medium text-primary hover:bg-muted/30 transition-colors border-t border-border/30"
         >
-          Show all {allTasks.length} tasks
+          Show all {allItems.length} items
         </button>
       )}
       {expanded && (
@@ -351,36 +364,36 @@ function ActionGroup({
 // --- Flat List ---
 
 function FlatList({
-  activeTasks,
+  activeItems,
   currentUserId,
   currentUserName,
   userNames,
   processNameMap,
 }: {
-  activeTasks: HumanTask[];
+  activeItems: ActionItem[];
   currentUserId: string;
   currentUserName?: string | null;
   userNames: Map<string, string>;
   processNameMap: Map<string, string>;
 }) {
   const sorted = React.useMemo(
-    () => [...activeTasks].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [activeTasks],
+    () => [...activeItems].sort((a, b) => getItemCreatedAt(b).localeCompare(getItemCreatedAt(a))),
+    [activeItems],
   );
 
   if (sorted.length === 0) return <EmptyState />;
 
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
-      {sorted.map((task) => (
-        <TaskRow
-          key={task.id}
-          task={task}
+      {sorted.map((item) => (
+        <ActionItemRow
+          key={getItemId(item)}
+          item={item}
           currentUserId={currentUserId}
           currentUserName={currentUserName}
           userNames={userNames}
           showProcess
-          processName={processNameMap.get(task.processInstanceId)}
+          processName={processNameMap.get(getItemProcessInstanceId(item))}
         />
       ))}
     </div>
@@ -426,15 +439,15 @@ function EmptyState() {
 // --- Main Component ---
 
 export function TaskGroupedView({
-  activeTasks,
-  completedTasks,
+  activeItems,
+  completedItems,
   loading,
   currentUserId,
   currentUserName,
   groupByFields,
 }: {
-  activeTasks: HumanTask[];
-  completedTasks: HumanTask[];
+  activeItems: ActionItem[];
+  completedItems: ActionItem[];
   loading: boolean;
   currentUserId: string;
   currentUserName?: string | null;
@@ -446,27 +459,29 @@ export function TaskGroupedView({
   const groupByAction = groupByFields.has('action');
 
   if (loading) return <LoadingSkeleton />;
-  if (activeTasks.length === 0 && completedTasks.length === 0) return <EmptyState />;
+  if (activeItems.length === 0 && completedItems.length === 0) return <EmptyState />;
 
   // No grouping — flat list
   if (!groupByProcess && !groupByAction) {
-    return <FlatList activeTasks={activeTasks} currentUserId={currentUserId} currentUserName={currentUserName} userNames={userNames} processNameMap={processNameMap} />;
+    return <FlatList activeItems={activeItems} currentUserId={currentUserId} currentUserName={currentUserName} userNames={userNames} processNameMap={processNameMap} />;
   }
 
   // Group by process (with optional action sub-grouping)
   if (groupByProcess) {
-    const byDefinition = new Map<string, { active: HumanTask[]; completed: HumanTask[] }>();
+    const byDefinition = new Map<string, { active: ActionItem[]; completed: ActionItem[] }>();
 
-    for (const task of activeTasks) {
-      const defName = processNameMap.get(task.processInstanceId) ?? task.processInstanceId.slice(0, 8);
+    for (const item of activeItems) {
+      const instanceId = getItemProcessInstanceId(item);
+      const defName = processNameMap.get(instanceId) ?? instanceId.slice(0, 8);
       const group = byDefinition.get(defName) ?? { active: [], completed: [] };
-      group.active.push(task);
+      group.active.push(item);
       byDefinition.set(defName, group);
     }
-    for (const task of completedTasks) {
-      const defName = processNameMap.get(task.processInstanceId) ?? task.processInstanceId.slice(0, 8);
+    for (const item of completedItems) {
+      const instanceId = getItemProcessInstanceId(item);
+      const defName = processNameMap.get(instanceId) ?? instanceId.slice(0, 8);
       const group = byDefinition.get(defName) ?? { active: [], completed: [] };
-      group.completed.push(task);
+      group.completed.push(item);
       byDefinition.set(defName, group);
     }
 
@@ -482,8 +497,8 @@ export function TaskGroupedView({
           <ProcessCard
             key={name}
             processName={name}
-            activeTasks={group.active}
-            completedTasks={group.completed}
+            activeItems={group.active}
+            completedItems={group.completed}
             currentUserId={currentUserId}
             currentUserName={currentUserName}
             userNames={userNames}
@@ -495,18 +510,18 @@ export function TaskGroupedView({
   }
 
   // Group by action only (no process grouping)
-  const byAction = new Map<string, { active: HumanTask[]; completed: HumanTask[] }>();
+  const byAction = new Map<string, { active: ActionItem[]; completed: ActionItem[] }>();
 
-  for (const task of activeTasks) {
-    const action = getActionType(task);
+  for (const item of activeItems) {
+    const action = getActionType(item);
     const group = byAction.get(action.type) ?? { active: [], completed: [] };
-    group.active.push(task);
+    group.active.push(item);
     byAction.set(action.type, group);
   }
-  for (const task of completedTasks) {
-    const action = getActionType(task);
+  for (const item of completedItems) {
+    const action = getActionType(item);
     const group = byAction.get(action.type) ?? { active: [], completed: [] };
-    group.completed.push(task);
+    group.completed.push(item);
     byAction.set(action.type, group);
   }
 
@@ -519,8 +534,8 @@ export function TaskGroupedView({
       {actionGroups.map(([type, group]) => (
         <ActionGroup
           key={type}
-          tasks={group.active}
-          completedTasks={group.completed}
+          items={group.active}
+          completedItems={group.completed}
           currentUserId={currentUserId}
           currentUserName={currentUserName}
           userNames={userNames}

@@ -255,6 +255,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       handoffRepo,
       notificationService,
       undefined, // humanTaskRepository
+      undefined, // coworkSessionRepository
       userDirectoryService,
     );
 
@@ -356,6 +357,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       handoffRepo,
       notificationService,
       undefined,
+      undefined, // coworkSessionRepository
       userDirectoryService,
     );
 
@@ -431,6 +433,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       handoffRepo,
       failingNotificationService,
       undefined,
+      undefined, // coworkSessionRepository
       userDirectoryService,
     );
 
@@ -464,6 +467,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       handoffRepo,
       notificationService,
       undefined,
+      undefined, // coworkSessionRepository
       userDirectoryService,
     );
 
