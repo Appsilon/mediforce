@@ -29,11 +29,12 @@ test.describe('Workflow Schedule & Publishing Journey', () => {
     await expect(page.getByText('Frequency').first()).toBeVisible({ timeout: 3_000 });
     await showStep(page);
 
-    // Select "Daily" frequency from the first available frequency dropdown
-    const frequencySelects = page.locator('select');
-    // Find the last frequency select (the newly added one)
-    const lastFrequencySelect = frequencySelects.last();
-    await lastFrequencySelect.selectOption('daily');
+    // Select "Daily" frequency — target the frequency select within the newly added cron entry.
+    // The new entry defaults to "Hourly", which also shows a minute select after the frequency.
+    // Use the label text to find the right select.
+    const frequencyLabel = page.getByText('Frequency').last();
+    const frequencySelect = frequencyLabel.locator('..').locator('select').first();
+    await frequencySelect.selectOption('daily');
     await showStep(page);
 
     // Verify the "Save & publish as vN" button is visible and shows the correct next version
