@@ -692,6 +692,36 @@ export function buildSeedData(testUserId: string) {
       triggers: [{ type: 'manual', name: 'start-review-cycle' }],
       createdAt: twoDaysAgo,
     },
+    'Supply Chain Review:2': {
+      name: 'Supply Chain Review',
+      namespace: 'test',
+      version: 2,
+      title: 'Added cron schedule trigger',
+      description: 'End-to-end supply chain review process with scheduled runs',
+      steps: [
+        { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector' },
+        { id: 'narrative-summary', name: 'Narrative Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3' },
+        { id: 'risk-scoring', name: 'Risk Scoring', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+        { id: 'human-review', name: 'Human Review', type: 'review', executor: 'human', verdicts: { approve: { target: 'done' }, revise: { target: 'vendor-assessment' } } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [
+        { from: 'vendor-assessment', to: 'narrative-summary' },
+        { from: 'narrative-summary', to: 'risk-scoring' },
+        { from: 'risk-scoring', to: 'human-review' },
+      ],
+      triggers: [
+        { type: 'manual', name: 'start-review-cycle' },
+        { type: 'cron', name: 'daily-run', schedule: '0 8 * * *' },
+      ],
+      createdAt: oneHourAgo,
+    },
+  };
+
+  const workflowMeta: Record<string, Record<string, unknown>> = {
+    'Supply Chain Review': {
+      publishedVersion: 1,
+    },
   };
 
   const agentDefinitions: Record<string, Record<string, unknown>> = {
@@ -787,5 +817,5 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions, namespaces, namespaceMembers };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, workflowMeta, agentDefinitions, namespaces, namespaceMembers };
 }

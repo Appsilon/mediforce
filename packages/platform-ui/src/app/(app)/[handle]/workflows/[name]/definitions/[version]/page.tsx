@@ -9,7 +9,7 @@ import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useAuth } from '@/contexts/auth-context';
 import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
-import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { saveWorkflowDefinition, setPublishedWorkflowVersion } from '@/app/actions/definitions';
 import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { VersionLabel } from '@/components/ui/version-label';
@@ -38,15 +38,29 @@ export default function WorkflowDefinitionVersionPage() {
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
-  const { definitions, loading } = useWorkflowDefinitions(decodedName);
+  const { definitions, loading, publishedVersion, refreshPublished } = useWorkflowDefinitions(decodedName);
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
   const [editing, setEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>([]);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>([]);
+  const [editedDefinitionOverrides, setEditedDefinitionOverrides] = useState<Partial<WorkflowDefinition>>({});
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
+  const [publishing, setPublishing] = useState(false);
+
+  const isPublished = publishedVersion !== null && publishedVersion === versionNumber;
+
+  const handlePublish = useCallback(async () => {
+    if (!definition) return;
+    setPublishing(true);
+    const result = await setPublishedWorkflowVersion(decodedName, definition.version);
+    if (result.success) {
+      await refreshPublished();
+    }
+    setPublishing(false);
+  }, [definition, decodedName, refreshPublished]);
 
   const currentSteps = editing ? editedSteps : (definition?.steps ?? []);
   const currentTransitions = editing ? editedTransitions : (definition?.transitions ?? []);
@@ -57,6 +71,7 @@ export default function WorkflowDefinitionVersionPage() {
     setEditedTitle('');
     setEditedSteps(structuredClone(definition.steps));
     setEditedTransitions(structuredClone(definition.transitions));
+    setEditedDefinitionOverrides({});
     setEditing(true);
     setSaveState({ status: 'idle' });
   }, [definition]);
@@ -64,6 +79,7 @@ export default function WorkflowDefinitionVersionPage() {
   const cancelEditing = useCallback(() => {
     setEditing(false);
     setEditedSteps([]);
+    setEditedDefinitionOverrides({});
     setSaveState({ status: 'idle' });
   }, []);
 
@@ -198,14 +214,15 @@ export default function WorkflowDefinitionVersionPage() {
     const result = await saveWorkflowDefinition({
       name: definition.name,
       title: editedTitle.trim() || undefined,
-      description: definition.description,
+      description: editedDefinitionOverrides.description ?? definition.description,
+      preamble: editedDefinitionOverrides.preamble ?? definition.preamble,
       steps: editedSteps,
       transitions,
-      triggers: definition.triggers,
-      roles: definition.roles,
-      env: definition.env,
-      notifications: definition.notifications,
-      metadata: definition.metadata,
+      triggers: editedDefinitionOverrides.triggers ?? definition.triggers,
+      roles: editedDefinitionOverrides.roles ?? definition.roles,
+      env: editedDefinitionOverrides.env ?? definition.env,
+      notifications: editedDefinitionOverrides.notifications ?? definition.notifications,
+      metadata: editedDefinitionOverrides.metadata ?? definition.metadata,
       repo: definition.repo,
       url: definition.url,
     });
@@ -218,7 +235,7 @@ export default function WorkflowDefinitionVersionPage() {
     } else {
       setSaveState({ status: 'error', message: result.error });
     }
-  }, [definition, editedTitle, editedSteps, editedTransitions, name, router]);
+  }, [definition, editedTitle, editedSteps, editedTransitions, editedDefinitionOverrides, name, router, handle]);
 
   // Build a WorkflowDefinition from edited steps for the diagram
   const diagramDefinition: WorkflowDefinition | null = definition
@@ -266,6 +283,11 @@ export default function WorkflowDefinitionVersionPage() {
               {editing && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                   editing
+                </span>
+              )}
+              {!editing && isPublished && (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  Published
                 </span>
               )}
             </div>
@@ -331,12 +353,31 @@ export default function WorkflowDefinitionVersionPage() {
                 </button>
 
                 {/* Start Run */}
-                <StartRunButton workflowName={decodedName} version={definition.version} />
+                <StartRunButton workflowName={decodedName} version={definition.version} label={isPublished ? undefined : 'Test run'} />
               </>
             )}
           </div>
         </div>
       </div>
+
+      {/* Draft banner */}
+      {!editing && !isPublished && (
+        <div className="mx-6 mt-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900/50 dark:bg-amber-950/30">
+          <span className="text-sm text-amber-800 dark:text-amber-200">
+            This version is a draft
+          </span>
+          <button
+            onClick={handlePublish}
+            disabled={publishing}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 transition-colors whitespace-nowrap',
+              publishing && 'opacity-50 cursor-not-allowed',
+            )}
+          >
+            {publishing ? 'Publishing...' : 'Publish this version'}
+          </button>
+        </div>
+      )}
 
       {/* Content: diagram + optional side panel */}
       <div className="flex flex-1 min-h-0">
@@ -359,11 +400,12 @@ export default function WorkflowDefinitionVersionPage() {
             </summary>
             {editing ? (
               <YamlEditor
-                steps={editedSteps}
-                transitions={editedTransitions}
-                onChange={(steps, transitions) => {
-                  setEditedSteps(steps);
-                  setEditedTransitions(transitions);
+                definition={diagramDefinition}
+                onChange={(updates) => {
+                  setEditedSteps(updates.steps);
+                  setEditedTransitions(updates.transitions);
+                  const { steps: _s, transitions: _t, name: _n, ...overrides } = updates;
+                  setEditedDefinitionOverrides(overrides);
                 }}
               />
             ) : (
@@ -409,32 +451,46 @@ export default function WorkflowDefinitionVersionPage() {
 }
 
 // ---------------------------------------------------------------------------
-// YAML editor — direct text editing of steps + transitions
+// YAML editor — direct text editing of full workflow definition
 // ---------------------------------------------------------------------------
 
-function YamlEditor({ steps, transitions, onChange }: {
-  steps: WorkflowStep[];
-  transitions: WorkflowDefinition['transitions'];
-  onChange: (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => void;
+/** Fields excluded from YAML editing (immutable identifiers / system fields) */
+const YAML_EXCLUDED_KEYS = new Set(['version', 'createdAt', 'name']);
+
+function YamlEditor({ definition, onChange }: {
+  definition: WorkflowDefinition;
+  onChange: (updates: Omit<WorkflowDefinition, 'version' | 'createdAt'>) => void;
 }) {
-  const [yamlText, setYamlText] = useState(() =>
-    yamlStringify({ steps, transitions }, { indent: 2 }),
-  );
+  const [yamlText, setYamlText] = useState(() => {
+    const editable: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(definition)) {
+      if (!YAML_EXCLUDED_KEYS.has(key) && value !== undefined) {
+        editable[key] = value;
+      }
+    }
+    return yamlStringify(editable, { indent: 2 });
+  });
   const [error, setError] = useState<string | null>(null);
 
   const applyYaml = useCallback(() => {
     try {
-      const parsed = yamlParse(yamlText) as { steps?: WorkflowStep[]; transitions?: WorkflowDefinition['transitions'] };
+      const parsed = yamlParse(yamlText) as Record<string, unknown>;
       if (!parsed?.steps || !Array.isArray(parsed.steps)) {
         setError('YAML must contain a "steps" array');
         return;
       }
       setError(null);
-      onChange(parsed.steps, parsed.transitions ?? []);
+      onChange({
+        ...parsed,
+        name: definition.name,
+        steps: parsed.steps as WorkflowStep[],
+        transitions: (parsed.transitions as WorkflowDefinition['transitions']) ?? [],
+        triggers: (parsed.triggers as WorkflowDefinition['triggers']) ?? definition.triggers,
+      } as Omit<WorkflowDefinition, 'version' | 'createdAt'>);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid YAML');
     }
-  }, [yamlText, onChange]);
+  }, [yamlText, onChange, definition.name, definition.triggers]);
 
   return (
     <div className="mt-2 space-y-2">

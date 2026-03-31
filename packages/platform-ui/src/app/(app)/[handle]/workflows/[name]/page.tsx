@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2, ArrowRightLeft, KeyRound } from 'lucide-react';
+import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, CalendarClock } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-editor';
+import { WorkflowScheduleEditor } from '@/components/workflows/workflow-schedule-editor';
 
 
 export default function ProcessDefinitionPage() {
@@ -226,7 +227,7 @@ export default function ProcessDefinitionPage() {
       {/* Tabs */}
       <Tabs.Root defaultValue="runs" className="flex flex-1 flex-col">
         <Tabs.List className="flex border-b px-6 gap-0">
-          {['runs', 'definitions', 'secrets'].map((tab) => (
+          {['runs', 'definitions', 'schedule', 'secrets'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -235,14 +236,16 @@ export default function ProcessDefinitionPage() {
                 'text-muted-foreground border-transparent',
                 'data-[state=active]:text-foreground data-[state=active]:border-primary',
                 'hover:text-foreground',
-                tab === 'secrets' && 'flex items-center gap-1.5',
+                (tab === 'secrets' || tab === 'schedule') && 'flex items-center gap-1.5',
               )}
             >
               {tab === 'runs'
                 ? `Runs${runs.length > 0 ? ` (${runs.length})` : ''}`
                 : tab === 'secrets'
                   ? <><KeyRound className="h-3.5 w-3.5" />Secrets</>
-                  : 'Definitions'}
+                  : tab === 'schedule'
+                    ? <><CalendarClock className="h-3.5 w-3.5" />Schedule</>
+                    : 'Definitions'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -273,6 +276,15 @@ export default function ProcessDefinitionPage() {
         <Tabs.Content value="definitions" className="flex-1 p-6">
           <div className="max-w-2xl">
             <DefinitionsList workflowName={decodedName} />
+          </div>
+        </Tabs.Content>
+
+        {/* Schedule tab */}
+        <Tabs.Content value="schedule" className="flex-1 p-6">
+          <div className="max-w-2xl">
+            {latest && (
+              <WorkflowScheduleEditor definition={latest as unknown as import('@mediforce/platform-core').WorkflowDefinition} latestVersion={Number(latest.version)} />
+            )}
           </div>
         </Tabs.Content>
 

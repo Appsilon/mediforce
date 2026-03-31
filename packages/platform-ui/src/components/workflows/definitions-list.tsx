@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ChevronRight, Pencil, Loader2 } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { VersionLabel } from '@/components/ui/version-label';
-import { setDefaultWorkflowVersion } from '@/app/actions/definitions';
+import { setPublishedWorkflowVersion } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
@@ -14,7 +14,7 @@ interface DefinitionsListProps {
 
 export function DefinitionsList({ workflowName }: DefinitionsListProps) {
   const handle = useHandleFromPath();
-  const { definitions, latestVersion, defaultVersion, loading, refreshDefault } = useWorkflowDefinitions(workflowName);
+  const { definitions, latestVersion, publishedVersion, loading, refreshPublished } = useWorkflowDefinitions(workflowName);
 
   if (loading) {
     return (
@@ -59,9 +59,9 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
 
       <div className="rounded-lg border divide-y">
         {definitions.map((def) => {
-          const isDefault = def.version === defaultVersion;
+          const isPublished = def.version === publishedVersion;
           const isArchived = def.archived === true;
-          const canSetDefault = !isDefault && !isArchived;
+          const canPublish = !isPublished && !isArchived;
 
           return (
             <div
@@ -77,6 +77,18 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                 className="flex items-center gap-2.5 flex-1 min-w-0"
               >
                 <VersionLabel version={def.version} title={def.title} className="text-sm shrink-0" />
+
+                {isPublished && (
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    Published
+                  </span>
+                )}
+
+                {!isPublished && !isArchived && (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    Draft
+                  </span>
+                )}
 
                 {isArchived && (
                   <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
@@ -97,28 +109,24 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                   </span>
                 )}
 
-                {isDefault ? (
-                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 whitespace-nowrap">
-                    default
-                  </span>
-                ) : (
+                {!isPublished && (
                   <button
                     onClick={async (e) => {
                       e.preventDefault();
-                      if (canSetDefault) {
-                        await setDefaultWorkflowVersion(workflowName, def.version);
-                        refreshDefault();
+                      if (canPublish) {
+                        await setPublishedWorkflowVersion(workflowName, def.version);
+                        refreshPublished();
                       }
                     }}
-                    disabled={!canSetDefault}
+                    disabled={!canPublish}
                     className={cn(
                       'text-[11px] whitespace-nowrap transition-colors',
-                      canSetDefault
+                      canPublish
                         ? 'text-muted-foreground/60 hover:text-foreground md:opacity-0 md:group-hover:opacity-100'
                         : 'invisible',
                     )}
                   >
-                    Make default
+                    Publish
                   </button>
                 )}
 

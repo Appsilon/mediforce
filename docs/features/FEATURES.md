@@ -12,6 +12,9 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Workflow Home](#workflow-home) — overview of all workflows and their active runs
 - [Workflow Editor — Browse](#workflow-editor--browse) — navigating workflow definitions and versions
 - [Workflow Editor — Edit Mode](#workflow-editor--edit-mode) — modifying workflow step graph visually
+- [Workflow Schedule — Cron](#workflow-schedule--cron) — adding cron triggers via the Schedule tab
+- [Workflow Schedule — Badges](#workflow-schedule--badges) — Published/Draft badges in definitions list
+- [Workflow Schedule — Draft Banner](#workflow-schedule--draft-banner) — draft version banner with publish action
 
 **Process Runs** — monitoring and controlling workflow executions
 - [Run Detail — Step Graph](#run-detail--step-graph) — tracking progress through workflow steps
@@ -63,6 +66,24 @@ Workflow detail page with Runs tab (default) showing execution history, and Defi
 Visual editor for workflow definitions. Click nodes to inspect step configuration, enter edit mode to modify steps, use "+" to add new steps. Cancel discards without saving. This is how workflow authors iterate on process design.
 
 ![workflow-editor-edit-mode](workflow-editor-edit-mode.gif)
+
+### Workflow Schedule — Cron
+
+The Schedule tab on workflow detail. Shows existing triggers and lets you add cron schedules with a frequency preset picker (hourly, daily, weekly, monthly). Time picker is restricted to 15-minute intervals matching the cron heartbeat. "Save & publish as vN" creates a new published version with the updated triggers.
+
+![workflow-schedule-cron](workflow-schedule-cron.gif)
+
+### Workflow Schedule — Badges
+
+Definitions list shows Published (green) and Draft (gray) badges next to version numbers. Published version is the one used by cron triggers and the default "Start run" action.
+
+![workflow-schedule-badges](workflow-schedule-badges.gif)
+
+### Workflow Schedule — Draft Banner
+
+Non-published versions show an amber draft banner with a "Publish this version" button. The start run button shows "Test run" label to indicate this isn't the production version.
+
+![workflow-schedule-draft-banner](workflow-schedule-draft-banner.gif)
 
 ---
 

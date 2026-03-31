@@ -16,9 +16,11 @@ interface StartRunButtonProps {
   version?: number;
   /** Show version dropdown (split button). */
   showVersionPicker?: boolean;
+  /** Override the button label (default: "Start Run"). */
+  label?: string;
 }
 
-export function StartRunButton({ workflowName, version, showVersionPicker }: StartRunButtonProps) {
+export function StartRunButton({ workflowName, version, showVersionPicker, label }: StartRunButtonProps) {
   const router = useRouter();
   const handle = useHandleFromPath();
   const { firebaseUser } = useAuth();
@@ -83,7 +85,7 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
           )}
         >
           {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-          {starting ? 'Starting...' : 'Start Run'}
+          {starting ? 'Starting...' : (label ?? 'Start Run')}
         </button>
         {errorBanner}
       </div>
@@ -103,7 +105,7 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
           )}
         >
           {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-          {starting ? 'Starting...' : 'Start Run'}
+          {starting ? 'Starting...' : (label ?? 'Start Run')}
         </button>
         <button
           onClick={() => setDropdownOpen((prev) => !prev)}
@@ -130,7 +132,7 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
                   <VersionLabel version={def.version} title={def.title} variant="inline" />
                   {isEffective && (
                     <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400 ml-auto shrink-0">
-                      default
+                      published
                     </span>
                   )}
                 </button>

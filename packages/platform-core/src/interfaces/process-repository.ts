@@ -17,7 +17,7 @@ export interface WorkflowDefinitionGroup {
   name: string;
   versions: WorkflowDefinition[];
   latestVersion: number;
-  defaultVersion: number | null;
+  publishedVersion: number | null;
 }
 
 export interface WorkflowDefinitionListResult {
@@ -33,8 +33,8 @@ export interface ProcessRepository {
   saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void>;
   listWorkflowDefinitions(): Promise<WorkflowDefinitionListResult>;
   getLatestWorkflowVersion(name: string): Promise<number>;
-  getDefaultWorkflowVersion(name: string): Promise<number | null>;
-  setDefaultWorkflowVersion(name: string, version: number): Promise<void>;
+  getPublishedWorkflowVersion(name: string): Promise<number | null>;
+  setPublishedWorkflowVersion(name: string, version: number): Promise<void>;
 
   // ---------------------------------------------------------------------------
   // ProcessDefinition methods (legacy)
