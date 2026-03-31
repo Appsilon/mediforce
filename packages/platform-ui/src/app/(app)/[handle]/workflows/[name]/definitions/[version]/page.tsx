@@ -9,7 +9,7 @@ import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useAuth } from '@/contexts/auth-context';
 import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
-import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { saveWorkflowDefinition, setPublishedWorkflowVersion } from '@/app/actions/definitions';
 import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { VersionLabel } from '@/components/ui/version-label';
@@ -38,7 +38,7 @@ export default function WorkflowDefinitionVersionPage() {
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
-  const { definitions, loading } = useWorkflowDefinitions(decodedName);
+  const { definitions, loading, publishedVersion, refreshPublished } = useWorkflowDefinitions(decodedName);
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
   const [editing, setEditing] = useState(false);
@@ -48,6 +48,19 @@ export default function WorkflowDefinitionVersionPage() {
   const [editedDefinitionOverrides, setEditedDefinitionOverrides] = useState<Partial<WorkflowDefinition>>({});
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
+  const [publishing, setPublishing] = useState(false);
+
+  const isPublished = publishedVersion !== null && publishedVersion === versionNumber;
+
+  const handlePublish = useCallback(async () => {
+    if (!definition) return;
+    setPublishing(true);
+    const result = await setPublishedWorkflowVersion(decodedName, definition.version);
+    if (result.success) {
+      await refreshPublished();
+    }
+    setPublishing(false);
+  }, [definition, decodedName, refreshPublished]);
 
   const currentSteps = editing ? editedSteps : (definition?.steps ?? []);
   const currentTransitions = editing ? editedTransitions : (definition?.transitions ?? []);
@@ -272,6 +285,11 @@ export default function WorkflowDefinitionVersionPage() {
                   editing
                 </span>
               )}
+              {!editing && isPublished && (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  published
+                </span>
+              )}
             </div>
             {editing && (
               <input
@@ -335,12 +353,31 @@ export default function WorkflowDefinitionVersionPage() {
                 </button>
 
                 {/* Start Run */}
-                <StartRunButton workflowName={decodedName} version={definition.version} />
+                <StartRunButton workflowName={decodedName} version={definition.version} label={isPublished ? undefined : 'Test run'} />
               </>
             )}
           </div>
         </div>
       </div>
+
+      {/* Draft banner */}
+      {!editing && !isPublished && (
+        <div className="mx-6 mt-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900/50 dark:bg-amber-950/30">
+          <span className="text-sm text-amber-800 dark:text-amber-200">
+            This version is a draft
+          </span>
+          <button
+            onClick={handlePublish}
+            disabled={publishing}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 transition-colors whitespace-nowrap',
+              publishing && 'opacity-50 cursor-not-allowed',
+            )}
+          >
+            {publishing ? 'Publishing...' : 'Publish this version'}
+          </button>
+        </div>
+      )}
 
       {/* Content: diagram + optional side panel */}
       <div className="flex flex-1 min-h-0">
