@@ -7,7 +7,8 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { CoworkSession, ProcessInstance, WorkflowDefinition } from '@mediforce/platform-core';
 import { db } from '@/lib/firebase';
-import { ConversationView } from '@/components/cowork/conversation-view';
+import { ChatCoworkView } from '@/components/cowork/chat-cowork-view';
+import { VoiceCoworkView } from '@/components/cowork/voice-cowork-view';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { routes } from '@/lib/routes';
@@ -103,12 +104,21 @@ export default function CoworkSessionPage() {
         </div>
       </div>
 
-      <ConversationView
-        session={session}
-        instance={instance}
-        handle={handle}
-        stepDescription={stepDescription}
-      />
+      {session.agent === 'voice-realtime' ? (
+        <VoiceCoworkView
+          session={session}
+          instance={instance}
+          handle={handle}
+          stepDescription={stepDescription}
+        />
+      ) : (
+        <ChatCoworkView
+          session={session}
+          instance={instance}
+          handle={handle}
+          stepDescription={stepDescription}
+        />
+      )}
     </div>
   );
 }

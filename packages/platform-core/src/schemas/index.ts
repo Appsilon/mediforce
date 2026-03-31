@@ -121,6 +121,8 @@ export {
 
 export {
   ConversationTurnSchema,
+  CoworkAgentSchema,
+  CoworkVoiceConfigSchema,
   CoworkSessionStatusSchema,
   CoworkSessionSchema,
   type ConversationTurn,

@@ -44,6 +44,8 @@ export {
   WorkflowStepSchema,
   WorkflowDefinitionSchema,
   ConversationTurnSchema,
+  CoworkAgentSchema,
+  CoworkVoiceConfigSchema,
   CoworkSessionStatusSchema,
   CoworkSessionSchema,
   NamespaceTypeSchema,

@@ -27,10 +27,24 @@ export const WorkflowAgentConfigSchema = z.object({
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
 });
 
-export const WorkflowCoworkConfigSchema = z.object({
+export const CoworkChatConfigSchema = z.object({
   model: z.string().optional(),
+});
+
+export const CoworkVoiceRealtimeConfigSchema = z.object({
+  model: z.string().optional(),
+  voice: z.string().optional(),
+  synthesisModel: z.string().optional(),
+  maxDurationSeconds: z.number().positive().optional(),
+  idleTimeoutSeconds: z.number().positive().optional(),
+});
+
+export const WorkflowCoworkConfigSchema = z.object({
+  agent: z.enum(['chat', 'voice-realtime']),
   systemPrompt: z.string().optional(),
   outputSchema: z.record(z.string(), z.unknown()).optional(),
+  chat: CoworkChatConfigSchema.optional(),
+  voiceRealtime: CoworkVoiceRealtimeConfigSchema.optional(),
 });
 
 export const WorkflowReviewConfigSchema = z.object({
