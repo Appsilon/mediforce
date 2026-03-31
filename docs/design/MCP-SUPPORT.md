@@ -54,7 +54,9 @@ WorkflowDefinition JSON
 
 BaseContainerAgentPlugin.prepareOutputDir()
   1. Resolves {{SECRET}} templates in MCP server env vars
-  2. Writes /output/mcp-config.json (Claude CLI format)
+  2. Writes /output/mcp-config.json (Claude CLI format, includes allowedTools)
+
+AgentPlugin.run()
   3. Emits status event with MCP server list for audit
 
         ↓
@@ -72,18 +74,16 @@ Inside Docker container:
   - MCP server processes terminate when claude process exits
 ```
 
-### Tool Discovery
+### Tool Discovery (Future)
 
-When adding an MCP server to the catalog, the platform auto-discovers available tools by querying the server's `tools/list` endpoint. This populates the tool allowlist UI with checkboxes, so workflow authors know exactly what tools are available and can restrict access granularly.
+Tool discovery is planned for v2. When adding an MCP server to the catalog, the platform will auto-discover available tools by querying the server's `tools/list` endpoint. For v1, available tools are defined manually in the catalog seed data.
 
-### Why stdio transport (not HTTP/SSE)
+### Why stdio transport
 
-MCP supports two transports: stdio and HTTP+SSE. We support both, configurable per tool:
+MCP supports two transports: stdio and HTTP+SSE. We use stdio only in v1:
 
-- **stdio** (default): Claude CLI spawns the MCP server as a child process. Automatic lifecycle, no ports, Docker-friendly.
-- **HTTP/SSE** (future): For long-running shared services. Requires network configuration in Docker.
-
-Both options are configurable per tool in the catalog. For v1, stdio covers every use case.
+- **stdio**: Claude CLI spawns the MCP server as a child process. Automatic lifecycle, no ports, Docker-friendly.
+- **HTTP/SSE** (future, v2): For long-running shared MCP servers. Requires network configuration in Docker.
 
 ## Schema
 
@@ -160,12 +160,15 @@ mcpServers: z.array(McpServerConfigSchema).optional(),
 
 - `packages/platform-core/src/schemas/__tests__/mcp-server-config.test.ts` — schema validation (valid, minimal, allowedTools, rejection)
 - `packages/agent-runtime/src/plugins/__tests__/claude-code-agent-plugin.test.ts` — MCP status event, `--mcp-config` flag presence/absence
+- `packages/agent-runtime/src/plugins/__tests__/resolve-env.test.ts` — `resolveValue` secret resolution (literals, templates, fallbacks, errors)
+- `packages/agent-runtime/src/plugins/__tests__/mcp-config-integration.test.ts` — `writeMcpConfig` file output (structure, secret resolution, allowedTools, empty env)
+- `packages/platform-ui/e2e/journeys/tool-catalog.journey.ts` — E2E journey: browse catalog, search, view detail page
 
 ## UI Design
 
 ### Tool Catalog (`/[handle]/tools`)
 
-Card grid grouped by category. Each card shows:
+Card grid grouped by category with section headers showing counts. Live search filters by name, description, and category. Each card shows:
 - Tool name + category badge
 - Description
 - Connection command
@@ -176,6 +179,8 @@ Card grid grouped by category. Each card shows:
 Categories: Development, Data Access, Communication, Clinical Data, Research.
 
 Seed catalog: GitHub, Filesystem, PostgreSQL, Slack, CDISC Library, Brave Search.
+
+E2E journey test: `e2e/journeys/tool-catalog.journey.ts` — GIF recording at `docs/features/tool-catalog.gif`.
 
 ### Tool Detail (`/[handle]/tools/[toolId]`)
 
@@ -220,7 +225,7 @@ MCP servers are defined at the org level. For v1, the catalog is seed data. For 
 
 ### Tool-level allowlisting
 
-The `allowedTools` field on `McpServerConfigSchema` restricts which tools from a server are available to the agent. When set, tools not in the allowlist are not exposed. When omitted, all tools are available. This is enforced at config generation time.
+The `allowedTools` field on `McpServerConfigSchema` restricts which tools from a server are available to the agent. When set, the allowlist is written to the generated `mcp-config.json` alongside the server config. When omitted, all tools are available. Note: Claude CLI does not natively enforce `allowedTools` — the field is included in the config for audit purposes and future enforcement (e.g., via prompt constraints or a filtering MCP proxy).
 
 ### Secrets scoping
 

@@ -282,7 +282,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       ? this.context.workflowSecrets
       : undefined;
 
-    const mcpConfig: Record<string, { command: string; args: string[]; env?: Record<string, string> }> = {};
+    const mcpConfig: Record<string, { command: string; args: string[]; env?: Record<string, string>; allowedTools?: string[] }> = {};
 
     for (const server of servers) {
       const resolvedEnv: Record<string, string> = {};
@@ -296,6 +296,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
         command: server.command,
         args: server.args ?? [],
         ...(Object.keys(resolvedEnv).length > 0 ? { env: resolvedEnv } : {}),
+        ...(server.allowedTools && server.allowedTools.length > 0 ? { allowedTools: server.allowedTools } : {}),
       };
     }
 
