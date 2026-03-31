@@ -24,6 +24,15 @@ export const CoworkSessionStatusSchema = z.enum([
   'abandoned',    // session abandoned
 ]);
 
+export const CoworkAgentSchema = z.enum(['chat', 'voice-realtime']);
+
+export const CoworkVoiceConfigSchema = z.object({
+  voice: z.string(),
+  synthesisModel: z.string(),
+  maxDurationSeconds: z.number(),
+  idleTimeoutSeconds: z.number(),
+});
+
 export const CoworkSessionSchema = z.object({
   id: z.string().min(1),
   processInstanceId: z.string().min(1),
@@ -31,9 +40,11 @@ export const CoworkSessionSchema = z.object({
   assignedRole: z.string().min(1),
   assignedUserId: z.string().nullable(),
   status: CoworkSessionStatusSchema,
+  agent: CoworkAgentSchema,
   model: z.string().nullable(),
   systemPrompt: z.string().nullable(),
   outputSchema: z.record(z.string(), z.unknown()).nullable(),
+  voiceConfig: CoworkVoiceConfigSchema.nullable(),
   artifact: z.record(z.string(), z.unknown()).nullable(),
   turns: z.array(ConversationTurnSchema),
   createdAt: z.string().datetime(),

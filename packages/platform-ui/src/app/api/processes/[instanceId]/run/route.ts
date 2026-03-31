@@ -155,6 +155,19 @@ export async function POST(
           const now = new Date().toISOString();
           const sessionId = crypto.randomUUID();
 
+          const agentType = currentStep.cowork?.agent ?? 'chat';
+          const model = agentType === 'voice-realtime'
+            ? (currentStep.cowork?.voiceRealtime?.model ?? 'gpt-4o-realtime-preview')
+            : (currentStep.cowork?.chat?.model ?? null);
+          const voiceConfig = agentType === 'voice-realtime'
+            ? {
+                voice: currentStep.cowork?.voiceRealtime?.voice ?? 'alloy',
+                synthesisModel: currentStep.cowork?.voiceRealtime?.synthesisModel ?? 'anthropic/claude-sonnet-4',
+                maxDurationSeconds: currentStep.cowork?.voiceRealtime?.maxDurationSeconds ?? 600,
+                idleTimeoutSeconds: currentStep.cowork?.voiceRealtime?.idleTimeoutSeconds ?? 60,
+              }
+            : null;
+
           await coworkSessionRepo.create({
             id: sessionId,
             processInstanceId: instanceId,
@@ -162,9 +175,11 @@ export async function POST(
             assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned',
             assignedUserId: null,
             status: 'active',
-            model: currentStep.cowork?.model ?? null,
+            agent: agentType,
+            model,
             systemPrompt: currentStep.cowork?.systemPrompt ?? null,
             outputSchema: currentStep.cowork?.outputSchema ?? null,
+            voiceConfig,
             artifact: null,
             turns: [],
             createdAt: now,
@@ -179,7 +194,7 @@ export async function POST(
             action: 'cowork.session.created',
             description: `Cowork session created for step '${instance.currentStepId}'`,
             timestamp: now,
-            inputSnapshot: { sessionId, stepId: instance.currentStepId, assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned' },
+            inputSnapshot: { sessionId, stepId: instance.currentStepId, agent: agentType, assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned' },
             outputSnapshot: {},
             basis: 'Cowork executor step reached in auto-runner loop',
             entityType: 'coworkSession',
