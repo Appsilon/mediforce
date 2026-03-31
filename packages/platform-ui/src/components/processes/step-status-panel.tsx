@@ -31,7 +31,7 @@ interface StepConfigInfo {
   fallbackBehavior?: string;
   timeoutMinutes?: number;
   reviewerType?: string;
-  agentConfig?: { skill?: string; prompt?: string; model?: string; skillsDir?: string };
+  agentConfig?: { skill?: string; prompt?: string; model?: string; skillsDir?: string; mcpServers?: Array<{ name: string }> };
 }
 
 interface StepStatusPanelProps {
@@ -238,6 +238,9 @@ function StepConfigDetail({
   if (config.fallbackBehavior) entries.push({ label: 'Fallback', value: config.fallbackBehavior.replace(/_/g, ' ') });
   if (config.timeoutMinutes) entries.push({ label: 'Timeout', value: `${config.timeoutMinutes} min` });
   if (config.reviewerType && config.reviewerType !== 'none') entries.push({ label: 'Reviewer', value: config.reviewerType });
+  if (config.agentConfig?.mcpServers && config.agentConfig.mcpServers.length > 0) {
+    entries.push({ label: 'MCP Tools', value: config.agentConfig.mcpServers.map((s) => s.name).join(', ') });
+  }
 
   if (entries.length === 0 && !assembledPrompt && !config.agentConfig?.prompt && !hasAgentLog) return null;
 
