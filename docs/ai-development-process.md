@@ -1,84 +1,81 @@
 # AI-Assisted Development Process
 
-How we use AI coding agents (Claude Code) to build Mediforce — and how the repo is structured to make that reliable.
+How we use AI coding agents to build Mediforce — and how the repo is structured to make that work well.
 
-## Why Structure Matters
+## Why This Matters
 
-AI agents are powerful but context-dependent. Without structure, they guess, skip steps, and produce inconsistent code. With the right instruction files, they behave like a disciplined senior engineer who reads the project conventions before touching anything.
+AI agents are powerful but context-dependent. Without structure, they guess, hallucinate conventions, and produce inconsistent code. With the right files in the right places, they become reliable collaborators that follow your project's actual patterns.
 
-The goal isn't to trust AI blindly — it's to give it clear enough instructions that a human Tech Lead can delegate confidently and review efficiently.
+This isn't about trusting AI blindly — it's about giving it the right instructions so a human Tech Lead can delegate effectively and review confidently.
 
-## The Instruction Hierarchy
+## How It Works
+
+### The Instruction Hierarchy
 
 ```
-CLAUDE.md (root)              ← Auto-loaded. Single line: @AGENTS.md
+CLAUDE.md (root)              ← Auto-loaded. Points to AGENTS.md
 └── AGENTS.md (root)          ← Core rules, architecture, testing, skills router
       └── Skills Router       ← Maps "what am I doing" → "which skill to invoke"
 
 skills/*/SKILL.md             ← On-demand workflows (invoked via /skill-name)
+skills/*/references/          ← Checklists, templates used by skills
 ```
 
-**Key principle:** Instructions live close to the code they describe. `AGENTS.md` is the single source of truth for how agents behave in this repo.
+**Key principle:** Instructions live close to the code they describe. The root `AGENTS.md` stays under 300 lines and routes to specific skills for deep workflows.
 
-## The Agent Delegation Model
+### The Agent Delegation Model
 
-The main AI thread acts as a **Tech Lead** — not an individual contributor. It:
+The main AI thread acts as a **Tech Lead** — it delegates execution to subagents and focuses on architecture, coherence, and review.
 
-- Delegates execution to subagents (research, analysis, coding)
-- Parallelizes independent work across multiple agents
-- Reviews subagent output critically — rejects hacks, over-engineering, unnecessary deps
-- Keeps context clean for architectural decisions, not line-by-line implementation
+- **Delegate execution** — spawn subagents for research, analysis, and coding. Parallelize independent work.
+- **Think big picture** — focus on architecture, goals, and coherence, not line-by-line implementation.
+- **Review, don't rubber-stamp** — reject hacks, unnecessary dependencies, over-engineering, and solutions that don't fit the project's direction.
 
 In practice: receive task → break it down → dispatch subagents → verify output → report back.
 
-## Skills: Standardized Workflows
+### Skills (Standardized Workflows)
 
-Skills are reusable instruction sets invoked on demand via `/skill-name`:
+Skills are reusable instruction sets invoked on demand via `/skill-name`. The Skills Router in `AGENTS.md` maps task types to the right skill:
 
-| Skill | When to invoke |
-|-------|---------------|
-| `/code-review` | Reviewing any PR or diff |
-| `/e2e-test` | Writing or running E2E journey tests |
+| Skill | Purpose |
+|-------|---------|
+| `/code-review` | Review PRs and diffs against an 8-section checklist (security, architecture, testing, etc.) |
+| `/e2e-test` | Write, run, and record E2E journey tests with TDD workflow |
 | `/agent-browser` | Visual verification of UI in a live browser |
-| `/renovate-review` | Reviewing Renovate dependency update PRs |
-| `/community` | Writing Discord updates from rough notes |
-| `/generate-pitch` | Generating a Marp pitch deck |
+| `/renovate-review` | Triage and validate Renovate dependency PRs |
+| `/community` | Write Discord updates from rough notes |
+| `/generate-pitch` | Generate a Marp pitch deck from vision docs |
 
-Each skill has a `SKILL.md` with step-by-step workflow and optional `references/` with checklists and templates.
+Each skill has a `SKILL.md` with step-by-step workflow and optional `references/` with templates and checklists.
 
-## Testing Workflow (TDD for UI Features)
+### Testing: TDD with GIF Recordings
 
-UI features follow a tight loop:
+UI features follow a tight TDD loop where the E2E test comes first and the GIF recording is part of the deliverable:
 
-1. **RED** — Write the E2E journey test first (`/e2e-test`)
+1. **RED** — Write the E2E journey test first
 2. **GREEN** — Implement until the test passes
-3. **Record** — `pnpm test:e2e:gif` converts recordings to GIFs in `docs/features/`
+3. **Record** — Convert test recordings to GIFs in `docs/features/`
 4. **Gallery** — Add entry to `docs/features/FEATURES.md`
-5. **Commit** — GIF + feature code + FEATURES.md in the same PR
+5. **Ship** — GIF + feature code + gallery update in the same PR
 
-GIF recordings are part of the deliverable, not an afterthought.
+Quality gates run after every change: typecheck (~5s), affected tests (<1s), full suite (~9s). E2E with Firebase emulators (~60s) before merging UI changes.
 
-## Code Quality Gates
+## Adding New Instructions
 
-After every code change:
+### When to create a new skill
 
-```bash
-pnpm typecheck          # ~5s — catches type errors
-pnpm test:affected      # <1s — tests for changed files only
-pnpm test               # ~9s — full unit + integration suite
+When you find yourself giving the same multi-step instructions repeatedly. A skill standardizes the workflow so every invocation is consistent. Add the skill to `skills/`, register it in `_registry.yml`, symlink it into `.claude/skills/`, and add a row to the Skills Router in `AGENTS.md`.
+
+### Writing style for instruction files
+
+`AGENTS.md` and skill files are **instructions**, not documentation:
+
+```markdown
+# Wrong
+The module provides CRUD operations for managing processes.
+
+# Right
+Use `makeCrudRoute` for all CRUD endpoints. MUST export `openApi` from every route.
 ```
 
-Before merging UI changes:
-```bash
-cd packages/platform-ui && pnpm test:e2e:auth   # ~60s — full E2E with emulators
-```
-
-## File Reference
-
-| File | Purpose | When to modify |
-|------|---------|----------------|
-| `CLAUDE.md` | Entry point | Never — it's one line |
-| `AGENTS.md` | Core rules, architecture, testing, skills router | When adding packages, changing conventions, or adding skills |
-| `skills/*/SKILL.md` | Workflow instructions | When improving a repeatable workflow |
-| `skills/*/references/*` | Checklists and templates | When improving quality gates |
-| `skills/_registry.yml` | Skills index | When adding a new skill |
+Every sentence tells the agent what to DO, what to REUSE, or what rules to FOLLOW.
