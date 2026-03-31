@@ -5,7 +5,7 @@ import { Plus, Trash2, Save, Clock, ChevronDown, ChevronUp, AlertCircle, Check, 
 import { formatCron } from '@/lib/format-cron';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { saveWorkflowDefinition, setPublishedWorkflowVersion } from '@/app/actions/definitions';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -225,9 +225,11 @@ function computeNextRuns(schedule: string, count: number, now: Date = new Date()
 
 interface WorkflowScheduleEditorProps {
   definition: WorkflowDefinition;
+  latestVersion?: number;
 }
 
-export function WorkflowScheduleEditor({ definition }: WorkflowScheduleEditorProps) {
+export function WorkflowScheduleEditor({ definition, latestVersion }: WorkflowScheduleEditorProps) {
+  const nextVersion = (latestVersion ?? definition.version) + 1;
   const currentTriggers: Trigger[] = definition.triggers ?? [];
   const cronTriggers = currentTriggers.filter((t) => t.type === 'cron');
   const hasManual = currentTriggers.some((t) => t.type === 'manual');
@@ -324,7 +326,9 @@ export function WorkflowScheduleEditor({ definition }: WorkflowScheduleEditorPro
     setSaving(false);
 
     if (result.success) {
-      setSaveResult({ success: true, message: `Saved as version ${result.version}.` });
+      // Auto-publish the new version
+      await setPublishedWorkflowVersion(result.name, result.version);
+      setSaveResult({ success: true, message: `Saved and published as v${result.version}.` });
     } else {
       setSaveResult({ success: false, message: result.error });
     }
@@ -397,30 +401,35 @@ export function WorkflowScheduleEditor({ definition }: WorkflowScheduleEditorPro
       </div>
 
       {/* Save */}
-      <div className="flex items-center justify-between pt-2 border-t">
-        <div className="text-sm">
-          {saveResult !== null && (
-            <span className={cn(
-              'inline-flex items-center gap-1.5',
-              saveResult.success ? 'text-green-600' : 'text-destructive',
-            )}>
-              {saveResult.success ? <Check className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
-              {saveResult.message}
-            </span>
-          )}
+      <div className="space-y-2 pt-2 border-t">
+        <div className="flex items-center justify-between">
+          <div className="text-sm">
+            {saveResult !== null && (
+              <span className={cn(
+                'inline-flex items-center gap-1.5',
+                saveResult.success ? 'text-green-600' : 'text-destructive',
+              )}>
+                {saveResult.success ? <Check className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+                {saveResult.message}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={handleSave}
+              disabled={saving || !hasChanges}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                'bg-primary text-primary-foreground hover:bg-primary/90',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+              )}
+            >
+              <Save className="h-3.5 w-3.5" />
+              {saving ? 'Saving...' : `Save & publish as v${nextVersion}`}
+            </button>
+            <p className="text-xs text-muted-foreground">This will create a new published version with updated triggers</p>
+          </div>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving || !hasChanges}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-            'bg-primary text-primary-foreground hover:bg-primary/90',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-          )}
-        >
-          <Save className="h-3.5 w-3.5" />
-          {saving ? 'Saving...' : 'Save schedule'}
-        </button>
       </div>
     </div>
   );

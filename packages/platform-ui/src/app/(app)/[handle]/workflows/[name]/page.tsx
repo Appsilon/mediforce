@@ -283,7 +283,7 @@ export default function ProcessDefinitionPage() {
         <Tabs.Content value="schedule" className="flex-1 p-6">
           <div className="max-w-2xl">
             {latest && (
-              <WorkflowScheduleEditor definition={latest as unknown as import('@mediforce/platform-core').WorkflowDefinition} />
+              <WorkflowScheduleEditor definition={latest as unknown as import('@mediforce/platform-core').WorkflowDefinition} latestVersion={Number(latest.version)} />
             )}
           </div>
         </Tabs.Content>
