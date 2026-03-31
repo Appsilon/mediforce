@@ -190,4 +190,34 @@ describe('AgentOutputEnvelopeSchema', () => {
       );
     }
   });
+
+  it('should accept envelope with presentation HTML string', () => {
+    const result = AgentOutputEnvelopeSchema.safeParse({
+      ...validEnvelope,
+      presentation: '<h1>Report</h1>',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.presentation).toBe('<h1>Report</h1>');
+    }
+  });
+
+  it('should accept envelope without presentation (backward compat)', () => {
+    const result = AgentOutputEnvelopeSchema.safeParse(validEnvelope);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.presentation).toBeUndefined();
+    }
+  });
+
+  it('should accept envelope with presentation: null', () => {
+    const result = AgentOutputEnvelopeSchema.safeParse({
+      ...validEnvelope,
+      presentation: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.presentation).toBeNull();
+    }
+  });
 });

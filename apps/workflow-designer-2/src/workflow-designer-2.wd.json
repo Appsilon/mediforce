@@ -1,8 +1,8 @@
 {
-  "name": "workflow-designer",
+  "name": "workflow-designer-2",
   "namespace": "appsilon",
-  "description": "Meta-workflow that turns a natural language idea into a complete Mediforce WorkflowDefinition. First design the steps, then choose how each step gets executed (human, AI agent, script). The result is a single registered WorkflowDefinition ready to run.",
-  "preamble": "## Domain Context\nThis workflow generates structured workflow definitions for the Mediforce platform. All clinical and pharma terminology in workflow descriptions refers to domain modeling constructs.",
+  "description": "Meta-workflow that turns a natural language idea into a complete Mediforce WorkflowDefinition. Enhanced with visual presentations — agents produce HTML views alongside their output so reviewers see flow diagrams and proposal comparisons instead of raw JSON.",
+  "preamble": "## Domain Context\nThis workflow generates structured workflow definitions for the Mediforce platform. All clinical and pharma terminology in workflow descriptions refers to domain modeling constructs.\n\n## Presentation Layer\nAgent steps in this workflow produce both result.json (structured data) and presentation.html (visual HTML view). The presentation is shown to reviewers in a sandboxed iframe with Tailwind CSS available. The HTML can access the result data via window.__data__.",
   "triggers": [
     { "name": "manual", "type": "manual" }
   ],
@@ -38,13 +38,13 @@
       "plugin": "claude-code-agent",
       "agent": {
         "skill": "generate-steps",
-        "skillsDir": "apps/workflow-designer/plugins/workflow-designer/skills",
+        "skillsDir": "apps/workflow-designer-2/plugins/workflow-designer-2/skills",
         "model": "sonnet",
         "confidenceThreshold": 0.5,
         "fallbackBehavior": "escalate_to_human",
         "timeoutMinutes": 10
       },
-      "description": "Generate workflow structure (steps, transitions, triggers) from the natural language description. Outputs YAML with step definitions, routing logic, and review loops — but no execution config yet."
+      "description": "Generate workflow structure (steps, transitions, triggers) from the natural language description. Outputs YAML with step definitions, routing logic, and review loops — plus an HTML flow diagram for visual review."
     },
     {
       "id": "review-steps",
@@ -52,7 +52,7 @@
       "type": "review",
       "executor": "human",
       "allowedRoles": ["workflow-designer"],
-      "description": "Review the generated workflow structure. Approve if the steps, transitions, and review loops match your intent. Revise to regenerate with feedback.",
+      "description": "Review the generated workflow structure. The visual flow diagram shows steps, transitions, and review loops. Approve if the design matches your intent. Revise to regenerate with feedback.",
       "verdicts": {
         "approve": { "target": "describe-execution-preferences" },
         "revise": { "target": "generate-steps" }
@@ -82,7 +82,7 @@
       "plugin": "claude-code-agent",
       "agent": {
         "skill": "generate-execution-proposals",
-        "skillsDir": "apps/workflow-designer/plugins/workflow-designer/skills",
+        "skillsDir": "apps/workflow-designer-2/plugins/workflow-designer-2/skills",
         "model": "sonnet",
         "confidenceThreshold": 0.5,
         "fallbackBehavior": "escalate_to_human",
@@ -92,7 +92,7 @@
         "APP_BASE_URL": "{{APP_BASE_URL}}",
         "PLATFORM_API_KEY": "{{PLATFORM_API_KEY}}"
       },
-      "description": "Generate 1-N execution proposals for the approved workflow structure. Each proposal assigns executor type, agent config, autonomy level, and plugin to every step. Proposals vary by automation strategy (e.g. all-human, hybrid, full-auto, budget-friendly). Outputs an options array for selection review."
+      "description": "Generate 1-N execution proposals for the approved workflow structure. Each proposal assigns executor type, agent config, autonomy level, and plugin to every step. Proposals are presented as visual comparison cards with automation breakdowns."
     },
     {
       "id": "review-execution",
@@ -100,7 +100,7 @@
       "type": "review",
       "executor": "human",
       "allowedRoles": ["workflow-designer"],
-      "description": "Review the proposed execution configurations. Select the one that best fits your needs, or revise to regenerate with different preferences.",
+      "description": "Review the proposed execution configurations. The visual comparison shows automation levels, executor assignments, and trade-offs for each proposal. Select the best fit, or revise to regenerate with different preferences.",
       "selection": 1,
       "verdicts": {
         "approve": { "target": "validate" },

@@ -79,6 +79,7 @@ export interface GitResultFile {
 export interface SpawnDockerResult {
   cliOutput: string;
   gitMetadata: GitMetadata | null;
+  presentation: string | null;
   outputDir: string;
   /** Env var names injected into the process (for audit logging) */
   injectedEnvVars: string[];
@@ -590,6 +591,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
           duration_ms,
           result: cleanResult,
           ...(spawnResult.gitMetadata ? { gitMetadata: spawnResult.gitMetadata } : {}),
+          ...(spawnResult.presentation ? { presentation: spawnResult.presentation } : {}),
         },
         timestamp: new Date().toISOString(),
       });
@@ -1083,7 +1085,15 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       }
     }
 
-    return { cliOutput, gitMetadata, outputDir, injectedEnvVars: [] };
+    // Read presentation.html from local output directory
+    let localPresentation: string | null = null;
+    try {
+      localPresentation = await readFile(join(outputDir, 'presentation.html'), 'utf-8');
+    } catch {
+      // presentation.html is optional
+    }
+
+    return { cliOutput, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
   }
 
   protected async spawnDockerContainer(
@@ -1280,6 +1290,14 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       // git-result.json may not exist if the agent made no changes
     }
 
-    return { cliOutput, gitMetadata, outputDir, injectedEnvVars };
+    // Read presentation.html from the output directory (optional agent-provided HTML view)
+    let presentation: string | null = null;
+    try {
+      presentation = await readFile(join(outputDir, 'presentation.html'), 'utf-8');
+    } catch {
+      // presentation.html is optional — agents may not produce one
+    }
+
+    return { cliOutput, gitMetadata, presentation, outputDir, injectedEnvVars };
   }
 }
