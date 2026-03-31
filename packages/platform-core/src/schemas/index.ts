@@ -141,3 +141,8 @@ export {
   WorkflowSecretsSchema,
   type WorkflowSecrets,
 } from './workflow-secret.js';
+
+export {
+  CronTriggerStateSchema,
+  type CronTriggerState,
+} from './cron-trigger-state.js';

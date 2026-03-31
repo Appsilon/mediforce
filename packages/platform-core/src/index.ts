@@ -46,6 +46,7 @@ export {
   NamespaceSchema,
   NamespaceMemberSchema,
   WorkflowSecretsSchema,
+  CronTriggerStateSchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -97,6 +98,7 @@ export type {
   Namespace,
   NamespaceMember,
   WorkflowSecrets,
+  CronTriggerState,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)
@@ -117,6 +119,7 @@ export type {
   UserDirectoryService,
   DirectoryUser,
   AgentRunRepository,
+  CronTriggerStateRepository,
 } from './interfaces/index.js';
 
 // Agent definition schema + repository interface
@@ -145,6 +148,7 @@ export {
   InMemoryHumanTaskRepository,
   InMemoryHandoffRepository,
   NoopNotificationService,
+  InMemoryCronTriggerStateRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,
