@@ -33,6 +33,10 @@ export { AgentRunner } from './runner/agent-runner.js';
 export type { AgentRunResult } from './runner/agent-runner.js';
 export { FallbackHandler } from './runner/fallback-handler.js';
 
+// Env validation
+export { validateWorkflowEnv } from './plugins/resolve-env.js';
+export type { MissingEnvVar } from './plugins/resolve-env.js';
+
 // Testing utilities
 export {
   InMemoryAgentEventLog,

@@ -1,3 +1,6 @@
+# Working directory for apps developer want to keep along the project but don't share publicly
+private-apps
+
 .planning
 CONTINUE_HERE.md
 
