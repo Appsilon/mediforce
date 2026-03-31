@@ -306,29 +306,32 @@ export class FirestoreProcessRepository implements ProcessRepository {
     const definitions = await Promise.all(
       Array.from(grouped.entries()).map(async ([name, versions]) => {
         const latestVersion = Math.max(...versions.map((v) => v.version));
-        const defaultVersion = await this.getDefaultWorkflowVersion(name);
-        return { name, versions, latestVersion, defaultVersion };
+        const publishedVersion = await this.getPublishedWorkflowVersion(name);
+        return { name, versions, latestVersion, publishedVersion };
       }),
     );
 
     return { definitions };
   }
 
-  async getDefaultWorkflowVersion(name: string): Promise<number | null> {
+  async getPublishedWorkflowVersion(name: string): Promise<number | null> {
     try {
       const metaRef = doc(this.db, 'workflowMeta', name);
       const snapshot = await getDoc(metaRef);
       if (!snapshot?.exists()) return null;
       const data = snapshot.data();
-      return typeof data?.defaultVersion === 'number' ? data.defaultVersion : null;
+      // Read publishedVersion first, fall back to legacy defaultVersion
+      if (typeof data?.publishedVersion === 'number') return data.publishedVersion;
+      if (typeof data?.defaultVersion === 'number') return data.defaultVersion;
+      return null;
     } catch {
       return null;
     }
   }
 
-  async setDefaultWorkflowVersion(name: string, version: number): Promise<void> {
+  async setPublishedWorkflowVersion(name: string, version: number): Promise<void> {
     const metaRef = doc(this.db, 'workflowMeta', name);
-    await setDoc(metaRef, { defaultVersion: version }, { merge: true });
+    await setDoc(metaRef, { publishedVersion: version }, { merge: true });
   }
 
   async getLatestWorkflowVersion(name: string): Promise<number> {

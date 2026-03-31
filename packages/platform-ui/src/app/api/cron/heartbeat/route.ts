@@ -32,7 +32,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Flatten to latest version of each definition that has at least one cron trigger
     const cronDefinitions = definitionGroups
-      .map((group) => group.versions.find((v) => v.version === group.latestVersion))
+      .map((group) => group.versions.find((v) => v.version === (group.publishedVersion ?? group.latestVersion)))
       .filter((def): def is WorkflowDefinition => def !== undefined)
       .filter(
         (def: WorkflowDefinition) =>

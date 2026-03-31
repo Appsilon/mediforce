@@ -26,10 +26,10 @@ export function useWorkflowDefinitions(name: string) {
 
   const latestVersion = definitions[0]?.version ?? 0;
 
-  // Default version from workflowMeta/{name}
-  const [defaultVersion, setDefaultVersionState] = useState<number | null>(null);
+  // Published version from workflowMeta/{name}
+  const [publishedVersion, setPublishedVersionState] = useState<number | null>(null);
 
-  const refreshDefault = useCallback(async () => {
+  const refreshPublished = useCallback(async () => {
     if (!name) return;
     try {
       const db = getFirestore(getApp());
@@ -37,19 +37,23 @@ export function useWorkflowDefinitions(name: string) {
       const snap = await getDoc(metaRef);
       if (snap.exists()) {
         const data = snap.data();
-        setDefaultVersionState(typeof data.defaultVersion === 'number' ? data.defaultVersion : null);
+        // Read publishedVersion first, fall back to legacy defaultVersion
+        const version = typeof data.publishedVersion === 'number' ? data.publishedVersion
+          : typeof data.defaultVersion === 'number' ? data.defaultVersion
+          : null;
+        setPublishedVersionState(version);
       } else {
-        setDefaultVersionState(null);
+        setPublishedVersionState(null);
       }
     } catch {
-      setDefaultVersionState(null);
+      setPublishedVersionState(null);
     }
   }, [name]);
 
-  useEffect(() => { refreshDefault(); }, [refreshDefault]);
+  useEffect(() => { refreshPublished(); }, [refreshPublished]);
 
-  // Effective version for running: default if set, otherwise latest
-  const effectiveVersion = defaultVersion ?? latestVersion;
+  // Effective version for running: published if set, otherwise latest
+  const effectiveVersion = publishedVersion ?? latestVersion;
 
-  return { definitions, latestVersion, defaultVersion, effectiveVersion, loading, error, refreshDefault };
+  return { definitions, latestVersion, publishedVersion, effectiveVersion, loading, error, refreshPublished };
 }

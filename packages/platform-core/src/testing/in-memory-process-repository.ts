@@ -50,17 +50,17 @@ export class InMemoryProcessRepository implements ProcessRepository {
         name,
         versions,
         latestVersion: Math.max(...versions.map((v) => v.version)),
-        defaultVersion: this.workflowDefaults.get(name) ?? null,
+        publishedVersion: this.workflowDefaults.get(name) ?? null,
       }),
     );
     return { definitions };
   }
 
-  async getDefaultWorkflowVersion(name: string): Promise<number | null> {
+  async getPublishedWorkflowVersion(name: string): Promise<number | null> {
     return this.workflowDefaults.get(name) ?? null;
   }
 
-  async setDefaultWorkflowVersion(name: string, version: number): Promise<void> {
+  async setPublishedWorkflowVersion(name: string, version: number): Promise<void> {
     this.workflowDefaults.set(name, version);
   }
 

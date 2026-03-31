@@ -118,15 +118,15 @@ export async function saveWorkflowDefinition(
 }
 
 // ---------------------------------------------------------------------------
-// Default version
+// Published version
 // ---------------------------------------------------------------------------
 
-export type SetDefaultVersionResult = { success: true } | { success: false; error: string };
+export type SetPublishedVersionResult = { success: true } | { success: false; error: string };
 
-export async function setDefaultWorkflowVersion(
+export async function setPublishedWorkflowVersion(
   name: string,
   version: number,
-): Promise<SetDefaultVersionResult> {
+): Promise<SetPublishedVersionResult> {
   const { processRepo } = getPlatformServices();
   try {
     // Verify version exists
@@ -134,7 +134,7 @@ export async function setDefaultWorkflowVersion(
     if (!def) {
       return { success: false, error: `Version ${version} not found` };
     }
-    await processRepo.setDefaultWorkflowVersion(name, version);
+    await processRepo.setPublishedWorkflowVersion(name, version);
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
