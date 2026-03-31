@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, Wrench } from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
   { href: '/runs', label: 'All runs', icon: Play, badge: null, exact: false },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
+  { href: '/tools', label: 'Tools', icon: Wrench, badge: null, exact: false },
   { href: '/tasks', label: 'New actions', icon: User, badge: null, exact: false },
 ] as const;
 
