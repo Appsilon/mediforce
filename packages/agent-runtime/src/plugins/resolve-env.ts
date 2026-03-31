@@ -18,7 +18,7 @@ export interface ResolvedEnv {
 
 const TEMPLATE_REGEX = /^\{\{(\w+)\}\}$/;
 
-function resolveValue(value: string, workflowSecrets?: Record<string, string>): string {
+export function resolveValue(value: string, workflowSecrets?: Record<string, string>): string {
   const match = TEMPLATE_REGEX.exec(value);
   if (!match) return value;
 

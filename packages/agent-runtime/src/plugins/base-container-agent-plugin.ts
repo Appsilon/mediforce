@@ -4,8 +4,8 @@ import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata } from '@mediforce/platform-core';
-import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig } from '@mediforce/platform-core';
+import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls } from './container-plugin.js';
 
@@ -236,8 +236,47 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   /** Hook called after the output directory is created and prompt.txt is written,
    *  but before the Docker container is spawned. Override to write additional files
    *  (e.g. agent config) into the output dir that will be mounted at /output. */
-  protected async prepareOutputDir(_outputDir: string): Promise<void> {
-    // Default: no-op
+  protected async prepareOutputDir(outputDir: string): Promise<void> {
+    await this.writeMcpConfig(outputDir);
+  }
+
+  /** Generate mcp-config.json for Claude CLI --mcp-config flag.
+   *  Resolves {{SECRET}} templates in MCP server env vars. */
+  protected async writeMcpConfig(outputDir: string): Promise<void> {
+    const servers = this.agentConfig.mcpServers;
+    if (!servers || servers.length === 0) return;
+
+    const workflowSecrets = isWorkflowAgentContext(this.context)
+      ? this.context.workflowSecrets
+      : undefined;
+
+    const mcpConfig: Record<string, { command: string; args: string[]; env?: Record<string, string> }> = {};
+
+    for (const server of servers) {
+      const resolvedEnv: Record<string, string> = {};
+      if (server.env) {
+        for (const [key, value] of Object.entries(server.env)) {
+          resolvedEnv[key] = resolveValue(value, workflowSecrets);
+        }
+      }
+
+      mcpConfig[server.name] = {
+        command: server.command,
+        args: server.args ?? [],
+        ...(Object.keys(resolvedEnv).length > 0 ? { env: resolvedEnv } : {}),
+      };
+    }
+
+    await writeFile(
+      join(outputDir, 'mcp-config.json'),
+      JSON.stringify({ mcpServers: mcpConfig }, null, 2),
+      'utf-8',
+    );
+
+    agentLog('mcp.config', 'MCP config written', {
+      stepId: this.context.stepId,
+      servers: servers.map((s) => s.name),
+    });
   }
 
   /** Resolve the host path to the mock-fixtures directory for this step's plugin.
@@ -306,6 +345,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         image: stepAgent.image,
         repo: stepAgent.repo,
         commit: stepAgent.commit,
+        mcpServers: stepAgent.mcpServers,
       };
     } else {
       const stepConfig = context.config.stepConfigs.find(
@@ -479,6 +519,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         payload: `agent activity log: ${logFile}`,
         timestamp: new Date().toISOString(),
       });
+
+      if (this.agentConfig.mcpServers && this.agentConfig.mcpServers.length > 0) {
+        await emit({
+          type: 'status',
+          payload: `MCP servers: ${this.agentConfig.mcpServers.map((s) => s.name).join(', ')}`,
+          timestamp: new Date().toISOString(),
+        });
+      }
 
       let spawnResult: SpawnDockerResult;
 
