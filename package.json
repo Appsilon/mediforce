@@ -23,7 +23,6 @@
     "migrate:handles": "tsx scripts/migrate-user-handles.ts"
   },
   "pnpm": {
-    "overrides": {},
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp",
