@@ -23,9 +23,7 @@
     "migrate:handles": "tsx scripts/migrate-user-handles.ts"
   },
   "pnpm": {
-    "overrides": {
-      "axios": "1.13.6"
-    },
+    "overrides": {},
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp",
