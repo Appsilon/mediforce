@@ -26,6 +26,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedCollection('processDefinitions', data.processDefinitions);
   await seedCollection('processConfigs', data.processConfigs);
   await seedCollection('workflowDefinitions', data.workflowDefinitions);
+  await seedCollection('workflowMeta', data.workflowMeta);
   await seedCollection('agentDefinitions', data.agentDefinitions);
   await seedCollection('namespaces', data.namespaces);
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
