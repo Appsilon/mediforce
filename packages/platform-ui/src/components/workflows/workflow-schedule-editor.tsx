@@ -677,6 +677,9 @@ function CronEntryEditor({
                   {date.toISOString().replace('T', ' ').replace(/:\d{2}\.\d{3}Z$/, ' UTC')}
                 </p>
               ))}
+              {nextRuns.length < 5 && (
+                <p className="text-xs text-muted-foreground italic">Could not compute all upcoming runs</p>
+              )}
             </div>
           )}
         </div>
