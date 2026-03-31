@@ -35,7 +35,8 @@ const coworkDesignerDef: WorkflowDefinition = {
       executor: 'cowork',
       allowedRoles: ['designer'],
       cowork: {
-        model: 'anthropic/claude-sonnet-4',
+        agent: 'chat',
+        chat: { model: 'anthropic/claude-sonnet-4' },
         systemPrompt: 'Help design a workflow.',
         outputSchema: {
           type: 'object',
@@ -119,9 +120,11 @@ describe('Cowork lifecycle: route → simulate session → finalize → complete
       assignedRole: 'designer',
       assignedUserId: null,
       status: 'active' as const,
+      agent: 'chat' as const,
       model: 'anthropic/claude-sonnet-4',
       systemPrompt: 'Help design a workflow.',
       outputSchema: coworkDesignerDef.steps[1].cowork!.outputSchema!,
+      voiceConfig: null,
       artifact: null,
       turns: [],
       createdAt: new Date().toISOString(),

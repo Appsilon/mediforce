@@ -8,3 +8,4 @@ export type { NotificationService, NotificationEvent, NotificationTarget } from 
 export type { UserDirectoryService, DirectoryUser } from './user-directory-service.js';
 export type { AgentRunRepository } from './agent-run-repository.js';
 export type { CoworkSessionRepository } from './cowork-session-repository.js';
+export type { CronTriggerStateRepository } from './cron-trigger-state-repository.js';

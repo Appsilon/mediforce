@@ -7,6 +7,7 @@ import {
   FirestoreHumanTaskRepository,
   FirestoreAgentDefinitionRepository,
   FirestoreCoworkSessionRepository,
+  FirestoreCronTriggerStateRepository,
   initializeFirebase,
   getFirestoreDb,
 } from '@mediforce/platform-infra';
@@ -45,6 +46,7 @@ export interface PlatformServices {
   humanTaskRepo: FirestoreHumanTaskRepository;
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
   coworkSessionRepo: FirestoreCoworkSessionRepository;
+  cronTriggerStateRepo: FirestoreCronTriggerStateRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -78,6 +80,7 @@ export function getPlatformServices(): PlatformServices {
   const humanTaskRepo = new FirestoreHumanTaskRepository(db);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository();
   const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);
+  const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -139,6 +142,7 @@ export function getPlatformServices(): PlatformServices {
     humanTaskRepo,
     agentDefinitionRepo,
     coworkSessionRepo,
+    cronTriggerStateRepo,
   };
 
   if (!seedingStarted) {

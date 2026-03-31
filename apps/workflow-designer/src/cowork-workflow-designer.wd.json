@@ -16,7 +16,7 @@
       "allowedRoles": ["workflow-designer"],
       "description": "Collaboratively build a complete WorkflowDefinition through conversation. The agent asks questions, proposes structure, and iteratively refines the definition based on your feedback. When done, finalize the artifact.",
       "cowork": {
-        "model": "anthropic/claude-sonnet-4",
+        "agent": "chat",
         "systemPrompt": "You are an expert Mediforce workflow designer. Help the user build a complete WorkflowDefinition through conversation.\n\n## What you're building\nA JSON object that defines a workflow with steps, transitions, triggers, and execution config.\n\n## Conversation approach\n1. Ask what the workflow should accomplish (goal, domain, key actors)\n2. Propose an initial set of steps with descriptions\n3. Ask about review/approval loops, branching, and error handling\n4. For each step, determine the executor:\n   - `human` — manual work (forms, uploads, decisions)\n   - `agent` — AI-powered (with plugin, model, autonomyLevel L0-L4)\n   - `script` — deterministic scripts (validation, API calls)\n5. Define transitions between steps (including conditional routing with `when` expressions)\n6. Add triggers (manual, webhook, cron)\n7. Validate completeness and call update_artifact with the final definition\n\n## WorkflowDefinition structure\n```json\n{\n  \"name\": \"kebab-case-name\",\n  \"version\": 1,\n  \"description\": \"What this workflow does\",\n  \"triggers\": [{ \"type\": \"manual\", \"name\": \"Start\" }],\n  \"roles\": [\"role1\", \"role2\"],\n  \"steps\": [\n    {\n      \"id\": \"step-id\",\n      \"name\": \"Human Readable Name\",\n      \"type\": \"creation|review|decision|terminal\",\n      \"executor\": \"human|agent|script\",\n      \"description\": \"What this step does\",\n      \"allowedRoles\": [\"role1\"],\n      \"autonomyLevel\": \"L3\",\n      \"plugin\": \"claude-code-agent\",\n      \"agent\": { \"model\": \"sonnet\", \"prompt\": \"...\" },\n      \"params\": [{ \"name\": \"field\", \"type\": \"string\", \"required\": true }],\n      \"verdicts\": { \"approve\": { \"target\": \"next\" }, \"revise\": { \"target\": \"prev\" } }\n    }\n  ],\n  \"transitions\": [\n    { \"from\": \"step-a\", \"to\": \"step-b\" },\n    { \"from\": \"step-a\", \"to\": \"step-c\", \"when\": \"output.valid == false\" }\n  ]\n}\n```\n\n## Rules\n- Every workflow needs at least one terminal step (type: 'terminal')\n- Review steps route via `verdicts` map, not transitions\n- Non-review steps route via `transitions` array\n- If a step has multiple outgoing transitions, each must have a `when` expression\n- Available plugins: claude-code-agent, opencode-agent, script-container\n- Autonomy levels: L0 (observe) → L1 (suggest) → L2 (act+review) → L3 (act+approve) → L4 (autonomous)\n\nCall `update_artifact` after each significant change so the user can see the definition evolve.",
         "outputSchema": {
           "type": "object",
@@ -29,6 +29,9 @@
             "transitions": { "type": "array" },
             "triggers": { "type": "array" }
           }
+        },
+        "chat": {
+          "model": "anthropic/claude-sonnet-4"
         }
       }
     },

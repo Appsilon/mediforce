@@ -44,12 +44,15 @@ export {
   WorkflowStepSchema,
   WorkflowDefinitionSchema,
   ConversationTurnSchema,
+  CoworkAgentSchema,
+  CoworkVoiceConfigSchema,
   CoworkSessionStatusSchema,
   CoworkSessionSchema,
   NamespaceTypeSchema,
   NamespaceSchema,
   NamespaceMemberSchema,
   WorkflowSecretsSchema,
+  CronTriggerStateSchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -105,6 +108,7 @@ export type {
   Namespace,
   NamespaceMember,
   WorkflowSecrets,
+  CronTriggerState,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)
@@ -126,6 +130,7 @@ export type {
   DirectoryUser,
   AgentRunRepository,
   CoworkSessionRepository,
+  CronTriggerStateRepository,
 } from './interfaces/index.js';
 
 // Agent definition schema + repository interface
@@ -155,6 +160,7 @@ export {
   InMemoryHandoffRepository,
   NoopNotificationService,
   InMemoryCoworkSessionRepository,
+  InMemoryCronTriggerStateRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,

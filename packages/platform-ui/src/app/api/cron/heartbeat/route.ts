@@ -22,7 +22,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { processRepo, cronTrigger } = getPlatformServices();
+  const { processRepo, cronTrigger, cronTriggerStateRepo } = getPlatformServices();
   const now = new Date();
   const triggered: TriggeredEntry[] = [];
   const skipped: SkippedEntry[] = [];
@@ -66,7 +66,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           continue;
         }
 
-        if (!isDue(schedule, now)) {
+        // Read last triggered time for this specific trigger.
+        // When no state exists (first run), use the definition's createdAt so
+        // gap-scanning catches any missed windows since the definition was created.
+        const state = await cronTriggerStateRepo.get(def.name, trigger.name);
+        const lastTriggeredAt = state
+          ? new Date(state.lastTriggeredAt)
+          : def.createdAt
+            ? new Date(def.createdAt)
+            : undefined;
+
+        if (!isDue(schedule, now, lastTriggeredAt)) {
           skipped.push({
             definitionName: def.name,
             definitionVersion: def.version,
@@ -83,6 +93,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           triggerName: trigger.name,
           triggeredBy: 'cron-heartbeat',
           payload: { schedule, firedAt: now.toISOString() },
+        });
+
+        // Persist trigger state AFTER successful fire (at-least-once semantics)
+        await cronTriggerStateRepo.set({
+          definitionName: def.name,
+          triggerName: trigger.name,
+          lastTriggeredAt: now.toISOString(),
         });
 
         // Kick off the run loop by calling the run endpoint
