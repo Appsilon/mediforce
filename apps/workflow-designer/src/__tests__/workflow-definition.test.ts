@@ -22,8 +22,8 @@ describe('workflow-designer', () => {
       if (!result.success) return;
 
       expect(result.data.name).toBe('workflow-designer');
-      expect(result.data.steps).toHaveLength(9);
-      expect(result.data.transitions).toHaveLength(7);
+      expect(result.data.steps).toHaveLength(13);
+      expect(result.data.transitions).toHaveLength(9);
       expect(result.data.triggers).toHaveLength(1);
     });
 

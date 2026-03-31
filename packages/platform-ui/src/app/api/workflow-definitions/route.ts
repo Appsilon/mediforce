@@ -4,6 +4,34 @@ import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform
 import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
 
 /**
+ * GET /api/workflow-definitions
+ *
+ * List all registered workflow definitions. Returns each workflow's latest
+ * version as a full WorkflowDefinition object, suitable for loading into
+ * the Workflow Designer edit flow.
+ */
+export async function GET(request: Request): Promise<NextResponse> {
+  if (!validateApiKey(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { processRepo } = getPlatformServices();
+  const { definitions } = await processRepo.listWorkflowDefinitions();
+
+  const result = definitions.map((group) => {
+    const latest = group.versions.find((v) => v.version === group.latestVersion);
+    return {
+      name: group.name,
+      latestVersion: group.latestVersion,
+      defaultVersion: group.defaultVersion,
+      definition: latest ?? null,
+    };
+  });
+
+  return NextResponse.json({ definitions: result });
+}
+
+/**
  * POST /api/workflow-definitions?namespace=handle
  *
  * Register a new WorkflowDefinition. Version is auto-incremented from the
