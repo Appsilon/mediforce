@@ -31,18 +31,6 @@ The main AI thread acts as a **Tech Lead** — not an individual contributor. It
 
 In practice: receive task → break it down → dispatch subagents → verify output → report back.
 
-## How We Work: No Spec Theatre
-
-We don't write formal specs for every change. The workflow scales to task size:
-
-| Task size | Approach |
-|-----------|----------|
-| Small fix, single file | Just do it. TypeCheck + test after. |
-| Feature, 3–10 files | Plan briefly in conversation, then execute. |
-| Architecture change | Discuss trade-offs with user, align on approach, then execute with subagents. |
-
-The key question before any non-trivial change: **"Is there a more elegant way to do this?"** If yes, pause and discuss before coding.
-
 ## Skills: Standardized Workflows
 
 Skills are reusable instruction sets invoked on demand via `/skill-name`:
