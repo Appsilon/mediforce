@@ -7,3 +7,5 @@ export type { HandoffRepository } from './handoff-repository.js';
 export type { NotificationService, NotificationEvent, NotificationTarget } from './notification-service.js';
 export type { UserDirectoryService, DirectoryUser } from './user-directory-service.js';
 export type { AgentRunRepository } from './agent-run-repository.js';
+export type { CoworkSessionRepository } from './cowork-session-repository.js';
+export type { CronTriggerStateRepository } from './cron-trigger-state-repository.js';

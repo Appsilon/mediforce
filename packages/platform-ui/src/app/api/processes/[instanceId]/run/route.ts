@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
 import { executeAgentStep } from '@/lib/execute-agent-step';
-
 import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '@/lib/loop-guard';
 
 interface RunProcessBody {
@@ -131,6 +130,84 @@ export async function POST(
               updatedAt: new Date().toISOString(),
             });
           }
+          break;
+        }
+
+        if (currentStep.executor === 'cowork') {
+          // Guard: skip if an active cowork session already exists for this step
+          const { coworkSessionRepo } = getPlatformServices();
+          const existingSessions = await coworkSessionRepo.getByInstanceId(instanceId);
+          const hasActiveSession = existingSessions.some(
+            (s) => s.stepId === instance.currentStepId && s.status === 'active',
+          );
+          if (hasActiveSession) {
+            console.log(`[auto-runner] Duplicate guard: active cowork session already exists for step '${instance.currentStepId}' on instance '${instanceId}' — pausing`);
+            if (instance.status === 'running') {
+              await instanceRepo.update(instanceId, {
+                status: 'paused',
+                pauseReason: 'cowork_in_progress',
+                updatedAt: new Date().toISOString(),
+              });
+            }
+            break;
+          }
+
+          const now = new Date().toISOString();
+          const sessionId = crypto.randomUUID();
+
+          const agentType = currentStep.cowork?.agent ?? 'chat';
+          const model = agentType === 'voice-realtime'
+            ? (currentStep.cowork?.voiceRealtime?.model ?? 'gpt-4o-realtime-preview')
+            : (currentStep.cowork?.chat?.model ?? null);
+          const voiceConfig = agentType === 'voice-realtime'
+            ? {
+                voice: currentStep.cowork?.voiceRealtime?.voice ?? 'alloy',
+                synthesisModel: currentStep.cowork?.voiceRealtime?.synthesisModel ?? 'anthropic/claude-sonnet-4',
+                maxDurationSeconds: currentStep.cowork?.voiceRealtime?.maxDurationSeconds ?? 600,
+                idleTimeoutSeconds: currentStep.cowork?.voiceRealtime?.idleTimeoutSeconds ?? 60,
+              }
+            : null;
+
+          await coworkSessionRepo.create({
+            id: sessionId,
+            processInstanceId: instanceId,
+            stepId: instance.currentStepId,
+            assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned',
+            assignedUserId: null,
+            status: 'active',
+            agent: agentType,
+            model,
+            systemPrompt: currentStep.cowork?.systemPrompt ?? null,
+            outputSchema: currentStep.cowork?.outputSchema ?? null,
+            voiceConfig,
+            artifact: null,
+            turns: [],
+            createdAt: now,
+            updatedAt: now,
+            finalizedAt: null,
+          });
+
+          await auditRepo.append({
+            actorId: 'auto-runner',
+            actorType: 'system',
+            actorRole: 'orchestrator',
+            action: 'cowork.session.created',
+            description: `Cowork session created for step '${instance.currentStepId}'`,
+            timestamp: now,
+            inputSnapshot: { sessionId, stepId: instance.currentStepId, agent: agentType, assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned' },
+            outputSnapshot: {},
+            basis: 'Cowork executor step reached in auto-runner loop',
+            entityType: 'coworkSession',
+            entityId: sessionId,
+            processInstanceId: instanceId,
+            processDefinitionVersion: initialInstance.definitionVersion,
+          });
+
+          await instanceRepo.update(instanceId, {
+            status: 'paused',
+            pauseReason: 'cowork_in_progress',
+            updatedAt: now,
+          });
           break;
         }
 

@@ -5,6 +5,8 @@ export { InMemoryProcessInstanceRepository } from './in-memory-process-instance-
 export { InMemoryHumanTaskRepository } from './in-memory-human-task-repository.js';
 export { InMemoryHandoffRepository } from './in-memory-handoff-repository.js';
 export { NoopNotificationService } from './noop-notification-service.js';
+export { InMemoryCoworkSessionRepository } from './in-memory-cowork-session-repository.js';
+export { InMemoryCronTriggerStateRepository } from './in-memory-cron-trigger-state-repository.js';
 
 // Test factories
 export {
@@ -18,5 +20,6 @@ export {
   buildWorkflowDefinition,
   buildAgentOutputEnvelope,
   buildFileMetadata,
+  buildCoworkSession,
   resetFactorySequence,
 } from './factories.js';

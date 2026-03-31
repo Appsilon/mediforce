@@ -7,6 +7,8 @@
  */
 
 const ALLOWED_MINUTES = new Set([0, 15, 30, 45]);
+const FIFTEEN_MIN_MS = 15 * 60 * 1000;
+const MAX_SCAN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface CronValidationResult {
   valid: boolean;
@@ -141,18 +143,13 @@ export function validateCronSchedule(schedule: string): CronValidationResult {
   return { valid: true };
 }
 
-export function isDue(schedule: string, now: Date): boolean {
-  const parsed = parseCron(schedule);
-  if (typeof parsed === 'string') {
-    return false;
-  }
-
-  // Round down to nearest 15-minute boundary (UTC)
-  const minute = Math.floor(now.getUTCMinutes() / 15) * 15;
-  const hour = now.getUTCHours();
-  const dayOfMonth = now.getUTCDate();
-  const month = now.getUTCMonth() + 1; // JS months are 0-indexed
-  const dayOfWeek = now.getUTCDay(); // 0 = Sunday
+/** Check whether a specific instant matches a parsed cron schedule (UTC). */
+function matchesInstant(parsed: ParsedCron, instant: Date): boolean {
+  const minute = Math.floor(instant.getUTCMinutes() / 15) * 15;
+  const hour = instant.getUTCHours();
+  const dayOfMonth = instant.getUTCDate();
+  const month = instant.getUTCMonth() + 1; // JS months are 0-indexed
+  const dayOfWeek = instant.getUTCDay(); // 0 = Sunday
 
   return (
     parsed.minutes.includes(minute) &&
@@ -161,4 +158,46 @@ export function isDue(schedule: string, now: Date): boolean {
     parsed.months.includes(month) &&
     parsed.daysOfWeek.includes(dayOfWeek)
   );
+}
+
+/** Round timestamp down to the nearest 15-minute boundary (UTC). */
+function floorTo15Min(ms: number): number {
+  return Math.floor(ms / FIFTEEN_MIN_MS) * FIFTEEN_MIN_MS;
+}
+
+/** Round timestamp up to the next 15-minute boundary (UTC). */
+function ceilTo15Min(ms: number): number {
+  return Math.ceil(ms / FIFTEEN_MIN_MS) * FIFTEEN_MIN_MS;
+}
+
+/**
+ * Check whether a cron schedule is due.
+ *
+ * Without `lastTriggeredAt`: checks if `now` falls in a matching 15-minute window (original behavior).
+ * With `lastTriggeredAt`: scans all 15-minute boundaries in (lastTriggeredAt, now] to find any match.
+ * This makes cron resilient to irregular heartbeat intervals — missed windows are caught on the next beat.
+ * Scan is capped at 24 hours to prevent runaway iteration.
+ */
+export function isDue(schedule: string, now: Date, lastTriggeredAt?: Date): boolean {
+  const parsed = parseCron(schedule);
+  if (typeof parsed === 'string') {
+    return false;
+  }
+
+  if (!lastTriggeredAt) {
+    return matchesInstant(parsed, now);
+  }
+
+  // Scan 15-minute boundaries in (lastTriggeredAt, now]
+  const scanStart = Math.max(lastTriggeredAt.getTime(), now.getTime() - MAX_SCAN_MS);
+  const cursor0 = ceilTo15Min(scanStart + 1); // first boundary strictly after scanStart
+  const end = floorTo15Min(now.getTime());
+
+  for (let cursor = cursor0; cursor <= end; cursor += FIFTEEN_MIN_MS) {
+    if (matchesInstant(parsed, new Date(cursor))) {
+      return true;
+    }
+  }
+
+  return false;
 }

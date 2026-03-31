@@ -19,9 +19,12 @@ export function ProcessStatusBadge({
   const isWaiting = status === 'paused' && (
     pauseReason === 'waiting_for_human' || pauseReason === 'awaiting_agent_approval'
   );
-  const label = isWaiting
-    ? (pauseReason === 'awaiting_agent_approval' ? 'Review needed' : 'Waiting')
-    : status;
+  const isCowork = status === 'paused' && pauseReason === 'cowork_in_progress';
+  const label = isCowork
+    ? 'Co-work'
+    : isWaiting
+      ? (pauseReason === 'awaiting_agent_approval' ? 'Review needed' : 'Waiting')
+      : status;
   const styleKey = isWaiting ? 'waiting' : status;
 
   return (
