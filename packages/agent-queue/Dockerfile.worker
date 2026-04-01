@@ -1,7 +1,7 @@
 FROM node:24-slim
 
 # Install Docker CLI so the worker can spawn containers
-RUN apt-get update && apt-get install -y --no-install-recommends docker.io git openssh-client && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends docker.io git openssh-client ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
