@@ -22,7 +22,9 @@ export function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: str
   }
   if (repo.startsWith('https://')) {
     const clean = repo.replace(/\.git$/, '');
-    return { gitUrl: `${clean}.git`, httpsUrl: clean };
+    const match = clean.match(/https:\/\/github\.com\/(.+)/);
+    const sshUrl = match ? `git@github.com:${match[1]}.git` : `${clean}.git`;
+    return { gitUrl: sshUrl, httpsUrl: clean };
   }
   return {
     gitUrl: `git@github.com:${repo}.git`,
