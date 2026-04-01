@@ -4,6 +4,12 @@
  * Shared logic: image build metadata resolution, env var resolution, context storage.
  * Subclasses: BaseContainerAgentPlugin (LLM agents), ScriptContainerPlugin (deterministic scripts).
  */
+import { execSync } from 'node:child_process';
+import { existsSync, mkdirSync, cpSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
+import { tmpdir, homedir } from 'node:os';
 import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
@@ -49,7 +55,7 @@ export function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext)
  * Resolve the repo auth token from the step or workflow-level config.
  * `repoAuth` is the name of a key in resolvedEnv (sourced from workflow secrets).
  */
-function resolveRepoToken(
+export function resolveRepoToken(
   agentConfig: AgentConfig,
   context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
@@ -95,12 +101,25 @@ export function resolveImageBuild(
   return undefined;
 }
 
+const SKILLS_CACHE_DIR = join(tmpdir(), 'mediforce-skills-cache');
+
+/** Convert SSH git URL to HTTPS with token for authenticated clone. */
+function toHttpsWithToken(sshUrl: string, token: string): string {
+  const match = sshUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
+  if (match) {
+    return `https://x-access-token:${token}@github.com/${match[1]}.git`;
+  }
+  return sshUrl.replace('https://', `https://x-access-token:${token}@`);
+}
+
 export abstract class ContainerPlugin implements AgentPlugin {
   abstract readonly metadata: PluginCapabilityMetadata;
 
   protected context!: AgentContext | WorkflowAgentContext;
   protected resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
   protected imageBuild: ImageBuildMeta | undefined;
+  /** Cached skills dir path fetched from git repo. */
+  protected repoSkillsDir: string | null = null;
 
   abstract initialize(context: AgentContext | WorkflowAgentContext): Promise<void>;
   abstract run(emit: EmitFn): Promise<void>;
@@ -114,5 +133,71 @@ export abstract class ContainerPlugin implements AgentPlugin {
     workflowSecrets?: Record<string, string>,
   ): void {
     this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv, workflowSecrets);
+  }
+
+  /**
+   * Fetch skills from a git repo into a deterministic cache directory.
+   * Cache key: sha256(repoUrl + commit + skillsDir).
+   * Returns the path to the cached skills directory.
+   */
+  protected async fetchSkillsFromRepo(
+    skillsDir: string,
+    repoUrl: string,
+    commit: string,
+    repoToken?: string,
+  ): Promise<string> {
+    const hash = createHash('sha256').update(`${repoUrl}\0${commit}\0${skillsDir}`).digest('hex').slice(0, 16);
+    const cacheDir = join(SKILLS_CACHE_DIR, hash);
+
+    // Cache hit
+    if (existsSync(cacheDir)) {
+      console.log(`[container-plugin] Skills cache hit for ${skillsDir} (${hash})`);
+      this.repoSkillsDir = cacheDir;
+      return cacheDir;
+    }
+
+    // Cache miss — clone, copy, delete clone
+    console.log(`[container-plugin] Fetching skills from ${repoUrl}@${commit.slice(0, 8)} path=${skillsDir}`);
+    const cloneDir = mkdtempSync(join(tmpdir(), 'mediforce-skills-clone-'));
+
+    try {
+      const cloneUrl = repoToken ? toHttpsWithToken(repoUrl, repoToken) : repoUrl;
+      const deployKeyPath = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
+      const execOpts = {
+        stdio: 'pipe' as const,
+        env: { ...process.env, GIT_SSH_COMMAND: `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no` },
+      };
+
+      execSync(`git init "${cloneDir}"`, execOpts);
+      execSync(`git -C "${cloneDir}" remote add origin "${cloneUrl}"`, execOpts);
+      execSync(`git -C "${cloneDir}" fetch origin ${commit} --depth 1`, execOpts);
+      execSync(`git -C "${cloneDir}" checkout FETCH_HEAD`, execOpts);
+
+      const sourceDir = join(cloneDir, skillsDir);
+      if (!existsSync(sourceDir)) {
+        throw new Error(
+          `Skills directory "${skillsDir}" not found in repo ${repoUrl}@${commit.slice(0, 8)}`,
+        );
+      }
+
+      mkdirSync(SKILLS_CACHE_DIR, { recursive: true });
+      cpSync(sourceDir, cacheDir, { recursive: true });
+      console.log(`[container-plugin] Skills cached at ${cacheDir}`);
+    } finally {
+      rmSync(cloneDir, { recursive: true, force: true });
+    }
+
+    this.repoSkillsDir = cacheDir;
+    return cacheDir;
+  }
+
+  /**
+   * Resolve skillsDir — uses repo cache if available, otherwise resolveProjectPath.
+   */
+  protected resolveSkillsDir(skillsDir: string, resolveProjectPath: (p: string) => string): string {
+    if (this.repoSkillsDir) {
+      return this.repoSkillsDir;
+    }
+    return resolveProjectPath(skillsDir);
   }
 }

@@ -7,7 +7,7 @@ import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/a
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, normalizeRepoUrls } from './container-plugin.js';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls } from './container-plugin.js';
 
 // Re-export for backward compatibility (other files import from here)
 export { normalizeRepoUrls };
@@ -247,7 +247,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  Returns null if skillsDir is not set. */
   protected getMockFixturesDir(): string | null {
     if (!this.agentConfig.skillsDir) return null;
-    return join(resolveProjectPath(this.agentConfig.skillsDir), '..', 'mock-fixtures');
+    return join(this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath), '..', 'mock-fixtures');
   }
 
   /** Resolve the host path to the mock data directory from _config.json.
@@ -431,10 +431,24 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         workingDirForPrompt = '/workspace';
       }
 
+      // Fetch skills from workflow repo if configured
+      if (this.agentConfig.skillsDir && isWorkflowAgentContext(this.context)) {
+        const wfRepo = this.context.workflowDefinition.repo;
+        if (wfRepo?.url && wfRepo?.commit) {
+          const repoToken = resolveRepoToken(this.agentConfig, this.context, this.resolvedEnv.vars);
+          await this.fetchSkillsFromRepo(
+            this.agentConfig.skillsDir,
+            normalizeRepoUrls(wfRepo.url).gitUrl,
+            wfRepo.commit,
+            repoToken,
+          );
+        }
+      }
+
       agentLog('run.buildPrompt', 'building prompt', {
         stepId,
         skillsDir: this.agentConfig.skillsDir ?? null,
-        resolvedSkillsDir: this.agentConfig.skillsDir ? resolveProjectPath(this.agentConfig.skillsDir) : null,
+        resolvedSkillsDir: this.agentConfig.skillsDir ? this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath) : null,
       });
 
       const prompt = await this.buildPrompt(updatedInput, timeoutMs, outputDirForPrompt, dockerOutputDir, workingDirForPrompt);
@@ -453,7 +467,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
       // Mount skill directory so reference files are available inside the container
       if (this.agentConfig.skill && this.agentConfig.skillsDir) {
-        options.skillDir = join(resolveProjectPath(this.agentConfig.skillsDir), this.agentConfig.skill);
+        options.skillDir = join(this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath), this.agentConfig.skill);
       }
 
       // Create activity log file for observability
@@ -679,7 +693,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // 1. Skill prompt from SKILL.md
     if (this.agentConfig.skill && this.agentConfig.skillsDir) {
       const skillContent = await this.readSkillFile(
-        resolveProjectPath(this.agentConfig.skillsDir),
+        this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath),
         this.agentConfig.skill,
       );
       parts.push(skillContent);
