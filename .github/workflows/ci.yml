@@ -115,6 +115,37 @@ jobs:
           path: packages/platform-ui/playwright-report/
           retention-days: 14
 
+  supply-chain-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check for compromised axios versions
+        run: |
+          if pnpm ls --depth=Infinity 2>/dev/null | grep -qE 'axios@(1\.14\.1|0\.30\.4)'; then
+            echo "::error::Compromised axios version detected!"
+            exit 1
+          fi
+      - name: Check for known malicious packages
+        run: |
+          for pkg in plain-crypto-js; do
+            if [ -d "node_modules/$pkg" ] || pnpm ls --depth=Infinity 2>/dev/null | grep -q "$pkg"; then
+              echo "::error::Malicious package '$pkg' detected!"
+              exit 1
+            fi
+          done
+      - name: Audit dependencies (critical = block)
+        run: pnpm audit --prod --audit-level=critical
+      - name: Audit dependencies (full report)
+        if: always()
+        run: pnpm audit --prod || true
+
   gif-check:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

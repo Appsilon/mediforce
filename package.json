@@ -22,6 +22,15 @@
     "start": "if [ \"$APP_NAME\" = \"supply-intelligence\" ]; then pnpm --filter supply-intelligence start; else pnpm --filter @mediforce/platform-ui start; fi",
     "migrate:handles": "tsx scripts/migrate-user-handles.ts"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "protobufjs",
+      "msgpackr-extract",
+      "@firebase/util"
+    ]
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^25.3.0",
