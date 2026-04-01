@@ -12,6 +12,7 @@ import {
   getFirestoreDb,
 } from '@mediforce/platform-infra';
 import { connectFirestoreEmulator } from 'firebase/firestore';
+import type { CronTriggerStateRepository } from '@mediforce/platform-core';
 import {
   WorkflowEngine,
   ManualTrigger,
@@ -46,7 +47,7 @@ export interface PlatformServices {
   humanTaskRepo: FirestoreHumanTaskRepository;
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
   coworkSessionRepo: FirestoreCoworkSessionRepository;
-  cronTriggerStateRepo: FirestoreCronTriggerStateRepository;
+  cronTriggerStateRepo: CronTriggerStateRepository;
 }
 
 export function getPlatformServices(): PlatformServices {

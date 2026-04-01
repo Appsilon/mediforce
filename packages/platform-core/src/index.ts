@@ -129,8 +129,7 @@ export type {
   UserDirectoryService,
   DirectoryUser,
   AgentRunRepository,
-  CoworkSessionRepository,
-  CronTriggerStateRepository,
+  CoworkSessionRepository,  CronTriggerStateRepository,
 } from './interfaces/index.js';
 
 // Agent definition schema + repository interface
@@ -159,8 +158,7 @@ export {
   InMemoryHumanTaskRepository,
   InMemoryHandoffRepository,
   NoopNotificationService,
-  InMemoryCoworkSessionRepository,
-  InMemoryCronTriggerStateRepository,
+  InMemoryCoworkSessionRepository,  InMemoryCronTriggerStateRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,
