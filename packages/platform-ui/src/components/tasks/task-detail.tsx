@@ -210,6 +210,19 @@ export function TaskDetail({
             </span>
           )}
         </div>
+        {processInstance && (
+          <div>
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+              Workflow
+            </div>
+            <Link
+              href={`/${handle}/workflows/${encodeURIComponent(processInstance.definitionName)}`}
+              className="text-primary hover:underline text-xs"
+            >
+              {processInstance.definitionName}
+            </Link>
+          </div>
+        )}
         <div>
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Role
