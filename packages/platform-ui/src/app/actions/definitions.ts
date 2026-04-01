@@ -108,10 +108,6 @@ export async function saveWorkflowDefinition(
     return { success: false, error: parsed.error.issues.map((i) => i.message).join(', ') };
   }
 
-  if (!parsed.data.title?.trim()) {
-    return { success: false, error: 'Title is required for new versions.' };
-  }
-
   const { processRepo } = getPlatformServices();
 
   try {
