@@ -26,8 +26,6 @@ ROOT = PLATFORM_UI.parent.parent
 
 ENV_LOCAL = PLATFORM_UI / ".env.local"
 FIREBASE_CONFIG = Path("/tmp/firebase-e2e.json")
-FIRESTORE_RULES = PLATFORM_UI / "firestore.rules"
-
 # Emulator ports
 AUTH_PORT = 9099
 FIRESTORE_PORT = 8080
