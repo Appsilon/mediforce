@@ -147,8 +147,12 @@ Testing strategies:
    ```bash
    git diff --name-only origin/main...HEAD | grep -qE 'platform-ui/src/|e2e/journeys/' && echo "E2E needed"
    ```
-5. If yes: ensure Firebase emulators are running (`curl -s http://127.0.0.1:9099 >/dev/null || (cd packages/platform-ui && pnpm emulators &; sleep 10)`)
-6. `cd packages/platform-ui && pnpm test:e2e:auth` — all E2E journey + smoke tests (34s)
+5. **Bootstrap the E2E environment** (idempotent — safe to run every time):
+   ```bash
+   python3 packages/platform-ui/scripts/bootstrap-e2e.py
+   ```
+   This creates `.env.local` with demo credentials, starts Firebase emulators, installs Playwright browsers, and installs ffmpeg. See [Remote E2E setup](#remote-e2e-setup) for details.
+6. `cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth` — all E2E journey + smoke tests (60s)
 
 **When adding/modifying UI features (TDD):**
 1. **RED** — Write the journey test first in `e2e/journeys/<feature>.journey.ts`. Use `showStep`/`showResult` from `helpers/recording.ts` at key moments for pacing during recordings.
@@ -195,6 +199,30 @@ const task = buildHumanTask({ assignee: 'user-1' });
 - `e2e/auth-setup.ts` creates test user, seeds Firestore, saves auth state
 - `e2e/helpers/seed-data.ts` — all fixture data. Update when adding new collections.
 - Dev server starts automatically on port 9007 (emulator mode)
+
+### Remote E2E setup
+
+In remote environments (Claude Code remote, CI, fresh machines), E2E tests need manual preparation. Run the bootstrap script **before** any E2E test:
+
+```bash
+python3 packages/platform-ui/scripts/bootstrap-e2e.py
+```
+
+The script is idempotent (safe to run multiple times) and handles:
+
+| What | Why | Manual equivalent |
+|------|-----|-------------------|
+| `.env.local` with demo credentials | Firebase SDK requires API key even in emulator mode | Copy `.env.local.example`, fill with dummy values |
+| Firebase emulator config (no UI) | Emulator UI download crashes in proxied environments | Create `/tmp/firebase-e2e.json` with `"ui": {"enabled": false}` |
+| Start Firebase emulators | Auth (9099) + Firestore (8080) needed for tests | `firebase emulators:start --project demo-mediforce --only auth,firestore` |
+| Playwright chromium | Browser binary must match `@playwright/test` version | `npx playwright install --with-deps chromium` |
+| ffmpeg | Required for GIF conversion (`e2e-to-gif.py`) | `apt-get install ffmpeg` |
+| Kill stale port 9007 | Previous dev server may block test webServer | `fuser -k 9007/tcp` |
+
+**Known issues in remote environments:**
+- Google Fonts fail to download (no internet or proxy blocks) — Next.js falls back to system fonts, tests still work
+- First route compilation takes 5-8s — tests use extended timeouts for initial page loads
+- Firebase emulator UI download may fail — the bootstrap script disables UI entirely
 
 ### Agent Browser
 
