@@ -2,6 +2,7 @@
 private-apps
 
 .planning
+.claude/worktrees/
 CONTINUE_HERE.md
 
 # dependencies
