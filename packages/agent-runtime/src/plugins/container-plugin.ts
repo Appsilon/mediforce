@@ -104,7 +104,7 @@ export function resolveImageBuild(
 const SKILLS_CACHE_DIR = join(tmpdir(), 'mediforce-skills-cache');
 
 /** Convert SSH git URL to HTTPS with token for authenticated clone. */
-function toHttpsWithToken(sshUrl: string, token: string): string {
+export function toHttpsWithToken(sshUrl: string, token: string): string {
   const match = sshUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
   if (match) {
     return `https://x-access-token:${token}@github.com/${match[1]}.git`;

@@ -9,6 +9,7 @@ import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
+import { toHttpsWithToken } from './container-plugin.js';
 
 export interface BuildImageOptions {
   image: string;
@@ -55,15 +56,6 @@ export async function getImageBuildCommit(image: string): Promise<string | null>
   } catch {
     return null;
   }
-}
-
-/** Convert SSH git URL to HTTPS with token for authenticated clone. */
-function toHttpsWithToken(sshUrl: string, token: string): string {
-  const match = sshUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
-  if (match) {
-    return `https://x-access-token:${token}@github.com/${match[1]}.git`;
-  }
-  return sshUrl.replace('https://', `https://x-access-token:${token}@`);
 }
 
 export async function buildImageFromRepo(options: BuildImageOptions): Promise<void> {

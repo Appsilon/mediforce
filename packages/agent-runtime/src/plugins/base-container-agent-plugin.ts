@@ -9,9 +9,6 @@ import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls } from './container-plugin.js';
 
-// Re-export for backward compatibility (other files import from here)
-export { normalizeRepoUrls };
-
 const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
 
