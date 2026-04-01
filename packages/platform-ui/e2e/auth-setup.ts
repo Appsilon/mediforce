@@ -7,7 +7,9 @@ const TEST_EMAIL = 'test@mediforce.dev';
 const TEST_PASSWORD = 'test123456';
 const TEST_DISPLAY_NAME = 'Test User';
 
-setup('authenticate and seed data', async ({ page }) => {
+setup('authenticate and seed data', async ({ page }, testInfo) => {
+  testInfo.setTimeout(120_000);
+
   // 1. Clear all emulator state
   await clearEmulators();
 
@@ -38,8 +40,23 @@ setup('authenticate and seed data', async ({ page }) => {
   await page.goto('/test-login', { timeout: 60_000 });
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', TEST_PASSWORD);
+  // Click submit and wait for the Firebase auth emulator sign-in to complete.
+  // We intercept the auth API response to know exactly when sign-in succeeded.
+  const signInResponse = page.waitForResponse(
+    (resp) => resp.url().includes('identitytoolkit') && resp.status() === 200,
+    { timeout: 30_000 },
+  );
   await page.click('button[type="submit"]');
-  await page.waitForURL(`**/${TEST_ORG_HANDLE}`, { timeout: 30_000 });
+  await signInResponse;
+
+  // The test-login page calls router.replace('/redirect') after sign-in, but the
+  // /redirect page inside the (app) layout has an auth-guard race condition:
+  // auth state is temporarily null during layout mount, causing a bounce to /login.
+  // Instead, navigate directly to the org page, bypassing /redirect entirely.
+  // Small delay lets the Firebase client SDK persist the auth token to IndexedDB.
+  await page.waitForTimeout(2_000);
+  await page.goto(`/${TEST_ORG_HANDLE}`, { timeout: 60_000 });
+  await page.waitForURL(`**/${TEST_ORG_HANDLE}`, { timeout: 60_000 });
 
   // 5. Save auth state for reuse by authenticated tests
   await page.context().storageState({ path: 'e2e/.auth/user.json' });

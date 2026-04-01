@@ -14,6 +14,9 @@ export const routes = {
   // ── Top-level ──────────────────────────────────────────────────
   home: (handle: string) => `/${handle}`,
 
+  // ── Team / Mission Control ────────────────────────────────────
+  team: (handle: string) => `/${handle}/team`,
+
   // ── Workflows ──────────────────────────────────────────────────
   workflows: (handle: string) => `/${handle}/workflows`,
   workflow: (handle: string, name: string) => `/${handle}/workflows/${encode(name)}`,
