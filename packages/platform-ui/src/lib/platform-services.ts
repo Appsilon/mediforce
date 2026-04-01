@@ -6,11 +6,13 @@ import {
   FirestoreAgentRunRepository,
   FirestoreHumanTaskRepository,
   FirestoreAgentDefinitionRepository,
-  FirestoreCoworkSessionRepository,  FirestoreCronTriggerStateRepository,
+  FirestoreCoworkSessionRepository,
+  FirestoreCronTriggerStateRepository,
   initializeFirebase,
   getFirestoreDb,
 } from '@mediforce/platform-infra';
 import { connectFirestoreEmulator } from 'firebase/firestore';
+import type { CronTriggerStateRepository } from '@mediforce/platform-core';
 import {
   WorkflowEngine,
   ManualTrigger,
@@ -44,7 +46,8 @@ export interface PlatformServices {
   auditRepo: FirestoreAuditRepository;
   humanTaskRepo: FirestoreHumanTaskRepository;
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
-  coworkSessionRepo: FirestoreCoworkSessionRepository;  cronTriggerStateRepo: FirestoreCronTriggerStateRepository;
+  coworkSessionRepo: FirestoreCoworkSessionRepository;
+  cronTriggerStateRepo: CronTriggerStateRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -77,7 +80,8 @@ export function getPlatformServices(): PlatformServices {
   const agentRunRepo = new FirestoreAgentRunRepository(db);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository();
-  const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);  const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
+  const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);
+  const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -138,7 +142,8 @@ export function getPlatformServices(): PlatformServices {
     auditRepo,
     humanTaskRepo,
     agentDefinitionRepo,
-    coworkSessionRepo,    cronTriggerStateRepo,
+    coworkSessionRepo,
+    cronTriggerStateRepo,
   };
 
   if (!seedingStarted) {

@@ -69,6 +69,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // Read last triggered time for this specific trigger.
         // When no state exists (first run), use the definition's createdAt so
         // gap-scanning catches any missed windows since the definition was created.
+        // TODO: race condition — overlapping heartbeats can read the same lastTriggeredAt
+        // and both fire the trigger. Not critical at current scale (single VPS cron),
+        // but needs a Firestore transaction or distributed lock if we scale out.
         const state = await cronTriggerStateRepo.get(def.name, trigger.name);
         const lastTriggeredAt = state
           ? new Date(state.lastTriggeredAt)
