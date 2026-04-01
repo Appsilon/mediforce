@@ -23,7 +23,7 @@ export const AgentConfigSchema = z.object({
   image: z.string().optional(),
   dockerfile: z.string().optional(),
   repo: z.string().optional(),
-  commit: z.string().optional(),
+  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
   repoAuth: z.string().optional(),
 });
 

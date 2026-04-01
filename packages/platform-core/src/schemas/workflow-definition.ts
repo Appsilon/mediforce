@@ -23,7 +23,7 @@ export const WorkflowAgentConfigSchema = z.object({
   image: z.string().optional(),
   dockerfile: z.string().optional(),
   repo: z.string().optional(),
-  commit: z.string().optional(),
+  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
   /** Name of a workflow secret containing a token for repo access. */
   repoAuth: z.string().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),

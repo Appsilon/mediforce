@@ -170,7 +170,7 @@ export abstract class ContainerPlugin implements AgentPlugin {
 
       execSync(`git init "${cloneDir}"`, execOpts);
       execSync(`git -C "${cloneDir}" remote add origin "${cloneUrl}"`, execOpts);
-      execSync(`git -C "${cloneDir}" fetch origin ${commit} --depth 1`, execOpts);
+      execSync(`git -C "${cloneDir}" fetch origin "${commit}" --depth 1`, execOpts);
       execSync(`git -C "${cloneDir}" checkout FETCH_HEAD`, execOpts);
 
       const sourceDir = join(cloneDir, skillsDir);

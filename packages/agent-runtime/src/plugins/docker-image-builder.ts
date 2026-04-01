@@ -80,7 +80,7 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
     // Clone repo at specific commit (sparse — fetch only what we need)
     execSync(`git init "${buildDir}"`, execOpts);
     execSync(`git -C "${buildDir}" remote add origin "${cloneUrl}"`, execOpts);
-    execSync(`git -C "${buildDir}" fetch origin ${commit} --depth 1`, execOpts);
+    execSync(`git -C "${buildDir}" fetch origin "${commit}" --depth 1`, execOpts);
     execSync(`git -C "${buildDir}" checkout FETCH_HEAD`, execOpts);
 
     // Build image — use the Dockerfile's directory as build context so COPY paths work naturally
@@ -88,7 +88,7 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
     const buildContext = dirname(dockerfilePath);
     console.log(`[docker-image-builder] Building image "${image}" from ${repoUrl}@${commit.slice(0, 8)}`);
     execSync(
-      `docker build -t "${image}" --label ${BUILD_COMMIT_LABEL}=${commit} -f "${dockerfilePath}" "${buildContext}"`,
+      `docker build -t "${image}" --label "${BUILD_COMMIT_LABEL}=${commit}" -f "${dockerfilePath}" "${buildContext}"`,
       { stdio: 'pipe' },
     );
     console.log(`[docker-image-builder] Image "${image}" built successfully`);

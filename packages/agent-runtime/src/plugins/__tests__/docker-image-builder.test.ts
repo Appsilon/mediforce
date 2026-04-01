@@ -87,7 +87,7 @@ describe('buildImageFromRepo', () => {
     // Should init, add remote, fetch commit, checkout (uses git -C <dir> syntax)
     expect(calls.some((cmd) => cmd.includes('git init'))).toBe(true);
     expect(calls.some((cmd) => cmd.includes('remote add origin'))).toBe(true);
-    expect(calls.some((cmd) => cmd.includes('fetch origin abc123'))).toBe(true);
+    expect(calls.some((cmd) => cmd.includes('fetch origin "abc123"'))).toBe(true);
     expect(calls.some((cmd) => cmd.includes('checkout FETCH_HEAD'))).toBe(true);
 
     // Should docker build with label
