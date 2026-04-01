@@ -64,8 +64,9 @@ export function createTestRepo(options: CreateTestRepoOptions = {}): TestRepo {
   mkdirSync(dockerfileDir, { recursive: true });
   writeFileSync(dockerfileFullPath, dockerfile);
 
-  // Write script
-  writeFileSync(join(workDir, 'run.sh'), script);
+  // Write script next to the Dockerfile (build context = Dockerfile's directory)
+  const dockerfileDir2 = join(workDir, dockerfilePath, '..');
+  writeFileSync(join(dockerfileDir2, 'run.sh'), script);
 
   // Commit and push
   execSync('git add -A', { ...execOpts, cwd: workDir });

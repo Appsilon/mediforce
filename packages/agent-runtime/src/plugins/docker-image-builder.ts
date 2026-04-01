@@ -7,7 +7,7 @@
  */
 import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 
 export interface BuildImageOptions {
@@ -83,11 +83,12 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
     execSync(`git -C "${buildDir}" fetch origin ${commit} --depth 1`, execOpts);
     execSync(`git -C "${buildDir}" checkout FETCH_HEAD`, execOpts);
 
-    // Build image with commit label for stale detection
+    // Build image — use the Dockerfile's directory as build context so COPY paths work naturally
     const dockerfilePath = join(buildDir, dockerfile);
+    const buildContext = dirname(dockerfilePath);
     console.log(`[docker-image-builder] Building image "${image}" from ${repoUrl}@${commit.slice(0, 8)}`);
     execSync(
-      `docker build -t "${image}" --label ${BUILD_COMMIT_LABEL}=${commit} -f "${dockerfilePath}" "${buildDir}"`,
+      `docker build -t "${image}" --label ${BUILD_COMMIT_LABEL}=${commit} -f "${dockerfilePath}" "${buildContext}"`,
       { stdio: 'pipe' },
     );
     console.log(`[docker-image-builder] Image "${image}" built successfully`);
