@@ -31,6 +31,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
   await seedSubcollection('processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions);
   await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);
+  await seedCollection('coworkSessions', data.coworkSessions);
 
   // 4. Sign in via test-login page to capture auth state
   // First load warms up Next.js compilation — allow extra time

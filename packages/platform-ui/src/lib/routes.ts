@@ -34,6 +34,9 @@ export const routes = {
     return base;
   },
 
+  // ── Co-work ────────────────────────────────────────────────────
+  cowork: (handle: string, sessionId: string) => `/${handle}/cowork/${sessionId}`,
+
   // ── Tasks ──────────────────────────────────────────────────────
   tasks: (handle: string) => `/${handle}/tasks`,
   task: (handle: string, taskId: string) => `/${handle}/tasks/${taskId}`,

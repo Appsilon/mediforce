@@ -108,14 +108,27 @@ export { NotificationTargetSchema, type NotificationTarget } from './process-con
 
 export {
   WorkflowAgentConfigSchema,
+  WorkflowCoworkConfigSchema,
   WorkflowReviewConfigSchema,
   WorkflowStepSchema,
   WorkflowDefinitionSchema,
   type WorkflowAgentConfig,
+  type WorkflowCoworkConfig,
   type WorkflowReviewConfig,
   type WorkflowStep,
   type WorkflowDefinition,
 } from './workflow-definition.js';
+
+export {
+  ConversationTurnSchema,
+  CoworkAgentSchema,
+  CoworkVoiceConfigSchema,
+  CoworkSessionStatusSchema,
+  CoworkSessionSchema,
+  type ConversationTurn,
+  type CoworkSessionStatus,
+  type CoworkSession,
+} from './cowork-session.js';
 
 export {
   PluginRoleSchema,

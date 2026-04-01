@@ -34,6 +34,7 @@ export async function POST(
     await instanceRepo.update(instanceId, {
       status: 'running',
       pauseReason: null,
+      error: null,
       updatedAt: now,
     });
 

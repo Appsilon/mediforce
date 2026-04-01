@@ -98,6 +98,61 @@ export async function startProcessRun(
   }
 }
 
+export async function resumeProcessRun(
+  instanceId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { instanceRepo, auditRepo } = getPlatformServices();
+    const instance = await instanceRepo.getById(instanceId);
+    if (!instance) {
+      return { success: false, error: 'Run not found' };
+    }
+    if (instance.status !== 'paused') {
+      return { success: false, error: `Cannot resume a ${instance.status} run` };
+    }
+    const now = new Date().toISOString();
+    await instanceRepo.update(instanceId, {
+      status: 'running',
+      pauseReason: null,
+      error: null,
+      updatedAt: now,
+    });
+    await auditRepo.append({
+      actorId: 'user',
+      actorType: 'user',
+      actorRole: 'operator',
+      action: 'process.resumed',
+      description: `Run resumed after env configuration (was paused: ${instance.pauseReason ?? 'unknown'})`,
+      timestamp: now,
+      inputSnapshot: { previousPauseReason: instance.pauseReason },
+      outputSnapshot: { status: 'running' },
+      basis: 'User set missing env vars and resumed via UI',
+      entityType: 'processInstance',
+      entityId: instanceId,
+      processInstanceId: instanceId,
+      processDefinitionVersion: instance.definitionVersion,
+    });
+
+    // Fire-and-forget: trigger auto-runner
+    const baseUrl = getAppBaseUrl();
+    fetch(`${baseUrl}/api/processes/${instanceId}/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
+      },
+      body: JSON.stringify({ triggeredBy: 'user' }),
+    }).catch(() => {});
+
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
+}
+
 export async function cancelProcessRun(
   instanceId: string,
 ): Promise<{ success: boolean; error?: string }> {

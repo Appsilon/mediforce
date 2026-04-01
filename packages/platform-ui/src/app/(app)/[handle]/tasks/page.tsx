@@ -4,8 +4,9 @@ import * as React from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { SlidersHorizontal, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { useMyTasks, useCompletedTasks } from '@/hooks/use-tasks';
+import { useMyTasks, useCompletedTasks, useMyCoworkSessions, useFinalizedCoworkSessions } from '@/hooks/use-tasks';
 import { TaskGroupedView, type GroupByField } from '@/components/tasks/task-grouped-view';
+import type { ActionItem } from '@/components/tasks/action-type';
 import { cn } from '@/lib/utils';
 
 const GROUP_FIELDS: { value: GroupByField; label: string }[] = [
@@ -96,16 +97,36 @@ export default function TasksPage() {
 
   const { data: activeTasks, loading: activeLoading } = useMyTasks(role);
   const { data: completedTasks, loading: completedLoading } = useCompletedTasks(role);
+  const { data: activeCoworkSessions, loading: coworkLoading } = useMyCoworkSessions(role);
+  const { data: finalizedCoworkSessions, loading: finalizedLoading } = useFinalizedCoworkSessions(role);
   const currentUserId = firebaseUser?.uid ?? '';
 
-  const totalTaskCount = activeTasks.length + completedTasks.length;
+  const activeItems: ActionItem[] = React.useMemo(
+    () => [
+      ...activeTasks.map((data): ActionItem => ({ kind: 'task', data })),
+      ...activeCoworkSessions.map((data): ActionItem => ({ kind: 'cowork', data })),
+    ],
+    [activeTasks, activeCoworkSessions],
+  );
+
+  const completedItems: ActionItem[] = React.useMemo(
+    () => [
+      ...completedTasks.map((data): ActionItem => ({ kind: 'task', data })),
+      ...finalizedCoworkSessions.map((data): ActionItem => ({ kind: 'cowork', data })),
+    ],
+    [completedTasks, finalizedCoworkSessions],
+  );
+
+  const totalItemCount = activeItems.length + completedItems.length;
   const processCount = React.useMemo(() => {
     const ids = new Set([
-      ...activeTasks.map((t) => t.processInstanceId),
-      ...completedTasks.map((t) => t.processInstanceId),
+      ...activeItems.map((item) => item.data.processInstanceId),
+      ...completedItems.map((item) => item.data.processInstanceId),
     ]);
     return ids.size;
-  }, [activeTasks, completedTasks]);
+  }, [activeItems, completedItems]);
+
+  const loading = activeLoading || completedLoading || coworkLoading || finalizedLoading;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -122,9 +143,9 @@ export default function TasksPage() {
               'All tasks'
             )}
           </p>
-          {!activeLoading && !completedLoading && totalTaskCount > 0 && (
+          {!loading && totalItemCount > 0 && (
             <p className="text-xs text-muted-foreground mt-1">
-              {totalTaskCount} {totalTaskCount === 1 ? 'task' : 'tasks'} across {processCount}{' '}
+              {totalItemCount} {totalItemCount === 1 ? 'item' : 'items'} across {processCount}{' '}
               {processCount === 1 ? 'workflow' : 'workflows'}
             </p>
           )}
@@ -133,9 +154,9 @@ export default function TasksPage() {
       </div>
 
       <TaskGroupedView
-        activeTasks={activeTasks}
-        completedTasks={completedTasks}
-        loading={activeLoading || completedLoading}
+        activeItems={activeItems}
+        completedItems={completedItems}
+        loading={loading}
         currentUserId={currentUserId}
         currentUserName={firebaseUser?.displayName}
         groupByFields={groupByFields}

@@ -11,6 +11,7 @@ import type {
   NotificationTarget,
   HumanTaskRepository,
   HumanTask,
+  CoworkSessionRepository,
   UserDirectoryService,
   WorkflowDefinition,
   WorkflowStep,
@@ -59,6 +60,7 @@ export class WorkflowEngine {
     private readonly handoffRepository?: HandoffRepository, // optional: Phase 4 handoff creation on escalation
     private readonly notificationService?: NotificationService, // optional: escalation notifications
     private readonly humanTaskRepository?: HumanTaskRepository, // optional: Phase 4.1 HumanTask creation on human step advance
+    private readonly coworkSessionRepository?: CoworkSessionRepository, // optional: cowork session creation on cowork step advance
     private readonly userDirectoryService?: UserDirectoryService, // optional: resolves roles to email targets for notifications
   ) {
     this.stepExecutor = new StepExecutor(instanceRepository, auditRepository);
@@ -304,6 +306,9 @@ export class WorkflowEngine {
             updatedAt: now,
           });
         }
+
+        // Note: CoworkSession creation is handled by the auto-runner (route.ts),
+        // not by advanceStep. This avoids duplicate sessions when both paths fire.
       }
     }
 

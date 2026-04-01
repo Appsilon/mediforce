@@ -6,7 +6,7 @@ import {
   FirestoreAgentRunRepository,
   FirestoreHumanTaskRepository,
   FirestoreAgentDefinitionRepository,
-  FirestoreCronTriggerStateRepository,
+  FirestoreCoworkSessionRepository,  FirestoreCronTriggerStateRepository,
   initializeFirebase,
   getFirestoreDb,
 } from '@mediforce/platform-infra';
@@ -44,7 +44,7 @@ export interface PlatformServices {
   auditRepo: FirestoreAuditRepository;
   humanTaskRepo: FirestoreHumanTaskRepository;
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
-  cronTriggerStateRepo: FirestoreCronTriggerStateRepository;
+  coworkSessionRepo: FirestoreCoworkSessionRepository;  cronTriggerStateRepo: FirestoreCronTriggerStateRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -77,7 +77,7 @@ export function getPlatformServices(): PlatformServices {
   const agentRunRepo = new FirestoreAgentRunRepository(db);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository();
-  const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
+  const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);  const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -116,6 +116,7 @@ export function getPlatformServices(): PlatformServices {
     undefined, // handoffRepository
     undefined, // notificationService
     humanTaskRepo, // humanTaskRepository — enables HumanTask creation on human step advance
+    coworkSessionRepo, // coworkSessionRepository — enables CoworkSession creation on cowork step advance
   );
 
   const agentRunner = new AgentRunner(
@@ -137,7 +138,7 @@ export function getPlatformServices(): PlatformServices {
     auditRepo,
     humanTaskRepo,
     agentDefinitionRepo,
-    cronTriggerStateRepo,
+    coworkSessionRepo,    cronTriggerStateRepo,
   };
 
   if (!seedingStarted) {

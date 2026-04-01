@@ -38,6 +38,55 @@ function resolveValue(value: string, workflowSecrets?: Record<string, string>): 
   return resolved;
 }
 
+// ---------------------------------------------------------------------------
+// Pre-flight validation — dry-run all {{TEMPLATE}} references without throwing
+// ---------------------------------------------------------------------------
+
+export interface MissingEnvVar {
+  secretName: string;
+  template: string;
+  steps: Array<{ stepId: string; stepName: string }>;
+}
+
+/**
+ * Validate all env var templates in a workflow definition can be resolved.
+ * Returns the list of missing secrets (empty = all good).
+ */
+export function validateWorkflowEnv(
+  definition: {
+    env?: Record<string, string>;
+    steps: Array<{ id: string; name: string; executor: string; env?: Record<string, string> }>;
+  },
+  workflowSecrets?: Record<string, string>,
+): MissingEnvVar[] {
+  const missingMap = new Map<string, MissingEnvVar>();
+
+  for (const step of definition.steps) {
+    if (step.executor !== 'agent' && step.executor !== 'script') continue;
+
+    const merged = { ...definition.env, ...step.env };
+
+    for (const [, value] of Object.entries(merged)) {
+      const match = TEMPLATE_REGEX.exec(value);
+      if (!match) continue;
+
+      const secretName = match[1];
+
+      // Check every resolution path (same order as resolveValue)
+      if (workflowSecrets && secretName in workflowSecrets && workflowSecrets[secretName] !== '') continue;
+      const resolved = process.env[secretName] || process.env[`DOCKER_${secretName}`];
+      if (resolved !== undefined && resolved !== '') continue;
+
+      if (!missingMap.has(secretName)) {
+        missingMap.set(secretName, { secretName, template: `{{${secretName}}}`, steps: [] });
+      }
+      missingMap.get(secretName)!.steps.push({ stepId: step.id, stepName: step.name });
+    }
+  }
+
+  return Array.from(missingMap.values());
+}
+
 export function resolveStepEnv(
   configEnv: Record<string, string> | undefined,
   stepEnv: Record<string, string> | undefined,

@@ -149,7 +149,19 @@ function ParamField({
         <p className="text-xs text-muted-foreground">{param.description}</p>
       )}
 
-      {param.type === 'boolean' ? (
+      {param.options && param.options.length > 0 ? (
+        <select
+          value={String(value ?? '')}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
+          className={inputClasses}
+        >
+          <option value="">Select...</option>
+          {param.options.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      ) : param.type === 'boolean' ? (
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
