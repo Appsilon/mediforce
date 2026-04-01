@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
-import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
+import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
+import { normalizeRepoUrls } from './base-container-agent-plugin.js';
 
 function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
   return 'step' in ctx && 'workflowDefinition' in ctx;
@@ -53,6 +54,7 @@ export class ScriptContainerPlugin implements AgentPlugin {
   private inlineScript: string | null = null;
   private runtime: string | null = null;
   private resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
+  private imageBuild: ImageBuildMeta | undefined;
 
   async initialize(context: AgentContext | WorkflowAgentContext): Promise<void> {
     this.context = context;
@@ -129,6 +131,30 @@ export class ScriptContainerPlugin implements AgentPlugin {
     // Resolve env vars from definition-level + step-level env + workflow secrets
     const workflowSecrets = isWorkflowAgentContext(context) ? context.workflowSecrets : undefined;
     this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv, workflowSecrets);
+
+    // Resolve image build metadata for lazy Docker image building.
+    const dockerfile = agentConfig.dockerfile;
+    const repo = agentConfig.repo;
+    const commit = agentConfig.commit;
+
+    if (repo && commit) {
+      this.imageBuild = {
+        image: this.image,
+        repoUrl: normalizeRepoUrls(repo).gitUrl,
+        commit,
+        dockerfile,
+      };
+    } else if (dockerfile && isWorkflowAgentContext(context)) {
+      const wfRepo = context.workflowDefinition.repo;
+      if (wfRepo?.url && wfRepo?.commit) {
+        this.imageBuild = {
+          image: this.image,
+          repoUrl: repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl,
+          commit: commit ?? wfRepo.commit,
+          dockerfile,
+        };
+      }
+    }
   }
 
   async run(emit: EmitFn): Promise<void> {
@@ -190,6 +216,7 @@ export class ScriptContainerPlugin implements AgentPlugin {
         stepId: this.context.stepId,
         outputDir,
         logFile: null,
+        imageBuild: this.imageBuild,
       });
 
       // Emit stdout/stderr lines as activity events (batch mode after completion)
