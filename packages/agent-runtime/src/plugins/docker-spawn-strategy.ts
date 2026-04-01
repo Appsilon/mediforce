@@ -17,6 +17,8 @@ export interface ImageBuildMeta {
   repoUrl: string;
   commit: string;
   dockerfile?: string;
+  /** Resolved token for authenticated HTTPS clone. When absent, falls back to SSH deploy key. */
+  repoToken?: string;
 }
 
 export interface DockerSpawnRequest {

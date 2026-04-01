@@ -59,6 +59,8 @@ export const RepoSchema = z.object({
   branch: z.string().optional(),
   directory: z.string().optional(),
   commit: z.string().optional(),
+  /** Name of a workflow secret containing a token for repo access (e.g. "GITHUB_TOKEN"). */
+  auth: z.string().optional(),
 });
 
 export const ProcessDefinitionSchema = z.object({

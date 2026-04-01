@@ -24,6 +24,7 @@ export const AgentConfigSchema = z.object({
   dockerfile: z.string().optional(),
   repo: z.string().optional(),
   commit: z.string().optional(),
+  repoAuth: z.string().optional(),
 });
 
 export const StepConfigSchema = z.object({

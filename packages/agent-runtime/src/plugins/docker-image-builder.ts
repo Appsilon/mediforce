@@ -15,6 +15,7 @@ export interface BuildImageOptions {
   repoUrl: string;
   commit: string;
   dockerfile?: string;
+  repoToken?: string;
 }
 
 export interface EnsureImageOptions {
@@ -22,6 +23,7 @@ export interface EnsureImageOptions {
   repoUrl?: string;
   commit?: string;
   dockerfile?: string;
+  repoToken?: string;
 }
 
 const BUILD_COMMIT_LABEL = 'mediforce.build.commit';
@@ -55,11 +57,21 @@ export async function getImageBuildCommit(image: string): Promise<string | null>
   }
 }
 
+/** Convert SSH git URL to HTTPS with token for authenticated clone. */
+function toHttpsWithToken(sshUrl: string, token: string): string {
+  const match = sshUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
+  if (match) {
+    return `https://x-access-token:${token}@github.com/${match[1]}.git`;
+  }
+  return sshUrl.replace('https://', `https://x-access-token:${token}@`);
+}
+
 export async function buildImageFromRepo(options: BuildImageOptions): Promise<void> {
-  const { image, repoUrl, commit, dockerfile = 'Dockerfile' } = options;
+  const { image, repoUrl, commit, dockerfile = 'Dockerfile', repoToken } = options;
   const buildDir = await mkdtemp(join(tmpdir(), 'mediforce-build-'));
 
   try {
+    const cloneUrl = repoToken ? toHttpsWithToken(repoUrl, repoToken) : repoUrl;
     const execOpts = {
       stdio: 'pipe' as const,
       env: { ...process.env, GIT_SSH_COMMAND: getGitSshCommand() },
@@ -67,7 +79,7 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
 
     // Clone repo at specific commit (sparse — fetch only what we need)
     execSync(`git init "${buildDir}"`, execOpts);
-    execSync(`git -C "${buildDir}" remote add origin "${repoUrl}"`, execOpts);
+    execSync(`git -C "${buildDir}" remote add origin "${cloneUrl}"`, execOpts);
     execSync(`git -C "${buildDir}" fetch origin ${commit} --depth 1`, execOpts);
     execSync(`git -C "${buildDir}" checkout FETCH_HEAD`, execOpts);
 
@@ -85,7 +97,7 @@ export async function buildImageFromRepo(options: BuildImageOptions): Promise<vo
 }
 
 export async function ensureImage(options: EnsureImageOptions): Promise<void> {
-  const { image, repoUrl, commit, dockerfile } = options;
+  const { image, repoUrl, commit, dockerfile, repoToken } = options;
 
   // If repo+commit not provided, just check existence
   if (!repoUrl || !commit) {
@@ -116,7 +128,7 @@ export async function ensureImage(options: EnsureImageOptions): Promise<void> {
         console.log(`[docker-image-builder] Image "${image}" stale (${currentCommit?.slice(0, 8)} → ${commit.slice(0, 8)}), rebuilding`);
       }
 
-      await buildImageFromRepo({ image, repoUrl, commit, dockerfile });
+      await buildImageFromRepo({ image, repoUrl, commit, dockerfile, repoToken });
     } finally {
       buildLocks.delete(image);
     }

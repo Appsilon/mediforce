@@ -35,6 +35,7 @@ export const DockerJobDataSchema = z.object({
     repoUrl: z.string(),
     commit: z.string(),
     dockerfile: z.string().optional(),
+    repoToken: z.string().optional(),
   }).optional(),
 });
 

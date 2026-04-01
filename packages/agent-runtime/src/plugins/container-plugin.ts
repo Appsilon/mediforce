@@ -45,10 +45,27 @@ export function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext)
  *
  * Steps without repo/commit/dockerfile are left alone (image must already exist).
  */
+/**
+ * Resolve the repo auth token from the step or workflow-level config.
+ * `repoAuth` is the name of a key in resolvedEnv (sourced from workflow secrets).
+ */
+function resolveRepoToken(
+  agentConfig: AgentConfig,
+  context: AgentContext | WorkflowAgentContext,
+  resolvedEnv?: Record<string, string>,
+): string | undefined {
+  // Step-level repoAuth takes priority
+  const authKey = agentConfig.repoAuth
+    ?? (isWorkflowAgentContext(context) ? context.workflowDefinition.repo?.auth : undefined);
+  if (!authKey || !resolvedEnv) return undefined;
+  return resolvedEnv[authKey];
+}
+
 export function resolveImageBuild(
   image: string,
   agentConfig: AgentConfig,
   context: AgentContext | WorkflowAgentContext,
+  resolvedEnv?: Record<string, string>,
 ): ImageBuildMeta | undefined {
   const { dockerfile, repo, commit } = agentConfig;
 
@@ -58,6 +75,7 @@ export function resolveImageBuild(
       repoUrl: normalizeRepoUrls(repo).gitUrl,
       commit,
       dockerfile,
+      repoToken: resolveRepoToken(agentConfig, context, resolvedEnv),
     };
   }
 
@@ -69,6 +87,7 @@ export function resolveImageBuild(
         repoUrl: repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl,
         commit: commit ?? wfRepo.commit,
         dockerfile,
+        repoToken: resolveRepoToken(agentConfig, context, resolvedEnv),
       };
     }
   }

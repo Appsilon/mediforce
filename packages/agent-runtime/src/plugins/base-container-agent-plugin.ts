@@ -1078,7 +1078,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       throw new Error(`agentConfig.image is required for Docker container execution`);
     }
 
-    const imageBuild = resolveImageBuild(image, this.agentConfig, this.context);
+    const imageBuild = resolveImageBuild(image, this.agentConfig, this.context, this.resolvedEnv.vars);
 
     // Merge config-driven env vars with plugin-internal env vars
     const internalVars = this.getInternalEnvVars();

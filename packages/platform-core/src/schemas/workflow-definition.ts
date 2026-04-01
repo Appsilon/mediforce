@@ -24,6 +24,8 @@ export const WorkflowAgentConfigSchema = z.object({
   dockerfile: z.string().optional(),
   repo: z.string().optional(),
   commit: z.string().optional(),
+  /** Name of a workflow secret containing a token for repo access. */
+  repoAuth: z.string().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
 });
