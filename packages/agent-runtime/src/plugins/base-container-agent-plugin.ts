@@ -3,14 +3,14 @@ import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath,
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, normalizeRepoUrls } from './container-plugin.js';
 
-function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
-  return 'step' in ctx && 'workflowDefinition' in ctx;
-}
+// Re-export for backward compatibility (other files import from here)
+export { normalizeRepoUrls };
 
 const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
@@ -100,30 +100,6 @@ export interface AgentCommandSpec {
   promptDelivery: 'stdin' | 'file';
 }
 
-/** Normalize a repo reference to SSH clone URL and HTTPS browsable URL.
- *  Supports: "org/repo", "git@github.com:org/repo.git", "https://github.com/org/repo", "/path/to/bare.git" */
-export function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: string } {
-  // File path (local bare repo)
-  if (repo.startsWith('/') || repo.startsWith('.')) {
-    return { gitUrl: repo, httpsUrl: '' };
-  }
-  // Already an SSH URL
-  if (repo.startsWith('git@')) {
-    const match = repo.match(/git@github\.com:(.+?)(?:\.git)?$/);
-    const orgRepo = match ? match[1] : repo;
-    return { gitUrl: repo, httpsUrl: `https://github.com/${orgRepo}` };
-  }
-  // Already an HTTPS URL
-  if (repo.startsWith('https://')) {
-    const clean = repo.replace(/\.git$/, '');
-    return { gitUrl: `${clean}.git`, httpsUrl: clean };
-  }
-  // Short form: "org/repo"
-  return {
-    gitUrl: `git@github.com:${repo}.git`,
-    httpsUrl: `https://github.com/${repo}`,
-  };
-}
 
 function hasFiles(input: Record<string, unknown>): input is Record<string, unknown> & { files: FileEntry[] } {
   return Array.isArray(input.files) &&
@@ -175,17 +151,11 @@ export async function cleanupTempDir(tempDir: string | null): Promise<void> {
  * prompt assembly, output extraction, file downloads, mock mode.
  * Subclasses implement agent-specific CLI invocation, env vars, and output parsing.
  */
-export abstract class BaseContainerAgentPlugin implements AgentPlugin {
-  abstract readonly metadata: PluginCapabilityMetadata;
-
-  protected context!: AgentContext | WorkflowAgentContext;
+export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   protected agentConfig!: AgentConfig;
 
   /** Human-readable agent name for log/status messages (e.g. "Claude Code", "OpenCode"). */
   abstract readonly agentName: string;
-
-  /** Resolved env vars from config — set during run(), used by spawnDockerContainer */
-  protected resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
 
   /** Return plugin-internal env vars needed by the container (e.g. config paths).
    *  NOT for API keys — those come from the step config's `env` field.
@@ -1108,34 +1078,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       throw new Error(`agentConfig.image is required for Docker container execution`);
     }
 
-    // Resolve image build metadata for lazy Docker image building.
-    // A step opts in to lazy build when it has:
-    //   a) step-level repo + commit (explicit — always enables lazy build), OR
-    //   b) step-level dockerfile + workflow-level repo with commit (fallback)
-    // Steps without repo/commit/dockerfile are left alone (image must exist).
-    let imageBuild: ImageBuildMeta | undefined;
-    {
-      const dockerfile = this.agentConfig.dockerfile;
-      let buildRepoUrl: string | undefined;
-      let buildCommit: string | undefined;
-
-      if (repo && commit) {
-        // Step explicitly declares its own repo + commit
-        buildRepoUrl = normalizeRepoUrls(repo).gitUrl;
-        buildCommit = commit;
-      } else if (dockerfile && isWorkflowAgentContext(this.context)) {
-        // Step has dockerfile but no repo — fall back to workflow-level repo
-        const wfRepo = this.context.workflowDefinition.repo;
-        if (wfRepo?.url && wfRepo?.commit) {
-          buildRepoUrl = repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl;
-          buildCommit = commit ?? wfRepo.commit;
-        }
-      }
-
-      if (buildRepoUrl && buildCommit) {
-        imageBuild = { image, repoUrl: buildRepoUrl, commit: buildCommit, dockerfile };
-      }
-    }
+    const imageBuild = resolveImageBuild(image, this.agentConfig, this.context);
 
     // Merge config-driven env vars with plugin-internal env vars
     const internalVars = this.getInternalEnvVars();
