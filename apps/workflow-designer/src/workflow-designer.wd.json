@@ -11,13 +11,18 @@
     {
       "id": "choose-mode",
       "name": "Create or Edit",
-      "type": "review",
+      "type": "creation",
       "executor": "human",
       "description": "Choose whether to design a new workflow from scratch or load and edit an existing one.",
-      "verdicts": {
-        "create-new": { "target": "describe-idea" },
-        "edit-existing": { "target": "fetch-workflows" }
-      }
+      "params": [
+        {
+          "name": "mode",
+          "type": "string",
+          "required": true,
+          "description": "create-new — design from scratch; edit-existing — modify a registered workflow",
+          "options": ["create-new", "edit-existing"]
+        }
+      ]
     },
     {
       "id": "describe-idea",
@@ -54,7 +59,8 @@
       },
       "agent": {
         "runtime": "javascript",
-        "inlineScript": "import { writeFileSync } from 'fs';\n\nconst baseUrl = process.env.APP_BASE_URL;\nconst apiKey = process.env.PLATFORM_API_KEY;\n\nif (!baseUrl || !apiKey) {\n  writeFileSync('/output/result.json', JSON.stringify({ options: [], error: 'Missing APP_BASE_URL or PLATFORM_API_KEY' }));\n  process.exit(0);\n}\n\ntry {\n  const response = await fetch(`${baseUrl}/api/workflow-definitions`, {\n    headers: { 'X-Api-Key': apiKey }\n  });\n  const body = await response.json();\n\n  if (!response.ok) {\n    writeFileSync('/output/result.json', JSON.stringify({ options: [], error: body.error || 'Failed to fetch workflows' }));\n    process.exit(0);\n  }\n\n  const options = (body.definitions || []).filter(d => d.definition).map(d => ({\n    label: `${d.definition.title || d.name} (v${d.latestVersion})`,\n    description: d.definition.description || d.name,\n    value: d.definition\n  }));\n\n  writeFileSync('/output/result.json', JSON.stringify({ options, summary: `Found ${options.length} workflow(s) available for editing` }));\n} catch (err) {\n  writeFileSync('/output/result.json', JSON.stringify({ options: [], error: `API call failed: ${err.message}` }));\n}\n"
+        "image": "node:20-slim",
+        "inlineScript": "import { writeFileSync } from 'fs';\n\nconst baseUrl = process.env.APP_BASE_URL;\nconst apiKey = process.env.PLATFORM_API_KEY;\n\nif (!baseUrl || !apiKey) {\n  writeFileSync('/output/result.json', JSON.stringify({ options: [], error: 'Missing APP_BASE_URL or PLATFORM_API_KEY' }));\n  process.exit(1);\n}\n\ntry {\n  const response = await fetch(`${baseUrl}/api/workflow-definitions`, {\n    headers: { 'X-Api-Key': apiKey }\n  });\n  const body = await response.json();\n\n  if (!response.ok) {\n    writeFileSync('/output/result.json', JSON.stringify({ options: [], error: body.error || 'Failed to fetch workflows' }));\n    process.exit(1);\n  }\n\n  const options = (body.definitions || []).filter(d => d.definition).map(d => ({\n    label: `${d.definition.title || d.name} (v${d.latestVersion})`,\n    description: d.definition.description || d.name,\n    value: d.definition\n  }));\n\n  writeFileSync('/output/result.json', JSON.stringify({ options, summary: `Found ${options.length} workflow(s) available for editing` }));\n} catch (err) {\n  writeFileSync('/output/result.json', JSON.stringify({ options: [], error: `API call failed: ${err.message}` }));\n  process.exit(1);\n}\n"
       }
     },
     {
@@ -190,7 +196,7 @@
       "description": "Register the validated WorkflowDefinition in the Mediforce platform. For new workflows this creates v1; for edits the platform auto-increments to the next version.",
       "agent": {
         "runtime": "javascript",
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst workflowDefinition = input.steps?.['validate']?.workflowDefinition || input.workflowDefinition;\n\nif (!workflowDefinition || !workflowDefinition.name) {\n  writeFileSync('/output/result.json', JSON.stringify({ registered: false, error: 'No WorkflowDefinition found in input', debugKeys: Object.keys(input) }));\n  process.exit(0);\n}\n\nconst baseUrl = process.env.APP_BASE_URL;\nconst apiKey = process.env.PLATFORM_API_KEY;\n\nif (!baseUrl || !apiKey) {\n  writeFileSync('/output/result.json', JSON.stringify({ registered: false, error: 'Missing APP_BASE_URL or PLATFORM_API_KEY' }));\n  process.exit(0);\n}\n\ntry {\n  const response = await fetch(`${baseUrl}/api/workflow-definitions`, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },\n    body: JSON.stringify(workflowDefinition),\n  });\n  const body = await response.json();\n  if (response.ok) {\n    writeFileSync('/output/result.json', JSON.stringify({ registered: true, name: body.name, version: body.version, summary: `Workflow '${body.name}' v${body.version} registered` }));\n  } else {\n    writeFileSync('/output/result.json', JSON.stringify({ registered: false, status: response.status, error: body.error || 'Registration failed' }));\n  }\n} catch (err) {\n  writeFileSync('/output/result.json', JSON.stringify({ registered: false, error: `API call failed: ${err.message}` }));\n}\n"
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\n\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst workflowDefinition = input.steps?.['validate']?.workflowDefinition || input.workflowDefinition;\n\nif (!workflowDefinition || !workflowDefinition.name) {\n  writeFileSync('/output/result.json', JSON.stringify({ registered: false, error: 'No WorkflowDefinition found in input', debugKeys: Object.keys(input) }));\n  process.exit(1);\n}\n\nconst baseUrl = process.env.APP_BASE_URL;\nconst apiKey = process.env.PLATFORM_API_KEY;\n\nif (!baseUrl || !apiKey) {\n  writeFileSync('/output/result.json', JSON.stringify({ registered: false, error: 'Missing APP_BASE_URL or PLATFORM_API_KEY' }));\n  process.exit(1);\n}\n\nconst ns = workflowDefinition.namespace || 'default';\n\ntry {\n  const response = await fetch(`${baseUrl}/api/workflow-definitions?namespace=${encodeURIComponent(ns)}`, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },\n    body: JSON.stringify(workflowDefinition),\n  });\n  const body = await response.json();\n  if (response.ok) {\n    writeFileSync('/output/result.json', JSON.stringify({ registered: true, name: body.name, version: body.version, summary: `Workflow '${body.name}' v${body.version} registered` }));\n  } else {\n    writeFileSync('/output/result.json', JSON.stringify({ registered: false, status: response.status, error: body.error || 'Registration failed' }));\n    process.exit(1);\n  }\n} catch (err) {\n  writeFileSync('/output/result.json', JSON.stringify({ registered: false, error: `API call failed: ${err.message}` }));\n  process.exit(1);\n}\n"
       }
     },
     {
@@ -201,6 +207,8 @@
     }
   ],
   "transitions": [
+    { "from": "choose-mode", "to": "describe-idea", "when": "output.mode == \"create-new\"" },
+    { "from": "choose-mode", "to": "fetch-workflows", "when": "output.mode == \"edit-existing\"" },
     { "from": "describe-idea", "to": "generate-steps" },
     { "from": "fetch-workflows", "to": "select-workflow" },
     { "from": "describe-changes", "to": "generate-steps" },
