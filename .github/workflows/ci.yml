@@ -124,7 +124,10 @@ jobs:
               exit 1
             fi
           done
-      - name: Audit dependencies
+      - name: Audit dependencies (critical = block)
+        run: pnpm audit --prod --audit-level=critical
+      - name: Audit dependencies (full report)
+        if: always()
         run: pnpm audit --prod || true
 
   gif-check:
