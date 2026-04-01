@@ -26,6 +26,7 @@ services:
   platform-ui:
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - SECRETS_ENCRYPTION_KEY=${SECRETS_ENCRYPTION_KEY}
 
   agent-worker:
     environment:
