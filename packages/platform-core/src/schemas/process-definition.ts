@@ -58,6 +58,7 @@ export const RepoSchema = z.object({
   url: z.string().url(),
   branch: z.string().optional(),
   directory: z.string().optional(),
+  commit: z.string().optional(),
 });
 
 export const ProcessDefinitionSchema = z.object({

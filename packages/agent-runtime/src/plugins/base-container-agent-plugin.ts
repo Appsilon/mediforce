@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
-import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
+import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
 
 function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
   return 'step' in ctx && 'workflowDefinition' in ctx;
@@ -1108,6 +1108,35 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       throw new Error(`agentConfig.image is required for Docker container execution`);
     }
 
+    // Resolve image build metadata for lazy Docker image building.
+    // A step opts in to lazy build when it has:
+    //   a) step-level repo + commit (explicit — always enables lazy build), OR
+    //   b) step-level dockerfile + workflow-level repo with commit (fallback)
+    // Steps without repo/commit/dockerfile are left alone (image must exist).
+    let imageBuild: ImageBuildMeta | undefined;
+    {
+      const dockerfile = this.agentConfig.dockerfile;
+      let buildRepoUrl: string | undefined;
+      let buildCommit: string | undefined;
+
+      if (repo && commit) {
+        // Step explicitly declares its own repo + commit
+        buildRepoUrl = normalizeRepoUrls(repo).gitUrl;
+        buildCommit = commit;
+      } else if (dockerfile && isWorkflowAgentContext(this.context)) {
+        // Step has dockerfile but no repo — fall back to workflow-level repo
+        const wfRepo = this.context.workflowDefinition.repo;
+        if (wfRepo?.url && wfRepo?.commit) {
+          buildRepoUrl = repo ? normalizeRepoUrls(repo).gitUrl : normalizeRepoUrls(wfRepo.url).gitUrl;
+          buildCommit = commit ?? wfRepo.commit;
+        }
+      }
+
+      if (buildRepoUrl && buildCommit) {
+        imageBuild = { image, repoUrl: buildRepoUrl, commit: buildCommit, dockerfile };
+      }
+    }
+
     // Merge config-driven env vars with plugin-internal env vars
     const internalVars = this.getInternalEnvVars();
     const envVars = { ...this.resolvedEnv.vars, ...internalVars };
@@ -1233,6 +1262,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       stepId,
       outputDir,
       logFile,
+      imageBuild,
     });
 
     // Process stdout lines for activity logging (batch mode — lines arrive after completion

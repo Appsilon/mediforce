@@ -21,6 +21,7 @@ export const AgentConfigSchema = z.object({
   runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
   // Container image — when omitted, inline scripts auto-resolve the image from the runtime
   image: z.string().optional(),
+  dockerfile: z.string().optional(),
   repo: z.string().optional(),
   commit: z.string().optional(),
 });

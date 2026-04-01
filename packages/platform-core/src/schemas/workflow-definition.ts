@@ -21,6 +21,7 @@ export const WorkflowAgentConfigSchema = z.object({
   inlineScript: z.string().optional(),
   runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
   image: z.string().optional(),
+  dockerfile: z.string().optional(),
   repo: z.string().optional(),
   commit: z.string().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),

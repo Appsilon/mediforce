@@ -78,6 +78,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
+      - ${DEPLOY_KEY_PATH:-/home/deploy/.ssh/deploy_key}:/root/.ssh/deploy_key:ro
     depends_on:
       redis:
         condition: service_healthy

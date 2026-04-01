@@ -29,6 +29,13 @@ export const DockerJobDataSchema = z.object({
   /** Files from outputDir, keyed by filename. Sent through Redis when caller
    *  and worker don't share a filesystem (e.g. Vercel → VPS). */
   inputFiles: z.record(z.string(), z.string()).optional(),
+  /** Image build metadata — when present, worker ensures image exists before docker run. */
+  imageBuild: z.object({
+    image: z.string(),
+    repoUrl: z.string(),
+    commit: z.string(),
+    dockerfile: z.string().optional(),
+  }).optional(),
 });
 
 export type DockerJobData = z.infer<typeof DockerJobDataSchema>;

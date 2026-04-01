@@ -10,6 +10,14 @@
 import { spawn } from 'node:child_process';
 import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { ensureImage } from './docker-image-builder.js';
+
+export interface ImageBuildMeta {
+  image: string;
+  repoUrl: string;
+  commit: string;
+  dockerfile?: string;
+}
 
 export interface DockerSpawnRequest {
   dockerArgs: string[];
@@ -20,6 +28,8 @@ export interface DockerSpawnRequest {
   stepId: string;
   outputDir: string;
   logFile: string | null;
+  /** When present, strategy ensures the image exists (lazy build) before docker run. */
+  imageBuild?: ImageBuildMeta;
 }
 
 export interface DockerSpawnResult {
@@ -38,7 +48,11 @@ export interface DockerSpawnStrategy {
  * This is the current behavior — extracted into a strategy for swapability.
  */
 export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
-  spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
+  async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
+    if (request.imageBuild) {
+      await ensureImage(request.imageBuild);
+    }
+
     return new Promise<DockerSpawnResult>((resolve, reject) => {
       const child = spawn('docker', request.dockerArgs, {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -139,6 +153,7 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       outputDir: request.outputDir,
       logFile: request.logFile,
       inputFiles,
+      imageBuild: request.imageBuild,
     });
 
     // Write output files from worker back to caller's outputDir
