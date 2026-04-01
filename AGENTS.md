@@ -244,6 +244,19 @@ The `skills/_registry.yml` indexes development skills. Runtime skills have per-a
 - `cp packages/platform-ui/.env.local.example packages/platform-ui/.env.local` and fill Firebase + OpenRouter keys
 - Deploys via Firebase App Hosting (`apphosting.yaml`)
 
+## Skills Router
+
+When a task matches one of these, invoke the skill before starting work:
+
+| Task | Skill |
+|------|-------|
+| Review a PR or code diff | `/code-review` → `skills/code-review/SKILL.md` |
+| Write or run E2E journey tests | `/e2e-test` → `skills/e2e-test/SKILL.md` |
+| Visual UI verification in browser | `/agent-browser` → `skills/agent-browser/SKILL.md` |
+| Review a Renovate dependency PR | `/renovate-review` → `skills/renovate-review/SKILL.md` |
+| Write a Discord community update | `/community` → `skills/community/SKILL.md` |
+| Generate a pitch deck | `/generate-pitch` → `skills/generate-pitch/SKILL.md` |
+
 ## Core Principles
 
 - **Simplicity First**: Make every change as simple as possible. Minimal code impact.
