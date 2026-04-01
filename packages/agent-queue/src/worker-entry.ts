@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 import { getRedisConnection } from './connection.js';
 import { QUEUE_NAME, DockerJobDataSchema } from './schemas.js';
 import type { DockerJobResult } from './schemas.js';
+import { ensureImage } from './docker-image-builder.js';
 
 /**
  * If inputFiles are provided (remote caller), create a local temp dir,
@@ -60,10 +61,15 @@ async function collectOutputFiles(outputDir: string): Promise<Record<string, str
   return files;
 }
 
-function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
+async function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
   const data = DockerJobDataSchema.parse(rawData);
   const logFile = data.logFile;
   const hasInputFiles = data.inputFiles && Object.keys(data.inputFiles).length > 0;
+
+  // Lazy image build: ensure Docker image exists before running container
+  if (data.imageBuild) {
+    await ensureImage(data.imageBuild);
+  }
 
   return prepareLocalOutputDir(data).then(({ localOutputDir, patchedArgs }) => new Promise<DockerJobResult>((resolve, reject) => {
     const child = spawn('docker', patchedArgs, {

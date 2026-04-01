@@ -1,14 +1,10 @@
 import { readFile, mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
-import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
-
-function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
-  return 'step' in ctx && 'workflowDefinition' in ctx;
-}
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild } from './container-plugin.js';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
@@ -37,7 +33,7 @@ const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: s
  *   3. Runs the script using the runtime's command in an auto-resolved Docker image
  *   4. Reads /output/result.json from the container
  */
-export class ScriptContainerPlugin implements AgentPlugin {
+export class ScriptContainerPlugin extends ContainerPlugin {
   readonly metadata: PluginCapabilityMetadata = {
     name: 'Script Container',
     description: 'Runs a deterministic script or inline code inside a Docker container — no LLM involved.',
@@ -46,13 +42,11 @@ export class ScriptContainerPlugin implements AgentPlugin {
     roles: ['executor'],
   };
 
-  private context!: AgentContext | WorkflowAgentContext;
   private image!: string;
   private commandArgs!: string[];
   private commandDisplay!: string;
   private inlineScript: string | null = null;
   private runtime: string | null = null;
-  private resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
 
   async initialize(context: AgentContext | WorkflowAgentContext): Promise<void> {
     this.context = context;
@@ -128,7 +122,8 @@ export class ScriptContainerPlugin implements AgentPlugin {
 
     // Resolve env vars from definition-level + step-level env + workflow secrets
     const workflowSecrets = isWorkflowAgentContext(context) ? context.workflowSecrets : undefined;
-    this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv, workflowSecrets);
+    this.resolveEnvironment(definitionEnv, stepEnv, workflowSecrets);
+    this.imageBuild = resolveImageBuild(this.image, agentConfig, context, this.resolvedEnv.vars);
   }
 
   async run(emit: EmitFn): Promise<void> {
@@ -190,6 +185,7 @@ export class ScriptContainerPlugin implements AgentPlugin {
         stepId: this.context.stepId,
         outputDir,
         logFile: null,
+        imageBuild: this.imageBuild,
       });
 
       // Emit stdout/stderr lines as activity events (batch mode after completion)

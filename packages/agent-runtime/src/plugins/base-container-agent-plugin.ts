@@ -3,14 +3,11 @@ import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath,
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
-import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
-
-function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
-  return 'step' in ctx && 'workflowDefinition' in ctx;
-}
+import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls } from './container-plugin.js';
 
 const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
@@ -100,30 +97,6 @@ export interface AgentCommandSpec {
   promptDelivery: 'stdin' | 'file';
 }
 
-/** Normalize a repo reference to SSH clone URL and HTTPS browsable URL.
- *  Supports: "org/repo", "git@github.com:org/repo.git", "https://github.com/org/repo", "/path/to/bare.git" */
-export function normalizeRepoUrls(repo: string): { gitUrl: string; httpsUrl: string } {
-  // File path (local bare repo)
-  if (repo.startsWith('/') || repo.startsWith('.')) {
-    return { gitUrl: repo, httpsUrl: '' };
-  }
-  // Already an SSH URL
-  if (repo.startsWith('git@')) {
-    const match = repo.match(/git@github\.com:(.+?)(?:\.git)?$/);
-    const orgRepo = match ? match[1] : repo;
-    return { gitUrl: repo, httpsUrl: `https://github.com/${orgRepo}` };
-  }
-  // Already an HTTPS URL
-  if (repo.startsWith('https://')) {
-    const clean = repo.replace(/\.git$/, '');
-    return { gitUrl: `${clean}.git`, httpsUrl: clean };
-  }
-  // Short form: "org/repo"
-  return {
-    gitUrl: `git@github.com:${repo}.git`,
-    httpsUrl: `https://github.com/${repo}`,
-  };
-}
 
 function hasFiles(input: Record<string, unknown>): input is Record<string, unknown> & { files: FileEntry[] } {
   return Array.isArray(input.files) &&
@@ -175,17 +148,11 @@ export async function cleanupTempDir(tempDir: string | null): Promise<void> {
  * prompt assembly, output extraction, file downloads, mock mode.
  * Subclasses implement agent-specific CLI invocation, env vars, and output parsing.
  */
-export abstract class BaseContainerAgentPlugin implements AgentPlugin {
-  abstract readonly metadata: PluginCapabilityMetadata;
-
-  protected context!: AgentContext | WorkflowAgentContext;
+export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   protected agentConfig!: AgentConfig;
 
   /** Human-readable agent name for log/status messages (e.g. "Claude Code", "OpenCode"). */
   abstract readonly agentName: string;
-
-  /** Resolved env vars from config — set during run(), used by spawnDockerContainer */
-  protected resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
 
   /** Return plugin-internal env vars needed by the container (e.g. config paths).
    *  NOT for API keys — those come from the step config's `env` field.
@@ -277,7 +244,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
    *  Returns null if skillsDir is not set. */
   protected getMockFixturesDir(): string | null {
     if (!this.agentConfig.skillsDir) return null;
-    return join(resolveProjectPath(this.agentConfig.skillsDir), '..', 'mock-fixtures');
+    return join(this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath), '..', 'mock-fixtures');
   }
 
   /** Resolve the host path to the mock data directory from _config.json.
@@ -461,10 +428,24 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
         workingDirForPrompt = '/workspace';
       }
 
+      // Fetch skills from workflow repo if configured
+      if (this.agentConfig.skillsDir && isWorkflowAgentContext(this.context)) {
+        const wfRepo = this.context.workflowDefinition.repo;
+        if (wfRepo?.url && wfRepo?.commit) {
+          const repoToken = resolveRepoToken(this.agentConfig, this.context, this.resolvedEnv.vars);
+          await this.fetchSkillsFromRepo(
+            this.agentConfig.skillsDir,
+            normalizeRepoUrls(wfRepo.url).gitUrl,
+            wfRepo.commit,
+            repoToken,
+          );
+        }
+      }
+
       agentLog('run.buildPrompt', 'building prompt', {
         stepId,
         skillsDir: this.agentConfig.skillsDir ?? null,
-        resolvedSkillsDir: this.agentConfig.skillsDir ? resolveProjectPath(this.agentConfig.skillsDir) : null,
+        resolvedSkillsDir: this.agentConfig.skillsDir ? this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath) : null,
       });
 
       const prompt = await this.buildPrompt(updatedInput, timeoutMs, outputDirForPrompt, dockerOutputDir, workingDirForPrompt);
@@ -483,7 +464,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
 
       // Mount skill directory so reference files are available inside the container
       if (this.agentConfig.skill && this.agentConfig.skillsDir) {
-        options.skillDir = join(resolveProjectPath(this.agentConfig.skillsDir), this.agentConfig.skill);
+        options.skillDir = join(this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath), this.agentConfig.skill);
       }
 
       // Create activity log file for observability
@@ -709,7 +690,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
     // 1. Skill prompt from SKILL.md
     if (this.agentConfig.skill && this.agentConfig.skillsDir) {
       const skillContent = await this.readSkillFile(
-        resolveProjectPath(this.agentConfig.skillsDir),
+        this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath),
         this.agentConfig.skill,
       );
       parts.push(skillContent);
@@ -1108,6 +1089,8 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       throw new Error(`agentConfig.image is required for Docker container execution`);
     }
 
+    const imageBuild = resolveImageBuild(image, this.agentConfig, this.context, this.resolvedEnv.vars);
+
     // Merge config-driven env vars with plugin-internal env vars
     const internalVars = this.getInternalEnvVars();
     const envVars = { ...this.resolvedEnv.vars, ...internalVars };
@@ -1233,6 +1216,7 @@ export abstract class BaseContainerAgentPlugin implements AgentPlugin {
       stepId,
       outputDir,
       logFile,
+      imageBuild,
     });
 
     // Process stdout lines for activity logging (batch mode — lines arrive after completion
