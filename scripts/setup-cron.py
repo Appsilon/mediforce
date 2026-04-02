@@ -37,11 +37,12 @@ def install(host: str, interval: int) -> None:
         print("  Run a deploy first so the repo is on the server.")
         sys.exit(1)
 
-    # Verify .env has required vars
-    result = ssh(host, f"grep -qE '^(PLATFORM_API_KEY|DOMAIN)=' {MEDIFORCE_DIR}/.env")
-    if result.returncode != 0:
-        print(f"ERROR: PLATFORM_API_KEY or DOMAIN not found in {MEDIFORCE_DIR}/.env on {host}")
-        sys.exit(1)
+    # Verify .env has both required vars
+    for var in ("PLATFORM_API_KEY", "DOMAIN"):
+        result = ssh(host, f"grep -q '^{var}=' {MEDIFORCE_DIR}/.env")
+        if result.returncode != 0:
+            print(f"ERROR: {var} not found in {MEDIFORCE_DIR}/.env on {host}")
+            sys.exit(1)
 
     cron_line = f"*/{interval} * * * * {HEARTBEAT_SCRIPT} # {CRON_COMMENT}"
 
