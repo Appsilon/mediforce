@@ -11,7 +11,6 @@ import { usePlugins } from '@/hooks/use-plugins';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
 import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
-import { StartRunButton } from '@/components/processes/start-run-button';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -282,59 +281,6 @@ export default function WorkflowDefinitionVersionPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {editing ? (
-              <>
-                {/* Cancel — ghost button, clearly "discard" */}
-                <button
-                  onClick={() => {
-                    if (confirm('Discard unsaved changes?')) cancelEditing();
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
-                >
-                  Cancel
-                </button>
-
-                {/* Save — primary action */}
-                <button
-                  onClick={handleSave}
-                  disabled={saveState.status === 'saving' || !editedTitle.trim()}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                    (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
-                  )}
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  {saveState.status === 'saving' ? 'Saving...' : 'Save new version'}
-                </button>
-
-                {saveState.status === 'saved' && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
-                    Saved as v{saveState.version}
-                  </span>
-                )}
-                {saveState.status === 'error' && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
-                    {saveState.message}
-                  </span>
-                )}
-              </>
-            ) : (
-              <>
-                {/* Edit — enters edit mode */}
-                <button
-                  onClick={enableEditing}
-                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  Edit
-                </button>
-
-                {/* Start Run */}
-                <StartRunButton workflowName={decodedName} version={definition.version} />
-              </>
-            )}
-          </div>
         </div>
       </div>
 
@@ -360,12 +306,23 @@ export default function WorkflowDefinitionVersionPage() {
               <>
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold">{editing ? 'Edit step' : 'Step details'}</h2>
-                  <button
-                    onClick={() => setSelectedStepId(null)}
-                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {!editing && (
+                      <button
+                        onClick={enableEditing}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setSelectedStepId(null)}
+                      className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 {editing ? (
                   <StepEditor
@@ -379,7 +336,52 @@ export default function WorkflowDefinitionVersionPage() {
               </>
             ) : (
               <>
-                <h2 className="text-sm font-semibold">YAML</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">YAML</h2>
+                  <div className="flex items-center gap-2">
+                    {editing ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            if (confirm('Discard unsaved changes?')) cancelEditing();
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSave}
+                          disabled={saveState.status === 'saving' || !editedTitle.trim()}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
+                            (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
+                          )}
+                        >
+                          <Save className="h-3.5 w-3.5" />
+                          {saveState.status === 'saving' ? 'Saving...' : 'Save new version'}
+                        </button>
+                        {saveState.status === 'saved' && (
+                          <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
+                            Saved as v{saveState.version}
+                          </span>
+                        )}
+                        {saveState.status === 'error' && (
+                          <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+                            {saveState.message}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        onClick={enableEditing}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                </div>
                 {editing ? (
                   <YamlEditor
                     steps={editedSteps}

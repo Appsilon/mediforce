@@ -26,26 +26,30 @@ const COLORS = {
   label: { forward: '#64748b', back: '#b45309' },
 } as const;
 
-const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: string }> = {
+const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: string; activeRing: string }> = {
   creation: {
     bg: 'bg-white dark:bg-slate-900',
     border: 'border-blue-200 dark:border-blue-800',
-    activeBorder: 'border-blue-500',
+    activeBorder: 'border-blue-600 dark:border-blue-400',
+    activeRing: 'ring-2 ring-blue-400 ring-offset-1 dark:ring-blue-500',
   },
   review: {
     bg: 'bg-amber-50/50 dark:bg-amber-950/20',
     border: 'border-amber-200 dark:border-amber-800',
-    activeBorder: 'border-amber-500',
+    activeBorder: 'border-amber-500 dark:border-amber-400',
+    activeRing: 'ring-2 ring-amber-400 ring-offset-1 dark:ring-amber-500',
   },
   decision: {
     bg: 'bg-purple-50/50 dark:bg-purple-950/20',
     border: 'border-purple-200 dark:border-purple-800',
-    activeBorder: 'border-purple-500',
+    activeBorder: 'border-purple-600 dark:border-purple-400',
+    activeRing: 'ring-2 ring-purple-400 ring-offset-1 dark:ring-purple-500',
   },
   terminal: {
     bg: 'bg-slate-50 dark:bg-slate-900',
     border: 'border-slate-200 dark:border-slate-700',
-    activeBorder: 'border-slate-500',
+    activeBorder: 'border-slate-600 dark:border-slate-400',
+    activeRing: 'ring-2 ring-slate-400 ring-offset-1 dark:ring-slate-500',
   },
 };
 
@@ -114,7 +118,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
           'rounded-xl border-[1.5px] px-4 py-3 transition-all cursor-pointer group/node relative',
           'hover:shadow-md',
           style.bg,
-          selected ? `${style.activeBorder} shadow-md ring-1 ring-primary/10` : style.border,
+          selected ? `${style.activeBorder} ${style.activeRing} shadow-lg` : style.border,
         )}
       >
         {/* Delete button — edit mode only */}
