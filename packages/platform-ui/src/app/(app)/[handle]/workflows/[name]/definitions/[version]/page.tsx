@@ -250,35 +250,35 @@ export default function WorkflowDefinitionVersionPage() {
     <div className="flex flex-1 flex-col relative">
       {/* Header */}
       <div className="border-b px-6 py-4 sticky top-0 z-30 bg-background">
-        <Link
-          href={routes.workflow(handle, decodedName)}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          {decodedName}
-        </Link>
-
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-headline font-semibold">{decodedName}</h1>
-              <VersionLabel version={definition.version} title={!editing ? definition.title : undefined} className="text-sm" />
-              {editing && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                  editing
-                </span>
+          <div className="space-y-0.5">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs text-muted-foreground w-24 shrink-0">Workflow ID</span>
+              <span className="text-sm font-mono">{decodedName}</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs text-muted-foreground w-24 shrink-0">Version</span>
+              {editing ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    placeholder="Version title (required) — e.g. &quot;Added automated review step&quot;"
+                    className="w-80 text-sm border rounded-md px-2.5 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    editing
+                  </span>
+                </div>
+              ) : (
+                <VersionLabel version={definition.version} title={definition.title} className="text-sm" />
               )}
             </div>
-            {editing && (
-              <input
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                placeholder="Version title (required) — e.g. &quot;Added automated review step&quot;"
-                className="mt-1 w-full max-w-md text-sm border rounded-md px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            )}
             {definition.description && (
-              <p className="text-sm text-muted-foreground mt-0.5">{definition.description}</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xs text-muted-foreground w-24 shrink-0">Description</span>
+                <span className="text-sm text-muted-foreground">{definition.description}</span>
+              </div>
             )}
           </div>
 
@@ -338,10 +338,10 @@ export default function WorkflowDefinitionVersionPage() {
         </div>
       </div>
 
-      {/* Content: diagram + optional side panel */}
+      {/* Content: diagram + side panel */}
       <div className="flex flex-1 min-h-0">
         {/* Diagram */}
-        <div className={cn('flex-1 p-6', selectedStep && 'pr-0')}>
+        <div className="flex-1 p-6 pr-0">
           <WorkflowDiagram
             definition={diagramDefinition}
             className="border-0"
@@ -351,58 +351,56 @@ export default function WorkflowDefinitionVersionPage() {
             onAddStep={editing ? addStepAfter : undefined}
             onRemoveStep={editing ? removeStep : undefined}
           />
-
-          {/* YAML — readonly preview or editable textarea in edit mode */}
-          <details className="mt-4">
-            <summary className="text-[11px] font-medium text-muted-foreground/40 cursor-pointer hover:text-muted-foreground transition-colors select-none">
-              {editing ? 'Edit YAML' : 'View YAML'}
-            </summary>
-            {editing ? (
-              <YamlEditor
-                steps={editedSteps}
-                transitions={editedTransitions}
-                onChange={(steps, transitions) => {
-                  setEditedSteps(steps);
-                  setEditedTransitions(transitions);
-                }}
-              />
-            ) : (
-              <pre className="mt-2 text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto max-h-[400px] overflow-y-auto leading-relaxed">
-                {yamlStringify(
-                  { ...diagramDefinition, version: undefined, createdAt: undefined },
-                  { indent: 2 },
-                )}
-              </pre>
-            )}
-          </details>
         </div>
 
-        {/* Side panel */}
-        {selectedStep && (
-          <div className="w-80 shrink-0 border-l bg-background overflow-y-auto">
-            <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">{editing ? 'Edit step' : 'Step details'}</h2>
-                <button
-                  onClick={() => setSelectedStepId(null)}
-                  className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {editing ? (
-                <StepEditor
-                  step={selectedStep}
-                  allSteps={currentSteps}
-                  onChange={(patch) => updateStep(selectedStep.id, patch)}
-                />
-              ) : (
-                <StepDetail step={selectedStep} />
-              )}
-            </div>
+        {/* Side panel — always visible; shows step details when a step is selected, YAML otherwise */}
+        <div className="w-1/2 shrink-0 border-l bg-background overflow-y-auto">
+          <div className="p-4 space-y-4">
+            {selectedStep ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">{editing ? 'Edit step' : 'Step details'}</h2>
+                  <button
+                    onClick={() => setSelectedStepId(null)}
+                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {editing ? (
+                  <StepEditor
+                    step={selectedStep}
+                    allSteps={currentSteps}
+                    onChange={(patch) => updateStep(selectedStep.id, patch)}
+                  />
+                ) : (
+                  <StepDetail step={selectedStep} />
+                )}
+              </>
+            ) : (
+              <>
+                <h2 className="text-sm font-semibold">YAML</h2>
+                {editing ? (
+                  <YamlEditor
+                    steps={editedSteps}
+                    transitions={editedTransitions}
+                    onChange={(steps, transitions) => {
+                      setEditedSteps(steps);
+                      setEditedTransitions(transitions);
+                    }}
+                  />
+                ) : (
+                  <pre className="text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto overflow-y-auto leading-relaxed">
+                    {yamlStringify(
+                      { ...diagramDefinition, version: undefined, createdAt: undefined },
+                      { indent: 2 },
+                    )}
+                  </pre>
+                )}
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -1015,7 +1013,7 @@ function StepDetail({ step }: { step: WorkflowStep }) {
           {step.agent!.prompt && (
             <div className="mt-2">
               <p className="text-[11px] text-muted-foreground mb-1">Prompt</p>
-              <p className="text-xs bg-muted/50 rounded-md p-2.5 whitespace-pre-wrap leading-relaxed">{step.agent!.prompt}</p>
+              <p className="w-full text-xs bg-muted/50 rounded-md p-2.5 whitespace-pre-line break-words leading-relaxed text-justify">{step.agent!.prompt}</p>
             </div>
           )}
         </Section>
