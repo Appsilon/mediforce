@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Pencil, X, Save, User, Bot, Terminal } from 'lucide-react';
+import { X, Save, User, Bot, Terminal } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useAuth } from '@/contexts/auth-context';
@@ -40,31 +40,75 @@ export default function WorkflowDefinitionVersionPage() {
   const { definitions, loading } = useWorkflowDefinitions(decodedName);
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
-  const [editing, setEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>([]);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>([]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
+  const [addingStep, setAddingStep] = useState(false);
+  const [pendingStepType, setPendingStepType] = useState<WorkflowStep['type'] | null>(null);
+  const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
 
-  const currentSteps = editing ? editedSteps : (definition?.steps ?? []);
-  const currentTransitions = editing ? editedTransitions : (definition?.transitions ?? []);
-  const selectedStep = currentSteps.find((s) => s.id === selectedStepId) ?? null;
-
-  const enableEditing = useCallback(() => {
+  // Initialize editable state from definition whenever it loads or changes version
+  useEffect(() => {
     if (!definition) return;
-    setEditedTitle('');
     setEditedSteps(structuredClone(definition.steps));
     setEditedTransitions(structuredClone(definition.transitions));
-    setEditing(true);
-    setSaveState({ status: 'idle' });
-  }, [definition]);
+    setEditedTitle('');
+    setEditHistory([]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [definition?.version]);
 
-  const cancelEditing = useCallback(() => {
-    setEditing(false);
-    setEditedSteps([]);
-    setSaveState({ status: 'idle' });
+  const currentSteps = editedSteps.length > 0 ? editedSteps : (definition?.steps ?? []);
+  const currentTransitions = editedSteps.length > 0 ? editedTransitions : (definition?.transitions ?? []);
+
+  const hasChanges = useMemo(() => {
+    if (!definition || editedSteps.length === 0) return false;
+    return (
+      JSON.stringify(editedSteps) !== JSON.stringify(definition.steps) ||
+      JSON.stringify(editedTransitions) !== JSON.stringify(definition.transitions)
+    );
+  }, [editedSteps, editedTransitions, definition]);
+  const selectedStep = currentSteps.find((s) => s.id === selectedStepId) ?? null;
+
+  const canMoveSelectedUp = (() => {
+    if (!selectedStepId) return false;
+    const incoming = currentTransitions.filter((t) => t.to === selectedStepId);
+    if (incoming.length !== 1) return false;
+    const pred = incoming[0].from;
+    return currentTransitions.filter((t) => t.from === pred).length === 1;
+  })();
+
+  const canMoveSelectedDown = (() => {
+    if (!selectedStepId) return false;
+    const outgoing = currentTransitions.filter((t) => t.from === selectedStepId);
+    if (outgoing.length !== 1) return false;
+    const succ = outgoing[0].to;
+    return currentTransitions.filter((t) => t.to === succ).length === 1;
+  })();
+
+  const saveSnapshot = useCallback(() => {
+    setEditHistory((prev) => [...prev, { steps: editedSteps, transitions: editedTransitions }]);
+  }, [editedSteps, editedTransitions]);
+
+  const undoEdit = useCallback(() => {
+    setEditHistory((prev) => {
+      if (prev.length === 0) return prev;
+      const snapshot = prev[prev.length - 1];
+      setEditedSteps(snapshot.steps);
+      setEditedTransitions(snapshot.transitions);
+      return prev.slice(0, -1);
+    });
   }, []);
+
+  const discardChanges = useCallback(() => {
+    if (!definition) return;
+    setEditedSteps(structuredClone(definition.steps));
+    setEditedTransitions(structuredClone(definition.transitions));
+    setEditedTitle('');
+    setSaveState({ status: 'idle' });
+    setEditHistory([]);
+  }, [definition]);
 
   const updateStep = useCallback((stepId: string, patch: Partial<WorkflowStep>) => {
     setEditedSteps((prev) =>
@@ -97,16 +141,32 @@ export default function WorkflowDefinitionVersionPage() {
     }
   }, [selectedStepId]);
 
-  const addStepAfter = useCallback((afterStepId: string, beforeStepId: string, executor: 'human' | 'agent' | 'script' = 'human') => {
+  // Ctrl+Z keyboard shortcut for undo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault();
+        undoEdit();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [undoEdit]);
+
+  const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor']) => {
+    saveSnapshot();
+    // Insert after selected step, or after the last step if nothing is selected
+    const afterId = selectedStepId ?? editedSteps[editedSteps.length - 1]?.id;
+    if (!afterId) return;
     const stepNum = editedSteps.length + 1;
     const newId = `new-step-${stepNum}`;
     setEditedSteps((prev) => {
-      const idx = prev.findIndex((s) => s.id === afterStepId);
+      const idx = prev.findIndex((s) => s.id === afterId);
       if (idx === -1) return prev;
       const newStep: WorkflowStep = {
         id: newId,
         name: `New Step ${stepNum}`,
-        type: 'creation',
+        type,
         executor,
         ...(executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
         ...(executor === 'script' ? { plugin: 'script-container' } : {}),
@@ -115,27 +175,23 @@ export default function WorkflowDefinitionVersionPage() {
       next.splice(idx + 1, 0, newStep);
       return next;
     });
-    // Rewire the specific edge: afterStep→beforeStep becomes afterStep→new→beforeStep
     setEditedTransitions((prev) => {
-      const targetEdge = prev.find((t) => t.from === afterStepId && t.to === beforeStepId);
-      if (!targetEdge) {
-        // Edge not found in explicit transitions — might be a verdict edge.
-        // Insert new step with both connections anyway.
-        return [
-          ...prev,
-          { from: afterStepId, to: newId },
-          { from: newId, to: beforeStepId },
-        ];
+      const existingEdge = prev.find((t) => t.from === afterId);
+      const without = existingEdge ? prev.filter((t) => t !== existingEdge) : prev;
+      if (type === 'terminal') {
+        return [...without, { from: afterId, to: newId }];
       }
-      return [
-        ...prev.filter((t) => t !== targetEdge),
-        { from: afterStepId, to: newId },
-        { from: newId, to: beforeStepId },
-      ];
+      return existingEdge
+        ? [...without, { from: afterId, to: newId }, { from: newId, to: existingEdge.to }]
+        : [...without, { from: afterId, to: newId }];
     });
-  }, [editedSteps.length]);
+    setSelectedStepId(newId);
+    setAddingStep(false);
+    setPendingStepType(null);
+  }, [selectedStepId, editedSteps, saveSnapshot]);
 
   const removeStep = useCallback((stepId: string) => {
+    saveSnapshot();
     setEditedSteps((prev) => prev.filter((s) => s.id !== stepId));
     // Rewire transitions: if A→removed→B, create A→B
     setEditedTransitions((prev) => {
@@ -148,7 +204,66 @@ export default function WorkflowDefinitionVersionPage() {
       return [...unrelated, ...rewired];
     });
     if (selectedStepId === stepId) setSelectedStepId(null);
-  }, [selectedStepId]);
+  }, [selectedStepId, saveSnapshot]);
+
+  const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
+    saveSnapshot();
+    setEditedTransitions((prev) => {
+      if (direction === 'up') {
+        const incoming = prev.filter((t) => t.to === stepId);
+        if (incoming.length !== 1) return prev;
+        const pred = incoming[0].from;
+        const predIncoming = prev.filter((t) => t.to === pred);
+        const predOutgoing = prev.filter((t) => t.from === pred);
+        if (predOutgoing.length !== 1) return prev;
+        const stepOutgoing = prev.filter((t) => t.from === stepId);
+        // Before: [...→pred→stepId→succ]  After: [...→stepId→pred→succ]
+        const toRemove = new Set([
+          ...predIncoming.map((t) => `${t.from}|${t.to}`),
+          `${pred}|${stepId}`,
+          ...stepOutgoing.map((t) => `${t.from}|${t.to}`),
+        ]);
+        return [
+          ...prev.filter((t) => !toRemove.has(`${t.from}|${t.to}`)),
+          ...predIncoming.map((t) => ({ from: t.from, to: stepId })),
+          { from: stepId, to: pred },
+          ...stepOutgoing.map((t) => ({ from: pred, to: t.to })),
+        ];
+      } else {
+        const outgoing = prev.filter((t) => t.from === stepId);
+        if (outgoing.length !== 1) return prev;
+        const succ = outgoing[0].to;
+        const succIncoming = prev.filter((t) => t.to === succ);
+        if (succIncoming.length !== 1) return prev;
+        const succOutgoing = prev.filter((t) => t.from === succ);
+        const stepIncoming = prev.filter((t) => t.to === stepId);
+        // Before: [pred→stepId→succ→...]  After: [pred→succ→stepId→...]
+        const toRemove = new Set([
+          ...stepIncoming.map((t) => `${t.from}|${t.to}`),
+          `${stepId}|${succ}`,
+          ...succOutgoing.map((t) => `${t.from}|${t.to}`),
+        ]);
+        return [
+          ...prev.filter((t) => !toRemove.has(`${t.from}|${t.to}`)),
+          ...stepIncoming.map((t) => ({ from: t.from, to: succ })),
+          { from: succ, to: stepId },
+          ...succOutgoing.map((t) => ({ from: stepId, to: t.to })),
+        ];
+      }
+    });
+    // Keep steps array order in sync
+    setEditedSteps((prev) => {
+      const idx = prev.findIndex((s) => s.id === stepId);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      if (direction === 'up' && idx > 0) {
+        [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+      } else if (direction === 'down' && idx < next.length - 1) {
+        [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+      }
+      return next;
+    });
+  }, [saveSnapshot]);
 
   const handleSave = useCallback(async () => {
     if (!definition) return;
@@ -257,21 +372,7 @@ export default function WorkflowDefinitionVersionPage() {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-xs text-muted-foreground w-24 shrink-0">Version</span>
-              {editing ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    value={editedTitle}
-                    onChange={(e) => setEditedTitle(e.target.value)}
-                    placeholder="Version title (required) — e.g. &quot;Added automated review step&quot;"
-                    className="w-80 text-sm border rounded-md px-2.5 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                    editing
-                  </span>
-                </div>
-              ) : (
-                <VersionLabel version={definition.version} title={definition.title} className="text-sm" />
-              )}
+              <VersionLabel version={definition.version} title={definition.title} className="text-sm" />
             </div>
             {definition.description && (
               <div className="flex items-baseline gap-2">
@@ -287,16 +388,141 @@ export default function WorkflowDefinitionVersionPage() {
       {/* Content: diagram + side panel */}
       <div className="flex flex-1 min-h-0">
         {/* Diagram */}
-        <div className="flex-1 p-6 pr-0">
+        <div className="flex-1 flex flex-col pr-0">
+          {/* Editing toolbar */}
+          <div className="border-b px-4 py-2 flex items-center gap-1.5 bg-muted/30 shrink-0 flex-wrap">
+              {/* Add Step */}
+              <div className="relative">
+                <button
+                  onClick={() => { setAddingStep(!addingStep); setPendingStepType(null); }}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  + Add Step
+                </button>
+                {addingStep && (
+                  <div className="absolute top-full left-0 mt-1.5 bg-background border rounded-xl shadow-xl p-3 z-50 w-64 space-y-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {([
+                          { type: 'creation', label: 'Creation', color: 'text-blue-600 dark:text-blue-400', bg: pendingStepType === 'creation' ? 'bg-blue-100 dark:bg-blue-900/50 ring-1 ring-blue-400' : 'hover:bg-muted' },
+                          { type: 'review', label: 'Review', color: 'text-amber-600 dark:text-amber-400', bg: pendingStepType === 'review' ? 'bg-amber-100 dark:bg-amber-900/50 ring-1 ring-amber-400' : 'hover:bg-muted' },
+                          { type: 'decision', label: 'Decision', color: 'text-purple-600 dark:text-purple-400', bg: pendingStepType === 'decision' ? 'bg-purple-100 dark:bg-purple-900/50 ring-1 ring-purple-400' : 'hover:bg-muted' },
+                          { type: 'terminal', label: 'End', color: 'text-emerald-600 dark:text-emerald-400', bg: 'hover:bg-muted' },
+                        ] as const).map((opt) => (
+                          <button
+                            key={opt.type}
+                            onClick={() => {
+                              if (opt.type === 'terminal') { addStep('terminal', 'human'); }
+                              else { setPendingStepType(opt.type); }
+                            }}
+                            className={cn('rounded-lg px-3 py-2 text-xs font-semibold transition-all text-left', opt.color, opt.bg)}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {pendingStepType && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Executor</p>
+                        <div className="flex gap-1.5">
+                          {(['creation', 'review', 'decision'].includes(pendingStepType) ? (
+                            pendingStepType === 'creation'
+                              ? (['human', 'agent', 'script'] as const)
+                              : (['human', 'agent'] as const)
+                          ) : []).map((executor) => (
+                            <button
+                              key={executor}
+                              onClick={() => addStep(pendingStepType, executor)}
+                              className="flex-1 rounded-lg py-1.5 text-xs font-semibold hover:bg-muted transition-all capitalize border"
+                            >
+                              {executor}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="w-px h-4 bg-border mx-0.5" />
+
+              {/* Move Up */}
+              <button
+                onClick={() => selectedStepId && moveStep(selectedStepId, 'up')}
+                disabled={!canMoveSelectedUp}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
+                  canMoveSelectedUp
+                    ? 'hover:bg-muted text-foreground'
+                    : 'opacity-40 cursor-not-allowed text-muted-foreground',
+                )}
+              >
+                ↑ Move Up
+              </button>
+
+              {/* Move Down */}
+              <button
+                onClick={() => selectedStepId && moveStep(selectedStepId, 'down')}
+                disabled={!canMoveSelectedDown}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
+                  canMoveSelectedDown
+                    ? 'hover:bg-muted text-foreground'
+                    : 'opacity-40 cursor-not-allowed text-muted-foreground',
+                )}
+              >
+                ↓ Move Down
+              </button>
+
+              {/* Undo */}
+              <button
+                onClick={undoEdit}
+                disabled={editHistory.length === 0}
+                title="Undo last change (Ctrl+Z)"
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
+                  editHistory.length > 0
+                    ? 'hover:bg-muted text-foreground'
+                    : 'opacity-40 cursor-not-allowed text-muted-foreground',
+                )}
+              >
+                ↩ Undo
+              </button>
+
+              <div className="w-px h-4 bg-border mx-0.5" />
+
+              {/* Remove Step */}
+              <button
+                onClick={() => selectedStepId && removeStep(selectedStepId)}
+                disabled={!selectedStepId}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
+                  selectedStepId
+                    ? 'hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-foreground dark:hover:bg-red-900/20 dark:hover:text-red-400'
+                    : 'opacity-40 cursor-not-allowed text-muted-foreground',
+                )}
+              >
+                Remove Step
+              </button>
+
+              {selectedStepId && (
+                <span className="ml-auto text-xs text-muted-foreground">
+                  Selected: <span className="font-mono">{selectedStepId}</span>
+                </span>
+              )}
+            </div>
+
+          <div className="flex-1 p-6 pt-4">
           <WorkflowDiagram
             definition={diagramDefinition}
             className="border-0"
             onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
             selectedStepId={selectedStepId}
-            editing={editing}
-            onAddStep={editing ? addStepAfter : undefined}
-            onRemoveStep={editing ? removeStep : undefined}
           />
+          </div>
         </div>
 
         {/* Side panel — always visible; shows step details when a step is selected, YAML otherwise */}
@@ -305,99 +531,71 @@ export default function WorkflowDefinitionVersionPage() {
             {selectedStep ? (
               <>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">{editing ? 'Edit step' : 'Step details'}</h2>
-                  <div className="flex items-center gap-2">
-                    {!editing && (
-                      <button
-                        onClick={enableEditing}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setSelectedStepId(null)}
-                      className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
+                  <h2 className="text-sm font-semibold">Edit step</h2>
+                  <button
+                    onClick={() => setSelectedStepId(null)}
+                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                {editing ? (
-                  <StepEditor
-                    step={selectedStep}
-                    allSteps={currentSteps}
-                    onChange={(patch) => updateStep(selectedStep.id, patch)}
-                  />
-                ) : (
-                  <StepDetail step={selectedStep} />
-                )}
+                <StepEditor
+                  step={selectedStep}
+                  allSteps={currentSteps}
+                  onChange={(patch) => updateStep(selectedStep.id, patch)}
+                />
               </>
             ) : (
               <>
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold">YAML</h2>
-                  <div className="flex items-center gap-2">
-                    {editing ? (
-                      <>
-                        <button
-                          onClick={() => {
-                            if (confirm('Discard unsaved changes?')) cancelEditing();
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleSave}
-                          disabled={saveState.status === 'saving' || !editedTitle.trim()}
-                          className={cn(
-                            'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                            (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
-                          )}
-                        >
-                          <Save className="h-3.5 w-3.5" />
-                          {saveState.status === 'saving' ? 'Saving...' : 'Save new version'}
-                        </button>
-                        {saveState.status === 'saved' && (
-                          <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
-                            Saved as v{saveState.version}
-                          </span>
-                        )}
-                        {saveState.status === 'error' && (
-                          <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
-                            {saveState.message}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <button
-                        onClick={enableEditing}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit
-                      </button>
-                    )}
-                  </div>
                 </div>
-                {editing ? (
-                  <YamlEditor
-                    steps={editedSteps}
-                    transitions={editedTransitions}
-                    onChange={(steps, transitions) => {
-                      setEditedSteps(steps);
-                      setEditedTransitions(transitions);
-                    }}
-                  />
-                ) : (
-                  <pre className="text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto overflow-y-auto leading-relaxed">
-                    {yamlStringify(
-                      { ...diagramDefinition, version: undefined, createdAt: undefined },
-                      { indent: 2 },
-                    )}
-                  </pre>
+                <pre className="text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto overflow-y-auto leading-relaxed">
+                  {yamlStringify(
+                    { ...diagramDefinition, version: undefined, createdAt: undefined },
+                    { indent: 2 },
+                  )}
+                </pre>
+                {hasChanges && (
+                  <div className="border-t pt-4 space-y-3">
+                    <input
+                      value={editedTitle}
+                      onChange={(e) => setEditedTitle(e.target.value)}
+                      placeholder="Version title (required) — e.g. &quot;Added automated review step&quot;"
+                      className="w-full text-sm border rounded-md px-2.5 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => {
+                          if (confirm('Discard unsaved changes?')) discardChanges();
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+                      >
+                        Discard changes
+                      </button>
+                      <button
+                        onClick={handleSave}
+                        disabled={saveState.status === 'saving' || !editedTitle.trim()}
+                        className={cn(
+                          'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
+                          (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
+                        )}
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                        {saveState.status === 'saving' ? 'Saving...' : 'Save new version'}
+                      </button>
+                      {saveState.status === 'saved' && (
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
+                          Saved as v{saveState.version}
+                        </span>
+                      )}
+                      {saveState.status === 'error' && (
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+                          {saveState.message}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
               </>
             )}
