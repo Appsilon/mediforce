@@ -24,6 +24,7 @@ const AUTONOMY_LEVELS = [
 ] as const;
 
 const STEP_TYPES = ['creation', 'review', 'decision', 'terminal'] as const;
+const STEP_TYPE_LABELS: Record<string, string> = { creation: 'Input', review: 'Review', decision: 'Decision', terminal: 'End' };
 
 const FALLBACK_OPTIONS = [
   { value: '', label: 'Default' },
@@ -353,7 +354,7 @@ export function WorkflowEditorCanvas({
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
                   <div className="flex flex-col gap-1">
                     {([
-                      { type: 'creation', label: 'Creation', description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400', activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
+                      { type: 'creation', label: 'Input', description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400', activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
                       { type: 'review', label: 'Review', description: 'A step where someone evaluates work and gives a verdict such as approve or reject.', color: 'text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-50 dark:bg-amber-900/30 ring-1 ring-amber-400' },
                       { type: 'decision', label: 'Decision', description: 'A branching step that routes the workflow to different paths based on a condition.', color: 'text-purple-600 dark:text-purple-400', activeBg: 'bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-400' },
                       { type: 'terminal', label: 'End', description: 'Marks the final state of the workflow — all paths must lead here.', color: 'text-emerald-600 dark:text-emerald-400', activeBg: '' },
@@ -1068,13 +1069,13 @@ function StepEditor({
                 key={t}
                 onClick={() => onChange({ type: t })}
                 className={cn(
-                  'flex-1 rounded-md py-1 text-[11px] font-medium capitalize transition-all border',
+                  'flex-1 rounded-md py-1 text-[11px] font-medium transition-all border',
                   step.type === t
                     ? 'border-primary bg-primary/5 text-primary'
                     : 'border-transparent bg-muted/50 text-muted-foreground hover:text-foreground',
                 )}
               >
-                {t}
+                {STEP_TYPE_LABELS[t] ?? t}
               </button>
             ))}
           </div>
