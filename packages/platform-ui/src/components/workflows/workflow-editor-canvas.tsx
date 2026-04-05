@@ -668,6 +668,115 @@ function StepEditor({
         )}
       </div>
 
+      {/* Parameters */}
+      {step.type !== 'terminal' && (
+        <Section title="Parameters">
+          <div className="space-y-3">
+            {(step.params ?? []).map((param, idx) => (
+              <div key={idx} className="rounded-lg border border-border/60 p-2.5 space-y-1.5 relative group">
+                {/* Name + type row */}
+                <div className="flex items-center gap-2">
+                  <input
+                    value={param.name}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], name: e.target.value };
+                      onChange({ params: next });
+                    }}
+                    placeholder="param-name"
+                    className="flex-1 bg-transparent text-xs font-mono font-medium border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors"
+                  />
+                  <select
+                    value={param.type ?? 'string'}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], type: e.target.value as 'string' | 'number' | 'boolean' | 'date' };
+                      onChange({ params: next });
+                    }}
+                    className="bg-transparent text-xs border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors cursor-pointer text-muted-foreground"
+                  >
+                    {(['string', 'number', 'boolean', 'date'] as const).map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={param.required ?? false}
+                      onChange={(e) => {
+                        const next = [...(step.params ?? [])];
+                        next[idx] = { ...next[idx], required: e.target.checked };
+                        onChange({ params: next });
+                      }}
+                      className="w-3 h-3 accent-primary"
+                    />
+                    required
+                  </label>
+                  <button
+                    onClick={() => {
+                      const next = (step.params ?? []).filter((_, i) => i !== idx);
+                      onChange({ params: next.length > 0 ? next : undefined });
+                    }}
+                    className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors shrink-0"
+                  >
+                    ×
+                  </button>
+                </div>
+                {/* Description */}
+                <input
+                  value={param.description ?? ''}
+                  onChange={(e) => {
+                    const next = [...(step.params ?? [])];
+                    next[idx] = { ...next[idx], description: e.target.value || undefined };
+                    onChange({ params: next });
+                  }}
+                  placeholder="Description…"
+                  className="w-full bg-transparent text-[11px] text-muted-foreground border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors placeholder:italic"
+                />
+                {/* Default value */}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[10px] text-muted-foreground/60 shrink-0">default</span>
+                  <input
+                    value={param.default !== undefined ? String(param.default) : ''}
+                    onChange={(e) => {
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], default: e.target.value || undefined };
+                      onChange({ params: next });
+                    }}
+                    placeholder="—"
+                    className="flex-1 bg-transparent text-[11px] font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors placeholder:text-muted-foreground/30"
+                  />
+                </div>
+                {/* Options (for string enum dropdowns) */}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[10px] text-muted-foreground/60 shrink-0">options</span>
+                  <input
+                    value={param.options?.join(', ') ?? ''}
+                    onChange={(e) => {
+                      const opts = e.target.value.split(',').map((o) => o.trim()).filter(Boolean);
+                      const next = [...(step.params ?? [])];
+                      next[idx] = { ...next[idx], options: opts.length > 0 ? opts : undefined };
+                      onChange({ params: next });
+                    }}
+                    placeholder="comma-separated choices"
+                    className="flex-1 bg-transparent text-[11px] border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors placeholder:italic placeholder:text-muted-foreground/30"
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                const next = [...(step.params ?? []), { name: '', type: 'string' as const, required: false }];
+                onChange({ params: next });
+              }}
+              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              + Add parameter
+            </button>
+          </div>
+        </Section>
+      )}
+
       {/* Agent section */}
       {isAgent && (
         <Section title="Agent">
