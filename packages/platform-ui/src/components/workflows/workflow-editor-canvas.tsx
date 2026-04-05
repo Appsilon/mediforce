@@ -348,17 +348,18 @@ export function WorkflowEditorCanvas({
               + Add Step
             </button>
             {addingStep && (
-              <div className="absolute top-full left-0 mt-1.5 bg-background border rounded-xl shadow-xl p-3 z-50 w-64 space-y-3">
+              <div className="absolute top-full left-0 mt-1.5 bg-background border rounded-xl shadow-xl p-3 z-50 w-80 space-y-3">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="flex flex-col gap-1">
                     {([
-                      { type: 'creation', label: 'Creation', color: 'text-blue-600 dark:text-blue-400', bg: pendingStepType === 'creation' ? 'bg-blue-100 dark:bg-blue-900/50 ring-1 ring-blue-400' : 'hover:bg-muted' },
-                      { type: 'review', label: 'Review', color: 'text-amber-600 dark:text-amber-400', bg: pendingStepType === 'review' ? 'bg-amber-100 dark:bg-amber-900/50 ring-1 ring-amber-400' : 'hover:bg-muted' },
-                      { type: 'decision', label: 'Decision', color: 'text-purple-600 dark:text-purple-400', bg: pendingStepType === 'decision' ? 'bg-purple-100 dark:bg-purple-900/50 ring-1 ring-purple-400' : 'hover:bg-muted' },
-                      { type: 'terminal', label: 'End', color: 'text-emerald-600 dark:text-emerald-400', bg: 'hover:bg-muted' },
+                      { type: 'creation', label: 'Creation', description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400', activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
+                      { type: 'review', label: 'Review', description: 'A step where someone evaluates work and gives a verdict such as approve or reject.', color: 'text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-50 dark:bg-amber-900/30 ring-1 ring-amber-400' },
+                      { type: 'decision', label: 'Decision', description: 'A branching step that routes the workflow to different paths based on a condition.', color: 'text-purple-600 dark:text-purple-400', activeBg: 'bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-400' },
+                      { type: 'terminal', label: 'End', description: 'Marks the final state of the workflow — all paths must lead here.', color: 'text-emerald-600 dark:text-emerald-400', activeBg: '' },
                     ] as const).map((opt) => {
                       const isTerminalDisabled = opt.type === 'terminal' && editedSteps.some((s) => s.type === 'terminal');
+                      const isActive = pendingStepType === opt.type;
                       return (
                         <button
                           key={opt.type}
@@ -368,12 +369,16 @@ export function WorkflowEditorCanvas({
                             else { setPendingStepType(opt.type); }
                           }}
                           className={cn(
-                            'rounded-lg px-3 py-2 text-xs font-semibold transition-all text-left',
-                            opt.color,
-                            isTerminalDisabled ? 'opacity-40 cursor-not-allowed' : opt.bg,
+                            'rounded-lg px-3 py-2 text-left transition-all w-full',
+                            isTerminalDisabled
+                              ? 'opacity-40 cursor-not-allowed'
+                              : isActive
+                                ? opt.activeBg
+                                : 'hover:bg-muted',
                           )}
                         >
-                          {opt.label}
+                          <span className={cn('text-xs font-semibold', opt.color)}>{opt.label}</span>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{opt.description}</p>
                         </button>
                       );
                     })}
