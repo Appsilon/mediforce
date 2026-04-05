@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { Save } from 'lucide-react';
+import { Save, HelpCircle } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
-import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -28,13 +27,33 @@ export default function WorkflowDefinitionVersionPage() {
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
   const [editedTitle, setEditedTitle] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
 
-  const handleSave = useCallback(async (
-    steps: WorkflowStep[],
-    transitions: WorkflowDefinition['transitions'],
-  ) => {
+  // Track current canvas state so the header button can trigger save
+  const currentStepsRef = useRef<WorkflowStep[]>([]);
+  const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>([]);
+
+  // Sync editable fields and canvas refs from definition once loaded
+  useEffect(() => {
     if (!definition) return;
+    setEditedDescription(definition.description ?? '');
+    currentStepsRef.current = definition.steps;
+    currentTransitionsRef.current = definition.transitions;
+  }, [definition?.version]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCanvasChange = useCallback(
+    (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
+      currentStepsRef.current = steps;
+      currentTransitionsRef.current = transitions;
+    },
+    [],
+  );
+
+  const handleSave = useCallback(async () => {
+    if (!definition) return;
+    const steps = currentStepsRef.current;
+    const transitions = currentTransitionsRef.current;
 
     const missingPlugin = steps.filter(
       (s) => s.type !== 'terminal' && (s.executor === 'agent' || s.executor === 'script') && !s.plugin,
@@ -75,7 +94,7 @@ export default function WorkflowDefinitionVersionPage() {
       name: definition.name,
       namespace: definition.namespace,
       title: editedTitle.trim() || undefined,
-      description: definition.description,
+      description: editedDescription.trim() || undefined,
       steps,
       transitions: mergedTransitions,
       triggers: definition.triggers,
@@ -95,59 +114,8 @@ export default function WorkflowDefinitionVersionPage() {
     } else {
       setSaveState({ status: 'error', message: result.error });
     }
-  }, [definition, editedTitle, name, handle, router]);
+  }, [definition, editedTitle, editedDescription, name, handle, router]);
 
-  const renderSavePanel = useCallback((
-    steps: WorkflowStep[],
-    transitions: WorkflowDefinition['transitions'],
-    onDiscard: () => void,
-  ) => {
-    if (!definition) return null;
-    const hasChanges =
-      JSON.stringify(steps) !== JSON.stringify(definition.steps) ||
-      JSON.stringify(transitions) !== JSON.stringify(definition.transitions);
-    if (!hasChanges) return null;
-
-    return (
-      <div className="space-y-3">
-        <input
-          value={editedTitle}
-          onChange={(e) => setEditedTitle(e.target.value)}
-          placeholder="Version title (required) — e.g. &quot;Added automated review step&quot;"
-          className="w-full text-sm border rounded-md px-2.5 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => { setEditedTitle(''); setSaveState({ status: 'idle' }); onDiscard(); }}
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
-          >
-            Discard changes
-          </button>
-          <button
-            onClick={() => handleSave(steps, transitions)}
-            disabled={saveState.status === 'saving' || !editedTitle.trim()}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-              (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
-            )}
-          >
-            <Save className="h-3.5 w-3.5" />
-            {saveState.status === 'saving' ? 'Saving...' : 'Save new version'}
-          </button>
-          {saveState.status === 'saved' && (
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
-              Saved as v{saveState.version}
-            </span>
-          )}
-          {saveState.status === 'error' && (
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
-              {saveState.message}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }, [definition, editedTitle, saveState, handleSave]);
 
   if (loading) {
     return (
@@ -174,21 +142,84 @@ export default function WorkflowDefinitionVersionPage() {
     <div className="flex flex-1 flex-col relative">
       {/* Header */}
       <div className="border-b px-6 py-4 sticky top-0 z-30 bg-background">
-        <div className="space-y-0.5">
-          <div className="flex items-baseline gap-2">
-            <span className="text-xs text-muted-foreground w-24 shrink-0">Workflow ID</span>
-            <span className="text-sm font-mono">{decodedName}</span>
+        <div className="flex flex-wrap items-end gap-4">
+          {/* Namespace */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">Namespace</label>
+            <input
+              value={definition.namespace ?? ''}
+              disabled
+              className="rounded-md border bg-muted px-3 py-1.5 text-sm outline-none text-muted-foreground cursor-not-allowed"
+            />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-xs text-muted-foreground w-24 shrink-0">Version</span>
-            <VersionLabel version={definition.version} title={definition.title} className="text-sm" />
+
+          {/* Workflow ID */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">Workflow ID</label>
+            <input
+              value={decodedName}
+              disabled
+              className="rounded-md border bg-muted px-3 py-1.5 text-sm font-mono outline-none text-muted-foreground cursor-not-allowed min-w-48"
+            />
           </div>
-          {definition.description && (
-            <div className="flex items-baseline gap-2">
-              <span className="text-xs text-muted-foreground w-24 shrink-0">Description</span>
-              <span className="text-sm text-muted-foreground">{definition.description}</span>
+
+          {/* Description */}
+          <div className="flex flex-col gap-1 flex-1 min-w-48">
+            <label className="text-xs font-medium text-muted-foreground">Description</label>
+            <input
+              value={editedDescription}
+              onChange={(e) => setEditedDescription(e.target.value)}
+              placeholder="What does this workflow do?"
+              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+            />
+          </div>
+
+          {/* Version name */}
+          <div className="flex flex-col gap-1 min-w-48">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              Version name
+              <span className="group relative inline-flex">
+                <HelpCircle className="h-3 w-3 text-muted-foreground/50 cursor-help" />
+                <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-[480px] rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
+                  Workflows evolve over time — each saved revision gets a version number automatically. A version name lets you describe what changed so it&apos;s easy to tell &quot;Added AI review step&quot; apart from &quot;Tightened approval criteria&quot; at a glance, rather than deciphering v1, v2, v3.
+                </span>
+              </span>
+            </label>
+            <input
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              placeholder="e.g. Added automated review step"
+              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+            />
+          </div>
+
+          {/* Save button */}
+          <div className="flex flex-col gap-1">
+            <div className="h-[18px]" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saveState.status === 'saving' || !editedTitle.trim()}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
+                  (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saveState.status === 'saving' ? 'Saving...' : 'Save new version'}
+              </button>
+              {saveState.status === 'saved' && (
+                <span className="inline-flex items-center rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
+                  Saved as v{saveState.version}
+                </span>
+              )}
+              {saveState.status === 'error' && (
+                <span className="inline-flex items-center rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+                  {saveState.message}
+                </span>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -199,7 +230,7 @@ export default function WorkflowDefinitionVersionPage() {
         initialTransitions={definition.transitions}
         workflowName={decodedName}
         yamlFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
-        renderSavePanel={renderSavePanel}
+        onChange={handleCanvasChange}
       />
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Save } from 'lucide-react';
+import { Save, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
@@ -66,7 +66,7 @@ export default function NewWorkflowPage() {
   const [workflowName, setWorkflowName] = useState('');
   const [namespace, setNamespace] = useState('');
   const [description, setDescription] = useState('');
-  const [versionTitle] = useState('Initial version');
+  const [versionTitle, setVersionTitle] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
 
   // Track current canvas state so the header button can trigger save
@@ -90,6 +90,14 @@ export default function NewWorkflowPage() {
     const workflowId = toWorkflowId(workflowName);
     if (!workflowId) {
       setSaveState({ status: 'error', message: 'Workflow name is required.' });
+      return;
+    }
+    if (!description.trim()) {
+      setSaveState({ status: 'error', message: 'Description is required.' });
+      return;
+    }
+    if (!versionTitle.trim()) {
+      setSaveState({ status: 'error', message: 'Version name is required.' });
       return;
     }
 
@@ -161,7 +169,7 @@ export default function NewWorkflowPage() {
         <div className="flex flex-wrap items-end gap-4">
           {/* Owner */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">Owner</label>
+            <label className="text-xs font-medium text-muted-foreground">Namespace</label>
             <select
               value={effectiveNamespace}
               onChange={(e) => setNamespace(e.target.value)}
@@ -195,20 +203,34 @@ export default function NewWorkflowPage() {
               placeholder="e.g. clinical-trial-review"
               className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring min-w-64"
             />
-            {workflowName && (
-              <span className="text-[11px] text-muted-foreground font-mono">
-                ID: {toWorkflowId(workflowName) || '—'}
-              </span>
-            )}
           </div>
 
           {/* Description */}
           <div className="flex flex-col gap-1 flex-1 min-w-48">
-            <label className="text-xs font-medium text-muted-foreground">Description <span className="text-muted-foreground/50 font-normal">(optional)</span></label>
+            <label className="text-xs font-medium text-muted-foreground">Description</label>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What does this workflow do?"
+              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+            />
+          </div>
+
+          {/* Version name */}
+          <div className="flex flex-col gap-1 min-w-48">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              Version name
+              <span className="group relative inline-flex">
+                <HelpCircle className="h-3 w-3 text-muted-foreground/50 cursor-help" />
+                <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-[480px] rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
+                  Workflows evolve over time — each saved revision gets a version number automatically. A version name lets you describe what changed so it&apos;s easy to tell &quot;Added AI review step&quot; apart from &quot;Tightened approval criteria&quot; at a glance, rather than deciphering v1, v2, v3.
+                </span>
+              </span>
+            </label>
+            <input
+              value={versionTitle}
+              onChange={(e) => setVersionTitle(e.target.value)}
+              placeholder="e.g. Initial version"
               className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
             />
           </div>
@@ -219,10 +241,10 @@ export default function NewWorkflowPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSave}
-                disabled={saveState.status === 'saving' || !toWorkflowId(workflowName)}
+                disabled={saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                  (saveState.status === 'saving' || !toWorkflowId(workflowName)) && 'opacity-50 cursor-not-allowed',
+                  (saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()) && 'opacity-50 cursor-not-allowed',
                 )}
               >
                 <Save className="h-3.5 w-3.5" />
