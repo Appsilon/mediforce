@@ -73,6 +73,7 @@ export default function WorkflowDefinitionVersionPage() {
 
     const result = await saveWorkflowDefinition({
       name: definition.name,
+      namespace: definition.namespace,
       title: editedTitle.trim() || undefined,
       description: definition.description,
       steps,
