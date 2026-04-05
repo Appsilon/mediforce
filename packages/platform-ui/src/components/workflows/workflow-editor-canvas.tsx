@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { X, User, Bot, Terminal } from 'lucide-react';
-import { stringify as yamlStringify } from 'yaml';
+import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
@@ -93,6 +93,9 @@ export function WorkflowEditorCanvas({
   const [addingStep, setAddingStep] = useState(false);
   const [pendingStepType, setPendingStepType] = useState<WorkflowStep['type'] | null>(null);
   const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
+  const [yamlEditMode, setYamlEditMode] = useState(false);
+  const [yamlDraft, setYamlDraft] = useState('');
+  const [yamlError, setYamlError] = useState<string | null>(null);
 
   const selectedStep = editedSteps.find((s) => s.id === selectedStepId) ?? null;
 
@@ -453,11 +456,62 @@ export function WorkflowEditorCanvas({
             <>
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold">YAML</h2>
+                <button
+                  onClick={() => {
+                    if (yamlEditMode) {
+                      setYamlEditMode(false);
+                      setYamlError(null);
+                    } else {
+                      setYamlDraft(yamlPreview);
+                      setYamlError(null);
+                      setYamlEditMode(true);
+                    }
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors border rounded-md px-2 py-0.5"
+                >
+                  {yamlEditMode ? 'Cancel' : 'Edit YAML'}
+                </button>
               </div>
-              <pre className="text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto overflow-y-auto leading-relaxed">
-                {yamlPreview}
-              </pre>
-              {savePanel && (
+              {yamlEditMode ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={yamlDraft}
+                    onChange={(e) => { setYamlDraft(e.target.value); setYamlError(null); }}
+                    rows={20}
+                    spellCheck={false}
+                    className="w-full text-[11px] font-mono bg-muted/30 rounded-lg p-4 border focus:outline-none focus:ring-1 focus:ring-primary resize-y leading-relaxed"
+                  />
+                  {yamlError && (
+                    <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
+                  )}
+                  <button
+                    onClick={() => {
+                      try {
+                        const parsed = yamlParse(yamlDraft) as { steps?: unknown; transitions?: unknown };
+                        if (!parsed?.steps || !Array.isArray(parsed.steps)) {
+                          setYamlError('YAML must contain a "steps" array');
+                          return;
+                        }
+                        saveSnapshot();
+                        setEditedSteps(parsed.steps as WorkflowStep[]);
+                        setEditedTransitions((Array.isArray(parsed.transitions) ? parsed.transitions : []) as WorkflowDefinition['transitions']);
+                        setYamlEditMode(false);
+                        setYamlError(null);
+                      } catch (err) {
+                        setYamlError(err instanceof Error ? err.message : 'Invalid YAML');
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    Apply YAML
+                  </button>
+                </div>
+              ) : (
+                <pre className="text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto overflow-y-auto leading-relaxed">
+                  {yamlPreview}
+                </pre>
+              )}
+              {!yamlEditMode && savePanel && (
                 <div className="border-t pt-4">
                   {savePanel}
                 </div>
