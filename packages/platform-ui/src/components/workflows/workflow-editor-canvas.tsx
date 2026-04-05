@@ -77,6 +77,11 @@ export interface WorkflowEditorCanvasProps {
     transitions: WorkflowDefinition['transitions'],
     onDiscard: () => void,
   ) => React.ReactNode;
+  /**
+   * Called whenever the edited steps or transitions change.
+   * Useful for lifting state up (e.g. to put a save button in the page header).
+   */
+  onChange?: (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => void;
 }
 
 export function WorkflowEditorCanvas({
@@ -85,6 +90,7 @@ export function WorkflowEditorCanvas({
   yamlFields,
   workflowName,
   renderSavePanel,
+  onChange,
 }: WorkflowEditorCanvasProps) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
@@ -149,6 +155,11 @@ export function WorkflowEditorCanvas({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [undoEdit]);
+
+  // ── Notify parent of changes ───────────────────────────────────────────────
+  useEffect(() => {
+    onChange?.(editedSteps, editedTransitions);
+  }, [editedSteps, editedTransitions, onChange]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const updateStep = useCallback((stepId: string, patch: Partial<WorkflowStep>) => {

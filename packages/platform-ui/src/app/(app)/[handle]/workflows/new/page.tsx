@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Save } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
@@ -66,16 +66,27 @@ export default function NewWorkflowPage() {
   const [workflowName, setWorkflowName] = useState('');
   const [namespace, setNamespace] = useState('');
   const [description, setDescription] = useState('');
-  const [versionTitle, setVersionTitle] = useState('Initial version');
+  const [versionTitle] = useState('Initial version');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
+
+  // Track current canvas state so the header button can trigger save
+  const currentStepsRef = useRef<WorkflowStep[]>(TEMPLATE_STEPS);
+  const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>(TEMPLATE_TRANSITIONS);
+
+  const handleCanvasChange = useCallback(
+    (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
+      currentStepsRef.current = steps;
+      currentTransitionsRef.current = transitions;
+    },
+    [],
+  );
 
   // Auto-select first namespace when namespaces load
   const effectiveNamespace = namespace || namespaces[0]?.handle || '';
 
-  const handleSave = useCallback(async (
-    steps: WorkflowStep[],
-    transitions: WorkflowDefinition['transitions'],
-  ) => {
+  const handleSave = useCallback(async () => {
+    const steps = currentStepsRef.current;
+    const transitions = currentTransitionsRef.current;
     const workflowId = toWorkflowId(workflowName);
     if (!workflowId) {
       setSaveState({ status: 'error', message: 'Workflow name is required.' });
@@ -131,45 +142,6 @@ export default function NewWorkflowPage() {
     }
   }, [workflowName, effectiveNamespace, versionTitle, description, handle, router]);
 
-  const renderSavePanel = useCallback((
-    steps: WorkflowStep[],
-    transitions: WorkflowDefinition['transitions'],
-    _onDiscard: () => void,
-  ) => {
-    const workflowId = toWorkflowId(workflowName);
-    return (
-      <div className="space-y-3">
-        <p className="text-xs text-muted-foreground">Ready to publish? Fill in the fields below and click Create.</p>
-        <input
-          value={versionTitle}
-          onChange={(e) => setVersionTitle(e.target.value)}
-          placeholder="Version title (required) — e.g. &quot;Initial version&quot;"
-          className="w-full text-sm border rounded-md px-2.5 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-        <button
-          onClick={() => handleSave(steps, transitions)}
-          disabled={saveState.status === 'saving' || !workflowId || !versionTitle.trim()}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap w-full justify-center',
-            (saveState.status === 'saving' || !workflowId || !versionTitle.trim()) && 'opacity-50 cursor-not-allowed',
-          )}
-        >
-          <Save className="h-3.5 w-3.5" />
-          {saveState.status === 'saving' ? 'Creating...' : 'Create Workflow'}
-        </button>
-        {saveState.status === 'saved' && (
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400 w-full">
-            Created — redirecting…
-          </span>
-        )}
-        {saveState.status === 'error' && (
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 w-full">
-            {saveState.message}
-          </span>
-        )}
-      </div>
-    );
-  }, [workflowName, versionTitle, saveState, handleSave]);
 
   const yamlFields: Record<string, unknown> = {
     name: toWorkflowId(workflowName) || 'my-workflow',
@@ -183,7 +155,7 @@ export default function NewWorkflowPage() {
       {/* Header */}
       <div className="border-b px-6 py-4 sticky top-0 z-30 bg-background space-y-4">
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Design your workflow visually. The canvas below shows a two-step starter: a human task followed by an AI agent review. Click any step to edit it, use the toolbar to add or rearrange steps, then fill in the fields on the right and click <strong>Create Workflow</strong>.
+          Design your workflow visually. The canvas below shows a two-step starter: a human task followed by an AI agent review. Click any step to edit it, use the toolbar to add or rearrange steps, then click <strong>Save and publish workflow</strong> above.
         </p>
 
         <div className="flex flex-wrap items-end gap-4">
@@ -240,6 +212,34 @@ export default function NewWorkflowPage() {
               className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
             />
           </div>
+
+          {/* Save button */}
+          <div className="flex flex-col gap-1">
+            <div className="h-[18px]" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saveState.status === 'saving' || !toWorkflowId(workflowName)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
+                  (saveState.status === 'saving' || !toWorkflowId(workflowName)) && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saveState.status === 'saving' ? 'Publishing...' : 'Save and publish workflow'}
+              </button>
+              {saveState.status === 'saved' && (
+                <span className="inline-flex items-center rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
+                  Created — redirecting…
+                </span>
+              )}
+              {saveState.status === 'error' && (
+                <span className="inline-flex items-center rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+                  {saveState.message}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -248,7 +248,7 @@ export default function NewWorkflowPage() {
         initialSteps={TEMPLATE_STEPS}
         initialTransitions={TEMPLATE_TRANSITIONS}
         yamlFields={yamlFields}
-        renderSavePanel={renderSavePanel}
+        onChange={handleCanvasChange}
       />
     </div>
   );
