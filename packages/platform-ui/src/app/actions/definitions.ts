@@ -96,16 +96,22 @@ export async function saveDefinition(yaml: string, namespace?: string): Promise<
 // WorkflowDefinition (new unified schema)
 // ---------------------------------------------------------------------------
 
+export type ValidationIssue = { path: (string | number)[]; message: string };
+
 export type SaveWorkflowDefinitionResult =
   | { success: true; name: string; version: number }
-  | { success: false; error: string };
+  | { success: false; error: string; issues?: ValidationIssue[] };
 
 export async function saveWorkflowDefinition(
   input: Omit<WorkflowDefinition, 'version' | 'createdAt'>,
 ): Promise<SaveWorkflowDefinitionResult> {
   const parsed = WorkflowDefinitionSchema.omit({ version: true, createdAt: true }).safeParse(input);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues.map((i) => i.message).join(', ') };
+    return {
+      success: false,
+      error: parsed.error.issues.map((i) => i.message).join(', '),
+      issues: parsed.error.issues.map((i) => ({ path: [...i.path] as (string | number)[], message: i.message })),
+    };
   }
 
   const { processRepo } = getPlatformServices();

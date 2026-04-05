@@ -82,6 +82,11 @@ export interface WorkflowEditorCanvasProps {
    * Useful for lifting state up (e.g. to put a save button in the page header).
    */
   onChange?: (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => void;
+  /**
+   * Field-level validation errors keyed by stepId → fieldName → message.
+   * Drives red highlights on diagram nodes and inline error text in StepEditor.
+   */
+  stepErrors?: Record<string, Record<string, string>>;
 }
 
 export function WorkflowEditorCanvas({
@@ -91,6 +96,7 @@ export function WorkflowEditorCanvas({
   workflowName,
   renderSavePanel,
   onChange,
+  stepErrors,
 }: WorkflowEditorCanvasProps) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
@@ -160,6 +166,12 @@ export function WorkflowEditorCanvas({
   useEffect(() => {
     onChange?.(editedSteps, editedTransitions);
   }, [editedSteps, editedTransitions, onChange]);
+
+  // ── Auto-select first errored step ─────────────────────────────────────────
+  useEffect(() => {
+    if (!stepErrors || Object.keys(stepErrors).length === 0) return;
+    setSelectedStepId(Object.keys(stepErrors)[0]);
+  }, [stepErrors]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const updateStep = useCallback((stepId: string, patch: Partial<WorkflowStep>) => {
@@ -438,6 +450,7 @@ export function WorkflowEditorCanvas({
             className="border-0"
             onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
             selectedStepId={selectedStepId}
+            errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
           />
         </div>
       </div>
@@ -461,6 +474,7 @@ export function WorkflowEditorCanvas({
                 allSteps={editedSteps}
                 workflowName={workflowName}
                 onChange={(patch) => updateStep(selectedStep.id, patch)}
+                errors={stepErrors?.[selectedStep.id]}
               />
             </>
           ) : (
@@ -543,16 +557,23 @@ function toSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+function friendlyFieldError(message: string): string {
+  if (/too small|>=1|at least 1/i.test(message)) return 'This field cannot be empty.';
+  return message;
+}
+
 function StepEditor({
   step,
   allSteps,
   workflowName,
   onChange,
+  errors,
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
   workflowName?: string;
   onChange: (patch: Partial<WorkflowStep>) => void;
+  errors?: Record<string, string>;
 }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
@@ -587,9 +608,10 @@ function StepEditor({
             if (isNewStep) patch.id = toSlug(e.target.value) || step.id;
             onChange(patch);
           }}
-          className={cn(inlineInput, 'text-[15px] font-semibold text-foreground')}
+          className={cn(inlineInput, 'text-[15px] font-semibold text-foreground', errors?.name && 'border-red-400 focus:border-red-500')}
         />
-        <StepIdField currentId={step.id} onChange={(newId) => onChange({ id: newId })} />
+        {errors?.name && <p className="text-[11px] text-red-500 mt-0.5">{friendlyFieldError(errors.name)}</p>}
+        <StepIdField currentId={step.id} onChange={(newId) => onChange({ id: newId })} error={errors?.id} />
         <textarea
           value={step.description ?? ''}
           onChange={(e) => onChange({ description: e.target.value || undefined })}
@@ -1061,7 +1083,7 @@ function StepEditor({
 // StepIdField
 // ---------------------------------------------------------------------------
 
-function StepIdField({ currentId, onChange }: { currentId: string; onChange: (newId: string) => void }) {
+function StepIdField({ currentId, onChange, error }: { currentId: string; onChange: (newId: string) => void; error?: string }) {
   const [draft, setDraft] = useState(currentId);
   const [dirty, setDirty] = useState(false);
   const prevIdRef = useRef(currentId);
@@ -1082,14 +1104,20 @@ function StepIdField({ currentId, onChange }: { currentId: string; onChange: (ne
   }, [draft, currentId, onChange]);
 
   return (
-    <input
-      value={draft}
-      onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
-      onBlur={commit}
-      onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
-      placeholder="step-id"
-      className="w-full bg-transparent border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0.5 focus:outline-none transition-colors font-mono text-xs text-muted-foreground mt-0.5"
-    />
+    <>
+      <input
+        value={draft}
+        onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
+        placeholder="step-id"
+        className={cn(
+          'w-full bg-transparent border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0.5 focus:outline-none transition-colors font-mono text-xs text-muted-foreground mt-0.5',
+          error && 'border-red-400 focus:border-red-500',
+        )}
+      />
+      {error && <p className="text-[11px] text-red-500 mt-0.5">{friendlyFieldError(error)}</p>}
+    </>
   );
 }
 

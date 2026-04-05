@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Save, HelpCircle } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
-import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { saveWorkflowDefinition, type ValidationIssue } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -16,6 +16,22 @@ type SaveState =
   | { status: 'saving' }
   | { status: 'saved'; version: number }
   | { status: 'error'; message: string };
+
+function parseStepErrors(
+  issues: ValidationIssue[],
+  steps: WorkflowStep[],
+): Record<string, Record<string, string>> {
+  const result: Record<string, Record<string, string>> = {};
+  for (const issue of issues) {
+    if (issue.path[0] === 'steps' && typeof issue.path[1] === 'number') {
+      const step = steps[issue.path[1]];
+      const field = String(issue.path[2] ?? 'unknown');
+      const key = step?.id || `__index_${issue.path[1]}`;
+      result[key] = { ...(result[key] ?? {}), [field]: issue.message };
+    }
+  }
+  return result;
+}
 
 export default function WorkflowDefinitionVersionPage() {
   const { name, version, handle } = useParams<{ name: string; version: string; handle: string }>();
@@ -29,6 +45,7 @@ export default function WorkflowDefinitionVersionPage() {
   const [editedTitle, setEditedTitle] = useState('');
   const [editedDescription, setEditedDescription] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
+  const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>([]);
@@ -77,6 +94,7 @@ export default function WorkflowDefinitionVersionPage() {
       return;
     }
 
+    setStepErrors({});
     setSaveState({ status: 'saving' });
 
     const mergedTransitions = [...transitions];
@@ -112,7 +130,14 @@ export default function WorkflowDefinitionVersionPage() {
         router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
       }, 500);
     } else {
-      setSaveState({ status: 'error', message: result.error });
+      const parsed = parseStepErrors(result.issues ?? [], steps);
+      setStepErrors(parsed);
+      setSaveState({
+        status: 'error',
+        message: Object.keys(parsed).length > 0
+          ? 'Some steps have errors — check the highlighted steps in the diagram.'
+          : result.error,
+      });
     }
   }, [definition, editedTitle, editedDescription, name, handle, router]);
 
@@ -231,6 +256,7 @@ export default function WorkflowDefinitionVersionPage() {
         workflowName={decodedName}
         yamlFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
         onChange={handleCanvasChange}
+        stepErrors={stepErrors}
       />
     </div>
   );

@@ -69,6 +69,7 @@ type StepNodeData = {
   executor: string;
   autonomyLevel?: string;
   plugin?: string;
+  hasError?: boolean;
 };
 
 const NODE_WIDTH = 240;
@@ -116,7 +117,11 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
           'rounded-xl border-[1.5px] px-4 py-3 transition-all cursor-pointer relative',
           'hover:shadow-md',
           style.bg,
-          selected ? `${style.activeBorder} ${style.activeRing} shadow-lg` : style.border,
+          selected
+            ? `${style.activeBorder} ${style.activeRing} shadow-lg`
+            : data.hasError
+              ? 'border-red-400 ring-2 ring-red-200 dark:ring-red-900/50'
+              : style.border,
         )}
       >
         <div className="flex items-start gap-2.5">
@@ -304,9 +309,10 @@ interface WorkflowDiagramProps {
   style?: React.CSSProperties;
   onNodeClick?: (stepId: string) => void;
   selectedStepId?: string | null;
+  errorStepIds?: Set<string>;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, selectedStepId }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, selectedStepId, errorStepIds }: WorkflowDiagramProps) {
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition),
     [definition],
@@ -317,10 +323,10 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, sel
     const styledNodes: Node<any>[] = layoutNodes.map((n) => ({
       ...n,
       selected: n.id === selectedStepId,
-      data: { ...n.data },
+      data: { ...n.data, hasError: errorStepIds?.has(n.id) ?? false },
     }));
     return { nodes: styledNodes, edges: layoutEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId]);
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {

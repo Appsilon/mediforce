@@ -6,7 +6,7 @@ import { Save, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
-import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { saveWorkflowDefinition, type ValidationIssue } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -53,6 +53,22 @@ type SaveState =
   | { status: 'saved'; name: string }
   | { status: 'error'; message: string };
 
+function parseStepErrors(
+  issues: ValidationIssue[],
+  steps: WorkflowStep[],
+): Record<string, Record<string, string>> {
+  const result: Record<string, Record<string, string>> = {};
+  for (const issue of issues) {
+    if (issue.path[0] === 'steps' && typeof issue.path[1] === 'number') {
+      const step = steps[issue.path[1]];
+      const field = String(issue.path[2] ?? 'unknown');
+      const key = step?.id || `__index_${issue.path[1]}`;
+      result[key] = { ...(result[key] ?? {}), [field]: issue.message };
+    }
+  }
+  return result;
+}
+
 function toWorkflowId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
@@ -68,6 +84,7 @@ export default function NewWorkflowPage() {
   const [description, setDescription] = useState('');
   const [versionTitle, setVersionTitle] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
+  const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>(TEMPLATE_STEPS);
@@ -117,6 +134,7 @@ export default function NewWorkflowPage() {
       return;
     }
 
+    setStepErrors({});
     setSaveState({ status: 'saving' });
 
     const mergedTransitions = [...transitions];
@@ -146,7 +164,14 @@ export default function NewWorkflowPage() {
         router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
       }, 500);
     } else {
-      setSaveState({ status: 'error', message: result.error });
+      const parsed = parseStepErrors(result.issues ?? [], steps);
+      setStepErrors(parsed);
+      setSaveState({
+        status: 'error',
+        message: Object.keys(parsed).length > 0
+          ? 'Some steps have errors — check the highlighted steps in the diagram.'
+          : result.error,
+      });
     }
   }, [workflowName, effectiveNamespace, versionTitle, description, handle, router]);
 
@@ -271,6 +296,7 @@ export default function NewWorkflowPage() {
         initialTransitions={TEMPLATE_TRANSITIONS}
         yamlFields={yamlFields}
         onChange={handleCanvasChange}
+        stepErrors={stepErrors}
       />
     </div>
   );
