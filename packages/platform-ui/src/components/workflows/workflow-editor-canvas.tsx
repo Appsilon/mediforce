@@ -204,40 +204,49 @@ export function WorkflowEditorCanvas({
   }, [selectedStepId]);
 
   const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor']) => {
+    const terminalStep = editedSteps.find((s) => s.type === 'terminal');
+
+    // Only one terminal allowed
+    if (type === 'terminal' && terminalStep) return;
+
     saveSnapshot();
-    const afterId = selectedStepId ?? editedSteps[editedSteps.length - 1]?.id;
-    if (!afterId) return;
     const stepNum = editedSteps.length + 1;
     const newId = `new-step-${stepNum}`;
-    setEditedSteps((prev) => {
-      const idx = prev.findIndex((s) => s.id === afterId);
-      if (idx === -1) return prev;
-      const newStep: WorkflowStep = {
-        id: newId,
-        name: `New Step ${stepNum}`,
-        type,
-        executor,
-        ...(executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
-        ...(executor === 'script' ? { plugin: 'script-container' } : {}),
-      };
-      const next = [...prev];
-      next.splice(idx + 1, 0, newStep);
-      return next;
-    });
-    setEditedTransitions((prev) => {
-      const existingEdge = prev.find((t) => t.from === afterId);
-      const without = existingEdge ? prev.filter((t) => t !== existingEdge) : prev;
-      if (type === 'terminal') {
-        return [...without, { from: afterId, to: newId }];
-      }
-      return existingEdge
-        ? [...without, { from: afterId, to: newId }, { from: newId, to: existingEdge.to }]
-        : [...without, { from: afterId, to: newId }];
-    });
+    const newStep: WorkflowStep = {
+      id: newId,
+      name: `New Step ${stepNum}`,
+      type,
+      executor,
+      ...(executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: 'L2' } : {}),
+      ...(executor === 'script' ? { plugin: 'script-container' } : {}),
+    };
+
+    if (!terminalStep || type === 'terminal') {
+      // No terminal yet (or we're adding the terminal itself): append at end
+      const lastId = editedSteps[editedSteps.length - 1]?.id;
+      setEditedSteps((prev) => [...prev, newStep]);
+      setEditedTransitions((prev) => lastId ? [...prev, { from: lastId, to: newId }] : prev);
+    } else {
+      // Insert immediately before the terminal step
+      const terminalIdx = editedSteps.findIndex((s) => s.id === terminalStep.id);
+      setEditedSteps((prev) => {
+        const next = [...prev];
+        next.splice(terminalIdx, 0, newStep);
+        return next;
+      });
+      setEditedTransitions((prev) => {
+        // Redirect all edges that previously pointed at terminal → now point at newStep
+        const rewired = prev.map((t) =>
+          t.to === terminalStep.id ? { ...t, to: newId } : t,
+        );
+        return [...rewired, { from: newId, to: terminalStep.id }];
+      });
+    }
+
     setSelectedStepId(newId);
     setAddingStep(false);
     setPendingStepType(null);
-  }, [selectedStepId, editedSteps, saveSnapshot]);
+  }, [editedSteps, saveSnapshot]);
 
   const removeStep = useCallback((stepId: string) => {
     saveSnapshot();
@@ -348,18 +357,26 @@ export function WorkflowEditorCanvas({
                       { type: 'review', label: 'Review', color: 'text-amber-600 dark:text-amber-400', bg: pendingStepType === 'review' ? 'bg-amber-100 dark:bg-amber-900/50 ring-1 ring-amber-400' : 'hover:bg-muted' },
                       { type: 'decision', label: 'Decision', color: 'text-purple-600 dark:text-purple-400', bg: pendingStepType === 'decision' ? 'bg-purple-100 dark:bg-purple-900/50 ring-1 ring-purple-400' : 'hover:bg-muted' },
                       { type: 'terminal', label: 'End', color: 'text-emerald-600 dark:text-emerald-400', bg: 'hover:bg-muted' },
-                    ] as const).map((opt) => (
-                      <button
-                        key={opt.type}
-                        onClick={() => {
-                          if (opt.type === 'terminal') { addStep('terminal', 'human'); }
-                          else { setPendingStepType(opt.type); }
-                        }}
-                        className={cn('rounded-lg px-3 py-2 text-xs font-semibold transition-all text-left', opt.color, opt.bg)}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+                    ] as const).map((opt) => {
+                      const isTerminalDisabled = opt.type === 'terminal' && editedSteps.some((s) => s.type === 'terminal');
+                      return (
+                        <button
+                          key={opt.type}
+                          disabled={isTerminalDisabled}
+                          onClick={() => {
+                            if (opt.type === 'terminal') { addStep('terminal', 'human'); }
+                            else { setPendingStepType(opt.type); }
+                          }}
+                          className={cn(
+                            'rounded-lg px-3 py-2 text-xs font-semibold transition-all text-left',
+                            opt.color,
+                            isTerminalDisabled ? 'opacity-40 cursor-not-allowed' : opt.bg,
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 {pendingStepType && (
