@@ -357,6 +357,7 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
   it('[DATA] getWorkflowDefinition returns null for non-existent', async () => {
     const repo = createFirestoreRepo();
     mockGetDoc.mockResolvedValue({ exists: () => false });
+    mockGetDocs.mockResolvedValue({ docs: [] });
 
     const result = await repo.getWorkflowDefinition('nonexistent', 1);
     expect(result).toBeNull();
