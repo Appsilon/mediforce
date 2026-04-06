@@ -308,11 +308,12 @@ interface WorkflowDiagramProps {
   className?: string;
   style?: React.CSSProperties;
   onNodeClick?: (stepId: string) => void;
+  onPaneClick?: () => void;
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, selectedStepId, errorStepIds }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onPaneClick, selectedStepId, errorStepIds }: WorkflowDiagramProps) {
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition),
     [definition],
@@ -354,6 +355,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, sel
           zoomOnDoubleClick={false}
           preventScrolling={false}
           onNodeClick={handleNodeClick}
+          onPaneClick={onPaneClick}
           defaultViewport={{ x: 16, y: 16, zoom: 1 }}
           proOptions={{ hideAttribution: true }}
         />
