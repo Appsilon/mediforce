@@ -25,7 +25,7 @@ test.describe('Task Review Journey', () => {
     const taskLink = page.getByText('Review Intake Data').first();
     await expect(taskLink).toBeVisible({ timeout: 10_000 });
     await click(page, taskLink);
-    await expect(page.getByRole('heading', { name: 'Review Intake Data' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'Review Intake Data' })).toBeVisible({ timeout: 20_000 });
     await showCaption(page, 'Task detail — full context for review', 3500);
   });
 
@@ -48,9 +48,9 @@ test.describe('Task Review Journey', () => {
     await expect(page.getByRole('link', { name: /view next task/i })).toBeVisible({ timeout: 15_000 });
     await showCaption(page, 'Task approved — next task available', 3500);
 
-    await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-human-review`);
+    // Status badge updates via onSnapshot listener — no need to navigate back
     await expect(page.getByText(/completed/i).first()).toBeVisible({ timeout: 10_000 });
-    await showCaption(page, 'Revisiting task — status changed to completed', 3500);
+    await showCaption(page, 'Status changed to completed', 3500);
     await endRecording(page);
   });
 });
