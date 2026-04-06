@@ -586,6 +586,43 @@ function friendlyFieldError(message: string): string {
   return message;
 }
 
+/** Fields that only make sense for 'agent' executor (not script). */
+const AGENT_ONLY_FIELDS = ['model', 'skill', 'prompt', 'skillsDir', 'timeoutMs', 'timeoutMinutes', 'confidenceThreshold', 'fallbackBehavior'] as const;
+/** Fields that only make sense for 'script' executor (not agent). */
+const SCRIPT_ONLY_FIELDS = ['command', 'inlineScript', 'runtime', 'image', 'dockerfile', 'repo', 'commit', 'repoAuth'] as const;
+
+function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: WorkflowStep['executor']): Partial<WorkflowStep> {
+  const base: Partial<WorkflowStep> = { executor: targetExecutor };
+
+  if (targetExecutor === 'human') {
+    return { ...base, plugin: undefined, autonomyLevel: undefined, agent: undefined };
+  }
+
+  if (targetExecutor === 'agent') {
+    const cleanedAgent = step.agent
+      ? Object.fromEntries(Object.entries(step.agent).filter(([k]) => !SCRIPT_ONLY_FIELDS.includes(k as typeof SCRIPT_ONLY_FIELDS[number])))
+      : undefined;
+    return {
+      ...base,
+      allowedRoles: undefined,
+      plugin: step.plugin ?? 'opencode-agent',
+      agent: Object.keys(cleanedAgent ?? {}).length > 0 ? cleanedAgent as WorkflowStep['agent'] : undefined,
+    };
+  }
+
+  // script
+  const cleanedAgent = step.agent
+    ? Object.fromEntries(Object.entries(step.agent).filter(([k]) => !AGENT_ONLY_FIELDS.includes(k as typeof AGENT_ONLY_FIELDS[number])))
+    : undefined;
+  return {
+    ...base,
+    allowedRoles: undefined,
+    autonomyLevel: undefined,
+    plugin: step.plugin ?? 'script-container',
+    agent: Object.keys(cleanedAgent ?? {}).length > 0 ? cleanedAgent as WorkflowStep['agent'] : undefined,
+  };
+}
+
 function StepEditor({
   step,
   allSteps,
@@ -656,11 +693,7 @@ function StepEditor({
             ] as const).map(({ value: ex, Icon, activeColor }) => (
               <button
                 key={ex}
-                onClick={() => onChange({
-                  executor: ex,
-                  ...(ex === 'agent' && !step.plugin ? { plugin: 'opencode-agent' } : {}),
-                  ...(ex === 'script' && !step.plugin ? { plugin: 'script-container' } : {}),
-                })}
+                onClick={() => onChange(buildExecutorChangePatch(step, ex))}
                 className={cn(
                   'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium capitalize transition-all',
                   step.executor === ex ? activeColor : 'text-muted-foreground hover:text-foreground',
