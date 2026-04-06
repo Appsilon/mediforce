@@ -17,6 +17,9 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Workflow Editor — YAML](#workflow-editor--yaml) — live YAML preview and direct YAML edit mode
 - [New Workflow](#new-workflow) — filling the creation form and publishing a workflow
 - [New Workflow — Validation](#new-workflow--validation) — save blocked when workflow name is invalid
+- [Workflow Editor — Pane Deselect](#workflow-editor--pane-deselect) — clicking canvas background deselects step and restores YAML panel
+- [Workflow Editor — Executor Switch](#workflow-editor--executor-switch) — changing executor type clears stale fields from the workflow definition
+- [Workflow Editor — Cowork Step](#workflow-editor--cowork-step) — adding a cowork step with human+agent collaboration config
 
 **Process Runs** — monitoring and controlling workflow executions
 - [Run Detail — Step Graph](#run-detail--step-graph) — tracking progress through workflow steps
@@ -102,6 +105,24 @@ The new workflow form starts with a template canvas (draft → ai-review → don
 If the workflow ID field contains only characters that slugify to an empty string (e.g. `---`), the save button remains disabled even when other required fields are filled. Guards against creating workflows with no valid URL-safe identifier.
 
 ![workflow-new-validation](workflow-new-validation.gif)
+
+### Workflow Editor — Pane Deselect
+
+Clicking the empty canvas background deselects the active step and restores the YAML preview panel on the right. This lets users quickly dismiss an open step editor without navigating away.
+
+![workflow-editor-pane-deselect](workflow-editor-pane-deselect.gif)
+
+### Workflow Editor — Executor Switch
+
+The step editor exposes a single 4-way toggle (Human / Agent / Script / Cowork) for all step types. Switching executor removes any fields that belong exclusively to the previous executor so the saved YAML stays consistent — no leftover `plugin`, `script`, or `cowork` blocks.
+
+![workflow-editor-executor-switch](workflow-editor-executor-switch.gif)
+
+### Workflow Editor — Cowork Step
+
+Adding a Cowork step opens an explainer for first-time users and a configuration panel: chat/voice toggle, foundation model selector, system prompt, and output schema. The step is rendered on the canvas with a teal "Cowork" badge.
+
+![workflow-editor-cowork](workflow-editor-cowork.gif)
 
 ---
 

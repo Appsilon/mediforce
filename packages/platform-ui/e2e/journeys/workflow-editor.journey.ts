@@ -36,9 +36,18 @@ function stepTypeButton(page: import('@playwright/test').Page, type: keyof typeo
  * Returns the executor button inside the Add Step dropdown.
  * Uses strict text matching to avoid matching step descriptions that contain "human".
  */
-function executorButton(page: import('@playwright/test').Page, executor: 'human' | 'agent' | 'script') {
+function executorButton(page: import('@playwright/test').Page, executor: 'human' | 'agent' | 'script' | 'cowork') {
   // Executor buttons have exactly the executor name as their full text content.
   return page.locator('button').filter({ hasText: new RegExp(`^${executor}$`, 'i') });
+}
+
+/**
+ * Returns the executor toggle button inside the step editor side panel.
+ * Scoped to the side panel to avoid matching the Add Step dropdown buttons.
+ */
+function stepEditorExecutorButton(page: import('@playwright/test').Page, executor: 'human' | 'agent' | 'script' | 'cowork') {
+  // The side panel is the right half of the canvas layout (border-l container).
+  return page.locator('div.border-l button').filter({ hasText: new RegExp(`^${executor}$`, 'i') });
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -261,9 +270,8 @@ test.describe('Workflow Editor Journey', () => {
     await showStep(page);
 
     // Template canvas already has three steps: draft, ai-review, done
-    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('.react-flow__node')).toHaveCount(3, { timeout: 8_000 });
     const templateNodeCount = await page.locator('.react-flow__node').count();
-    expect(templateNodeCount).toBeGreaterThanOrEqual(3);
 
     // Save button starts disabled (all required fields empty)
     const saveButton = page.getByRole('button', { name: /save and publish workflow/i });
@@ -323,6 +331,122 @@ test.describe('Workflow Editor Journey', () => {
 
     // Button must remain disabled — toWorkflowId('---') === ''
     await expect(saveButton).toBeDisabled();
+    await showResult(page);
+
+    await endRecording(page);
+  });
+
+  // ── Pane click deselects step ─────────────────────────────────────────────
+
+  test('clicking canvas pane deselects step and restores YAML panel', async ({ page }, testInfo) => {
+    await setupRecording(page, 'workflow-editor-pane-deselect', testInfo);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+
+    // YAML panel is visible initially (no step selected)
+    await expect(page.getByRole('heading', { name: 'YAML' })).toBeVisible({ timeout: 10_000 });
+
+    // Click a node — step editor opens
+    await click(page, page.locator('.react-flow__node').first());
+    await expect(page.getByRole('heading', { name: /edit step/i })).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('heading', { name: 'YAML' })).not.toBeVisible();
+    await showStep(page);
+
+    // Click empty canvas space — pane click triggers deselect, YAML panel returns
+    // Click near top-left corner to avoid hitting any node
+    await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
+    await expect(page.getByRole('heading', { name: 'YAML' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: /edit step/i })).not.toBeVisible();
+    await showResult(page);
+
+    await endRecording(page);
+  });
+
+  // ── Executor switching clears stale YAML fields ───────────────────────────
+
+  test('switching executor removes stale fields from YAML', async ({ page }, testInfo) => {
+    await setupRecording(page, 'workflow-editor-executor-switch', testInfo);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    const initialNodeCount = await page.locator('.react-flow__node').count();
+
+    // Add an agent step
+    await click(page, page.getByRole('button', { name: /\+ add step/i }));
+    await expect(page.getByText(/^step type$/i)).toBeVisible({ timeout: 3_000 });
+    await click(page, stepTypeButton(page, 'Input'));
+    await expect(page.getByText(/^executor$/i)).toBeVisible({ timeout: 3_000 });
+    await click(page, executorButton(page, 'agent'));
+    await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
+
+    // The new step is auto-selected — step editor is already open
+    await expect(page.getByRole('heading', { name: /edit step/i })).toBeVisible({ timeout: 5_000 });
+    await showStep(page);
+
+    // Switch executor to human directly in the open step editor
+    // Use .first() — executor toggle human button comes before Review sub-type buttons in DOM
+    await click(page, stepEditorExecutorButton(page, 'human').first());
+    await showStep(page);
+
+    // Deselect and verify YAML no longer contains agent-specific fields
+    await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
+    const yamlPre = page.locator('pre');
+    await expect(yamlPre).toBeVisible({ timeout: 10_000 });
+    const yamlWithHuman = await yamlPre.textContent() ?? '';
+    // The new step should now be human with no agent-specific fields
+    expect(yamlWithHuman).not.toContain('opencode-agent');
+    // Extract the new step's section (starts at 'id: new-step-' and ends at the next list item or end)
+    const newStepSection = yamlWithHuman.slice(yamlWithHuman.indexOf('id: new-step-'));
+    expect(newStepSection).toContain('executor: human');
+    expect(newStepSection).not.toContain('autonomyLevel');
+    await showResult(page);
+
+    await endRecording(page);
+  });
+
+  // ── Cowork step ───────────────────────────────────────────────────────────
+
+  test('cowork step appears in diagram and editor shows configuration', async ({ page }, testInfo) => {
+    await setupRecording(page, 'workflow-editor-cowork', testInfo);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    const initialNodeCount = await page.locator('.react-flow__node').count();
+
+    // Add a cowork step
+    await click(page, page.getByRole('button', { name: /\+ add step/i }));
+    await expect(page.getByText(/^step type$/i)).toBeVisible({ timeout: 3_000 });
+    await click(page, stepTypeButton(page, 'Input'));
+    await expect(page.getByText(/^executor$/i)).toBeVisible({ timeout: 3_000 });
+    await click(page, executorButton(page, 'cowork'));
+    await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
+    await showStep(page);
+
+    // New node shows "Cowork" executor label in the diagram
+    // Search in any canvas node — don't rely on index since insertion order may vary in ReactFlow DOM
+    await expect(page.locator('.react-flow__node').getByText('Cowork').first()).toBeVisible({ timeout: 3_000 });
+
+    // Step editor opens with the cowork explainer for a new step
+    await expect(page.getByText(/What is a Cowork step/i)).toBeVisible({ timeout: 3_000 });
+    await showStep(page);
+
+    // Chat / Voice toggle is visible, Chat is active by default
+    await expect(page.getByRole('button', { name: /^Chat$/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Voice$/i })).toBeVisible();
+
+    // System prompt textarea is visible
+    const systemPromptTextarea = page.getByPlaceholder(/Instructions for the AI collaborator/i);
+    await expect(systemPromptTextarea).toBeVisible();
+    await systemPromptTextarea.fill('You are a helpful clinical trial data analyst.');
+    await showStep(page);
+
+    // Deselect to see YAML — it should contain cowork config
+    await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
+    const yamlPre = page.locator('pre');
+    await expect(yamlPre).toBeVisible({ timeout: 10_000 });
+    const yamlText = await yamlPre.textContent();
+    expect(yamlText).toContain('executor: cowork');
+    expect(yamlText).toContain('agent: chat');
+    expect(yamlText).toContain('clinical trial data analyst');
     await showResult(page);
 
     await endRecording(page);
