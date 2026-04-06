@@ -647,31 +647,29 @@ function StepEditor({
 
       {/* Executor toggle */}
       <div className="space-y-2">
-        {step.type !== 'terminal' && step.executor !== 'script' && (
+        {step.type !== 'terminal' && (
           <div className="flex gap-1 p-0.5 rounded-lg bg-muted">
-            {(['human', 'agent'] as const).map((ex) => {
-              const Icon = ex === 'human' ? User : Bot;
-              const activeColors: Record<string, string> = {
-                human: 'bg-blue-500 text-white shadow-sm',
-                agent: 'bg-violet-500 text-white shadow-sm',
-              };
-              return (
-                <button
-                  key={ex}
-                  onClick={() => onChange({
-                    executor: ex,
-                    ...(ex === 'agent' && !step.plugin ? { plugin: 'opencode-agent' } : {}),
-                  })}
-                  className={cn(
-                    'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium capitalize transition-all',
-                    step.executor === ex ? activeColors[ex] : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {ex}
-                </button>
-              );
-            })}
+            {([
+              { value: 'human', Icon: User, activeColor: 'bg-blue-500 text-white shadow-sm' },
+              { value: 'agent', Icon: Bot, activeColor: 'bg-violet-500 text-white shadow-sm' },
+              { value: 'script', Icon: Terminal, activeColor: 'bg-amber-500 text-white shadow-sm' },
+            ] as const).map(({ value: ex, Icon, activeColor }) => (
+              <button
+                key={ex}
+                onClick={() => onChange({
+                  executor: ex,
+                  ...(ex === 'agent' && !step.plugin ? { plugin: 'opencode-agent' } : {}),
+                  ...(ex === 'script' && !step.plugin ? { plugin: 'script-container' } : {}),
+                })}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium capitalize transition-all',
+                  step.executor === ex ? activeColor : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {ex}
+              </button>
+            ))}
           </div>
         )}
 
@@ -1080,23 +1078,6 @@ function StepEditor({
               </button>
             ))}
           </div>
-          {step.type !== 'terminal' && (
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-xs text-muted-foreground">Automated step</span>
-              <button
-                onClick={() => onChange({ executor: step.executor === 'script' ? 'human' : 'script' })}
-                className={cn(
-                  'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors',
-                  step.executor === 'script' ? 'bg-amber-500' : 'bg-muted',
-                )}
-              >
-                <span className={cn(
-                  'pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
-                  step.executor === 'script' ? 'translate-x-4' : 'translate-x-0',
-                )} />
-              </button>
-            </div>
-          )}
         </div>
       </details>
     </div>
