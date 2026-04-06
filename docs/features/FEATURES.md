@@ -11,7 +11,12 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 **Workflows** — defining and managing automated processes
 - [Workflow Home](#workflow-home) — overview of all workflows and their active runs
 - [Workflow Editor — Browse](#workflow-editor--browse) — navigating workflow definitions and versions
-- [Workflow Editor — Edit Mode](#workflow-editor--edit-mode) — modifying workflow step graph visually
+- [Workflow Editor — Canvas](#workflow-editor--canvas) — always-edit canvas with header controls and step panel
+- [Workflow Editor — Add Step](#workflow-editor--add-step) — step type picker with executor selection
+- [Workflow Editor — Undo](#workflow-editor--undo) — reverting canvas changes with the undo button
+- [Workflow Editor — YAML](#workflow-editor--yaml) — live YAML preview and direct YAML edit mode
+- [New Workflow](#new-workflow) — filling the creation form and publishing a workflow
+- [New Workflow — Validation](#new-workflow--validation) — save blocked when workflow name is invalid
 
 **Process Runs** — monitoring and controlling workflow executions
 - [Run Detail — Step Graph](#run-detail--step-graph) — tracking progress through workflow steps
@@ -62,11 +67,41 @@ Workflow detail page with Runs tab (default) showing execution history, and Defi
 
 ![workflow-editor-browse](workflow-editor-browse.gif)
 
-### Workflow Editor — Edit Mode
+### Workflow Editor — Canvas
 
-Visual editor for workflow definitions. Click nodes to inspect step configuration, enter edit mode to modify steps, use "+" to add new steps. Cancel discards without saving. This is how workflow authors iterate on process design.
+The definition version page always opens in edit mode — no separate "Edit" button needed. The sticky header shows read-only namespace and workflow ID fields, plus an editable description and version name. The "Save new version" button stays disabled until a version name is entered. Clicking any canvas node opens the "Edit step" panel on the right.
 
-![workflow-editor-edit-mode](workflow-editor-edit-mode.gif)
+![workflow-editor-canvas](workflow-editor-canvas.gif)
+
+### Workflow Editor — Add Step
+
+The "+ Add step" dropdown presents step types (Input, Review, Decision, End) each with a short description. Selecting a type reveals executor options (human, agent, script). The End type is disabled when a terminal step already exists. After choosing an executor the new step is inserted before the terminal node and auto-selected for editing.
+
+![workflow-editor-add-step](workflow-editor-add-step.gif)
+
+### Workflow Editor — Undo
+
+The undo button in the canvas toolbar reverses the last canvas change. It starts disabled (empty history), becomes enabled after any mutation (e.g. adding a step), and returns to disabled once the history is exhausted.
+
+![workflow-editor-undo](workflow-editor-undo.gif)
+
+### Workflow Editor — YAML
+
+When no step is selected the right panel shows a live YAML preview of the full workflow definition. Clicking "Edit YAML" switches to a textarea for direct edits with an "Apply YAML" button. Clicking "Cancel" exits YAML edit mode and restores the read-only preview.
+
+![workflow-editor-yaml](workflow-editor-yaml.gif)
+
+### New Workflow
+
+The new workflow form starts with a template canvas (draft → ai-review → done). The "Save and publish workflow" button stays disabled until all three fields are filled: workflow ID, description, and version name. On save the user is redirected to the newly created definition page.
+
+![workflow-new](workflow-new.gif)
+
+### New Workflow — Validation
+
+If the workflow ID field contains only characters that slugify to an empty string (e.g. `---`), the save button remains disabled even when other required fields are filled. Guards against creating workflows with no valid URL-safe identifier.
+
+![workflow-new-validation](workflow-new-validation.gif)
 
 ---
 
