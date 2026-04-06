@@ -12,7 +12,7 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal } from 'lucide-react';
+import { User, Bot, Terminal, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 
@@ -57,6 +57,7 @@ const EXECUTOR_STYLES: Record<string, { icon: typeof User; color: string; bg: st
   human: { icon: User, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
   agent: { icon: Bot, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30' },
   script: { icon: Terminal, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+  cowork: { icon: Users, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/30' },
 };
 
 // ---------------------------------------------------------------------------
@@ -134,7 +135,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             </p>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                {data.executor === 'human' ? 'Human' : data.executor === 'agent' ? 'Agent' : 'Script'}
+                {{ human: 'Human', agent: 'Agent', script: 'Script', cowork: 'Cowork' }[data.executor] ?? data.executor}
               </span>
               {data.autonomyLevel && (
                 <span className="text-[10px] font-mono text-muted-foreground/70">
