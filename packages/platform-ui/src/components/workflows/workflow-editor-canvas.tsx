@@ -1350,13 +1350,10 @@ function StepEditor({
 function StepIdField({ currentId, onChange, error }: { currentId: string; onChange: (newId: string) => void; error?: string }) {
   const [draft, setDraft] = useState(currentId);
   const [dirty, setDirty] = useState(false);
-  const prevIdRef = useRef(currentId);
 
-  if (currentId !== prevIdRef.current && !dirty) {
-    prevIdRef.current = currentId;
-    setDraft(currentId);
-  }
-  prevIdRef.current = currentId;
+  useEffect(() => {
+    if (!dirty) setDraft(currentId);
+  }, [currentId, dirty]);
 
   const commit = useCallback(() => {
     const slug = draft.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');

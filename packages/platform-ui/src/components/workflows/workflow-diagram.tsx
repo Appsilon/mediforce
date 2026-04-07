@@ -332,8 +332,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
   );
 
   const { nodes, edges } = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const styledNodes: Node<any>[] = layoutNodes.map((n) => ({
+    const styledNodes: Node<StepNodeData>[] = layoutNodes.map((n) => ({
       ...n,
       selected: n.id === selectedStepId,
       data: {
