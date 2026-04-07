@@ -40,7 +40,7 @@ function ToolCard({ tool, handle }: { tool: CatalogTool; handle: string }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-base">{tool.name}</h3>
-            <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium', categoryColor.bg, categoryColor.text)}>
+            <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap', categoryColor.bg, categoryColor.text)}>
               <span className={cn('h-1.5 w-1.5 rounded-full', categoryColor.dot)} />
               {tool.category}
             </span>
