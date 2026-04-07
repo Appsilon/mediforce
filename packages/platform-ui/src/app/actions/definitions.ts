@@ -53,10 +53,10 @@ export async function saveDefinition(yaml: string, namespace?: string): Promise<
   // Route to the correct collection based on the version field type.
   if (typeof (raw as Record<string, unknown>).version === 'number') {
     const { version: _v, createdAt: _c, ...rest } = raw as Record<string, unknown>;
-    const input = {
+    const input: unknown = {
       ...rest,
       namespace: namespace ?? (rest.namespace as string | undefined),
-    } as Omit<WorkflowDefinition, 'version' | 'createdAt'>;
+    };
     const result = await saveWorkflowDefinition(input);
     if (!result.success) return result;
     return { success: true, name: result.name, version: String(result.version) };
@@ -103,7 +103,7 @@ export type SaveWorkflowDefinitionResult =
   | { success: false; error: string; issues?: ValidationIssue[] };
 
 export async function saveWorkflowDefinition(
-  input: Omit<WorkflowDefinition, 'version' | 'createdAt'>,
+  input: unknown,
 ): Promise<SaveWorkflowDefinitionResult> {
   const parsed = WorkflowDefinitionSchema.omit({ version: true, createdAt: true }).safeParse(input);
   if (!parsed.success) {
