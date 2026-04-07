@@ -8,50 +8,40 @@ test.describe('Tool Catalog Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}/tools`);
     await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible({ timeout: 10_000 });
 
-    // Access control banner visible
-    await expect(page.getByText('Per-step access control')).toBeVisible();
-    await showStep(page);
-
     // Category sections visible
-    await expect(page.getByText('Development').first()).toBeVisible();
     await expect(page.getByText('Data Access').first()).toBeVisible();
     await expect(page.getByText('Clinical Data').first()).toBeVisible();
 
     // Tool cards visible
-    await expect(page.getByText('GitHub').first()).toBeVisible();
+    await expect(page.getByText('Filesystem').first()).toBeVisible();
     await expect(page.getByText('PostgreSQL').first()).toBeVisible();
     await expect(page.getByText('CDISC Library').first()).toBeVisible();
     await showStep(page);
 
-    // Secrets badges visible
-    await expect(page.getByText('GITHUB_TOKEN').first()).toBeVisible();
-    await expect(page.getByText('DATABASE_URL').first()).toBeVisible();
-
-    // Tool access badges
-    await expect(page.getByText('1 tool allowed').first()).toBeVisible(); // PostgreSQL
-    await expect(page.getByText('All tools available').first()).toBeVisible();
+    // Security level badges visible
+    await expect(page.getByText('Allowlist + secrets').first()).toBeVisible(); // PostgreSQL
+    await expect(page.getByText('Open access').first()).toBeVisible(); // Filesystem
     await showStep(page);
 
     // Search filters tools
     await click(page, page.getByPlaceholder('Search tools...'));
     await page.getByPlaceholder('Search tools...').fill('postgres');
     await expect(page.getByText('PostgreSQL').first()).toBeVisible();
-    await expect(page.getByText('GitHub')).not.toBeVisible();
+    await expect(page.getByText('Filesystem')).not.toBeVisible();
     await showStep(page);
 
     // Clear search
     await page.getByPlaceholder('Search tools...').fill('');
-    await expect(page.getByText('GitHub').first()).toBeVisible();
+    await expect(page.getByText('Filesystem').first()).toBeVisible();
 
-    // Navigate to tool detail
-    const detailLinks = page.getByRole('link', { name: 'Details' });
-    await click(page, detailLinks.first());
+    // Navigate to tool detail (whole card is a link)
+    await click(page, page.getByText('PostgreSQL').first());
     await expect(page.getByText('Connection')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Available Tools')).toBeVisible();
     await showStep(page);
 
-    // Tool detail shows tools list
-    await expect(page.getByText('search_code').first()).toBeVisible();
+    // Tool detail shows secrets and allowlist
+    await expect(page.getByText('DATABASE_URL').first()).toBeVisible();
+    await expect(page.getByText('Tool Allowlist')).toBeVisible();
     await showStep(page);
 
     // Usage snippet visible
