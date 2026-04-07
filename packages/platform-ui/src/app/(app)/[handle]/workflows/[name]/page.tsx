@@ -91,18 +91,9 @@ export default function ProcessDefinitionPage() {
     <div className="flex flex-1 flex-col gap-0">
       {/* Header */}
       <div className="border-b px-6 py-4">
-        <Link
-          href={`/${handle}`}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Workflows
-        </Link>
-
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-headline font-semibold">{decodedName}</h1>
               {latest?.archived && (
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   Archived

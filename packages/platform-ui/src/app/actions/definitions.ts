@@ -1,6 +1,6 @@
 'use server';
 
-import { stringify as yamlStringify } from 'yaml';
+import { stringify as yamlStringify, parse as parseYaml } from 'yaml';
 import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { getPlatformServices } from '@/lib/platform-services';
 import { parseProcessDefinition, WorkflowDefinitionSchema } from '@mediforce/platform-core';
@@ -38,6 +38,31 @@ export async function saveDefinition(yaml: string, namespace?: string): Promise<
     return { success: false, error: 'YAML content is required.' };
   }
 
+  // Parse YAML once so we can inspect the version field type.
+  let raw: unknown;
+  try {
+    raw = parseYaml(yaml);
+  } catch (err) {
+    return { success: false, error: `YAML syntax error: ${(err as Error).message}` };
+  }
+  if (raw == null) {
+    return { success: false, error: 'YAML document is empty or contains only comments.' };
+  }
+
+  // WorkflowDefinition uses an integer version; ProcessDefinition uses a semver string.
+  // Route to the correct collection based on the version field type.
+  if (typeof (raw as Record<string, unknown>).version === 'number') {
+    const { version: _v, createdAt: _c, ...rest } = raw as Record<string, unknown>;
+    const input: unknown = {
+      ...rest,
+      namespace: namespace ?? (rest.namespace as string | undefined),
+    };
+    const result = await saveWorkflowDefinition(input);
+    if (!result.success) return result;
+    return { success: true, name: result.name, version: String(result.version) };
+  }
+
+  // Legacy ProcessDefinition path (semver version string).
   const result = parseProcessDefinition(yaml);
   if (!result.success) {
     return { success: false, error: result.error };
@@ -71,20 +96,22 @@ export async function saveDefinition(yaml: string, namespace?: string): Promise<
 // WorkflowDefinition (new unified schema)
 // ---------------------------------------------------------------------------
 
+export type ValidationIssue = { path: (string | number)[]; message: string };
+
 export type SaveWorkflowDefinitionResult =
   | { success: true; name: string; version: number }
-  | { success: false; error: string };
+  | { success: false; error: string; issues?: ValidationIssue[] };
 
 export async function saveWorkflowDefinition(
-  input: Omit<WorkflowDefinition, 'version' | 'createdAt'>,
+  input: unknown,
 ): Promise<SaveWorkflowDefinitionResult> {
   const parsed = WorkflowDefinitionSchema.omit({ version: true, createdAt: true }).safeParse(input);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues.map((i) => i.message).join(', ') };
-  }
-
-  if (!parsed.data.title?.trim()) {
-    return { success: false, error: 'Title is required for new versions.' };
+    return {
+      success: false,
+      error: parsed.error.issues.map((i) => i.message).join(', '),
+      issues: parsed.error.issues.map((i) => ({ path: [...i.path] as (string | number)[], message: i.message })),
+    };
   }
 
   const { processRepo } = getPlatformServices();

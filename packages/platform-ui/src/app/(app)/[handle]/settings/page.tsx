@@ -151,15 +151,7 @@ export default function OrgSettingsPage() {
     <div className="flex flex-1 flex-col p-6">
       <div className="mx-auto w-full max-w-2xl">
         <div className="mb-8">
-          <Link
-            href={`/${handle}`}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            @{handle}
-          </Link>
-          <h1 className="text-xl font-semibold">Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground">
             Manage organization settings for <span className="font-semibold">@{handle}</span>.
           </p>
         </div>

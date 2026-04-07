@@ -104,17 +104,11 @@ export default function StepDetailPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">
-      {/* Back */}
-      <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="h-4 w-4" />
-        {decodedName}
-      </Link>
-
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
           {execution && <StatusIcon status={execution.status} />}
-          <h1 className="text-2xl font-headline font-semibold">{stepName}</h1>
+          <h2 className="text-2xl font-headline font-semibold">{stepName}</h2>
           {isAgent && (
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-900/30 px-2 py-0.5 text-xs text-violet-700 dark:text-violet-300">
               <Bot className="h-3 w-3" /> Agent

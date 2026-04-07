@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { where, doc, getDoc } from 'firebase/firestore';
+import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { useCollection } from './use-collection';
 import { getFirestore } from 'firebase/firestore';
@@ -9,20 +10,77 @@ import { getApp } from 'firebase/app';
 
 type WorkflowDefinitionDoc = WorkflowDefinition & { id: string };
 
+// Legacy processDefinitions documents store version as a semver string.
+type LegacyDefinitionDoc = {
+  id: string;
+  name: string;
+  version: string;
+  title?: string;
+  description?: string;
+  steps: { id: string; type?: string; [key: string]: unknown }[];
+  triggers: { type: string; name: string; [key: string]: unknown }[];
+  transitions: { from: string; to: string; when?: string }[];
+  archived?: boolean;
+  deleted?: boolean;
+  createdAt?: string;
+  namespace?: string;
+  [key: string]: unknown;
+};
+
+/** Normalize a legacy ProcessDefinition doc to the WorkflowDefinition shape. */
+function normalizeLegacyDoc(legacyDoc: LegacyDefinitionDoc): WorkflowDefinitionDoc | null {
+  const versionNum = parseInt(legacyDoc.version, 10);
+  if (isNaN(versionNum) || versionNum <= 0) return null;
+  const parsed = WorkflowDefinitionSchema.safeParse({ ...legacyDoc, version: versionNum });
+  if (!parsed.success) return null;
+  return { ...parsed.data, id: legacyDoc.id };
+}
+
 export function useWorkflowDefinitions(name: string) {
   const constraints = useMemo(
     () => [where('name', '==', name)],
     [name],
   );
-  const { data, loading, error } = useCollection<WorkflowDefinitionDoc>(
+
+  // Primary source: workflowDefinitions collection (integer versions)
+  const { data: wfData, loading: wfLoading, error: wfError } = useCollection<WorkflowDefinitionDoc>(
     name ? 'workflowDefinitions' : '',
     constraints,
   );
 
-  const definitions = useMemo(
-    () => [...data].sort((a, b) => b.version - a.version),
-    [data],
+  // Fallback source: legacy processDefinitions collection (semver string versions)
+  const { data: legacyData, loading: legacyLoading } = useCollection<LegacyDefinitionDoc>(
+    name ? 'processDefinitions' : '',
+    constraints,
   );
+
+  const loading = wfLoading || legacyLoading;
+
+  const definitions = useMemo(() => {
+    const seen = new Set<number>();
+    const merged: WorkflowDefinitionDoc[] = [];
+
+    // workflowDefinitions take priority
+    for (const doc of wfData) {
+      if (doc.deleted) continue;
+      if (!seen.has(doc.version)) {
+        seen.add(doc.version);
+        merged.push(doc);
+      }
+    }
+
+    // Normalize and add legacy docs where no wf version covers the same version number
+    for (const doc of legacyData) {
+      if ((doc as { deleted?: boolean }).deleted) continue;
+      const normalized = normalizeLegacyDoc(doc);
+      if (normalized && !seen.has(normalized.version)) {
+        seen.add(normalized.version);
+        merged.push(normalized);
+      }
+    }
+
+    return merged.sort((a, b) => b.version - a.version);
+  }, [wfData, legacyData]);
 
   const latestVersion = definitions[0]?.version ?? 0;
 
@@ -51,5 +109,5 @@ export function useWorkflowDefinitions(name: string) {
   // Effective version for running: default if set, otherwise latest
   const effectiveVersion = defaultVersion ?? latestVersion;
 
-  return { definitions, latestVersion, defaultVersion, effectiveVersion, loading, error, refreshDefault };
+  return { definitions, latestVersion, defaultVersion, effectiveVersion, loading, error: wfError, refreshDefault };
 }

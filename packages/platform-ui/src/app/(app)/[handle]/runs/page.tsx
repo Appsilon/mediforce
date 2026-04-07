@@ -41,12 +41,7 @@ export default function RunsPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-xl font-headline font-semibold">
-          {workflowFilter
-            ? `Runs — ${formatStepName(workflowFilter)}`
-            : 'All Runs'}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <p className="text-sm text-muted-foreground">
           {workflowFilter
             ? 'All runs for this workflow.'
             : 'All workflow runs across the platform.'}
