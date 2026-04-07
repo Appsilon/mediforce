@@ -71,6 +71,7 @@ type StepNodeData = {
   autonomyLevel?: string;
   plugin?: string;
   hasError?: boolean;
+  onDelete?: () => void;
 };
 
 const NODE_WIDTH = 240;
@@ -115,7 +116,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
       <div
         style={{ width: NODE_WIDTH, minHeight: NODE_INNER_HEIGHT }}
         className={cn(
-          'rounded-xl border-[1.5px] px-4 py-3 transition-all cursor-pointer relative',
+          'group rounded-xl border-[1.5px] px-4 py-3 transition-all cursor-pointer relative',
           'hover:shadow-md',
           style.bg,
           selected
@@ -125,6 +126,15 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
               : style.border,
         )}
       >
+        {data.onDelete && (
+          <button
+            onClick={(e) => { e.stopPropagation(); data.onDelete?.(); }}
+            className="absolute -top-2 -right-2 z-10 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none shadow hover:bg-red-600 transition-colors"
+            aria-label="Delete step"
+          >
+            ×
+          </button>
+        )}
         <div className="flex items-start gap-2.5">
           <div className={cn('rounded-lg p-1.5 mt-0.5', exec.bg)}>
             <Icon className={cn('h-3.5 w-3.5', exec.color)} />
@@ -309,12 +319,13 @@ interface WorkflowDiagramProps {
   className?: string;
   style?: React.CSSProperties;
   onNodeClick?: (stepId: string) => void;
+  onNodeDelete?: (stepId: string) => void;
   onPaneClick?: () => void;
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, onPaneClick, selectedStepId, errorStepIds }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onPaneClick, selectedStepId, errorStepIds }: WorkflowDiagramProps) {
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition),
     [definition],
@@ -325,10 +336,14 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onP
     const styledNodes: Node<any>[] = layoutNodes.map((n) => ({
       ...n,
       selected: n.id === selectedStepId,
-      data: { ...n.data, hasError: errorStepIds?.has(n.id) ?? false },
+      data: {
+        ...n.data,
+        hasError: errorStepIds?.has(n.id) ?? false,
+        onDelete: onNodeDelete && n.data.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
+      },
     }));
     return { nodes: styledNodes, edges: layoutEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds]);
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, onNodeDelete]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {

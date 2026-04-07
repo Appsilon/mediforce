@@ -488,6 +488,7 @@ export function WorkflowEditorCanvas({
             definition={diagramDefinition}
             className="border-0"
             onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
+            onNodeDelete={removeStep}
             onPaneClick={() => setSelectedStepId(null)}
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}

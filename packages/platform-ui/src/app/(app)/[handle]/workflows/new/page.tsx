@@ -267,6 +267,12 @@ export default function NewWorkflowPage() {
               <button
                 onClick={handleSave}
                 disabled={saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()}
+                title={
+                  !toWorkflowId(workflowName) ? 'Enter a workflow ID to publish' :
+                  !description.trim() ? 'Enter a description to publish' :
+                  !versionTitle.trim() ? 'Enter a version name to publish' :
+                  undefined
+                }
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
                   (saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()) && 'opacity-50 cursor-not-allowed',
@@ -275,6 +281,12 @@ export default function NewWorkflowPage() {
                 <Save className="h-3.5 w-3.5" />
                 {saveState.status === 'saving' ? 'Publishing...' : 'Save and publish workflow'}
               </button>
+              {saveState.status !== 'saving' && saveState.status !== 'saved' && saveState.status !== 'error' && (
+                !toWorkflowId(workflowName) ? <span className="text-xs text-muted-foreground">Workflow ID required</span> :
+                !description.trim() ? <span className="text-xs text-muted-foreground">Description required</span> :
+                !versionTitle.trim() ? <span className="text-xs text-muted-foreground">Version name required</span> :
+                null
+              )}
               {saveState.status === 'saved' && (
                 <span className="inline-flex items-center rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
                   Created — redirecting…

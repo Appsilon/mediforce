@@ -225,6 +225,7 @@ export default function WorkflowDefinitionVersionPage() {
               <button
                 onClick={handleSave}
                 disabled={saveState.status === 'saving' || !editedTitle.trim()}
+                title={!editedTitle.trim() ? 'Enter a version name to save' : undefined}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
                   (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
@@ -233,6 +234,9 @@ export default function WorkflowDefinitionVersionPage() {
                 <Save className="h-3.5 w-3.5" />
                 {saveState.status === 'saving' ? 'Saving...' : 'Save new version'}
               </button>
+              {!editedTitle.trim() && saveState.status !== 'saving' && (
+                <span className="text-xs text-muted-foreground">Version name required</span>
+              )}
               {saveState.status === 'saved' && (
                 <span className="inline-flex items-center rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
                   Saved as v{saveState.version}
