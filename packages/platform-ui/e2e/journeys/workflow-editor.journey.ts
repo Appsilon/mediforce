@@ -397,7 +397,9 @@ test.describe('Workflow Editor Journey', () => {
     // Extract the new step's section (starts at 'id: new-step-' and ends at the next list item or end)
     const newStepSection = yamlWithHuman.slice(yamlWithHuman.indexOf('id: new-step-'));
     expect(newStepSection).toContain('executor: human');
-    expect(newStepSection).not.toContain('autonomyLevel');
+    // autonomyLevel is preserved when switching executor so it can be restored on return —
+    // only strictly agent-specific fields (plugin, opencode-agent config) should be gone
+    expect(newStepSection).not.toContain('opencode-agent');
     await showResult(page);
 
     await endRecording(page);
