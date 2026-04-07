@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { where, doc, getDoc } from 'firebase/firestore';
+import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { useCollection } from './use-collection';
 import { getFirestore } from 'firebase/firestore';
@@ -27,10 +28,12 @@ type LegacyDefinitionDoc = {
 };
 
 /** Normalize a legacy ProcessDefinition doc to the WorkflowDefinition shape. */
-function normalizeLegacyDoc(doc: LegacyDefinitionDoc): WorkflowDefinitionDoc | null {
-  const versionNum = parseInt(doc.version, 10);
+function normalizeLegacyDoc(legacyDoc: LegacyDefinitionDoc): WorkflowDefinitionDoc | null {
+  const versionNum = parseInt(legacyDoc.version, 10);
   if (isNaN(versionNum) || versionNum <= 0) return null;
-  return { ...doc, version: versionNum } as unknown as WorkflowDefinitionDoc;
+  const parsed = WorkflowDefinitionSchema.safeParse({ ...legacyDoc, version: versionNum });
+  if (!parsed.success) return null;
+  return { ...parsed.data, id: legacyDoc.id };
 }
 
 export function useWorkflowDefinitions(name: string) {

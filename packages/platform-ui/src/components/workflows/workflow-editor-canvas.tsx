@@ -200,9 +200,9 @@ export function WorkflowEditorCanvas({
           return { ...s, verdicts: updatedVerdicts };
         }),
       );
-      if (selectedStepId === stepId) setSelectedStepId(newId);
+      setSelectedStepId((prev) => (prev === stepId ? newId : prev));
     }
-  }, [selectedStepId]);
+  }, []);
 
   const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor']) => {
     const terminalStep = editedSteps.find((s) => s.type === 'terminal');

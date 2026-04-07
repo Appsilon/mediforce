@@ -51,13 +51,18 @@ export default function WorkflowDefinitionVersionPage() {
   const currentStepsRef = useRef<WorkflowStep[]>([]);
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>([]);
 
-  // Sync editable fields and canvas refs from definition once loaded
+  // Sync editable fields and canvas refs when the user navigates to a different
+  // version. We intentionally key on version only (not the full definition object)
+  // so that local edits in the canvas don't reset the description field on every
+  // onChange callback — definition is rebuilt from Firestore state on each render
+  // but the version number is stable while the user is on the same page.
   useEffect(() => {
     if (!definition) return;
     setEditedDescription(definition.description ?? '');
     currentStepsRef.current = definition.steps;
     currentTransitionsRef.current = definition.transitions;
-  }, [definition?.version]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [definition?.version]);
 
   const handleCanvasChange = useCallback(
     (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {

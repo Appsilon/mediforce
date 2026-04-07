@@ -287,6 +287,10 @@ export class FirestoreProcessRepository implements ProcessRepository {
       // the document was written directly without schema stripping.
       const wfParsed = WorkflowDefinitionSchema.safeParse({ ...raw, version });
       if (wfParsed.success) return wfParsed.data;
+      console.warn(
+        `[process-repository] legacy processDefinitions parse failed for ${name}:${version}`,
+        wfParsed.error.format(),
+      );
     }
 
     return null;

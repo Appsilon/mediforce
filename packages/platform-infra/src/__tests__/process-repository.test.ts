@@ -456,4 +456,60 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
       'my-workflow:42',
     );
   });
+
+  // Legacy processDefinitions fallback tests
+  it('[DATA] getWorkflowDefinition falls back to legacy processDefinitions when primary not found', async () => {
+    const repo = createFirestoreRepo();
+    const definition = buildWorkflowDefinition({ name: 'legacy-workflow', version: 1 });
+
+    // Primary workflowDefinitions: not found
+    mockGetDoc.mockResolvedValue({ exists: () => false });
+    // Legacy processDefinitions: one matching doc with string version "1"
+    mockGetDocs.mockResolvedValue({
+      docs: [
+        { id: 'legacy-doc', data: () => ({ ...definition, version: '1' }) },
+      ],
+    });
+
+    const result = await repo.getWorkflowDefinition('legacy-workflow', 1);
+    expect(result).not.toBeNull();
+    expect(result?.name).toBe('legacy-workflow');
+    expect(result?.version).toBe(1);
+  });
+
+  it('[DATA] getWorkflowDefinition skips legacy doc that fails schema parse and returns null', async () => {
+    const repo = createFirestoreRepo();
+
+    // Primary: not found
+    mockGetDoc.mockResolvedValue({ exists: () => false });
+    // Legacy: doc with version "1" but missing required fields (steps/transitions)
+    mockGetDocs.mockResolvedValue({
+      docs: [
+        { id: 'bad-doc', data: () => ({ name: 'bad-workflow', version: '1' }) },
+      ],
+    });
+
+    const result = await repo.getWorkflowDefinition('bad-workflow', 1);
+    expect(result).toBeNull();
+  });
+
+  it('[DATA] getWorkflowDefinition selects correct legacy doc when multiple exist', async () => {
+    const repo = createFirestoreRepo();
+    const defV1 = buildWorkflowDefinition({ name: 'multi-legacy', version: 1 });
+    const defV2 = buildWorkflowDefinition({ name: 'multi-legacy', version: 2 });
+
+    // Primary: not found
+    mockGetDoc.mockResolvedValue({ exists: () => false });
+    // Legacy: two docs with different string versions
+    mockGetDocs.mockResolvedValue({
+      docs: [
+        { id: 'doc-v1', data: () => ({ ...defV1, version: '1' }) },
+        { id: 'doc-v2', data: () => ({ ...defV2, version: '2' }) },
+      ],
+    });
+
+    const result = await repo.getWorkflowDefinition('multi-legacy', 2);
+    expect(result).not.toBeNull();
+    expect(result?.version).toBe(2);
+  });
 });
