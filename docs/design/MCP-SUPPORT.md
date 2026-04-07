@@ -225,7 +225,7 @@ MCP servers are defined at the org level. For v1, the catalog is seed data. For 
 
 ### Tool-level allowlisting
 
-The `allowedTools` field on `McpServerConfigSchema` restricts which tools from a server are available to the agent. When set, the allowlist is written to the generated `mcp-config.json` alongside the server config. When omitted, all tools are available. Note: Claude CLI does not natively enforce `allowedTools` — the field is included in the config for audit purposes and future enforcement (e.g., via prompt constraints or a filtering MCP proxy).
+The `allowedTools` field on `McpServerConfigSchema` restricts which tools from a server are available to the agent. When set, the runtime translates it into `--allowedTools mcp__servername__toolname` CLI arguments that Claude CLI enforces at the tool-call level. When omitted, all tools from that server are available.
 
 ### Secrets scoping
 
@@ -234,6 +234,29 @@ Secrets use the existing `{{SECRET}}` template system resolved from workflow sec
 ### Immutable config
 
 The MCP config file is generated at runtime from the immutable workflow definition version. It cannot drift or be modified by the agent. This is critical for GxP compliance.
+
+## Security Mechanisms
+
+### What we enforce and how
+
+| Mechanism | How it works | Status |
+|-----------|-------------|--------|
+| **Per-step server scoping** | Each step declares `mcpServers[]` explicitly. No inheritance, no ambient access. Steps without MCP config get zero MCP tools. | Enforced |
+| **`--strict-mcp-config`** | Claude CLI ignores any `.mcp.json` or user-level MCP configs. Agent only gets servers from our generated config. Prevents rogue server injection via workspace files. | Enforced |
+| **Tool allowlisting** | `allowedTools` per server → translated to `--allowedTools mcp__servername__toolname` CLI args. Claude CLI blocks calls to tools not in the list. | Enforced |
+| **Secret scoping** | Each MCP server only receives secrets declared in its own `env` config. `{{SECRET}}` templates resolved from workflow secrets + process.env. No cross-server secret leakage. | Enforced |
+| **Immutable config** | MCP config generated at runtime from immutable workflow definition version. Agent cannot modify it. Config lives in `/output/` (Docker) which the agent can't write to. | Enforced |
+| **Audit trail** | MCP server list emitted as status event at step start. All tool calls logged in stream-json activity log with tool name + arguments. | Enforced |
+| **Base tool allowlist** | Agent always gets `Bash,Read,Write,Edit,Glob,Grep` + declared MCP tools. Nothing more. | Enforced |
+
+### What we don't enforce (yet)
+
+| Gap | Why | Risk level | Plan |
+|-----|-----|-----------|------|
+| **Tool discovery** | Can't auto-discover what tools a server exposes until we connect to it. Catalog shows seed data, not live tools. | Low — doesn't affect runtime security, only UX. | v2: query `tools/list` at catalog-add time. |
+| **MCP server authentication** | MCP servers we spawn don't verify who's calling them. In stdio mode, only Claude CLI talks to them (child process). | Low — stdio is 1:1, no network exposure. | v2 HTTP transport: add auth headers. |
+| **Rate limiting** | No per-tool call limits. An agent could make 1000 calls to an MCP tool in one step. | Medium — cost/abuse concern, not security. | v2: configurable per-tool rate limits. |
+| **Output validation** | We don't validate what MCP servers return. A malicious server could inject prompt content. | Medium — mitigated by Docker isolation + trusted catalog. | v2: output sanitization layer. |
 
 ## Future Work
 
