@@ -2,77 +2,69 @@
 
 import { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { Wrench, Search, Shield, ChevronRight, Lock } from 'lucide-react';
+import { Wrench, Search, Shield, ShieldCheck, ShieldAlert, ChevronRight, Database, Globe, HardDrive, FlaskConical } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { TOOL_CATALOG, type CatalogTool } from '@/lib/tool-catalog-seed';
 
-function getCategoryColor(category: string): { text: string; bg: string; dot: string } {
-  const colors: Record<string, { text: string; bg: string; dot: string }> = {
-    'Data Access': { text: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-50 dark:bg-blue-950/30', dot: 'bg-blue-500' },
-    'Clinical Data': { text: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/30', dot: 'bg-emerald-500' },
+function getToolIcon(id: string) {
+  const icons: Record<string, typeof Database> = {
+    filesystem: HardDrive,
+    fetch: Globe,
+    postgres: Database,
+    sqlite: Database,
+    'cdisc-library': FlaskConical,
   };
-  return colors[category] ?? { text: 'text-muted-foreground', bg: 'bg-muted', dot: 'bg-muted-foreground' };
+  return icons[id] ?? Wrench;
 }
 
-function getToolIcon(id: string): string {
-  const icons: Record<string, string> = {
-    filesystem: '📁',
-    fetch: '🌐',
-    postgres: '🐘',
-    sqlite: '🗃️',
-    'cdisc-library': '🧬',
-  };
-  return icons[id] ?? '🔧';
+function getSecurityLevel(tool: CatalogTool): { label: string; color: string; icon: typeof Shield } {
+  const hasAllowlist = tool.allowedTools && tool.allowedTools.length > 0;
+  const hasSecrets = tool.env && Object.values(tool.env).some((v) => v.startsWith('{{'));
+
+  if (hasAllowlist && hasSecrets) {
+    return { label: 'Allowlist + secrets', color: 'text-emerald-600 dark:text-emerald-400', icon: ShieldCheck };
+  }
+  if (hasAllowlist) {
+    return { label: 'Tool allowlist', color: 'text-blue-600 dark:text-blue-400', icon: Shield };
+  }
+  if (hasSecrets) {
+    return { label: 'Secrets required', color: 'text-blue-600 dark:text-blue-400', icon: Shield };
+  }
+  return { label: 'Open access', color: 'text-amber-600 dark:text-amber-400', icon: ShieldAlert };
 }
 
 function ToolCard({ tool, handle }: { tool: CatalogTool; handle: string }) {
-  const categoryColor = getCategoryColor(tool.category);
-  const secrets = tool.env ? Object.values(tool.env).filter((v): v is string => typeof v === 'string' && v.startsWith('{{')) : [];
+  const Icon = getToolIcon(tool.id);
+  const security = getSecurityLevel(tool);
+  const SecurityIcon = security.icon;
 
   return (
-    <div className="rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-md flex flex-col">
-      {/* Header */}
-      <div className="px-4 py-4 flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-lg">
-          {getToolIcon(tool.id)}
+    <Link
+      href={`/${handle}/tools/${tool.id}`}
+      className="group rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-md flex flex-col"
+    >
+      <div className="px-4 py-4 flex items-start gap-3 flex-1">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/5 text-primary">
+          <Icon className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-base">{tool.name}</h3>
-            <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap', categoryColor.bg, categoryColor.text)}>
-              <span className={cn('h-1.5 w-1.5 rounded-full', categoryColor.dot)} />
-              {tool.category}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{tool.description}</p>
+          <h3 className="font-semibold text-base group-hover:text-primary transition-colors">{tool.name}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{tool.description}</p>
         </div>
       </div>
 
-      {/* Footer */}
       <div className="border-t border-border/50 px-4 py-2.5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {secrets.length > 0 && (
-            <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
-              <Lock className="h-2.5 w-2.5" />
-              {secrets.length} secret{secrets.length !== 1 ? 's' : ''}
-            </span>
-          )}
-          {tool.allowedTools && (
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-              {tool.allowedTools.length} tool{tool.allowedTools.length !== 1 ? 's' : ''} allowed
-            </span>
-          )}
-        </div>
-        <Link
-          href={`/${handle}/tools/${tool.id}`}
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-        >
-          Details
+        <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium', security.color)}>
+          <SecurityIcon className="h-3.5 w-3.5" />
+          {security.label}
+        </span>
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+          View details
           <ChevronRight className="h-3 w-3" />
-        </Link>
+        </span>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -104,14 +96,11 @@ export default function ToolsPage() {
   return (
     <div className="flex flex-1 flex-col p-6">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-headline font-semibold">Tools</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            MCP servers available to agent steps. Each tool provides external capabilities
-            that workflows can grant to specific steps.
-          </p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-xl font-headline font-semibold">Tools</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          External capabilities available to workflow steps. Assign tools to control what each agent can access.
+        </p>
       </div>
 
       {/* Search */}
@@ -124,21 +113,6 @@ export default function ToolsPage() {
           onChange={(e) => setQuery(e.target.value)}
           className="w-full rounded-md border bg-background pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
-      </div>
-
-      {/* Access Control Info */}
-      <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 mb-6">
-        <div className="flex items-start gap-2">
-          <Shield className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-foreground">Per-step access control</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Tools from this catalog can be assigned to individual workflow steps.
-              Each step declares which tools it needs — agents only see tools explicitly granted to their step.
-              Secrets are scoped per-tool and resolved at runtime.
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Tool Grid by Category */}
@@ -167,9 +141,9 @@ export default function ToolsPage() {
         </div>
       )}
 
-      {/* Stats footer */}
+      {/* Footer */}
       <div className="mt-8 pt-4 border-t text-xs text-muted-foreground">
-        {TOOL_CATALOG.length} tools in catalog · {categories.size} categories
+        {TOOL_CATALOG.length} tools · Each tool&apos;s access level is determined by its secrets and tool allowlist configuration.
       </div>
     </div>
   );
