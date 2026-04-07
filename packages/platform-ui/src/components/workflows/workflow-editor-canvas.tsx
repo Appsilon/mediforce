@@ -228,8 +228,23 @@ export function WorkflowEditorCanvas({
       const lastId = editedSteps[editedSteps.length - 1]?.id;
       setEditedSteps((prev) => [...prev, newStep]);
       setEditedTransitions((prev) => lastId ? [...prev, { from: lastId, to: newId }] : prev);
+    } else if (selectedStepId && selectedStepId !== terminalStep.id) {
+      // Insert after the currently selected step
+      const selectedIdx = editedSteps.findIndex((s) => s.id === selectedStepId);
+      setEditedSteps((prev) => {
+        const next = [...prev];
+        next.splice(selectedIdx + 1, 0, newStep);
+        return next;
+      });
+      setEditedTransitions((prev) => {
+        // Edges from selectedStep → their targets now go through newStep
+        const outgoing = prev.filter((t) => t.from === selectedStepId);
+        const others = prev.filter((t) => t.from !== selectedStepId);
+        const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
+        return [...others, { from: selectedStepId, to: newId }, ...rewired];
+      });
     } else {
-      // Insert immediately before the terminal step
+      // No step selected: insert immediately before the terminal step
       const terminalIdx = editedSteps.findIndex((s) => s.id === terminalStep.id);
       setEditedSteps((prev) => {
         const next = [...prev];
@@ -248,7 +263,7 @@ export function WorkflowEditorCanvas({
     setSelectedStepId(newId);
     setAddingStep(false);
     setPendingStepType(null);
-  }, [editedSteps, saveSnapshot]);
+  }, [editedSteps, selectedStepId, saveSnapshot]);
 
   const removeStep = useCallback((stepId: string) => {
     saveSnapshot();
@@ -596,7 +611,8 @@ function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: WorkflowSt
   const base: Partial<WorkflowStep> = { executor: targetExecutor };
 
   if (targetExecutor === 'human') {
-    return { ...base, plugin: undefined, autonomyLevel: undefined, agent: undefined, cowork: undefined };
+    // Preserve autonomyLevel so it is restored if the user switches back to agent
+    return { ...base, plugin: undefined, agent: undefined, cowork: undefined };
   }
 
   if (targetExecutor === 'agent') {
