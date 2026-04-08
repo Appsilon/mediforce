@@ -96,20 +96,21 @@ We're [Appsilon](https://appsilon.com) — we've been building open-source tools
 
 We're building the standard for human-agent collaboration in pharma — and we're doing it in the open.
 
+- **[Getting Started](GETTING-STARTED.md)** — set up your development environment
 - **[Join our Discord](https://discord.gg/Hkb2K7YE)** — follow progress, ask questions, shape the roadmap
 - **Star this repo** — helps others in pharma find us
 - **Open an issue** — tell us what processes matter most to you
 
 ## Development
 
-pnpm monorepo. Quick start:
+**[Getting Started Guide](GETTING-STARTED.md)** — Quick start with emulators and demo data, no setup required.
+
+Quick start:
 
 ```bash
 pnpm install
-cp packages/platform-ui/.env.local.example packages/platform-ui/.env.local
-# fill in Firebase config values
-pnpm dev:ui        # platform UI only (port 9003)
-pnpm dev           # platform UI + supply intelligence (ports 9003 + 9004)
+python3 packages/platform-ui/scripts/bootstrap-e2e.py  # One-time setup
+NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:ui              # Start with demo data
 ```
 
 Run tests:
@@ -151,6 +152,7 @@ pnpm dev:local     # platform UI + supply intelligence
 
 | | |
 |---|---|
+| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment with Firebase |
 | **[Vision](docs/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
 | **[Architecture](docs/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
 | **[How We Work](docs/how-we-work.md)** | Building bottom-up, in public, with real processes |
