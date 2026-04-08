@@ -14,24 +14,46 @@ Get the app running locally in minutes. Start with Firebase emulators and demo d
 
 Run the app with pre-seeded demo data. No Firebase account needed.
 
+### Step 1: Bootstrap environment
+
 ```bash
 pnpm install
-python3 packages/platform-ui/scripts/bootstrap-e2e.py
+cd packages/platform-ui
+python3 scripts/bootstrap-dev.py
+```
+
+This creates `.env.local` with demo credentials and starts Firebase emulators.
+
+### Step 2: Seed demo data
+
+```bash
+pnpm seed:dev
+```
+
+This seeds:
+- Workflow definitions (Supply Chain Review, Protocol to TFL, Workflow Designer)
+- Process instances in various states (running, paused, completed)
+- Human tasks ready for action
+- Agent runs with results
+
+### Step 3: Start the app
+
+```bash
 NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:ui
 ```
 
-**What happens:**
-1. Installs dependencies
-2. Creates `.env.local` with demo credentials
-3. Starts Firebase emulators (Auth + Firestore)
-4. Seeds demo workflows and process instances
-
 Open http://localhost:9003
 
+### Step 4: Sign in
+
+Demo credentials:
+- **Email**: test@mediforce.dev
+- **Password**: test123456
+
 **You'll see:**
-- Workflow Dashboard with demo workflows (Supply Chain Review, Protocol to TFL, etc.)
-- Process instances in various states (running, paused, completed)
-- Tasks ready for the test user
+- Workflow Dashboard with demo workflows
+- Process instances in various states
+- Tasks assigned to the test user
 
 **Emulator ports:**
 - App: http://localhost:9003
@@ -117,10 +139,6 @@ The API returns:
 - `agent` — AI agent executes
 - `script` — containerized script (Docker)
 - `cowork` — interactive coworker session
-
-**See real examples:**
-- `apps/community-digest/src/community-digest.wd.json` — Daily GitHub digest
-- `apps/protocol-to-tfl/src/protocol-to-tfl.wd.json` — Clinical protocol to TFL
 
 ### Via UI
 
@@ -243,6 +261,12 @@ Workflows combine human tasks and AI agent tasks with configurable autonomy leve
 }
 ```
 
+**Note:** The `skillsDir` path (`apps/document-review/skills`) is illustrative. Create this directory structure if you're building a custom agent plugin, or reference an existing plugin like `apps/community-digest/plugins/community-digest/skills`.
+
+**See real examples:**
+- `apps/community-digest/src/community-digest.wd.json` — Daily GitHub digest
+- `apps/protocol-to-tfl/src/protocol-to-tfl.wd.json` — Clinical protocol to TFL
+
 ---
 
 ## 5. Persistent Data with Your Firebase
@@ -276,13 +300,14 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id       # optional
 NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id                       # optional
 
 # API key for server-to-server calls (required)
+# This key gates all API write operations — keep it secret
 PLATFORM_API_KEY=your-secret-key
 
 # Optional: LLM keys for agent execution
 OPENROUTER_API_KEY=your-openrouter-key
 ```
 
-Required: `API_KEY`, `AUTH_DOMAIN`, `PROJECT_ID`, `PLATFORM_API_KEY`.
+Required: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `PLATFORM_API_KEY`.
 
 ### Run with Production Firebase
 
@@ -321,10 +346,16 @@ lsof -ti:9003 | xargs kill -9
 
 ### Emulators fail to start
 
-Re-run bootstrap:
+Run the bootstrap script:
 
 ```bash
-python3 packages/platform-ui/scripts/bootstrap-e2e.py
+python3 packages/platform-ui/scripts/bootstrap-dev.py
+```
+
+Or start manually:
+
+```bash
+pnpm emulators
 ```
 
 ### "Permission denied" Firestore errors
@@ -356,6 +387,13 @@ curl -H "X-Api-Key: test-api-key" \
   "http://localhost:9003/api/workflow-definitions?namespace=my-namespace"
 ```
 
+### Demo data doesn't appear after seed
+
+Make sure:
+1. Emulators are running (`pnpm emulators` or bootstrap script)
+2. You ran `pnpm seed:dev` (not just bootstrap)
+3. You're using `NEXT_PUBLIC_USE_EMULATORS=true` when starting the app
+
 ---
 
 ## Commands Reference
@@ -363,14 +401,15 @@ curl -H "X-Api-Key: test-api-key" \
 | Command | Description |
 |---------|-------------|
 | `pnpm install` | Install dependencies |
-| `python3 packages/platform-ui/scripts/bootstrap-e2e.py` | Bootstrap emulator environment |
+| `python3 packages/platform-ui/scripts/bootstrap-dev.py` | Bootstrap emulator environment |
+| `cd packages/platform-ui && pnpm seed:dev` | Seed demo data |
 | `NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:ui` | Run with emulators (port 9003) |
 | `pnpm dev:ui` | Run with production Firebase |
 | `pnpm dev` | Run Platform UI + Supply Intelligence |
 | `pnpm test:fast` | Quick unit tests |
 | `pnpm test` | All unit + integration tests |
 | `cd packages/platform-ui && pnpm test:e2e:auth` | E2E with emulators |
-| `pnpm emulators` | Start Firebase emulators |
+| `pnpm emulators` | Start Firebase emulators (Auth + Firestore) |
 
 ---
 

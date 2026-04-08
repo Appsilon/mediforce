@@ -109,9 +109,15 @@ Quick start:
 
 ```bash
 pnpm install
-python3 packages/platform-ui/scripts/bootstrap-e2e.py  # One-time setup
-NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:ui              # Start with demo data
+cd packages/platform-ui
+python3 scripts/bootstrap-dev.py     # Create .env.local, start emulators
+pnpm seed:dev                        # Seed demo data
+NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:ui
 ```
+
+Demo credentials: `test@mediforce.dev` / `test123456`
+
+For production Firebase setup, see the [Getting Started Guide](GETTING-STARTED.md).
 
 Run tests:
 
