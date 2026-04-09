@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { WorkflowStepSchema, TransitionSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { StepEditor } from './workflow-editor/step-editor';
+import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
 
 // ---------------------------------------------------------------------------
 // YAML code editor (CodeMirror 6)
@@ -158,24 +159,8 @@ export function WorkflowEditorCanvas({
 
   const selectedStep = editedSteps.find((s) => s.id === selectedStepId) ?? null;
 
-  // ── Move eligibility (all steps, used by diagram hover buttons and toolbar) ─
-  const { canMoveUpSet, canMoveDownSet } = (() => {
-    const up = new Set<string>();
-    const down = new Set<string>();
-    for (const step of editedSteps) {
-      const incoming = editedTransitions.filter((t) => t.to === step.id);
-      if (incoming.length === 1) {
-        const pred = incoming[0].from;
-        if (editedTransitions.filter((t) => t.from === pred).length === 1) up.add(step.id);
-      }
-      const outgoing = editedTransitions.filter((t) => t.from === step.id);
-      if (outgoing.length === 1) {
-        const succ = outgoing[0].to;
-        if (editedTransitions.filter((t) => t.to === succ).length === 1) down.add(step.id);
-      }
-    }
-    return { canMoveUpSet: up, canMoveDownSet: down };
-  })();
+  // ── Move eligibility (all steps, used by diagram hover buttons) ─────────────
+  const { canMoveUp: canMoveUpSet, canMoveDown: canMoveDownSet } = computeMoveEligibility(editedSteps, editedTransitions);
 
   // ── History ────────────────────────────────────────────────────────────────
   // Keep refs in sync so saveSnapshot can read current state without being
@@ -249,24 +234,9 @@ export function WorkflowEditorCanvas({
 
   // ── Ensure terminal step always exists + auto-connect orphaned steps ──────────
   useEffect(() => {
-    const terminal = editedSteps.find((s) => s.type === 'terminal');
-    if (!terminal) {
-      // Auto-add a terminal step if none exists
-      const newTerminal: WorkflowStep = { id: 'done', name: 'Done', type: 'terminal', executor: 'human' };
-      setEditedSteps((prev) => [...prev, newTerminal]);
-      return; // transitions will be wired on the next effect run
-    }
-    // Auto-connect any step with no outgoing transition to the terminal
-    const orphans = editedSteps.filter(
-      (s) => s.type !== 'terminal' && !editedTransitions.some((t) => t.from === s.id),
-    );
-    if (orphans.length > 0) {
-      const terminalId = terminal.id;
-      setEditedTransitions((prev) => [
-        ...prev,
-        ...orphans.map((s) => ({ from: s.id, to: terminalId })),
-      ]);
-    }
+    const { steps: nextSteps, transitions: nextTransitions } = ensureTerminalConnected(editedSteps, editedTransitions);
+    if (nextSteps !== editedSteps) setEditedSteps(nextSteps);
+    if (nextTransitions !== editedTransitions) setEditedTransitions(nextTransitions);
   }, [editedSteps, editedTransitions]);
 
   // ── Sync yamlPreview → yamlDraft when diagram changes (not user edits) ───────
