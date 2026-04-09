@@ -12,9 +12,12 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Workflow Home](#workflow-home) — overview of all workflows and their active runs
 - [Workflow Editor — Browse](#workflow-editor--browse) — navigating workflow definitions and versions
 - [Workflow Editor — Canvas](#workflow-editor--canvas) — always-edit canvas with header controls and step panel
-- [Workflow Editor — Add Step](#workflow-editor--add-step) — step type picker with executor selection
+- [Workflow Editor — Add Step](#workflow-editor--add-step) — step type picker (Creation, Review, Decision) with executor selection
 - [Workflow Editor — Undo](#workflow-editor--undo) — reverting canvas changes with the undo button
-- [Workflow Editor — YAML](#workflow-editor--yaml) — live YAML preview and direct YAML edit mode
+- [Workflow Editor — Redo](#workflow-editor--redo) — re-applying an undone change with the redo button
+- [Workflow Editor — Hover Panel](#workflow-editor--hover-panel) — per-step delete and move actions revealed on hover
+- [Workflow Editor — YAML](#workflow-editor--yaml) — live YAML preview in an always-on code editor
+- [Workflow Editor — YAML Hidden](#workflow-editor--yaml-hidden) — YAML editor hidden while a step is selected
 - [New Workflow](#new-workflow) — filling the creation form and publishing a workflow
 - [New Workflow — Validation](#new-workflow--validation) — save blocked when workflow name is invalid
 - [Workflow Editor — Pane Deselect](#workflow-editor--pane-deselect) — clicking canvas background deselects step and restores YAML panel
@@ -72,31 +75,49 @@ Workflow detail page with Runs tab (default) showing execution history, and Defi
 
 ### Workflow Editor — Canvas
 
-The definition version page always opens in edit mode — no separate "Edit" button needed. The sticky header shows read-only namespace and workflow ID fields, plus an editable description and version name. The "Save new version" button stays disabled until a version name is entered. Clicking any canvas node opens the "Edit step" panel on the right.
+The definition version page always opens in edit mode — no separate "Edit" button needed. The sticky header shows the workflow name as a heading plus an editable description and version title. The "Save new version" button stays disabled until a version title is entered. Clicking any canvas node opens the "Edit step" panel on the right.
 
 ![workflow-editor-canvas](workflow-editor-canvas.gif)
 
 ### Workflow Editor — Add Step
 
-The "+ Add step" dropdown presents step types (Input, Review, Decision, End) each with a short description. Selecting a type reveals executor options (human, agent, script). The End type is disabled when a terminal step already exists. After choosing an executor the new step is inserted before the terminal node and auto-selected for editing.
+The "Add Step" dropdown presents step types (Creation, Review, Decision) each with a short description. Selecting a type reveals executor options ("Who handles this step?": human, agent, script, cowork). After choosing an executor the new step is inserted before the terminal node and auto-selected for editing.
 
 ![workflow-editor-add-step](workflow-editor-add-step.gif)
 
 ### Workflow Editor — Undo
 
-The undo button in the canvas toolbar reverses the last canvas change. It starts disabled (empty history), becomes enabled after any mutation (e.g. adding a step), and returns to disabled once the history is exhausted.
+The Undo button in the canvas toolbar reverses the last canvas change. It starts disabled (empty history), becomes enabled after any mutation (e.g. adding a step), and returns to disabled once the history is exhausted.
 
 ![workflow-editor-undo](workflow-editor-undo.gif)
 
+### Workflow Editor — Redo
+
+The Redo button re-applies a change that was just undone. After undoing a step addition the Redo button becomes enabled; clicking it restores the step.
+
+![workflow-editor-redo](workflow-editor-redo.gif)
+
+### Workflow Editor — Hover Panel
+
+Each step node reveals a vertical panel of three icon buttons on hover: delete (red), move up, and move down. The move buttons are disabled for steps that can't swap without breaking branch/merge points. Clicking delete removes the step and re-wires transitions automatically.
+
+![workflow-editor-hover-panel](workflow-editor-hover-panel.gif)
+
 ### Workflow Editor — YAML
 
-When no step is selected the right panel shows a live YAML preview of the full workflow definition. Clicking "Edit YAML" switches to a textarea for direct edits with an "Apply YAML" button. Clicking "Cancel" exits YAML edit mode and restores the read-only preview.
+When no step is selected the right panel shows a live CodeMirror editor with syntax-highlighted YAML for the full workflow definition. The "Save YAML" button in the toolbar applies edits made directly in the code editor.
 
 ![workflow-editor-yaml](workflow-editor-yaml.gif)
 
+### Workflow Editor — YAML Hidden
+
+Selecting a step replaces the YAML editor with the step configuration panel and hides both the "Workflow source code" label and the "Save YAML" button. Deselecting restores the YAML view.
+
+![workflow-editor-yaml-hidden](workflow-editor-yaml-hidden.gif)
+
 ### New Workflow
 
-The new workflow form starts with a template canvas (draft → ai-review → done). The "Save and publish workflow" button stays disabled until all three fields are filled: workflow ID, description, and version name. On save the user is redirected to the newly created definition page.
+The new workflow form starts with a template canvas (draft → ai-review → done). The "Publish workflow" button stays disabled until all three fields are filled: workflow name, description, and version title. On save the user is redirected to the newly created definition page.
 
 ![workflow-new](workflow-new.gif)
 
