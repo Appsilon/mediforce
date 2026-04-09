@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, PenLine, Search, GitBranch, Flag, HelpCircle, Save } from 'lucide-react';
+import { X, PenLine, Search, GitBranch, Flag, HelpCircle, Save, Plus, ArrowUp, ArrowDown, Undo2, Trash2 } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -38,8 +38,8 @@ function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: stri
           }
         }),
         EditorView.theme({
-          '&': { fontSize: '11px' },
-          '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
+          '&': { fontSize: '11px', height: 'auto' },
+          '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'visible' },
           '.cm-content': { padding: '8px 0' },
           '.cm-gutters': { borderRight: '1px solid var(--border)', background: 'transparent', color: 'var(--muted-foreground)', fontSize: '10px' },
           '.cm-activeLineGutter': { background: 'transparent' },
@@ -417,21 +417,47 @@ export function WorkflowEditorCanvas({
 
   const savePanel = renderSavePanel?.(editedSteps, editedTransitions, discardChanges) ?? null;
 
+  const applyYaml = () => {
+    try {
+      const doc = yamlParse(yamlDraft) as Record<string, unknown>;
+      const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
+      if (!stepsResult.success) {
+        setYamlError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
+        return;
+      }
+      const transitionsResult = TransitionSchema.array().safeParse(
+        Array.isArray(doc?.transitions) ? doc.transitions : [],
+      );
+      if (!transitionsResult.success) {
+        setYamlError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
+        return;
+      }
+      saveSnapshot();
+      setEditedSteps(stepsResult.data);
+      setEditedTransitions(transitionsResult.data);
+      lastSyncedYamlRef.current = yamlDraft;
+      setYamlError(null);
+    } catch (err) {
+      setYamlError(err instanceof Error ? err.message : 'Invalid YAML');
+    }
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-1 min-h-0">
-      {/* Diagram column */}
-      <div className="flex-1 flex flex-col pr-0">
-        {/* Toolbar */}
-        <div className="border-b px-4 py-2 flex items-center gap-1.5 bg-muted/30 shrink-0 flex-wrap">
-          {/* Add Step */}
-          <div className="relative" ref={addStepDropdownRef}>
-            <button
-              onClick={() => { setAddingStep(!addingStep); setPendingStepType(null); setPendingInsertAfterId(null); }}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              + Add Step
-            </button>
+    <div className="flex flex-1 flex-col min-h-0">
+
+      {/* ── Unified sticky toolbar ── */}
+      <div className="shrink-0 border-b px-4 py-2 flex items-center gap-1.5 flex-wrap bg-background">
+
+        {/* Add Step */}
+        <div className="relative" ref={addStepDropdownRef}>
+          <button
+            onClick={() => { setAddingStep(!addingStep); setPendingStepType(null); setPendingInsertAfterId(null); }}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Step
+          </button>
             {addingStep && (
               <div className="absolute top-full left-0 mt-1.5 bg-background border rounded-xl shadow-xl p-3 z-50 w-80 space-y-3">
                 <div>
@@ -500,23 +526,27 @@ export function WorkflowEditorCanvas({
           <button
             onClick={() => selectedStepId && moveStep(selectedStepId, 'up')}
             disabled={!canMoveSelectedUp}
+            title="Move selected step up"
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
               canMoveSelectedUp ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
             )}
           >
-            ↑ Move Up
+            <ArrowUp className="h-3.5 w-3.5" />
+            Move Up
           </button>
 
           <button
             onClick={() => selectedStepId && moveStep(selectedStepId, 'down')}
             disabled={!canMoveSelectedDown}
+            title="Move selected step down"
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
               canMoveSelectedDown ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
             )}
           >
-            ↓ Move Down
+            <ArrowDown className="h-3.5 w-3.5" />
+            Move Down
           </button>
 
           <button
@@ -528,7 +558,8 @@ export function WorkflowEditorCanvas({
               editHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
             )}
           >
-            ↩ Undo
+            <Undo2 className="h-3.5 w-3.5" />
+            Undo
           </button>
 
           <div className="w-px h-4 bg-border mx-0.5" />
@@ -536,6 +567,7 @@ export function WorkflowEditorCanvas({
           <button
             onClick={() => selectedStepId && removeStep(selectedStepId)}
             disabled={!selectedStepId}
+            title="Remove selected step"
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
               selectedStepId
@@ -543,124 +575,102 @@ export function WorkflowEditorCanvas({
                 : 'opacity-40 cursor-not-allowed text-muted-foreground',
             )}
           >
+            <Trash2 className="h-3.5 w-3.5" />
             Remove Step
           </button>
 
-          {selectedStepId && (
-            <span className="ml-auto text-xs text-muted-foreground">
-              Selected: <span className="font-mono">{selectedStepId}</span>
-            </span>
-          )}
-        </div>
+          {/* Right section: YAML title + save */}
+          <div className="ml-auto flex items-center gap-2">
+            {selectedStepId && (
+              <span className="text-xs text-muted-foreground mr-2">
+                Selected: <span className="font-mono">{selectedStepId}</span>
+              </span>
+            )}
+            <div className="w-px h-4 bg-border" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-semibold">Workflow source code</span>
+              <span className="group relative inline-flex items-center">
+                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40" />
+                <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
+                  <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
+                  <p>You can author workflows three ways:</p>
+                  <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                    <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
+                    <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
+                    <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
+                  </ul>
+                </span>
+              </span>
+            </div>
+            {yamlError && (
+              <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
+            )}
+            <button
+              onClick={applyYaml}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Save className="h-3.5 w-3.5" />
+              Save changes
+            </button>
+          </div>
+        </div>{/* end unified toolbar */}
 
-        {/* Diagram */}
-        <div className="flex-1 p-6 pt-4">
-          <WorkflowDiagram
-            definition={diagramDefinition}
-            className="border-0"
-            onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
-            onNodeDelete={removeStep}
-            onEdgeAdd={(fromStepId) => { setPendingInsertAfterId(fromStepId); setAddingStep(true); }}
-            onPaneClick={() => setSelectedStepId(null)}
-            selectedStepId={selectedStepId}
-            errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
-          />
-        </div>
-      </div>
+        {/* ── Two-column content area ── */}
+        <div className="flex flex-1 overflow-y-auto items-start">
 
-      {/* Side panel */}
-      <div className="w-1/2 shrink-0 border-l bg-background overflow-y-auto">
-        <div className="p-4 space-y-4">
-          {selectedStep ? (
-            <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">Edit step</h2>
-                <button
-                  onClick={() => setSelectedStepId(null)}
-                  className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <StepEditor
-                step={selectedStep}
-                allSteps={editedSteps}
-                workflowName={workflowName}
-                onChange={(patch) => updateStep(selectedStep.id, patch)}
-                errors={stepErrors?.[selectedStep.id]}
-              />
-            </>
-          ) : (
-            <>
-              {/* Header */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <h2 className="text-sm font-semibold">Workflow source code</h2>
-                  <span className="group relative inline-flex items-center">
-                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40" />
-                    <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
-                      <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
-                      <p>You can author workflows three ways:</p>
-                      <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                        <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
-                        <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
-                        <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
-                      </ul>
-                    </span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {yamlError && (
-                    <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
+          {/* Diagram column */}
+          <div className="flex-1 p-6 pt-4">
+            <WorkflowDiagram
+              definition={diagramDefinition}
+              className="border-0"
+              onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
+              onNodeDelete={removeStep}
+              onEdgeAdd={(fromStepId) => { setPendingInsertAfterId(fromStepId); setAddingStep(true); }}
+              onPaneClick={() => setSelectedStepId(null)}
+              selectedStepId={selectedStepId}
+              errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
+            />
+          </div>
+
+          {/* Side panel */}
+          <div className="w-1/2 shrink-0 border-l bg-background">
+            <div className="p-4 space-y-4">
+              {selectedStep ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold">Edit step</h2>
+                    <button
+                      onClick={() => setSelectedStepId(null)}
+                      className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <StepEditor
+                    step={selectedStep}
+                    allSteps={editedSteps}
+                    workflowName={workflowName}
+                    onChange={(patch) => updateStep(selectedStep.id, patch)}
+                    errors={stepErrors?.[selectedStep.id]}
+                  />
+                </>
+              ) : (
+                <>
+                  <YamlCodeEditor
+                    value={yamlDraft}
+                    onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
+                  />
+                  {savePanel && (
+                    <div className="border-t pt-4">
+                      {savePanel}
+                    </div>
                   )}
-                  <button
-                    onClick={() => {
-                      try {
-                        const doc = yamlParse(yamlDraft) as Record<string, unknown>;
-                        const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
-                        if (!stepsResult.success) {
-                          setYamlError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
-                          return;
-                        }
-                        const transitionsResult = TransitionSchema.array().safeParse(
-                          Array.isArray(doc?.transitions) ? doc.transitions : [],
-                        );
-                        if (!transitionsResult.success) {
-                          setYamlError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
-                          return;
-                        }
-                        saveSnapshot();
-                        setEditedSteps(stepsResult.data);
-                        setEditedTransitions(transitionsResult.data);
-                        lastSyncedYamlRef.current = yamlDraft;
-                        setYamlError(null);
-                      } catch (err) {
-                        setYamlError(err instanceof Error ? err.message : 'Invalid YAML');
-                      }
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    Save changes
-                  </button>
-                </div>
-              </div>
-
-              {/* Code editor */}
-              <YamlCodeEditor
-                value={yamlDraft}
-                onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
-              />
-
-              {savePanel && (
-                <div className="border-t pt-4">
-                  {savePanel}
-                </div>
+                </>
               )}
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+          </div>
+
+        </div>{/* end two-column */}
     </div>
   );
 }

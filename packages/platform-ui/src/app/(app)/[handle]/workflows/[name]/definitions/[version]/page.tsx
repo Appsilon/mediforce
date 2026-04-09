@@ -169,7 +169,7 @@ export default function WorkflowDefinitionVersionPage() {
   if (definition === null) return null;
 
   return (
-    <div className="flex flex-1 flex-col relative">
+    <div className="flex h-full flex-col relative">
       {/* Header */}
       <div className="border-b px-6 py-5 sticky top-0 z-30 bg-background">
         <div className="flex items-start justify-between gap-6">
