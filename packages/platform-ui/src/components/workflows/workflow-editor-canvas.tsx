@@ -70,6 +70,7 @@ function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: stri
     const view = new EditorView({ state, parent: containerRef.current });
     viewRef.current = view;
     return () => { view.destroy(); viewRef.current = null; };
+    // init-only: value is synced via the second useEffect below
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

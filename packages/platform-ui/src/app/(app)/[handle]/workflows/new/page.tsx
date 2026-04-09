@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Save, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
-import { saveWorkflowDefinition, type ValidationIssue } from '@/app/actions/definitions';
+import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -53,22 +54,6 @@ type SaveState =
   | { status: 'saved'; name: string }
   | { status: 'error'; message: string };
 
-function parseStepErrors(
-  issues: ValidationIssue[],
-  steps: WorkflowStep[],
-): Record<string, Record<string, string>> {
-  const result: Record<string, Record<string, string>> = {};
-  for (const issue of issues) {
-    if (issue.path[0] === 'steps' && typeof issue.path[1] === 'number') {
-      const step = steps[issue.path[1]];
-      const field = String(issue.path[2] ?? 'unknown');
-      const key = step?.id || `__index_${issue.path[1]}`;
-      result[key] = { ...(result[key] ?? {}), [field]: issue.message };
-    }
-  }
-  return result;
-}
-
 function toWorkflowId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
@@ -89,6 +74,9 @@ export default function NewWorkflowPage() {
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>(TEMPLATE_STEPS);
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>(TEMPLATE_TRANSITIONS);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current); }, []);
 
   const handleCanvasChange = useCallback(
     (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
@@ -118,35 +106,16 @@ export default function NewWorkflowPage() {
       return;
     }
 
-    const missingPlugin = steps.filter(
-      (s) => s.type !== 'terminal' && (s.executor === 'agent' || s.executor === 'script') && !s.plugin,
-    );
-    if (missingPlugin.length > 0) {
-      setSaveState({ status: 'error', message: `Plugin required for agent/script steps: ${missingPlugin.map((s) => `"${s.name}"`).join(', ')}` });
-      return;
-    }
-
-    const idCounts = new Map<string, number>();
-    for (const s of steps) idCounts.set(s.id, (idCounts.get(s.id) ?? 0) + 1);
-    const dupes = [...idCounts.entries()].filter(([, count]) => count > 1).map(([id]) => id);
-    if (dupes.length > 0) {
-      setSaveState({ status: 'error', message: `Duplicate step IDs: ${dupes.join(', ')}` });
+    const validationError = validateSteps(steps);
+    if (validationError !== null) {
+      setSaveState({ status: 'error', message: validationError });
       return;
     }
 
     setStepErrors({});
     setSaveState({ status: 'saving' });
 
-    const mergedTransitions = [...transitions];
-    for (const step of steps) {
-      if (step.type === 'review' && step.verdicts) {
-        for (const verdict of Object.values(step.verdicts)) {
-          if (verdict.target && !mergedTransitions.some((t) => t.from === step.id && t.to === verdict.target)) {
-            mergedTransitions.push({ from: step.id, to: verdict.target });
-          }
-        }
-      }
-    }
+    const mergedTransitions = mergeVerdictTransitions(steps, transitions);
 
     const result = await saveWorkflowDefinition({
       name: workflowId,
@@ -160,7 +129,7 @@ export default function NewWorkflowPage() {
 
     if (result.success) {
       setSaveState({ status: 'saved', name: result.name });
-      setTimeout(() => {
+      redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
       }, 500);
     } else {

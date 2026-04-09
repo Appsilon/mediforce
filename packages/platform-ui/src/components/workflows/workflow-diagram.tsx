@@ -433,7 +433,7 @@ interface WorkflowDiagramProps {
   onNodeDelete?: (stepId: string) => void;
   onNodeMoveUp?: (stepId: string) => void;
   onNodeMoveDown?: (stepId: string) => void;
-  onEdgeAdd?: (fromStepId: string, toStepId: string) => void;
+  onEdgeAdd?: (fromStepId: string) => void;
   onPaneClick?: () => void;
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
@@ -465,7 +465,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         return {
           ...e,
           type: 'addStep',
-          data: { onAdd: () => onEdgeAdd(e.source, e.target) } satisfies AddStepEdgeData,
+          data: { onAdd: () => onEdgeAdd(e.source) } satisfies AddStepEdgeData,
         };
       }
       return e;
