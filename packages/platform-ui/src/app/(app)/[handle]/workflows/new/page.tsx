@@ -186,118 +186,88 @@ export default function NewWorkflowPage() {
   return (
     <div className="flex flex-1 flex-col relative">
       {/* Header */}
-      <div className="border-b px-6 py-4 sticky top-0 z-30 bg-background space-y-4">
-        <p className="text-sm text-muted-foreground max-w-2xl">
-          Design your workflow visually. The canvas below shows a two-step starter: a human task followed by an AI agent review. Click any step to edit it, use the toolbar to add or rearrange steps, then click <strong>Save and publish workflow</strong> above.
-        </p>
-
-        <div className="flex flex-wrap items-end gap-4">
-          {/* Owner */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">Namespace</label>
-            <select
-              value={effectiveNamespace}
-              onChange={(e) => setNamespace(e.target.value)}
-              disabled={namespacesLoading || namespaces.length === 0}
-              className={cn(
-                'rounded-md border bg-background px-3 py-1.5 text-sm outline-none',
-                'focus:ring-1 focus:ring-ring focus:border-ring',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-              )}
-            >
-              {namespacesLoading ? (
-                <option value="">Loading...</option>
-              ) : (
-                namespaces.map((ns) => (
-                  <option key={ns.handle} value={ns.handle}>
-                    {ns.displayName ?? ns.handle} (@{ns.handle})
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-
-          {/* Workflow name */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">
-              Workflow ID <span className="text-muted-foreground/50 font-normal">(used in URLs, auto-slugged)</span>
-            </label>
+      <div className="border-b px-6 py-5 sticky top-0 z-30 bg-background">
+        <div className="flex items-start justify-between gap-6">
+          {/* Left: workflow identity */}
+          <div className="flex-1 min-w-0">
             <input
               value={workflowName}
               onChange={(e) => setWorkflowName(e.target.value)}
-              placeholder="e.g. clinical-trial-review"
-              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring min-w-64"
+              placeholder="Workflow name…"
+              className="w-full bg-transparent text-2xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
             />
-          </div>
-
-          {/* Description */}
-          <div className="flex flex-col gap-1 flex-1 min-w-48">
-            <label className="text-xs font-medium text-muted-foreground">Description</label>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What does this workflow do?"
-              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+              placeholder="Add a description…"
+              className="mt-1 w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
             />
-          </div>
-
-          {/* Version name */}
-          <div className="flex flex-col gap-1 min-w-48">
-            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              Version name
-              <span className="group relative inline-flex">
-                <HelpCircle className="h-3 w-3 text-muted-foreground/50 cursor-help" />
-                <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-[480px] rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
-                  Workflows evolve over time — each saved revision gets a version number automatically. A version name lets you describe what changed so it&apos;s easy to tell &quot;Added AI review step&quot; apart from &quot;Tightened approval criteria&quot; at a glance, rather than deciphering v1, v2, v3.
-                </span>
-              </span>
-            </label>
-            <input
-              value={versionTitle}
-              onChange={(e) => setVersionTitle(e.target.value)}
-              placeholder="e.g. Initial version"
-              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
-            />
-          </div>
-
-          {/* Save button */}
-          <div className="flex flex-col gap-1">
-            <div className="h-[18px]" />
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSave}
-                disabled={saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()}
-                title={
-                  !toWorkflowId(workflowName) ? 'Enter a workflow ID to publish' :
-                  !description.trim() ? 'Enter a description to publish' :
-                  !versionTitle.trim() ? 'Enter a version name to publish' :
-                  undefined
-                }
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                  (saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()) && 'opacity-50 cursor-not-allowed',
-                )}
+            {/* Secondary metadata row */}
+            <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground/60 flex-wrap">
+              <span>@</span>
+              <select
+                value={effectiveNamespace}
+                onChange={(e) => setNamespace(e.target.value)}
+                disabled={namespacesLoading || namespaces.length === 0}
+                className="bg-transparent border-0 text-xs text-muted-foreground/60 outline-none cursor-pointer hover:text-muted-foreground disabled:cursor-not-allowed -ml-1 py-0 max-w-[160px]"
               >
-                <Save className="h-3.5 w-3.5" />
-                {saveState.status === 'saving' ? 'Publishing...' : 'Save and publish workflow'}
-              </button>
-              {saveState.status !== 'saving' && saveState.status !== 'saved' && saveState.status !== 'error' && (
-                !toWorkflowId(workflowName) ? <span className="text-xs text-muted-foreground">Workflow ID required</span> :
-                !description.trim() ? <span className="text-xs text-muted-foreground">Description required</span> :
-                !versionTitle.trim() ? <span className="text-xs text-muted-foreground">Version name required</span> :
-                null
+                {namespacesLoading ? (
+                  <option value="">Loading…</option>
+                ) : (
+                  namespaces.map((ns) => (
+                    <option key={ns.handle} value={ns.handle}>{ns.handle}</option>
+                  ))
+                )}
+              </select>
+              {toWorkflowId(workflowName) && (
+                <>
+                  <span>·</span>
+                  <span className="font-mono">{toWorkflowId(workflowName)}</span>
+                </>
               )}
-              {saveState.status === 'saved' && (
-                <span className="inline-flex items-center rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
-                  Created — redirecting…
-                </span>
-              )}
-              {saveState.status === 'error' && (
-                <span className="inline-flex items-center rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
-                  {saveState.message}
-                </span>
-              )}
+              <span>·</span>
+              <span className="shrink-0">v1 ·</span>
+              <input
+                value={versionTitle}
+                onChange={(e) => setVersionTitle(e.target.value)}
+                placeholder="version note, e.g. Initial version"
+                className={cn(
+                  'bg-transparent border-b border-transparent hover:border-muted-foreground/30 focus:border-primary outline-none text-xs placeholder:text-muted-foreground/40 placeholder:italic px-0 py-px w-52',
+                  !versionTitle.trim() && workflowName && 'border-amber-300 dark:border-amber-700',
+                )}
+              />
             </div>
+          </div>
+
+          {/* Right: save controls */}
+          <div className="flex items-center gap-2 shrink-0 pt-0.5">
+            {saveState.status === 'saved' && (
+              <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                Created — redirecting…
+              </span>
+            )}
+            {saveState.status === 'error' && (
+              <span className="text-sm text-red-600 dark:text-red-400 max-w-xs truncate" title={saveState.message}>
+                {saveState.message}
+              </span>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()}
+              title={
+                !toWorkflowId(workflowName) ? 'Enter a workflow name to publish' :
+                !description.trim() ? 'Add a description to publish' :
+                !versionTitle.trim() ? 'Enter a version note to publish' :
+                undefined
+              }
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
+                (saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()) && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              <Save className="h-3.5 w-3.5" />
+              {saveState.status === 'saving' ? 'Publishing…' : 'Publish workflow'}
+            </button>
           </div>
         </div>
       </div>

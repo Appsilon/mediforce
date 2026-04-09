@@ -171,88 +171,73 @@ export default function WorkflowDefinitionVersionPage() {
   return (
     <div className="flex flex-1 flex-col relative">
       {/* Header */}
-      <div className="border-b px-6 py-4 sticky top-0 z-30 bg-background">
-        <div className="flex flex-wrap items-end gap-4">
-          {/* Namespace */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">Namespace</label>
-            <input
-              value={definition.namespace ?? ''}
-              disabled
-              className="rounded-md border bg-muted px-3 py-1.5 text-sm outline-none text-muted-foreground cursor-not-allowed"
-            />
-          </div>
-
-          {/* Workflow ID */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">Workflow ID</label>
-            <input
-              value={decodedName}
-              disabled
-              className="rounded-md border bg-muted px-3 py-1.5 text-sm font-mono outline-none text-muted-foreground cursor-not-allowed min-w-48"
-            />
-          </div>
-
-          {/* Description */}
-          <div className="flex flex-col gap-1 flex-1 min-w-48">
-            <label className="text-xs font-medium text-muted-foreground">Description</label>
+      <div className="border-b px-6 py-5 sticky top-0 z-30 bg-background">
+        <div className="flex items-start justify-between gap-6">
+          {/* Left: workflow identity */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground truncate">
+              {decodedName}
+            </h1>
             <input
               value={editedDescription}
               onChange={(e) => setEditedDescription(e.target.value)}
-              placeholder="What does this workflow do?"
-              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+              placeholder="Add a description…"
+              className="mt-1 w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
             />
-          </div>
-
-          {/* Version name */}
-          <div className="flex flex-col gap-1 min-w-48">
-            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              Version name
-              <span className="group relative inline-flex">
-                <HelpCircle className="h-3 w-3 text-muted-foreground/50 cursor-help" />
-                <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-[480px] rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
-                  Workflows evolve over time — each saved revision gets a version number automatically. A version name lets you describe what changed so it&apos;s easy to tell &quot;Added AI review step&quot; apart from &quot;Tightened approval criteria&quot; at a glance, rather than deciphering v1, v2, v3.
+            {/* Secondary metadata row */}
+            <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground/60 flex-wrap">
+              {definition.namespace && (
+                <>
+                  <span className="font-mono">@{definition.namespace}</span>
+                  <span>·</span>
+                </>
+              )}
+              <span className="font-mono">v{definition.version}</span>
+              <span>·</span>
+              <span className="shrink-0">Version note:</span>
+              <input
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                placeholder="describe this revision…"
+                title={!editedTitle.trim() ? 'Enter a version note to save' : undefined}
+                className={cn(
+                  'bg-transparent border-b border-transparent hover:border-muted-foreground/30 focus:border-primary outline-none text-xs placeholder:text-muted-foreground/40 placeholder:italic px-0 py-px w-52',
+                  !editedTitle.trim() && 'border-amber-300 dark:border-amber-700',
+                )}
+              />
+              <span className="group relative inline-flex items-center">
+                <HelpCircle className="h-3 w-3 text-muted-foreground/40 cursor-help" />
+                <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-72 rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
+                  Each saved revision gets a version number automatically. A version note helps you tell &quot;Added AI review&quot; from &quot;Tightened criteria&quot; at a glance.
                 </span>
               </span>
-            </label>
-            <input
-              value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
-              placeholder="e.g. Added automated review step"
-              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
-            />
+            </div>
           </div>
 
-          {/* Save button */}
-          <div className="flex flex-col gap-1">
-            <div className="h-[18px]" />
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSave}
-                disabled={saveState.status === 'saving' || !editedTitle.trim()}
-                title={!editedTitle.trim() ? 'Enter a version name to save' : undefined}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                  (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
-                )}
-              >
-                <Save className="h-3.5 w-3.5" />
-                {saveState.status === 'saving' ? 'Saving...' : 'Save new version'}
-              </button>
-              {!editedTitle.trim() && saveState.status !== 'saving' && (
-                <span className="text-xs text-muted-foreground">Version name required</span>
+          {/* Right: save controls */}
+          <div className="flex items-center gap-2 shrink-0 pt-0.5">
+            {saveState.status === 'saved' && (
+              <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                Saved as v{saveState.version}
+              </span>
+            )}
+            {saveState.status === 'error' && (
+              <span className="text-sm text-red-600 dark:text-red-400 max-w-xs truncate" title={saveState.message}>
+                {saveState.message}
+              </span>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saveState.status === 'saving' || !editedTitle.trim()}
+              title={!editedTitle.trim() ? 'Enter a version note to save' : undefined}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
+                (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
               )}
-              {saveState.status === 'saved' && (
-                <span className="inline-flex items-center rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
-                  Saved as v{saveState.version}
-                </span>
-              )}
-              {saveState.status === 'error' && (
-                <span className="inline-flex items-center rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
-                  {saveState.message}
-                </span>
-              )}
-            </div>
+            >
+              <Save className="h-3.5 w-3.5" />
+              {saveState.status === 'saving' ? 'Saving…' : 'Save new version'}
+            </button>
           </div>
         </div>
       </div>
