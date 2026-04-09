@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, PenLine, Search, GitBranch, Flag, HelpCircle, Save, Plus, Undo2, Redo2 } from 'lucide-react';
+import { X, PenLine, Search, GitBranch, HelpCircle, Save, Plus, Undo2, Redo2 } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { yaml as yamlLang } from '@codemirror/lang-yaml';
+import { tags } from '@lezer/highlight';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import { WorkflowStepSchema, TransitionSchema } from '@mediforce/platform-core';
@@ -41,9 +43,26 @@ function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: stri
           '&': { fontSize: '11px', height: 'auto' },
           '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'visible' },
           '.cm-content': { padding: '8px 0' },
-          '.cm-gutters': { borderRight: '1px solid var(--border)', background: 'transparent', color: 'var(--muted-foreground)', fontSize: '10px' },
+          '.cm-gutters': { borderRight: '1px solid var(--border)', background: 'transparent', color: 'hsl(var(--muted-foreground))', fontSize: '10px' },
           '.cm-activeLineGutter': { background: 'transparent' },
+          // Syntax token colours (using CSS vars so they adapt to light/dark)
+          '.cm-tok-key':     { color: 'hsl(var(--primary))', fontWeight: '500' },
+          '.cm-tok-string':  { color: 'hsl(var(--color-status-warn))' },
+          '.cm-tok-number':  { color: 'hsl(38 75% 45%)' },
+          '.cm-tok-bool':    { color: 'hsl(var(--color-status-ok))' },
+          '.cm-tok-null':    { color: 'hsl(var(--muted-foreground))' },
+          '.cm-tok-comment': { color: 'hsl(var(--muted-foreground))', fontStyle: 'italic' },
+          '.cm-tok-punct':   { color: 'hsl(var(--muted-foreground) / 0.6)' },
         }),
+        syntaxHighlighting(HighlightStyle.define([
+          { tag: tags.propertyName,              class: 'cm-tok-key' },
+          { tag: tags.string,                    class: 'cm-tok-string' },
+          { tag: tags.number,                    class: 'cm-tok-number' },
+          { tag: [tags.bool, tags.atom],         class: 'cm-tok-bool' },
+          { tag: tags.null,                      class: 'cm-tok-null' },
+          { tag: tags.comment,                   class: 'cm-tok-comment' },
+          { tag: [tags.separator, tags.bracket], class: 'cm-tok-punct' },
+        ])),
       ],
     });
 
@@ -227,6 +246,28 @@ export function WorkflowEditorCanvas({
     if (!stepErrors || Object.keys(stepErrors).length === 0) return;
     setSelectedStepId(Object.keys(stepErrors)[0]);
   }, [stepErrors]);
+
+  // ── Ensure terminal step always exists + auto-connect orphaned steps ──────────
+  useEffect(() => {
+    const terminal = editedSteps.find((s) => s.type === 'terminal');
+    if (!terminal) {
+      // Auto-add a terminal step if none exists
+      const newTerminal: WorkflowStep = { id: 'done', name: 'Done', type: 'terminal', executor: 'human' };
+      setEditedSteps((prev) => [...prev, newTerminal]);
+      return; // transitions will be wired on the next effect run
+    }
+    // Auto-connect any step with no outgoing transition to the terminal
+    const orphans = editedSteps.filter(
+      (s) => s.type !== 'terminal' && !editedTransitions.some((t) => t.from === s.id),
+    );
+    if (orphans.length > 0) {
+      const terminalId = terminal.id;
+      setEditedTransitions((prev) => [
+        ...prev,
+        ...orphans.map((s) => ({ from: s.id, to: terminalId })),
+      ]);
+    }
+  }, [editedSteps, editedTransitions]);
 
   // ── Sync yamlPreview → yamlDraft when diagram changes (not user edits) ───────
   const yamlPreviewForSync = yamlStringify(
@@ -484,28 +525,18 @@ export function WorkflowEditorCanvas({
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
                   <div className="flex flex-col gap-1">
                     {([
-                      { type: 'creation', icon: PenLine,   label: 'Input',    description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400',   activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
+                      { type: 'creation', icon: PenLine,   label: 'Creation', description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400',   activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
                       { type: 'review',   icon: Search,     label: 'Review',   description: 'A step where someone evaluates work and gives a verdict such as approve or reject.', color: 'text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-50 dark:bg-amber-900/30 ring-1 ring-amber-400' },
                       { type: 'decision', icon: GitBranch,  label: 'Decision', description: 'A branching step that routes the workflow to different paths based on a condition.', color: 'text-purple-600 dark:text-purple-400', activeBg: 'bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-400' },
-                      { type: 'terminal', icon: Flag,       label: 'End',      description: 'Marks the final state of the workflow — all paths must lead here.',                 color: 'text-emerald-600 dark:text-emerald-400', activeBg: '' },
                     ] as const).map((opt) => {
-                      const isTerminalDisabled = opt.type === 'terminal' && editedSteps.some((s) => s.type === 'terminal');
                       const isActive = pendingStepType === opt.type;
                       return (
                         <button
                           key={opt.type}
-                          disabled={isTerminalDisabled}
-                          onClick={() => {
-                            if (opt.type === 'terminal') { addStep('terminal', 'human'); }
-                            else { setPendingStepType(opt.type); }
-                          }}
+                          onClick={() => setPendingStepType(opt.type)}
                           className={cn(
                             'rounded-lg px-3 py-2 text-left transition-all w-full',
-                            isTerminalDisabled
-                              ? 'opacity-40 cursor-not-allowed'
-                              : isActive
-                                ? opt.activeBg
-                                : 'hover:bg-muted',
+                            isActive ? opt.activeBg : 'hover:bg-muted',
                           )}
                         >
                           <div className="flex items-center gap-1.5">
@@ -520,7 +551,7 @@ export function WorkflowEditorCanvas({
                 </div>
                 {pendingStepType && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Executor</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Who handles this step?</p>
                     <div className="flex gap-1.5">
                       {(pendingStepType === 'creation'
                         ? (['human', 'agent', 'script', 'cowork'] as const)
