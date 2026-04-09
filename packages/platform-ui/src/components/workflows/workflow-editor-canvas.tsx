@@ -1,13 +1,74 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, PenLine, Search, GitBranch, Flag } from 'lucide-react';
+import { X, PenLine, Search, GitBranch, Flag, HelpCircle, Save } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
+import { EditorState } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
+import { basicSetup } from 'codemirror';
+import { yaml as yamlLang } from '@codemirror/lang-yaml';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import { WorkflowStepSchema, TransitionSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { StepEditor } from './workflow-editor/step-editor';
+
+// ---------------------------------------------------------------------------
+// YAML code editor (CodeMirror 6)
+// ---------------------------------------------------------------------------
+
+function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const externalUpdateRef = useRef(false);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const state = EditorState.create({
+      doc: value,
+      extensions: [
+        basicSetup,
+        yamlLang(),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged && !externalUpdateRef.current) {
+            onChangeRef.current(update.state.doc.toString());
+          }
+        }),
+        EditorView.theme({
+          '&': { fontSize: '11px' },
+          '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
+          '.cm-content': { padding: '8px 0' },
+          '.cm-gutters': { borderRight: '1px solid var(--border)', background: 'transparent', color: 'var(--muted-foreground)', fontSize: '10px' },
+          '.cm-activeLineGutter': { background: 'transparent' },
+        }),
+      ],
+    });
+
+    const view = new EditorView({ state, parent: containerRef.current });
+    viewRef.current = view;
+    return () => { view.destroy(); viewRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync externally-driven value changes into the editor
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || view.state.doc.toString() === value) return;
+    externalUpdateRef.current = true;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
+    externalUpdateRef.current = false;
+  }, [value]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="rounded-lg border overflow-hidden [&_.cm-editor]:outline-none [&_.cm-editor.cm-focused]:outline-none"
+    />
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -69,9 +130,11 @@ export function WorkflowEditorCanvas({
   const [pendingInsertAfterId, setPendingInsertAfterId] = useState<string | null>(null);
   const addStepDropdownRef = useRef<HTMLDivElement>(null);
   const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
-  const [yamlEditMode, setYamlEditMode] = useState(false);
   const [yamlDraft, setYamlDraft] = useState('');
   const [yamlError, setYamlError] = useState<string | null>(null);
+  // Tracks the last value we pushed into yamlDraft from the diagram,
+  // so we can distinguish "user edits" from "diagram-driven updates".
+  const lastSyncedYamlRef = useRef('');
 
   const selectedStep = editedSteps.find((s) => s.id === selectedStepId) ?? null;
 
@@ -144,6 +207,20 @@ export function WorkflowEditorCanvas({
     if (!stepErrors || Object.keys(stepErrors).length === 0) return;
     setSelectedStepId(Object.keys(stepErrors)[0]);
   }, [stepErrors]);
+
+  // ── Sync yamlPreview → yamlDraft when diagram changes (not user edits) ───────
+  const yamlPreviewForSync = yamlStringify(
+    { ...(yamlFields ?? {}), steps: editedSteps, transitions: editedTransitions },
+    { indent: 2 },
+  );
+  useEffect(() => {
+    if (yamlDraft === lastSyncedYamlRef.current) {
+      setYamlDraft(yamlPreviewForSync);
+      lastSyncedYamlRef.current = yamlPreviewForSync;
+    }
+  // yamlDraft intentionally omitted — we only want to run this when the diagram changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yamlPreviewForSync]);
 
   // ── Close Add Step dropdown on outside click ───────────────────────────────
   useEffect(() => {
@@ -336,10 +413,7 @@ export function WorkflowEditorCanvas({
     transitions: editedTransitions,
   } as WorkflowDefinition;
 
-  const yamlPreview = yamlStringify(
-    { ...(yamlFields ?? {}), steps: editedSteps, transitions: editedTransitions },
-    { indent: 2 },
-  );
+
 
   const savePanel = renderSavePanel?.(editedSteps, editedTransitions, discardChanges) ?? null;
 
@@ -518,72 +592,67 @@ export function WorkflowEditorCanvas({
             </>
           ) : (
             <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">YAML</h2>
+              {/* Header */}
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-sm font-semibold">Workflow source code</h2>
+                <span className="group relative inline-flex items-center">
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40" />
+                  <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
+                    <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
+                    <p>You can author workflows three ways:</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                      <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
+                      <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
+                      <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
+                    </ul>
+                  </span>
+                </span>
+              </div>
+
+              {/* Code editor */}
+              <YamlCodeEditor
+                value={yamlDraft}
+                onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
+              />
+
+              {/* Save / error row */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => {
-                    if (yamlEditMode) {
-                      setYamlEditMode(false);
+                    try {
+                      const doc = yamlParse(yamlDraft) as Record<string, unknown>;
+                      const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
+                      if (!stepsResult.success) {
+                        setYamlError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
+                        return;
+                      }
+                      const transitionsResult = TransitionSchema.array().safeParse(
+                        Array.isArray(doc?.transitions) ? doc.transitions : [],
+                      );
+                      if (!transitionsResult.success) {
+                        setYamlError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
+                        return;
+                      }
+                      saveSnapshot();
+                      setEditedSteps(stepsResult.data);
+                      setEditedTransitions(transitionsResult.data);
+                      lastSyncedYamlRef.current = yamlDraft;
                       setYamlError(null);
-                    } else {
-                      setYamlDraft(yamlPreview);
-                      setYamlError(null);
-                      setYamlEditMode(true);
+                    } catch (err) {
+                      setYamlError(err instanceof Error ? err.message : 'Invalid YAML');
                     }
                   }}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors border rounded-md px-2 py-0.5"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                 >
-                  {yamlEditMode ? 'Cancel' : 'Edit YAML'}
+                  <Save className="h-3.5 w-3.5" />
+                  Save changes
                 </button>
+                {yamlError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
+                )}
               </div>
-              {yamlEditMode ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={yamlDraft}
-                    onChange={(e) => { setYamlDraft(e.target.value); setYamlError(null); }}
-                    rows={20}
-                    spellCheck={false}
-                    className="w-full text-[11px] font-mono bg-muted/30 rounded-lg p-4 border focus:outline-none focus:ring-1 focus:ring-primary resize-y leading-relaxed"
-                  />
-                  {yamlError && (
-                    <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
-                  )}
-                  <button
-                    onClick={() => {
-                      try {
-                        const doc = yamlParse(yamlDraft) as Record<string, unknown>;
-                        const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
-                        if (!stepsResult.success) {
-                          setYamlError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
-                          return;
-                        }
-                        const transitionsResult = TransitionSchema.array().safeParse(
-                          Array.isArray(doc?.transitions) ? doc.transitions : [],
-                        );
-                        if (!transitionsResult.success) {
-                          setYamlError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
-                          return;
-                        }
-                        saveSnapshot();
-                        setEditedSteps(stepsResult.data);
-                        setEditedTransitions(transitionsResult.data);
-                        setYamlEditMode(false);
-                        setYamlError(null);
-                      } catch (err) {
-                        setYamlError(err instanceof Error ? err.message : 'Invalid YAML');
-                      }
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    Apply YAML
-                  </button>
-                </div>
-              ) : (
-                <pre className="text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto overflow-y-auto leading-relaxed">
-                  {yamlPreview}
-                </pre>
-              )}
-              {!yamlEditMode && savePanel && (
+
+              {savePanel && (
                 <div className="border-t pt-4">
                   {savePanel}
                 </div>

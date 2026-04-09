@@ -236,6 +236,12 @@ export default function NewWorkflowPage() {
                   !versionTitle.trim() && workflowName && 'border-amber-300 dark:border-amber-700',
                 )}
               />
+              <span className="group relative inline-flex items-center">
+                <HelpCircle className="h-3 w-3 text-muted-foreground/40" />
+                <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
+                  Each saved revision gets a version number automatically. A version note helps you tell &quot;Added AI review&quot; from &quot;Tightened criteria&quot; at a glance.
+                </span>
+              </span>
             </div>
           </div>
 

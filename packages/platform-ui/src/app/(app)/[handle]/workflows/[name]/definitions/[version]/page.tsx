@@ -206,8 +206,8 @@ export default function WorkflowDefinitionVersionPage() {
                 )}
               />
               <span className="group relative inline-flex items-center">
-                <HelpCircle className="h-3 w-3 text-muted-foreground/40 cursor-help" />
-                <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-72 rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
+                <HelpCircle className="h-3 w-3 text-muted-foreground/40" />
+                <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
                   Each saved revision gets a version number automatically. A version note helps you tell &quot;Added AI review&quot; from &quot;Tightened criteria&quot; at a glance.
                 </span>
               </span>
