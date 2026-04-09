@@ -4,15 +4,19 @@ import React, { useMemo, useCallback } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   type Node,
   type Edge,
+  type EdgeProps,
   type NodeProps,
   Handle,
   Position,
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal, Users } from 'lucide-react';
+import { User, Bot, Terminal, Users, Trash2, Plus, PenLine, Search, GitBranch, Flag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 
@@ -53,6 +57,13 @@ const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: st
   },
 };
 
+const STEP_TYPE_CONFIG: Record<string, { icon: typeof PenLine; label: string; color: string }> = {
+  creation: { icon: PenLine,    label: 'Input',    color: 'text-blue-500 dark:text-blue-400' },
+  review:   { icon: Search,     label: 'Review',   color: 'text-amber-500 dark:text-amber-400' },
+  decision: { icon: GitBranch,  label: 'Decision', color: 'text-purple-500 dark:text-purple-400' },
+  terminal: { icon: Flag,       label: 'End',      color: 'text-emerald-500 dark:text-emerald-400' },
+};
+
 const EXECUTOR_STYLES: Record<string, { icon: typeof User; color: string; bg: string }> = {
   human: { icon: User, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
   agent: { icon: Bot, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30' },
@@ -76,7 +87,7 @@ type StepNodeData = {
 
 const NODE_WIDTH = 240;
 const NODE_INNER_HEIGHT = 72;
-const ROW_GAP = 48;
+const ROW_GAP = 58;
 
 const HANDLE_CLASS = '!bg-transparent !border-0 !w-px !h-px';
 
@@ -105,6 +116,8 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   const style = STEP_STYLES[data.stepType] ?? STEP_STYLES.creation;
   const exec = EXECUTOR_STYLES[data.executor] ?? EXECUTOR_STYLES.human;
   const Icon = exec.icon;
+  const typeConfig = STEP_TYPE_CONFIG[data.stepType] ?? STEP_TYPE_CONFIG.creation;
+  const TypeIcon = typeConfig.icon;
 
   return (
     <>
@@ -129,10 +142,10 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
         {data.onDelete && (
           <button
             onClick={(e) => { e.stopPropagation(); data.onDelete?.(); }}
-            className="absolute -top-2 -right-2 z-10 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none shadow hover:bg-red-600 transition-colors"
+            className="absolute top-2 right-2 z-10 hidden group-hover:flex h-5 w-5 items-center justify-center rounded text-red-500 hover:text-red-600 transition-colors bg-transparent"
             aria-label="Delete step"
           >
-            ×
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
         )}
         <div className="flex items-start gap-2.5">
@@ -144,6 +157,9 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
               {data.label}
             </p>
             <div className="flex items-center gap-1.5 mt-1">
+              <TypeIcon className={cn('h-3 w-3 shrink-0', typeConfig.color)} strokeWidth={1.5} />
+              <span className={cn('text-[10px] font-semibold', typeConfig.color)}>{typeConfig.label}</span>
+              <span className="text-[10px] text-muted-foreground/30">·</span>
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                 {{ human: 'Human', agent: 'Agent', script: 'Script', cowork: 'Cowork' }[data.executor] ?? data.executor}
               </span>
@@ -161,6 +177,69 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
 }
 
 const nodeTypes = { step: StepNode };
+
+// ---------------------------------------------------------------------------
+// Custom edge — forward edges with a mid-point "add step" button
+// ---------------------------------------------------------------------------
+
+type AddStepEdgeData = {
+  onAdd?: () => void;
+};
+
+function AddStepEdge({
+  id,
+  sourceX, sourceY, sourcePosition,
+  targetX, targetY, targetPosition,
+  style, markerEnd,
+  label, labelStyle, labelBgStyle, labelBgPadding, labelBgBorderRadius,
+  data,
+}: EdgeProps & { data?: AddStepEdgeData }) {
+  const [path, midX, midY] = getSmoothStepPath({
+    sourceX, sourceY, sourcePosition,
+    targetX, targetY, targetPosition,
+  });
+
+  // Position the button 40% along the source→target vector (10% closer to source than midpoint).
+  const buttonX = sourceX + 0.4 * (targetX - sourceX);
+  const buttonY = sourceY + 0.4 * (targetY - sourceY);
+
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={path}
+        style={style}
+        markerEnd={markerEnd}
+        label={label}
+        labelX={midX}
+        labelY={midY}
+        labelStyle={labelStyle}
+        labelBgStyle={labelBgStyle}
+        labelBgPadding={labelBgPadding}
+        labelBgBorderRadius={labelBgBorderRadius}
+        labelShowBg={true}
+      />
+      {data?.onAdd && (
+        <EdgeLabelRenderer>
+          <button
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${buttonX}px, ${buttonY}px)`,
+              pointerEvents: 'all',
+            }}
+            className="nodrag nopan h-5 w-5 flex items-center justify-center rounded-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-400 hover:text-primary hover:border-primary transition-colors shadow-sm"
+            onClick={(e) => { e.stopPropagation(); data.onAdd?.(); }}
+            aria-label="Add step here"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
+const edgeTypes = { addStep: AddStepEdge };
 
 // ---------------------------------------------------------------------------
 // Layout engine — top-down, even spacing
@@ -320,12 +399,13 @@ interface WorkflowDiagramProps {
   style?: React.CSSProperties;
   onNodeClick?: (stepId: string) => void;
   onNodeDelete?: (stepId: string) => void;
+  onEdgeAdd?: (fromStepId: string, toStepId: string) => void;
   onPaneClick?: () => void;
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onPaneClick, selectedStepId, errorStepIds }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onEdgeAdd, onPaneClick, selectedStepId, errorStepIds }: WorkflowDiagramProps) {
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition),
     [definition],
@@ -341,8 +421,19 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         onDelete: onNodeDelete && n.data.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
       },
     }));
-    return { nodes: styledNodes, edges: layoutEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, onNodeDelete]);
+    const styledEdges: Edge[] = layoutEdges.map((e) => {
+      const isForward = e.sourceHandle !== 'right-out';
+      if (isForward && onEdgeAdd) {
+        return {
+          ...e,
+          type: 'addStep',
+          data: { onAdd: () => onEdgeAdd(e.source, e.target) } satisfies AddStepEdgeData,
+        };
+      }
+      return e;
+    });
+    return { nodes: styledNodes, edges: styledEdges };
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, onNodeDelete, onEdgeAdd]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {
@@ -361,6 +452,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={true}

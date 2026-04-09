@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X, PenLine, Search, GitBranch, Flag } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
@@ -65,6 +65,9 @@ export function WorkflowEditorCanvas({
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [addingStep, setAddingStep] = useState(false);
   const [pendingStepType, setPendingStepType] = useState<WorkflowStep['type'] | null>(null);
+  // When adding via an edge + button, we insert after this step id without changing selectedStepId.
+  const [pendingInsertAfterId, setPendingInsertAfterId] = useState<string | null>(null);
+  const addStepDropdownRef = useRef<HTMLDivElement>(null);
   const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
   const [yamlEditMode, setYamlEditMode] = useState(false);
   const [yamlDraft, setYamlDraft] = useState('');
@@ -142,6 +145,20 @@ export function WorkflowEditorCanvas({
     setSelectedStepId(Object.keys(stepErrors)[0]);
   }, [stepErrors]);
 
+  // ── Close Add Step dropdown on outside click ───────────────────────────────
+  useEffect(() => {
+    if (!addingStep) return;
+    const handler = (e: MouseEvent) => {
+      if (!addStepDropdownRef.current?.contains(e.target as Node)) {
+        setAddingStep(false);
+        setPendingStepType(null);
+        setPendingInsertAfterId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [addingStep]);
+
   // ── Mutations ──────────────────────────────────────────────────────────────
   const updateStep = useCallback((stepId: string, patch: Partial<WorkflowStep>) => {
     setEditedSteps((prev) =>
@@ -191,25 +208,29 @@ export function WorkflowEditorCanvas({
       ...(executor === 'cowork' ? { cowork: { agent: 'chat' as const } } : {}),
     };
 
+    // pendingInsertAfterId is set when adding via an edge + button — use it
+    // in preference to selectedStepId so the right panel stays unchanged.
+    const insertAfterId = pendingInsertAfterId ?? selectedStepId;
+
     if (!terminalStep || type === 'terminal') {
       // No terminal yet (or we're adding the terminal itself): append at end
       const lastId = editedSteps[editedSteps.length - 1]?.id;
       setEditedSteps((prev) => [...prev, newStep]);
       setEditedTransitions((prev) => lastId ? [...prev, { from: lastId, to: newId }] : prev);
-    } else if (selectedStepId && selectedStepId !== terminalStep.id) {
-      // Insert after the currently selected step
-      const selectedIdx = editedSteps.findIndex((s) => s.id === selectedStepId);
+    } else if (insertAfterId && insertAfterId !== terminalStep.id) {
+      // Insert after the target step
+      const insertIdx = editedSteps.findIndex((s) => s.id === insertAfterId);
       setEditedSteps((prev) => {
         const next = [...prev];
-        next.splice(selectedIdx + 1, 0, newStep);
+        next.splice(insertIdx + 1, 0, newStep);
         return next;
       });
       setEditedTransitions((prev) => {
-        // Edges from selectedStep → their targets now go through newStep
-        const outgoing = prev.filter((t) => t.from === selectedStepId);
-        const others = prev.filter((t) => t.from !== selectedStepId);
+        // Edges from insertAfterId → their targets now go through newStep
+        const outgoing = prev.filter((t) => t.from === insertAfterId);
+        const others = prev.filter((t) => t.from !== insertAfterId);
         const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
-        return [...others, { from: selectedStepId, to: newId }, ...rewired];
+        return [...others, { from: insertAfterId, to: newId }, ...rewired];
       });
     } else {
       // No step selected: insert immediately before the terminal step
@@ -228,10 +249,15 @@ export function WorkflowEditorCanvas({
       });
     }
 
-    setSelectedStepId(newId);
+    // Only auto-select the new step when not inserting via an edge button
+    // (edge button should leave the right panel unchanged).
+    if (pendingInsertAfterId === null) {
+      setSelectedStepId(newId);
+    }
+    setPendingInsertAfterId(null);
     setAddingStep(false);
     setPendingStepType(null);
-  }, [editedSteps, selectedStepId, saveSnapshot]);
+  }, [editedSteps, selectedStepId, pendingInsertAfterId, saveSnapshot]);
 
   const removeStep = useCallback((stepId: string) => {
     saveSnapshot();
@@ -325,9 +351,9 @@ export function WorkflowEditorCanvas({
         {/* Toolbar */}
         <div className="border-b px-4 py-2 flex items-center gap-1.5 bg-muted/30 shrink-0 flex-wrap">
           {/* Add Step */}
-          <div className="relative">
+          <div className="relative" ref={addStepDropdownRef}>
             <button
-              onClick={() => { setAddingStep(!addingStep); setPendingStepType(null); }}
+              onClick={() => { setAddingStep(!addingStep); setPendingStepType(null); setPendingInsertAfterId(null); }}
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               + Add Step
@@ -338,10 +364,10 @@ export function WorkflowEditorCanvas({
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
                   <div className="flex flex-col gap-1">
                     {([
-                      { type: 'creation', label: 'Input', description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400', activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
-                      { type: 'review', label: 'Review', description: 'A step where someone evaluates work and gives a verdict such as approve or reject.', color: 'text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-50 dark:bg-amber-900/30 ring-1 ring-amber-400' },
-                      { type: 'decision', label: 'Decision', description: 'A branching step that routes the workflow to different paths based on a condition.', color: 'text-purple-600 dark:text-purple-400', activeBg: 'bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-400' },
-                      { type: 'terminal', label: 'End', description: 'Marks the final state of the workflow — all paths must lead here.', color: 'text-emerald-600 dark:text-emerald-400', activeBg: '' },
+                      { type: 'creation', icon: PenLine,   label: 'Input',    description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400',   activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
+                      { type: 'review',   icon: Search,     label: 'Review',   description: 'A step where someone evaluates work and gives a verdict such as approve or reject.', color: 'text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-50 dark:bg-amber-900/30 ring-1 ring-amber-400' },
+                      { type: 'decision', icon: GitBranch,  label: 'Decision', description: 'A branching step that routes the workflow to different paths based on a condition.', color: 'text-purple-600 dark:text-purple-400', activeBg: 'bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-400' },
+                      { type: 'terminal', icon: Flag,       label: 'End',      description: 'Marks the final state of the workflow — all paths must lead here.',                 color: 'text-emerald-600 dark:text-emerald-400', activeBg: '' },
                     ] as const).map((opt) => {
                       const isTerminalDisabled = opt.type === 'terminal' && editedSteps.some((s) => s.type === 'terminal');
                       const isActive = pendingStepType === opt.type;
@@ -362,7 +388,10 @@ export function WorkflowEditorCanvas({
                                 : 'hover:bg-muted',
                           )}
                         >
-                          <span className={cn('text-xs font-semibold', opt.color)}>{opt.label}</span>
+                          <div className="flex items-center gap-1.5">
+                            <opt.icon className={cn('h-3.5 w-3.5 shrink-0', opt.color)} strokeWidth={1.5} />
+                            <span className={cn('text-xs font-semibold', opt.color)}>{opt.label}</span>
+                          </div>
                           <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{opt.description}</p>
                         </button>
                       );
@@ -457,6 +486,7 @@ export function WorkflowEditorCanvas({
             className="border-0"
             onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
             onNodeDelete={removeStep}
+            onEdgeAdd={(fromStepId) => { setPendingInsertAfterId(fromStepId); setAddingStep(true); }}
             onPaneClick={() => setSelectedStepId(null)}
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
