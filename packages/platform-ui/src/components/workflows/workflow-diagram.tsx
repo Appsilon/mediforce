@@ -16,7 +16,7 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal, Users, Trash2, Plus, PenLine, Search, GitBranch, Flag } from 'lucide-react';
+import { User, Bot, Terminal, Users, Trash2, Plus, PenLine, Search, GitBranch, Flag, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 
@@ -83,10 +83,12 @@ type StepNodeData = {
   plugin?: string;
   hasError?: boolean;
   onDelete?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 };
 
 const NODE_WIDTH = 240;
-const NODE_INNER_HEIGHT = 72;
+const NODE_INNER_HEIGHT = 85;
 const ROW_GAP = 58;
 
 const HANDLE_CLASS = '!bg-transparent !border-0 !w-px !h-px';
@@ -139,14 +141,44 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
               : style.border,
         )}
       >
-        {data.onDelete && (
-          <button
-            onClick={(e) => { e.stopPropagation(); data.onDelete?.(); }}
-            className="absolute top-2 right-2 z-10 hidden group-hover:flex h-5 w-5 items-center justify-center rounded text-red-500 hover:text-red-600 transition-colors bg-transparent"
-            aria-label="Delete step"
-          >
-            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-          </button>
+        {(data.onMoveUp || data.onMoveDown || data.onDelete) && (
+          <div className="absolute top-2.5 right-2.5 z-10 hidden group-hover:flex flex-col gap-0.5">
+            {data.onDelete && (
+              <button
+                onClick={(e) => { e.stopPropagation(); data.onDelete?.(); }}
+                className="h-5 w-5 flex items-center justify-center rounded text-red-400 hover:text-red-600 transition-colors bg-transparent"
+                aria-label="Delete step"
+              >
+                <Trash2 className="h-3 w-3" strokeWidth={1.5} />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); data.onMoveUp?.(); }}
+              disabled={!data.onMoveUp}
+              className={cn(
+                'h-5 w-5 flex items-center justify-center rounded transition-colors bg-transparent',
+                data.onMoveUp
+                  ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  : 'text-muted-foreground/20 cursor-not-allowed',
+              )}
+              aria-label="Move step up"
+            >
+              <ArrowUp className="h-3 w-3" strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); data.onMoveDown?.(); }}
+              disabled={!data.onMoveDown}
+              className={cn(
+                'h-5 w-5 flex items-center justify-center rounded transition-colors bg-transparent',
+                data.onMoveDown
+                  ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  : 'text-muted-foreground/20 cursor-not-allowed',
+              )}
+              aria-label="Move step down"
+            >
+              <ArrowDown className="h-3 w-3" strokeWidth={1.5} />
+            </button>
+          </div>
         )}
         <div className="flex items-start gap-2.5">
           <div className={cn('rounded-lg p-1.5 mt-0.5', exec.bg)}>
@@ -399,13 +431,17 @@ interface WorkflowDiagramProps {
   style?: React.CSSProperties;
   onNodeClick?: (stepId: string) => void;
   onNodeDelete?: (stepId: string) => void;
+  onNodeMoveUp?: (stepId: string) => void;
+  onNodeMoveDown?: (stepId: string) => void;
   onEdgeAdd?: (fromStepId: string, toStepId: string) => void;
   onPaneClick?: () => void;
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
+  canMoveUp?: Set<string>;
+  canMoveDown?: Set<string>;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onEdgeAdd, onPaneClick, selectedStepId, errorStepIds }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, onPaneClick, selectedStepId, errorStepIds, canMoveUp, canMoveDown }: WorkflowDiagramProps) {
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition),
     [definition],
@@ -419,6 +455,8 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         ...n.data,
         hasError: errorStepIds?.has(n.id) ?? false,
         onDelete: onNodeDelete && n.data.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
+        onMoveUp: onNodeMoveUp && canMoveUp?.has(n.id) ? () => onNodeMoveUp(n.id) : undefined,
+        onMoveDown: onNodeMoveDown && canMoveDown?.has(n.id) ? () => onNodeMoveDown(n.id) : undefined,
       },
     }));
     const styledEdges: Edge[] = layoutEdges.map((e) => {
@@ -433,7 +471,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
       return e;
     });
     return { nodes: styledNodes, edges: styledEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, onNodeDelete, onEdgeAdd]);
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, canMoveUp, canMoveDown]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {

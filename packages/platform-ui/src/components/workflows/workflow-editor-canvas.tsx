@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, PenLine, Search, GitBranch, Flag, HelpCircle, Save, Plus, ArrowUp, ArrowDown, Undo2, Trash2 } from 'lucide-react';
+import { X, PenLine, Search, GitBranch, Flag, HelpCircle, Save, Plus, Undo2, Redo2 } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -130,6 +130,7 @@ export function WorkflowEditorCanvas({
   const [pendingInsertAfterId, setPendingInsertAfterId] = useState<string | null>(null);
   const addStepDropdownRef = useRef<HTMLDivElement>(null);
   const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
+  const [redoHistory, setRedoHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
   const [yamlDraft, setYamlDraft] = useState('');
   const [yamlError, setYamlError] = useState<string | null>(null);
   // Tracks the last value we pushed into yamlDraft from the diagram,
@@ -138,21 +139,23 @@ export function WorkflowEditorCanvas({
 
   const selectedStep = editedSteps.find((s) => s.id === selectedStepId) ?? null;
 
-  // ── Move eligibility ───────────────────────────────────────────────────────
-  const canMoveSelectedUp = (() => {
-    if (!selectedStepId) return false;
-    const incoming = editedTransitions.filter((t) => t.to === selectedStepId);
-    if (incoming.length !== 1) return false;
-    const pred = incoming[0].from;
-    return editedTransitions.filter((t) => t.from === pred).length === 1;
-  })();
-
-  const canMoveSelectedDown = (() => {
-    if (!selectedStepId) return false;
-    const outgoing = editedTransitions.filter((t) => t.from === selectedStepId);
-    if (outgoing.length !== 1) return false;
-    const succ = outgoing[0].to;
-    return editedTransitions.filter((t) => t.to === succ).length === 1;
+  // ── Move eligibility (all steps, used by diagram hover buttons and toolbar) ─
+  const { canMoveUpSet, canMoveDownSet } = (() => {
+    const up = new Set<string>();
+    const down = new Set<string>();
+    for (const step of editedSteps) {
+      const incoming = editedTransitions.filter((t) => t.to === step.id);
+      if (incoming.length === 1) {
+        const pred = incoming[0].from;
+        if (editedTransitions.filter((t) => t.from === pred).length === 1) up.add(step.id);
+      }
+      const outgoing = editedTransitions.filter((t) => t.from === step.id);
+      if (outgoing.length === 1) {
+        const succ = outgoing[0].to;
+        if (editedTransitions.filter((t) => t.to === succ).length === 1) down.add(step.id);
+      }
+    }
+    return { canMoveUpSet: up, canMoveDownSet: down };
   })();
 
   // ── History ────────────────────────────────────────────────────────────────
@@ -166,12 +169,25 @@ export function WorkflowEditorCanvas({
 
   const saveSnapshot = useCallback(() => {
     setEditHistory((prev) => [...prev, { steps: editedStepsRef.current, transitions: editedTransitionsRef.current }]);
+    setRedoHistory([]);
   }, []);
 
   const undoEdit = useCallback(() => {
     setEditHistory((prev) => {
       if (prev.length === 0) return prev;
       const snapshot = prev[prev.length - 1];
+      setRedoHistory((r) => [...r, { steps: editedStepsRef.current, transitions: editedTransitionsRef.current }]);
+      setEditedSteps(snapshot.steps);
+      setEditedTransitions(snapshot.transitions);
+      return prev.slice(0, -1);
+    });
+  }, []);
+
+  const redoEdit = useCallback(() => {
+    setRedoHistory((prev) => {
+      if (prev.length === 0) return prev;
+      const snapshot = prev[prev.length - 1];
+      setEditHistory((h) => [...h, { steps: editedStepsRef.current, transitions: editedTransitionsRef.current }]);
       setEditedSteps(snapshot.steps);
       setEditedTransitions(snapshot.transitions);
       return prev.slice(0, -1);
@@ -182,20 +198,24 @@ export function WorkflowEditorCanvas({
     setEditedSteps(structuredClone(initialSteps));
     setEditedTransitions(structuredClone(initialTransitions));
     setEditHistory([]);
+    setRedoHistory([]);
     setSelectedStepId(null);
   }, [initialSteps, initialTransitions]);
 
-  // ── Ctrl+Z ─────────────────────────────────────────────────────────────────
+  // ── Ctrl+Z / Ctrl+Shift+Z ──────────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         undoEdit();
+      } else if (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        redoEdit();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [undoEdit]);
+  }, [undoEdit, redoEdit]);
 
   // ── Notify parent of changes ───────────────────────────────────────────────
   useEffect(() => {
@@ -524,32 +544,6 @@ export function WorkflowEditorCanvas({
           <div className="w-px h-4 bg-border mx-0.5" />
 
           <button
-            onClick={() => selectedStepId && moveStep(selectedStepId, 'up')}
-            disabled={!canMoveSelectedUp}
-            title="Move selected step up"
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-              canMoveSelectedUp ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
-            )}
-          >
-            <ArrowUp className="h-3.5 w-3.5" />
-            Move Up
-          </button>
-
-          <button
-            onClick={() => selectedStepId && moveStep(selectedStepId, 'down')}
-            disabled={!canMoveSelectedDown}
-            title="Move selected step down"
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-              canMoveSelectedDown ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
-            )}
-          >
-            <ArrowDown className="h-3.5 w-3.5" />
-            Move Down
-          </button>
-
-          <button
             onClick={undoEdit}
             disabled={editHistory.length === 0}
             title="Undo last change (Ctrl+Z)"
@@ -562,57 +556,50 @@ export function WorkflowEditorCanvas({
             Undo
           </button>
 
-          <div className="w-px h-4 bg-border mx-0.5" />
-
           <button
-            onClick={() => selectedStepId && removeStep(selectedStepId)}
-            disabled={!selectedStepId}
-            title="Remove selected step"
+            onClick={redoEdit}
+            disabled={redoHistory.length === 0}
+            title="Redo last change (Ctrl+Shift+Z)"
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-              selectedStepId
-                ? 'hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-foreground dark:hover:bg-red-900/20 dark:hover:text-red-400'
-                : 'opacity-40 cursor-not-allowed text-muted-foreground',
+              redoHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
             )}
           >
-            <Trash2 className="h-3.5 w-3.5" />
-            Remove Step
+            <Redo2 className="h-3.5 w-3.5" />
+            Redo
           </button>
 
-          {/* Right section: YAML title + save */}
-          <div className="ml-auto flex items-center gap-2">
-            {selectedStepId && (
-              <span className="text-xs text-muted-foreground mr-2">
-                Selected: <span className="font-mono">{selectedStepId}</span>
-              </span>
-            )}
-            <div className="w-px h-4 bg-border" />
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold">Workflow source code</span>
-              <span className="group relative inline-flex items-center">
-                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40" />
-                <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
-                  <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
-                  <p>You can author workflows three ways:</p>
-                  <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                    <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
-                    <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
-                    <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
-                  </ul>
+          {/* Right section: YAML title + save (hidden when a step is selected) */}
+          {!selectedStepId && (
+            <div className="ml-auto flex items-center gap-2">
+              <div className="w-px h-4 bg-border" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-semibold">Workflow source code</span>
+                <span className="group relative inline-flex items-center">
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40" />
+                  <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
+                    <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
+                    <p>You can author workflows three ways:</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                      <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
+                      <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
+                      <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
+                    </ul>
+                  </span>
                 </span>
-              </span>
+              </div>
+              {yamlError && (
+                <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
+              )}
+              <button
+                onClick={applyYaml}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <Save className="h-3.5 w-3.5" />
+                Save YAML
+              </button>
             </div>
-            {yamlError && (
-              <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
-            )}
-            <button
-              onClick={applyYaml}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <Save className="h-3.5 w-3.5" />
-              Save changes
-            </button>
-          </div>
+          )}
         </div>{/* end unified toolbar */}
 
         {/* ── Two-column content area ── */}
@@ -625,10 +612,14 @@ export function WorkflowEditorCanvas({
               className="border-0"
               onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
               onNodeDelete={removeStep}
+              onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
+              onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
               onEdgeAdd={(fromStepId) => { setPendingInsertAfterId(fromStepId); setAddingStep(true); }}
               onPaneClick={() => setSelectedStepId(null)}
               selectedStepId={selectedStepId}
               errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
+              canMoveUp={canMoveUpSet}
+              canMoveDown={canMoveDownSet}
             />
           </div>
 
