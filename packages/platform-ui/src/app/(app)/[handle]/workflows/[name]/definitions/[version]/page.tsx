@@ -188,18 +188,19 @@ export default function WorkflowDefinitionVersionPage() {
             <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground/60 flex-wrap">
               {definition.namespace && (
                 <>
-                  <span className="font-mono">@{definition.namespace}</span>
+                  <span className="shrink-0">Namespace:</span>
+                  <span className="font-mono">{definition.namespace}</span>
                   <span>·</span>
                 </>
               )}
               <span className="font-mono">v{definition.version}</span>
               <span>·</span>
-              <span className="shrink-0">Version note:</span>
+              <span className="shrink-0">Version title:</span>
               <input
                 value={editedTitle}
                 onChange={(e) => setEditedTitle(e.target.value)}
                 placeholder="describe this revision…"
-                title={!editedTitle.trim() ? 'Enter a version note to save' : undefined}
+                title={!editedTitle.trim() ? 'Enter a version title to save' : undefined}
                 className={cn(
                   'bg-transparent border-b border-transparent hover:border-muted-foreground/30 focus:border-primary outline-none text-xs placeholder:text-muted-foreground/40 placeholder:italic px-0 py-px w-52',
                   !editedTitle.trim() && 'border-amber-300 dark:border-amber-700',

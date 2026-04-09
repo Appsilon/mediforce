@@ -593,20 +593,57 @@ export function WorkflowEditorCanvas({
           ) : (
             <>
               {/* Header */}
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-semibold">Workflow source code</h2>
-                <span className="group relative inline-flex items-center">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40" />
-                  <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
-                    <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
-                    <p>You can author workflows three ways:</p>
-                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                      <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
-                      <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
-                      <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
-                    </ul>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-sm font-semibold">Workflow source code</h2>
+                  <span className="group relative inline-flex items-center">
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40" />
+                    <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
+                      <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
+                      <p>You can author workflows three ways:</p>
+                      <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                        <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
+                        <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
+                        <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
+                      </ul>
+                    </span>
                   </span>
-                </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {yamlError && (
+                    <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
+                  )}
+                  <button
+                    onClick={() => {
+                      try {
+                        const doc = yamlParse(yamlDraft) as Record<string, unknown>;
+                        const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
+                        if (!stepsResult.success) {
+                          setYamlError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
+                          return;
+                        }
+                        const transitionsResult = TransitionSchema.array().safeParse(
+                          Array.isArray(doc?.transitions) ? doc.transitions : [],
+                        );
+                        if (!transitionsResult.success) {
+                          setYamlError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
+                          return;
+                        }
+                        saveSnapshot();
+                        setEditedSteps(stepsResult.data);
+                        setEditedTransitions(transitionsResult.data);
+                        lastSyncedYamlRef.current = yamlDraft;
+                        setYamlError(null);
+                      } catch (err) {
+                        setYamlError(err instanceof Error ? err.message : 'Invalid YAML');
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    Save changes
+                  </button>
+                </div>
               </div>
 
               {/* Code editor */}
@@ -614,43 +651,6 @@ export function WorkflowEditorCanvas({
                 value={yamlDraft}
                 onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
               />
-
-              {/* Save / error row */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => {
-                    try {
-                      const doc = yamlParse(yamlDraft) as Record<string, unknown>;
-                      const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
-                      if (!stepsResult.success) {
-                        setYamlError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
-                        return;
-                      }
-                      const transitionsResult = TransitionSchema.array().safeParse(
-                        Array.isArray(doc?.transitions) ? doc.transitions : [],
-                      );
-                      if (!transitionsResult.success) {
-                        setYamlError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
-                        return;
-                      }
-                      saveSnapshot();
-                      setEditedSteps(stepsResult.data);
-                      setEditedTransitions(transitionsResult.data);
-                      lastSyncedYamlRef.current = yamlDraft;
-                      setYamlError(null);
-                    } catch (err) {
-                      setYamlError(err instanceof Error ? err.message : 'Invalid YAML');
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  Save changes
-                </button>
-                {yamlError && (
-                  <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
-                )}
-              </div>
 
               {savePanel && (
                 <div className="border-t pt-4">

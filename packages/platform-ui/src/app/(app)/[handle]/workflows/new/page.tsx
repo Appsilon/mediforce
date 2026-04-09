@@ -204,12 +204,12 @@ export default function NewWorkflowPage() {
             />
             {/* Secondary metadata row */}
             <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground/60 flex-wrap">
-              <span>@</span>
+              <span className="shrink-0">Namespace:</span>
               <select
                 value={effectiveNamespace}
                 onChange={(e) => setNamespace(e.target.value)}
                 disabled={namespacesLoading || namespaces.length === 0}
-                className="bg-transparent border-0 text-xs text-muted-foreground/60 outline-none cursor-pointer hover:text-muted-foreground disabled:cursor-not-allowed -ml-1 py-0 max-w-[160px]"
+                className="bg-transparent border-0 text-xs text-muted-foreground/60 outline-none cursor-pointer hover:text-muted-foreground disabled:cursor-not-allowed py-0 max-w-[160px]"
               >
                 {namespacesLoading ? (
                   <option value="">Loading…</option>
@@ -226,7 +226,7 @@ export default function NewWorkflowPage() {
                 </>
               )}
               <span>·</span>
-              <span className="shrink-0">v1 ·</span>
+              <span className="shrink-0">v1 · Version title:</span>
               <input
                 value={versionTitle}
                 onChange={(e) => setVersionTitle(e.target.value)}
@@ -263,7 +263,7 @@ export default function NewWorkflowPage() {
               title={
                 !toWorkflowId(workflowName) ? 'Enter a workflow name to publish' :
                 !description.trim() ? 'Add a description to publish' :
-                !versionTitle.trim() ? 'Enter a version note to publish' :
+                !versionTitle.trim() ? 'Enter a version title to publish' :
                 undefined
               }
               className={cn(
