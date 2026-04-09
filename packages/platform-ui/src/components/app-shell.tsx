@@ -113,6 +113,13 @@ function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Cru
   return [{ label: 'Workflows', href: null }];
 }
 
+function ImgWithFallback({ src, className, fallback }: { src: string; className: string; fallback: React.ReactNode }) {
+  const [errored, setErrored] = React.useState(false);
+  if (errored) return <>{fallback}</>;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" className={className} onError={() => setErrored(true)} />;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { firebaseUser, signOut } = useAuth();
@@ -153,11 +160,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               {(() => {
                 const avatarSrc = activeNamespace?.avatarUrl ?? (activeNamespace?.type === 'personal' ? firebaseUser?.photoURL : undefined) ?? undefined;
-                if (avatarSrc) {
-                  // eslint-disable-next-line @next/next/no-img-element
-                  return <img src={avatarSrc} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />;
-                }
-                return (
+                const avatarFallback = (
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
                     {activeNamespace !== null && activeNamespace.type === 'organization' ? (
                       <Building2 className="h-3.5 w-3.5" />
@@ -172,6 +175,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     )}
                   </div>
                 );
+                if (avatarSrc) {
+                  return <ImgWithFallback src={avatarSrc} className="h-7 w-7 shrink-0 rounded-md object-cover" fallback={avatarFallback} />;
+                }
+                return avatarFallback;
               })()}
               <span className="flex-1 truncate text-left text-sm font-medium">
                 {activeDisplayName}
@@ -198,8 +205,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         )}
                       >
                         {firebaseUser?.photoURL ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={firebaseUser.photoURL} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                          <ImgWithFallback src={firebaseUser.photoURL} className="h-5 w-5 shrink-0 rounded-full object-cover" fallback={<User className="h-4 w-4 shrink-0" />} />
                         ) : (
                           <User className="h-4 w-4 shrink-0" />
                         )}
@@ -225,8 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         )}
                       >
                         {ns.avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={ns.avatarUrl} alt="" className="h-5 w-5 shrink-0 rounded object-cover" />
+                          <ImgWithFallback src={ns.avatarUrl} className="h-5 w-5 shrink-0 rounded object-cover" fallback={<Building2 className="h-4 w-4 shrink-0" />} />
                         ) : (
                           <Building2 className="h-4 w-4 shrink-0" />
                         )}
