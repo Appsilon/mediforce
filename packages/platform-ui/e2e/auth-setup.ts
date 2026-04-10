@@ -39,6 +39,14 @@ setup('authenticate and seed data', async ({ page }) => {
   await page.fill('input[name="email"]', TEST_EMAIL);
   await page.fill('input[name="password"]', TEST_PASSWORD);
   await page.click('button[type="submit"]');
+  // Wait for the button to show "Signing in…" then for navigation
+  // The sign-in triggers onAuthStateChanged which updates React state
+  // and the useEffect in test-login navigates to /redirect
+  await page.waitForFunction(
+    () => !window.location.pathname.includes('test-login') && !window.location.pathname.includes('login'),
+    { timeout: 15_000 },
+  );
+  // Now wait for the redirect page to resolve to the org handle
   await page.waitForURL(`**/${TEST_ORG_HANDLE}`, { timeout: 30_000 });
 
   // 5. Save auth state for reuse by authenticated tests

@@ -9,6 +9,7 @@ import {
   RepoSchema,
 } from './process-definition.js';
 import { ProcessNotificationConfigSchema } from './process-config.js';
+import { McpServerConfigSchema } from './mcp-server-config.js';
 
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
@@ -28,6 +29,9 @@ export const WorkflowAgentConfigSchema = z.object({
   repoAuth: z.string().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
+  /** MCP servers available to this agent step. Each entry defines a server
+   *  the agent can connect to during execution (stdio transport). */
+  mcpServers: z.array(McpServerConfigSchema).optional(),
 });
 
 export const CoworkChatConfigSchema = z.object({

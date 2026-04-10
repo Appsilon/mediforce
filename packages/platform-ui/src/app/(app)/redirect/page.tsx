@@ -18,7 +18,7 @@ export default function RedirectPage() {
       ? localStorage.getItem('lastNamespace')
       : null;
 
-    if (lastNamespace !== null && lastNamespace !== '') {
+    if (lastNamespace !== null && lastNamespace !== '' && lastNamespace !== 'redirect') {
       router.replace(`/${lastNamespace}`);
       return;
     }

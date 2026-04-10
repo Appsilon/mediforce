@@ -33,6 +33,10 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Cowork Chat Session](#cowork-chat-session) — real-time conversation workspace with artifact panel
 - [Cowork Finalize Flow](#cowork-finalize-flow) — locking the artifact and advancing the workflow
 
+**Tools** — MCP server catalog with per-step access control
+- [Tool Catalog](#tool-catalog) — browsing, searching, and inspecting MCP tools
+
+
 **Agents** — AI agent catalog and execution oversight
 - [Agent Catalog & History](#agent-catalog--history) — discovering agents and reviewing their past runs
 - [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
@@ -181,6 +185,18 @@ When all required fields are present, the user clicks "Finalize Artifact" to loc
 ![cowork-finalize-flow](cowork-finalize-flow.gif)
 
 ---
+
+
+## Tools
+
+### Tool Catalog
+
+Organization-level MCP server catalog with three-layer access control. Browse tools by category (Development, Data Access, Clinical Data, etc.), search by name, and inspect tool details including connection info, required secrets, and per-tool allowlists. Each tool shows which operations are available vs restricted — workflow authors assign tools to specific steps, and agents only see tools explicitly granted to their step.
+
+![tool-catalog](tool-catalog.gif)
+
+---
+
 
 ## Agents
 
