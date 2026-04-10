@@ -1,5 +1,6 @@
 # Working directory for apps developer want to keep along the project but don't share publicly
 private-apps
+.worktreeinclude
 
 .planning
 .claude/worktrees/
