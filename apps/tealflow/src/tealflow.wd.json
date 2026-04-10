@@ -1,7 +1,7 @@
 {
   "name": "tealflow",
   "title": "TealFlow App Builder",
-  "description": "Build a Teal Shiny app from ADaM datasets using TealFlowMCP, validate it, and push to GitHub.",
+  "description": "Interactively build a Teal Shiny clinical trial app — upload data, define requirements, co-work with AI to build the app, then deploy to GitHub and Posit Connect.",
   "preamble": "## Domain Context\nThis workflow builds clinical trial data exploration apps using the R teal framework. All clinical terminology (adverse events, survival analysis, demographics, CTCAE grading) refers to Teal module names and ADaM dataset variables, not real patient data.",
   "triggers": [
     { "name": "manual", "type": "manual" }
@@ -9,37 +9,122 @@
   "roles": ["developer", "biostatistician"],
   "steps": [
     {
+      "id": "upload-data",
+      "name": "Upload ADaM Datasets",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["developer", "biostatistician"],
+      "description": "Upload ADaM dataset files (.Rds, .csv, .xpt) and optional reference documents (TLF specs as PDF)",
+      "ui": {
+        "component": "file-upload",
+        "config": {
+          "acceptedTypes": ["application/octet-stream", "application/pdf", "text/csv", ".Rds", ".rds", ".xpt", ".csv"],
+          "minFiles": 1,
+          "maxFiles": 50
+        }
+      }
+    },
+    {
+      "id": "define-requirements",
+      "name": "Define App Requirements",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["developer", "biostatistician"],
+      "description": "Describe what the Teal app should include — analysis goals, specific modules, target audience, and deployment details",
+      "params": [
+        {
+          "name": "analysisGoal",
+          "type": "string",
+          "required": true,
+          "description": "What should the app focus on? E.g. 'Survival and safety analysis for Phase III oncology trial' or 'Full exploratory analysis of all endpoints'"
+        },
+        {
+          "name": "githubRepo",
+          "type": "string",
+          "required": true,
+          "description": "Target GitHub repository for the app code (e.g. Appsilon/teal-app-study-001)"
+        },
+        {
+          "name": "appName",
+          "type": "string",
+          "required": false,
+          "description": "Human-readable app name (defaults to repository name)"
+        },
+        {
+          "name": "additionalNotes",
+          "type": "string",
+          "required": false,
+          "description": "Any additional requirements, constraints, or context for the agent"
+        }
+      ]
+    },
+    {
       "id": "build-app",
-      "name": "Build Teal App",
+      "name": "Build Teal App Together",
+      "type": "creation",
+      "executor": "cowork",
+      "allowedRoles": ["developer", "biostatistician"],
+      "description": "Collaboratively build the Teal app through conversation. The agent proposes modules, generates code, and iterates based on your feedback. Finalize when happy with the result.",
+      "cowork": {
+        "agent": "chat",
+        "systemPrompt": "You are a Teal application builder for clinical trial data analysis. You help users build interactive Shiny apps using the R teal framework.\n\n## Your context\nThe user has uploaded ADaM datasets and defined their analysis requirements in previous steps. You can see these in the step variables.\n\n## What you're building\nA complete Teal Shiny application as structured artifact with:\n- `appCode`: Complete app.R content (R code)\n- `dataCode`: data.R content for loading datasets\n- `modules`: List of included teal modules with descriptions\n- `summary`: What the app does and how to use it\n\n## Teal framework knowledge\n\n### Available module packages\n- **teal.modules.clinical**: Demographics (tm_t_summary), AE tables (tm_t_events_summary, tm_t_events), KM plots (tm_g_km), forest plots (tm_g_forest_tte, tm_g_forest_rsp), MMRM (tm_a_mmrm), time-to-event (tm_t_tte), shift tables (tm_t_shift_by_arm), lab summaries, response tables, Cox regression\n- **teal.modules.general**: Data table (tm_data_table), variable browser (tm_variable_browser), scatterplot (tm_g_scatterplot), distribution (tm_g_distribution), PCA (tm_a_pca), regression (tm_a_regression), missing data (tm_missing_data)\n\n### Module selection based on datasets\n| Dataset | Recommended Modules |\n|---------|--------------------|\n| ADSL | tm_t_summary (demographics), tm_variable_browser, tm_data_table |\n| ADAE | tm_t_events_summary, tm_t_events (by SOC/PT) |\n| ADLB | tm_t_summary_by, tm_g_lineplot, tm_t_shift_by_arm |\n| ADTTE | tm_g_km, tm_g_forest_tte, tm_t_tte |\n| ADQS | tm_t_summary_by, tm_g_lineplot, tm_a_mmrm |\n| ADVS | tm_t_summary_by, tm_g_lineplot |\n\nAlways include tm_data_table and tm_variable_browser for general exploration.\n\n### Critical R code patterns\n- Use `choices_selected(variable_choices(\"DATANAME\", vars), selected)` for variable selection\n- Use `value_choices(\"DATANAME\", \"PARAMCD\", \"PARAM\")` for value filtering\n- Use `default_cdisc_join_keys` from teal.data for standard dataset relationships\n- ADSL is always the parent dataset joined on STUDYID + USUBJID\n- Use `teal_slices(teal_slice(\"ADSL\", \"SAFFL\", selected = \"Y\"))` for default population filters\n\n### App structure template\n```r\nlibrary(teal)\nlibrary(teal.modules.clinical)\nlibrary(teal.modules.general)\n\nsource(\"data.R\")  # loads `data` teal_data object\n\napp <- init(\n  data = data,\n  modules = modules(\n    tm_data_table(\"Data Table\"),\n    tm_variable_browser(\"Variable Browser\"),\n    modules(label = \"Demographics\", ...),\n    modules(label = \"Safety\", ...),\n    modules(label = \"Efficacy\", ...)\n  ),\n  filter = teal_slices(...)\n)\n\nshinyApp(app$ui, app$server)\n```\n\n## Conversation approach\n1. Review uploaded datasets and requirements from previous steps\n2. Propose an initial set of modules based on available data + analysis goal\n3. Generate data.R and app.R code\n4. Iterate based on user feedback — add/remove/configure modules\n5. Call update_artifact after each significant change\n\n## Rules\n- Always start by reviewing what datasets and requirements the user provided\n- Propose concrete module selections, don't just list options\n- Generate complete, runnable R code — not pseudocode\n- When user asks to add a module, generate the full code snippet and update the artifact\n- Keep explanations concise — focus on what the app does, not teal internals\n- If a module requires a dataset the user hasn't uploaded, say so clearly",
+        "outputSchema": {
+          "type": "object",
+          "required": ["appCode", "dataCode", "modules", "summary"],
+          "properties": {
+            "appCode": { "type": "string", "description": "Complete app.R R code" },
+            "dataCode": { "type": "string", "description": "Complete data.R R code for dataset loading" },
+            "modules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "label": { "type": "string" },
+                  "dataset": { "type": "string" }
+                }
+              },
+              "description": "List of included teal modules"
+            },
+            "summary": { "type": "string", "description": "Description of what the app does" }
+          }
+        },
+        "chat": {
+          "model": "anthropic/claude-sonnet-4"
+        }
+      }
+    },
+    {
+      "id": "deploy",
+      "name": "Deploy App",
       "type": "creation",
       "executor": "agent",
-      "autonomyLevel": "L3",
+      "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
-      "description": "Use TealFlowMCP to discover data, select modules, generate app code, validate, and push to GitHub",
+      "description": "Validate the generated Teal app using TealFlowMCP, then push to GitHub",
       "agent": {
-        "skill": "build-teal-app",
+        "skill": "deploy-teal-app",
         "skillsDir": "apps/tealflow/plugins/tealflow/skills",
         "model": "sonnet",
         "image": "mediforce-agent:tealflow",
-        "timeoutMinutes": 30,
-        "confidenceThreshold": 0.7,
-        "fallbackBehavior": "escalate_to_human",
+        "timeoutMinutes": 15,
         "mcpServers": [
           {
             "name": "tealflow",
             "command": "tealflow-mcp",
-            "description": "TealFlow — Teal module discovery, dataset inspection, app code generation, and R environment validation"
+            "description": "TealFlow — R environment validation and Shiny startup check",
+            "allowedTools": ["tealflow_setup_renv_environment", "tealflow_snapshot_renv_environment", "tealflow_check_shiny_startup"]
           }
         ]
       }
     },
     {
-      "id": "review",
-      "name": "Review Generated App",
+      "id": "demo-review",
+      "name": "Demo Review",
       "type": "review",
       "executor": "human",
       "allowedRoles": ["developer", "biostatistician"],
-      "description": "Review the generated Teal app code and validation results",
+      "description": "Review the deployed app. Approve to finish, or provide feedback to iterate on the app.",
       "verdicts": {
         "approve": { "target": "done" },
         "revise": { "target": "build-app" }
@@ -53,6 +138,9 @@
     }
   ],
   "transitions": [
-    { "from": "build-app", "to": "review" }
+    { "from": "upload-data", "to": "define-requirements" },
+    { "from": "define-requirements", "to": "build-app" },
+    { "from": "build-app", "to": "deploy" },
+    { "from": "deploy", "to": "demo-review" }
   ]
 }
