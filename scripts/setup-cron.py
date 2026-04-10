@@ -17,6 +17,7 @@ import sys
 
 CRON_COMMENT = "mediforce-heartbeat"
 MEDIFORCE_DIR = "/opt/mediforce"
+HEARTBEAT_SCRIPT = f"{MEDIFORCE_DIR}/scripts/heartbeat.sh"
 DEFAULT_INTERVAL = 15
 
 
@@ -29,33 +30,21 @@ def ssh(host: str, command: str) -> subprocess.CompletedProcess:
 
 
 def install(host: str, interval: int) -> None:
-    # Read env vars from server
-    result = ssh(host, f"grep -E '^(PLATFORM_API_KEY|DOMAIN)=' {MEDIFORCE_DIR}/.env")
+    # Verify heartbeat script exists on server
+    result = ssh(host, f"test -x {HEARTBEAT_SCRIPT}")
     if result.returncode != 0:
-        print(f"ERROR: Cannot read .env on {host}: {result.stderr.strip()}")
+        print(f"ERROR: {HEARTBEAT_SCRIPT} not found or not executable on {host}")
+        print("  Run a deploy first so the repo is on the server.")
         sys.exit(1)
 
-    env = {}
-    for line in result.stdout.strip().splitlines():
-        key, _, value = line.partition("=")
-        env[key] = value.strip().strip('"').strip("'")
-
-    for key in ("PLATFORM_API_KEY", "DOMAIN"):
-        if key not in env:
-            print(f"ERROR: {key} not found in {MEDIFORCE_DIR}/.env on {host}")
+    # Verify .env has both required vars
+    for var in ("PLATFORM_API_KEY", "DOMAIN"):
+        result = ssh(host, f"grep -q '^{var}=' {MEDIFORCE_DIR}/.env")
+        if result.returncode != 0:
+            print(f"ERROR: {var} not found in {MEDIFORCE_DIR}/.env on {host}")
             sys.exit(1)
 
-    url = f"https://{env['DOMAIN']}/api/cron/heartbeat"
-    api_key = env["PLATFORM_API_KEY"]
-
-    cron_line = (
-        f"*/{interval} * * * * "
-        f'curl -sf -X POST "{url}" '
-        f'-H "X-Api-Key: {api_key}" '
-        f'-H "Content-Type: application/json" '
-        f">/dev/null 2>&1 "
-        f"# {CRON_COMMENT}"
-    )
+    cron_line = f"*/{interval} * * * * {HEARTBEAT_SCRIPT} # {CRON_COMMENT}"
 
     # Remove old entry if exists, then append new one
     install_cmd = (
@@ -69,12 +58,23 @@ def install(host: str, interval: int) -> None:
         sys.exit(1)
 
     print(f"Installed on {host}:")
-    print(f"  URL:      {url}")
+    print(f"  Script:   {HEARTBEAT_SCRIPT}")
     print(f"  Interval: every {interval} min")
 
-    # Verify
+    # Verify crontab was written
     result = ssh(host, f"crontab -l | grep '{CRON_COMMENT}'")
     print(f"  Crontab:  {result.stdout.strip()}")
+
+    # Smoke test: run the heartbeat script and check exit code + log output
+    print("\n  Smoke test...")
+    result = ssh(host, f"{HEARTBEAT_SCRIPT} && tail -1 {MEDIFORCE_DIR}/logs/heartbeat.log")
+    if result.returncode != 0:
+        print(f"  WARN: Heartbeat script failed: {result.stderr.strip()}")
+    else:
+        last_line = result.stdout.strip()
+        print(f"  Result:   {last_line}")
+        if "200" not in last_line:
+            print("  WARN: Expected HTTP 200 — check .env DOMAIN and PLATFORM_API_KEY")
 
 
 def remove(host: str) -> None:

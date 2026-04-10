@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight } from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
@@ -59,6 +59,60 @@ function NavItem({
   );
 }
 
+type Crumb = { label: string; href: string | null };
+
+function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Crumb[] {
+  const rest = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : pathname;
+  const segments = rest.split('/').filter(Boolean);
+  const [s0, s1, s2, s3, s4, s5] = segments;
+
+  const workflows: Crumb = { label: 'Workflows', href: prefix || '/' };
+
+  if (segments.length === 0) return [{ label: 'Workflows', href: null }];
+
+  if (s0 === 'runs') return [workflows, { label: 'All Runs', href: null }];
+  if (s0 === 'tasks') return [workflows, { label: 'Tasks', href: null }];
+  if (s0 === 'monitoring') return [workflows, { label: 'Monitoring', href: null }];
+  if (s0 === 'settings') return [workflows, { label: 'Settings', href: null }];
+  if (s0 === 'members') return [workflows, { label: 'Members', href: null }];
+  if (s0 === 'catalog') return [workflows, { label: 'Catalog', href: null }];
+
+  if (s0 === 'agents') {
+    const agents: Crumb = { label: 'Agents', href: `${prefix}/agents` };
+    if (!s1) return [{ ...agents, href: null }];
+    if (s1 === 'new') return [agents, { label: 'New Agent', href: null }];
+    if (s1 === 'definitions') return [agents, { label: 'Configure Agent', href: null }];
+    return [agents];
+  }
+
+  if (s0 === 'workflows') {
+    if (!s1 || s1 === 'new') return [workflows, { label: 'New Workflow', href: null }];
+
+    const workflowName = decodeURIComponent(s1);
+    const workflowHref = `${prefix}/workflows/${s1}`;
+    const workflow: Crumb = { label: workflowName, href: workflowHref };
+
+    if (!s2) return [workflows, { ...workflow, href: null }];
+
+    if (s2 === 'definitions' && s3) {
+      return [workflows, workflow, { label: `Workflow Editor`, href: null }];
+    }
+
+    if (s2 === 'runs' && s3) {
+      const runHref = `${prefix}/workflows/${s1}/runs/${s3}`;
+      const run: Crumb = { label: `Run`, href: runHref };
+      if (s4 === 'steps' && s5) {
+        return [workflows, workflow, run, { label: decodeURIComponent(s5).replace(/-/g, ' '), href: null }];
+      }
+      return [workflows, workflow, { ...run, href: null }];
+    }
+
+    return [workflows, workflow];
+  }
+
+  return [{ label: 'Workflows', href: null }];
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { firebaseUser, signOut } = useAuth();
@@ -78,11 +132,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Build handle-prefixed href
   const handlePrefix = handleFromPath !== '' ? `/${handleFromPath}` : '';
 
-  const currentLabel =
-    [...NAV_ITEMS, MONITORING_ITEM].find((item) => {
-      const path = 'href' in item ? item.href : item.path;
-      return path !== '' && pathname.includes(path);
-    })?.label ?? 'Mediforce';
+  const breadcrumbs = buildBreadcrumbs(pathname, handleFromPath, handlePrefix);
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
@@ -288,7 +338,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
-            <span className="text-sm font-medium text-foreground">{currentLabel}</span>
+            <nav className="flex items-center gap-1 text-sm">
+              {breadcrumbs.length > 1 && (
+                <>
+                  <Link
+                    href={breadcrumbs[breadcrumbs.length - 2].href ?? '#'}
+                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors mr-2"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Go back
+                  </Link>
+                  <span className="text-muted-foreground/30">|</span>
+                </>
+              )}
+              {breadcrumbs.map((crumb, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />}
+                  {crumb.href !== null ? (
+                    <Link href={crumb.href} className="text-muted-foreground hover:text-foreground transition-colors">
+                      {crumb.label}
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-foreground">{crumb.label}</span>
+                  )}
+                </React.Fragment>
+              ))}
+            </nav>
           </div>
 
           <div className="flex items-center gap-2">

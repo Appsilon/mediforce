@@ -41,6 +41,10 @@ RUN pnpm --filter @mediforce/platform-ui build
 
 # --- Runner ---
 FROM node:24-slim AS runner
+
+# Git needed for cloning workflow repos (skill loading, lazy image build)
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ENV NODE_ENV=production

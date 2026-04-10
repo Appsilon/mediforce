@@ -246,6 +246,7 @@ export class FirestoreProcessRepository implements ProcessRepository {
     name: string,
     version: number,
   ): Promise<WorkflowDefinition | null> {
+    // Primary: look in workflowDefinitions by composite key
     const docRef = doc(
       this.db,
       this.workflowDefinitionsCollection,
@@ -253,11 +254,46 @@ export class FirestoreProcessRepository implements ProcessRepository {
     );
     const snapshot = await getDoc(docRef);
 
-    if (!snapshot.exists()) {
-      return null;
+    if (snapshot.exists()) {
+      const parsed = WorkflowDefinitionSchema.safeParse(snapshot.data());
+      if (parsed.success) return parsed.data;
+      console.warn(
+        `[process-repository] workflowDefinitions parse failed for ${name}:${version}`,
+        parsed.error.format(),
+      );
     }
 
-    return WorkflowDefinitionSchema.parse(snapshot.data());
+    // Fallback: scan processDefinitions (legacy collection) where the version
+    // was stored as a semver-like string (e.g. "1" or "1.0.0").
+    const legacyQuery = query(
+      collection(this.db, this.definitionsCollection),
+      where('name', '==', name),
+    );
+    const legacySnap = await getDocs(legacyQuery);
+    for (const legacyDoc of legacySnap.docs) {
+      const raw = legacyDoc.data();
+      const rawVersion = raw.version;
+      const normalizedVersion =
+        typeof rawVersion === 'number'
+          ? rawVersion
+          : typeof rawVersion === 'string'
+            ? parseInt(rawVersion, 10)
+            : NaN;
+      if (normalizedVersion !== version) continue;
+
+      // Attempt to interpret the legacy doc as a WorkflowDefinition.
+      // The raw Firestore data may contain fields (e.g. executor) that were
+      // stripped by ProcessDefinitionSchema but preserved in Firestore if
+      // the document was written directly without schema stripping.
+      const wfParsed = WorkflowDefinitionSchema.safeParse({ ...raw, version });
+      if (wfParsed.success) return wfParsed.data;
+      console.warn(
+        `[process-repository] legacy processDefinitions parse failed for ${name}:${version}`,
+        wfParsed.error.format(),
+      );
+    }
+
+    return null;
   }
 
   async saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void> {
