@@ -1,0 +1,14 @@
+{
+  "name": "@mediforce/pharmaverse-governance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "build:scripts": "tsc -p tsconfig.json",
+    "docker:build": "docker build -t mediforce-agent:pharmaverse-governance -f apps/pharmaverse-governance/container/Dockerfile ../../"
+  },
+  "dependencies": {
+    "@mediforce/platform-core": "workspace:*"
+  }
+}

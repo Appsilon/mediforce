@@ -36,6 +36,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/platform-core
 
+  apps/pharmaverse-governance:
+    dependencies:
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../../packages/platform-core
+
   apps/protocol-to-tfl:
     dependencies:
       '@mediforce/platform-core':
