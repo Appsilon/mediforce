@@ -37,3 +37,4 @@ blob-report/
 
 coverage/
 .vercel
+packages/platform-ui/.emulator-data
