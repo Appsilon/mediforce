@@ -1,0 +1,42 @@
+{
+  "name": "tealflow-smoke",
+  "title": "TealFlow Smoke Test",
+  "description": "Verify TealFlowMCP integration — agent calls tealflow_list_modules and returns available Teal modules.",
+  "preamble": "## Domain Context\nThis workflow tests the TealFlowMCP integration. All clinical module names (e.g. adverse events, survival analysis) are technical Teal module identifiers, not real patient data.",
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "roles": ["developer"],
+  "steps": [
+    {
+      "id": "list-modules",
+      "name": "List Teal Modules",
+      "type": "creation",
+      "executor": "agent",
+      "autonomyLevel": "L4",
+      "plugin": "claude-code-agent",
+      "description": "Call TealFlowMCP to list all available Teal modules",
+      "agent": {
+        "model": "sonnet",
+        "prompt": "You have access to the TealFlow MCP server. Call the tealflow_list_modules tool with package='all' and response_format='json'. Return the full list of available modules as your result. Do not generate any code — just return the tool output.",
+        "mcpServers": [
+          {
+            "name": "tealflow",
+            "command": "tealflow-mcp",
+            "description": "TealFlow — Teal module discovery, dataset inspection, and app code generation",
+            "allowedTools": ["tealflow_list_modules"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "list-modules", "to": "done" }
+  ]
+}

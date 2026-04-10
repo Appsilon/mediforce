@@ -1,0 +1,58 @@
+{
+  "name": "tealflow",
+  "title": "TealFlow App Builder",
+  "description": "Build a Teal Shiny app from ADaM datasets using TealFlowMCP, validate it, and push to GitHub.",
+  "preamble": "## Domain Context\nThis workflow builds clinical trial data exploration apps using the R teal framework. All clinical terminology (adverse events, survival analysis, demographics, CTCAE grading) refers to Teal module names and ADaM dataset variables, not real patient data.",
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "roles": ["developer", "biostatistician"],
+  "steps": [
+    {
+      "id": "build-app",
+      "name": "Build Teal App",
+      "type": "creation",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "claude-code-agent",
+      "description": "Use TealFlowMCP to discover data, select modules, generate app code, validate, and push to GitHub",
+      "agent": {
+        "skill": "build-teal-app",
+        "skillsDir": "apps/tealflow/plugins/tealflow/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:tealflow",
+        "timeoutMinutes": 30,
+        "confidenceThreshold": 0.7,
+        "fallbackBehavior": "escalate_to_human",
+        "mcpServers": [
+          {
+            "name": "tealflow",
+            "command": "tealflow-mcp",
+            "description": "TealFlow — Teal module discovery, dataset inspection, app code generation, and R environment validation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "review",
+      "name": "Review Generated App",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["developer", "biostatistician"],
+      "description": "Review the generated Teal app code and validation results",
+      "verdicts": {
+        "approve": { "target": "done" },
+        "revise": { "target": "build-app" }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "build-app", "to": "review" }
+  ]
+}
