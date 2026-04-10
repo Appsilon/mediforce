@@ -664,9 +664,9 @@ export function buildSeedData(testUserId: string) {
       email: 'test@mediforce.dev',
       displayName: 'Test User',
       handle: 'test',
-      organizations: [],
+      organizations: ['pharmaverse'],
       role: 'admin',
-      roles: ['reviewer', 'analyst', 'operator'],
+      roles: ['reviewer', 'analyst', 'operator', 'council-member', 'governance-lead'],
     },
   };
 
@@ -776,9 +776,25 @@ export function buildSeedData(testUserId: string) {
       linkedUserId: testUserId,
       createdAt: '2024-01-01T00:00:00.000Z',
     },
+    pharmaverse: {
+      id: 'pharmaverse',
+      handle: 'pharmaverse',
+      type: 'org',
+      displayName: 'Pharmaverse',
+      createdAt: '2024-01-01T00:00:00.000Z',
+    },
   };
 
   const namespaceMembers: Record<string, Record<string, unknown>> = {
+    [testUserId]: {
+      id: testUserId,
+      uid: testUserId,
+      role: 'owner',
+      joinedAt: '2024-01-01T00:00:00.000Z',
+    },
+  };
+
+  const pharmaverseNamespaceMembers: Record<string, Record<string, unknown>> = {
     [testUserId]: {
       id: testUserId,
       uid: testUserId,
@@ -870,6 +886,37 @@ export function buildSeedData(testUserId: string) {
   };
 
   // Workflow definition with a cowork step
+  workflowDefinitions['pharmaverse-governance:1'] = {
+    name: 'pharmaverse-governance',
+    namespace: 'pharmaverse',
+    version: 1,
+    title: 'Pharmaverse Semiannual Package Governance Review',
+    description: 'Automated Track B semiannual review cycle for pharmaverse packages. Discovers all R packages in the pharmaverse GitHub org, collects maintenance and quality metrics, assesses each package against governance criteria (status tags, quality badges, renewal triggers), and produces a council-ready summary report.',
+    roles: ['council-member', 'governance-lead'],
+    steps: [
+      { id: 'discover-packages', name: 'Discover Pharmaverse Packages', type: 'creation', executor: 'script', autonomyLevel: 'L4', plugin: 'script-container' },
+      { id: 'collect-metrics', name: 'Collect Per-Package Metrics', type: 'creation', executor: 'script', autonomyLevel: 'L4', plugin: 'script-container' },
+      { id: 'assess-packages', name: 'Assess Package Governance Status', type: 'creation', executor: 'agent', autonomyLevel: 'L3', plugin: 'claude-code-agent' },
+      { id: 'review-package-reports', name: 'Review Package Reports', type: 'review', executor: 'human', allowedRoles: ['council-member', 'governance-lead'], verdicts: { approve: { target: 'generate-council-summary' }, revise: { target: 'assess-packages' } } },
+      { id: 'generate-council-summary', name: 'Generate Council Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3', plugin: 'claude-code-agent' },
+      { id: 'review-council-summary', name: 'Review Council Summary', type: 'review', executor: 'human', allowedRoles: ['governance-lead'], verdicts: { approve: { target: 'apply-governance-state' }, revise: { target: 'generate-council-summary' } } },
+      { id: 'apply-governance-state', name: 'Apply Governance State to GitHub', type: 'creation', executor: 'script', autonomyLevel: 'L4', plugin: 'script-container' },
+      { id: 'done', name: 'Review Complete', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [
+      { from: 'discover-packages', to: 'collect-metrics' },
+      { from: 'collect-metrics', to: 'assess-packages' },
+      { from: 'assess-packages', to: 'review-package-reports' },
+      { from: 'generate-council-summary', to: 'review-council-summary' },
+      { from: 'apply-governance-state', to: 'done' },
+    ],
+    triggers: [
+      { type: 'cron', name: 'semiannual-review', schedule: '0 8 1 1,7 *' },
+      { type: 'manual', name: 'manual' },
+    ],
+    createdAt: twoDaysAgo,
+  };
+
   workflowDefinitions['Workflow Designer:1'] = {
     name: 'Workflow Designer',
     namespace: 'test',
@@ -905,5 +952,5 @@ export function buildSeedData(testUserId: string) {
     createdAt: twoDaysAgo,
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions, namespaces, namespaceMembers, coworkSessions };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions, namespaces, namespaceMembers, pharmaverseNamespaceMembers, coworkSessions };
 }
