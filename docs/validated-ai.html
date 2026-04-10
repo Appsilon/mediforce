@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Validated AI — Mediforce</title>
+  <meta name="description" content="How Mediforce makes AI results safe to use in regulated pharma." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0A0A0B;
+      --bg-raised: #111113;
+      --bg-subtle: #18181B;
+      --accent: #5EEAD4;
+      --accent-dim: rgba(94,234,212,0.10);
+      --accent-border: rgba(94,234,212,0.18);
+      --text: #FAFAFA;
+      --text-2: rgba(250,250,250,0.72);
+      --text-3: rgba(250,250,250,0.48);
+      --text-4: rgba(250,250,250,0.28);
+      --border: rgba(255,255,255,0.06);
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      line-height: 1.7; -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: rgba(94,234,212,0.25); }
+    a { color: var(--accent); text-decoration: none; }
+
+    .w { max-width: 640px; margin: 0 auto; padding: 0 24px; }
+
+    /* Nav */
+    nav {
+      position: sticky; top: 0; z-index: 50;
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(10,10,11,0.8); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700; font-size: 15px; color: var(--text);
+      display: flex; align-items: center; gap: 8px; text-decoration: none;
+    }
+    .nav-logo svg { width: 20px; height: 20px; }
+    .nav-links { display: flex; gap: 8px; }
+    .nav-links a {
+      font-size: 13px; font-weight: 500; color: var(--text-3);
+      padding: 6px 12px; border-radius: 6px; transition: color 0.15s; text-decoration: none;
+    }
+    .nav-links a:hover { color: var(--text-2); }
+
+    /* Hero */
+    .hero { padding: 100px 0 60px; }
+    .hero-label {
+      font-size: 13px; font-weight: 500; color: var(--text-3);
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      font-size: 40px; font-weight: 800;
+      letter-spacing: -0.035em; line-height: 1.15;
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+    .hero .lead {
+      margin-top: 20px;
+      font-size: 17px; color: var(--text-3); line-height: 1.8;
+    }
+    @media (max-width: 640px) {
+      .hero { padding: 72px 0 48px; }
+      .hero h1 { font-size: 28px; }
+    }
+
+    /* Prose */
+    .s { padding: 64px 0; }
+    .s + .s { border-top: 1px solid var(--border); }
+    .s h2 {
+      font-size: 24px; font-weight: 700;
+      letter-spacing: -0.02em; line-height: 1.3;
+      margin-bottom: 16px;
+    }
+    .s p {
+      font-size: 16px; color: var(--text-2); line-height: 1.8;
+      margin-bottom: 16px;
+    }
+    .s p strong { color: var(--text); font-weight: 600; }
+
+    /* Callout */
+    .c {
+      margin: 24px 0;
+      padding: 20px 24px;
+      border-radius: 8px;
+      font-size: 15px; line-height: 1.7;
+      color: var(--text-2);
+      border: 1px solid var(--accent-border);
+      background: var(--accent-dim);
+    }
+    .c strong { color: var(--accent); font-weight: 600; }
+
+    /* Flow diagram */
+    .flow {
+      margin: 40px 0;
+      display: flex; flex-direction: column;
+    }
+    .flow-step {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 0;
+      min-height: 80px;
+    }
+    .flow-line {
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .flow-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      background: var(--bg);
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+    .flow-dot--filled { background: var(--accent); }
+    .flow-connector {
+      width: 2px; flex: 1;
+      background: var(--border);
+      margin: 4px 0;
+    }
+    .flow-content {
+      padding-bottom: 24px;
+    }
+    .flow-title {
+      font-size: 15px; font-weight: 600; color: var(--text);
+      line-height: 1.3;
+    }
+    .flow-desc {
+      margin-top: 4px;
+      font-size: 14px; color: var(--text-3); line-height: 1.65;
+    }
+    .flow-tag {
+      display: inline-block;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 2px 8px; border-radius: 4px;
+      margin-top: 6px;
+    }
+    .flow-tag--auto {
+      color: var(--accent); background: var(--accent-dim);
+    }
+    .flow-tag--human {
+      color: #A78BFA; background: rgba(167,139,250,0.12);
+    }
+    .flow-tag--platform {
+      color: #FBBF24; background: rgba(251,191,36,0.10);
+    }
+
+    /* Versus */
+    .vs {
+      display: grid; gap: 12px; margin: 24px 0;
+    }
+    @media (min-width: 540px) { .vs { grid-template-columns: 1fr 1fr; } }
+    .vs-item {
+      padding: 20px; border-radius: 8px; border: 1px solid var(--border);
+    }
+    .vs-item h4 {
+      font-size: 12px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .vs-item p { font-size: 14px; color: var(--text-3); line-height: 1.65; margin: 0; }
+    .vs--a { border-color: rgba(248,113,113,0.15); }
+    .vs--a h4 { color: #F87171; }
+    .vs--b { border-color: var(--accent-border); background: var(--accent-dim); }
+    .vs--b h4 { color: var(--accent); }
+
+    /* Cards */
+    .cards {
+      display: grid; gap: 12px; margin: 32px 0;
+    }
+    @media (min-width: 540px) { .cards { grid-template-columns: 1fr 1fr; } }
+    .card {
+      padding: 20px; border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: var(--accent-border); }
+    .card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .card p { font-size: 13px; color: var(--text-3); line-height: 1.6; margin: 0; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border); padding: 24px 0;
+    }
+    .f {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 13px; color: var(--text-4);
+    }
+    .f a { color: var(--text-4); text-decoration: none; }
+    .f a:hover { color: var(--text-3); }
+    .f-links { display: flex; gap: 20px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <svg viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="6" fill="#5EEAD4"/><path d="M7 12h10M12 7v10" stroke="#0A0A0B" stroke-width="2.5" stroke-linecap="round"/></svg>
+    Mediforce
+  </a>
+  <div class="nav-links">
+    <a href="/">&larr; Home</a>
+    <a href="https://github.com/Appsilon/mediforce" target="_blank">GitHub</a>
+  </div>
+</nav>
+
+
+<section class="hero">
+  <div class="w">
+    <div class="hero-label">How we think about validated AI</div>
+    <h1>You can't validate AI the way<br>you validate software.<br><em>So we validate the process.</em></h1>
+    <p class="lead">
+      AI gives you a draft, a suggestion, a classification.
+      But in pharma, you can't use it until you can prove the process around it was sound.
+      That's the problem we solve.
+    </p>
+  </div>
+</section>
+
+
+<section class="s">
+  <div class="w">
+    <h2>The situation right now</h2>
+    <p>
+      Your team wants to use AI. Your compliance team wants to know it's safe.
+      There is no FDA playbook for this. No standard. No checklist.
+    </p>
+    <p>
+      But there doesn't need to be &mdash; because pharma has solved a version
+      of this problem before. Every R package used in a submission is "validated."
+      Every LIMS, every EDC, every SAS script. These tools went through
+      qualification, testing, documentation &mdash; and then a human used them
+      within a controlled process and took responsibility for the result.
+    </p>
+    <p>
+      The difference with AI is that the tool itself is non-deterministic.
+      Same input, different output every time.
+      So you can't just qualify the tool once and move on.
+      <strong>You need a process that catches problems continuously</strong> &mdash;
+      not just once during validation.
+    </p>
+  </div>
+</section>
+
+
+<section class="s">
+  <div class="w">
+    <h2>Our approach: make every AI output earn its way through</h2>
+    <p>
+      In Mediforce, an AI agent doesn't just produce an output and hand it off.
+      The output goes through a pipeline of checks before anyone can use it.
+      Here's what that looks like:
+    </p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-line">
+          <div class="flow-dot flow-dot--filled"></div>
+          <div class="flow-connector"></div>
+        </div>
+        <div class="flow-content">
+          <div class="flow-title">Agent produces a result</div>
+          <div class="flow-desc">
+            The AI drafts a document, classifies data, generates a recommendation &mdash;
+            whatever the workflow step requires. Everything is logged: model version,
+            prompt version, input data, raw output.
+          </div>
+          <span class="flow-tag flow-tag--auto">Automated</span>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-line">
+          <div class="flow-dot"></div>
+          <div class="flow-connector"></div>
+        </div>
+        <div class="flow-content">
+          <div class="flow-title">Guardrails check the output</div>
+          <div class="flow-desc">
+            Does the output have the right structure? Are values within expected ranges?
+            Does it reference things that exist in the source data?
+            Is there patient data that shouldn't be there?
+            If any check fails, the output is blocked before it goes further.
+          </div>
+          <span class="flow-tag flow-tag--auto">Automated</span>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-line">
+          <div class="flow-dot"></div>
+          <div class="flow-connector"></div>
+        </div>
+        <div class="flow-content">
+          <div class="flow-title">The platform enforces the next step</div>
+          <div class="flow-desc">
+            If this step is configured as human-in-the-loop, the platform will not
+            let it proceed without approval. No workaround, no override.
+            The autonomy level you set is the autonomy level that happens.
+          </div>
+          <span class="flow-tag flow-tag--platform">Platform enforced</span>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-line">
+          <div class="flow-dot"></div>
+          <div class="flow-connector"></div>
+        </div>
+        <div class="flow-content">
+          <div class="flow-title">A qualified person reviews</div>
+          <div class="flow-desc">
+            They see exactly what the agent proposed, highlighted against the source data.
+            They can approve, modify, or reject. Every change is tracked &mdash;
+            what the AI said vs. what the human decided. The platform records
+            who signed off, when, and what the action meant.
+          </div>
+          <span class="flow-tag flow-tag--human">Human decision</span>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-line">
+          <div class="flow-dot"></div>
+          <div class="flow-connector"></div>
+        </div>
+        <div class="flow-content">
+          <div class="flow-title">The platform checks if the review was real</div>
+          <div class="flow-desc">
+            Did the reviewer spend enough time? Do they approve everything unchanged,
+            every single time? The platform tracks patterns. If someone is
+            rubber-stamping, the system flags it. Genuine oversight isn't optional &mdash;
+            it's enforced.
+          </div>
+          <span class="flow-tag flow-tag--platform">Anti-rubber-stamping</span>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-line">
+          <div class="flow-dot flow-dot--filled"></div>
+        </div>
+        <div class="flow-content">
+          <div class="flow-title">The result is ready to use</div>
+          <div class="flow-desc">
+            Now you have an output that's been through automated checks,
+            reviewed by a qualified person, and backed by a complete audit trail.
+            You can use it. You can defend it. You can show an auditor exactly what happened.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="s">
+  <div class="w">
+    <h2>This isn't just about compliance</h2>
+    <p>
+      The reason we decompose work into steps isn't just for the audit trail.
+      There are practical reasons this is better than giving an agent a big task
+      and hoping for the best:
+    </p>
+
+    <div class="cards">
+      <div class="card">
+        <h4>Smaller blast radius</h4>
+        <p>If an agent makes a mistake in step 3, you catch it there. You don't discover it after the whole process ran.</p>
+      </div>
+      <div class="card">
+        <h4>Different experts for different steps</h4>
+        <p>A medical writer reviews the narrative. A statistician reviews the numbers. Each person sees only what they need to judge.</p>
+      </div>
+      <div class="card">
+        <h4>Agents don't judge their own work</h4>
+        <p>The agent that produces a draft doesn't review it. A different agent &mdash; or a human &mdash; does. Like separation of duties in GMP.</p>
+      </div>
+      <div class="card">
+        <h4>Security by design</h4>
+        <p>Each agent can only access the data it needs. Working on Study A? It can't see Study B. Scoped per schema, per table, per study.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="s">
+  <div class="w">
+    <h2>How we think about reproducibility</h2>
+    <p>
+      In traditional pharma: same code, same data, same result &mdash; even 20 years from now.
+      With AI, that's impossible. The model might not exist next year.
+    </p>
+    <p>
+      But what's reproducibility actually <em>for</em>?
+      It's so an auditor can verify the result is legitimate.
+      In our model, you don't need to re-run the agent.
+      You need to <strong>reconstruct the decision</strong>:
+    </p>
+    <p>
+      <em>Here's the data. Here's what the agent proposed. Here's what the reviewer changed.
+      Here's the final version. Here's who signed off.</em>
+    </p>
+
+    <div class="c">
+      <strong>The audit trail is the reproducibility mechanism</strong> &mdash;
+      not re-execution. Everything is stored: input, agent config, raw output,
+      human modifications, final artifact. Even if the model no longer exists,
+      you can prove what happened.
+    </div>
+  </div>
+</section>
+
+
+<section class="s">
+  <div class="w">
+    <h2>Not everything needs the same rigor</h2>
+    <p>
+      If the output feeds into an FDA submission, you want the full stack:
+      agent qualification, automated guardrails, human review with anti-rubber-stamping.
+      Autonomy L1&ndash;L2 only.
+    </p>
+    <p>
+      If it's supply chain logistics for clinical supplies,
+      that's your internal process &mdash; no predicate rule requires you to validate it.
+      You still get the platform, you still get the audit trail,
+      but the rigor is proportionate to the risk.
+    </p>
+    <p>
+      This isn't our invention. It comes from <strong>ICH E6(R3)</strong>,
+      which introduced "critical-to-quality factors" &mdash;
+      focus rigor where it matters for patient safety and data reliability.
+      We just made it a configuration setting in the platform.
+    </p>
+  </div>
+</section>
+
+
+<section class="s">
+  <div class="w">
+    <h2>Where we are</h2>
+    <p>
+      This is our point of view, not an industry standard. There isn't one yet.
+      We're building Mediforce in conversation with pharma teams, regulatory consultants,
+      and people who've been doing GxP validation for longer than we've been writing code.
+    </p>
+    <p>
+      If you see gaps in this thinking &mdash; especially if you think we're wrong
+      about something &mdash; that's the conversation we want to have.
+    </p>
+  </div>
+</section>
+
+
+<footer>
+  <div class="w f">
+    <span>Mediforce &middot; Draft &mdash; April 2026</span>
+    <div class="f-links">
+      <a href="/">Home</a>
+      <a href="https://github.com/Appsilon/mediforce" target="_blank">GitHub</a>
+      <a href="https://discord.gg/TVx4VkG3C2" target="_blank">Discord</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
