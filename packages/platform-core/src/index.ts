@@ -53,6 +53,7 @@ export {
   NamespaceMemberSchema,
   WorkflowSecretsSchema,
   CronTriggerStateSchema,
+  McpServerConfigSchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -109,6 +110,7 @@ export type {
   NamespaceMember,
   WorkflowSecrets,
   CronTriggerState,
+  McpServerConfig,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)
