@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -18,7 +19,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { User, Bot, Terminal, Users, Trash2, Plus, PenLine, Search, GitBranch, Flag, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { WorkflowDefinition } from '@mediforce/platform-core';
+import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -215,8 +216,14 @@ const nodeTypes = { step: StepNode };
 // ---------------------------------------------------------------------------
 
 type AddStepEdgeData = {
-  onAdd?: () => void;
+  onAdd?: (type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void;
 };
+
+const STEP_TYPE_OPTIONS = [
+  { type: 'creation' as const, icon: PenLine,  label: 'Creation', description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400',    activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
+  { type: 'review'   as const, icon: Search,    label: 'Review',   description: 'A step where someone evaluates work and gives a verdict such as approve or reject.',  color: 'text-amber-600 dark:text-amber-400',  activeBg: 'bg-amber-50 dark:bg-amber-900/30 ring-1 ring-amber-400' },
+  { type: 'decision' as const, icon: GitBranch, label: 'Decision', description: 'A branching step that routes the workflow to different paths based on a condition.',   color: 'text-purple-600 dark:text-purple-400', activeBg: 'bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-400' },
+] as const;
 
 function AddStepEdge({
   id,
@@ -226,6 +233,27 @@ function AddStepEdge({
   label, labelStyle, labelBgStyle, labelBgPadding, labelBgBorderRadius,
   data,
 }: EdgeProps & { data?: AddStepEdgeData }) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [pendingType, setPendingType] = useState<WorkflowStep['type'] | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!popoverOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        popoverRef.current && !popoverRef.current.contains(e.target as HTMLElement) &&
+        buttonRef.current && !buttonRef.current.contains(e.target as HTMLElement)
+      ) {
+        setPopoverOpen(false);
+        setPendingType(null);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [popoverOpen]);
+
   const [path, midX, midY] = getSmoothStepPath({
     sourceX, sourceY, sourcePosition,
     targetX, targetY, targetPosition,
@@ -234,6 +262,24 @@ function AddStepEdge({
   // Position the button 40% along the source→target vector (10% closer to source than midpoint).
   const buttonX = sourceX + 0.4 * (targetX - sourceX);
   const buttonY = sourceY + 0.4 * (targetY - sourceY);
+
+  const handleButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (popoverOpen) {
+      setPopoverOpen(false);
+      setPendingType(null);
+      setPopoverPos(null);
+    } else {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (rect) {
+        setPopoverPos({
+          top: rect.bottom + window.scrollY + 8,
+          left: rect.left + window.scrollX + rect.width / 2,
+        });
+      }
+      setPopoverOpen(true);
+    }
+  };
 
   return (
     <>
@@ -253,19 +299,79 @@ function AddStepEdge({
       />
       {data?.onAdd && (
         <EdgeLabelRenderer>
-          <button
+          <div
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${buttonX}px, ${buttonY}px)`,
               pointerEvents: 'all',
             }}
-            className="nodrag nopan h-5 w-5 flex items-center justify-center rounded-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-400 hover:text-primary hover:border-primary transition-colors shadow-sm"
-            onClick={(e) => { e.stopPropagation(); data.onAdd?.(); }}
-            aria-label="Add step here"
+            className="nodrag nopan"
           >
-            <Plus className="h-3 w-3" />
-          </button>
+            <button
+              ref={buttonRef}
+              onClick={handleButtonClick}
+              className="h-5 w-5 flex items-center justify-center rounded-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-400 hover:text-primary hover:border-primary transition-colors shadow-sm"
+              aria-label="Add step here"
+            >
+              <Plus className="h-3 w-3" />
+            </button>
+          </div>
         </EdgeLabelRenderer>
+      )}
+      {popoverOpen && popoverPos && data?.onAdd && createPortal(
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'absolute',
+            top: popoverPos.top,
+            left: popoverPos.left,
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+          }}
+          className="bg-background border rounded-xl shadow-xl p-3 w-80 space-y-3"
+        >
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
+            <div className="flex flex-col gap-1">
+              {STEP_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.type}
+                  onClick={(e) => { e.stopPropagation(); setPendingType(opt.type); }}
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-left transition-all w-full',
+                    pendingType === opt.type ? opt.activeBg : 'hover:bg-muted',
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <opt.icon className={cn('h-3.5 w-3.5 shrink-0', opt.color)} strokeWidth={1.5} />
+                    <span className={cn('text-xs font-semibold', opt.color)}>{opt.label}</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{opt.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+          {pendingType && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Who handles this step?</p>
+              <div className="flex gap-1.5">
+                {(pendingType === 'creation'
+                  ? (['human', 'agent', 'script', 'cowork'] as const)
+                  : (['human', 'agent'] as const)
+                ).map((executor) => (
+                  <button
+                    key={executor}
+                    onClick={(e) => { e.stopPropagation(); data.onAdd?.(pendingType, executor); setPopoverOpen(false); setPendingType(null); setPopoverPos(null); }}
+                    className="flex-1 rounded-lg py-1.5 text-xs font-semibold hover:bg-muted transition-all capitalize border"
+                  >
+                    {executor}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>,
+        document.body,
       )}
     </>
   );
@@ -433,7 +539,7 @@ interface WorkflowDiagramProps {
   onNodeDelete?: (stepId: string) => void;
   onNodeMoveUp?: (stepId: string) => void;
   onNodeMoveDown?: (stepId: string) => void;
-  onEdgeAdd?: (fromStepId: string) => void;
+  onEdgeAdd?: (fromStepId: string, type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void;
   onPaneClick?: () => void;
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
@@ -465,7 +571,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         return {
           ...e,
           type: 'addStep',
-          data: { onAdd: () => onEdgeAdd(e.source) } satisfies AddStepEdgeData,
+          data: { onAdd: (type, executor) => onEdgeAdd(e.source, type, executor) } satisfies AddStepEdgeData,
         };
       }
       return e;

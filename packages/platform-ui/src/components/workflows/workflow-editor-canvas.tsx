@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, PenLine, Search, GitBranch, HelpCircle, Save, Plus, Undo2, Redo2 } from 'lucide-react';
+import { X, HelpCircle, Save, Undo2, Redo2 } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -145,11 +145,6 @@ export function WorkflowEditorCanvas({
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-  const [addingStep, setAddingStep] = useState(false);
-  const [pendingStepType, setPendingStepType] = useState<WorkflowStep['type'] | null>(null);
-  // When adding via an edge + button, we insert after this step id without changing selectedStepId.
-  const [pendingInsertAfterId, setPendingInsertAfterId] = useState<string | null>(null);
-  const addStepDropdownRef = useRef<HTMLDivElement>(null);
   const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
   const [redoHistory, setRedoHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
   const [yamlDraft, setYamlDraft] = useState('');
@@ -254,19 +249,6 @@ export function WorkflowEditorCanvas({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [yamlPreviewForSync]);
 
-  // ── Close Add Step dropdown on outside click ───────────────────────────────
-  useEffect(() => {
-    if (!addingStep) return;
-    const handler = (e: MouseEvent) => {
-      if (!addStepDropdownRef.current?.contains(e.target as Node)) {
-        setAddingStep(false);
-        setPendingStepType(null);
-        setPendingInsertAfterId(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [addingStep]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const updateStep = useCallback((stepId: string, patch: Partial<WorkflowStep>) => {
@@ -298,7 +280,7 @@ export function WorkflowEditorCanvas({
     }
   }, []);
 
-  const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor']) => {
+  const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor'], insertAfterId: string | null = null) => {
     const terminalStep = editedSteps.find((s) => s.type === 'terminal');
 
     // Only one terminal allowed
@@ -317,29 +299,29 @@ export function WorkflowEditorCanvas({
       ...(executor === 'cowork' ? { cowork: { agent: 'chat' as const } } : {}),
     };
 
-    // pendingInsertAfterId is set when adding via an edge + button — use it
-    // in preference to selectedStepId so the right panel stays unchanged.
-    const insertAfterId = pendingInsertAfterId ?? selectedStepId;
+    // When inserting via an edge button, insertAfterId is set explicitly.
+    // Otherwise fall back to the currently selected step.
+    const resolvedInsertAfterId = insertAfterId ?? selectedStepId;
 
     if (!terminalStep || type === 'terminal') {
       // No terminal yet (or we're adding the terminal itself): append at end
       const lastId = editedSteps[editedSteps.length - 1]?.id;
       setEditedSteps((prev) => [...prev, newStep]);
       setEditedTransitions((prev) => lastId ? [...prev, { from: lastId, to: newId }] : prev);
-    } else if (insertAfterId && insertAfterId !== terminalStep.id) {
+    } else if (resolvedInsertAfterId && resolvedInsertAfterId !== terminalStep.id) {
       // Insert after the target step
-      const insertIdx = editedSteps.findIndex((s) => s.id === insertAfterId);
+      const insertIdx = editedSteps.findIndex((s) => s.id === resolvedInsertAfterId);
       setEditedSteps((prev) => {
         const next = [...prev];
         next.splice(insertIdx + 1, 0, newStep);
         return next;
       });
       setEditedTransitions((prev) => {
-        // Edges from insertAfterId → their targets now go through newStep
-        const outgoing = prev.filter((t) => t.from === insertAfterId);
-        const others = prev.filter((t) => t.from !== insertAfterId);
+        // Edges from resolvedInsertAfterId → their targets now go through newStep
+        const outgoing = prev.filter((t) => t.from === resolvedInsertAfterId);
+        const others = prev.filter((t) => t.from !== resolvedInsertAfterId);
         const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
-        return [...others, { from: insertAfterId, to: newId }, ...rewired];
+        return [...others, { from: resolvedInsertAfterId, to: newId }, ...rewired];
       });
     } else {
       // No step selected: insert immediately before the terminal step
@@ -360,13 +342,10 @@ export function WorkflowEditorCanvas({
 
     // Only auto-select the new step when not inserting via an edge button
     // (edge button should leave the right panel unchanged).
-    if (pendingInsertAfterId === null) {
+    if (insertAfterId === null) {
       setSelectedStepId(newId);
     }
-    setPendingInsertAfterId(null);
-    setAddingStep(false);
-    setPendingStepType(null);
-  }, [editedSteps, selectedStepId, pendingInsertAfterId, saveSnapshot]);
+  }, [editedSteps, selectedStepId, saveSnapshot]);
 
   const removeStep = useCallback((stepId: string) => {
     saveSnapshot();
@@ -481,71 +460,7 @@ export function WorkflowEditorCanvas({
       {/* ── Unified sticky toolbar ── */}
       <div className="shrink-0 border-b px-4 py-2 flex items-center gap-1.5 flex-wrap bg-background">
 
-        {/* Add Step */}
-        <div className="relative" ref={addStepDropdownRef}>
-          <button
-            onClick={() => { setAddingStep(!addingStep); setPendingStepType(null); setPendingInsertAfterId(null); }}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add Step
-          </button>
-            {addingStep && (
-              <div className="absolute top-full left-0 mt-1.5 bg-background border rounded-xl shadow-xl p-3 z-50 w-80 space-y-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
-                  <div className="flex flex-col gap-1">
-                    {([
-                      { type: 'creation', icon: PenLine,   label: 'Creation', description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400',   activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
-                      { type: 'review',   icon: Search,     label: 'Review',   description: 'A step where someone evaluates work and gives a verdict such as approve or reject.', color: 'text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-50 dark:bg-amber-900/30 ring-1 ring-amber-400' },
-                      { type: 'decision', icon: GitBranch,  label: 'Decision', description: 'A branching step that routes the workflow to different paths based on a condition.', color: 'text-purple-600 dark:text-purple-400', activeBg: 'bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-400' },
-                    ] as const).map((opt) => {
-                      const isActive = pendingStepType === opt.type;
-                      return (
-                        <button
-                          key={opt.type}
-                          onClick={() => setPendingStepType(opt.type)}
-                          className={cn(
-                            'rounded-lg px-3 py-2 text-left transition-all w-full',
-                            isActive ? opt.activeBg : 'hover:bg-muted',
-                          )}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <opt.icon className={cn('h-3.5 w-3.5 shrink-0', opt.color)} strokeWidth={1.5} />
-                            <span className={cn('text-xs font-semibold', opt.color)}>{opt.label}</span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{opt.description}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                {pendingStepType && (
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Who handles this step?</p>
-                    <div className="flex gap-1.5">
-                      {(pendingStepType === 'creation'
-                        ? (['human', 'agent', 'script', 'cowork'] as const)
-                        : (['human', 'agent'] as const)
-                      ).map((executor) => (
-                        <button
-                          key={executor}
-                          onClick={() => addStep(pendingStepType, executor)}
-                          className="flex-1 rounded-lg py-1.5 text-xs font-semibold hover:bg-muted transition-all capitalize border"
-                        >
-                          {executor}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="w-px h-4 bg-border mx-0.5" />
-
-          <button
+        <button
             onClick={undoEdit}
             disabled={editHistory.length === 0}
             title="Undo last change (Ctrl+Z)"
@@ -616,7 +531,7 @@ export function WorkflowEditorCanvas({
               onNodeDelete={removeStep}
               onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
               onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
-              onEdgeAdd={(fromStepId) => { setPendingInsertAfterId(fromStepId); setAddingStep(true); }}
+              onEdgeAdd={(fromStepId, type, executor) => addStep(type, executor, fromStepId)}
               onPaneClick={() => setSelectedStepId(null)}
               selectedStepId={selectedStepId}
               errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
