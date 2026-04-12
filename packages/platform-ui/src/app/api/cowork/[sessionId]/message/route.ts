@@ -184,10 +184,19 @@ export async function POST(
         let artifactDelta: Record<string, unknown> | null = null;
         if (hasToolCall && toolCallArgs.length > 0) {
           try {
-            const parsed = JSON.parse(toolCallArgs) as { artifact: Record<string, unknown> };
-            artifactDelta = parsed.artifact;
+            const parsed = JSON.parse(toolCallArgs) as { artifact: Record<string, unknown> | string };
+            // Model sometimes returns artifact as JSON string — parse it
+            let rawArtifact = parsed.artifact;
+            if (typeof rawArtifact === 'string') {
+              rawArtifact = JSON.parse(rawArtifact) as Record<string, unknown>;
+            }
+            artifactDelta = typeof rawArtifact === 'object' && rawArtifact !== null
+              ? rawArtifact as Record<string, unknown>
+              : null;
 
-            await coworkSessionRepo.updateArtifact(sessionId, artifactDelta);
+            if (artifactDelta) {
+              await coworkSessionRepo.updateArtifact(sessionId, artifactDelta);
+            }
 
             controller.enqueue(
               encoder.encode(

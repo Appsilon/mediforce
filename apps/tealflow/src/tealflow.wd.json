@@ -102,6 +102,12 @@
       "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
       "description": "Validate the generated Teal app using TealFlowMCP, then push to GitHub",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+        "GITHUB_TOKEN": "{{GITHUB_TOKEN}}"
+      },
       "agent": {
         "skill": "deploy-teal-app",
         "skillsDir": "apps/tealflow/plugins/tealflow/skills",
