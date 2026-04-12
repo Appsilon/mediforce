@@ -3,9 +3,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { Save, HelpCircle } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
+import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
 import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
 import { cn } from '@/lib/utils';
@@ -27,10 +28,10 @@ export default function WorkflowDefinitionVersionPage() {
   const { definitions, loading } = useWorkflowDefinitions(decodedName);
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
-  const [editedTitle, setEditedTitle] = useState('');
   const [editedDescription, setEditedDescription] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
   const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>([]);
@@ -60,17 +61,19 @@ export default function WorkflowDefinitionVersionPage() {
     [],
   );
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (title: string) => {
     if (!definition) return;
     const steps = currentStepsRef.current;
     const transitions = currentTransitionsRef.current;
 
     const validationError = validateSteps(steps);
     if (validationError !== null) {
+      setDialogOpen(false);
       setSaveState({ status: 'error', message: validationError });
       return;
     }
 
+    setDialogOpen(false);
     setStepErrors({});
     setSaveState({ status: 'saving' });
 
@@ -79,7 +82,7 @@ export default function WorkflowDefinitionVersionPage() {
     const result = await saveWorkflowDefinition({
       name: definition.name,
       namespace: definition.namespace,
-      title: editedTitle.trim() || undefined,
+      title: title || undefined,
       description: editedDescription.trim() || undefined,
       steps,
       transitions: mergedTransitions,
@@ -107,7 +110,7 @@ export default function WorkflowDefinitionVersionPage() {
           : result.error,
       });
     }
-  }, [definition, editedTitle, editedDescription, name, handle, router]);
+  }, [definition, editedDescription, name, handle, router]);
 
 
   if (loading) {
@@ -156,24 +159,12 @@ export default function WorkflowDefinitionVersionPage() {
                   <span>·</span>
                 </>
               )}
-              <span className="font-mono">v{definition.version}</span>
-              <span>·</span>
-              <span className="shrink-0">Version title:</span>
-              <input
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                placeholder="describe this revision…"
-                title={!editedTitle.trim() ? 'Enter a version title to save' : undefined}
-                className={cn(
-                  'bg-transparent border-b border-transparent hover:border-muted-foreground/30 focus:border-primary outline-none text-xs placeholder:text-muted-foreground/40 placeholder:italic px-0 py-px w-52',
-                  !editedTitle.trim() && 'border-amber-300 dark:border-amber-700',
-                )}
-              />
-              <span className="group relative inline-flex items-center">
-                <HelpCircle className="h-3 w-3 text-muted-foreground/40" />
-                <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
-                  Each saved revision gets a version number automatically. A version note helps you tell &quot;Added AI review&quot; from &quot;Tightened criteria&quot; at a glance.
-                </span>
+              <span className="text-muted-foreground">
+                You are editing workflow version{' '}
+                <span className="font-mono font-medium">v{definition.version}</span>
+                {definition.title ? (
+                  <> named <span className="font-medium">&ldquo;{definition.title}&rdquo;</span></>
+                ) : null}
               </span>
             </div>
           </div>
@@ -191,12 +182,11 @@ export default function WorkflowDefinitionVersionPage() {
               </span>
             )}
             <button
-              onClick={handleSave}
-              disabled={saveState.status === 'saving' || !editedTitle.trim()}
-              title={!editedTitle.trim() ? 'Enter a version note to save' : undefined}
+              onClick={() => setDialogOpen(true)}
+              disabled={saveState.status === 'saving'}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                (saveState.status === 'saving' || !editedTitle.trim()) && 'opacity-50 cursor-not-allowed',
+                saveState.status === 'saving' && 'opacity-50 cursor-not-allowed',
               )}
             >
               <Save className="h-3.5 w-3.5" />
@@ -215,6 +205,14 @@ export default function WorkflowDefinitionVersionPage() {
         yamlFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
         onChange={handleCanvasChange}
         stepErrors={stepErrors}
+      />
+
+      <SaveVersionDialog
+        open={dialogOpen}
+        nextVersion={definition.version + 1}
+        confirmLabel="Save new version"
+        onClose={() => setDialogOpen(false)}
+        onConfirm={handleSave}
       />
     </div>
   );

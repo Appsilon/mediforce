@@ -2,10 +2,11 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Save, HelpCircle } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
+import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
 import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
 import { cn } from '@/lib/utils';
@@ -67,9 +68,9 @@ export default function NewWorkflowPage() {
   const [workflowName, setWorkflowName] = useState('');
   const [namespace, setNamespace] = useState('');
   const [description, setDescription] = useState('');
-  const [versionTitle, setVersionTitle] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
   const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>(TEMPLATE_STEPS);
@@ -89,29 +90,29 @@ export default function NewWorkflowPage() {
   // Auto-select first namespace when namespaces load
   const effectiveNamespace = namespace || namespaces[0]?.handle || '';
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (versionTitle: string) => {
     const steps = currentStepsRef.current;
     const transitions = currentTransitionsRef.current;
     const workflowId = toWorkflowId(workflowName);
     if (!workflowId) {
+      setDialogOpen(false);
       setSaveState({ status: 'error', message: 'Workflow name is required.' });
       return;
     }
     if (!description.trim()) {
+      setDialogOpen(false);
       setSaveState({ status: 'error', message: 'Description is required.' });
-      return;
-    }
-    if (!versionTitle.trim()) {
-      setSaveState({ status: 'error', message: 'Version name is required.' });
       return;
     }
 
     const validationError = validateSteps(steps);
     if (validationError !== null) {
+      setDialogOpen(false);
       setSaveState({ status: 'error', message: validationError });
       return;
     }
 
+    setDialogOpen(false);
     setStepErrors({});
     setSaveState({ status: 'saving' });
 
@@ -120,7 +121,7 @@ export default function NewWorkflowPage() {
     const result = await saveWorkflowDefinition({
       name: workflowId,
       namespace: effectiveNamespace || undefined,
-      title: versionTitle.trim() || undefined,
+      title: versionTitle || undefined,
       description: description.trim() || undefined,
       steps,
       transitions: mergedTransitions,
@@ -142,7 +143,7 @@ export default function NewWorkflowPage() {
           : result.error,
       });
     }
-  }, [workflowName, effectiveNamespace, versionTitle, description, handle, router]);
+  }, [workflowName, effectiveNamespace, description, handle, router]);
 
 
   const yamlFields: Record<string, unknown> = {
@@ -151,6 +152,8 @@ export default function NewWorkflowPage() {
     description: description || undefined,
     triggers: [{ type: 'manual', name: 'start' }],
   };
+
+  const canPublish = saveState.status !== 'saving' && !!toWorkflowId(workflowName) && !!description.trim();
 
   return (
     <div className="flex h-full flex-col relative">
@@ -195,22 +198,7 @@ export default function NewWorkflowPage() {
                 </>
               )}
               <span>·</span>
-              <span className="shrink-0">v1 · Version title:</span>
-              <input
-                value={versionTitle}
-                onChange={(e) => setVersionTitle(e.target.value)}
-                placeholder="version note, e.g. Initial version"
-                className={cn(
-                  'bg-transparent border-b border-transparent hover:border-muted-foreground/30 focus:border-primary outline-none text-xs placeholder:text-muted-foreground/40 placeholder:italic px-0 py-px w-52',
-                  !versionTitle.trim() && workflowName && 'border-amber-300 dark:border-amber-700',
-                )}
-              />
-              <span className="group relative inline-flex items-center">
-                <HelpCircle className="h-3 w-3 text-muted-foreground/40" />
-                <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
-                  Each saved revision gets a version number automatically. A version note helps you tell &quot;Added AI review&quot; from &quot;Tightened criteria&quot; at a glance.
-                </span>
-              </span>
+              <span className="text-muted-foreground">You are adding a new workflow</span>
             </div>
           </div>
 
@@ -227,17 +215,16 @@ export default function NewWorkflowPage() {
               </span>
             )}
             <button
-              onClick={handleSave}
-              disabled={saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()}
+              onClick={() => setDialogOpen(true)}
+              disabled={!canPublish}
               title={
                 !toWorkflowId(workflowName) ? 'Enter a workflow name to publish' :
                 !description.trim() ? 'Add a description to publish' :
-                !versionTitle.trim() ? 'Enter a version title to publish' :
                 undefined
               }
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                (saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()) && 'opacity-50 cursor-not-allowed',
+                !canPublish && 'opacity-50 cursor-not-allowed',
               )}
             >
               <Save className="h-3.5 w-3.5" />
@@ -254,6 +241,14 @@ export default function NewWorkflowPage() {
         yamlFields={yamlFields}
         onChange={handleCanvasChange}
         stepErrors={stepErrors}
+      />
+
+      <SaveVersionDialog
+        open={dialogOpen}
+        nextVersion={1}
+        confirmLabel="Publish workflow"
+        onClose={() => setDialogOpen(false)}
+        onConfirm={handleSave}
       />
     </div>
   );
