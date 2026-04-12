@@ -510,10 +510,10 @@ export function WorkflowEditorCanvas({
               )}
               <button
                 onClick={applyYaml}
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border hover:bg-muted text-foreground transition-colors"
               >
                 <Save className="h-3.5 w-3.5" />
-                Save YAML
+                Apply YAML to canvas
               </button>
             </div>
           )}
