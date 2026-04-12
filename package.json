@@ -29,7 +29,11 @@
       "protobufjs",
       "msgpackr-extract",
       "@firebase/util"
-    ]
+    ],
+    "overrides": {
+      "axios": ">=1.15.0"
+    },
+    "minimumReleaseAgeExclude": ["axios"]
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
