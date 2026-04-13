@@ -52,6 +52,8 @@ export const WorkflowCoworkConfigSchema = z.object({
   outputSchema: z.record(z.string(), z.unknown()).optional(),
   chat: CoworkChatConfigSchema.optional(),
   voiceRealtime: CoworkVoiceRealtimeConfigSchema.optional(),
+  /** MCP servers available to the LLM during this cowork step */
+  mcpServers: z.array(McpServerConfigSchema).optional(),
 });
 
 export const WorkflowReviewConfigSchema = z.object({

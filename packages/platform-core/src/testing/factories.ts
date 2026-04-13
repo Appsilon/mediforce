@@ -346,6 +346,7 @@ export function buildCoworkSession(
     outputSchema: null,
     voiceConfig: null,
     artifact: null,
+    mcpServers: null,
     turns: [],
     createdAt: DEFAULT_TIMESTAMP,
     updatedAt: DEFAULT_UPDATED_TIMESTAMP,

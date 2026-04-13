@@ -31,6 +31,7 @@
     "@codemirror/view": "^6.40.0",
     "@hookform/resolvers": "^5.0.0",
     "@mediforce/agent-runtime": "workspace:*",
+    "@mediforce/mcp-client": "workspace:*",
     "@mediforce/platform-core": "workspace:*",
     "@mediforce/platform-infra": "workspace:*",
     "@mediforce/supply-intelligence-plugins": "workspace:*",
