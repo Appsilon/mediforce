@@ -62,6 +62,10 @@ export const routes = {
     return qs ? `${base}?${qs}` : base;
   },
 
+  // ── Tools ──────────────────────────────────────────────────────
+  tools: (handle: string) => `/${handle}/tools`,
+  tool: (handle: string, toolId: string) => `/${handle}/tools/${encode(toolId)}`,
+
   // ── Catalog ────────────────────────────────────────────────────
   catalog: (handle: string) => `/${handle}/catalog`,
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { McpServerConfigSchema } from './mcp-server-config.js';
 
 export const ReviewConstraintsSchema = z.object({
   maxIterations: z.number().int().positive().optional(),
@@ -25,6 +26,7 @@ export const AgentConfigSchema = z.object({
   repo: z.string().optional(),
   commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
   repoAuth: z.string().optional(),
+  mcpServers: z.array(McpServerConfigSchema).optional(),
 });
 
 export const StepConfigSchema = z.object({

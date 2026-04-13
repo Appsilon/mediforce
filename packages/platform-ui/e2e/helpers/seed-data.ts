@@ -678,7 +678,7 @@ export function buildSeedData(testUserId: string) {
       title: 'Initial vendor assessment workflow',
       description: 'End-to-end supply chain review process',
       steps: [
-        { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector' },
+        { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector', agent: { skill: 'vendor-assessment', mcpServers: [{ name: 'postgres-ro', command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres'], env: { DATABASE_URL: '{{DB_URL}}' }, allowedTools: ['query'] }, { name: 'filesystem', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'] }] } },
         { id: 'narrative-summary', name: 'Narrative Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3' },
         { id: 'risk-scoring', name: 'Risk Scoring', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'human-review', name: 'Human Review', type: 'review', executor: 'human', verdicts: { approve: { target: 'done' }, revise: { target: 'vendor-assessment' } } },

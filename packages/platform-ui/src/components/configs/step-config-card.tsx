@@ -428,6 +428,33 @@ export function StepConfigCard({
                   />
                 </div>
               )}
+              {config.agentConfig.mcpServers && config.agentConfig.mcpServers.length > 0 && (
+                <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                  <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    MCP Tools ({config.agentConfig.mcpServers.length})
+                  </h5>
+                  <div className="space-y-1.5">
+                    {config.agentConfig.mcpServers.map((server) => (
+                      <div key={server.name} className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{server.name}</span>
+                          {server.description && (
+                            <span className="text-xs text-muted-foreground truncate max-w-[200px]">{server.description}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {server.allowedTools && (
+                            <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">
+                              {server.allowedTools.length} tools
+                            </span>
+                          )}
+                          <code className="text-[10px] font-mono text-muted-foreground">{server.command}</code>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
