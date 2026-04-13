@@ -1,7 +1,6 @@
 'use server';
 
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
-import { buildMessages, ARTIFACT_TOOL } from '@/lib/cowork/build-messages';
 import type { ConversationTurn } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -20,116 +19,34 @@ export async function sendMessage(
   sessionId: string,
   message: string,
 ): Promise<SendMessageResult> {
-  const { coworkSessionRepo, instanceRepo } = getPlatformServices();
+  const { getAppBaseUrl } = await import('@/lib/platform-services');
+  const appUrl = getAppBaseUrl();
 
-  const session = await coworkSessionRepo.getById(sessionId);
-  if (!session) {
-    return { success: false, error: 'Session not found' };
-  }
-
-  if (session.status !== 'active') {
-    return { success: false, error: `Cannot message a ${session.status} session` };
-  }
-
-  // Save human turn
-  const humanTurnId = crypto.randomUUID();
-  await coworkSessionRepo.addTurn(sessionId, {
-    id: humanTurnId,
-    role: 'human',
-    content: message,
-    timestamp: new Date().toISOString(),
-    artifactDelta: null,
-  });
-
-  // Reload session with updated turns
-  const updatedSession = (await coworkSessionRepo.getById(sessionId))!;
-
-  // Load step context
-  let stepContext: Record<string, unknown> | undefined;
-  const instance = await instanceRepo.getById(session.processInstanceId);
-  if (instance) {
-    stepContext = instance.variables as Record<string, unknown>;
-  }
-
-  // Build messages (without the new message since it's already in turns)
-  // We pass empty string since the human turn is already in updatedSession.turns
-  const messages = buildMessages(updatedSession, '', stepContext);
-  // Remove the trailing empty user message that buildMessages adds
-  messages.pop();
-
-  const model = session.model ?? 'anthropic/claude-sonnet-4';
-
-  // Call OpenRouter (non-streaming for server action simplicity)
-  const openRouterResponse = await fetch(
-    'https://openrouter.ai/api/v1/chat/completions',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY ?? process.env.DOCKER_OPENROUTER_API_KEY ?? ''}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        tools: [ARTIFACT_TOOL],
-        temperature: 0.7,
-        max_tokens: 4096,
-      }),
+  const response = await fetch(`${appUrl}/api/cowork/${sessionId}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
     },
-  );
-
-  if (!openRouterResponse.ok) {
-    const errorText = await openRouterResponse.text();
-    return { success: false, error: `Model API error ${openRouterResponse.status}: ${errorText}` };
-  }
-
-  const data = (await openRouterResponse.json()) as {
-    choices: Array<{
-      message: {
-        content?: string | null;
-        tool_calls?: Array<{
-          function: { name: string; arguments: string };
-        }>;
-      };
-    }>;
-  };
-
-  const choice = data.choices?.[0]?.message;
-  const agentText = choice?.content ?? '';
-
-  // Process tool calls (update_artifact)
-  let artifact: Record<string, unknown> | undefined;
-  if (choice?.tool_calls) {
-    for (const toolCall of choice.tool_calls) {
-      if (toolCall.function.name === 'update_artifact') {
-        try {
-          const parsed = JSON.parse(toolCall.function.arguments) as {
-            artifact: Record<string, unknown>;
-          };
-          artifact = parsed.artifact;
-          await coworkSessionRepo.updateArtifact(sessionId, artifact);
-        } catch {
-          // Skip malformed tool calls
-        }
-      }
-    }
-  }
-
-  // Save agent turn
-  const agentTurnId = crypto.randomUUID();
-  await coworkSessionRepo.addTurn(sessionId, {
-    id: agentTurnId,
-    role: 'agent',
-    content: agentText,
-    timestamp: new Date().toISOString(),
-    artifactDelta: artifact ?? null,
+    body: JSON.stringify({ message }),
   });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    return { success: false, error: data.error ?? `API error ${response.status}` };
+  }
+
+  const data = (await response.json()) as {
+    turnId: string;
+    agentText: string;
+    artifact?: Record<string, unknown>;
+  };
 
   return {
     success: true,
-    agentText,
-    artifact,
-    turnId: agentTurnId,
+    agentText: data.agentText,
+    artifact: data.artifact,
+    turnId: data.turnId,
   };
 }
 

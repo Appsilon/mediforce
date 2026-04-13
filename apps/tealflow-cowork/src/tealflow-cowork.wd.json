@@ -1,0 +1,62 @@
+{
+  "name": "tealflow-cowork",
+  "namespace": "appsilon",
+  "title": "Tealflow Module Explorer",
+  "description": "Explore available teal modules via MCP and select which ones to include in a teal app. A minimal example of MCP tool use in a cowork step.",
+  "preamble": "## Domain Context\nThis workflow uses the tealflow MCP server to query available teal modules for clinical trial data exploration. All clinical terminology (adverse events, demographics, efficacy endpoints) refers to teal module categories and data analysis constructs.",
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "roles": ["analyst"],
+  "steps": [
+    {
+      "id": "explore-modules",
+      "name": "Explore Teal Modules",
+      "type": "creation",
+      "executor": "cowork",
+      "allowedRoles": ["analyst"],
+      "description": "Chat with AI to explore available teal modules. The AI can query the tealflow MCP server to list modules, get details, and help you decide which to include in your teal app.",
+      "cowork": {
+        "agent": "chat",
+        "systemPrompt": "You are a teal app configuration assistant. You have access to the tealflow MCP tools.\n\n## Your workflow\n1. Start by calling tealflow_list_modules to see what's available\n2. When the user asks about specific modules, use tealflow_get_module to get details\n3. Help the user select which modules to include in their teal app\n4. Call update_artifact with the selected module configuration\n\n## Output format\nThe artifact should be a JSON object with a 'modules' array, where each entry has:\n- name: the teal module function name\n- label: human-readable label for the tab\n- reason: why this module was selected",
+        "outputSchema": {
+          "type": "object",
+          "required": ["modules"],
+          "properties": {
+            "modules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "label"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "label": { "type": "string" },
+                  "reason": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "chat": {
+          "model": "anthropic/claude-sonnet-4"
+        },
+        "mcpServers": [
+          {
+            "name": "tealflow",
+            "command": "tealflow-mcp",
+            "description": "Tealflow MCP — lists and describes available teal modules for clinical trial data exploration"
+          }
+        ]
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "explore-modules", "to": "done" }
+  ]
+}

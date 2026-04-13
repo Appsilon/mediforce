@@ -261,7 +261,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
 
       mcpConfig[server.name] = {
-        command: server.command,
+        command: server.command ?? '',
         args: server.args ?? [],
         ...(Object.keys(resolvedEnv).length > 0 ? { env: resolvedEnv } : {}),
         ...(server.allowedTools && server.allowedTools.length > 0 ? { allowedTools: server.allowedTools } : {}),
