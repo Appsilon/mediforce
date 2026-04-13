@@ -443,6 +443,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         commit: stepAgent.commit,
         dockerfile: stepAgent.dockerfile,
         mcpServers: stepAgent.mcpServers,
+        allowedTools: stepAgent.allowedTools,
       };
     } else {
       const stepConfig = context.config.stepConfigs.find(
