@@ -18,6 +18,33 @@ import {
   type CoworkSessionRepository,
 } from '@mediforce/platform-core';
 
+/**
+ * Sanitize raw Firestore data before Zod parse.
+ * LLMs sometimes return artifact as JSON string instead of object — fix on read.
+ */
+function sanitizeSessionData(data: Record<string, unknown>): Record<string, unknown> {
+  if (typeof data.artifact === 'string') {
+    try {
+      data.artifact = JSON.parse(data.artifact);
+    } catch {
+      data.artifact = null;
+    }
+  }
+  if (Array.isArray(data.turns)) {
+    for (const turn of data.turns) {
+      const t = turn as Record<string, unknown>;
+      if (typeof t.artifactDelta === 'string') {
+        try {
+          t.artifactDelta = JSON.parse(t.artifactDelta);
+        } catch {
+          t.artifactDelta = null;
+        }
+      }
+    }
+  }
+  return data;
+}
+
 export class FirestoreCoworkSessionRepository implements CoworkSessionRepository {
   private readonly collectionName = 'coworkSessions';
 
@@ -33,7 +60,7 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
     const docRef = doc(this.db, this.collectionName, sessionId);
     const snap = await getDoc(docRef);
     if (!snap.exists()) return null;
-    return CoworkSessionSchema.parse(snap.data());
+    return CoworkSessionSchema.parse(sanitizeSessionData(snap.data()));
   }
 
   async getByInstanceId(instanceId: string): Promise<CoworkSession[]> {
@@ -44,7 +71,7 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
       orderBy('createdAt', 'asc'),
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => CoworkSessionSchema.parse(d.data()));
+    return snap.docs.map((d) => CoworkSessionSchema.parse(sanitizeSessionData(d.data())));
   }
 
   async addTurn(sessionId: string, turn: ConversationTurn): Promise<CoworkSession> {

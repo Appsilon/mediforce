@@ -101,7 +101,7 @@
       "executor": "agent",
       "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
-      "description": "Validate the generated Teal app using TealFlowMCP, then push to GitHub",
+      "description": "Write app code from cowork artifact and push to GitHub",
       "env": {
         "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
         "ANTHROPIC_API_KEY": "",
@@ -113,15 +113,7 @@
         "skillsDir": "apps/tealflow/plugins/tealflow/skills",
         "model": "sonnet",
         "image": "mediforce-agent:tealflow",
-        "timeoutMinutes": 15,
-        "mcpServers": [
-          {
-            "name": "tealflow",
-            "command": "tealflow-mcp",
-            "description": "TealFlow — R environment validation and Shiny startup check",
-            "allowedTools": ["tealflow_setup_renv_environment", "tealflow_snapshot_renv_environment", "tealflow_check_shiny_startup"]
-          }
-        ]
+        "timeoutMinutes": 5
       }
     },
     {
