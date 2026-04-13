@@ -1,13 +1,95 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X, HelpCircle, Save, Undo2, Redo2 } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
+import { EditorState } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
+import { basicSetup } from 'codemirror';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { yaml as yamlLang } from '@codemirror/lang-yaml';
+import { tags } from '@lezer/highlight';
 import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import { WorkflowStepSchema, TransitionSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { StepEditor } from './workflow-editor/step-editor';
+import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
+
+// ---------------------------------------------------------------------------
+// YAML code editor (CodeMirror 6)
+// ---------------------------------------------------------------------------
+
+function YamlCodeEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const externalUpdateRef = useRef(false);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const state = EditorState.create({
+      doc: value,
+      extensions: [
+        basicSetup,
+        yamlLang(),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged && !externalUpdateRef.current) {
+            onChangeRef.current(update.state.doc.toString());
+          }
+        }),
+        EditorView.theme({
+          '&': { fontSize: '11px', height: 'auto' },
+          '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'visible' },
+          '.cm-content': { padding: '8px 0' },
+          '.cm-gutters': { borderRight: '1px solid var(--border)', background: 'transparent', color: 'hsl(var(--muted-foreground))', fontSize: '10px' },
+          '.cm-activeLineGutter': { background: 'transparent' },
+          // Syntax token colours (using CSS vars so they adapt to light/dark)
+          '.cm-tok-key':     { color: 'hsl(var(--primary))', fontWeight: '500' },
+          '.cm-tok-string':  { color: 'hsl(var(--color-status-warn))' },
+          '.cm-tok-number':  { color: 'hsl(38 75% 45%)' },
+          '.cm-tok-bool':    { color: 'hsl(var(--color-status-ok))' },
+          '.cm-tok-null':    { color: 'hsl(var(--muted-foreground))' },
+          '.cm-tok-comment': { color: 'hsl(var(--muted-foreground))', fontStyle: 'italic' },
+          '.cm-tok-punct':   { color: 'hsl(var(--muted-foreground) / 0.6)' },
+        }),
+        syntaxHighlighting(HighlightStyle.define([
+          { tag: tags.propertyName,              class: 'cm-tok-key' },
+          { tag: tags.string,                    class: 'cm-tok-string' },
+          { tag: tags.number,                    class: 'cm-tok-number' },
+          { tag: [tags.bool, tags.atom],         class: 'cm-tok-bool' },
+          { tag: tags.null,                      class: 'cm-tok-null' },
+          { tag: tags.comment,                   class: 'cm-tok-comment' },
+          { tag: [tags.separator, tags.bracket], class: 'cm-tok-punct' },
+        ])),
+      ],
+    });
+
+    const view = new EditorView({ state, parent: containerRef.current });
+    viewRef.current = view;
+    return () => { view.destroy(); viewRef.current = null; };
+    // init-only: value is synced via the second useEffect below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync externally-driven value changes into the editor
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || view.state.doc.toString() === value) return;
+    externalUpdateRef.current = true;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
+    externalUpdateRef.current = false;
+  }, [value]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="rounded-lg border overflow-hidden [&_.cm-editor]:outline-none [&_.cm-editor.cm-focused]:outline-none"
+    />
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -63,31 +145,18 @@ export function WorkflowEditorCanvas({
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-  const [addingStep, setAddingStep] = useState(false);
-  const [pendingStepType, setPendingStepType] = useState<WorkflowStep['type'] | null>(null);
   const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
-  const [yamlEditMode, setYamlEditMode] = useState(false);
+  const [redoHistory, setRedoHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
   const [yamlDraft, setYamlDraft] = useState('');
   const [yamlError, setYamlError] = useState<string | null>(null);
+  // Tracks the last value we pushed into yamlDraft from the diagram,
+  // so we can distinguish "user edits" from "diagram-driven updates".
+  const lastSyncedYamlRef = useRef('');
 
   const selectedStep = editedSteps.find((s) => s.id === selectedStepId) ?? null;
 
-  // ── Move eligibility ───────────────────────────────────────────────────────
-  const canMoveSelectedUp = (() => {
-    if (!selectedStepId) return false;
-    const incoming = editedTransitions.filter((t) => t.to === selectedStepId);
-    if (incoming.length !== 1) return false;
-    const pred = incoming[0].from;
-    return editedTransitions.filter((t) => t.from === pred).length === 1;
-  })();
-
-  const canMoveSelectedDown = (() => {
-    if (!selectedStepId) return false;
-    const outgoing = editedTransitions.filter((t) => t.from === selectedStepId);
-    if (outgoing.length !== 1) return false;
-    const succ = outgoing[0].to;
-    return editedTransitions.filter((t) => t.to === succ).length === 1;
-  })();
+  // ── Move eligibility (all steps, used by diagram hover buttons) ─────────────
+  const { canMoveUp: canMoveUpSet, canMoveDown: canMoveDownSet } = computeMoveEligibility(editedSteps, editedTransitions);
 
   // ── History ────────────────────────────────────────────────────────────────
   // Keep refs in sync so saveSnapshot can read current state without being
@@ -100,12 +169,25 @@ export function WorkflowEditorCanvas({
 
   const saveSnapshot = useCallback(() => {
     setEditHistory((prev) => [...prev, { steps: editedStepsRef.current, transitions: editedTransitionsRef.current }]);
+    setRedoHistory([]);
   }, []);
 
   const undoEdit = useCallback(() => {
     setEditHistory((prev) => {
       if (prev.length === 0) return prev;
       const snapshot = prev[prev.length - 1];
+      setRedoHistory((r) => [...r, { steps: editedStepsRef.current, transitions: editedTransitionsRef.current }]);
+      setEditedSteps(snapshot.steps);
+      setEditedTransitions(snapshot.transitions);
+      return prev.slice(0, -1);
+    });
+  }, []);
+
+  const redoEdit = useCallback(() => {
+    setRedoHistory((prev) => {
+      if (prev.length === 0) return prev;
+      const snapshot = prev[prev.length - 1];
+      setEditHistory((h) => [...h, { steps: editedStepsRef.current, transitions: editedTransitionsRef.current }]);
       setEditedSteps(snapshot.steps);
       setEditedTransitions(snapshot.transitions);
       return prev.slice(0, -1);
@@ -116,20 +198,24 @@ export function WorkflowEditorCanvas({
     setEditedSteps(structuredClone(initialSteps));
     setEditedTransitions(structuredClone(initialTransitions));
     setEditHistory([]);
+    setRedoHistory([]);
     setSelectedStepId(null);
   }, [initialSteps, initialTransitions]);
 
-  // ── Ctrl+Z ─────────────────────────────────────────────────────────────────
+  // ── Ctrl+Z / Ctrl+Shift+Z ──────────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         undoEdit();
+      } else if (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        redoEdit();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [undoEdit]);
+  }, [undoEdit, redoEdit]);
 
   // ── Notify parent of changes ───────────────────────────────────────────────
   useEffect(() => {
@@ -141,6 +227,28 @@ export function WorkflowEditorCanvas({
     if (!stepErrors || Object.keys(stepErrors).length === 0) return;
     setSelectedStepId(Object.keys(stepErrors)[0]);
   }, [stepErrors]);
+
+  // ── Ensure terminal step always exists + auto-connect orphaned steps ──────────
+  useEffect(() => {
+    const { steps: nextSteps, transitions: nextTransitions } = ensureTerminalConnected(editedSteps, editedTransitions);
+    if (nextSteps !== editedSteps) setEditedSteps(nextSteps);
+    if (nextTransitions !== editedTransitions) setEditedTransitions(nextTransitions);
+  }, [editedSteps, editedTransitions]);
+
+  // ── Sync yamlPreview → yamlDraft when diagram changes (not user edits) ───────
+  const yamlPreviewForSync = yamlStringify(
+    { ...(yamlFields ?? {}), steps: editedSteps, transitions: editedTransitions },
+    { indent: 2 },
+  );
+  useEffect(() => {
+    if (yamlDraft === lastSyncedYamlRef.current) {
+      setYamlDraft(yamlPreviewForSync);
+      lastSyncedYamlRef.current = yamlPreviewForSync;
+    }
+  // yamlDraft intentionally omitted — we only want to run this when the diagram changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yamlPreviewForSync]);
+
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const updateStep = useCallback((stepId: string, patch: Partial<WorkflowStep>) => {
@@ -172,7 +280,7 @@ export function WorkflowEditorCanvas({
     }
   }, []);
 
-  const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor']) => {
+  const addStep = useCallback((type: WorkflowStep['type'], executor: WorkflowStep['executor'], insertAfterId: string | null = null) => {
     const terminalStep = editedSteps.find((s) => s.type === 'terminal');
 
     // Only one terminal allowed
@@ -191,25 +299,29 @@ export function WorkflowEditorCanvas({
       ...(executor === 'cowork' ? { cowork: { agent: 'chat' as const } } : {}),
     };
 
+    // When inserting via an edge button, insertAfterId is set explicitly.
+    // Otherwise fall back to the currently selected step.
+    const resolvedInsertAfterId = insertAfterId ?? selectedStepId;
+
     if (!terminalStep || type === 'terminal') {
       // No terminal yet (or we're adding the terminal itself): append at end
       const lastId = editedSteps[editedSteps.length - 1]?.id;
       setEditedSteps((prev) => [...prev, newStep]);
       setEditedTransitions((prev) => lastId ? [...prev, { from: lastId, to: newId }] : prev);
-    } else if (selectedStepId && selectedStepId !== terminalStep.id) {
-      // Insert after the currently selected step
-      const selectedIdx = editedSteps.findIndex((s) => s.id === selectedStepId);
+    } else if (resolvedInsertAfterId && resolvedInsertAfterId !== terminalStep.id) {
+      // Insert after the target step
+      const insertIdx = editedSteps.findIndex((s) => s.id === resolvedInsertAfterId);
       setEditedSteps((prev) => {
         const next = [...prev];
-        next.splice(selectedIdx + 1, 0, newStep);
+        next.splice(insertIdx + 1, 0, newStep);
         return next;
       });
       setEditedTransitions((prev) => {
-        // Edges from selectedStep → their targets now go through newStep
-        const outgoing = prev.filter((t) => t.from === selectedStepId);
-        const others = prev.filter((t) => t.from !== selectedStepId);
+        // Edges from resolvedInsertAfterId → their targets now go through newStep
+        const outgoing = prev.filter((t) => t.from === resolvedInsertAfterId);
+        const others = prev.filter((t) => t.from !== resolvedInsertAfterId);
         const rewired = outgoing.map((t) => ({ from: newId, to: t.to }));
-        return [...others, { from: selectedStepId, to: newId }, ...rewired];
+        return [...others, { from: resolvedInsertAfterId, to: newId }, ...rewired];
       });
     } else {
       // No step selected: insert immediately before the terminal step
@@ -228,9 +340,11 @@ export function WorkflowEditorCanvas({
       });
     }
 
-    setSelectedStepId(newId);
-    setAddingStep(false);
-    setPendingStepType(null);
+    // Only auto-select the new step when not inserting via an edge button
+    // (edge button should leave the right panel unchanged).
+    if (insertAfterId === null) {
+      setSelectedStepId(newId);
+    }
   }, [editedSteps, selectedStepId, saveSnapshot]);
 
   const removeStep = useCallback((stepId: string) => {
@@ -310,113 +424,43 @@ export function WorkflowEditorCanvas({
     transitions: editedTransitions,
   } as WorkflowDefinition;
 
-  const yamlPreview = yamlStringify(
-    { ...(yamlFields ?? {}), steps: editedSteps, transitions: editedTransitions },
-    { indent: 2 },
-  );
+
 
   const savePanel = renderSavePanel?.(editedSteps, editedTransitions, discardChanges) ?? null;
 
+  const applyYaml = () => {
+    try {
+      const doc = yamlParse(yamlDraft) as Record<string, unknown>;
+      const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
+      if (!stepsResult.success) {
+        setYamlError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
+        return;
+      }
+      const transitionsResult = TransitionSchema.array().safeParse(
+        Array.isArray(doc?.transitions) ? doc.transitions : [],
+      );
+      if (!transitionsResult.success) {
+        setYamlError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
+        return;
+      }
+      saveSnapshot();
+      setEditedSteps(stepsResult.data);
+      setEditedTransitions(transitionsResult.data);
+      lastSyncedYamlRef.current = yamlDraft;
+      setYamlError(null);
+    } catch (err) {
+      setYamlError(err instanceof Error ? err.message : 'Invalid YAML');
+    }
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-1 min-h-0">
-      {/* Diagram column */}
-      <div className="flex-1 flex flex-col pr-0">
-        {/* Toolbar */}
-        <div className="border-b px-4 py-2 flex items-center gap-1.5 bg-muted/30 shrink-0 flex-wrap">
-          {/* Add Step */}
-          <div className="relative">
-            <button
-              onClick={() => { setAddingStep(!addingStep); setPendingStepType(null); }}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              + Add Step
-            </button>
-            {addingStep && (
-              <div className="absolute top-full left-0 mt-1.5 bg-background border rounded-xl shadow-xl p-3 z-50 w-80 space-y-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
-                  <div className="flex flex-col gap-1">
-                    {([
-                      { type: 'creation', label: 'Input', description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400', activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
-                      { type: 'review', label: 'Review', description: 'A step where someone evaluates work and gives a verdict such as approve or reject.', color: 'text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-50 dark:bg-amber-900/30 ring-1 ring-amber-400' },
-                      { type: 'decision', label: 'Decision', description: 'A branching step that routes the workflow to different paths based on a condition.', color: 'text-purple-600 dark:text-purple-400', activeBg: 'bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-400' },
-                      { type: 'terminal', label: 'End', description: 'Marks the final state of the workflow — all paths must lead here.', color: 'text-emerald-600 dark:text-emerald-400', activeBg: '' },
-                    ] as const).map((opt) => {
-                      const isTerminalDisabled = opt.type === 'terminal' && editedSteps.some((s) => s.type === 'terminal');
-                      const isActive = pendingStepType === opt.type;
-                      return (
-                        <button
-                          key={opt.type}
-                          disabled={isTerminalDisabled}
-                          onClick={() => {
-                            if (opt.type === 'terminal') { addStep('terminal', 'human'); }
-                            else { setPendingStepType(opt.type); }
-                          }}
-                          className={cn(
-                            'rounded-lg px-3 py-2 text-left transition-all w-full',
-                            isTerminalDisabled
-                              ? 'opacity-40 cursor-not-allowed'
-                              : isActive
-                                ? opt.activeBg
-                                : 'hover:bg-muted',
-                          )}
-                        >
-                          <span className={cn('text-xs font-semibold', opt.color)}>{opt.label}</span>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{opt.description}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                {pendingStepType && (
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Executor</p>
-                    <div className="flex gap-1.5">
-                      {(pendingStepType === 'creation'
-                        ? (['human', 'agent', 'script', 'cowork'] as const)
-                        : (['human', 'agent'] as const)
-                      ).map((executor) => (
-                        <button
-                          key={executor}
-                          onClick={() => addStep(pendingStepType, executor)}
-                          className="flex-1 rounded-lg py-1.5 text-xs font-semibold hover:bg-muted transition-all capitalize border"
-                        >
-                          {executor}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+    <div className="flex flex-1 flex-col min-h-0">
 
-          <div className="w-px h-4 bg-border mx-0.5" />
+      {/* ── Unified sticky toolbar ── */}
+      <div className="shrink-0 border-b px-4 py-2 flex items-center gap-1.5 flex-wrap bg-background">
 
-          <button
-            onClick={() => selectedStepId && moveStep(selectedStepId, 'up')}
-            disabled={!canMoveSelectedUp}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-              canMoveSelectedUp ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
-            )}
-          >
-            ↑ Move Up
-          </button>
-
-          <button
-            onClick={() => selectedStepId && moveStep(selectedStepId, 'down')}
-            disabled={!canMoveSelectedDown}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-              canMoveSelectedDown ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
-            )}
-          >
-            ↓ Move Down
-          </button>
-
-          <button
+        <button
             onClick={undoEdit}
             disabled={editHistory.length === 0}
             title="Undo last change (Ctrl+Z)"
@@ -425,143 +469,116 @@ export function WorkflowEditorCanvas({
               editHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
             )}
           >
-            ↩ Undo
+            <Undo2 className="h-3.5 w-3.5" />
+            Undo
           </button>
-
-          <div className="w-px h-4 bg-border mx-0.5" />
 
           <button
-            onClick={() => selectedStepId && removeStep(selectedStepId)}
-            disabled={!selectedStepId}
+            onClick={redoEdit}
+            disabled={redoHistory.length === 0}
+            title="Redo last change (Ctrl+Shift+Z)"
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-              selectedStepId
-                ? 'hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-foreground dark:hover:bg-red-900/20 dark:hover:text-red-400'
-                : 'opacity-40 cursor-not-allowed text-muted-foreground',
+              redoHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
             )}
           >
-            Remove Step
+            <Redo2 className="h-3.5 w-3.5" />
+            Redo
           </button>
 
-          {selectedStepId && (
-            <span className="ml-auto text-xs text-muted-foreground">
-              Selected: <span className="font-mono">{selectedStepId}</span>
-            </span>
+          {/* Right section: YAML title + save (hidden when a step is selected) */}
+          {!selectedStepId && (
+            <div className="ml-auto flex items-center gap-2">
+              <div className="w-px h-4 bg-border" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-semibold">Workflow source code</span>
+                <span className="group relative inline-flex items-center">
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40" />
+                  <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
+                    <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
+                    <p>You can author workflows three ways:</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                      <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
+                      <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
+                      <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
+                    </ul>
+                  </span>
+                </span>
+              </div>
+              {yamlError && (
+                <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
+              )}
+              <button
+                onClick={applyYaml}
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border hover:bg-muted text-foreground transition-colors"
+              >
+                <Save className="h-3.5 w-3.5" />
+                Apply YAML to canvas
+              </button>
+            </div>
           )}
-        </div>
+        </div>{/* end unified toolbar */}
 
-        {/* Diagram */}
-        <div className="flex-1 p-6 pt-4">
-          <WorkflowDiagram
-            definition={diagramDefinition}
-            className="border-0"
-            onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
-            onNodeDelete={removeStep}
-            onPaneClick={() => setSelectedStepId(null)}
-            selectedStepId={selectedStepId}
-            errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
-          />
-        </div>
-      </div>
+        {/* ── Two-column content area ── */}
+        <div className="flex flex-1 overflow-y-auto items-start">
 
-      {/* Side panel */}
-      <div className="w-1/2 shrink-0 border-l bg-background overflow-y-auto">
-        <div className="p-4 space-y-4">
-          {selectedStep ? (
-            <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">Edit step</h2>
-                <button
-                  onClick={() => setSelectedStepId(null)}
-                  className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <StepEditor
-                step={selectedStep}
-                allSteps={editedSteps}
-                workflowName={workflowName}
-                onChange={(patch) => updateStep(selectedStep.id, patch)}
-                errors={stepErrors?.[selectedStep.id]}
-              />
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">YAML</h2>
-                <button
-                  onClick={() => {
-                    if (yamlEditMode) {
-                      setYamlEditMode(false);
-                      setYamlError(null);
-                    } else {
-                      setYamlDraft(yamlPreview);
-                      setYamlError(null);
-                      setYamlEditMode(true);
-                    }
-                  }}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors border rounded-md px-2 py-0.5"
-                >
-                  {yamlEditMode ? 'Cancel' : 'Edit YAML'}
-                </button>
-              </div>
-              {yamlEditMode ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={yamlDraft}
-                    onChange={(e) => { setYamlDraft(e.target.value); setYamlError(null); }}
-                    rows={20}
-                    spellCheck={false}
-                    className="w-full text-[11px] font-mono bg-muted/30 rounded-lg p-4 border focus:outline-none focus:ring-1 focus:ring-primary resize-y leading-relaxed"
+          {/* Diagram column */}
+          <div className="flex-1 p-6 pt-4">
+            <WorkflowDiagram
+              definition={diagramDefinition}
+              className="border-0"
+              onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
+              onNodeDelete={removeStep}
+              onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
+              onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
+              onEdgeAdd={(fromStepId, type, executor) => addStep(type, executor, fromStepId)}
+              onPaneClick={() => setSelectedStepId(null)}
+              selectedStepId={selectedStepId}
+              errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
+              canMoveUp={canMoveUpSet}
+              canMoveDown={canMoveDownSet}
+            />
+          </div>
+
+          {/* Side panel */}
+          <div className="w-1/2 shrink-0 border-l bg-background">
+            <div className="p-4 space-y-4">
+              {selectedStep ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold">Edit step</h2>
+                    <button
+                      onClick={() => setSelectedStepId(null)}
+                      className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <StepEditor
+                    step={selectedStep}
+                    allSteps={editedSteps}
+                    workflowName={workflowName}
+                    onChange={(patch) => updateStep(selectedStep.id, patch)}
+                    errors={stepErrors?.[selectedStep.id]}
                   />
-                  {yamlError && (
-                    <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
-                  )}
-                  <button
-                    onClick={() => {
-                      try {
-                        const doc = yamlParse(yamlDraft) as Record<string, unknown>;
-                        const stepsResult = WorkflowStepSchema.array().safeParse(doc?.steps);
-                        if (!stepsResult.success) {
-                          setYamlError(`steps: ${stepsResult.error.issues[0]?.message ?? 'invalid'}`);
-                          return;
-                        }
-                        const transitionsResult = TransitionSchema.array().safeParse(
-                          Array.isArray(doc?.transitions) ? doc.transitions : [],
-                        );
-                        if (!transitionsResult.success) {
-                          setYamlError(`transitions: ${transitionsResult.error.issues[0]?.message ?? 'invalid'}`);
-                          return;
-                        }
-                        saveSnapshot();
-                        setEditedSteps(stepsResult.data);
-                        setEditedTransitions(transitionsResult.data);
-                        setYamlEditMode(false);
-                        setYamlError(null);
-                      } catch (err) {
-                        setYamlError(err instanceof Error ? err.message : 'Invalid YAML');
-                      }
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    Apply YAML
-                  </button>
-                </div>
+                </>
               ) : (
-                <pre className="text-[11px] font-mono bg-muted/30 rounded-lg p-4 overflow-x-auto overflow-y-auto leading-relaxed">
-                  {yamlPreview}
-                </pre>
+                <>
+                  <YamlCodeEditor
+                    value={yamlDraft}
+                    onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
+                  />
+                  {savePanel && (
+                    <div className="border-t pt-4">
+                      {savePanel}
+                    </div>
+                  )}
+                </>
               )}
-              {!yamlEditMode && savePanel && (
-                <div className="border-t pt-4">
-                  {savePanel}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+          </div>
+
+        </div>{/* end two-column */}
     </div>
   );
 }

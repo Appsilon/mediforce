@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Save, HelpCircle } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
-import { saveWorkflowDefinition, type ValidationIssue } from '@/app/actions/definitions';
+import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
+import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -53,22 +55,6 @@ type SaveState =
   | { status: 'saved'; name: string }
   | { status: 'error'; message: string };
 
-function parseStepErrors(
-  issues: ValidationIssue[],
-  steps: WorkflowStep[],
-): Record<string, Record<string, string>> {
-  const result: Record<string, Record<string, string>> = {};
-  for (const issue of issues) {
-    if (issue.path[0] === 'steps' && typeof issue.path[1] === 'number') {
-      const step = steps[issue.path[1]];
-      const field = String(issue.path[2] ?? 'unknown');
-      const key = step?.id || `__index_${issue.path[1]}`;
-      result[key] = { ...(result[key] ?? {}), [field]: issue.message };
-    }
-  }
-  return result;
-}
-
 function toWorkflowId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
@@ -82,13 +68,16 @@ export default function NewWorkflowPage() {
   const [workflowName, setWorkflowName] = useState('');
   const [namespace, setNamespace] = useState('');
   const [description, setDescription] = useState('');
-  const [versionTitle, setVersionTitle] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
   const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>(TEMPLATE_STEPS);
   const currentTransitionsRef = useRef<WorkflowDefinition['transitions']>(TEMPLATE_TRANSITIONS);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (redirectTimerRef.current !== null) clearTimeout(redirectTimerRef.current); }, []);
 
   const handleCanvasChange = useCallback(
     (steps: WorkflowStep[], transitions: WorkflowDefinition['transitions']) => {
@@ -101,57 +90,38 @@ export default function NewWorkflowPage() {
   // Auto-select first namespace when namespaces load
   const effectiveNamespace = namespace || namespaces[0]?.handle || '';
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (versionTitle: string) => {
     const steps = currentStepsRef.current;
     const transitions = currentTransitionsRef.current;
     const workflowId = toWorkflowId(workflowName);
     if (!workflowId) {
+      setDialogOpen(false);
       setSaveState({ status: 'error', message: 'Workflow name is required.' });
       return;
     }
     if (!description.trim()) {
+      setDialogOpen(false);
       setSaveState({ status: 'error', message: 'Description is required.' });
       return;
     }
-    if (!versionTitle.trim()) {
-      setSaveState({ status: 'error', message: 'Version name is required.' });
+
+    const validationError = validateSteps(steps);
+    if (validationError !== null) {
+      setDialogOpen(false);
+      setSaveState({ status: 'error', message: validationError });
       return;
     }
 
-    const missingPlugin = steps.filter(
-      (s) => s.type !== 'terminal' && (s.executor === 'agent' || s.executor === 'script') && !s.plugin,
-    );
-    if (missingPlugin.length > 0) {
-      setSaveState({ status: 'error', message: `Plugin required for agent/script steps: ${missingPlugin.map((s) => `"${s.name}"`).join(', ')}` });
-      return;
-    }
-
-    const idCounts = new Map<string, number>();
-    for (const s of steps) idCounts.set(s.id, (idCounts.get(s.id) ?? 0) + 1);
-    const dupes = [...idCounts.entries()].filter(([, count]) => count > 1).map(([id]) => id);
-    if (dupes.length > 0) {
-      setSaveState({ status: 'error', message: `Duplicate step IDs: ${dupes.join(', ')}` });
-      return;
-    }
-
+    setDialogOpen(false);
     setStepErrors({});
     setSaveState({ status: 'saving' });
 
-    const mergedTransitions = [...transitions];
-    for (const step of steps) {
-      if (step.type === 'review' && step.verdicts) {
-        for (const verdict of Object.values(step.verdicts)) {
-          if (verdict.target && !mergedTransitions.some((t) => t.from === step.id && t.to === verdict.target)) {
-            mergedTransitions.push({ from: step.id, to: verdict.target });
-          }
-        }
-      }
-    }
+    const mergedTransitions = mergeVerdictTransitions(steps, transitions);
 
     const result = await saveWorkflowDefinition({
       name: workflowId,
       namespace: effectiveNamespace || undefined,
-      title: versionTitle.trim() || undefined,
+      title: versionTitle || undefined,
       description: description.trim() || undefined,
       steps,
       transitions: mergedTransitions,
@@ -160,7 +130,7 @@ export default function NewWorkflowPage() {
 
     if (result.success) {
       setSaveState({ status: 'saved', name: result.name });
-      setTimeout(() => {
+      redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
       }, 500);
     } else {
@@ -173,7 +143,7 @@ export default function NewWorkflowPage() {
           : result.error,
       });
     }
-  }, [workflowName, effectiveNamespace, versionTitle, description, handle, router]);
+  }, [workflowName, effectiveNamespace, description, handle, router]);
 
 
   const yamlFields: Record<string, unknown> = {
@@ -183,121 +153,83 @@ export default function NewWorkflowPage() {
     triggers: [{ type: 'manual', name: 'start' }],
   };
 
+  const canPublish = saveState.status !== 'saving' && !!toWorkflowId(workflowName) && !!description.trim();
+
   return (
-    <div className="flex flex-1 flex-col relative">
+    <div className="flex h-full flex-col relative">
       {/* Header */}
-      <div className="border-b px-6 py-4 sticky top-0 z-30 bg-background space-y-4">
-        <p className="text-sm text-muted-foreground max-w-2xl">
-          Design your workflow visually. The canvas below shows a two-step starter: a human task followed by an AI agent review. Click any step to edit it, use the toolbar to add or rearrange steps, then click <strong>Save and publish workflow</strong> above.
-        </p>
-
-        <div className="flex flex-wrap items-end gap-4">
-          {/* Owner */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">Namespace</label>
-            <select
-              value={effectiveNamespace}
-              onChange={(e) => setNamespace(e.target.value)}
-              disabled={namespacesLoading || namespaces.length === 0}
-              className={cn(
-                'rounded-md border bg-background px-3 py-1.5 text-sm outline-none',
-                'focus:ring-1 focus:ring-ring focus:border-ring',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-              )}
-            >
-              {namespacesLoading ? (
-                <option value="">Loading...</option>
-              ) : (
-                namespaces.map((ns) => (
-                  <option key={ns.handle} value={ns.handle}>
-                    {ns.displayName ?? ns.handle} (@{ns.handle})
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-
-          {/* Workflow name */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">
-              Workflow ID <span className="text-muted-foreground/50 font-normal">(used in URLs, auto-slugged)</span>
-            </label>
+      <div className="border-b px-6 py-5 sticky top-0 z-30 bg-background">
+        <div className="flex items-start justify-between gap-6">
+          {/* Left: workflow identity */}
+          <div className="flex-1 min-w-0">
             <input
               value={workflowName}
               onChange={(e) => setWorkflowName(e.target.value)}
-              placeholder="e.g. clinical-trial-review"
-              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring min-w-64"
+              placeholder="Workflow name…"
+              className="w-full bg-transparent text-2xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
             />
-          </div>
-
-          {/* Description */}
-          <div className="flex flex-col gap-1 flex-1 min-w-48">
-            <label className="text-xs font-medium text-muted-foreground">Description</label>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What does this workflow do?"
-              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+              placeholder="Add a description…"
+              className="mt-1 w-full bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
             />
-          </div>
-
-          {/* Version name */}
-          <div className="flex flex-col gap-1 min-w-48">
-            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              Version name
-              <span className="group relative inline-flex">
-                <HelpCircle className="h-3 w-3 text-muted-foreground/50 cursor-help" />
-                <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-[480px] rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed">
-                  Workflows evolve over time — each saved revision gets a version number automatically. A version name lets you describe what changed so it&apos;s easy to tell &quot;Added AI review step&quot; apart from &quot;Tightened approval criteria&quot; at a glance, rather than deciphering v1, v2, v3.
-                </span>
-              </span>
-            </label>
-            <input
-              value={versionTitle}
-              onChange={(e) => setVersionTitle(e.target.value)}
-              placeholder="e.g. Initial version"
-              className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
-            />
-          </div>
-
-          {/* Save button */}
-          <div className="flex flex-col gap-1">
-            <div className="h-[18px]" />
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSave}
-                disabled={saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()}
-                title={
-                  !toWorkflowId(workflowName) ? 'Enter a workflow ID to publish' :
-                  !description.trim() ? 'Enter a description to publish' :
-                  !versionTitle.trim() ? 'Enter a version name to publish' :
-                  undefined
-                }
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-                  (saveState.status === 'saving' || !toWorkflowId(workflowName) || !description.trim() || !versionTitle.trim()) && 'opacity-50 cursor-not-allowed',
-                )}
+            {/* Secondary metadata row */}
+            <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground/60 flex-wrap">
+              <span className="shrink-0">Namespace:</span>
+              <select
+                value={effectiveNamespace}
+                onChange={(e) => setNamespace(e.target.value)}
+                disabled={namespacesLoading || namespaces.length === 0}
+                className="bg-transparent border-0 text-xs text-muted-foreground/60 outline-none cursor-pointer hover:text-muted-foreground disabled:cursor-not-allowed py-0 max-w-[160px]"
               >
-                <Save className="h-3.5 w-3.5" />
-                {saveState.status === 'saving' ? 'Publishing...' : 'Save and publish workflow'}
-              </button>
-              {saveState.status !== 'saving' && saveState.status !== 'saved' && saveState.status !== 'error' && (
-                !toWorkflowId(workflowName) ? <span className="text-xs text-muted-foreground">Workflow ID required</span> :
-                !description.trim() ? <span className="text-xs text-muted-foreground">Description required</span> :
-                !versionTitle.trim() ? <span className="text-xs text-muted-foreground">Version name required</span> :
-                null
+                {namespacesLoading ? (
+                  <option value="">Loading…</option>
+                ) : (
+                  namespaces.map((ns) => (
+                    <option key={ns.handle} value={ns.handle}>{ns.handle}</option>
+                  ))
+                )}
+              </select>
+              {toWorkflowId(workflowName) && (
+                <>
+                  <span>·</span>
+                  <span className="font-mono">{toWorkflowId(workflowName)}</span>
+                </>
               )}
-              {saveState.status === 'saved' && (
-                <span className="inline-flex items-center rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
-                  Created — redirecting…
-                </span>
-              )}
-              {saveState.status === 'error' && (
-                <span className="inline-flex items-center rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
-                  {saveState.message}
-                </span>
-              )}
+              <span>·</span>
+              <span className="text-muted-foreground">You are adding a new workflow</span>
             </div>
+          </div>
+
+          {/* Right: save controls */}
+          <div className="flex items-center gap-2 shrink-0 pt-0.5">
+            {saveState.status === 'saved' && (
+              <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                Created — redirecting…
+              </span>
+            )}
+            {saveState.status === 'error' && (
+              <span className="text-sm text-red-600 dark:text-red-400 max-w-xs truncate" title={saveState.message}>
+                {saveState.message}
+              </span>
+            )}
+            <button
+              onClick={() => setDialogOpen(true)}
+              disabled={!canPublish}
+              title={
+                !toWorkflowId(workflowName) ? 'Enter a workflow name to publish' :
+                !description.trim() ? 'Add a description to publish' :
+                undefined
+              }
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
+                !canPublish && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              <Save className="h-3.5 w-3.5" />
+              {saveState.status === 'saving' ? 'Publishing…' : 'Publish workflow'}
+            </button>
           </div>
         </div>
       </div>
@@ -309,6 +241,14 @@ export default function NewWorkflowPage() {
         yamlFields={yamlFields}
         onChange={handleCanvasChange}
         stepErrors={stepErrors}
+      />
+
+      <SaveVersionDialog
+        open={dialogOpen}
+        nextVersion={1}
+        confirmLabel="Publish workflow"
+        onClose={() => setDialogOpen(false)}
+        onConfirm={handleSave}
       />
     </div>
   );
