@@ -17,6 +17,7 @@ const nextConfig = {
     '@mediforce/agent-queue',
     '@mediforce/supply-intelligence-plugins',
     '@mediforce/supply-intelligence',
+    '@mediforce/mcp-client',
   ],
   serverExternalPackages: ['bullmq', 'ioredis'],
   webpack: (config) => {
@@ -33,6 +34,7 @@ const nextConfig = {
       '@mediforce/agent-queue': path.join(packagesDir, 'agent-queue/src/index.ts'),
       '@mediforce/supply-intelligence-plugins': path.join(packagesDir, 'supply-intelligence-plugins/src/index.ts'),
       '@mediforce/supply-intelligence': path.join(packagesDir, 'supply-intelligence/src/index.ts'),
+      '@mediforce/mcp-client': path.join(packagesDir, 'mcp-client/src/index.ts'),
     };
     return config;
   },

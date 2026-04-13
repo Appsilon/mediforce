@@ -12,6 +12,7 @@ import { routes } from '@/lib/routes';
 import type { CoworkSession, ConversationTurn, ProcessInstance } from '@mediforce/platform-core';
 import { ArtifactPanel } from './artifact-panel';
 import { ContextPanel } from './context-panel';
+import { ToolCallBubble } from './tool-call-bubble';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -105,19 +106,21 @@ function StepDescriptionBubble({ description }: { description: string }) {
 // ---------------------------------------------------------------------------
 
 export function ChatCoworkView({
-  session: initialSession,
+  session,
   instance,
   handle,
   stepDescription,
 }: ChatCoworkViewProps) {
-  const [turns, setTurns] = React.useState<ConversationTurn[]>(initialSession.turns);
-  const [artifact, setArtifact] = React.useState<Record<string, unknown> | null>(
-    initialSession.artifact,
-  );
+  // Turns and artifact are driven by Firestore onSnapshot from the parent page.
+  // The server action delegates to the API route which writes turns directly to Firestore,
+  // including intermediate tool turns that appear in real-time.
+  const turns = session.turns;
+  const artifact = session.artifact;
+
   const [input, setInput] = React.useState('');
   const [sending, setSending] = React.useState(false);
   const [finalizing, setFinalizing] = React.useState(false);
-  const [finalized, setFinalized] = React.useState(initialSession.status === 'finalized');
+  const finalized = session.status === 'finalized';
   const [error, setError] = React.useState<string | null>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
@@ -145,34 +148,11 @@ export function ChatCoworkView({
     setError(null);
     setSending(true);
 
-    const humanTurn: ConversationTurn = {
-      id: crypto.randomUUID(),
-      role: 'human',
-      content: message,
-      timestamp: new Date().toISOString(),
-      artifactDelta: null,
-    };
-    setTurns((prev) => [...prev, humanTurn]);
-
     try {
-      const result = await sendMessage(initialSession.id, message);
+      const result = await sendMessage(session.id, message);
 
       if (!result.success) {
         setError(result.error ?? 'Failed to send message');
-        return;
-      }
-
-      const agentTurn: ConversationTurn = {
-        id: result.turnId ?? crypto.randomUUID(),
-        role: 'agent',
-        content: result.agentText ?? '',
-        timestamp: new Date().toISOString(),
-        artifactDelta: result.artifact ?? null,
-      };
-      setTurns((prev) => [...prev, agentTurn]);
-
-      if (result.artifact) {
-        setArtifact(result.artifact);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
@@ -180,7 +160,7 @@ export function ChatCoworkView({
       setSending(false);
       inputRef.current?.focus();
     }
-  }, [input, sending, finalized, initialSession.id]);
+  }, [input, sending, finalized, session.id]);
 
   const handleFinalize = React.useCallback(async () => {
     if (!artifact || finalizing) return;
@@ -189,20 +169,18 @@ export function ChatCoworkView({
     setError(null);
 
     try {
-      const result = await finalizeSession(initialSession.id, artifact);
+      const result = await finalizeSession(session.id, artifact);
 
       if (!result.success) {
         setError(result.error ?? 'Failed to finalize');
         return;
       }
-
-      setFinalized(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to finalize');
     } finally {
       setFinalizing(false);
     }
-  }, [artifact, finalizing, initialSession.id]);
+  }, [artifact, finalizing, session.id]);
 
   const handleKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -223,7 +201,7 @@ export function ChatCoworkView({
       {/* Chat panel */}
       <div className="flex flex-1 flex-col rounded-lg border">
         {/* Context panel (foldable) */}
-        <ContextPanel instance={instance} session={initialSession} handle={handle} />
+        <ContextPanel instance={instance} session={session} handle={handle} />
 
         {/* Messages */}
         <div className="flex-1 overflow-auto p-4 space-y-3">
@@ -238,11 +216,15 @@ export function ChatCoworkView({
             </div>
           )}
 
-          {turns.map((turn) => (
-            <ChatBubble key={turn.id} turn={turn} />
-          ))}
+          {turns.map((turn) =>
+            turn.role === 'tool' ? (
+              <ToolCallBubble key={turn.id} turn={turn} />
+            ) : (
+              <ChatBubble key={turn.id} turn={turn} />
+            ),
+          )}
 
-          {sending && turns.length > 0 && turns[turns.length - 1].role === 'human' && (
+          {sending && turns.length > 0 && turns[turns.length - 1].role !== 'tool' && (
             <ThinkingIndicator />
           )}
 
@@ -319,7 +301,7 @@ export function ChatCoworkView({
       <div className="w-[400px] shrink-0">
         <ArtifactPanel
           artifact={artifact}
-          outputSchema={initialSession.outputSchema}
+          outputSchema={session.outputSchema}
           onFinalize={handleFinalize}
           finalizing={finalizing}
           finalized={finalized}
