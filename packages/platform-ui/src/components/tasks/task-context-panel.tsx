@@ -3,9 +3,10 @@
 import * as React from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import * as Tabs from '@radix-ui/react-tabs';
-import { FileText, Code, ChevronDown } from 'lucide-react';
+import { FileText, Code, ChevronDown, MonitorPlay } from 'lucide-react';
 import type { StepExecution } from '@mediforce/platform-core';
 import { useSubcollection } from '@/hooks/use-process-instances';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 
 interface TaskContextPanelProps {
@@ -39,6 +40,8 @@ export function TaskContextPanel({
   }, [executions, stepId]);
 
   const hasContent = previousStepOutput !== null && previousStepOutput.output !== null;
+  const presentation = (previousStepOutput?.agentOutput as Record<string, unknown> | null)?.presentation;
+  const hasPresentation = typeof presentation === 'string' && presentation.length > 0;
 
   // Notify parent about content availability
   React.useEffect(() => {
@@ -71,9 +74,10 @@ export function TaskContextPanel({
 
   const output = previousStepOutput!.output!;
   const isObject = typeof output === 'object' && output !== null;
+  const defaultTab = hasPresentation ? 'presentation' : 'summary';
 
   return (
-    <Collapsible.Root defaultOpen={false}>
+    <Collapsible.Root defaultOpen={hasPresentation}>
       <div className="rounded-lg border">
         <Collapsible.Trigger className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -85,9 +89,10 @@ export function TaskContextPanel({
           <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
         </Collapsible.Trigger>
         <Collapsible.Content>
-          <Tabs.Root defaultValue="summary">
+          <Tabs.Root defaultValue={defaultTab}>
             <Tabs.List className="flex gap-1 border-b px-4">
               {[
+                ...(hasPresentation ? [{ value: 'presentation', label: 'Presentation', icon: MonitorPlay }] : []),
                 { value: 'summary', label: 'Summary', icon: FileText },
                 { value: 'full', label: 'Full Output', icon: Code },
               ].map(({ value, label, icon: Icon }) => (
@@ -106,6 +111,15 @@ export function TaskContextPanel({
                 </Tabs.Trigger>
               ))}
             </Tabs.List>
+
+            {hasPresentation && (
+              <Tabs.Content value="presentation" className="p-4">
+                <PresentationIframe
+                  html={presentation as string}
+                  data={isObject ? (output as Record<string, unknown>) : null}
+                />
+              </Tabs.Content>
+            )}
 
             <Tabs.Content value="summary" className="p-4">
               {isObject ? (
@@ -278,4 +292,73 @@ function ValueDisplay({ value }: { value: unknown }) {
   }
 
   return <span>{String(value)}</span>;
+}
+
+/** Sandboxed iframe for rendering agent-provided HTML presentation. */
+function PresentationIframe({ html, data }: { html: string; data: Record<string, unknown> | null }) {
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const [iframeHeight, setIframeHeight] = React.useState(400);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  React.useEffect(() => {
+    function handler(event: MessageEvent) {
+      if (
+        typeof event.data === 'object' &&
+        event.data.type === 'resize' &&
+        typeof event.data.height === 'number' &&
+        iframeRef.current &&
+        event.source === iframeRef.current.contentWindow
+      ) {
+        setIframeHeight(event.data.height);
+      }
+    }
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  React.useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
+  }, [isDark]);
+
+  const safeData = JSON.stringify(data ?? {}).replace(/<\//g, '<\\/');
+  const isFullDocument = html.trim().toLowerCase().startsWith('<!doctype') || html.trim().toLowerCase().startsWith('<html');
+
+  const srcdoc = isFullDocument
+    ? html.replace('</head>', `<script>window.__data__ = ${safeData};</script></head>`)
+        .replace('</body>', `<script>
+const ro = new ResizeObserver(() => {
+  window.parent.postMessage({ type: 'resize', height: document.body.scrollHeight }, '*');
+});
+ro.observe(document.body);
+window.addEventListener('message', (e) => {
+  if (e.data?.type === 'theme') {
+    document.documentElement.classList.toggle('dark', e.data.dark);
+  }
+});
+</script></body>`)
+    : `<!DOCTYPE html><html><head>
+<script>window.__data__ = ${safeData};</script>
+</head><body>${html}
+<script>
+const ro = new ResizeObserver(() => {
+  window.parent.postMessage({ type: 'resize', height: document.body.scrollHeight }, '*');
+});
+ro.observe(document.body);
+window.addEventListener('message', (e) => {
+  if (e.data?.type === 'theme') {
+    document.documentElement.classList.toggle('dark', e.data.dark);
+  }
+});
+</script></body></html>`;
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={srcdoc}
+      sandbox="allow-scripts"
+      style={{ width: '100%', height: iframeHeight, border: 'none' }}
+      title="Agent presentation"
+    />
+  );
 }
