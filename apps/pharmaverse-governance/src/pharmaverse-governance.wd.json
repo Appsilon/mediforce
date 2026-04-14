@@ -47,9 +47,7 @@
       "plugin": "claude-code-agent",
       "description": "Apply governance criteria to each package's metrics. Compare proposed state against current custom properties to detect changes. Propose status tag, quality badges (all 3 dimensions), and flag items needing council attention (tag changes, renewals due, early warnings). Generate per-package report with criteria ID references.",
       "env": {
-        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
-        "ANTHROPIC_API_KEY": "",
-        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+        "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}"
       },
       "agent": {
         "skill": "assess-package-governance",
@@ -82,9 +80,7 @@
       "plugin": "claude-code-agent",
       "description": "Aggregate all approved package reports into a council-ready summary document: consent agenda (healthy packages), proposed tag changes (with evidence and criteria IDs), renewal assessments due (with RC-1..RC-4 dimensions), early warnings, and specific action items for council members.",
       "env": {
-        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
-        "ANTHROPIC_API_KEY": "",
-        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+        "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}"
       },
       "agent": {
         "skill": "generate-council-summary",
