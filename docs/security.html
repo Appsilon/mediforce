@@ -37,44 +37,51 @@
     a { color: var(--accent); text-decoration: none; }
     .w { max-width: 780px; margin: 0 auto; padding: 0 32px; }
 
-    /* Nav */
-    nav { position: sticky; top: 0; z-index: 50; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.88); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); }
-    .nav-logo { font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: -0.025em; color: var(--text); display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .nav-logo svg { width: 22px; height: 22px; }
-    .nav-links { display: flex; gap: 4px; }
-    .nav-links a { font-size: 13px; font-weight: 500; color: var(--text-3); padding: 6px 12px; border-radius: 6px; text-decoration: none; transition: color 0.15s; }
-    .nav-links a:hover { color: var(--text-2); }
+    /* Header */
+    .header { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.88); backdrop-filter: blur(16px); }
+    .header-inner { max-width: 68rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; }
+    .logo-group { display: flex; align-items: center; gap: 0.625rem; text-decoration: none; }
+    .logo-mark { width: 1.75rem; height: 1.75rem; display: flex; align-items: center; justify-content: center; }
+    .logo-mark svg { width: 100%; height: 100%; }
+    .logo-text { font-family: 'Manrope', sans-serif; font-size: 1.125rem; font-weight: 700; letter-spacing: -0.025em; color: var(--text); }
+    .header-links { display: flex; align-items: center; gap: 0.5rem; }
+    .header-link { display: inline-flex; align-items: center; font-size: 0.8125rem; font-weight: 500; color: var(--text-3); padding: 0.375rem 0.75rem; border-radius: 0.375rem; text-decoration: none; transition: color 0.15s; }
+    .header-link:hover { color: var(--text); }
 
-    /* Pillar nav grid */
-    .pillar-nav {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 10px; margin: 32px 0 0;
+    /* Pillar TOC — sticky full-width strip */
+    .pillar-toc {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 53px;
+      z-index: 30;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(12px);
+      transition: box-shadow 0.2s;
     }
-    @media (min-width: 640px) { .pillar-nav { grid-template-columns: 1fr 1fr 1fr 1fr; } }
-    .pillar-nav-item {
-      display: flex; flex-direction: column; gap: 8px;
-      padding: 20px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--bg-2);
+    .pillar-toc.stuck { box-shadow: 0 1px 8px rgba(0,0,0,0.04); }
+    @media (max-width: 640px) { .pillar-toc { grid-template-columns: 1fr 1fr; } }
+    .pillar-toc-item {
+      padding: 20px 20px 16px;
       text-decoration: none;
-      transition: border-color 0.2s, transform 0.15s;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      text-align: center;
     }
-    .pillar-nav-item:hover { transform: translateY(-2px); }
-    .pni--isolate { border-left: 3px solid #0D9488; }
-    .pni--isolate:hover { border-color: rgba(13,148,136,0.25); border-left-color: #0D9488; }
-    .pni--access { border-left: 3px solid var(--purple); }
-    .pni--access:hover { border-color: var(--purple-border); border-left-color: var(--purple); }
-    .pni--encrypt { border-left: 3px solid var(--blue); }
-    .pni--encrypt:hover { border-color: var(--blue-border); border-left-color: var(--blue); }
-    .pni--deploy { border-left: 3px solid var(--slate); }
-    .pni--deploy:hover { border-color: var(--slate-border); border-left-color: var(--slate); }
-    .pni-label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
-    .pni--isolate .pni-label { color: #0D9488; }
-    .pni--access .pni-label { color: var(--purple); }
-    .pni--encrypt .pni-label { color: var(--blue); }
-    .pni--deploy .pni-label { color: var(--slate); }
-    .pni-desc { font-size: 12px; color: var(--text-3); line-height: 1.5; }
+    .pillar-toc-item:hover { background: var(--bg-2); }
+    .pillar-toc-item.active { background: var(--bg-2); }
+    .pti--isolate.active { border-bottom-color: var(--accent); }
+    .pti--access.active { border-bottom-color: var(--purple); }
+    .pti--encrypt.active { border-bottom-color: var(--blue); }
+    .pti--deploy.active { border-bottom-color: var(--slate); }
+    .pti-label { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+    .pti--isolate .pti-label { color: var(--accent); }
+    .pti--access .pti-label { color: var(--purple); }
+    .pti--encrypt .pti-label { color: var(--blue); }
+    .pti--deploy .pti-label { color: var(--slate); }
+    .pti-desc { font-size: 11px; color: var(--text-4); line-height: 1.4; transition: color 0.2s; }
+    .pillar-toc-item.active .pti-desc { color: var(--text-3); }
 
     /* Hero */
     .hero { padding: 80px 0 40px; }
@@ -91,15 +98,10 @@
     .s p strong { color: var(--text); font-weight: 600; }
 
     /* Pillar */
-    .pillar { padding: 64px 0 56px; border-top: 1px solid var(--border); }
-    .pillar-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-    .pillar-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
-    .pb--isolate { color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); }
-    .pb--access { color: var(--purple); background: var(--purple-dim); border: 1px solid var(--purple-border); }
-    .pb--encrypt { color: var(--blue); background: var(--blue-dim); border: 1px solid var(--blue-border); }
-    .pb--deploy { color: var(--slate); background: var(--slate-dim); border: 1px solid var(--slate-border); }
-    .pillar h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
-    .pillar > .psub { margin-top: 4px; font-size: 14px; color: var(--text-3); line-height: 1.7; max-width: 500px; }
+    .pillar { padding: 64px 0 48px; border-top: 1px solid var(--border); scroll-margin-top: 120px; }
+    .pillar h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.25; }
+    .pillar .psub { margin-top: 4px; font-size: 14px; color: var(--text-3); line-height: 1.7; max-width: 520px; }
+    .pillar-head { display: none; }
 
     /* Feature cards */
     .fcards { display: flex; flex-direction: column; gap: 8px; margin-top: 28px; }
@@ -174,18 +176,20 @@
 </head>
 <body>
 
-<nav>
-  <a href="/" class="nav-logo">
-    <svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="1.8" fill="none" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg>
-    Mediforce
-  </a>
-  <div class="nav-links">
-    <a href="/">Home</a>
-    <a href="/validated-ai.html">Validated AI</a>
-    <a href="/security.html">Security</a>
-    <a href="https://github.com/Appsilon/mediforce" target="_blank">GitHub</a>
+<header class="header">
+  <div class="header-inner">
+    <a href="/" class="logo-group">
+      <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="1.8" fill="none" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
+      <span class="logo-text">Mediforce</span>
+    </a>
+    <div class="header-links">
+
+      <a href="/validated-ai.html" class="header-link">Validated AI</a>
+      <a href="/security.html" class="header-link">Security</a>
+      <a href="https://github.com/Appsilon/mediforce" target="_blank" class="header-link">GitHub</a>
+    </div>
   </div>
-</nav>
+</header>
 
 <section class="hero">
   <div class="w">
@@ -197,26 +201,27 @@
       where your data lives, and what models process it.
     </p>
 
-    <div class="pillar-nav">
-      <a href="#isolate" class="pillar-nav-item pni--isolate">
-        <div class="pni-label">Isolate</div>
-        <div class="pni-desc">Every agent in a sandbox. Every step has a scope.</div>
-      </a>
-      <a href="#access" class="pillar-nav-item pni--access">
-        <div class="pni-label">Access</div>
-        <div class="pni-desc">Who can do what. Enforced, not advised.</div>
-      </a>
-      <a href="#encrypt" class="pillar-nav-item pni--encrypt">
-        <div class="pni-label">Encrypt</div>
-        <div class="pni-desc">Secrets encrypted. Audit trail tamper-evident.</div>
-      </a>
-      <a href="#deploy" class="pillar-nav-item pni--deploy">
-        <div class="pni-label">Deploy</div>
-        <div class="pni-desc">Your infrastructure. Your models. Your rules.</div>
-      </a>
-    </div>
   </div>
 </section>
+
+<div class="pillar-toc">
+  <a href="#isolate" class="pillar-toc-item pti--isolate">
+    <div class="pti-label">Isolate</div>
+    <div class="pti-desc">Every agent sandboxed. Every step scoped.</div>
+  </a>
+  <a href="#access" class="pillar-toc-item pti--access">
+    <div class="pti-label">Access</div>
+    <div class="pti-desc">Who can do what. Enforced, not advised.</div>
+  </a>
+  <a href="#encrypt" class="pillar-toc-item pti--encrypt">
+    <div class="pti-label">Encrypt</div>
+    <div class="pti-desc">Secrets encrypted. Trail tamper-evident.</div>
+  </a>
+  <a href="#deploy" class="pillar-toc-item pti--deploy">
+    <div class="pti-label">Deploy</div>
+    <div class="pti-desc">Your infra. Your models. Your rules.</div>
+  </a>
+</div>
 
 <!-- ═══ ISOLATE ═══ -->
 <section class="pillar pillar--isolate" id="isolate">
@@ -485,5 +490,37 @@
   </div>
 </footer>
 
+<script>
+const pillars = document.querySelectorAll('.pillar[id]');
+const tocItems = document.querySelectorAll('.pillar-toc-item');
+const toc = document.querySelector('.pillar-toc');
+const tocMap = {};
+tocItems.forEach(item => {
+  const href = item.getAttribute('href');
+  if (href) tocMap[href.replace('#', '')] = item;
+});
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      tocItems.forEach(t => t.classList.remove('active'));
+      const item = tocMap[entry.target.id];
+      if (item) item.classList.add('active');
+    }
+  });
+}, { rootMargin: '-80px 0px -60% 0px' });
+pillars.forEach(p => observer.observe(p));
+const tocObserver = new IntersectionObserver(([entry]) => {
+  toc.classList.toggle('stuck', !entry.isIntersecting);
+}, { threshold: 1, rootMargin: '-50px 0px 0px 0px' });
+tocObserver.observe(toc);
+tocItems.forEach(item => {
+  item.addEventListener('click', e => {
+    e.preventDefault();
+    const id = item.getAttribute('href').replace('#', '');
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+</script>
 </body>
 </html>

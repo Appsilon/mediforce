@@ -68,37 +68,28 @@
       justify-content: space-between;
       padding: 0.875rem 1.5rem;
     }
-    .logo-group { display: flex; align-items: center; gap: 0.625rem; }
+    .logo-group { display: flex; align-items: center; gap: 0.625rem; text-decoration: none; }
     .logo-mark {
-      width: 1.5rem; height: 1.5rem;
+      width: 1.75rem; height: 1.75rem;
       display: flex; align-items: center; justify-content: center;
     }
-    .logo-mark svg {
-      width: 100%; height: 100%;
-    }
+    .logo-mark svg { width: 100%; height: 100%; }
     .logo-text {
       font-family: 'Manrope', sans-serif;
       font-size: 1.125rem; font-weight: 700; letter-spacing: -0.025em;
       color: var(--text);
     }
-    .header-links { display: flex; align-items: center; gap: 0.75rem; }
+    .header-links { display: flex; align-items: center; gap: 0.5rem; }
     .header-link {
       display: inline-flex; align-items: center; gap: 0.375rem;
       font-size: 0.8125rem; font-weight: 500;
-      color: var(--text-70);
+      color: var(--text-60);
       padding: 0.375rem 0.75rem;
       border-radius: 0.375rem;
-      border: 1px solid transparent;
-      transition: color 0.15s, border-color 0.15s;
+      text-decoration: none;
+      transition: color 0.15s;
     }
-    .header-link:hover { color: var(--text); border-color: var(--border-light); }
-    .header-link svg { width: 1rem; height: 1rem; }
-    .header-link--discord {
-      background: var(--discord);
-      color: #fff;
-      font-weight: 600;
-    }
-    .header-link--discord:hover { background: var(--discord-hover); color: #fff; border-color: transparent; }
+    .header-link:hover { color: var(--text); }
 
     /* ── Hero ── */
     .hero {
@@ -439,21 +430,16 @@
 </head>
 <body>
 
-  <!-- Header -->
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo-group">
-        <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo-g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo-g)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="1.8" fill="none" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
+        <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="1.8" fill="none" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
         <span class="logo-text">Mediforce</span>
       </a>
       <div class="header-links">
         <a href="/validated-ai.html" class="header-link">Validated AI</a>
         <a href="/security.html" class="header-link">Security</a>
-        <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="header-link">GitHub</a>
-        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="header-link header-link--discord">
-          <svg viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/></svg>
-          Join Community
-        </a>
+        <a href="https://github.com/Appsilon/mediforce" target="_blank" class="header-link">GitHub</a>
       </div>
     </div>
   </header>
@@ -500,11 +486,10 @@
           </p>
         </div>
         <div class="why-item">
-          <h3>Pharma needs this</h3>
+          <h3>AI is ready. Process isn't.</h3>
           <p>
-            Efficiency pressure is growing. Every company wants to deploy AI, but
-            regulated environments need structure, oversight, and audit trails
-            that don't exist yet.
+            Teams want to use AI today. But regulated work needs structure,
+            oversight, and audit trails that most AI tools don't provide.
           </p>
         </div>
         <div class="why-item">
