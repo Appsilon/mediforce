@@ -15,9 +15,9 @@
       --accent: #0D9488;
       --accent-dim: rgba(13,148,136,0.06);
       --accent-border: rgba(13,148,136,0.18);
-      --red: #DC2626;
-      --red-dim: rgba(220,38,38,0.06);
-      --red-border: rgba(220,38,38,0.18);
+      --red: #0E7490;
+      --red-dim: rgba(14,116,144,0.06);
+      --red-border: rgba(14,116,144,0.18);
       --purple: #7C3AED;
       --purple-dim: rgba(124,58,237,0.06);
       --purple-border: rgba(124,58,237,0.18);
@@ -51,7 +51,7 @@
     .anchor-nav { display: flex; gap: 6px; justify-content: center; padding: 12px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 49px; z-index: 40; background: rgba(255,255,255,0.92); backdrop-filter: blur(16px); }
     .anchor-nav a { font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 100px; text-decoration: none; transition: all 0.15s; border: 1px solid transparent; }
     .anchor-nav a:hover { background: var(--bg-2); }
-    .an--isolate { color: var(--red); } .an--isolate:hover { border-color: var(--red-border) !important; }
+    .an--isolate { color: #0E7490; } .an--isolate:hover { border-color: rgba(14,116,144,0.25) !important; }
     .an--access { color: var(--purple); } .an--access:hover { border-color: var(--purple-border) !important; }
     .an--encrypt { color: var(--blue); } .an--encrypt:hover { border-color: var(--blue-border) !important; }
     .an--deploy { color: var(--slate); } .an--deploy:hover { border-color: var(--slate-border) !important; }
@@ -60,7 +60,7 @@
     .hero { padding: 80px 0 40px; }
     .hero-eyebrow { font-size: 13px; font-weight: 500; color: var(--text-3); margin-bottom: 16px; }
     .hero h1 { font-size: 38px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.15; max-width: 560px; }
-    .hero h1 em { font-style: normal; color: var(--red); }
+    .hero h1 em { font-style: normal; color: var(--accent); }
     .hero .lead { margin-top: 18px; font-size: 16px; color: var(--text-3); line-height: 1.8; max-width: 520px; }
     @media (max-width: 640px) { .hero { padding: 56px 0 32px; } .hero h1 { font-size: 26px; } }
 
@@ -160,8 +160,9 @@
     Mediforce
   </a>
   <div class="nav-links">
-    <a href="/">&larr; Home</a>
+    <a href="/">Home</a>
     <a href="/validated-ai.html">Validated AI</a>
+    <a href="/security.html">Security</a>
     <a href="https://github.com/Appsilon/mediforce" target="_blank">GitHub</a>
   </div>
 </nav>
