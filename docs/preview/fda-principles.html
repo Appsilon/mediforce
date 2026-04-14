@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FDA/EMA AI Principles — Mediforce</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #FFFFFF; --bg-2: #F8F9FA; --bg-3: #F1F3F5;
+      --accent: #0D9488;
+      --text: #111827; --text-2: #374151; --text-3: #6B7280; --text-4: #9CA3AF;
+      --border: #E5E7EB;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+
+    /* Header */
+    .header { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.88); backdrop-filter: blur(16px); }
+    .header-inner { max-width: 72rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; }
+    .logo-group { display: flex; align-items: center; gap: 0.625rem; text-decoration: none; }
+    .logo-mark { width: 1.75rem; height: 1.75rem; display: flex; align-items: center; justify-content: center; }
+    .logo-mark svg { width: 100%; height: 100%; }
+    .logo-text { font-family: 'Manrope', sans-serif; font-size: 1.125rem; font-weight: 700; letter-spacing: -0.025em; color: var(--text); }
+    .header-links { display: flex; align-items: center; gap: 0.5rem; }
+    .header-link { font-size: 0.8125rem; font-weight: 500; color: var(--text-3); padding: 0.375rem 0.75rem; text-decoration: none; transition: color 0.15s; }
+    .header-link:hover { color: var(--text); }
+
+    /* Content */
+    .w { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; }
+
+    /* Hero */
+    .hero { padding: 64px 0 40px; }
+    .hero-eyebrow { font-size: 13px; font-weight: 500; color: var(--text-3); margin-bottom: 12px; }
+    .hero h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.2; max-width: 640px; }
+    .hero .lead { margin-top: 14px; font-size: 15px; color: var(--text-3); line-height: 1.7; max-width: 560px; }
+    .hero .lead a { text-decoration: underline; text-underline-offset: 2px; }
+
+    /* Summary */
+    .summary-bar {
+      display: flex; gap: 24px; margin: 20px 0 0;
+      font-size: 13px;
+    }
+    .summary-item { display: flex; align-items: center; gap: 6px; }
+    .summary-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .summary-item span:last-child { color: var(--text-3); }
+
+    /* Table */
+    .principles-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 40px 0;
+      font-size: 13px;
+    }
+    .principles-table th {
+      text-align: left;
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text-4);
+      padding: 10px 16px;
+      border-bottom: 2px solid var(--border);
+      background: var(--bg-2);
+      position: sticky; top: 53px; z-index: 10;
+    }
+    .principles-table td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    /* Principle name cell */
+    .td-principle {
+      font-weight: 600;
+      color: var(--text);
+      background: var(--bg-2);
+      border-right: 1px solid var(--border);
+      width: 200px;
+    }
+    .td-principle .p-num {
+      font-family: 'Manrope', sans-serif;
+      font-size: 11px; font-weight: 800;
+      color: var(--accent);
+      display: block;
+      margin-bottom: 2px;
+    }
+    .td-principle .p-name {
+      font-size: 13px; font-weight: 600;
+      line-height: 1.35;
+    }
+    .td-principle .p-desc {
+      font-size: 11px; font-weight: 400;
+      color: var(--text-3);
+      line-height: 1.45;
+      margin-top: 4px;
+    }
+    /* Feature cell */
+    .td-feature {
+      color: var(--text-2);
+      font-weight: 500;
+    }
+    /* Page link cell */
+    .td-page {
+      font-size: 12px;
+      color: var(--text-3);
+      white-space: nowrap;
+    }
+    .td-page a { text-decoration: underline; text-underline-offset: 2px; }
+    /* Status cell */
+    .td-status { text-align: center; width: 100px; }
+    .status {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 100px;
+      white-space: nowrap;
+    }
+    .status--live { color: #059669; background: rgba(16,185,129,0.1); }
+    .status--building { color: #D97706; background: rgba(245,158,11,0.1); }
+    .status--planned { color: var(--text-4); background: var(--bg-2); }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .status--live .status-dot { background: #10B981; }
+    .status--building .status-dot { background: #F59E0B; }
+    .status--planned .status-dot { background: var(--text-4); }
+
+    /* Group separator */
+    .principles-table tr.group-first td {
+      border-top: 2px solid var(--border);
+    }
+
+    /* Hover */
+    .principles-table tbody tr:hover td { background: rgba(13,148,136,0.02); }
+    .principles-table tbody tr:hover .td-principle { background: rgba(13,148,136,0.04); }
+
+    /* About */
+    .about { padding: 48px 0; border-top: 1px solid var(--border); }
+    .about h2 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .about p { font-size: 14px; color: var(--text-2); line-height: 1.7; margin-bottom: 10px; max-width: 600px; }
+
+    /* Footer */
+    footer { border-top: 1px solid var(--border); padding: 20px 0; }
+    .f { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-4); }
+    .f a { color: var(--text-4); text-decoration: none; } .f a:hover { color: var(--text-3); }
+    .f-links { display: flex; gap: 16px; }
+
+    @media (max-width: 768px) {
+      .td-principle { width: 140px; }
+      .td-page { display: none; }
+      .principles-table th:nth-child(3) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <a href="/" class="logo-group">
+      <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="1.8" fill="none" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
+      <span class="logo-text">Mediforce</span>
+    </a>
+    <div class="header-links">
+      <a href="validated-ai.html" class="header-link">Validated AI</a>
+      <a href="security.html" class="header-link">Security</a>
+      <a href="https://github.com/Appsilon/mediforce" target="_blank" class="header-link">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="w">
+    <div class="hero-eyebrow">FDA &amp; EMA &middot; January 2026</div>
+    <h1>10 Guiding Principles of Good AI Practice in Drug Development</h1>
+    <p class="lead">
+      In January 2026, FDA and EMA jointly published
+      <a href="https://www.fda.gov/media/177030/download" target="_blank">10 guiding principles</a>
+      for AI in drug development. Mediforce is built to be consistent with all of them
+      and helps your organization follow them in practice.
+    </p>
+    <div class="summary-bar">
+      <div class="summary-item">
+        <span class="summary-dot" style="background: #10B981;"></span>
+        <span><strong>7</strong> addressed today</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-dot" style="background: #F59E0B;"></span>
+        <span><strong>3</strong> in development</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="w">
+<table class="principles-table">
+  <thead>
+    <tr>
+      <th>Principle</th>
+      <th>Mediforce capability</th>
+      <th>Details</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+
+    <!-- 1. Human-centric -->
+    <tr class="group-first">
+      <td class="td-principle" rowspan="3">
+        <span class="p-num">01</span>
+        <span class="p-name">Human-centric by design</span>
+        <span class="p-desc">AI aligns with ethical and human-centric values</span>
+      </td>
+      <td class="td-feature">Autonomy levels L0&ndash;L4 per workflow step</td>
+      <td class="td-page"><a href="validated-ai.html#control">Validated AI &rarr; Control</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">HITL enforcement &mdash; workflow pauses until human approves</td>
+      <td class="td-page"><a href="validated-ai.html#control">Validated AI &rarr; Control</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Anti-rubber-stamping &mdash; review quality monitoring</td>
+      <td class="td-page"><a href="validated-ai.html#watch">Validated AI &rarr; Watch</a></td>
+      <td class="td-status"><span class="status status--building"><span class="status-dot"></span> Building</span></td>
+    </tr>
+
+    <!-- 2. Risk-based -->
+    <tr class="group-first">
+      <td class="td-principle" rowspan="3">
+        <span class="p-num">02</span>
+        <span class="p-name">Risk-based approach</span>
+        <span class="p-desc">Proportionate validation based on context and model risk</span>
+      </td>
+      <td class="td-feature">Proportional rigor per use case</td>
+      <td class="td-page"><a href="validated-ai.html">Validated AI</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Confidence thresholds with auto-escalation</td>
+      <td class="td-page"><a href="validated-ai.html#control">Validated AI &rarr; Control</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Autonomy level selection based on step risk</td>
+      <td class="td-page"><a href="validated-ai.html#control">Validated AI &rarr; Control</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+
+    <!-- 3. Standards -->
+    <tr class="group-first">
+      <td class="td-principle" rowspan="3">
+        <span class="p-num">03</span>
+        <span class="p-name">Adherence to standards</span>
+        <span class="p-desc">GxP, cybersecurity, regulatory standards</span>
+      </td>
+      <td class="td-feature">Audit trail &mdash; 21 CFR Part 11 aligned</td>
+      <td class="td-page"><a href="validated-ai.html#prove">Validated AI &rarr; Prove</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">RBAC, access control, e-signatures</td>
+      <td class="td-page"><a href="security.html#access">Security &rarr; Access</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">AES-256-GCM encryption, namespace isolation</td>
+      <td class="td-page"><a href="security.html#encrypt">Security &rarr; Encrypt</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+
+    <!-- 4. Context of use -->
+    <tr class="group-first">
+      <td class="td-principle" rowspan="2">
+        <span class="p-num">04</span>
+        <span class="p-name">Clear context of use</span>
+        <span class="p-desc">Well-defined role and scope</span>
+      </td>
+      <td class="td-feature">Workflow definitions with explicit step purpose</td>
+      <td class="td-page"><a href="validated-ai.html#control">Validated AI &rarr; Control</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Per-step agent config &mdash; model, prompt, tools scoped</td>
+      <td class="td-page"><a href="security.html#isolate">Security &rarr; Isolate</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+
+    <!-- 5. Multidisciplinary -->
+    <tr class="group-first">
+      <td class="td-principle" rowspan="3">
+        <span class="p-num">05</span>
+        <span class="p-name">Multidisciplinary expertise</span>
+        <span class="p-desc">Diverse expertise throughout life cycle</span>
+      </td>
+      <td class="td-feature">Role-based step assignment &mdash; different experts per step</td>
+      <td class="td-page"><a href="validated-ai.html#control">Validated AI &rarr; Control</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Per-step RBAC &mdash; right expert reviews right step</td>
+      <td class="td-page"><a href="security.html#access">Security &rarr; Access</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Producer &ne; reviewer &mdash; enforced separation of duties</td>
+      <td class="td-page"><a href="validated-ai.html#control">Validated AI &rarr; Control</a></td>
+      <td class="td-status"><span class="status status--building"><span class="status-dot"></span> Building</span></td>
+    </tr>
+
+    <!-- 6. Data governance -->
+    <tr class="group-first">
+      <td class="td-principle" rowspan="3">
+        <span class="p-num">06</span>
+        <span class="p-name">Data governance &amp; documentation</span>
+        <span class="p-desc">Traceable, verifiable, GxP-compliant</span>
+      </td>
+      <td class="td-feature">Audit trail with input/output snapshots</td>
+      <td class="td-page"><a href="validated-ai.html#prove">Validated AI &rarr; Prove</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Decision reconstruction &mdash; full chain from input to approval</td>
+      <td class="td-page"><a href="validated-ai.html#prove">Validated AI &rarr; Prove</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Per-step data scoping &mdash; agents see only authorized data</td>
+      <td class="td-page"><a href="security.html#isolate">Security &rarr; Isolate</a></td>
+      <td class="td-status"><span class="status status--building"><span class="status-dot"></span> Building</span></td>
+    </tr>
+
+    <!-- 7. Model design -->
+    <tr class="group-first">
+      <td class="td-principle" rowspan="3">
+        <span class="p-num">07</span>
+        <span class="p-name">Model design &amp; development</span>
+        <span class="p-desc">Interpretability, explainability, transparency</span>
+      </td>
+      <td class="td-feature">Agent output envelope &mdash; confidence, reasoning chain, annotations</td>
+      <td class="td-page"><a href="validated-ai.html#control">Validated AI &rarr; Control</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Model-agnostic &mdash; any model, self-hosted or cloud</td>
+      <td class="td-page"><a href="security.html#deploy">Security &rarr; Deploy</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Open source &mdash; inspect every line</td>
+      <td class="td-page"><a href="https://github.com/Appsilon/mediforce" target="_blank">GitHub</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+
+    <!-- 8. Performance assessment -->
+    <tr class="group-first">
+      <td class="td-principle" rowspan="3">
+        <span class="p-num">08</span>
+        <span class="p-name">Risk-based performance assessment</span>
+        <span class="p-desc">Evaluate complete system including human-AI interactions</span>
+      </td>
+      <td class="td-feature">Agent benchmark suites &mdash; run N times, measure quality</td>
+      <td class="td-page"><a href="validated-ai.html#test">Validated AI &rarr; Test</a></td>
+      <td class="td-status"><span class="status status--building"><span class="status-dot"></span> Building</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">End-to-end workflow evals</td>
+      <td class="td-page"><a href="validated-ai.html#test">Validated AI &rarr; Test</a></td>
+      <td class="td-status"><span class="status status--building"><span class="status-dot"></span> Building</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Judge agents &mdash; AI reviewing AI outputs</td>
+      <td class="td-page"><a href="validated-ai.html#watch">Validated AI &rarr; Watch</a></td>
+      <td class="td-status"><span class="status status--building"><span class="status-dot"></span> Building</span></td>
+    </tr>
+
+    <!-- 9. Life cycle -->
+    <tr class="group-first">
+      <td class="td-principle" rowspan="3">
+        <span class="p-num">09</span>
+        <span class="p-name">Life cycle management</span>
+        <span class="p-desc">Monitoring, re-evaluation, drift detection</span>
+      </td>
+      <td class="td-feature">Agent version tracking &mdash; model, prompt, config per execution</td>
+      <td class="td-page"><a href="validated-ai.html#prove">Validated AI &rarr; Prove</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Drift monitoring &mdash; periodic benchmark re-runs</td>
+      <td class="td-page"><a href="validated-ai.html#test">Validated AI &rarr; Test</a></td>
+      <td class="td-status"><span class="status status--building"><span class="status-dot"></span> Building</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Qualification reports &mdash; auditor-ready documentation</td>
+      <td class="td-page"><a href="validated-ai.html#prove">Validated AI &rarr; Prove</a></td>
+      <td class="td-status"><span class="status status--planned"><span class="status-dot"></span> Planned</span></td>
+    </tr>
+
+    <!-- 10. Clear info -->
+    <tr class="group-first">
+      <td class="td-principle" rowspan="2">
+        <span class="p-num">10</span>
+        <span class="p-name">Clear, essential information</span>
+        <span class="p-desc">Performance, limitations, explainability</span>
+      </td>
+      <td class="td-feature">Reasoning chain &amp; confidence rationale in every output</td>
+      <td class="td-page"><a href="validated-ai.html#control">Validated AI &rarr; Control</a></td>
+      <td class="td-status"><span class="status status--live"><span class="status-dot"></span> Live</span></td>
+    </tr>
+    <tr>
+      <td class="td-feature">Workflow risk report &mdash; one view of how risk is managed</td>
+      <td class="td-page"><a href="validated-ai.html#prove">Validated AI &rarr; Prove</a></td>
+      <td class="td-status"><span class="status status--building"><span class="status-dot"></span> Building</span></td>
+    </tr>
+
+  </tbody>
+</table>
+</div>
+
+<section class="about">
+  <div class="w">
+    <h2>About this page</h2>
+    <p>
+      The <a href="https://www.fda.gov/media/177030/download" target="_blank">Guiding Principles of Good AI Practice in Drug Development</a>
+      was published jointly by the U.S. FDA and the European Medicines Agency in January 2026.
+    </p>
+    <p>
+      Status reflects where we are today.
+      Mediforce is open source &mdash; every feature listed here can be
+      <a href="https://github.com/Appsilon/mediforce" target="_blank">inspected in the codebase</a>.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="w f">
+    <span>Mediforce &middot; April 2026</span>
+    <div class="f-links">
+      <a href="validated-ai.html">Validated AI</a>
+      <a href="security.html">Security</a>
+      <a href="https://github.com/Appsilon/mediforce" target="_blank">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
