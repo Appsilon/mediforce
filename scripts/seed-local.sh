@@ -109,6 +109,7 @@ seed_workflow_definition "$REPO_ROOT/apps/community-digest/src/community-digest.
 seed_workflow_definition "$REPO_ROOT/apps/community-digest/src/community-digest-sonnet45.wd.json"
 seed_workflow_definition "$REPO_ROOT/apps/protocol-to-tfl/src/protocol-to-tfl.wd.json"
 seed_workflow_definition "$REPO_ROOT/apps/estimand-extractor/src/estimand-extractor.wd.json"
+seed_workflow_definition "$REPO_ROOT/apps/pharmaverse-governance/src/pharmaverse-governance.wd.json"
 echo ""
 
 # --- Legacy Process Definitions (kept for backward compatibility) ---
