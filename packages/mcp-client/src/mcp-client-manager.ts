@@ -8,6 +8,38 @@ import { resolveValue } from './resolve-env.js';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const NAMESPACE_SEPARATOR = '__';
 
+/**
+ * Env vars inherited by stdio MCP subprocesses. Deliberately narrow to avoid
+ * leaking platform secrets (Firebase, OpenRouter, DB creds, etc.) to third-party
+ * MCP servers. Add keys here only if they are operationally required and non-sensitive.
+ * Any secret the server needs must be passed explicitly via McpServerConfig.env.
+ */
+const INHERITED_ENV_KEYS = [
+  'PATH',
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'TZ',
+  'TMPDIR',
+  'TEMP',
+  'TMP',
+  'NODE_ENV',
+  'NODE_PATH',
+] as const;
+
+function inheritedEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const key of INHERITED_ENV_KEYS) {
+    const value = process.env[key];
+    if (value !== undefined) env[key] = value;
+  }
+  return env;
+}
+
 interface ConnectedServer {
   name: string;
   client: Client;
@@ -31,76 +63,98 @@ export class McpClientManager {
 
   /**
    * Connect to all configured MCP servers and discover their tools.
+   * Servers are connected in parallel so total latency is max(server), not sum(server).
+   * If any server fails to connect, already-connected transports are torn down and the error bubbles up.
    * Returns all tools in OpenRouter-compatible function format, namespaced as serverName__toolName.
    */
   async connect(): Promise<McpToolDefinition[]> {
+    const results = await Promise.allSettled(
+      this.servers.map((serverConfig) => this.connectServer(serverConfig)),
+    );
+
+    const rejected = results
+      .map((r, i) => ({ r, name: this.servers[i].name }))
+      .filter((x): x is { r: PromiseRejectedResult; name: string } => x.r.status === 'rejected');
+
+    if (rejected.length > 0) {
+      // Roll back any already-connected servers so the manager is not left in a partial state.
+      await this.disconnect();
+      const firstError = rejected[0].r.reason;
+      const message = firstError instanceof Error ? firstError.message : String(firstError);
+      throw new Error(`Failed to connect MCP server '${rejected[0].name}': ${message}`);
+    }
+
     const allTools: McpToolDefinition[] = [];
+    for (const r of results) {
+      if (r.status === 'fulfilled') allTools.push(...r.value);
+    }
+    return allTools;
+  }
 
-    for (const serverConfig of this.servers) {
-      const resolvedEnv: Record<string, string> = {};
-      if (serverConfig.env) {
-        for (const [key, value] of Object.entries(serverConfig.env)) {
-          resolvedEnv[key] = resolveValue(value, this.options.workflowSecrets);
-        }
+  private async connectServer(serverConfig: McpServerConfig): Promise<McpToolDefinition[]> {
+    const resolvedEnv: Record<string, string> = {};
+    if (serverConfig.env) {
+      for (const [key, value] of Object.entries(serverConfig.env)) {
+        resolvedEnv[key] = resolveValue(value, this.options.workflowSecrets);
       }
+    }
 
-      let transport: StdioClientTransport | StreamableHTTPClientTransport;
+    let transport: StdioClientTransport | StreamableHTTPClientTransport;
 
-      if (serverConfig.command) {
-        transport = new StdioClientTransport({
-          command: serverConfig.command,
-          args: serverConfig.args ?? [],
-          env: {
-            ...process.env as Record<string, string>,
-            ...resolvedEnv,
-          },
-        });
-      } else if (serverConfig.url) {
-        transport = new StreamableHTTPClientTransport(
-          new URL(serverConfig.url),
-        );
-      } else {
-        throw new Error(`MCP server '${serverConfig.name}': either command or url must be provided`);
-      }
-
-      const client = new Client({
-        name: `mediforce-cowork-${serverConfig.name}`,
-        version: '1.0.0',
+    if (serverConfig.command) {
+      transport = new StdioClientTransport({
+        command: serverConfig.command,
+        args: serverConfig.args ?? [],
+        env: {
+          ...inheritedEnv(),
+          ...resolvedEnv,
+        },
       });
+    } else if (serverConfig.url) {
+      transport = new StreamableHTTPClientTransport(
+        new URL(serverConfig.url),
+      );
+    } else {
+      throw new Error(`MCP server '${serverConfig.name}': either command or url must be provided`);
+    }
 
-      await client.connect(transport);
+    const client = new Client({
+      name: `mediforce-cowork-${serverConfig.name}`,
+      version: '1.0.0',
+    });
 
-      const toolsResponse = await client.listTools();
-      const toolMap = new Map<string, { originalName: string }>();
+    await client.connect(transport);
 
-      for (const tool of toolsResponse.tools) {
-        // Apply allowedTools filter
-        if (serverConfig.allowedTools && serverConfig.allowedTools.length > 0) {
-          if (!serverConfig.allowedTools.includes(tool.name)) continue;
-        }
+    const toolsResponse = await client.listTools();
+    const toolMap = new Map<string, { originalName: string }>();
+    const serverTools: McpToolDefinition[] = [];
 
-        const namespacedName = `${serverConfig.name}${NAMESPACE_SEPARATOR}${tool.name}`;
-        toolMap.set(namespacedName, { originalName: tool.name });
-
-        allTools.push({
-          type: 'function',
-          function: {
-            name: namespacedName,
-            description: tool.description ?? '',
-            parameters: (tool.inputSchema as Record<string, unknown>) ?? { type: 'object', properties: {} },
-          },
-        });
+    for (const tool of toolsResponse.tools) {
+      if (serverConfig.allowedTools && serverConfig.allowedTools.length > 0) {
+        if (!serverConfig.allowedTools.includes(tool.name)) continue;
       }
 
-      this.connected.set(serverConfig.name, {
-        name: serverConfig.name,
-        client,
-        transport,
-        tools: toolMap,
+      const namespacedName = `${serverConfig.name}${NAMESPACE_SEPARATOR}${tool.name}`;
+      toolMap.set(namespacedName, { originalName: tool.name });
+
+      serverTools.push({
+        type: 'function',
+        function: {
+          name: namespacedName,
+          description: tool.description ?? '',
+          parameters: (tool.inputSchema as Record<string, unknown>) ?? { type: 'object', properties: {} },
+        },
       });
     }
 
-    return allTools;
+    this.connected.set(serverConfig.name, {
+      name: serverConfig.name,
+      client,
+      transport,
+      tools: toolMap,
+    });
+
+    return serverTools;
   }
 
   /**

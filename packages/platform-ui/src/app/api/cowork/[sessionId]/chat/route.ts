@@ -52,19 +52,6 @@ export async function POST(
     return NextResponse.json({ error: 'message string required' }, { status: 400 });
   }
 
-  // Save human turn
-  const humanTurnId = crypto.randomUUID();
-  await coworkSessionRepo.addTurn(sessionId, {
-    id: humanTurnId,
-    role: 'human',
-    content: humanMessage,
-    timestamp: new Date().toISOString(),
-    artifactDelta: null,
-  });
-
-  // Reload session with updated turns
-  const updatedSession = (await coworkSessionRepo.getById(sessionId))!;
-
   // Load step context from process instance variables
   let stepContext: Record<string, unknown> | undefined;
   const instance = await instanceRepo.getById(session.processInstanceId);
@@ -72,7 +59,8 @@ export async function POST(
     stepContext = instance.variables as Record<string, unknown>;
   }
 
-  // Connect to MCP servers if configured
+  // Connect to MCP servers BEFORE persisting the human turn so that a connection
+  // failure does not leave an orphan user message with no agent reply in Firestore.
   let mcpManager: McpClientManager | null = null;
   let mcpTools: McpToolDefinition[] = [];
 
@@ -89,9 +77,26 @@ export async function POST(
     }
   }
 
+  // Save human turn now that we know we can serve a response
+  const humanTurnId = crypto.randomUUID();
+  await coworkSessionRepo.addTurn(sessionId, {
+    id: humanTurnId,
+    role: 'human',
+    content: humanMessage,
+    timestamp: new Date().toISOString(),
+    artifactDelta: null,
+  });
+
+  // Reload session with updated turns
+  const updatedSession = await coworkSessionRepo.getById(sessionId);
+  if (!updatedSession) {
+    if (mcpManager) await mcpManager.disconnect().catch(() => {});
+    return NextResponse.json({ error: 'Session disappeared after saving human turn' }, { status: 500 });
+  }
+
   try {
     // Build messages
-    const messages = buildMessages(updatedSession, humanMessage, stepContext);
+    const messages = buildMessages(updatedSession, stepContext);
 
     // Add MCP server info to system prompt if tools are available
     if (mcpTools.length > 0 && session.mcpServers) {
@@ -153,10 +158,10 @@ export async function POST(
           // Use empty args if parsing fails
         }
 
-        // Write running turn
-        const runningTurnId = crypto.randomUUID();
+        // Write running turn so the UI can show a live "tool is running" bubble
+        const toolTurnId = crypto.randomUUID();
         await coworkSessionRepo.addTurn(sessionId, {
-          id: runningTurnId,
+          id: toolTurnId,
           role: 'tool',
           content: '',
           timestamp: new Date().toISOString(),
@@ -170,19 +175,10 @@ export async function POST(
         // Execute tool
         const result = await mcpManager!.callTool(toolName, toolArgs);
 
-        // Write result turn
-        const resultTurnId = `${runningTurnId}-result`;
-        await coworkSessionRepo.addTurn(sessionId, {
-          id: resultTurnId,
-          role: 'tool',
-          content: '',
-          timestamp: new Date().toISOString(),
-          artifactDelta: null,
-          toolName,
-          toolArgs,
+        // Update the same turn with the result — no orphaned 'running' rows left behind
+        await coworkSessionRepo.updateTurn(sessionId, toolTurnId, {
           toolResult: result.content,
           toolStatus: result.isError ? 'error' : 'success',
-          serverName,
         });
 
         toolCallSummaries.push({

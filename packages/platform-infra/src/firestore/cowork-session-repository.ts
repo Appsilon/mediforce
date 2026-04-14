@@ -74,10 +74,45 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
     return snap.docs.map((d) => CoworkSessionSchema.parse(sanitizeSessionData(d.data())));
   }
 
+  async findMostRecentActive(instanceId: string): Promise<CoworkSession | null> {
+    const colRef = collection(this.db, this.collectionName);
+    const q = query(
+      colRef,
+      where('processInstanceId', '==', instanceId),
+      where('status', '==', 'active'),
+      orderBy('createdAt', 'desc'),
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    return CoworkSessionSchema.parse(sanitizeSessionData(snap.docs[0].data()));
+  }
+
   async addTurn(sessionId: string, turn: ConversationTurn): Promise<CoworkSession> {
     const docRef = doc(this.db, this.collectionName, sessionId);
     await updateDoc(docRef, {
       turns: arrayUnion(turn),
+      updatedAt: new Date().toISOString(),
+    });
+    return (await this.getById(sessionId))!;
+  }
+
+  async updateTurn(
+    sessionId: string,
+    turnId: string,
+    patch: Partial<ConversationTurn>,
+  ): Promise<CoworkSession> {
+    // Firestore has no in-place array element update — read, modify, write whole array.
+    const session = await this.getById(sessionId);
+    if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
+    const index = session.turns.findIndex((t) => t.id === turnId);
+    if (index === -1) throw new Error(`Turn not found: ${turnId}`);
+    // role is the discriminant — patch cannot change it, and id stays fixed.
+    const existing = session.turns[index];
+    const merged = { ...existing, ...patch, id: existing.id, role: existing.role } as ConversationTurn;
+    const updatedTurns: ConversationTurn[] = session.turns.map((t, i) => (i === index ? merged : t));
+    const docRef = doc(this.db, this.collectionName, sessionId);
+    await updateDoc(docRef, {
+      turns: updatedTurns,
       updatedAt: new Date().toISOString(),
     });
     return (await this.getById(sessionId))!;

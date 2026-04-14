@@ -79,9 +79,10 @@ function buildMockWorkflowAgentContext(
 function buildContextWithMcpServers(
   mcpServers: Array<{
     name: string;
-    command: string;
-    args: string[];
+    command?: string;
+    args?: string[];
     env?: Record<string, string>;
+    url?: string;
     allowedTools?: string[];
   }>,
 ): AgentContext {
@@ -310,6 +311,53 @@ describe('writeMcpConfig integration', () => {
     };
 
     expect(parsed.mcpServers['no-filter']).not.toHaveProperty('allowedTools');
+
+    await cleanup();
+  });
+
+  it('[DATA] writes url entry (no empty command) for URL-only servers', async () => {
+    const context = buildContextWithMcpServers([
+      { name: 'remote', url: 'https://mcp.example.com/v1' },
+    ]);
+    await plugin.initialize(context);
+
+    await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+    const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+    const parsed = JSON.parse(raw) as {
+      mcpServers: Record<string, Record<string, unknown>>;
+    };
+
+    expect(parsed.mcpServers['remote']).toEqual({ url: 'https://mcp.example.com/v1' });
+    expect(parsed.mcpServers['remote']).not.toHaveProperty('command');
+    expect(parsed.mcpServers['remote']).not.toHaveProperty('args');
+
+    await cleanup();
+  });
+
+  it('[DATA] supports mixed stdio and url servers in the same config', async () => {
+    const context = buildContextWithMcpServers([
+      { name: 'local-stdio', command: 'node', args: ['/opt/mcp/server.js'] },
+      { name: 'remote-http', url: 'https://mcp.example.com/v1', allowedTools: ['search'] },
+    ]);
+    await plugin.initialize(context);
+
+    await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+    const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+    const parsed = JSON.parse(raw) as {
+      mcpServers: Record<string, Record<string, unknown>>;
+    };
+
+    expect(parsed.mcpServers['local-stdio']).toMatchObject({
+      command: 'node',
+      args: ['/opt/mcp/server.js'],
+    });
+    expect(parsed.mcpServers['remote-http']).toMatchObject({
+      url: 'https://mcp.example.com/v1',
+      allowedTools: ['search'],
+    });
+    expect(parsed.mcpServers['remote-http']).not.toHaveProperty('command');
 
     await cleanup();
   });

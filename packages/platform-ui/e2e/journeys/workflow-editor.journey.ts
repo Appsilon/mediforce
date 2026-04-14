@@ -513,4 +513,45 @@ test.describe('Workflow Editor Journey', () => {
 
     await endRecording(page);
   });
+
+  test('cowork step MCP server configuration appears in YAML', async ({ page }, testInfo) => {
+    await setupRecording(page, 'workflow-editor-cowork-mcp', testInfo);
+    await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
+
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    const initialNodeCount = await page.locator('.react-flow__node').count();
+
+    // Add a cowork step
+    await click(page, page.getByLabel('Add step here').first());
+    await click(page, stepTypeButton(page, 'Creation'));
+    await click(page, executorButton(page, 'cowork'));
+    await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
+
+    // Open the new step editor
+    await click(page, page.locator('.react-flow__node').filter({ hasText: /New Step/i }));
+    await expect(page.getByText(/What is a Cowork step/i)).toBeVisible({ timeout: 3_000 });
+
+    // Add an MCP server entry
+    await expect(page.getByText('MCP Servers')).toBeVisible();
+    await click(page, page.getByRole('button', { name: /^Add$/ }).last());
+
+    // Fill the server name and command
+    const nameInput = page.getByPlaceholder('server-name');
+    await expect(nameInput).toBeVisible({ timeout: 3_000 });
+    await nameInput.fill('tealflow');
+    const commandInput = page.getByPlaceholder(/e\.g\. tealflow-mcp/);
+    await expect(commandInput).toBeVisible();
+    await commandInput.fill('tealflow-mcp');
+    await showStep(page);
+
+    // Deselect and check YAML contains mcpServers entry
+    await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
+    const yamlContent = page.locator('.cm-content');
+    await expect(yamlContent).toBeVisible({ timeout: 10_000 });
+    await expect(yamlContent).toContainText('mcpServers', { timeout: 5_000 });
+    await expect(yamlContent).toContainText('tealflow-mcp', { timeout: 5_000 });
+    await showResult(page);
+
+    await endRecording(page);
+  });
 });

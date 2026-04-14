@@ -153,7 +153,8 @@ function McpServersEditor({
   onChange: (servers: McpServerConfig[]) => void;
 }) {
   const addServer = () => {
-    onChange([...servers, { name: '', command: '', args: [] }]);
+    // Empty name/command are UI placeholders; schema validation enforces non-empty at save time.
+    onChange([...servers, { name: '', command: undefined, args: [] }]);
   };
 
   const removeServer = (index: number) => {
@@ -207,14 +208,19 @@ function McpServerEntry({
   onChange: (patch: Partial<McpServerConfig>) => void;
   onRemove: () => void;
 }) {
-  const useUrl = server.url !== undefined && server.url !== '';
-  const transportMode = useUrl ? 'url' : 'command';
+  // Transport mode is UI state — derived initially from the data, but then tracked
+  // locally so that an in-progress empty field doesn't flip the mode back.
+  const [transportMode, setTransportMode] = useState<'command' | 'url'>(
+    server.url !== undefined ? 'url' : 'command',
+  );
 
   const toggleTransport = () => {
     if (transportMode === 'command') {
-      onChange({ url: '', command: undefined });
+      setTransportMode('url');
+      onChange({ command: undefined });
     } else {
-      onChange({ command: '', url: undefined });
+      setTransportMode('command');
+      onChange({ url: undefined });
     }
   };
 

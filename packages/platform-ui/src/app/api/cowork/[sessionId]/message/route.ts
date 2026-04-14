@@ -72,10 +72,16 @@ export async function POST(
   });
 
   // Reload session to get updated turns
-  const updatedSession = (await coworkSessionRepo.getById(sessionId))!;
+  const updatedSession = await coworkSessionRepo.getById(sessionId);
+  if (!updatedSession) {
+    return new Response(
+      JSON.stringify({ error: 'Session disappeared after saving human turn' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
 
   // Build messages for the model
-  const messages = buildMessages(updatedSession, humanMessage, stepContext);
+  const messages = buildMessages(updatedSession, stepContext);
   const model = session.model ?? 'anthropic/claude-sonnet-4';
 
   // Stream from OpenRouter

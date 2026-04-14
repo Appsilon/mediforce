@@ -81,23 +81,22 @@ function buildSystemPrompt(session: CoworkSession): string {
  * 1. System message (task + schema + instructions)
  * 2. If artifact exists: inject it as context
  * 3. Conversation history (turns → user/assistant messages)
- * 4. New human message
+ *
+ * The caller must persist the new human turn to the session before calling this —
+ * `session.turns` is the single source of truth for conversation state.
  */
 export function buildMessages(
   session: CoworkSession,
-  newMessage: string,
   stepContext?: Record<string, unknown>,
 ): ChatMessage[] {
   const messages: ChatMessage[] = [];
 
-  // System prompt
   let systemContent = buildSystemPrompt(session);
   if (stepContext && Object.keys(stepContext).length > 0) {
     systemContent += `\n\n## Context from previous step\n\`\`\`json\n${JSON.stringify(stepContext, null, 2)}\n\`\`\``;
   }
   messages.push({ role: 'system', content: systemContent });
 
-  // Current artifact state (if any)
   if (session.artifact) {
     messages.push({
       role: 'system',
@@ -105,7 +104,6 @@ export function buildMessages(
     });
   }
 
-  // Conversation history (skip tool turns — they're intermediate Firestore state)
   for (const turn of session.turns) {
     if (turn.role === 'tool') continue;
     messages.push({
@@ -113,9 +111,6 @@ export function buildMessages(
       content: turn.content,
     });
   }
-
-  // New human message
-  messages.push({ role: 'user', content: newMessage });
 
   return messages;
 }

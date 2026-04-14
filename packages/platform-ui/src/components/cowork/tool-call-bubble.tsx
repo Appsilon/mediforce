@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Wrench, Loader2, ChevronDown, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ConversationTurn } from '@mediforce/platform-core';
+import type { ToolTurn } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
 // Elapsed timer for running state
@@ -24,11 +24,11 @@ function ElapsedTimer() {
 // ToolCallBubble — renders a tool turn (running / success / error)
 // ---------------------------------------------------------------------------
 
-export function ToolCallBubble({ turn }: { turn: ConversationTurn }) {
+export function ToolCallBubble({ turn }: { turn: ToolTurn }) {
   const [expanded, setExpanded] = React.useState(false);
 
-  const status = turn.toolStatus ?? 'running';
-  const displayName = turn.toolName ?? 'unknown tool';
+  const status = turn.toolStatus;
+  const displayName = turn.toolName;
   // Strip server namespace prefix for cleaner display
   const shortName = displayName.includes('__')
     ? displayName.slice(displayName.indexOf('__') + 2)

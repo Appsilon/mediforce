@@ -126,11 +126,17 @@ export {
 
 export {
   ConversationTurnSchema,
+  HumanTurnSchema,
+  AgentTurnSchema,
+  ToolTurnSchema,
   CoworkAgentSchema,
   CoworkVoiceConfigSchema,
   CoworkSessionStatusSchema,
   CoworkSessionSchema,
   type ConversationTurn,
+  type HumanTurn,
+  type AgentTurn,
+  type ToolTurn,
   type CoworkSessionStatus,
   type CoworkSession,
 } from './cowork-session.js';

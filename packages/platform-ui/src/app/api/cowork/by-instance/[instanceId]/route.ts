@@ -17,18 +17,13 @@ export async function GET(
   const { instanceId } = await params;
   const { coworkSessionRepo } = getPlatformServices();
 
-  const sessions = await coworkSessionRepo.getByInstanceId(instanceId);
-  const activeSessions = sessions.filter((s) => s.status === 'active');
-
-  if (activeSessions.length === 0) {
+  const session = await coworkSessionRepo.findMostRecentActive(instanceId);
+  if (!session) {
     return NextResponse.json(
       { error: `No active cowork session found for instance '${instanceId}'` },
       { status: 404 },
     );
   }
-
-  // Return the most recent active session (last in the list)
-  const session = activeSessions[activeSessions.length - 1];
 
   return NextResponse.json(session);
 }

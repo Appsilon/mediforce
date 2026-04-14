@@ -177,6 +177,37 @@ describe('McpClientManager', () => {
       delete process.env['DB_CONNECTION'];
     });
 
+    it('should not leak non-allowlisted env vars (e.g. OPENROUTER_API_KEY) to stdio subprocesses', async () => {
+      process.env['OPENROUTER_API_KEY'] = 'sk-secret-do-not-leak';
+      process.env['FIREBASE_PRIVATE_KEY'] = 'also-secret';
+      process.env['PATH'] = '/usr/local/bin:/usr/bin';
+
+      const manager = new McpClientManager([stdioServer]);
+      await manager.connect();
+
+      expect(stdioConstructorCalls).toHaveLength(1);
+      const envPassed = stdioConstructorCalls[0].env as Record<string, string>;
+
+      expect(envPassed).not.toHaveProperty('OPENROUTER_API_KEY');
+      expect(envPassed).not.toHaveProperty('FIREBASE_PRIVATE_KEY');
+      expect(envPassed.PATH).toBe('/usr/local/bin:/usr/bin');
+
+      delete process.env['OPENROUTER_API_KEY'];
+      delete process.env['FIREBASE_PRIVATE_KEY'];
+    });
+
+    it('should allow server.env to override inherited keys', async () => {
+      process.env['PATH'] = '/usr/local/bin';
+
+      const manager = new McpClientManager([
+        { name: 'svr', command: 'cmd', args: [], env: { PATH: '/custom/bin' } },
+      ]);
+      await manager.connect();
+
+      const envPassed = stdioConstructorCalls[0].env as Record<string, string>;
+      expect(envPassed.PATH).toBe('/custom/bin');
+    });
+
     it('should throw if neither command nor url is provided', async () => {
       // We use "as" here because the schema refinement would normally prevent this,
       // but the manager should still guard against it at runtime

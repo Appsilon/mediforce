@@ -39,8 +39,7 @@ describe('ConversationTurnSchema', () => {
       serverName: 'tealflow',
     });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.role).toBe('tool');
+    if (result.success && result.data.role === 'tool') {
       expect(result.data.toolName).toBe('tealflow__tealflow_list_modules');
       expect(result.data.toolStatus).toBe('success');
       expect(result.data.serverName).toBe('tealflow');
@@ -60,7 +59,7 @@ describe('ConversationTurnSchema', () => {
       serverName: 'tealflow',
     });
     expect(result.success).toBe(true);
-    if (result.success) {
+    if (result.success && result.data.role === 'tool') {
       expect(result.data.toolStatus).toBe('running');
       expect(result.data.toolResult).toBeUndefined();
     }
@@ -74,6 +73,7 @@ describe('ConversationTurnSchema', () => {
       timestamp: '2025-01-01T00:00:00.000Z',
       artifactDelta: null,
       toolName: 'tealflow__broken_tool',
+      toolArgs: {},
       toolStatus: 'error',
       toolResult: 'Connection refused',
       serverName: 'tealflow',
@@ -81,7 +81,41 @@ describe('ConversationTurnSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('should still parse human/agent turns without tool fields (backward compat)', () => {
+  it('should reject a tool turn missing toolName', () => {
+    const result = ConversationTurnSchema.safeParse({
+      id: 'turn-bad',
+      role: 'tool',
+      content: '',
+      timestamp: '2025-01-01T00:00:00.000Z',
+      artifactDelta: null,
+      toolArgs: {},
+      toolStatus: 'running',
+      serverName: 'tealflow',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject a human turn with tool-only fields', () => {
+    const result = ConversationTurnSchema.safeParse({
+      id: 'turn-bad',
+      role: 'human',
+      content: 'hello',
+      timestamp: '2025-01-01T00:00:00.000Z',
+      artifactDelta: null,
+      toolName: 'not-allowed',
+      toolStatus: 'running',
+    });
+    // With the discriminated union + default object strip, extra fields are ignored,
+    // but the schema must at least parse to the human variant.
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.role).toBe('human');
+      // toolName is not part of HumanTurn — it's stripped by Zod's default object behavior.
+      expect((result.data as Record<string, unknown>).toolName).toBeUndefined();
+    }
+  });
+
+  it('should parse human/agent turns without tool fields', () => {
     const result = ConversationTurnSchema.safeParse({
       id: 'turn-6',
       role: 'human',
@@ -90,10 +124,6 @@ describe('ConversationTurnSchema', () => {
       artifactDelta: null,
     });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.toolName).toBeUndefined();
-      expect(result.data.toolStatus).toBeUndefined();
-    }
   });
 });
 

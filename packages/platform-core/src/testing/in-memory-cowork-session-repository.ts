@@ -24,6 +24,13 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     );
   }
 
+  async findMostRecentActive(instanceId: string): Promise<CoworkSession | null> {
+    const active = [...this.sessions.values()]
+      .filter((s) => s.processInstanceId === instanceId && s.status === 'active')
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return active[0] ?? null;
+  }
+
   async addTurn(sessionId: string, turn: ConversationTurn): Promise<CoworkSession> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
@@ -31,6 +38,28 @@ export class InMemoryCoworkSessionRepository implements CoworkSessionRepository 
     const updated: CoworkSession = {
       ...session,
       turns: [...session.turns, turn],
+      updatedAt: now,
+    };
+    this.sessions.set(sessionId, updated);
+    return { ...updated, turns: [...updated.turns] };
+  }
+
+  async updateTurn(
+    sessionId: string,
+    turnId: string,
+    patch: Partial<ConversationTurn>,
+  ): Promise<CoworkSession> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
+    const index = session.turns.findIndex((t) => t.id === turnId);
+    if (index === -1) throw new Error(`Turn not found: ${turnId}`);
+    const now = new Date().toISOString();
+    // role is the discriminant — patch cannot change it, and id stays fixed.
+    const merged = { ...session.turns[index], ...patch, id: session.turns[index].id, role: session.turns[index].role } as ConversationTurn;
+    const newTurns: ConversationTurn[] = session.turns.map((t, i) => (i === index ? merged : t));
+    const updated: CoworkSession = {
+      ...session,
+      turns: newTurns,
       updatedAt: now,
     };
     this.sessions.set(sessionId, updated);
