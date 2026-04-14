@@ -47,6 +47,19 @@
     .header-link { display: inline-flex; align-items: center; font-size: 0.8125rem; font-weight: 500; color: var(--text-3); padding: 0.375rem 0.75rem; border-radius: 0.375rem; text-decoration: none; transition: color 0.15s; }
     .header-link:hover { color: var(--text); }
 
+    /* Draft banner */
+    .evolving-badge {
+      display: inline-block;
+      font-size: 11px; font-weight: 600;
+      color: #92400E;
+      background: #FEF3C7;
+      padding: 3px 10px;
+      border-radius: 100px;
+      margin-left: 10px;
+      vertical-align: middle;
+      letter-spacing: 0.02em;
+    }
+
     /* Pillar TOC — sticky full-width strip */
     .pillar-toc {
       display: grid;
@@ -339,7 +352,7 @@
 
 <section class="hero">
   <div class="w">
-    <div class="hero-eyebrow">How we think about validated AI</div>
+    <div class="hero-eyebrow">How we think about validated AI <span class="evolving-badge">Request for Comments</span></div>
     <h1>Validate the <em>process</em>, not the AI.</h1>
     <p class="lead">
       You can't validate an AI agent the way you validate software.
@@ -771,10 +784,63 @@
 </section>
 
 <!-- CTA -->
-<section class="cta">
+<section class="s" style="padding: 72px 0;">
   <div class="w">
-    <h2>This is a starting point, not a finished standard.</h2>
-    <p>If you see gaps &mdash; especially if you think we're wrong &mdash; that's the conversation we want.</p>
+    <h2 style="font-size: 26px; margin-bottom: 24px;">Where we are</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+      <div style="padding: 24px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-2);">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: #10B981;"></span>
+          <span style="font-size: 13px; font-weight: 700; color: #059669;">Live</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-2);">
+          <span>Autonomy levels L0&ndash;L4</span>
+          <span>Per-step RBAC</span>
+          <span>Audit trail with snapshots</span>
+          <span>Confidence thresholds</span>
+          <span>Output envelope validation</span>
+          <span>Real-time monitoring</span>
+        </div>
+      </div>
+      <div style="padding: 24px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-2);">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: #F59E0B;"></span>
+          <span style="font-size: 13px; font-weight: 700; color: #D97706;">Building</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-2);">
+          <span>Agent benchmark suites</span>
+          <span>Workflow evals</span>
+          <span>Judge agents</span>
+          <span>Anti-rubber-stamping</span>
+          <span>Workflow risk reports</span>
+          <span>Drift monitoring</span>
+        </div>
+      </div>
+      <div style="padding: 24px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-2);">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--text-4);"></span>
+          <span style="font-size: 13px; font-weight: 700; color: var(--text-3);">Next</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-3);">
+          <span>Qualification report generator</span>
+          <span>Challenge outputs</span>
+          <span>Data scoping enforcement</span>
+          <span>Producer &ne; reviewer rules</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding: 80px 0; border-top: 1px solid var(--border); background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 100%);">
+  <div class="w" style="text-align: center;">
+    <div style="display: inline-block; font-size: 11px; font-weight: 600; color: #92400E; background: #FEF3C7; padding: 4px 12px; border-radius: 100px; margin-bottom: 16px;">Request for Comments</div>
+    <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 10px;">We published this to start a conversation.</h2>
+    <p style="font-size: 15px; color: var(--text-3); max-width: 460px; margin: 0 auto 28px; line-height: 1.7;">
+      There's no industry standard for this yet. We have a point of view
+      and we're building towards it &mdash; but we'd rather shape it
+      with the people who'll use it than in isolation.
+    </p>
     <div class="cta-btns">
       <a href="https://discord.gg/TVx4VkG3C2" target="_blank" class="cb cb--p">
         <svg viewBox="0 -28.5 256 256" fill="currentColor"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z"/></svg>
