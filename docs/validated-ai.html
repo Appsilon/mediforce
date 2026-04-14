@@ -44,14 +44,41 @@
     .nav-links a { font-size: 13px; font-weight: 500; color: var(--text-3); padding: 6px 12px; border-radius: 6px; text-decoration: none; transition: color 0.15s; }
     .nav-links a:hover { color: var(--text-2); }
 
-    /* Anchor nav */
-    .anchor-nav { display: flex; gap: 6px; justify-content: center; padding: 12px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 49px; z-index: 40; background: rgba(255,255,255,0.92); backdrop-filter: blur(16px); }
-    .anchor-nav a { font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 100px; text-decoration: none; transition: all 0.15s; border: 1px solid transparent; }
-    .anchor-nav a:hover { background: var(--bg-2); }
-    .an--test { color: var(--accent); } .an--test:hover { border-color: var(--accent-border) !important; }
-    .an--watch { color: var(--purple); } .an--watch:hover { border-color: var(--purple-border) !important; }
-    .an--control { color: var(--amber); } .an--control:hover { border-color: var(--amber-border) !important; }
-    .an--prove { color: var(--blue); } .an--prove:hover { border-color: var(--blue-border) !important; }
+    /* Pillar nav grid */
+    .pillar-nav {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; margin: 32px 0 0;
+    }
+    @media (min-width: 640px) { .pillar-nav { grid-template-columns: 1fr 1fr 1fr 1fr; } }
+    .pillar-nav-item {
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      text-decoration: none;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .pillar-nav-item:hover { transform: translateY(-2px); }
+    .pni--test { border-left: 3px solid var(--accent); }
+    .pni--test:hover { border-color: var(--accent-border); border-left-color: var(--accent); }
+    .pni--watch { border-left: 3px solid var(--purple); }
+    .pni--watch:hover { border-color: var(--purple-border); border-left-color: var(--purple); }
+    .pni--control { border-left: 3px solid var(--amber); }
+    .pni--control:hover { border-color: var(--amber-border); border-left-color: var(--amber); }
+    .pni--prove { border-left: 3px solid var(--blue); }
+    .pni--prove:hover { border-color: var(--blue-border); border-left-color: var(--blue); }
+    .pni-label {
+      font-size: 13px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .pni--test .pni-label { color: var(--accent); }
+    .pni--watch .pni-label { color: var(--purple); }
+    .pni--control .pni-label { color: var(--amber); }
+    .pni--prove .pni-label { color: var(--blue); }
+    .pni-desc {
+      font-size: 12px; color: var(--text-3); line-height: 1.5;
+    }
 
     /* Hero */
     .hero { padding: 80px 0 40px; }
@@ -289,7 +316,7 @@
 
 <nav>
   <a href="/" class="nav-logo">
-    <svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg>
+    <svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="1.8" fill="none" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg>
     Mediforce
   </a>
   <div class="nav-links">
@@ -300,13 +327,6 @@
   </div>
 </nav>
 
-<div class="anchor-nav">
-  <a href="#test" class="an--test">Test</a>
-  <a href="#watch" class="an--watch">Watch</a>
-  <a href="#control" class="an--control">Control</a>
-  <a href="#prove" class="an--prove">Prove</a>
-</div>
-
 <section class="hero">
   <div class="w">
     <div class="hero-eyebrow">How we think about validated AI</div>
@@ -316,6 +336,25 @@
       So we validate everything around it &mdash; the checks, the enforcement,
       the review, and the proof that it all actually happened.
     </p>
+
+    <div class="pillar-nav">
+      <a href="#test" class="pillar-nav-item pni--test">
+        <div class="pni-label">Test</div>
+        <div class="pni-desc">Run agents and workflows on hundreds of cases. Measure what you get.</div>
+      </a>
+      <a href="#watch" class="pillar-nav-item pni--watch">
+        <div class="pni-label">Watch</div>
+        <div class="pni-desc">Monitor agents in production. Monitor the humans who review them.</div>
+      </a>
+      <a href="#control" class="pillar-nav-item pni--control">
+        <div class="pni-label">Control</div>
+        <div class="pni-desc">Define rules. The platform enforces them. No workarounds.</div>
+      </a>
+      <a href="#prove" class="pillar-nav-item pni--prove">
+        <div class="pni-label">Prove</div>
+        <div class="pni-desc">Show exactly what happened. Complete audit trail, always.</div>
+      </a>
+    </div>
   </div>
 </section>
 
@@ -338,7 +377,6 @@
       </div>
       <div class="diagram-result"><strong>&darr; Result you can use and defend</strong> &mdash; audit trail attached</div>
     </div>
-    <p style="font-size:13px; color: var(--text-4); margin-top: 12px;">Four categories of mechanisms make this work.</p>
   </div>
 </section>
 

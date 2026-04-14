@@ -47,14 +47,36 @@
     .nav-links a { font-size: 13px; font-weight: 500; color: var(--text-3); padding: 6px 12px; border-radius: 6px; text-decoration: none; transition: color 0.15s; }
     .nav-links a:hover { color: var(--text-2); }
 
-    /* Anchor nav */
-    .anchor-nav { display: flex; gap: 6px; justify-content: center; padding: 12px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 49px; z-index: 40; background: rgba(255,255,255,0.92); backdrop-filter: blur(16px); }
-    .anchor-nav a { font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 100px; text-decoration: none; transition: all 0.15s; border: 1px solid transparent; }
-    .anchor-nav a:hover { background: var(--bg-2); }
-    .an--isolate { color: #0E7490; } .an--isolate:hover { border-color: rgba(14,116,144,0.25) !important; }
-    .an--access { color: var(--purple); } .an--access:hover { border-color: var(--purple-border) !important; }
-    .an--encrypt { color: var(--blue); } .an--encrypt:hover { border-color: var(--blue-border) !important; }
-    .an--deploy { color: var(--slate); } .an--deploy:hover { border-color: var(--slate-border) !important; }
+    /* Pillar nav grid */
+    .pillar-nav {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; margin: 32px 0 0;
+    }
+    @media (min-width: 640px) { .pillar-nav { grid-template-columns: 1fr 1fr 1fr 1fr; } }
+    .pillar-nav-item {
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      text-decoration: none;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .pillar-nav-item:hover { transform: translateY(-2px); }
+    .pni--isolate { border-left: 3px solid #0E7490; }
+    .pni--isolate:hover { border-color: rgba(14,116,144,0.25); border-left-color: #0E7490; }
+    .pni--access { border-left: 3px solid var(--purple); }
+    .pni--access:hover { border-color: var(--purple-border); border-left-color: var(--purple); }
+    .pni--encrypt { border-left: 3px solid var(--blue); }
+    .pni--encrypt:hover { border-color: var(--blue-border); border-left-color: var(--blue); }
+    .pni--deploy { border-left: 3px solid var(--slate); }
+    .pni--deploy:hover { border-color: var(--slate-border); border-left-color: var(--slate); }
+    .pni-label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .pni--isolate .pni-label { color: #0E7490; }
+    .pni--access .pni-label { color: var(--purple); }
+    .pni--encrypt .pni-label { color: var(--blue); }
+    .pni--deploy .pni-label { color: var(--slate); }
+    .pni-desc { font-size: 12px; color: var(--text-3); line-height: 1.5; }
 
     /* Hero */
     .hero { padding: 80px 0 40px; }
@@ -156,7 +178,7 @@
 
 <nav>
   <a href="/" class="nav-logo">
-    <svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg>
+    <svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="1.8" fill="none" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg>
     Mediforce
   </a>
   <div class="nav-links">
@@ -167,13 +189,6 @@
   </div>
 </nav>
 
-<div class="anchor-nav">
-  <a href="#isolate" class="an--isolate">Isolate</a>
-  <a href="#access" class="an--access">Access</a>
-  <a href="#encrypt" class="an--encrypt">Encrypt</a>
-  <a href="#deploy" class="an--deploy">Deploy</a>
-</div>
-
 <section class="hero">
   <div class="w">
     <div class="hero-eyebrow">Security model</div>
@@ -183,6 +198,25 @@
       Mediforce gives you granular control over what each agent can access,
       where your data lives, and what models process it.
     </p>
+
+    <div class="pillar-nav">
+      <a href="#isolate" class="pillar-nav-item pni--isolate">
+        <div class="pni-label">Isolate</div>
+        <div class="pni-desc">Every agent in a sandbox. Every step has a scope.</div>
+      </a>
+      <a href="#access" class="pillar-nav-item pni--access">
+        <div class="pni-label">Access</div>
+        <div class="pni-desc">Who can do what. Enforced, not advised.</div>
+      </a>
+      <a href="#encrypt" class="pillar-nav-item pni--encrypt">
+        <div class="pni-label">Encrypt</div>
+        <div class="pni-desc">Secrets encrypted. Audit trail tamper-evident.</div>
+      </a>
+      <a href="#deploy" class="pillar-nav-item pni--deploy">
+        <div class="pni-label">Deploy</div>
+        <div class="pni-desc">Your infrastructure. Your models. Your rules.</div>
+      </a>
+    </div>
   </div>
 </section>
 
