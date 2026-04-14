@@ -23,6 +23,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Workflow Editor — Pane Deselect](#workflow-editor--pane-deselect) — clicking canvas background deselects step and restores YAML panel
 - [Workflow Editor — Executor Switch](#workflow-editor--executor-switch) — changing executor type clears stale fields from the workflow definition
 - [Workflow Editor — Cowork Step](#workflow-editor--cowork-step) — adding a cowork step with human+agent collaboration config
+- [Workflow Editor — Cowork MCP Servers](#workflow-editor--cowork-mcp-servers) — configuring MCP server tools on a cowork step
 
 **Process Runs** — monitoring and controlling workflow executions
 - [Run Detail — Step Graph](#run-detail--step-graph) — tracking progress through workflow steps
@@ -148,6 +149,12 @@ The step editor exposes a single 4-way toggle (Human / Agent / Script / Cowork) 
 Adding a Cowork step opens an explainer for first-time users and a configuration panel: chat/voice toggle, foundation model selector, system prompt, and output schema. The step is rendered on the canvas with a teal "Cowork" badge.
 
 ![workflow-editor-cowork](workflow-editor-cowork.gif)
+
+### Workflow Editor — Cowork MCP Servers
+
+The cowork step editor includes an MCP Servers section where the agent's external tools are configured per step. Each entry toggles between stdio (command + args) and HTTP (URL) transports, accepts an optional allowedTools allowlist, and can be removed individually — returning the section to its empty-state hint.
+
+![workflow-editor-cowork-mcp](workflow-editor-cowork-mcp.gif)
 
 ---
 
