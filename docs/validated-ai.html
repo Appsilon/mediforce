@@ -7,7 +7,7 @@
   <meta name="description" content="Concrete mechanisms for making AI safe to use in regulated pharma." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -38,8 +38,8 @@
 
     /* Nav */
     nav { position: sticky; top: 0; z-index: 50; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.88); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); }
-    .nav-logo { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; color: var(--text); display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .nav-logo svg { width: 20px; height: 20px; }
+    .nav-logo { font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: -0.025em; color: var(--text); display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .nav-logo svg { width: 22px; height: 22px; }
     .nav-links { display: flex; gap: 4px; }
     .nav-links a { font-size: 13px; font-weight: 500; color: var(--text-3); padding: 6px 12px; border-radius: 6px; text-decoration: none; transition: color 0.15s; }
     .nav-links a:hover { color: var(--text-2); }
@@ -289,7 +289,7 @@
 
 <nav>
   <a href="/" class="nav-logo">
-    <svg viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="6" fill="#5EEAD4"/><path d="M7 12h10M12 7v10" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/></svg>
+    <svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg>
     Mediforce
   </a>
   <div class="nav-links">
