@@ -194,7 +194,7 @@ function parseSemverMajor(tag: string): number | null {
 async function collectGovernanceState(
   repo: string,
 ): Promise<PackageMetrics['currentState']> {
-  const url = `https://api.github.com/repos/pharmaverse/${repo}/properties/values`;
+  const url = `https://api.github.com/repos/${repo}/properties/values`;
   const response = await githubFetch(url);
 
   const defaultState: PackageMetrics['currentState'] = {
@@ -239,7 +239,7 @@ async function collectGovernanceState(
 // ---------------------------------------------------------------------------
 
 async function collectReleases(repo: string): Promise<PackageMetrics['releases']> {
-  const url = `https://api.github.com/repos/pharmaverse/${repo}/releases?per_page=100`;
+  const url = `https://api.github.com/repos/${repo}/releases?per_page=100`;
   const response = await githubFetch(url);
 
   if (!response.ok) {
@@ -299,7 +299,7 @@ async function fetchFirstCommentTime(
   repo: string,
   issueNumber: number,
 ): Promise<string | null> {
-  const url = `https://api.github.com/repos/pharmaverse/${repo}/issues/${issueNumber}/comments?per_page=1`;
+  const url = `https://api.github.com/repos/${repo}/issues/${issueNumber}/comments?per_page=1`;
   const response = await githubFetch(url);
   if (!response.ok) return null;
 
@@ -319,7 +319,7 @@ interface RawIssue {
 
 async function collectIssues(repo: string): Promise<PackageMetrics['issues']> {
   const since18m = monthsAgo(18).toISOString();
-  const url = `https://api.github.com/repos/pharmaverse/${repo}/issues?state=all&per_page=100&since=${since18m}`;
+  const url = `https://api.github.com/repos/${repo}/issues?state=all&per_page=100&since=${since18m}`;
   const response = await githubFetch(url);
 
   const defaultIssues: PackageMetrics['issues'] = {
@@ -401,7 +401,7 @@ interface RawReview {
 }
 
 async function collectPullRequests(repo: string): Promise<PackageMetrics['pullRequests']> {
-  const url = `https://api.github.com/repos/pharmaverse/${repo}/pulls?state=all&per_page=50&sort=updated&direction=desc`;
+  const url = `https://api.github.com/repos/${repo}/pulls?state=all&per_page=50&sort=updated&direction=desc`;
   const response = await githubFetch(url);
 
   if (!response.ok) {
@@ -422,7 +422,7 @@ async function collectPullRequests(repo: string): Promise<PackageMetrics['pullRe
 
   const reviewTasks = mergedPrs.map((pr) => {
     return async () => {
-      const reviewUrl = `https://api.github.com/repos/pharmaverse/${repo}/pulls/${pr.number}/reviews?per_page=1`;
+      const reviewUrl = `https://api.github.com/repos/${repo}/pulls/${pr.number}/reviews?per_page=1`;
       const reviewResponse = await githubFetch(reviewUrl);
       if (!reviewResponse.ok) return;
       const reviews = (await reviewResponse.json()) as RawReview[];
@@ -513,7 +513,8 @@ async function collectCranStatus(
 async function collectCoverage(repo: string): Promise<PackageMetrics['coverage']> {
   // Try codecov first
   try {
-    const codecovUrl = `https://codecov.io/api/v2/github/pharmaverse/repos/${repo}/`;
+    const repoName = repo.includes('/') ? repo.split('/')[1] : repo;
+    const codecovUrl = `https://codecov.io/api/v2/github/pharmaverse/repos/${repoName}/`;
     const response = await fetch(codecovUrl, {
       headers: { 'User-Agent': 'mediforce-pharmaverse-governance' },
     });
@@ -532,7 +533,7 @@ async function collectCoverage(repo: string): Promise<PackageMetrics['coverage']
 
   // Try README badge
   try {
-    const readmeUrl = `https://api.github.com/repos/pharmaverse/${repo}/readme`;
+    const readmeUrl = `https://api.github.com/repos/${repo}/readme`;
     const response = await githubFetch(readmeUrl);
 
     if (response.ok) {
@@ -568,7 +569,7 @@ async function collectCoverage(repo: string): Promise<PackageMetrics['coverage']
 // ---------------------------------------------------------------------------
 
 async function collectVignettes(repo: string): Promise<boolean> {
-  const url = `https://api.github.com/repos/pharmaverse/${repo}/contents/vignettes`;
+  const url = `https://api.github.com/repos/${repo}/contents/vignettes`;
   const response = await githubFetch(url);
   return response.ok;
 }
@@ -578,12 +579,12 @@ async function collectVignettes(repo: string): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 async function collectDocumentation(repo: string): Promise<PackageMetrics['documentation']> {
-  const manUrl = `https://api.github.com/repos/pharmaverse/${repo}/contents/man`;
+  const manUrl = `https://api.github.com/repos/${repo}/contents/man`;
   const manResponse = await githubFetch(manUrl);
   const hasManPages = manResponse.ok;
 
   // Check DESCRIPTION for roxygen2 usage
-  const descUrl = `https://api.github.com/repos/pharmaverse/${repo}/contents/DESCRIPTION`;
+  const descUrl = `https://api.github.com/repos/${repo}/contents/DESCRIPTION`;
   const descResponse = await githubFetch(descUrl);
   let usesRoxygen = false;
 
@@ -604,7 +605,7 @@ async function collectDocumentation(repo: string): Promise<PackageMetrics['docum
 
 async function collectContributors(repo: string): Promise<PackageMetrics['contributors']> {
   // Total contributors
-  const contribUrl = `https://api.github.com/repos/pharmaverse/${repo}/contributors?per_page=100`;
+  const contribUrl = `https://api.github.com/repos/${repo}/contributors?per_page=100`;
   const contribResponse = await githubFetch(contribUrl);
   let total = 0;
 
@@ -614,7 +615,7 @@ async function collectContributors(repo: string): Promise<PackageMetrics['contri
   }
 
   // Commit activity (weekly breakdown for last year)
-  const activityUrl = `https://api.github.com/repos/pharmaverse/${repo}/stats/commit_activity`;
+  const activityUrl = `https://api.github.com/repos/${repo}/stats/commit_activity`;
   const activityResponse = await githubFetch(activityUrl);
 
   let commitsLast90Days = 0;
@@ -660,6 +661,7 @@ async function collectPackageMetrics(pkg: PackageInput): Promise<PackageMetrics>
       return await fn();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      console.error(`  [${pkg.name}] ${label} FAILED: ${message}`);
       errors.push(`${label}: ${message}`);
       return fallback;
     }
@@ -754,11 +756,32 @@ async function collectPackageMetrics(pkg: PackageInput): Promise<PackageMetrics>
 // Main
 // ---------------------------------------------------------------------------
 
+// Testing filter: only process these packages to save API calls and time
+const TEST_FILTER = ['admiral', 'rhino'];
+
 async function main(): Promise<void> {
   const inputRaw = await readFile('/output/input.json', 'utf-8');
   const input = JSON.parse(inputRaw) as DiscoverResult;
 
-  const packages = input.packages;
+  let packages = input.packages;
+
+  // Derive repoUrl if missing (backward compat with older discover-packages output)
+  for (const pkg of packages) {
+    if (!pkg.repoUrl && pkg.repo) {
+      pkg.repoUrl = `https://github.com/${pkg.repo}`;
+    }
+    if (!pkg.defaultBranch) {
+      pkg.defaultBranch = 'main';
+    }
+  }
+
+  // Apply test filter
+  if (TEST_FILTER.length > 0) {
+    const before = packages.length;
+    packages = packages.filter((pkg) => TEST_FILTER.includes(pkg.name));
+    console.log(`Test filter active: ${before} packages → ${packages.length} (${TEST_FILTER.join(', ')})`);
+  }
+
   console.log(`Collecting metrics for ${packages.length} packages...`);
 
   const results: PackageMetrics[] = [];
