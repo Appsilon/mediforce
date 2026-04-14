@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mediforce — AI agents and humans, working together in pharma</title>
+  <meta name="description" content="Open-source platform for deploying AI agents into regulated clinical processes — with compliance, audit trails, and human oversight built in." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #FFFFFF;
+      --bg-dark: #F8F9FA;
+      --bg-card: #F8F9FA;
+      --discord: #5865F2;
+      --discord-hover: #4752C4;
+      --accent: #0D9488;
+      --accent-dim: rgba(13,148,136,0.08);
+      --accent-dark: #0F766E;
+      --text: #111827;
+      --text-90: #1F2937;
+      --text-80: #374151;
+      --text-70: #4B5563;
+      --text-60: #6B7280;
+      --text-50: #9CA3AF;
+      --text-40: #D1D5DB;
+      --text-30: #E5E7EB;
+      --border: #E5E7EB;
+      --border-light: #D1D5DB;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .container {
+      max-width: 68rem;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    /* ── Header ── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .header-inner {
+      max-width: 68rem;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.875rem 1.5rem;
+    }
+    .logo-group { display: flex; align-items: center; gap: 0.625rem; text-decoration: none; }
+    .logo-mark {
+      width: 1.75rem; height: 1.75rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-mark svg { width: 100%; height: 100%; }
+    .logo-text {
+      font-family: 'Manrope', sans-serif;
+      font-size: 1.125rem; font-weight: 700; letter-spacing: -0.025em;
+      color: var(--text);
+    }
+    .header-links { display: flex; align-items: center; gap: 0.5rem; }
+    .header-link {
+      display: inline-flex; align-items: center; gap: 0.375rem;
+      font-size: 0.8125rem; font-weight: 500;
+      color: var(--text-60);
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.375rem;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .header-link:hover { color: var(--text); }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative;
+      padding: 6rem 0 5rem;
+      text-align: center;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -40%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60rem;
+      height: 30rem;
+      background: radial-gradient(ellipse at center, rgba(13, 148, 136, 0.06) 0%, rgba(88, 101, 242, 0.03) 40%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.375rem 1rem;
+      border-radius: 9999px;
+      border: 1px solid rgba(13, 148, 136, 0.2);
+      background: rgba(13, 148, 136, 0.06);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--accent);
+      margin-bottom: 2rem;
+    }
+    .hero-badge svg { width: 0.875rem; height: 0.875rem; }
+    .hero h1 {
+      position: relative;
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      line-height: 1.15;
+      max-width: 48rem;
+      margin: 0 auto;
+    }
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--accent) 0%, hsl(200, 80%, 70%) 50%, var(--discord) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-subtitle {
+      position: relative;
+      max-width: 40rem;
+      margin: 1.25rem auto 0;
+      font-size: 1.125rem;
+      color: var(--text-60);
+      line-height: 1.7;
+    }
+    .hero-ctas {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-top: 2.5rem;
+    }
+    .hero-divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(13, 148, 136, 0.25) 30%, rgba(88, 101, 242, 0.2) 70%, transparent);
+    }
+
+    @media (min-width: 640px) {
+      .hero { padding: 8rem 0 6rem; }
+      .hero h1 { font-size: 3.75rem; }
+    }
+    @media (min-width: 1024px) {
+      .hero h1 { font-size: 4.25rem; }
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.6875rem 1.375rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem; font-weight: 600;
+      transition: background 0.15s, border-color 0.15s;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+    .btn svg { width: 1.125rem; height: 1.125rem; flex-shrink: 0; }
+    .btn--discord { background: var(--discord); color: #fff; }
+    .btn--discord:hover { background: var(--discord-hover); }
+    .btn--outline { background: transparent; color: var(--text-90); border-color: var(--text-30); }
+    .btn--outline:hover { background: #F1F3F5; border-color: var(--text-50); }
+
+    /* ── Section base ── */
+    .section {
+      padding: 5rem 0;
+    }
+    .section--alt {
+      background: var(--bg-dark);
+    }
+    .section-label {
+      display: inline-block;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+      padding: 0.25rem 0.625rem;
+      border-radius: 0.25rem;
+      background: rgba(102, 217, 194, 0.08);
+      border: 1px solid rgba(102, 217, 194, 0.15);
+    }
+    .section-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    .section-subtitle {
+      margin-top: 0.75rem;
+      font-size: 1rem;
+      color: var(--text-60);
+      max-width: 36rem;
+      line-height: 1.7;
+    }
+
+    @media (min-width: 640px) {
+      .section-title { font-size: 2rem; }
+    }
+
+    /* ── Why Now (3-col) ── */
+    .why-grid {
+      display: grid;
+      gap: 2rem;
+      margin-top: 3rem;
+    }
+    @media (min-width: 640px) {
+      .why-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    .why-item {
+      padding: 1.5rem;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+      background: #F8F9FA;
+      transition: border-color 0.2s;
+    }
+    .why-item:hover { border-color: rgba(13, 148, 136, 0.2); }
+    .why-item h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+    .why-item p {
+      font-size: 0.875rem;
+      color: var(--text-60);
+      line-height: 1.7;
+    }
+
+    /* ── How It Works (table) ── */
+    .how-intro {
+      margin-top: 1rem;
+      font-size: 0.9375rem;
+      color: var(--text-60);
+      max-width: 42rem;
+      line-height: 1.7;
+    }
+    .autonomy-table {
+      margin-top: 2.5rem;
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .autonomy-table th {
+      text-align: left;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-40);
+      padding: 0 1rem 0.75rem;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .autonomy-table td {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .autonomy-table tr:last-child td { border-bottom: none; }
+    .autonomy-table .level-name {
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .autonomy-table .level-desc { color: var(--text-80); }
+    .autonomy-table .level-human { color: var(--text-50); }
+
+    @media (max-width: 639px) {
+      .autonomy-table thead { display: none; }
+      .autonomy-table, .autonomy-table tbody, .autonomy-table tr, .autonomy-table td {
+        display: block;
+      }
+      .autonomy-table tr {
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .autonomy-table tr:last-child { border-bottom: none; }
+      .autonomy-table td {
+        padding: 0.125rem 0;
+        border-bottom: none;
+      }
+      .autonomy-table .level-human::before {
+        content: "Human: ";
+        color: var(--text-40);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+    }
+
+    /* ── Built For Regulated ── */
+    .regulated-grid {
+      display: grid;
+      gap: 2rem;
+      margin-top: 3rem;
+    }
+    @media (min-width: 640px) {
+      .regulated-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    .regulated-item {
+      padding: 1.75rem;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .regulated-item h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .regulated-item p {
+      font-size: 0.875rem;
+      color: var(--text-60);
+      line-height: 1.7;
+    }
+    .regulated-icon {
+      width: 2rem; height: 2rem;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    /* ── Community ── */
+    .community-grid {
+      display: grid;
+      gap: 1.5rem;
+      margin-top: 2.5rem;
+    }
+    @media (min-width: 640px) {
+      .community-grid { grid-template-columns: 1fr 1fr; }
+    }
+    .community-card {
+      padding: 2rem;
+      border-radius: 0.75rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+    }
+    .community-card h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .community-card p {
+      font-size: 0.875rem;
+      color: var(--text-60);
+      line-height: 1.7;
+      margin-bottom: 1.25rem;
+    }
+    .community-card .schedule {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .schedule .tz {
+      font-weight: 400;
+      color: var(--text-50);
+    }
+    .community-card--discord { border-color: rgba(88,101,242,0.3); }
+    .community-card--discord:hover { border-color: rgba(88,101,242,0.5); }
+    .community-card-icon {
+      width: 2.25rem; height: 2.25rem;
+      margin-bottom: 1rem;
+    }
+    .community-card-icon--discord { color: var(--discord); }
+    .community-card-icon--session { color: var(--accent); }
+    .community-byline {
+      margin-top: 2rem;
+      font-size: 0.8125rem;
+      color: var(--text-40);
+    }
+    .community-byline a {
+      color: var(--text-50);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .community-byline a:hover { color: var(--text-70); }
+
+    /* ── Footer ── */
+    .footer {
+      border-top: 1px solid var(--border);
+      background: var(--bg-dark);
+    }
+    .footer-inner {
+      max-width: 68rem;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem;
+      font-size: 0.8125rem;
+      color: var(--text-40);
+    }
+    .footer-links { display: flex; gap: 1.5rem; }
+    .footer-links a { transition: color 0.15s; }
+    .footer-links a:hover { color: var(--text-70); }
+
+    @media (max-width: 639px) {
+      .footer-inner {
+        flex-direction: column;
+        gap: 0.75rem;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo-group">
+        <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="1.8" fill="none" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
+        <span class="logo-text">Mediforce</span>
+      </a>
+      <div class="header-links">
+        <a href="/preview/validated-ai.html" class="header-link">Validated AI</a>
+        <a href="/preview/security.html" class="header-link">Security</a>
+        <a href="https://github.com/Appsilon/mediforce" target="_blank" class="header-link">GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        Open Source
+      </div>
+      <h1>AI agents and humans, <span class="gradient">working together</span> in the pharmaceutical industry</h1>
+      <p class="hero-subtitle">
+        Open-source platform for deploying AI agents into regulated clinical
+        processes — with compliance, audit trails, and human oversight built in.
+      </p>
+      <div class="hero-ctas">
+        <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="btn btn--outline">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+          View on GitHub
+        </a>
+        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="btn btn--discord">
+          <svg viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/></svg>
+          Join Community
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <div class="hero-divider"></div>
+
+  <!-- Why Now -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-label">Why now</div>
+      <h2 class="section-title">The infrastructure for AI in pharma doesn't exist yet</h2>
+      <div class="why-grid">
+        <div class="why-item">
+          <h3>AI agents are ready</h3>
+          <p>
+            Large language models can do real cognitive work: review documents,
+            extract insights, draft reports, flag inconsistencies. The capability
+            is here.
+          </p>
+        </div>
+        <div class="why-item">
+          <h3>AI is ready. Process isn't.</h3>
+          <p>
+            Teams want to use AI today. But regulated work needs structure,
+            oversight, and audit trails that most AI tools don't provide.
+          </p>
+        </div>
+        <div class="why-item">
+          <h3>No standard exists</h3>
+          <p>
+            Every organization reinvents how to integrate AI into clinical
+            processes. Mediforce is building the open standard for
+            human-agent collaboration in pharma.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section class="section">
+    <div class="container">
+      <div class="section-label">How it works</div>
+      <h2 class="section-title">You define the process. The platform handles compliance.</h2>
+      <p class="how-intro">
+        For each step in a workflow, you decide who does the work — human, AI
+        agent, or both. Agents operate at one of four autonomy levels, and the
+        platform enforces the rules.
+      </p>
+      <table class="autonomy-table">
+        <thead>
+          <tr>
+            <th>Level</th>
+            <th>What the agent does</th>
+            <th>Human involvement</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="level-name">Observer</td>
+            <td class="level-desc">Watches and reports</td>
+            <td class="level-human">None — informational only</td>
+          </tr>
+          <tr>
+            <td class="level-name">Advisor</td>
+            <td class="level-desc">Suggests actions</td>
+            <td class="level-human">Human decides and acts</td>
+          </tr>
+          <tr>
+            <td class="level-name">Drafter</td>
+            <td class="level-desc">Does work, submits for approval</td>
+            <td class="level-human">Human approves or sends back</td>
+          </tr>
+          <tr>
+            <td class="level-name">Executor</td>
+            <td class="level-desc">Acts autonomously</td>
+            <td class="level-human">Human reviews after the fact</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Built for Regulated Environments -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-label">Built for regulated environments</div>
+      <h2 class="section-title">Compliance built into every layer</h2>
+      <div class="regulated-grid">
+        <div class="regulated-item">
+          <svg class="regulated-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+          </svg>
+          <h3>Audit trail</h3>
+          <p>
+            Every action is recorded — who did what, when, and why. Full
+            traceability from agent decision to human approval.
+          </p>
+        </div>
+        <div class="regulated-item">
+          <svg class="regulated-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+          </svg>
+          <h3>Accountability</h3>
+          <p>
+            Clear record of who is responsible for each step. Humans and
+            agents have defined roles — no ambiguity about who made a decision.
+          </p>
+        </div>
+        <div class="regulated-item">
+          <svg class="regulated-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9.75 16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" />
+          </svg>
+          <h3>Open source</h3>
+          <p>
+            Inspect every line of code. No vendor lock-in, no black boxes.
+            Deploy on your infrastructure, audit the logic, contribute back.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Community -->
+  <section class="section">
+    <div class="container">
+      <div class="section-label">Community</div>
+      <h2 class="section-title">We're building this in the open</h2>
+      <p class="section-subtitle">
+        Follow the development, ask questions, and shape the direction of the project.
+      </p>
+      <div class="community-grid">
+        <div class="community-card community-card--discord">
+          <svg class="community-card-icon community-card-icon--discord" viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/>
+          </svg>
+          <h3>Join our Discord</h3>
+          <p>
+            Ask questions, share ideas, follow progress, or just see how things
+            evolve. This is where the conversation happens.
+          </p>
+          <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="btn btn--discord">
+            <svg viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/></svg>
+            Join Discord Server
+          </a>
+        </div>
+        <div class="community-card">
+          <svg class="community-card-icon community-card-icon--session" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z"/>
+          </svg>
+          <h3>Weekly Planning Session</h3>
+          <div class="schedule">
+            <span>Fridays</span>
+            <span>3:00 PM <span class="tz">CET</span></span>
+            <span>2:00 PM <span class="tz">GMT</span></span>
+            <span>9:00 AM <span class="tz">EST</span></span>
+          </div>
+          <p>
+            Live demo, architecture discussion, and open Q&amp;A. Every Friday on
+            Discord. Drop in, listen, or ask anything.
+          </p>
+          <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="btn btn--outline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
+            Join Weekly Session
+          </a>
+        </div>
+      </div>
+      <p class="community-byline">
+        Built by <a href="https://appsilon.com" target="_blank" rel="noopener noreferrer">Appsilon</a> — building open-source tools for life sciences since 2013.
+      </p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>Mediforce</span>
+      <nav class="footer-links">
+        <a href="/preview/validated-ai.html">Validated AI</a>
+        <a href="/preview/security.html">Security</a>
+        <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer">Discord</a>
+        <a href="https://appsilon.com" target="_blank" rel="noopener noreferrer">Appsilon.com</a>
+      </nav>
+    </div>
+  </footer>
+
+</body>
+</html>
