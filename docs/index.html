@@ -7,29 +7,29 @@
   <meta name="description" content="Open-source platform for deploying AI agents into regulated clinical processes — with compliance, audit trails, and human oversight built in." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #313338;
-      --bg-dark: #2b2d31;
-      --bg-card: #2b2d31;
+      --bg: #FFFFFF;
+      --bg-dark: #F8F9FA;
+      --bg-card: #F8F9FA;
       --discord: #5865F2;
       --discord-hover: #4752C4;
-      --accent: hsl(172, 66%, 60%);
-      --accent-dim: hsl(172, 40%, 40%);
-      --accent-dark: hsl(172, 66%, 32%);
-      --text: #fff;
-      --text-90: rgba(255,255,255,0.9);
-      --text-80: rgba(255,255,255,0.8);
-      --text-70: rgba(255,255,255,0.7);
-      --text-60: rgba(255,255,255,0.6);
-      --text-50: rgba(255,255,255,0.5);
-      --text-40: rgba(255,255,255,0.4);
-      --text-30: rgba(255,255,255,0.3);
-      --border: rgba(255,255,255,0.08);
-      --border-light: rgba(255,255,255,0.12);
+      --accent: #0D9488;
+      --accent-dim: rgba(13,148,136,0.08);
+      --accent-dark: #0F766E;
+      --text: #111827;
+      --text-90: #1F2937;
+      --text-80: #374151;
+      --text-70: #4B5563;
+      --text-60: #6B7280;
+      --text-50: #9CA3AF;
+      --text-40: #D1D5DB;
+      --text-30: #E5E7EB;
+      --border: #E5E7EB;
+      --border-light: #D1D5DB;
     }
 
     html { scroll-behavior: smooth; }
@@ -56,9 +56,9 @@
       top: 0;
       z-index: 100;
       border-bottom: 1px solid var(--border);
-      background: rgba(43, 45, 49, 0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
     .header-inner {
       max-width: 68rem;
@@ -68,37 +68,28 @@
       justify-content: space-between;
       padding: 0.875rem 1.5rem;
     }
-    .logo-group { display: flex; align-items: center; gap: 0.625rem; }
+    .logo-group { display: flex; align-items: center; gap: 0.625rem; text-decoration: none; }
     .logo-mark {
-      width: 1.5rem; height: 1.5rem;
+      width: 1.75rem; height: 1.75rem;
       display: flex; align-items: center; justify-content: center;
     }
-    .logo-mark svg {
-      width: 100%; height: 100%;
-    }
+    .logo-mark svg { width: 100%; height: 100%; }
     .logo-text {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.125rem; font-weight: 700; letter-spacing: -0.03em;
+      font-family: 'Manrope', sans-serif;
+      font-size: 1.125rem; font-weight: 700; letter-spacing: -0.025em;
       color: var(--text);
     }
-    .header-links { display: flex; align-items: center; gap: 0.75rem; }
+    .header-links { display: flex; align-items: center; gap: 0.5rem; }
     .header-link {
       display: inline-flex; align-items: center; gap: 0.375rem;
       font-size: 0.8125rem; font-weight: 500;
-      color: var(--text-70);
+      color: var(--text-60);
       padding: 0.375rem 0.75rem;
       border-radius: 0.375rem;
-      border: 1px solid transparent;
-      transition: color 0.15s, border-color 0.15s;
+      text-decoration: none;
+      transition: color 0.15s;
     }
-    .header-link:hover { color: var(--text); border-color: var(--border-light); }
-    .header-link svg { width: 1rem; height: 1rem; }
-    .header-link--discord {
-      background: var(--discord);
-      color: #fff;
-      font-weight: 600;
-    }
-    .header-link--discord:hover { background: var(--discord-hover); color: #fff; border-color: transparent; }
+    .header-link:hover { color: var(--text); }
 
     /* ── Hero ── */
     .hero {
@@ -115,7 +106,7 @@
       transform: translateX(-50%);
       width: 60rem;
       height: 30rem;
-      background: radial-gradient(ellipse at center, rgba(102, 217, 194, 0.08) 0%, rgba(88, 101, 242, 0.04) 40%, transparent 70%);
+      background: radial-gradient(ellipse at center, rgba(13, 148, 136, 0.06) 0%, rgba(88, 101, 242, 0.03) 40%, transparent 70%);
       pointer-events: none;
     }
     .hero-badge {
@@ -124,8 +115,8 @@
       gap: 0.5rem;
       padding: 0.375rem 1rem;
       border-radius: 9999px;
-      border: 1px solid rgba(102, 217, 194, 0.25);
-      background: rgba(102, 217, 194, 0.06);
+      border: 1px solid rgba(13, 148, 136, 0.2);
+      background: rgba(13, 148, 136, 0.06);
       font-size: 0.8125rem;
       font-weight: 500;
       color: var(--accent);
@@ -155,6 +146,14 @@
       color: var(--text-60);
       line-height: 1.7;
     }
+    .hero-subtitle a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      text-decoration-color: rgba(13,148,136,0.3);
+      transition: text-decoration-color 0.15s;
+    }
+    .hero-subtitle a:hover { text-decoration-color: var(--accent); }
     .hero-ctas {
       position: relative;
       display: flex;
@@ -166,7 +165,7 @@
     .hero-divider {
       width: 100%;
       height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(102, 217, 194, 0.3) 30%, rgba(88, 101, 242, 0.3) 70%, transparent);
+      background: linear-gradient(90deg, transparent, rgba(13, 148, 136, 0.25) 30%, rgba(88, 101, 242, 0.2) 70%, transparent);
     }
 
     @media (min-width: 640px) {
@@ -191,7 +190,7 @@
     .btn--discord { background: var(--discord); color: #fff; }
     .btn--discord:hover { background: var(--discord-hover); }
     .btn--outline { background: transparent; color: var(--text-90); border-color: var(--text-30); }
-    .btn--outline:hover { background: rgba(255,255,255,0.05); border-color: var(--text-50); }
+    .btn--outline:hover { background: #F1F3F5; border-color: var(--text-50); }
 
     /* ── Section base ── */
     .section {
@@ -243,10 +242,10 @@
       padding: 1.5rem;
       border-radius: 0.75rem;
       border: 1px solid var(--border);
-      background: rgba(255,255,255,0.02);
+      background: #F8F9FA;
       transition: border-color 0.2s;
     }
-    .why-item:hover { border-color: rgba(102, 217, 194, 0.2); }
+    .why-item:hover { border-color: rgba(13, 148, 136, 0.2); }
     .why-item h3 {
       font-size: 1rem;
       font-weight: 600;
@@ -345,6 +344,16 @@
       color: var(--text-60);
       line-height: 1.7;
     }
+    .learn-more {
+      display: inline-block;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .learn-more:hover { color: var(--accent-dark); }
     .regulated-icon {
       width: 2rem; height: 2rem;
       color: var(--accent);
@@ -439,22 +448,17 @@
 </head>
 <body>
 
-  <!-- Header -->
   <header class="header">
     <div class="header-inner">
-      <a href="/" class="logo-group">
-        <div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L2 8v8l10 5 10-5V8L12 3Z" stroke="url(#logo-g)" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 8v8M8 10v4M16 10v4" stroke="url(#logo-g)" stroke-width="1.5" stroke-linecap="round"/><defs><linearGradient id="logo-g" x1="2" y1="3" x2="22" y2="21" gradientUnits="userSpaceOnUse"><stop stop-color="hsl(172, 66%, 60%)"/><stop offset="1" stop-color="hsl(200, 80%, 70%)"/></linearGradient></defs></svg></div>
-        <span class="logo-text">mediforce<span style="color: var(--accent)">.ai</span></span>
+      <a href="index.html" class="logo-group">
+        <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="1.8" fill="none" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
+        <span class="logo-text">Mediforce</span>
       </a>
       <div class="header-links">
-        <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="header-link">
-          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-          GitHub
-        </a>
-        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="header-link header-link--discord">
-          <svg viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/></svg>
-          Join Community
-        </a>
+        <a href="validated-ai.html" class="header-link">Validated AI</a>
+        <a href="security.html" class="header-link">Security</a>
+        <a href="fda-principles.html" class="header-link">FDA Principles</a>
+        <a href="https://github.com/Appsilon/mediforce" target="_blank" class="header-link">GitHub</a>
       </div>
     </div>
   </header>
@@ -469,7 +473,8 @@
       <h1>AI agents and humans, <span class="gradient">working together</span> in the pharmaceutical industry</h1>
       <p class="hero-subtitle">
         Open-source platform for deploying AI agents into regulated clinical
-        processes — with compliance, audit trails, and human oversight built in.
+        processes — with <a href="validated-ai.html">compliance</a>, <a href="security.html">audit trails</a>,
+        and human oversight built in.
       </p>
       <div class="hero-ctas">
         <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="btn btn--outline">
@@ -501,11 +506,10 @@
           </p>
         </div>
         <div class="why-item">
-          <h3>Pharma needs this</h3>
+          <h3>AI is ready. Process isn't.</h3>
           <p>
-            Efficiency pressure is growing. Every company wants to deploy AI, but
-            regulated environments need structure, oversight, and audit trails
-            that don't exist yet.
+            Teams want to use AI today. But regulated work needs structure,
+            oversight, and audit trails that most AI tools don't provide.
           </p>
         </div>
         <div class="why-item">
@@ -579,6 +583,7 @@
             Every action is recorded — who did what, when, and why. Full
             traceability from agent decision to human approval.
           </p>
+          <a href="validated-ai.html" class="learn-more">How we validate AI &rarr;</a>
         </div>
         <div class="regulated-item">
           <svg class="regulated-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -589,6 +594,7 @@
             Clear record of who is responsible for each step. Humans and
             agents have defined roles — no ambiguity about who made a decision.
           </p>
+          <a href="security.html" class="learn-more">Security architecture &rarr;</a>
         </div>
         <div class="regulated-item">
           <svg class="regulated-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -599,6 +605,7 @@
             Inspect every line of code. No vendor lock-in, no black boxes.
             Deploy on your infrastructure, audit the logic, contribute back.
           </p>
+          <a href="fda-principles.html" class="learn-more">FDA/EMA AI principles alignment &rarr;</a>
         </div>
       </div>
     </div>
@@ -659,6 +666,9 @@
     <div class="footer-inner">
       <span>Mediforce</span>
       <nav class="footer-links">
+        <a href="validated-ai.html">Validated AI</a>
+        <a href="security.html">Security</a>
+        <a href="fda-principles.html">FDA Principles</a>
         <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer">Discord</a>
         <a href="https://appsilon.com" target="_blank" rel="noopener noreferrer">Appsilon.com</a>
