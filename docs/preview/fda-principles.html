@@ -33,12 +33,68 @@
     /* Content */
     .w { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; }
 
-    /* Hero */
+    /* Hero — two-column with doc preview */
     .hero { padding: 64px 0 40px; }
+    .hero-grid {
+      display: grid; grid-template-columns: 1fr 320px; gap: 48px; align-items: start;
+    }
+    @media (max-width: 900px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .hero-doc { display: none; }
+    }
     .hero-eyebrow { font-size: 13px; font-weight: 500; color: var(--text-3); margin-bottom: 12px; }
-    .hero h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.2; max-width: 640px; }
-    .hero .lead { margin-top: 14px; font-size: 15px; color: var(--text-3); line-height: 1.7; max-width: 560px; }
+    .hero h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.2; }
+    .hero .lead { margin-top: 14px; font-size: 15px; color: var(--text-3); line-height: 1.7; }
     .hero .lead a { text-decoration: underline; text-underline-offset: 2px; }
+
+    /* Document preview card */
+    .hero-doc {
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+      overflow: hidden;
+      background: white;
+      transform: rotate(1deg);
+      transition: transform 0.3s;
+    }
+    .hero-doc:hover { transform: rotate(0deg); }
+    .hero-doc a { display: block; text-decoration: none; color: inherit; }
+    .doc-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid #E5E7EB;
+    }
+    .doc-logos {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+    }
+    .doc-fda { font-size: 11px; font-weight: 800; color: #00529B; letter-spacing: 0.02em; line-height: 1.2; }
+    .doc-fda span { display: block; font-size: 8px; font-weight: 600; color: #00529B; letter-spacing: 0.06em; }
+    .doc-ema { font-size: 10px; font-weight: 700; color: #003399; text-align: right; }
+    .doc-ema span { display: block; font-size: 7px; color: #666; font-weight: 400; }
+    .doc-title {
+      font-size: 14px; font-weight: 700; color: #111;
+      line-height: 1.3; margin-bottom: 4px;
+    }
+    .doc-date { font-size: 10px; color: #999; }
+    .doc-body {
+      padding: 16px 24px 20px;
+    }
+    .doc-line {
+      height: 6px; border-radius: 3px;
+      background: #F1F3F5;
+      margin-bottom: 6px;
+    }
+    .doc-line--short { width: 70%; }
+    .doc-line--med { width: 85%; }
+    .doc-line--long { width: 95%; }
+    .doc-line--gap { margin-top: 14px; }
+    .doc-principle {
+      margin-top: 12px;
+      font-size: 10px; font-weight: 700; color: #333;
+    }
+    .doc-principle-text {
+      font-size: 9px; color: #888; margin-top: 2px; line-height: 1.4;
+    }
 
     /* Summary */
     .summary-bar {
@@ -169,22 +225,51 @@
 
 <section class="hero">
   <div class="w">
-    <div class="hero-eyebrow">FDA &amp; EMA &middot; January 2026</div>
-    <h1>10 Guiding Principles of Good AI Practice in Drug Development</h1>
-    <p class="lead">
-      In January 2026, FDA and EMA jointly published
-      <a href="https://www.fda.gov/media/177030/download" target="_blank">10 guiding principles</a>
-      for AI in drug development. Mediforce is built to be consistent with all of them
-      and helps your organization follow them in practice.
-    </p>
-    <div class="summary-bar">
-      <div class="summary-item">
-        <span class="summary-dot" style="background: #10B981;"></span>
-        <span><strong>7</strong> addressed today</span>
+    <div class="hero-grid">
+      <div>
+        <div class="hero-eyebrow">FDA &amp; EMA &middot; January 2026</div>
+        <h1>10 Guiding Principles of Good AI Practice in Drug Development</h1>
+        <p class="lead">
+          FDA and EMA jointly published
+          <a href="https://www.fda.gov/media/177030/download" target="_blank">10 guiding principles</a>
+          for AI in drug development. Mediforce is built to be consistent with all of them
+          and helps your organization follow them in practice.
+        </p>
+        <div class="summary-bar">
+          <div class="summary-item">
+            <span class="summary-dot" style="background: #10B981;"></span>
+            <span><strong>7</strong> addressed today</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-dot" style="background: #F59E0B;"></span>
+            <span><strong>3</strong> in development</span>
+          </div>
+        </div>
       </div>
-      <div class="summary-item">
-        <span class="summary-dot" style="background: #F59E0B;"></span>
-        <span><strong>3</strong> in development</span>
+      <div class="hero-doc">
+        <a href="https://www.fda.gov/media/177030/download" target="_blank">
+          <div class="doc-header">
+            <div class="doc-logos">
+              <div class="doc-fda">U.S. FOOD &amp; DRUG<span>ADMINISTRATION</span></div>
+              <div class="doc-ema">EMA<span>European Medicines Agency</span></div>
+            </div>
+            <div class="doc-title">Guiding Principles of Good AI Practice in Drug Development</div>
+            <div class="doc-date">January 2026</div>
+          </div>
+          <div class="doc-body">
+            <div class="doc-line doc-line--long"></div>
+            <div class="doc-line doc-line--long"></div>
+            <div class="doc-line doc-line--med"></div>
+            <div class="doc-line doc-line--short"></div>
+            <div class="doc-line doc-line--long doc-line--gap"></div>
+            <div class="doc-line doc-line--long"></div>
+            <div class="doc-line doc-line--med"></div>
+            <div class="doc-principle">1. Human-centric by design</div>
+            <div class="doc-principle-text">The development and use of AI technologies align with ethical and human-centric values.</div>
+            <div class="doc-principle" style="margin-top:8px;">2. Risk-based approach</div>
+            <div class="doc-principle-text">Proportionate validation, risk mitigation, and oversight&hellip;</div>
+          </div>
+        </a>
       </div>
     </div>
   </div>
