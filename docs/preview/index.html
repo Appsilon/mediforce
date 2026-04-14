@@ -146,6 +146,14 @@
       color: var(--text-60);
       line-height: 1.7;
     }
+    .hero-subtitle a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      text-decoration-color: rgba(13,148,136,0.3);
+      transition: text-decoration-color 0.15s;
+    }
+    .hero-subtitle a:hover { text-decoration-color: var(--accent); }
     .hero-ctas {
       position: relative;
       display: flex;
@@ -336,6 +344,16 @@
       color: var(--text-60);
       line-height: 1.7;
     }
+    .learn-more {
+      display: inline-block;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .learn-more:hover { color: var(--accent-dark); }
     .regulated-icon {
       width: 2rem; height: 2rem;
       color: var(--accent);
@@ -432,13 +450,14 @@
 
   <header class="header">
     <div class="header-inner">
-      <a href="/" class="logo-group">
+      <a href="index.html" class="logo-group">
         <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="1.8" fill="none" opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
         <span class="logo-text">Mediforce</span>
       </a>
       <div class="header-links">
         <a href="validated-ai.html" class="header-link">Validated AI</a>
         <a href="security.html" class="header-link">Security</a>
+        <a href="fda-principles.html" class="header-link">FDA Principles</a>
         <a href="https://github.com/Appsilon/mediforce" target="_blank" class="header-link">GitHub</a>
       </div>
     </div>
@@ -454,7 +473,8 @@
       <h1>AI agents and humans, <span class="gradient">working together</span> in the pharmaceutical industry</h1>
       <p class="hero-subtitle">
         Open-source platform for deploying AI agents into regulated clinical
-        processes — with compliance, audit trails, and human oversight built in.
+        processes — with <a href="validated-ai.html">compliance</a>, <a href="security.html">audit trails</a>,
+        and human oversight built in.
       </p>
       <div class="hero-ctas">
         <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="btn btn--outline">
@@ -563,6 +583,7 @@
             Every action is recorded — who did what, when, and why. Full
             traceability from agent decision to human approval.
           </p>
+          <a href="validated-ai.html" class="learn-more">How we validate AI &rarr;</a>
         </div>
         <div class="regulated-item">
           <svg class="regulated-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -573,6 +594,7 @@
             Clear record of who is responsible for each step. Humans and
             agents have defined roles — no ambiguity about who made a decision.
           </p>
+          <a href="security.html" class="learn-more">Security architecture &rarr;</a>
         </div>
         <div class="regulated-item">
           <svg class="regulated-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -583,6 +605,7 @@
             Inspect every line of code. No vendor lock-in, no black boxes.
             Deploy on your infrastructure, audit the logic, contribute back.
           </p>
+          <a href="fda-principles.html" class="learn-more">FDA/EMA AI principles alignment &rarr;</a>
         </div>
       </div>
     </div>
@@ -645,6 +668,7 @@
       <nav class="footer-links">
         <a href="validated-ai.html">Validated AI</a>
         <a href="security.html">Security</a>
+        <a href="fda-principles.html">FDA Principles</a>
         <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer">Discord</a>
         <a href="https://appsilon.com" target="_blank" rel="noopener noreferrer">Appsilon.com</a>
