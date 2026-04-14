@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "build:scripts": "tsc -p tsconfig.json",
-    "docker:build": "docker build -t mediforce-agent:pharmaverse-governance -f apps/pharmaverse-governance/container/Dockerfile ../../"
+    "docker:build": "docker build -t mediforce-agent:pharmaverse-governance -f container/Dockerfile ../../"
   },
   "dependencies": {
     "@mediforce/platform-core": "workspace:*"
