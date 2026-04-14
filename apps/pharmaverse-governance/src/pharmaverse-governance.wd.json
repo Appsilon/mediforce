@@ -32,7 +32,7 @@
       "executor": "script",
       "autonomyLevel": "L4",
       "plugin": "script-container",
-      "description": "For each discovered package, collect: current governance custom properties (status tag, badges, review dates), releases (dates, versions, major bumps), issue response times (critical/non-critical), PR activity, CRAN check status (primary source), test coverage, vignette presence, documentation state, contributor activity, CRAN/Bioconductor publication status. Handles GitHub API rate limiting with exponential backoff.",
+      "description": "For each discovered package, collect: current governance custom properties (status tag, badges, review dates), releases (dates, versions, major bumps), issue response times (critical/non-critical), PR activity, CRAN check status (primary source), test coverage, vignette presence, documentation state, contributor activity, CRAN/Bioconductor publication status. Handles GitHub API rate limiting with exponential backoff. NOTE: For testing, only admiral and rhino are processed.",
       "agent": {
         "image": "mediforce-agent:pharmaverse-governance",
         "command": "node /app/collect-metrics.js"
@@ -43,7 +43,7 @@
       "name": "Assess Package Governance Status",
       "type": "creation",
       "executor": "agent",
-      "autonomyLevel": "L3",
+      "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
       "description": "Apply governance criteria to each package's metrics. Compare proposed state against current custom properties to detect changes. Propose status tag, quality badges (all 3 dimensions), and flag items needing council attention (tag changes, renewals due, early warnings). Generate per-package report with criteria ID references.",
       "env": {
@@ -54,21 +54,7 @@
         "skillsDir": "apps/pharmaverse-governance/plugins/pharmaverse-governance/skills",
         "model": "sonnet",
         "image": "mediforce-golden-image",
-        "confidenceThreshold": 0.7,
-        "fallbackBehavior": "escalate_to_human",
         "timeoutMinutes": 30
-      }
-    },
-    {
-      "id": "review-package-reports",
-      "name": "Review Package Reports",
-      "type": "review",
-      "executor": "human",
-      "allowedRoles": ["council-member", "governance-lead"],
-      "description": "Council reviews individual package assessment reports. Each report shows the proposed status tag, quality badge assessments, and flagged items with governance criteria references. Packages with no proposed changes appear in a consent agenda section. Approve to proceed to council summary generation, or revise to send back for reassessment with feedback.",
-      "verdicts": {
-        "approve": { "target": "generate-council-summary" },
-        "revise": { "target": "assess-packages" }
       }
     },
     {
@@ -76,9 +62,9 @@
       "name": "Generate Council Summary",
       "type": "creation",
       "executor": "agent",
-      "autonomyLevel": "L3",
+      "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
-      "description": "Aggregate all approved package reports into a council-ready summary document: consent agenda (healthy packages), proposed tag changes (with evidence and criteria IDs), renewal assessments due (with RC-1..RC-4 dimensions), early warnings, and specific action items for council members.",
+      "description": "Aggregate all package assessment reports into a council-ready summary document: consent agenda (healthy packages), proposed tag changes (with evidence and criteria IDs), renewal assessments due (with RC-1..RC-4 dimensions), early warnings, and specific action items for council members. Output a clear, readable report suitable for PDF download.",
       "env": {
         "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}"
       },
@@ -98,7 +84,7 @@
       "type": "review",
       "executor": "human",
       "allowedRoles": ["governance-lead"],
-      "description": "Governance lead reviews the final council summary before distribution. Verify that consent agenda, tag change proposals, renewal assessments, and action items are accurate and complete. Approve to persist governance state to GitHub, or revise to regenerate with feedback.",
+      "description": "Governance lead reviews the final council summary before distribution. Verify that consent agenda, tag change proposals, renewal assessments, and action items are accurate and complete. The report is downloadable as PDF. Approve to persist governance state to GitHub, or revise to regenerate with feedback.",
       "verdicts": {
         "approve": { "target": "apply-governance-state" },
         "revise": { "target": "generate-council-summary" }
@@ -111,10 +97,10 @@
       "executor": "script",
       "autonomyLevel": "L4",
       "plugin": "script-container",
-      "description": "Write approved governance state (status tags, quality badges, review date) to GitHub org custom properties on each pharmaverse repo. Updates last-review-date and endorsement-term-start where applicable. Logs all property changes for audit trail.",
+      "description": "Write approved governance state (status tags, quality badges, review date) to GitHub org custom properties on each pharmaverse repo. NOTE: Currently a no-op for testing — no changes are written to GitHub.",
       "agent": {
         "image": "mediforce-agent:pharmaverse-governance",
-        "command": "node /app/apply-governance-state.js"
+        "command": "node -e \"const fs = require('fs'); const input = JSON.parse(fs.readFileSync('/output/prev-review-council-summary-packages.json','utf8')); fs.writeFileSync('/output/result.json', JSON.stringify({ skipped: true, reason: 'testing-mode', packageCount: 0, message: 'Apply step disabled for testing — no changes written to GitHub' })); console.log('Apply step skipped (testing mode)');\""
       }
     },
     {
@@ -127,7 +113,7 @@
   "transitions": [
     { "from": "discover-packages", "to": "collect-metrics" },
     { "from": "collect-metrics", "to": "assess-packages" },
-    { "from": "assess-packages", "to": "review-package-reports" },
+    { "from": "assess-packages", "to": "generate-council-summary" },
     { "from": "generate-council-summary", "to": "review-council-summary" },
     { "from": "apply-governance-state", "to": "done" }
   ]

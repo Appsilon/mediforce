@@ -8,6 +8,8 @@ const CONCURRENCY_LIMIT = 5;
 interface PackageInfo {
   name: string;
   repo: string;
+  repoUrl: string;
+  defaultBranch: string;
   docs: string;
   task: string;
   details: string;
@@ -139,14 +141,29 @@ async function main(): Promise<void> {
     }
 
     const name = fields.name ?? entry.name.replace(/\.yaml$/, '');
+    const repo = fields.repo ?? '';
+    const repoUrl = repo ? `https://github.com/${repo}` : '';
+
+    // Fetch default branch from the GitHub API
+    let defaultBranch = 'main';
+    if (repo) {
+      const repoResponse = await githubFetch(`https://api.github.com/repos/${repo}`);
+      if (repoResponse.ok) {
+        const repoData = (await repoResponse.json()) as { default_branch?: string };
+        defaultBranch = repoData.default_branch ?? 'main';
+      }
+    }
+
     packages.push({
       name,
-      repo: fields.repo ?? '',
+      repo,
+      repoUrl,
+      defaultBranch,
       docs: fields.docs ?? '',
       task: fields.task ?? '',
       details: fields.details ?? '',
     });
-    console.log(`  ${name}`);
+    console.log(`  ${name} (${repo}, branch: ${defaultBranch})`);
   });
 
   packages.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
