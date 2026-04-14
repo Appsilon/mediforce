@@ -514,7 +514,7 @@ test.describe('Workflow Editor Journey', () => {
     await endRecording(page);
   });
 
-  test('cowork step MCP server configuration appears in YAML', async ({ page }, testInfo) => {
+  test('cowork step MCP server editor supports add, fill, transport toggle, and remove', async ({ page }, testInfo) => {
     await setupRecording(page, 'workflow-editor-cowork-mcp', testInfo);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
@@ -531,25 +531,42 @@ test.describe('Workflow Editor Journey', () => {
     await click(page, page.locator('.react-flow__node').filter({ hasText: /New Step/i }));
     await expect(page.getByText(/What is a Cowork step/i)).toBeVisible({ timeout: 3_000 });
 
-    // Add an MCP server entry
-    await expect(page.getByText('MCP Servers')).toBeVisible();
-    await click(page, page.getByRole('button', { name: /^Add$/ }).last());
+    // Scope MCP edits to the step editor side panel.
+    const sidePanel = page.locator('div.border-l');
 
-    // Fill the server name and command
-    const nameInput = page.getByPlaceholder('server-name');
+    // Empty-state hint is visible before adding any server.
+    await expect(sidePanel.getByText(/No MCP servers configured/i)).toBeVisible();
+    await expect(sidePanel.getByText('MCP Servers', { exact: true })).toBeVisible();
+
+    // Click Add — a server entry with name/command inputs appears.
+    await click(page, sidePanel.getByRole('button', { name: /^Add$/ }));
+    await expect(sidePanel.getByText(/No MCP servers configured/i)).not.toBeVisible();
+
+    // Fill the stdio-mode server fields.
+    const nameInput = sidePanel.getByPlaceholder('server-name');
     await expect(nameInput).toBeVisible({ timeout: 3_000 });
     await nameInput.fill('tealflow');
-    const commandInput = page.getByPlaceholder(/e\.g\. tealflow-mcp/);
+    await expect(nameInput).toHaveValue('tealflow');
+
+    const commandInput = sidePanel.getByPlaceholder(/e\.g\. tealflow-mcp/);
     await expect(commandInput).toBeVisible();
     await commandInput.fill('tealflow-mcp');
+    await expect(commandInput).toHaveValue('tealflow-mcp');
     await showStep(page);
 
-    // Deselect and check YAML contains mcpServers entry
-    await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
-    const yamlContent = page.locator('.cm-content');
-    await expect(yamlContent).toBeVisible({ timeout: 10_000 });
-    await expect(yamlContent).toContainText('mcpServers', { timeout: 5_000 });
-    await expect(yamlContent).toContainText('tealflow-mcp', { timeout: 5_000 });
+    // Transport toggle switches the visible input to URL mode and back.
+    const transportToggle = sidePanel.getByRole('button', { name: /^stdio$/ });
+    await click(page, transportToggle);
+    await expect(sidePanel.getByPlaceholder(/localhost:8080\/mcp/)).toBeVisible();
+    await expect(sidePanel.getByPlaceholder(/e\.g\. tealflow-mcp/)).not.toBeVisible();
+
+    await click(page, sidePanel.getByRole('button', { name: /^http$/ }));
+    await expect(sidePanel.getByPlaceholder(/e\.g\. tealflow-mcp/)).toBeVisible();
+    await showStep(page);
+
+    // Remove — empty state returns.
+    await click(page, sidePanel.locator('button').filter({ has: page.locator('svg.lucide-trash-2') }));
+    await expect(sidePanel.getByText(/No MCP servers configured/i)).toBeVisible();
     await showResult(page);
 
     await endRecording(page);
