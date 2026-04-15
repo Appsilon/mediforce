@@ -117,7 +117,7 @@ interface CouncilSummary {
 }
 
 interface InputData {
-  councilSummary: CouncilSummary;
+  councilSummary?: CouncilSummary;
   steps?: {
     'assess-packages'?: {
       assessments: PackageAssessment[];
@@ -126,8 +126,12 @@ interface InputData {
       packages: PackageMetrics[];
     };
     'discover-packages'?: {
-      packages: Array<{ name: string; task: string }>;
+      packages: Array<{ name: string; task: string; maintainerName?: string; maintainerEmail?: string }>;
     };
+    'generate-council-summary'?: {
+      councilSummary?: CouncilSummary;
+    };
+    [key: string]: unknown;
   };
 }
 
@@ -136,6 +140,8 @@ interface ReportEntry {
   htmlPath: string;
   pdfPath: string;
   status: string;
+  maintainerName: string;
+  maintainerEmail: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,8 +150,9 @@ interface ReportEntry {
 
 const REPORTS_DIR = '/output/reports';
 
-function escapeHtml(text: string): string {
-  return text
+function escapeHtml(text: string | null | undefined): string {
+  if (text === null || text === undefined) return '';
+  return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -549,6 +556,102 @@ async function generatePdf(htmlPath: string, pdfPath: string, browser: Browser):
 }
 
 // ---------------------------------------------------------------------------
+// Notification Review Presentation
+// ---------------------------------------------------------------------------
+
+function statusColor(status: string): string {
+  const s = status.toLowerCase();
+  if (s.includes('stable')) return '#22c55e';
+  if (s.includes('maturing')) return '#3b82f6';
+  if (s.includes('watch')) return '#f59e0b';
+  if (s.includes('at-risk') || s.includes('at risk')) return '#ef4444';
+  if (s.includes('archived')) return '#6b7280';
+  return '#6b7280';
+}
+
+function buildNotificationPresentation(
+  reportContents: Array<{ entry: ReportEntry; html: string }>,
+  reviewDate: string,
+): string {
+  const cards = reportContents.map(({ entry, html }) => {
+    // Extract <body> content from the full HTML report to embed inline
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    const bodyContent = bodyMatch ? bodyMatch[1] : '<p>Report content unavailable</p>';
+    const color = statusColor(entry.status);
+
+    return `
+    <details class="report-card" style="border-left: 4px solid ${color};">
+      <summary>
+        <span class="pkg-name">${escapeHtml(entry.packageName)}</span>
+        <span class="badge" style="background: ${color}; color: #fff;">${escapeHtml(entry.status)}</span>
+        <span class="recipient">
+          <span class="recipient-icon">&#9993;</span>
+          <span class="recipient-name">${escapeHtml(entry.maintainerName)}</span>
+          &lt;${escapeHtml(entry.maintainerEmail)}&gt;
+        </span>
+      </summary>
+      <div class="report-body">
+        <div class="email-bar">
+          <strong>To:</strong> ${escapeHtml(entry.maintainerName)} &lt;${escapeHtml(entry.maintainerEmail)}&gt;
+          &nbsp;&nbsp;|&nbsp;&nbsp;
+          <strong>Attachment:</strong> ${escapeHtml(entry.packageName)}.pdf
+        </div>
+        <div class="report-preview">${bodyContent}</div>
+      </div>
+    </details>`;
+  }).join('\n');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #1e293b; background: #fff; padding: 1.5rem; max-width: 920px; margin: 0 auto; line-height: 1.6; font-size: 14px; }
+    h1 { font-size: 1.3rem; font-weight: 700; border-bottom: 3px solid #2563eb; padding-bottom: 0.5rem; margin: 0 0 0.5rem 0; }
+    .subtitle { font-size: 0.85rem; color: #64748b; margin-bottom: 1.25rem; }
+
+    .report-card { border: 1px solid #e2e8f0; border-radius: 0.5rem; margin: 0.75rem 0; overflow: hidden; }
+    .report-card > summary { padding: 0.75rem 1rem; cursor: pointer; font-weight: 600; font-size: 0.95rem; background: #f8fafc; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; list-style: none; }
+    .report-card > summary::-webkit-details-marker { display: none; }
+    .report-card > summary::before { content: '▶'; font-size: 0.6rem; color: #94a3b8; transition: transform 0.15s; }
+    .report-card[open] > summary::before { transform: rotate(90deg); }
+    .report-card > summary:hover { background: #f1f5f9; }
+
+    .pkg-name { font-size: 1rem; }
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 700; }
+    .recipient { margin-left: auto; font-size: 0.8rem; font-weight: 400; color: #475569; display: flex; align-items: center; gap: 0.3rem; }
+    .recipient-icon { font-size: 1rem; }
+
+    .report-body { padding: 0; }
+    .email-bar { background: #eff6ff; border-bottom: 1px solid #bfdbfe; padding: 0.6rem 1rem; font-size: 0.82rem; color: #1e40af; }
+    .report-preview { padding: 1rem; border-top: 1px solid #e2e8f0; }
+
+    /* Reset styles inside the embedded report so they don't clash */
+    .report-preview h1 { font-size: 1.2rem; border-bottom: 2px solid #2563eb; }
+
+    @media (prefers-color-scheme: dark) {
+      body { color: #e2e8f0; background: #0f172a; }
+      h1 { color: #f1f5f9; border-bottom-color: #3b82f6; }
+      .subtitle { color: #94a3b8; }
+      .report-card { border-color: #334155; }
+      .report-card > summary { background: #1e293b; }
+      .report-card > summary:hover { background: #334155; }
+      .recipient { color: #94a3b8; }
+      .email-bar { background: #1e293b; border-color: #334155; color: #93c5fd; }
+      .report-preview { border-color: #334155; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Notification Preview &mdash; Per-Package Governance Reports</h1>
+  <div class="subtitle">${escapeHtml(String(reportContents.length))} reports to send &nbsp;|&nbsp; Review date: ${escapeHtml(reviewDate)}</div>
+  ${cards}
+</body>
+</html>`;
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -556,9 +659,13 @@ async function main(): Promise<void> {
   const inputRaw = await readFile('/output/input.json', 'utf-8');
   const input = JSON.parse(inputRaw) as InputData;
 
-  const councilSummary = input.councilSummary;
+  // councilSummary may be at the top level (direct input) or nested inside
+  // the generate-council-summary step output (when reached via review-council-summary
+  // verdict routing, where steps: instance.variables is merged in).
+  const councilSummary = input.councilSummary
+    ?? input.steps?.['generate-council-summary']?.councilSummary;
   if (!councilSummary) {
-    throw new Error('Missing councilSummary in input.json');
+    throw new Error('Missing councilSummary in input.json — not found at top level or in steps.generate-council-summary');
   }
 
   const reviewDate = councilSummary.reviewDate ?? new Date().toISOString().slice(0, 10);
@@ -566,7 +673,7 @@ async function main(): Promise<void> {
   // Extract assessment data from steps
   const assessments: PackageAssessment[] = input.steps?.['assess-packages']?.assessments ?? [];
   const metricsPackages: PackageMetrics[] = input.steps?.['collect-metrics']?.packages ?? [];
-  const discoveredPackages: Array<{ name: string; task: string }> = input.steps?.['discover-packages']?.packages ?? [];
+  const discoveredPackages = input.steps?.['discover-packages']?.packages ?? [];
 
   if (assessments.length === 0) {
     console.warn('No package assessments found in input. Writing empty result.');
@@ -585,8 +692,9 @@ async function main(): Promise<void> {
     metricsMap.set(pkg.packageName, pkg);
   }
 
-  const discoveredMap = new Map<string, { name: string; task: string }>();
+  const discoveredMap = new Map<string, (typeof discoveredPackages)[number]>();
   for (const pkg of discoveredPackages) {
+    console.log(`  discovered: ${pkg.name} maintainer=${pkg.maintainerName ?? 'unknown'} <${pkg.maintainerEmail ?? 'N/A'}>`);
     discoveredMap.set(pkg.name, pkg);
   }
 
@@ -602,6 +710,7 @@ async function main(): Promise<void> {
 
   // Generate HTML reports
   const reports: ReportEntry[] = [];
+  const reportHtmlContents: Array<{ entry: ReportEntry; html: string }> = [];
   for (const assessment of assessments) {
     const packageName = assessment.packageName;
     const htmlPath = `${REPORTS_DIR}/${packageName}.html`;
@@ -613,12 +722,16 @@ async function main(): Promise<void> {
     const html = generatePackageHtml(assessment, metrics, discovered, decision, reviewDate);
     await writeFile(htmlPath, html, 'utf-8');
 
-    reports.push({
+    const entry: ReportEntry = {
       packageName,
       htmlPath,
       pdfPath: `${REPORTS_DIR}/${packageName}.pdf`,
       status: assessment.proposedStatus,
-    });
+      maintainerName: discovered?.maintainerName ?? 'Unknown',
+      maintainerEmail: discovered?.maintainerEmail ?? 'N/A',
+    };
+    reports.push(entry);
+    reportHtmlContents.push({ entry, html });
 
     console.log(`  HTML: ${htmlPath}`);
   }
@@ -639,8 +752,14 @@ async function main(): Promise<void> {
     await browser.close();
   }
 
+  // Build presentation HTML for the review step — embeds each report with maintainer info
+  const presentationHtml = buildNotificationPresentation(reportHtmlContents, reviewDate);
+  await writeFile('/output/presentation.html', presentationHtml, 'utf-8');
+
   // Write result
   const result = {
+    output_file: '/output/result.json',
+    presentation: presentationHtml,
     reports,
     totalReports: reports.length,
     generatedAt: new Date().toISOString(),
