@@ -22,3 +22,9 @@ env:
     secret: PLATFORM_API_KEY
   - variable: OPENROUTER_API_KEY
     secret: OPENROUTER_API_KEY
+  - variable: MAILGUN_API_KEY
+    secret: MAILGUN_API_KEY
+  - variable: MAILGUN_DOMAIN
+    value: mg.appsilon.com
+  - variable: MAILGUN_FROM_EMAIL
+    value: mediforce@appsilon.com
