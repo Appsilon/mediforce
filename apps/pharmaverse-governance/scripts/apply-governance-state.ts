@@ -181,12 +181,21 @@ async function updateRepoProperties(repo: string, properties: CustomProperty[]):
   }
 }
 
+// Dry-run mode: compute diffs and report what would change without making API calls
+const DRY_RUN = process.env.DRY_RUN !== 'false'; // default: true (safe)
+
 async function main(): Promise<void> {
   const inputRaw = await readFile('/output/input.json', 'utf-8');
-  const input = JSON.parse(inputRaw) as ApplyInput;
+
+  // Input may come from council summary (via steps) or directly
+  const raw = JSON.parse(inputRaw) as Record<string, unknown>;
+  const input: ApplyInput = {
+    packages: (raw.packages ?? []) as ApprovedPackageState[],
+    reviewDate: (raw.reviewDate as string) ?? new Date().toISOString().split('T')[0],
+  };
 
   const { packages, reviewDate } = input;
-  console.log(`Applying governance state for ${packages.length} packages (review date: ${reviewDate})...`);
+  console.log(`${DRY_RUN ? '[DRY RUN] ' : ''}Applying governance state for ${packages.length} packages (review date: ${reviewDate})...`);
 
   const applied: AppliedChange[] = [];
   const failed: FailedChange[] = [];
@@ -196,7 +205,6 @@ async function main(): Promise<void> {
     console.log(`\nProcessing ${pkg.repo}...`);
 
     try {
-      const properties = buildProperties(pkg, reviewDate);
       const changes = detectChanges(pkg, reviewDate);
       changesDetected += changes.length;
 
@@ -206,14 +214,19 @@ async function main(): Promise<void> {
         );
       }
 
-      await updateRepoProperties(pkg.repo, properties);
+      if (!DRY_RUN) {
+        const properties = buildProperties(pkg, reviewDate);
+        await updateRepoProperties(pkg.repo, properties);
+        console.log(`  Successfully updated ${pkg.repo} (${changes.length} changes)`);
+      } else {
+        console.log(`  [DRY RUN] Would update ${pkg.repo} (${changes.length} changes)`);
+      }
 
       applied.push({ repo: pkg.repo, changes });
-      console.log(`  Successfully updated ${pkg.repo} (${changes.length} changes)`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       failed.push({ repo: pkg.repo, error: message });
-      console.error(`  Failed to update ${pkg.repo}: ${message}`);
+      console.error(`  Failed to process ${pkg.repo}: ${message}`);
     }
   }
 
@@ -230,9 +243,12 @@ async function main(): Promise<void> {
     },
   };
 
-  await writeFile('/output/result.json', JSON.stringify(result, null, 2), 'utf-8');
+  // Add dry-run indicator to result
+  const output = { ...result, dryRun: DRY_RUN, message: DRY_RUN ? 'Dry run — no changes written to GitHub' : 'Changes applied to GitHub' };
+
+  await writeFile('/output/result.json', JSON.stringify(output, null, 2), 'utf-8');
   console.log(
-    `\nDone: ${applied.length} repos updated, ${failed.length} failed, ${changesDetected} total changes detected`,
+    `\n${DRY_RUN ? '[DRY RUN] ' : ''}Done: ${applied.length} repos processed, ${failed.length} failed, ${changesDetected} total changes detected`,
   );
 }
 

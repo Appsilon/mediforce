@@ -13,6 +13,8 @@ interface PackageInfo {
   docs: string;
   task: string;
   details: string;
+  maintainerName: string | null;
+  maintainerEmail: string | null;
 }
 
 interface DiscoverResult {
@@ -104,6 +106,39 @@ async function fetchPackageYaml(entryUrl: string): Promise<Record<string, string
   return parseYaml(decoded);
 }
 
+/** Fetch DESCRIPTION from a GitHub repo and extract Maintainer name + email. */
+async function fetchMaintainerInfo(repo: string): Promise<{ name: string | null; email: string | null }> {
+  const url = `https://api.github.com/repos/${repo}/contents/DESCRIPTION`;
+  const response = await githubFetch(url);
+  if (!response.ok) return { name: null, email: null };
+
+  const data = (await response.json()) as GitHubFileContent;
+  if (!data.content || data.encoding !== 'base64') return { name: null, email: null };
+
+  const content = Buffer.from(data.content, 'base64').toString('utf-8');
+
+  // R DESCRIPTION Maintainer field: "First Last <email@example.com>"
+  const maintainerMatch = content.match(/^Maintainer:\s*(.+)/m);
+  if (maintainerMatch) {
+    const raw = maintainerMatch[1].trim();
+    const emailMatch = raw.match(/<([^>]+)>/);
+    const email = emailMatch ? emailMatch[1] : null;
+    const name = raw.replace(/<[^>]+>/, '').trim() || null;
+    return { name, email };
+  }
+
+  // Fallback: try Authors@R for person with "cre" role
+  const authorsBlock = content.match(/Authors@R:\s*([\s\S]*?)(?=\n[A-Z]|\n$)/);
+  if (authorsBlock) {
+    const creMatch = authorsBlock[1].match(/person\(\s*"([^"]+)"\s*,\s*"([^"]+)"[^)]*email\s*=\s*"([^"]+)"[^)]*role[^)]*"cre"/);
+    if (creMatch) {
+      return { name: `${creMatch[1]} ${creMatch[2]}`, email: creMatch[3] };
+    }
+  }
+
+  return { name: null, email: null };
+}
+
 async function processInBatches<T, R>(
   items: T[],
   concurrency: number,
@@ -154,6 +189,9 @@ async function main(): Promise<void> {
       }
     }
 
+    // Fetch maintainer info from DESCRIPTION file
+    const maintainer = repo ? await fetchMaintainerInfo(repo) : { name: null, email: null };
+
     packages.push({
       name,
       repo,
@@ -162,8 +200,10 @@ async function main(): Promise<void> {
       docs: fields.docs ?? '',
       task: fields.task ?? '',
       details: fields.details ?? '',
+      maintainerName: maintainer.name,
+      maintainerEmail: maintainer.email,
     });
-    console.log(`  ${name} (${repo}, branch: ${defaultBranch})`);
+    console.log(`  ${name} (${repo}, branch: ${defaultBranch}, maintainer: ${maintainer.email ?? 'unknown'})`);
   });
 
   packages.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));

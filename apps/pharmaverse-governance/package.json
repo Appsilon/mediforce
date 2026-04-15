@@ -9,6 +9,7 @@
     "docker:build": "docker build -t mediforce-agent:pharmaverse-governance -f container/Dockerfile ../../"
   },
   "dependencies": {
-    "@mediforce/platform-core": "workspace:*"
+    "@mediforce/platform-core": "workspace:*",
+    "puppeteer": "^24.0.0"
   }
 }
