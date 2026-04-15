@@ -49,7 +49,7 @@ export default function MembersPage() {
   const rawHandle = params.handle;
   const handle = Array.isArray(rawHandle) ? rawHandle[0] : (rawHandle ?? '');
 
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, sendPasswordReset } = useAuth();
   const { namespace, loading: namespaceLoading } = useNamespace(handle);
 
   const userProfiles = useUserProfiles();
@@ -102,7 +102,43 @@ export default function MembersPage() {
       const usersSnapshot = await getDocs(usersQuery);
 
       if (usersSnapshot.empty) {
-        setAddError('No user found with this email. They need to sign in at least once first.');
+        // User hasn't signed in yet — create account via invite API and send setup email
+        const platformApiKey = process.env.NEXT_PUBLIC_PLATFORM_API_KEY ?? '';
+        const inviteRes = await fetch('/api/users/invite', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Api-Key': platformApiKey,
+          },
+          body: JSON.stringify({ email: trimmedEmail }),
+        });
+
+        if (!inviteRes.ok) {
+          const data = (await inviteRes.json()) as { error?: string };
+          setAddError(data.error ?? 'Failed to create invite.');
+          setAdding(false);
+          return;
+        }
+
+        const inviteData = (await inviteRes.json()) as { uid: string; email: string };
+
+        // Send Firebase password setup email (acts as invite)
+        try {
+          await sendPasswordReset(trimmedEmail);
+        } catch {
+          // Non-fatal — user was created, email send failed silently
+        }
+
+        // Now add to namespace using the newly created user
+        await setDoc(doc(db, 'namespaces', handle, 'members', inviteData.uid), {
+          uid: inviteData.uid,
+          role: newRole,
+          joinedAt: new Date().toISOString(),
+        });
+        await setDoc(doc(db, 'users', inviteData.uid), { organizations: [handle] }, { merge: true });
+
+        setNewEmail('');
+        setNewRole('member');
         setAdding(false);
         return;
       }
