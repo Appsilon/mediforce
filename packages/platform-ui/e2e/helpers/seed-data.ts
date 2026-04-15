@@ -889,6 +889,26 @@ export function buildSeedData(testUserId: string) {
     assignedRoles: ['reviewer'],
   };
 
+  // Dedicated instance for resume test — isolated so resuming doesn't affect other tests
+  processInstances['proc-resume-target'] = {
+    id: 'proc-resume-target',
+    definitionName: 'Supply Chain Review',
+    definitionVersion: '1.0.0',
+    configName: 'all-human',
+    configVersion: '1',
+    status: 'paused',
+    currentStepId: 'risk-scoring',
+    variables: {},
+    triggerType: 'manual',
+    triggerPayload: {},
+    createdAt: oneHourAgo,
+    updatedAt: now,
+    createdBy: 'system',
+    pauseReason: 'step_failure',
+    error: 'Agent timed out after 30s',
+    assignedRoles: ['reviewer'],
+  };
+
   // Workflow definition with a cowork step
   workflowDefinitions['Workflow Designer:1'] = {
     name: 'Workflow Designer',

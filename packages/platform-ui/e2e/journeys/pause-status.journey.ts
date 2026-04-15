@@ -59,22 +59,23 @@ test.describe('Pause Status Labels & Resume Journey', () => {
   test('clicking Resume on a blocked process restarts it', async ({ page }, testInfo) => {
     await setupRecording(page, 'pause-status-resume-flow', testInfo);
 
-    // Navigate to the step_failure process
-    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-step-failure`);
+    // Navigate to the dedicated resume target (isolated from other tests)
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-resume-target`);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
+
+    // Verify Error badge is visible before resuming
+    const errorBadge = page.locator('.rounded-full').filter({ hasText: 'Error' });
+    await expect(errorBadge).toBeVisible();
     await showStep(page);
 
-    // Click Resume
+    // Click Resume — the badge should change as the process transitions
     await page.getByRole('button', { name: /resume/i }).click();
 
-    // Should show "Resuming..." briefly, then badge changes from "Error"
-    // The Firestore listener will update the UI automatically
-    await expect(page.getByText('Resuming...')).toBeVisible({ timeout: 5_000 });
-    await showStep(page);
+    // After resume, the "Error" badge disappears (process moves to running or failed)
+    await expect(errorBadge).not.toBeVisible({ timeout: 10_000 });
 
-    // After resume completes, the "Error" badge should disappear
-    // (process may re-pause at a new step or continue running)
-    await expect(page.locator('.rounded-full').filter({ hasText: 'Error' })).not.toBeVisible({ timeout: 10_000 });
+    // Resume button also disappears (process is no longer in resumable paused state)
+    await expect(page.getByRole('button', { name: /resume/i })).not.toBeVisible({ timeout: 5_000 });
     await showResult(page);
     await endRecording(page);
   });

@@ -32,6 +32,10 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Cancel Run](#cancel-run) — safely stopping a running process with confirmation
 - [Run Report](#run-report) — post-completion summary with timing and step outputs
 - [Report Unavailable](#report-unavailable) — guard preventing report access on in-progress runs
+- [Pause Status — Waiting for Human](#pause-status--waiting-for-human) — paused workflow shows contextual label and task CTA
+- [Pause Status — Agent Escalated](#pause-status--agent-escalated) — agent handoff shows action-needed label with Resume
+- [Pause Status — Step Failure](#pause-status--step-failure) — blocked workflow shows Error badge with Resume
+- [Pause Status — Resume Flow](#pause-status--resume-flow) — resuming a blocked workflow from the detail page
 
 **Co-work** — collaborative human+AI artifact building
 - [Cowork Chat Session](#cowork-chat-session) — real-time conversation workspace with artifact panel
@@ -195,6 +199,30 @@ Post-completion report with step timeline, wall-clock and active processing time
 Reports are only available for completed runs. Accessing the report URL for a running process shows a clear message instead of an error. Guards against broken links from in-progress runs.
 
 ![run-report-unavailable](run-report-unavailable.gif)
+
+### Pause Status — Waiting for Human
+
+When a workflow pauses for human input, the badge shows "Waiting for action" with a direct "Open task" link instead of a confusing "Paused" label.
+
+![pause-status-waiting-human](pause-status-waiting-human.gif)
+
+### Pause Status — Agent Escalated
+
+When an agent hands off to a human (escalation or low confidence), the badge shows "Waiting for action" with a Resume button to restart the workflow.
+
+![pause-status-agent-escalated](pause-status-agent-escalated.gif)
+
+### Pause Status — Step Failure
+
+When a workflow step fails, the badge shows "Error" in red with failure details and a Resume button to retry.
+
+![pause-status-step-failure](pause-status-step-failure.gif)
+
+### Pause Status — Resume Flow
+
+Clicking Resume on a blocked workflow restarts it — the badge updates automatically via Firestore listener.
+
+![pause-status-resume-flow](pause-status-resume-flow.gif)
 
 ---
 
