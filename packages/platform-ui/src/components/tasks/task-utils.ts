@@ -76,13 +76,20 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
   };
 }
 
-/** Find agent output from sibling tasks for the same step. */
+/** Find agent output from the closest preceding sibling task for the same step.
+ *  Siblings are expected to be ordered by createdAt asc. We walk backwards from
+ *  the current task's position so that each review task picks up the agent output
+ *  from the iteration that directly preceded it, not the latest one.
+ */
 export function getAgentOutputFromSiblings(
   task: HumanTask,
   siblingTasks: HumanTask[],
 ): AgentOutputData | null {
-  // Look for a sibling task with the same stepId that has agent output
-  for (const sibling of siblingTasks) {
+  const taskIndex = siblingTasks.findIndex((s) => s.id === task.id);
+  // Walk backwards from the task's position (or from the end if not found)
+  const startIndex = taskIndex > 0 ? taskIndex - 1 : siblingTasks.length - 1;
+  for (let i = startIndex; i >= 0; i--) {
+    const sibling = siblingTasks[i];
     if (sibling.id === task.id) continue;
     if (sibling.stepId !== task.stepId) continue;
     const output = getAgentOutput(sibling);

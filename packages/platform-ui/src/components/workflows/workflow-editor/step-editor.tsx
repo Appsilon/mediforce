@@ -185,6 +185,24 @@ export function StepEditor({
         />
       </div>
 
+      {/* Step type */}
+      <div className="flex gap-1">
+        {STEP_TYPES.filter((t) => t !== 'terminal' || step.type === 'terminal').map((t) => (
+          <button
+            key={t}
+            onClick={() => onChange({ type: t })}
+            className={cn(
+              'flex-1 rounded-md py-1 text-[11px] font-medium transition-all border',
+              step.type === t
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-transparent bg-muted/50 text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {STEP_TYPE_LABELS[t] ?? t}
+          </button>
+        ))}
+      </div>
+
       {/* Executor toggle */}
       <div className="space-y-2">
         {step.type !== 'terminal' && (
@@ -539,8 +557,8 @@ export function StepEditor({
       {/* Environment variables */}
       {step.type !== 'terminal' && (
         <Section title="Environment">
-          {Object.entries(step.env ?? {}).map(([key, val]) => (
-            <div key={key} className="flex items-baseline gap-1.5">
+          {Object.entries(step.env ?? {}).map(([key, val], idx) => (
+            <div key={idx} className="flex items-baseline gap-1.5">
               <input
                 value={key}
                 onChange={(e) => {
@@ -598,30 +616,6 @@ export function StepEditor({
         </Section>
       )}
 
-      {/* Step definition (collapsed) */}
-      <details className="group">
-        <summary className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/40 cursor-pointer hover:text-muted-foreground transition-colors select-none">
-          Step definition
-        </summary>
-        <div className="mt-2 space-y-2.5">
-          <div className="flex gap-1">
-            {STEP_TYPES.map((t) => (
-              <button
-                key={t}
-                onClick={() => onChange({ type: t })}
-                className={cn(
-                  'flex-1 rounded-md py-1 text-[11px] font-medium transition-all border',
-                  step.type === t
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-transparent bg-muted/50 text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {STEP_TYPE_LABELS[t] ?? t}
-              </button>
-            ))}
-          </div>
-        </div>
-      </details>
     </div>
   );
 }

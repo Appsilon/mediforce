@@ -196,7 +196,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                 {{ human: 'Human', agent: 'Agent', script: 'Script', cowork: 'Cowork' }[data.executor] ?? data.executor}
               </span>
-              {data.autonomyLevel && (
+              {data.autonomyLevel && data.executor === 'agent' && (
                 <span className="text-[10px] font-mono text-muted-foreground/70">
                   {data.autonomyLevel}
                 </span>
