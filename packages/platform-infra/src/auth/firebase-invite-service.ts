@@ -1,6 +1,11 @@
 import type { Auth } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
 
+function generateTemporaryPassword(): string {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return 'Mf-' + Array.from({ length: 9 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
 export class FirebaseInviteService {
   constructor(
     private readonly adminAuth: Auth,
@@ -8,12 +13,18 @@ export class FirebaseInviteService {
   ) {}
 
   // Creates Firebase Auth user + Firestore user doc.
-  // Returns the uid. If user already exists in Firebase Auth, returns existing uid.
-  async createInvitedUser(email: string, displayName?: string): Promise<string> {
+  // Returns { uid, temporaryPassword }. If user already exists in Firebase Auth, returns existing uid.
+  async createInvitedUser(
+    email: string,
+    displayName?: string,
+    password?: string,
+  ): Promise<{ uid: string; temporaryPassword: string }> {
+    const actualPassword = password ?? generateTemporaryPassword();
     let uid: string;
     try {
       const userRecord = await this.adminAuth.createUser({
         email,
+        password: actualPassword,
         ...(displayName !== undefined ? { displayName } : {}),
         emailVerified: false,
       });
@@ -44,6 +55,21 @@ export class FirebaseInviteService {
       { merge: true },
     );
 
-    return uid;
+    return { uid, temporaryPassword: actualPassword };
+  }
+
+  async getUsersLastSignIn(uids: string[]): Promise<Map<string, string | null>> {
+    const result = new Map<string, string | null>();
+    await Promise.all(
+      uids.map(async (uid) => {
+        try {
+          const userRecord = await this.adminAuth.getUser(uid);
+          result.set(uid, userRecord.metadata.lastSignInTime ?? null);
+        } catch {
+          result.set(uid, null);
+        }
+      }),
+    );
+    return result;
   }
 }

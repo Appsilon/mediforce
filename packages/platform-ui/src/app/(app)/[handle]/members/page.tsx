@@ -1,15 +1,20 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where, type DocumentReference } from 'firebase/firestore';
+import {
+  arrayRemove,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  updateDoc,
+} from 'firebase/firestore';
 import Link from 'next/link';
-import { ArrowLeft, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, Check, ClipboardCopy, Trash2, Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
-import { useCollection } from '@/hooks/use-collection';
 import { useNamespace } from '@/hooks/use-namespace';
-import { useUserProfiles } from '@/hooks/use-users';
 import { NamespaceMemberSchema } from '@mediforce/platform-core';
 import type { NamespaceMember } from '@mediforce/platform-core';
 
@@ -17,12 +22,34 @@ type NamespaceMemberWithId = NamespaceMember & { id: string };
 
 type MemberRole = 'member' | 'admin';
 
+interface MemberWithLastSignIn extends NamespaceMemberWithId {
+  lastSignInTime?: string | null;
+}
+
+interface InviteResult {
+  email: string;
+  temporaryPassword: string;
+  emailSent: boolean;
+}
+
 function formatDate(isoString: string): string {
   return new Date(isoString).toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   });
+}
+
+function formatLastSignIn(isoString: string | null | undefined): string {
+  if (isoString === null || isoString === undefined) return 'Never';
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function RoleBadge({ role }: { role: NamespaceMember['role'] }) {
@@ -44,28 +71,93 @@ function RoleBadge({ role }: { role: NamespaceMember['role'] }) {
   );
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      aria-label="Copy to clipboard"
+    >
+      {copied ? <Check className="h-3 w-3" /> : <ClipboardCopy className="h-3 w-3" />}
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
+
 export default function MembersPage() {
   const params = useParams();
   const rawHandle = params.handle;
   const handle = Array.isArray(rawHandle) ? rawHandle[0] : (rawHandle ?? '');
 
-  const { firebaseUser, sendPasswordReset } = useAuth();
+  const { firebaseUser } = useAuth();
   const { namespace, loading: namespaceLoading } = useNamespace(handle);
 
-  const userProfiles = useUserProfiles();
-  const collectionPath = handle !== '' ? `namespaces/${handle}/members` : '';
-  const { data: rawMembers, loading: membersLoading } = useCollection<NamespaceMemberWithId>(
-    collectionPath,
-  );
+  // Realtime Firestore subscription for role changes
+  const [realtimeMembers, setRealtimeMembers] = useState<NamespaceMemberWithId[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
 
-  const members = useMemo((): NamespaceMemberWithId[] => {
-    return rawMembers
-      .filter((rawMember) => NamespaceMemberSchema.safeParse(rawMember).success)
+  useEffect(() => {
+    if (handle === '') return;
+    const colRef = collection(db, `namespaces/${handle}/members`);
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const docs = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as NamespaceMemberWithId)
+        .filter((raw) => NamespaceMemberSchema.safeParse(raw).success);
+      setRealtimeMembers(docs);
+      setMembersLoading(false);
+    }, () => {
+      setMembersLoading(false);
+    });
+    return unsubscribe;
+  }, [handle]);
+
+  // API fetch for lastSignInTime
+  const [lastSignInMap, setLastSignInMap] = useState<Map<string, string | null>>(new Map());
+
+  const fetchLastSignIn = useCallback(async () => {
+    if (handle === '') return;
+    const platformApiKey = process.env.NEXT_PUBLIC_PLATFORM_API_KEY ?? '';
+    try {
+      const res = await fetch(`/api/users/members?handle=${encodeURIComponent(handle)}`, {
+        headers: { 'X-Api-Key': platformApiKey },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { members: Array<{ uid: string; lastSignInTime: string | null }> };
+      const map = new Map<string, string | null>();
+      for (const member of data.members) {
+        map.set(member.uid, member.lastSignInTime);
+      }
+      setLastSignInMap(map);
+    } catch {
+      // non-fatal — lastSignIn just won't show
+    }
+  }, [handle]);
+
+  useEffect(() => {
+    void fetchLastSignIn();
+  }, [fetchLastSignIn]);
+
+  // Merge realtime members with lastSignInTime from API
+  const members = useMemo((): MemberWithLastSignIn[] => {
+    return realtimeMembers
+      .map((member) => ({
+        ...member,
+        lastSignInTime: lastSignInMap.get(member.uid),
+      }))
       .sort((memberA, memberB) => {
         const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
         return (roleOrder[memberA.role] ?? 3) - (roleOrder[memberB.role] ?? 3);
       });
-  }, [rawMembers]);
+  }, [realtimeMembers, lastSignInMap]);
 
   const currentUserMember = useMemo(
     () =>
@@ -80,98 +172,59 @@ export default function MembersPage() {
     currentUserMember !== undefined &&
     (currentUserMember.role === 'owner' || currentUserMember.role === 'admin');
 
-  const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState<MemberRole>('member');
-  const [addError, setAddError] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
+  // Invite form state
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [inviteRole, setInviteRole] = useState<MemberRole>('member');
+  const [inviting, setInviting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleAddMember(event: React.FormEvent<HTMLFormElement>) {
+  async function handleInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setAddError(null);
+    setError(null);
 
-    const trimmedEmail = newEmail.trim().toLowerCase();
+    const trimmedEmail = inviteEmail.trim().toLowerCase();
     if (trimmedEmail === '') {
-      setAddError('Email is required.');
+      setError('Email is required.');
       return;
     }
 
-    setAdding(true);
-
+    setInviting(true);
     try {
-      const usersQuery = query(collection(db, 'users'), where('email', '==', trimmedEmail));
-      const usersSnapshot = await getDocs(usersQuery);
+      const platformApiKey = process.env.NEXT_PUBLIC_PLATFORM_API_KEY ?? '';
+      const res = await fetch('/api/users/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': platformApiKey,
+        },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          displayName: inviteName.trim() !== '' ? inviteName.trim() : undefined,
+          namespaceHandle: handle,
+          role: inviteRole,
+        }),
+      });
 
-      if (usersSnapshot.empty) {
-        // User hasn't signed in yet — create account via invite API and send setup email
-        const platformApiKey = process.env.NEXT_PUBLIC_PLATFORM_API_KEY ?? '';
-        const inviteRes = await fetch('/api/users/invite', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Api-Key': platformApiKey,
-          },
-          body: JSON.stringify({ email: trimmedEmail }),
-        });
-
-        if (!inviteRes.ok) {
-          const data = (await inviteRes.json()) as { error?: string };
-          setAddError(data.error ?? 'Failed to create invite.');
-          setAdding(false);
-          return;
-        }
-
-        const inviteData = (await inviteRes.json()) as { uid: string; email: string };
-
-        // Send Firebase password setup email (acts as invite)
-        try {
-          await sendPasswordReset(trimmedEmail);
-        } catch {
-          // Non-fatal — user was created, email send failed silently
-        }
-
-        // Now add to namespace using the newly created user
-        await setDoc(doc(db, 'namespaces', handle, 'members', inviteData.uid), {
-          uid: inviteData.uid,
-          role: newRole,
-          joinedAt: new Date().toISOString(),
-        });
-        await setDoc(doc(db, 'users', inviteData.uid), { organizations: [handle] }, { merge: true });
-
-        setNewEmail('');
-        setNewRole('member');
-        setAdding(false);
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        setError(data.error ?? 'Failed to send invite.');
         return;
       }
 
-      const userDoc = usersSnapshot.docs[0];
-      const uid = userDoc.id;
-      const userData = userDoc.data();
-
-      const existingMember = members.find((member) => member.uid === uid);
-      if (existingMember !== undefined) {
-        setAddError('This user is already a member.');
-        setAdding(false);
-        return;
-      }
-
-      await setDoc(doc(db, 'namespaces', handle, 'members', uid), {
-        uid,
-        role: newRole,
-        ...(typeof userData.displayName === 'string' ? { displayName: userData.displayName } : {}),
-        ...(typeof userData.photoURL === 'string' ? { avatarUrl: userData.photoURL } : {}),
-        joinedAt: new Date().toISOString(),
-      });
-
-      await updateDoc(doc(db, 'users', uid), {
-        organizations: arrayUnion(handle),
-      });
-
-      setNewEmail('');
-      setNewRole('member');
+      const data = (await res.json()) as { uid: string; email: string; temporaryPassword: string; emailSent: boolean };
+      setInviteResult({ email: data.email, temporaryPassword: data.temporaryPassword, emailSent: data.emailSent });
+      setShowInviteForm(false);
+      setInviteEmail('');
+      setInviteName('');
+      setInviteRole('member');
+      void fetchLastSignIn();
     } catch (err: unknown) {
-      setAddError(err instanceof Error ? err.message : 'Failed to add member.');
+      setError(err instanceof Error ? err.message : 'Failed to send invite.');
     } finally {
-      setAdding(false);
+      setInviting(false);
     }
   }
 
@@ -182,14 +235,14 @@ export default function MembersPage() {
         organizations: arrayRemove(handle),
       });
     } catch {
-      // silently fail — useCollection will update the list
+      // silently fail — realtime subscription will reflect actual state
     }
   }
 
   async function handleToggleRole(memberUid: string, currentRole: string) {
-    const newRole = currentRole === 'admin' ? 'member' : 'admin';
+    const nextRole = currentRole === 'admin' ? 'member' : 'admin';
     try {
-      await updateDoc(doc(db, 'namespaces', handle, 'members', memberUid), { role: newRole });
+      await updateDoc(doc(db, 'namespaces', handle, 'members', memberUid), { role: nextRole });
     } catch {
       // useCollection will reflect actual state
     }
@@ -199,15 +252,67 @@ export default function MembersPage() {
 
   return (
     <div className="min-h-screen bg-background px-4 py-12">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-8">
-          {namespace !== null && namespace.type === 'organization' && (
-            <p className="text-sm text-muted-foreground">
-              Manage who has access to this organization.
-            </p>
+      <div className="mx-auto max-w-3xl">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/${handle}`}
+              className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <div>
+              <h1 className="text-xl font-semibold">Members</h1>
+              {namespace !== null && namespace.type === 'organization' && (
+                <p className="text-sm text-muted-foreground">
+                  Manage who has access to this organization.
+                </p>
+              )}
+            </div>
+          </div>
+          {canManageMembers && !showInviteForm && (
+            <button
+              type="button"
+              onClick={() => { setInviteResult(null); setShowInviteForm(true); }}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Invite user
+            </button>
           )}
         </div>
 
+        {/* Invite result card */}
+        {inviteResult !== null && (
+          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30 px-4 py-4">
+            <div className="flex items-start gap-2">
+              <Check className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+              <div className="space-y-1 min-w-0">
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                  Invite sent to {inviteResult.email}
+                </p>
+                <div className="text-sm text-green-700 dark:text-green-300 space-y-0.5">
+                  <p>Login: <span className="font-mono">{inviteResult.email}</span></p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p>
+                      Temporary password:{' '}
+                      <span className="font-mono font-semibold">{inviteResult.temporaryPassword}</span>
+                    </p>
+                    <CopyButton text={inviteResult.temporaryPassword} />
+                  </div>
+                </div>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  {inviteResult.emailSent
+                    ? 'Email sent ✓'
+                    : 'Email not sent — share credentials manually'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Members table */}
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((index) => (
@@ -215,7 +320,7 @@ export default function MembersPage() {
                 key={index}
                 className="rounded-lg border bg-card px-4 py-4 animate-pulse flex gap-3"
               >
-                <div className="h-7 w-7 rounded-full bg-muted shrink-0" />
+                <div className="h-8 w-8 rounded-full bg-muted shrink-0" />
                 <div className="space-y-2 flex-1">
                   <div className="h-4 w-36 rounded bg-muted" />
                   <div className="h-3 w-52 rounded bg-muted" />
@@ -231,108 +336,164 @@ export default function MembersPage() {
             <p className="text-sm text-muted-foreground">No members yet.</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {members.map((member) => {
-              const profile = userProfiles.get(member.uid);
-              const name = member.displayName ?? profile?.displayName ?? member.uid;
-              const avatar = member.avatarUrl ?? profile?.photoURL;
-              return (
-              <div
-                key={member.id}
-                className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3"
-              >
-                {avatar !== undefined ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatar} alt={name} className="h-8 w-8 shrink-0 rounded-full object-cover" />
-                ) : (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                    {name.includes(' ')
-                      ? `${name.split(' ')[0]?.[0] ?? ''}${name.split(' ')[1]?.[0] ?? ''}`.toUpperCase()
-                      : name.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium truncate">{name}</span>
-                    {isOwner && member.role !== 'owner' ? (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleRole(member.uid, member.role)}
-                        title={`Click to change to ${member.role === 'admin' ? 'member' : 'admin'}`}
-                        className="cursor-pointer"
-                      >
-                        <RoleBadge role={member.role} />
-                      </button>
-                    ) : (
-                      <RoleBadge role={member.role} />
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Joined {formatDate(member.joinedAt)}
-                  </p>
-                </div>
-                {canManageMembers && member.role !== 'owner' && member.uid !== firebaseUser?.uid && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveMember(member.uid)}
-                    className="shrink-0 rounded p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    aria-label={`Remove ${name}`}
+          <div className="overflow-hidden rounded-lg border bg-card">
+            {/* Table header — hidden on mobile */}
+            <div className="hidden sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-2 border-b bg-muted/50">
+              <span className="text-xs font-medium text-muted-foreground">User</span>
+              <span className="text-xs font-medium text-muted-foreground">Role</span>
+              <span className="text-xs font-medium text-muted-foreground">Joined</span>
+              <span className="text-xs font-medium text-muted-foreground">Last sign-in</span>
+              <span className="sr-only">Actions</span>
+            </div>
+            <div className="divide-y">
+              {members.map((member) => {
+                const name = member.displayName ?? member.uid;
+                const avatar = member.avatarUrl;
+                const initials = name.includes(' ')
+                  ? `${name.split(' ')[0]?.[0] ?? ''}${name.split(' ')[1]?.[0] ?? ''}`.toUpperCase()
+                  : name.slice(0, 2).toUpperCase();
+
+                return (
+                  <div
+                    key={member.id}
+                    className="flex flex-col gap-2 px-4 py-3 sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-center sm:gap-x-4"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-              );
-            })}
+                    {/* User cell */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      {avatar !== undefined ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatar} alt={name} className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                      ) : (
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                          {initials}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{name}</p>
+                      </div>
+                    </div>
+
+                    {/* Role cell */}
+                    <div>
+                      {isOwner && member.role !== 'owner' ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRole(member.uid, member.role)}
+                          title={`Click to change to ${member.role === 'admin' ? 'member' : 'admin'}`}
+                          className="cursor-pointer"
+                        >
+                          <RoleBadge role={member.role} />
+                        </button>
+                      ) : (
+                        <RoleBadge role={member.role} />
+                      )}
+                    </div>
+
+                    {/* Joined cell */}
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                      <span className="sm:hidden text-muted-foreground/70">Joined </span>
+                      {formatDate(member.joinedAt)}
+                    </div>
+
+                    {/* Last sign-in cell */}
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                      <span className="sm:hidden text-muted-foreground/70">Last sign-in: </span>
+                      {formatLastSignIn(member.lastSignInTime)}
+                    </div>
+
+                    {/* Actions cell */}
+                    <div className="flex justify-end">
+                      {canManageMembers && member.role !== 'owner' && member.uid !== firebaseUser?.uid ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(member.uid)}
+                          className="shrink-0 rounded p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          aria-label={`Remove ${name}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <div className="w-8" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {canManageMembers && (
-          <div className="mt-8 rounded-lg border bg-card px-4 py-5">
-            <h2 className="text-sm font-semibold mb-4">Add member</h2>
-            <form onSubmit={handleAddMember} className="flex flex-col gap-3">
+        {/* Invite form */}
+        {showInviteForm && canManageMembers && (
+          <div className="mt-6 rounded-lg border bg-card px-4 py-5">
+            <h2 className="text-sm font-semibold mb-4">Invite user</h2>
+            <form onSubmit={handleInvite} className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="newEmail" className="text-sm font-medium">
-                  Email
+                <label htmlFor="inviteEmail" className="text-sm font-medium">
+                  Email <span className="text-destructive">*</span>
                 </label>
                 <input
-                  id="newEmail"
+                  id="inviteEmail"
                   type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="colleague@example.com"
                   className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                  disabled={adding}
+                  disabled={inviting}
+                  required
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="newRole" className="text-sm font-medium">
+                <label htmlFor="inviteName" className="text-sm font-medium">
+                  Display name
+                </label>
+                <input
+                  id="inviteName"
+                  type="text"
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                  placeholder="Jane Smith"
+                  className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  disabled={inviting}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="inviteRole" className="text-sm font-medium">
                   Role
                 </label>
                 <select
-                  id="newRole"
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value as MemberRole)}
+                  id="inviteRole"
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as MemberRole)}
                   className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                  disabled={adding}
+                  disabled={inviting}
                 >
                   <option value="member">member</option>
                   <option value="admin">admin</option>
                 </select>
               </div>
 
-              {addError !== null && (
-                <p className="text-xs text-destructive">{addError}</p>
+              {error !== null && (
+                <p className="text-xs text-destructive">{error}</p>
               )}
 
-              <div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowInviteForm(false); setError(null); }}
+                  disabled={inviting}
+                  className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
-                  disabled={adding}
+                  disabled={inviting}
                   className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
-                  {adding ? 'Adding…' : 'Add member'}
+                  {inviting ? 'Sending…' : 'Send invite'}
                 </button>
               </div>
             </form>
