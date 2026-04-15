@@ -37,11 +37,28 @@ export function TaskContextPanel({
     'stepExecutions',
   );
 
-  // Find the most recent completed step execution that is NOT the current human step
+  // Find the completed step execution that directly precedes this human task's step.
+  // Strategy: find the earliest execution of the current stepId, then pick the latest
+  // completed execution (different step) that started before it. This ensures each
+  // review task shows the output that triggered it, not the globally latest output.
   const previousStepOutput = React.useMemo(() => {
     if (!executions.length) return null;
+
+    // Find when the current human step first started (i.e. when the task was created)
+    const currentStepExecs = executions
+      .filter((e) => e.stepId === stepId)
+      .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
+    const currentStepStart = currentStepExecs.length > 0
+      ? new Date(currentStepExecs[0].startedAt).getTime()
+      : Infinity;
+
     const completed = executions
-      .filter((e) => e.stepId !== stepId && e.status === 'completed' && e.output)
+      .filter((e) =>
+        e.stepId !== stepId &&
+        e.status === 'completed' &&
+        e.output &&
+        new Date(e.startedAt).getTime() <= currentStepStart,
+      )
       .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
     return completed.length > 0 ? completed[completed.length - 1] : null;
   }, [executions, stepId]);
