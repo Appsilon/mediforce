@@ -28,3 +28,5 @@ env:
     value: mg.appsilon.com
   - variable: MAILGUN_FROM_EMAIL
     value: mediforce@appsilon.com
+  - variable: MAILGUN_SENDER_NAME
+    value: Mediforce Pharmaverse

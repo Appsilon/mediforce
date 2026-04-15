@@ -51,6 +51,7 @@ export class FirebaseInviteService {
         uid,
         email,
         ...(displayName !== undefined ? { displayName } : {}),
+        mustChangePassword: true,
       },
       { merge: true },
     );

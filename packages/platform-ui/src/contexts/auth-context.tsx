@@ -101,9 +101,11 @@ async function ensurePersonalNamespace(user: { uid: string; email: string | null
 interface AuthContextValue {
   firebaseUser: FirebaseUser | null;
   loading: boolean;
+  mustChangePassword: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
+  clearMustChangePassword: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -112,6 +114,7 @@ const AuthContext = React.createContext<AuthContextValue | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = React.useState<FirebaseUser | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [mustChangePassword, setMustChangePassword] = React.useState(false);
 
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -128,6 +131,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch(() => {});
         }
         ensurePersonalNamespace(user).catch(() => {});
+
+        // Check if user must change their temporary password
+        getDoc(doc(db, 'users', user.uid)).then((snap) => {
+          if (snap.exists()) {
+            setMustChangePassword(snap.data().mustChangePassword === true);
+          }
+        }).catch(() => {});
+      } else {
+        setMustChangePassword(false);
       }
     });
     return unsub;
@@ -146,12 +158,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   }, []);
 
+  const clearMustChangePassword = React.useCallback(async () => {
+    if (auth.currentUser !== null) {
+      await setDoc(doc(db, 'users', auth.currentUser.uid), { mustChangePassword: false }, { merge: true });
+      setMustChangePassword(false);
+    }
+  }, []);
+
   const signOut = React.useCallback(async () => {
     await firebaseSignOut(auth);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ firebaseUser, loading, signInWithGoogle, signInWithEmail, sendPasswordReset, signOut }}>
+    <AuthContext.Provider value={{ firebaseUser, loading, mustChangePassword, signInWithGoogle, signInWithEmail, sendPasswordReset, clearMustChangePassword, signOut }}>
       {children}
     </AuthContext.Provider>
   );
