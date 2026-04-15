@@ -24,7 +24,7 @@ async function sendInviteEmail(params: {
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
 
         <!-- Header -->
-        <tr><td style="background:#09090b;border-radius:8px 8px 0 0;padding:28px 32px">
+        <tr><td style="background:#1c8879;border-radius:8px 8px 0 0;padding:28px 32px">
           <p style="margin:0;font-size:18px;font-weight:600;color:#ffffff;letter-spacing:-0.3px">${params.senderName}</p>
         </td></tr>
 
@@ -51,7 +51,7 @@ async function sendInviteEmail(params: {
             </tr>
           </table>
 
-          <a href="${loginUrl}" style="display:block;text-align:center;background:#09090b;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:500">
+          <a href="${loginUrl}" style="display:block;text-align:center;background:#1c8879;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:500">
             Sign in to ${params.senderName}
           </a>
         </td></tr>
