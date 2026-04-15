@@ -15,7 +15,7 @@ env:
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
     value: "1:402907948635:web:fafb70d6ce9b16691c817e"
   - variable: NEXT_PUBLIC_PLATFORM_URL
-    value: https://mediforce-for-pharmaverse--mediforce-for-pharmaverse.us-east4.hosted.app
+    value: https://pharmaverse.mediforce.ai
   - variable: NEXT_PUBLIC_PLATFORM_API_KEY
     secret: PLATFORM_API_KEY
   - variable: PLATFORM_API_KEY
