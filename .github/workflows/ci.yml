@@ -120,31 +120,35 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
       - name: Check for compromised axios versions
         run: |
-          if pnpm ls --depth=Infinity 2>/dev/null | grep -qE 'axios@(1\.14\.1|0\.30\.4)'; then
+          if grep -qE 'axios@(1\.14\.1|0\.30\.4)' pnpm-lock.yaml; then
             echo "::error::Compromised axios version detected!"
             exit 1
           fi
       - name: Check for known malicious packages
         run: |
           for pkg in plain-crypto-js; do
-            if [ -d "node_modules/$pkg" ] || pnpm ls --depth=Infinity 2>/dev/null | grep -q "$pkg"; then
+            if grep -q "${pkg}@" pnpm-lock.yaml; then
               echo "::error::Malicious package '$pkg' detected!"
               exit 1
             fi
           done
+      - name: Install osv-scanner
+        run: |
+          curl -fsSL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o /usr/local/bin/osv-scanner
+          chmod +x /usr/local/bin/osv-scanner
       - name: Audit dependencies (critical = block)
-        run: pnpm audit --prod --audit-level=critical
+        run: |
+          output=$(osv-scanner scan --lockfile=pnpm-lock.yaml 2>&1) || true
+          echo "$output"
+          if echo "$output" | grep -qP '[1-9]\d* Critical'; then
+            echo "::error::Critical vulnerabilities found!"
+            exit 1
+          fi
       - name: Audit dependencies (full report)
         if: always()
-        run: pnpm audit --prod || true
+        run: osv-scanner scan --lockfile=pnpm-lock.yaml || true
 
   gif-check:
     if: github.event_name == 'pull_request'
