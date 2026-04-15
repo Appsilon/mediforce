@@ -223,18 +223,33 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         });
       }
 
-      // Emit stdout/stderr lines as activity events (batch mode after completion)
-      for (const line of spawnResult.stdout.split('\n').filter(Boolean)) {
+      // Emit stdout/stderr as batched events to avoid Firestore write contention.
+      // Previously each line was a separate setDoc() call, causing transaction lock
+      // timeouts when scripts produce many log lines (e.g., collect-metrics).
+      const stdoutLines = spawnResult.stdout.split('\n').filter(Boolean);
+      const stderrLines = spawnResult.stderr.split('\n').filter(Boolean);
+
+      if (stdoutLines.length > 0) {
         await emit({
           type: 'assistant',
-          payload: JSON.stringify({ ts: new Date().toISOString(), type: 'assistant', subtype: 'text', text: line }),
+          payload: JSON.stringify({
+            ts: new Date().toISOString(),
+            type: 'assistant',
+            subtype: 'text',
+            text: stdoutLines.join('\n'),
+          }),
           timestamp: new Date().toISOString(),
         });
       }
-      for (const line of spawnResult.stderr.split('\n').filter(Boolean)) {
+      if (stderrLines.length > 0) {
         await emit({
           type: 'assistant',
-          payload: JSON.stringify({ ts: new Date().toISOString(), type: 'assistant', subtype: 'text', text: `[stderr] ${line}` }),
+          payload: JSON.stringify({
+            ts: new Date().toISOString(),
+            type: 'assistant',
+            subtype: 'text',
+            text: `[stderr] ${stderrLines.join('\n[stderr] ')}`,
+          }),
           timestamp: new Date().toISOString(),
         });
       }
@@ -260,6 +275,14 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         result = { raw: containerOutput };
       }
 
+      // Read presentation.html if it exists (rendered in review step iframe)
+      let presentation: string | null = null;
+      try {
+        presentation = await readFile(join(outputDir, 'presentation.html'), 'utf-8');
+      } catch {
+        // No presentation file — fine
+      }
+
       const durationMs = Date.now() - startTime;
 
       await emit({
@@ -276,6 +299,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           model: 'script',
           duration_ms: durationMs,
           result,
+          ...(presentation ? { presentation } : {}),
         },
         timestamp: new Date().toISOString(),
       });

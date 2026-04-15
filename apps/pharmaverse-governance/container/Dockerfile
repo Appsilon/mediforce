@@ -9,7 +9,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages/platform-core/package.json packages/platform-core/
 COPY apps/pharmaverse-governance/package.json apps/pharmaverse-governance/
 
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN pnpm install --frozen-lockfile --shamefully-hoist || pnpm install --shamefully-hoist
 
 # Copy source and build
 COPY packages/platform-core/ packages/platform-core/

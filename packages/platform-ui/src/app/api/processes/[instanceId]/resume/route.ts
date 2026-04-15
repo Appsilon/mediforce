@@ -23,9 +23,9 @@ export async function POST(
       return NextResponse.json({ error: 'Instance not found' }, { status: 404 });
     }
 
-    if (instance.status !== 'paused') {
+    if (instance.status !== 'paused' && instance.status !== 'failed') {
       return NextResponse.json(
-        { error: `Instance is '${instance.status}', expected 'paused'` },
+        { error: `Instance is '${instance.status}', expected 'paused' or 'failed'` },
         { status: 409 },
       );
     }
