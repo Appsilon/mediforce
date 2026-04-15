@@ -65,7 +65,10 @@ export function ensureTerminalConnected(
 
   const terminalId = terminal.id;
   const orphans = resultSteps.filter(
-    (s) => s.type !== 'terminal' && !resultTransitions.some((t) => t.from === s.id),
+    (s) =>
+      s.type !== 'terminal' &&
+      !resultTransitions.some((t) => t.from === s.id) &&
+      !Object.values(s.verdicts ?? {}).some((v) => v.target),
   );
 
   if (orphans.length > 0) {
