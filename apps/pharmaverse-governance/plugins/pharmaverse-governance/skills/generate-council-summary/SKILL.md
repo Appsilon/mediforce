@@ -71,7 +71,7 @@ The report MUST contain these sections in this exact order:
 2. **Governance Criteria Reference** — collapsed `<details>`, as specified in the CSS/HTML below
 3. **Overview Stats** — grid of stat cards
 4. **Council Decisions** — only shown after first revision
-5. **Proposed Changes** — one `<details>` per package, each collapsed by default
+5. **Proposed Changes** — a grid table with one row per package (header-aligned badges), then one collapsed `<details>` per package for evidence/details
 6. **Early Warnings** — collapsed `<details>`
 7. **Pending Action Items** — three categories: blocking pre-checks, meeting decisions, post-approval actions
 
@@ -112,8 +112,8 @@ You MUST use this exact HTML structure and CSS. Only fill in the data placeholde
     details.ref { border-color: #dee2e6; border-left: 3px solid #ff0043; }
     details.ref > summary { background: #f7f7f7; font-size: 0.8rem; color: #444; }
 
-    /* Badges — pharmaverse palette, strong saturation */
-    .b { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.65rem; font-weight: 700; vertical-align: middle; white-space: nowrap; font-family: 'Montserrat', sans-serif; letter-spacing: 0.02em; }
+    /* Badges — pharmaverse palette, compact sizing to fit single row */
+    .b { display: inline-block; padding: 0.1rem 0.35rem; border-radius: 0.2rem; font-size: 0.55rem; font-weight: 700; vertical-align: middle; white-space: nowrap; font-family: 'Montserrat', sans-serif; letter-spacing: 0.02em; text-align: center; }
     .b-stable { background: #22c55e; color: #fff; }
     .b-maturing { background: #3b82f6; color: #fff; }
     .b-watch { background: #f59e0b; color: #fff; }
@@ -133,11 +133,17 @@ You MUST use this exact HTML structure and CSS. Only fill in the data placeholde
     td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #f5f5f5; }
     tr:hover td { background: #f8f9fa; }
 
-    /* Package header in proposed changes */
-    .pkg-header { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-    .pkg-badges { display: flex; gap: 0.3rem; flex-wrap: wrap; }
-    .badge-col-labels { display: flex; gap: 0.3rem; font-size: 0.55rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.15rem; font-family: 'Montserrat', sans-serif; }
-    .badge-col-labels span { min-width: 4.5rem; text-align: center; }
+    /* Proposed changes — fixed 7-column grid so badges align across all rows */
+    .changes-grid { display: grid; grid-template-columns: minmax(5rem,1.2fr) minmax(4rem,1fr) 1.2rem repeat(3, minmax(4rem,1fr)) minmax(3.5rem,0.8fr); align-items: center; font-size: 0.55rem; }
+    .changes-col-headers { display: contents; }
+    .changes-col-headers span { padding: 0.35rem 0.25rem 0.2rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.04em; font-family: 'Montserrat', sans-serif; font-weight: 600; border-bottom: 1px solid #dee2e6; text-align: center; }
+    .changes-col-headers span:first-child { text-align: left; }
+    .changes-row { display: contents; }
+    .changes-row > * { padding: 0.45rem 0.25rem; border-bottom: 1px solid #f1f5f9; }
+    .changes-row .cr-name { font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 0.85rem; text-align: left; }
+    .changes-row .cr-name a { color: #007bff; text-decoration: none; }
+    .changes-row .cr-cell { text-align: center; }
+    .changes-row .cr-arrow { text-align: center; color: #6c757d; font-size: 0.75rem; }
 
     /* Package detail status borders — add class to <details> for colored left accent */
     details.status-stable { border-left: 4px solid #22c55e; }
@@ -156,12 +162,15 @@ You MUST use this exact HTML structure and CSS. Only fill in the data placeholde
     .dec-box { background: #ecfdf5; border: 2px solid #22c55e; border-radius: 0.25rem; padding: 0.6rem 0.85rem; margin: 0.4rem 0; }
     .dec-label { font-size: 0.65rem; text-transform: uppercase; color: #16a34a; font-weight: 700; letter-spacing: 0.05em; font-family: 'Montserrat', sans-serif; }
 
-    /* Action items */
-    .actions-group { margin: 0.5rem 0; }
-    .actions-group h3 { font-family: 'Montserrat', sans-serif; font-size: 0.85rem; font-weight: 600; margin: 0.75rem 0 0.25rem 0; color: #444; }
-    .actions-group h3 .icon { margin-right: 0.25rem; }
-    .action { padding: 0.3rem 0; font-size: 0.82rem; border-bottom: 1px solid #f5f5f5; }
+    /* Action items — professional left-accent styling, no emojis */
+    .actions-group { margin: 0.75rem 0; padding-left: 0.85rem; border-left: 3px solid #dee2e6; }
+    .actions-group.pre-decision { border-left-color: #3b82f6; }
+    .actions-group.decisions { border-left-color: #f59e0b; }
+    .actions-group.post-approval { border-left-color: #6b7280; }
+    .actions-group h3 { font-family: 'Montserrat', sans-serif; font-size: 0.85rem; font-weight: 600; margin: 0 0 0.35rem 0; color: #444; }
+    .action { padding: 0.35rem 0; font-size: 0.82rem; border-bottom: 1px solid #f5f5f5; }
     .action:last-child { border-bottom: none; }
+    .action strong { font-weight: 600; color: #212529; }
     .all-clear { background: #d4edda; border: 1px solid #c3e6cb; border-radius: 0.25rem; padding: 0.6rem 0.85rem; font-size: 0.85rem; color: #155724; font-weight: 500; }
 
     /* Links — pharmaverse blue */
@@ -175,6 +184,10 @@ You MUST use this exact HTML structure and CSS. Only fill in the data placeholde
       body { color: #dee2e6; background: #1a1a2e; }
       h1 { color: #f8f9fa; border-bottom-color: #ff0043; }
       h2, .actions-group h3 { color: #dee2e6; }
+      .actions-group { border-left-color: #3a3a4e; }
+      .actions-group.pre-decision { border-left-color: #3b82f6; }
+      .actions-group.decisions { border-left-color: #f59e0b; }
+      .actions-group.post-approval { border-left-color: #6b7280; }
       .stat, summary { background: #2a2a3e; border-color: #3a3a4e; }
       .stat.green { background: #0a2a1a; border-color: #22c55e; }
       .stat.amber { background: #2a2000; border-color: #f59e0b; }
@@ -198,6 +211,10 @@ You MUST use this exact HTML structure and CSS. Only fill in the data placeholde
       .dec-box { background: #0a2a1a; border-color: #22c55e; }
       a { color: #3bbfe4; }
       a:hover { color: #6dd5f0; }
+      .changes-col-headers span { border-color: #3a3a4e; color: #adb5bd; }
+      .changes-row > * { border-color: #2a2a3e; }
+      .changes-row .cr-name a { color: #3bbfe4; }
+      .changes-row .cr-arrow { color: #adb5bd; }
       .divider { border-color: #3a3a4e; }
       .cnt { background: #3a3a4e; color: #adb5bd; }
       .all-clear { background: #0a2a1a; border-color: #22c55e; color: #34ce57; }
@@ -211,7 +228,7 @@ You MUST use this exact HTML structure and CSS. Only fill in the data placeholde
 
 <!-- ===== 2. CRITERIA REFERENCE (always collapsed) ===== -->
 <details class="ref">
-  <summary>📋 Governance Criteria Reference</summary>
+  <summary>Governance Criteria Reference</summary>
   <div class="det-body">
     <table>
       <tr><th>Code</th><th>Criteria</th></tr>
@@ -261,39 +278,51 @@ You MUST use this exact HTML structure and CSS. Only fill in the data placeholde
 -->
 
 <!-- ===== 5. PROPOSED CHANGES ===== -->
-<!-- Column labels row — always show above the first package -->
 <h2>Proposed Changes</h2>
 
 <!-- If none: -->
 <!-- <p class="muted">No changes proposed this cycle.</p> -->
 
-<!-- For each package, one <details> block, COLLAPSED by default. -->
+<!-- The changes-grid is a CSS grid container. Column headers and each package row
+     use display:contents so all cells share the same 7-column track. -->
+<div class="changes-grid">
+
+  <!-- Column headers — always present -->
+  <div class="changes-col-headers">
+    <span>Package</span>
+    <span>Status</span>
+    <span></span>
+    <span>Submission</span>
+    <span>Maintenance</span>
+    <span>Quality</span>
+    <span>Decision</span>
+  </div>
+
+  <!-- For each package, one row using display:contents.
+       Each row has exactly 7 cells matching the grid columns. -->
+  <!--
+  <div class="changes-row">
+    <div class="cr-name"><a href="{repoUrl}" target="_blank">{packageName}</a></div>
+    <div class="cr-cell"><span class="b b-{statusClass}">{proposed status}</span></div>
+    <div class="cr-arrow">→</div>
+    <div class="cr-cell"><span class="b b-{ok|warn|fail|na}">{submissionBadge}</span></div>
+    <div class="cr-cell"><span class="b b-{ok|warn|fail|na}">{maintenanceBadge}</span></div>
+    <div class="cr-cell"><span class="b b-{ok|warn|fail|na}">{qualityBadge}</span></div>
+    <div class="cr-cell"><span class="b b-pending">Pending</span></div>
+  </div>
+  -->
+
+</div>
+
+<!-- Per-package detail blocks — one collapsed <details> per package AFTER the grid.
+     These contain evidence, criteria tables, and recommendations. -->
 <!-- Add status-{class} to <details> for colored left border: status-stable, status-maturing, status-watch, status-atrisk, status-archived -->
 <!--
 <details class="status-{statusClass}">
-  <summary>
-    <span class="pkg-header">
-      <a href="{repoUrl}" target="_blank">{packageName}</a>
-      <span class="b b-{statusClass}">{proposed status}</span>
-      →
-      <span class="pkg-badges">
-        <span class="b b-{ok|warn|fail|na}" title="Submission Readiness">{badge}</span>
-        <span class="b b-{ok|warn|fail|na}" title="Maintenance Health">{badge}</span>
-        <span class="b b-{ok|warn|fail|na}" title="Technical Quality">{badge}</span>
-      </span>
-    </span>
-    <span class="b b-pending">Pending</span>
-    OR
-    <span class="b b-decided">Decided</span>
-  </summary>
+  <summary>{packageName} — Details</summary>
   <div class="det-body">
 
-    ALWAYS include a badge legend row at the top of each package body:
-    <div class="badge-col-labels">
-      <span>Submission</span><span>Maintenance</span><span>Quality</span>
-    </div>
-
-    Then: evidence, status criteria table, proposed badge assignments.
+    Evidence, status criteria table, proposed badge assignments.
 
     Maintenance details table (if available — always include, collapsed):
     <details>
@@ -326,35 +355,35 @@ You MUST use this exact HTML structure and CSS. Only fill in the data placeholde
 
 <hr class="divider">
 
-<!-- ===== 7. ACTION ITEMS — three categories ===== -->
+<!-- ===== 7. ACTION ITEMS — three categories, no emojis ===== -->
 <h2>Action Items</h2>
 
 <!-- Category A: Pre-decision checks (blocking — must be resolved before council can decide) -->
-<div class="actions-group">
-  <h3><span class="icon">🔍</span> Pre-Decision Checks</h3>
+<div class="actions-group pre-decision">
+  <h3>Pre-Decision Checks</h3>
   <!-- Things like "verify CRAN status for X", "confirm coverage numbers for Y" -->
   <!-- If none: <p class="muted">None — all data verified.</p> -->
-  <div class="action">• {description}</div>
+  <div class="action"><strong>{assignee}:</strong> {description}</div>
 </div>
 
 <!-- Category B: Meeting decisions (blocking — council votes needed before approval) -->
-<div class="actions-group">
-  <h3><span class="icon">🗳️</span> Decisions Required</h3>
+<div class="actions-group decisions">
+  <h3>Decisions Required</h3>
   <!-- Things like "Vote on Watch designation for X", "Approve renewal for Y" -->
   <!-- If none: <p class="muted">None — all decisions made.</p> -->
-  <div class="action">• {description} — <em>{vote threshold}</em></div>
+  <div class="action"><strong>{assignee}:</strong> {description} — <em>{vote threshold}</em></div>
 </div>
 
 <!-- Category C: Post-approval actions (non-blocking — happen after report is approved) -->
-<div class="actions-group">
-  <h3><span class="icon">📬</span> Post-Approval Actions</h3>
+<div class="actions-group post-approval">
+  <h3>Post-Approval Actions</h3>
   <!-- Things like "Notify maintainer of X", "Schedule follow-up review for Y" -->
   <!-- If none: <p class="muted">None.</p> -->
-  <div class="action">• {description}</div>
+  <div class="action"><strong>{assignee}:</strong> {description}</div>
 </div>
 
 <!-- If ALL categories A and B are empty: -->
-<!-- <div class="all-clear">✓ All blocking items resolved — ready for final approval.</div> -->
+<!-- <div class="all-clear">All blocking items resolved — ready for final approval.</div> -->
 
 </body>
 </html>
@@ -365,11 +394,13 @@ You MUST use this exact HTML structure and CSS. Only fill in the data placeholde
 1. **Use the CSS classes exactly as defined.** Do not invent new CSS classes or inline styles beyond what's in the template.
 2. **Stat cards are always a 6-column grid.** The CSS `.stats` uses `grid-template-columns: repeat(6, 1fr)`. This prevents wrapping. Do not change the grid.
 3. **Every `<details>` for a proposed change is COLLAPSED by default** (no `open` attribute). The user expands what they want to read.
-4. **Each package's badge row must have column labels** above it using `.badge-col-labels`: Submission, Maintenance, Quality. This makes the colored badges understandable.
-5. **Maintenance details** table (releases, issues, PRs, response times) is always present inside each package but wrapped in a nested collapsed `<details>`. This keeps the main view clean.
-6. **Do NOT include** sections called "Council Judgement", "Data Flags", "Data Quality Notes", or similar. If there are data gaps, note them briefly in the evidence section with "⚠ {metric}: data unavailable".
-7. **Action items have exactly three categories** as specified. Classify each action into the correct category. Pre-decision checks and meeting decisions are blocking (must be resolved before approval). Post-approval actions are non-blocking.
-8. **The "All blocking items resolved" banner** only appears when categories A and B are both empty.
+4. **Proposed Changes uses a CSS grid layout** (`.changes-grid`) with 7 columns. The header row (`.changes-col-headers`) and each package row (`.changes-row`) both use `display: contents` so all cells share the same column tracks. This ensures badges align perfectly across rows without wrapping.
+5. **Detail blocks** for each package are separate collapsed `<details>` elements placed AFTER the grid — not inside it. They contain evidence, criteria tables, and recommendations.
+6. **Maintenance details** table (releases, issues, PRs, response times) is always present inside each package detail block but wrapped in a nested collapsed `<details>`. This keeps the main view clean.
+7. **Do NOT include** sections called "Council Judgement", "Data Flags", "Data Quality Notes", or similar. If there are data gaps, note them briefly in the evidence section.
+8. **Action items have exactly three categories** with professional left-border accents — no emojis. Use `.actions-group.pre-decision`, `.actions-group.decisions`, `.actions-group.post-approval` classes. Each action item starts with `<strong>{assignee}:</strong>` to identify the responsible party.
+9. **No emojis anywhere** in the generated HTML. The report must look professional and clean.
+10. **The "All blocking items resolved" banner** only appears when categories A and B are both empty.
 
 ### Handling Revision Cycles
 
