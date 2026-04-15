@@ -149,7 +149,7 @@ Testing strategies:
    ```
 5. **Bootstrap the E2E environment** (idempotent — safe to run every time):
    ```bash
-   python3 packages/platform-ui/scripts/bootstrap-e2e.py
+   python3 packages/platform-ui/scripts/bootstrap_e2e.py
    ```
    This creates `.env.local` with demo credentials, starts Firebase emulators, installs Playwright browsers, and installs ffmpeg. See [Remote E2E setup](#remote-e2e-setup) for details.
 6. `cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth` — all E2E journey + smoke tests (60s)
@@ -205,7 +205,7 @@ const task = buildHumanTask({ assignee: 'user-1' });
 In remote environments (Claude Code remote, CI, fresh machines), E2E tests need manual preparation. Run the bootstrap script **before** any E2E test:
 
 ```bash
-python3 packages/platform-ui/scripts/bootstrap-e2e.py
+python3 packages/platform-ui/scripts/bootstrap_e2e.py
 ```
 
 The script is idempotent (safe to run multiple times) and handles:

@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Validated AI — Mediforce</title>
+  <meta name="description" content="Concrete mechanisms for making AI safe to use in regulated pharma." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #FFFFFF; --bg-2: #F8F9FA; --bg-3: #F1F3F5;
+      --accent: #0D9488;
+      --accent-dim: rgba(13,148,136,0.06);
+      --accent-border: rgba(13,148,136,0.18);
+      --purple: #7C3AED;
+      --purple-dim: rgba(124,58,237,0.06);
+      --purple-border: rgba(124,58,237,0.18);
+      --amber: #D97706;
+      --amber-dim: rgba(217,119,6,0.06);
+      --amber-border: rgba(217,119,6,0.18);
+      --blue: #2563EB;
+      --blue-dim: rgba(37,99,235,0.06);
+      --blue-border: rgba(37,99,235,0.18);
+      --text: #111827;
+      --text-2: #374151;
+      --text-3: #6B7280;
+      --text-4: #9CA3AF;
+      --border: #E5E7EB;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; -webkit-font-smoothing: antialiased; }
+    ::selection { background: rgba(13,148,136,0.15); }
+    a { color: var(--accent); text-decoration: none; }
+    .w { max-width: 780px; margin: 0 auto; padding: 0 32px; }
+
+    /* Header */
+    .header { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.88); backdrop-filter: blur(16px); }
+    .header-inner { max-width: 68rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; }
+    .logo-group { display: flex; align-items: center; gap: 0.625rem; text-decoration: none; }
+    .logo-mark { width: 1.75rem; height: 1.75rem; display: flex; align-items: center; justify-content: center; }
+    .logo-mark svg { width: 100%; height: 100%; }
+    .logo-text { font-family: 'Manrope', sans-serif; font-size: 1.125rem; font-weight: 700; letter-spacing: -0.025em; color: var(--text); }
+    .header-links { display: flex; align-items: center; gap: 0.25rem; }
+    .header-link { display: inline-flex; align-items: center; font-size: 0.8125rem; font-weight: 600; color: var(--text-2); padding: 0.375rem 0.75rem; border-radius: 0.375rem; text-decoration: none; transition: color 0.15s; }
+    .header-link:hover { color: var(--text); background: var(--bg-2); }
+    .header-link--icon { display: flex; align-items: center; padding: 0.375rem 0.5rem; color: var(--text-3); }
+    .header-link--icon:hover { color: var(--text); background: var(--bg-2); }
+    .header-link--icon svg { width: 1.125rem; height: 1.125rem; }
+
+    /* Draft banner */
+    .evolving-badge {
+      display: inline-block;
+      font-size: 11px; font-weight: 600;
+      color: #92400E;
+      background: #FEF3C7;
+      padding: 3px 10px;
+      border-radius: 100px;
+      margin-left: 10px;
+      vertical-align: middle;
+      letter-spacing: 0.02em;
+    }
+
+    /* Pillar TOC — sticky full-width strip */
+    .pillar-toc {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 53px;
+      z-index: 30;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(12px);
+      transition: box-shadow 0.2s;
+    }
+    .pillar-toc.stuck {
+      box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+    }
+    @media (max-width: 640px) { .pillar-toc { grid-template-columns: 1fr 1fr; } }
+    .pillar-toc-item {
+      padding: 20px 20px 16px;
+      text-decoration: none;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      position: relative;
+      text-align: center;
+    }
+    .pillar-toc-item:hover { background: var(--bg-2); }
+    /* Active state */
+    .pillar-toc-item.active { background: var(--bg-2); }
+    .pti--test.active { border-bottom-color: var(--accent); }
+    .pti--watch.active { border-bottom-color: var(--purple); }
+    .pti--control.active { border-bottom-color: var(--amber); }
+    .pti--prove.active { border-bottom-color: var(--blue); }
+    .pti-label {
+      font-size: 13px; font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .pti--test .pti-label { color: var(--accent); }
+    .pti--watch .pti-label { color: var(--purple); }
+    .pti--control .pti-label { color: var(--amber); }
+    .pti--prove .pti-label { color: var(--blue); }
+    .pti-desc {
+      font-size: 11px; color: var(--text-4); line-height: 1.4;
+      transition: color 0.2s;
+    }
+    .pillar-toc-item.active .pti-desc { color: var(--text-3); }
+
+    /* Hero */
+    .hero { padding: 80px 0 40px; }
+    .hero-eyebrow { font-size: 13px; font-weight: 600; color: var(--text-2); margin-bottom: 16px; }
+    .hero h1 { font-size: 38px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.15; max-width: 540px; }
+    .hero h1 em { font-style: normal; color: var(--accent); }
+    .hero .lead { margin-top: 18px; font-size: 16px; color: var(--text-3); line-height: 1.8; max-width: 480px; }
+    @media (max-width: 640px) { .hero { padding: 56px 0 32px; } .hero h1 { font-size: 26px; } }
+
+    /* Section */
+    .s { padding: 48px 0; border-top: 1px solid var(--border); }
+    .s h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 10px; }
+    .s p { font-size: 15px; color: var(--text-2); line-height: 1.8; margin-bottom: 12px; }
+    .s p strong { color: var(--text); font-weight: 600; }
+
+    /* Diagram */
+    .diagram { margin: 28px 0 12px; border: 1px solid var(--purple-border); border-radius: 12px; padding: 24px 20px 16px; position: relative; background: var(--purple-dim); }
+    .diagram-label { position: absolute; top: -11px; left: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--purple); background: #FFFFFF; padding: 0 8px; }
+    .diagram-human { display: grid; gap: 6px; margin-bottom: 12px; }
+    @media (min-width: 540px) { .diagram-human { grid-template-columns: 1fr 1fr 1fr; } }
+    .dh-item { padding: 8px 10px; border-radius: 6px; background: rgba(124,58,237,0.04); border: 1px solid rgba(124,58,237,0.12); }
+    .dh-item h5 { font-size: 11px; font-weight: 600; color: #7C3AED; margin-bottom: 1px; }
+    .dh-item p { font-size: 10px; color: var(--text-3); line-height: 1.4; margin: 0; }
+    .diagram-inner { border: 1px solid var(--accent-border); border-radius: 8px; padding: 16px 14px 12px; position: relative; background: rgba(13,148,136,0.03); }
+    .diagram-inner-label { position: absolute; top: -10px; left: 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); background: #FFFFFF; padding: 0 8px; }
+    .diagram-inner-label span { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.6; margin-left: 4px; }
+    .diagram-flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); }
+    .diagram-flow .step { padding: 5px 10px; border-radius: 5px; background: var(--bg-3); border: 1px solid var(--border); font-weight: 500; white-space: nowrap; }
+    .diagram-flow .arr { color: var(--text-4); }
+    .diagram-result { margin-top: 10px; text-align: center; font-size: 12px; color: var(--text-3); }
+    .diagram-result strong { color: #059669; }
+
+    /* Pillar — clean headers, no banners */
+    .pillar { padding: 64px 0 48px; border-top: 1px solid var(--border); scroll-margin-top: 120px; }
+    .pillar h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.25; }
+    .pillar > .w > .psub, .pillar .psub { margin-top: 4px; font-size: 14px; color: var(--text-3); line-height: 1.7; max-width: 520px; }
+    .pillar-head { display: none; }
+    .pillar-banner { display: none; }
+
+    /* Feature cards */
+    .fcards { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 28px; }
+    @media (min-width: 640px) {
+      .fcards--3 { grid-template-columns: 1fr 1fr 1fr; }
+      .fcards--2 { grid-template-columns: 1fr 1fr; }
+    }
+    .fc {
+      display: grid; grid-template-columns: 40px 1fr; gap: 14px;
+      padding: 18px 20px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      transition: border-color 0.2s;
+      align-items: start;
+    }
+    @media (min-width: 640px) {
+      .fc--wide { grid-column: 1 / -1; }
+    }
+    /* Compact cards in 3-col: stack vertically */
+    .fc--compact { display: flex; flex-direction: column; gap: 10px; }
+    .fc--compact .fc-icon { width: 36px; height: 36px; }
+    .fc:hover { border-color: var(--accent-border); }
+    /* Per-pillar hover colors */
+    .pillar--test .fc:hover { border-color: var(--accent-border); }
+    .pillar--watch .fc:hover { border-color: var(--purple-border); }
+    .pillar--control .fc:hover { border-color: var(--amber-border); }
+    .pillar--prove .fc:hover { border-color: var(--blue-border); }
+
+    .fc-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .fc-icon svg { width: 20px; height: 20px; }
+    /* Icon colors per pillar */
+    .pillar--test .fc-icon { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-border); }
+    .pillar--watch .fc-icon { background: var(--purple-dim); color: var(--purple); border: 1px solid var(--purple-border); }
+    .pillar--control .fc-icon { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber-border); }
+    .pillar--prove .fc-icon { background: var(--blue-dim); color: var(--blue); border: 1px solid var(--blue-border); }
+
+    .fc-body { min-width: 0; }
+    .fc-body h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .fc-body p { font-size: 13px; color: var(--text-3); line-height: 1.6; margin: 0; }
+    .fc-body strong { color: var(--text-2); font-weight: 600; }
+    .fc-detail {
+      margin-top: 8px; font-size: 12px; color: var(--text-4); line-height: 1.55;
+      padding: 10px 12px; border-radius: 6px;
+      background: var(--bg); border: 1px solid var(--border);
+    }
+    .fc-detail strong { color: var(--text-3); font-weight: 600; }
+
+    /* Mockups */
+    .mockup {
+      margin: 10px 0 0;
+      border-radius: 8px;
+      border: 1px solid #1E293B;
+      background: #0F172A;
+      overflow: hidden;
+      font-size: 12px;
+      color: #E2E8F0;
+    }
+    .mockup-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 12px;
+      background: #0B1222;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 10px; font-weight: 600; color: #64748B;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .mockup-bar .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .mockup-bar .dot--r { background: #F87171; }
+    .mockup-bar .dot--y { background: #FBBF24; }
+    .mockup-bar .dot--g { background: #34D399; }
+    .mockup-body { padding: 14px; }
+
+    /* Benchmark report mockup */
+    .mock-bench-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+      margin-bottom: 12px;
+    }
+    .mock-stat {
+      padding: 10px; border-radius: 6px;
+      background: #1E293B; border: 1px solid rgba(255,255,255,0.06);
+      text-align: center;
+    }
+    .mock-stat-val {
+      font-size: 22px; font-weight: 700; line-height: 1;
+    }
+    .mock-stat-val--good { color: #34D399; }
+    .mock-stat-val--warn { color: #FBBF24; }
+    .mock-stat-val--info { color: #60A5FA; }
+    .mock-stat-label {
+      font-size: 10px; color: #64748B; margin-top: 4px;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .mock-bar-chart {
+      display: flex; align-items: flex-end; gap: 3px; height: 40px;
+      padding: 0 4px;
+    }
+    .mock-bar {
+      flex: 1; border-radius: 2px 2px 0 0;
+      background: rgba(94,234,212,0.25);
+      min-height: 4px;
+    }
+    .mock-bar--hi { background: rgba(94,234,212,0.5); }
+    .mock-bar-label {
+      font-size: 9px; color: var(--text-4); text-align: center; margin-top: 4px;
+    }
+
+    /* Anti-rubber-stamp mockup */
+    .mock-review-row {
+      display: grid; grid-template-columns: 110px 80px 80px 1fr; gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 11px; color: #94A3B8;
+      align-items: center;
+    }
+    .mock-review-row:last-child { border-bottom: none; }
+    .mock-review-head {
+      font-size: 9px; font-weight: 600; color: #64748B;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .mock-flag {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 10px; font-weight: 600;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .mock-flag--ok { color: #34D399; background: rgba(52,211,153,0.1); }
+    .mock-flag--warn { color: #FBBF24; background: rgba(251,191,36,0.1); }
+    .mock-flag--bad { color: #F87171; background: rgba(248,113,113,0.1); }
+
+    /* Risk report mockup */
+    .mock-risk-row {
+      display: grid; grid-template-columns: 32px 1fr 80px 100px; gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 11px; color: #94A3B8;
+      align-items: center;
+    }
+    .mock-risk-row:last-child { border-bottom: none; }
+    .mock-step-num {
+      width: 24px; height: 24px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700;
+    }
+    .mock-step-num--agent { background: rgba(94,234,212,0.12); color: var(--accent); }
+    .mock-step-num--human { background: rgba(167,139,250,0.12); color: var(--purple); }
+    .mock-step-num--det { background: rgba(96,165,250,0.12); color: var(--blue); }
+    .mock-level {
+      font-size: 10px; font-weight: 600;
+      padding: 2px 6px; border-radius: 4px;
+      text-align: center;
+    }
+    .mock-level--l3 { color: #FBBF24; background: rgba(251,191,36,0.1); }
+    .mock-level--l0 { color: var(--purple); background: rgba(167,139,250,0.1); }
+    .mock-level--det { color: var(--blue); background: rgba(96,165,250,0.1); }
+    .mock-conf {
+      height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+    .mock-conf-fill {
+      height: 100%; border-radius: 3px;
+    }
+    .mock-conf-fill--hi { background: #34D399; }
+    .mock-conf-fill--mid { background: #FBBF24; }
+
+    /* Callout */
+    .c { margin: 16px 0; padding: 14px 18px; border-radius: 8px; font-size: 13px; line-height: 1.7; color: var(--text-2); border: 1px solid var(--accent-border); background: var(--accent-dim); }
+    .c strong { color: var(--accent); font-weight: 600; }
+
+    /* CTA */
+    .cta { padding: 64px 0; border-top: 1px solid var(--border); text-align: center; }
+    .cta h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    .cta p { font-size: 14px; color: var(--text-3); line-height: 1.7; max-width: 400px; margin: 0 auto 20px; }
+    .cta-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .cb { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; transition: all 0.15s; border: 1px solid var(--border); }
+    .cb svg { width: 15px; height: 15px; flex-shrink: 0; }
+    .cb--p { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
+    .cb--p:hover { opacity: 0.9; }
+    .cb--s { background: transparent; color: var(--text-2); }
+    .cb--s:hover { background: var(--bg-2); border-color: var(--text-4); }
+
+    /* Footer */
+    footer { border-top: 1px solid var(--border); padding: 20px 0; }
+    .f { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-4); }
+    .f a { color: var(--text-4); text-decoration: none; } .f a:hover { color: var(--text-3); }
+    .f-links { display: flex; gap: 16px; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <a href="index.html" class="logo-group">
+      <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="2.0" fill="none" opacity="0.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
+      <span class="logo-text">Mediforce</span>
+    </a>
+    <div class="header-links">
+
+      <a href="validated-ai.html" class="header-link">Validation</a>
+      <a href="security.html" class="header-link">Security</a>
+      <a href="fda-principles.html" class="header-link">FDA Alignment</a>
+      <a href="https://github.com/Appsilon/mediforce" target="_blank" class="header-link header-link--icon" aria-label="GitHub"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="w">
+    <div class="hero-eyebrow">How we think about validated AI</div>
+    <h1>Validate the <em>process</em>, not the AI.</h1>
+    <p class="lead">
+      You can't validate an AI agent the way you validate software.
+      So we put a qualified human at the center &mdash; and validate
+      everything that supports them: the checks, the enforcement,
+      and the proof that it all actually happened.
+    </p>
+
+    <div class="diagram" style="margin-top: 40px;">
+      <div class="diagram-label">Human review &mdash; with real oversight</div>
+      <div class="diagram-human">
+        <div class="dh-item"><h5>Full diff</h5><p>AI proposal vs. reviewer's decision</p></div>
+        <div class="dh-item"><h5>Tracked changes</h5><p>Every modification recorded</p></div>
+        <div class="dh-item"><h5>Anti-rubber-stamping</h5><p>Time, rates, challenge outputs</p></div>
+      </div>
+      <div class="diagram-inner">
+        <div class="diagram-inner-label">Automated checks <span>&mdash; before human sees anything</span></div>
+        <div class="diagram-flow">
+          <span class="step">Agent output</span><span class="arr">&rarr;</span>
+          <span class="step">Guardrails</span><span class="arr">&rarr;</span>
+          <span class="step">Autonomy enforcement</span>
+        </div>
+      </div>
+      <div class="diagram-result"><strong>&darr; Result you can use and defend</strong> &mdash; audit trail attached</div>
+    </div>
+  </div>
+</section>
+
+<div class="pillar-toc">
+  <a href="#test" class="pillar-toc-item pti--test">
+    <div class="pti-label">Test</div>
+    <div class="pti-desc">Run agents on hundreds of cases. Measure results.</div>
+  </a>
+  <a href="#watch" class="pillar-toc-item pti--watch">
+    <div class="pti-label">Watch</div>
+    <div class="pti-desc">Monitor agents and the humans who review them.</div>
+  </a>
+  <a href="#control" class="pillar-toc-item pti--control">
+    <div class="pti-label">Control</div>
+    <div class="pti-desc">Define rules. The platform enforces them.</div>
+  </a>
+  <a href="#prove" class="pillar-toc-item pti--prove">
+    <div class="pti-label">Prove</div>
+    <div class="pti-desc">Show exactly what happened. Always.</div>
+  </a>
+</div>
+
+<!-- ═══ TEST ═══ -->
+<section class="pillar pillar--test" id="test">
+  <div class="w">
+    <h2>Run it a thousand times. Measure what you get.</h2>
+    <p class="psub">Statistical testing for non-deterministic systems.</p>
+
+    <!-- Featured card: benchmark with mockup -->
+    <div class="fcards" style="margin-top: 28px;">
+      <div class="fc fc--wide">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Agent benchmark suites</h3>
+          <p>Define test cases. Run an agent 50 or 500 times. Measure <strong>consistency</strong>, <strong>quality</strong>, and <strong>scope compliance</strong>.</p>
+          <div class="mockup">
+            <div class="mockup-bar">
+              <span class="dot dot--r"></span><span class="dot dot--y"></span><span class="dot dot--g"></span>
+              Agent Qualification &mdash; Safety Narrative Agent v2.4
+            </div>
+            <div class="mockup-body">
+              <div class="mock-bench-grid">
+                <div class="mock-stat"><div class="mock-stat-val mock-stat-val--good">94%</div><div class="mock-stat-label">Quality pass rate</div></div>
+                <div class="mock-stat"><div class="mock-stat-val mock-stat-val--info">0.03</div><div class="mock-stat-label">Output variance</div></div>
+                <div class="mock-stat"><div class="mock-stat-val mock-stat-val--good">0</div><div class="mock-stat-label">Scope violations</div></div>
+              </div>
+              <div style="font-size:10px; color:#64748B; margin-bottom: 6px;">Quality distribution across 2,000 runs (20 protocols &times; 100 runs)</div>
+              <div class="mock-bar-chart">
+                <div class="mock-bar" style="height:15%"></div>
+                <div class="mock-bar" style="height:20%"></div>
+                <div class="mock-bar" style="height:35%"></div>
+                <div class="mock-bar mock-bar--hi" style="height:65%"></div>
+                <div class="mock-bar mock-bar--hi" style="height:90%"></div>
+                <div class="mock-bar mock-bar--hi" style="height:100%"></div>
+                <div class="mock-bar mock-bar--hi" style="height:95%"></div>
+                <div class="mock-bar mock-bar--hi" style="height:88%"></div>
+                <div class="mock-bar mock-bar--hi" style="height:82%"></div>
+                <div class="mock-bar" style="height:60%"></div>
+                <div class="mock-bar" style="height:40%"></div>
+                <div class="mock-bar" style="height:25%"></div>
+                <div class="mock-bar" style="height:12%"></div>
+                <div class="mock-bar" style="height:5%"></div>
+              </div>
+              <div class="mock-bar-label">Low &larr; Quality score &rarr; High</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 3 compact cards -->
+    <div class="fcards fcards--3" style="margin-top: 8px;">
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Workflow evals</h3>
+          <p>Run entire multi-step workflows against scenarios. Measure final output quality end-to-end.</p>
+        </div>
+      </div>
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.049.58.025 1.193-.14 1.743"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Deterministic testing</h3>
+          <p>Routing, permissions, transforms &mdash; tested traditionally. <strong>The engine is fully deterministic.</strong></p>
+        </div>
+      </div>
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Drift monitoring</h3>
+          <p>Benchmarks re-run on schedule. Quality degrades? You know before production does.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ WATCH ═══ -->
+<section class="pillar pillar--watch" id="watch">
+  <div class="w">
+    <h2>Monitor the agents. Monitor the humans.</h2>
+    <p class="psub">Testing catches problems before deployment. Monitoring catches them in production.</p>
+
+    <!-- Anti-rubber-stamping: full-width with mockup -->
+    <div class="fcards" style="margin-top: 28px;">
+      <div class="fc fc--wide">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Anti-rubber-stamping</h3>
+          <p>Human review is only valuable if it's real. The platform tracks concrete signals:</p>
+          <div class="mockup">
+            <div class="mockup-bar">
+              <span class="dot dot--r"></span><span class="dot dot--y"></span><span class="dot dot--g"></span>
+              Review Quality &mdash; Last 30 days
+            </div>
+            <div class="mockup-body">
+              <div class="mock-review-row">
+                <div class="mock-review-head">Reviewer</div>
+                <div class="mock-review-head">Avg time</div>
+                <div class="mock-review-head">Modified</div>
+                <div class="mock-review-head">Status</div>
+              </div>
+              <div class="mock-review-row">
+                <div style="color:#E2E8F0">Dr. Chen</div>
+                <div>4m 12s</div>
+                <div>34%</div>
+                <div><span class="mock-flag mock-flag--ok">&#10003; Normal</span></div>
+              </div>
+              <div class="mock-review-row">
+                <div style="color:#E2E8F0">Dr. Kowalski</div>
+                <div>6m 45s</div>
+                <div>41%</div>
+                <div><span class="mock-flag mock-flag--ok">&#10003; Normal</span></div>
+              </div>
+              <div class="mock-review-row">
+                <div style="color:#E2E8F0">Dr. Patel</div>
+                <div style="color:#FBBF24">0m 08s</div>
+                <div style="color:#F87171">2%</div>
+                <div><span class="mock-flag mock-flag--bad">&#9888; Flagged</span></div>
+              </div>
+              <div class="mock-review-row">
+                <div style="color:#E2E8F0">Dr. Mueller</div>
+                <div>3m 30s</div>
+                <div>28%</div>
+                <div><span class="mock-flag mock-flag--ok">&#10003; Normal</span></div>
+              </div>
+              <div style="margin-top:8px; font-size:10px; color:#64748B;">
+                Challenge outputs: 3 inserted this month &middot; Dr. Patel missed 2/3
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Judge + Live: side by side -->
+    <div class="fcards fcards--2" style="margin-top: 8px;">
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5a17.92 17.92 0 0 1-8.716-2.247m0 0A8.966 8.966 0 0 1 3 12c0-1.264.26-2.466.733-3.559"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Judge agents</h3>
+          <p>An agent that evaluates other agents. Every output or spot-check a %. Scores, flags, escalates to humans.</p>
+          <div class="fc-detail">Reviews 100% of safety narratives. Spot-checks 10% of classifications. Flags below threshold.</div>
+        </div>
+      </div>
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5m.75-9 3-3 2.148 2.148A12.061 12.061 0 0 1 16.5 7.605"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Live activity</h3>
+          <p>Real-time dashboard: running, stuck, waiting for review. Task queues per role. Instant updates.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CONTROL ═══ -->
+<section class="pillar pillar--control" id="control">
+  <div class="w">
+    <h2>Define the rules. The platform enforces them.</h2>
+    <p class="psub">Not guidelines. Enforcement. Configured rules cannot be bypassed.</p>
+
+    <!-- Autonomy: full-width featured -->
+    <div class="fcards" style="margin-top: 28px;">
+      <div class="fc fc--wide">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 13.5V3.75m0 9.75a1.5 1.5 0 0 1 0 3m0-3a1.5 1.5 0 0 0 0 3m0 3.75V16.5m12-3V3.75m0 9.75a1.5 1.5 0 0 1 0 3m0-3a1.5 1.5 0 0 0 0 3m0 3.75V16.5m-6-9V3.75m0 3.75a1.5 1.5 0 0 1 0 3m0-3a1.5 1.5 0 0 0 0 3m0 9.75V10.5"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Autonomy levels</h3>
+          <p>Each step: who decides? You choose per step.</p>
+          <div class="mockup" style="margin-top:10px;">
+            <div class="mockup-bar">
+              <span class="dot dot--r"></span><span class="dot dot--y"></span><span class="dot dot--g"></span>
+              Autonomy Configuration
+            </div>
+            <div class="mockup-body" style="padding: 12px 14px;">
+              <div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">
+                <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; background:#1E293B; border:1px solid rgba(255,255,255,0.06);">
+                  <span style="font-weight:700; color:#A78BFA; min-width:28px;">L0</span>
+                  <span style="color:#E2E8F0; font-weight:500;">Human only</span>
+                  <span style="margin-left:auto; font-size:10px; color:#64748B;">No agent involvement</span>
+                  <span style="width:60px; height:6px; border-radius:3px; background:linear-gradient(90deg, #A78BFA 100%, transparent 100%);"></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; background:#1E293B; border:1px solid rgba(255,255,255,0.06);">
+                  <span style="font-weight:700; color:#818CF8; min-width:28px;">L1</span>
+                  <span style="color:#E2E8F0; font-weight:500;">Agent assists</span>
+                  <span style="margin-left:auto; font-size:10px; color:#64748B;">Human decides</span>
+                  <span style="width:60px; height:6px; border-radius:3px; background:linear-gradient(90deg, #A78BFA 75%, #5EEAD4 100%);"></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; background:#1E293B; border:1px solid rgba(255,255,255,0.06);">
+                  <span style="font-weight:700; color:#60A5FA; min-width:28px;">L2</span>
+                  <span style="color:#E2E8F0; font-weight:500;">Agent annotates</span>
+                  <span style="margin-left:auto; font-size:10px; color:#64748B;">Output collected, not applied</span>
+                  <span style="width:60px; height:6px; border-radius:3px; background:linear-gradient(90deg, #A78BFA 50%, #5EEAD4 100%);"></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; background:#1E293B; border:1px solid rgba(FBBF24,0.08); border-color:rgba(251,191,36,0.15);">
+                  <span style="font-weight:700; color:#FBBF24; min-width:28px;">L3</span>
+                  <span style="color:#E2E8F0; font-weight:500;">Agent proposes</span>
+                  <span style="margin-left:auto; font-size:10px; color:#FBBF24;">Pauses until human approves</span>
+                  <span style="width:60px; height:6px; border-radius:3px; background:linear-gradient(90deg, #A78BFA 25%, #5EEAD4 100%);"></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; background:#1E293B; border:1px solid rgba(255,255,255,0.06);">
+                  <span style="font-weight:700; color:#5EEAD4; min-width:28px;">L4</span>
+                  <span style="color:#E2E8F0; font-weight:500;">Agent decides</span>
+                  <span style="margin-left:auto; font-size:10px; color:#64748B;">Applied automatically</span>
+                  <span style="width:60px; height:6px; border-radius:3px; background:#5EEAD4;"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 2x2 grid -->
+    <div class="fcards fcards--2" style="margin-top: 8px;">
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Producer &ne; reviewer</h3>
+          <p>The agent that produces output cannot review it. Separation of duties.</p>
+        </div>
+      </div>
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Per-step access control</h3>
+          <p>Each step specifies allowed roles. Wrong role? Blocked and logged.</p>
+        </div>
+      </div>
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Data scoping</h3>
+          <p>Agents access only data for their step. Study A can't see Study B.</p>
+        </div>
+      </div>
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Confidence thresholds</h3>
+          <p>Below threshold? Auto-escalation to human regardless of autonomy.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PROVE ═══ -->
+<section class="pillar pillar--prove" id="prove">
+  <div class="w">
+    <h2>Show exactly what happened.</h2>
+    <p class="psub">Structured records with snapshots and tamper-evident timestamps.</p>
+
+    <!-- Risk report: full-width with mockup -->
+    <div class="fcards" style="margin-top: 28px;">
+      <div class="fc fc--wide">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Workflow risk report</h3>
+          <p>One view: which steps are tested, which have oversight, confidence scores, qualification results.</p>
+          <div class="mockup">
+            <div class="mockup-bar">
+              <span class="dot dot--r"></span><span class="dot dot--y"></span><span class="dot dot--g"></span>
+              Risk Report &mdash; Issue Resolution Workflow
+            </div>
+            <div class="mockup-body">
+              <div class="mock-risk-row" style="border-bottom: none; padding-bottom: 4px;">
+                <div class="mock-review-head">#</div>
+                <div class="mock-review-head">Step</div>
+                <div class="mock-review-head">Level</div>
+                <div class="mock-review-head">Confidence</div>
+              </div>
+              <div class="mock-risk-row">
+                <div><span class="mock-step-num mock-step-num--agent">1</span></div>
+                <div style="color:#E2E8F0">Classify issue</div>
+                <div><span class="mock-level mock-level--l3">L3 HITL</span></div>
+                <div><div class="mock-conf"><div class="mock-conf-fill mock-conf-fill--hi" style="width:94%"></div></div></div>
+              </div>
+              <div class="mock-risk-row">
+                <div><span class="mock-step-num mock-step-num--det">2</span></div>
+                <div style="color:#E2E8F0">Route to team</div>
+                <div><span class="mock-level mock-level--det">42 tests</span></div>
+                <div style="font-size:10px; color:#64748B">deterministic</div>
+              </div>
+              <div class="mock-risk-row">
+                <div><span class="mock-step-num mock-step-num--agent">3</span></div>
+                <div style="color:#E2E8F0">Draft resolution</div>
+                <div><span class="mock-level mock-level--l3">L3 HITL</span></div>
+                <div><div class="mock-conf"><div class="mock-conf-fill mock-conf-fill--hi" style="width:88%"></div></div></div>
+              </div>
+              <div class="mock-risk-row">
+                <div><span class="mock-step-num mock-step-num--agent">4</span></div>
+                <div style="color:#E2E8F0">Judge review</div>
+                <div><span class="mock-level mock-level--l3">100%</span></div>
+                <div><div class="mock-conf"><div class="mock-conf-fill mock-conf-fill--hi" style="width:96%"></div></div></div>
+              </div>
+              <div class="mock-risk-row">
+                <div><span class="mock-step-num mock-step-num--human">5</span></div>
+                <div style="color:#E2E8F0">Expert approval</div>
+                <div><span class="mock-level mock-level--l0">L0 Human</span></div>
+                <div style="font-size:10px; color:#64748B">manual</div>
+              </div>
+              <div style="margin-top:8px; display:flex; gap:16px; font-size:10px; color:#64748B;">
+                <span>Avg confidence: <strong style="color:#34D399">0.91</strong></span>
+                <span>Last 200 runs</span>
+                <span>3 reviewers active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 3 compact cards -->
+    <div class="fcards fcards--3" style="margin-top: 8px;">
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Audit trail</h3>
+          <p><strong>Who</strong>, <strong>what</strong>, <strong>when</strong>, <strong>why</strong>, <strong>before/after</strong>. Append-only.</p>
+        </div>
+      </div>
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Decision reconstruction</h3>
+          <p>Input, config, raw output, human changes, final version. <strong>Don't re-run — reconstruct.</strong></p>
+        </div>
+      </div>
+      <div class="fc fc--compact">
+        <div class="fc-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 0 1 9 9v.375M10.125 2.25A3.375 3.375 0 0 1 13.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 0 1 3.375 3.375M9 15l2.25 2.25L15 12"/></svg>
+        </div>
+        <div class="fc-body">
+          <h3>Qualification reports</h3>
+          <p>Pass/fail, consistency, scope tests, drift history. Auditor-ready.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Proportional rigor -->
+<section class="s">
+  <div class="w">
+    <h2>Not everything needs maximum rigor.</h2>
+    <p>
+      Output goes into FDA submission? Full stack, L1&ndash;L3 only.
+      Supply chain logistics? Control + Prove, L3&ndash;L4 fine.
+      <strong>Rigor proportional to risk</strong> &mdash; from ICH E6(R3).
+    </p>
+    <div class="c">
+      <strong>Submission-adjacent</strong> &mdash; all four pillars, full rigor, L1&ndash;L3.<br>
+      <strong>Regulated operations</strong> &mdash; Test + Control + Prove, L2&ndash;L3.<br>
+      <strong>Operational</strong> &mdash; Control + Prove recommended, L3&ndash;L4 fine.
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="s" style="padding: 72px 0;">
+  <div class="w">
+    <h2 style="font-size: 26px; margin-bottom: 8px;">Where we are</h2>
+    <p style="font-size: 15px; color: var(--text-3); line-height: 1.7; max-width: 520px; margin-bottom: 28px;">
+      What you see above is part vision, part working software.
+      We're building this in the open, with teams who'll actually use it &mdash;
+      refining the framework as we go.
+    </p>
+
+    <div style="display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
+      <!-- Live items -->
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px;">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="#10B981"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>
+        <span style="color: var(--text);">Autonomy levels L0&ndash;L4</span>
+        <span style="margin-left: auto; font-size: 11px; color: #059669; font-weight: 500;">v1 live</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px;">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="#10B981"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>
+        <span style="color: var(--text);">Per-step RBAC enforcement</span>
+        <span style="margin-left: auto; font-size: 11px; color: #059669; font-weight: 500;">v1 live</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px;">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="#10B981"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>
+        <span style="color: var(--text);">Audit trail with snapshots</span>
+        <span style="margin-left: auto; font-size: 11px; color: #059669; font-weight: 500;">v1 live</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px;">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="#10B981"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>
+        <span style="color: var(--text);">Confidence thresholds &amp; auto-escalation</span>
+        <span style="margin-left: auto; font-size: 11px; color: #059669; font-weight: 500;">v1 live</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px;">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="#10B981"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>
+        <span style="color: var(--text);">Real-time monitoring</span>
+        <span style="margin-left: auto; font-size: 11px; color: #059669; font-weight: 500;">v1 live</span>
+      </div>
+      <!-- Building items -->
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px; background: var(--bg-2);">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#D97706" stroke-width="1.5"><circle cx="10" cy="10" r="7.25"/><path d="M10 6v4l2.5 2.5" stroke-linecap="round"/></svg>
+        <span style="color: var(--text-2);">Agent benchmark suites</span>
+        <span style="margin-left: auto; font-size: 11px; color: #D97706; font-weight: 500;">building</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px; background: var(--bg-2);">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#D97706" stroke-width="1.5"><circle cx="10" cy="10" r="7.25"/><path d="M10 6v4l2.5 2.5" stroke-linecap="round"/></svg>
+        <span style="color: var(--text-2);">Anti-rubber-stamping metrics</span>
+        <span style="margin-left: auto; font-size: 11px; color: #D97706; font-weight: 500;">building</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px; background: var(--bg-2);">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#D97706" stroke-width="1.5"><circle cx="10" cy="10" r="7.25"/><path d="M10 6v4l2.5 2.5" stroke-linecap="round"/></svg>
+        <span style="color: var(--text-2);">Judge agents &amp; workflow evals</span>
+        <span style="margin-left: auto; font-size: 11px; color: #D97706; font-weight: 500;">building</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px; background: var(--bg-2);">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#D97706" stroke-width="1.5"><circle cx="10" cy="10" r="7.25"/><path d="M10 6v4l2.5 2.5" stroke-linecap="round"/></svg>
+        <span style="color: var(--text-2);">Drift monitoring</span>
+        <span style="margin-left: auto; font-size: 11px; color: #D97706; font-weight: 500;">building</span>
+      </div>
+      <!-- Planned items -->
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px;">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="var(--text-4)" stroke-width="1.5"><circle cx="10" cy="10" r="7.25"/></svg>
+        <span style="color: var(--text-3);">Qualification report generator</span>
+        <span style="margin-left: auto; font-size: 11px; color: var(--text-4); font-weight: 500;">planned</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 13px;">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="var(--text-4)" stroke-width="1.5"><circle cx="10" cy="10" r="7.25"/></svg>
+        <span style="color: var(--text-3);">Challenge outputs for reviewer testing</span>
+        <span style="margin-left: auto; font-size: 11px; color: var(--text-4); font-weight: 500;">planned</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; font-size: 13px;">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="var(--text-4)" stroke-width="1.5"><circle cx="10" cy="10" r="7.25"/></svg>
+        <span style="color: var(--text-3);">Workflow risk report &amp; producer&ne;reviewer</span>
+        <span style="margin-left: auto; font-size: 11px; color: var(--text-4); font-weight: 500;">planned</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding: 80px 0; border-top: 1px solid var(--border); background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 100%);">
+  <div class="w" style="text-align: center;">
+    <div style="display: inline-block; font-size: 11px; font-weight: 600; color: #92400E; background: #FEF3C7; padding: 4px 12px; border-radius: 100px; margin-bottom: 16px;">Request for Comments</div>
+    <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 10px;">We published this to start a conversation.</h2>
+    <p style="font-size: 15px; color: var(--text-3); max-width: 460px; margin: 0 auto 28px; line-height: 1.7;">
+      There's no industry standard for this yet. We have a point of view
+      and we're building towards it &mdash; but we'd rather shape it
+      with the people who'll use it than in isolation.
+    </p>
+    <div class="cta-btns">
+      <a href="https://discord.gg/TVx4VkG3C2" target="_blank" class="cb cb--p">
+        <svg viewBox="0 -28.5 256 256" fill="currentColor"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z"/></svg>
+        Join the conversation
+      </a>
+      <a href="https://github.com/Appsilon/mediforce" target="_blank" class="cb cb--s">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="w f">
+    <span>Mediforce &middot; Draft &mdash; April 2026</span>
+    <div class="f-links">
+      <a href="/">Home</a>
+      <a href="https://github.com/Appsilon/mediforce" target="_blank">GitHub</a>
+      <a href="https://discord.gg/TVx4VkG3C2" target="_blank">Discord</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Active TOC on scroll
+const pillars = document.querySelectorAll('.pillar[id]');
+const tocItems = document.querySelectorAll('.pillar-toc-item');
+const toc = document.querySelector('.pillar-toc');
+const tocMap = {};
+tocItems.forEach(item => {
+  const href = item.getAttribute('href');
+  if (href) tocMap[href.replace('#', '')] = item;
+});
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      tocItems.forEach(t => t.classList.remove('active'));
+      const item = tocMap[entry.target.id];
+      if (item) item.classList.add('active');
+    }
+  });
+}, { rootMargin: '-80px 0px -60% 0px' });
+
+pillars.forEach(p => observer.observe(p));
+
+// Stuck shadow
+const tocObserver = new IntersectionObserver(([entry]) => {
+  toc.classList.toggle('stuck', !entry.isIntersecting);
+}, { threshold: 1, rootMargin: '-50px 0px 0px 0px' });
+tocObserver.observe(toc);
+
+// Smooth scroll
+tocItems.forEach(item => {
+  item.addEventListener('click', e => {
+    e.preventDefault();
+    const id = item.getAttribute('href').replace('#', '');
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+</script>
+</body>
+</html>

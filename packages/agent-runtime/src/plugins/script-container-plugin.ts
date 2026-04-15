@@ -1,12 +1,10 @@
 import { readFile, mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild } from './container-plugin.js';
-import { isLocalExecutionAllowed } from './base-container-agent-plugin.js';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
@@ -49,7 +47,6 @@ export class ScriptContainerPlugin extends ContainerPlugin {
   private commandDisplay!: string;
   private inlineScript: string | null = null;
   private runtime: string | null = null;
-  private isLocalMode = false;
 
   async initialize(context: AgentContext | WorkflowAgentContext): Promise<void> {
     this.context = context;
@@ -101,19 +98,10 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
       this.inlineScript = agentConfig.inlineScript;
       this.runtime = runtime;
-
-      if (!agentConfig.image && isLocalExecutionAllowed()) {
-        this.isLocalMode = true;
-        this.image = 'local';
-        // commandArgs will be set in run() once the temp dir is known
-        this.commandArgs = [];
-        this.commandDisplay = `${runtimeCfg.cmd('script' + runtimeCfg.ext).join(' ')} (local)`;
-      } else {
-        this.image = agentConfig.image ?? runtimeCfg.image;
-        const scriptPath = `/output/script${runtimeCfg.ext}`;
-        this.commandArgs = runtimeCfg.cmd(scriptPath);
-        this.commandDisplay = this.commandArgs.join(' ');
-      }
+      this.image = agentConfig.image ?? runtimeCfg.image;
+      const scriptPath = `/output/script${runtimeCfg.ext}`;
+      this.commandArgs = runtimeCfg.cmd(scriptPath);
+      this.commandDisplay = this.commandArgs.join(' ');
     } else if (agentConfig.command) {
       // Command mode — existing behavior
       if (!agentConfig.image) {
@@ -166,62 +154,39 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       }
 
       const timeoutMs = DEFAULT_TIMEOUT_MS;
+      const containerName = `mediforce-script-${this.context.processInstanceId}-${this.context.stepId}`.slice(0, 63);
 
-      let spawnResult: { stdout: string; stderr: string; exitCode: number | null; signal: string | null };
-
-      if (this.isLocalMode && this.inlineScript && this.runtime) {
-        // --- Local execution: run script as a child process, no Docker ---
-        const runtimeCfg = RUNTIME_CONFIG[this.runtime];
-        const rewrittenScript = this.inlineScript.replaceAll('/output/', `${outputDir}/`);
-        const scriptFileName = `script${runtimeCfg.ext}`;
-        const localScriptPath = join(outputDir, scriptFileName);
-        await writeFile(localScriptPath, rewrittenScript, 'utf-8');
-
-        const cmdArgs = runtimeCfg.cmd(localScriptPath);
-        console.log(`[ScriptContainer] Spawning LOCAL: ${cmdArgs.join(' ')}`);
-
-        await emit({
-          type: 'status',
-          payload: 'running locally (no Docker) — ALLOW_LOCAL_AGENTS=true',
-          timestamp: new Date().toISOString(),
-        });
-
-        spawnResult = await this.spawnLocalScript(cmdArgs, outputDir, timeoutMs);
-      } else {
-        // --- Docker execution ---
-        const containerName = `mediforce-script-${this.context.processInstanceId}-${this.context.stepId}`.slice(0, 63);
-
-        const envFlags: string[] = [];
-        for (const [key, value] of Object.entries(this.resolvedEnv.vars)) {
-          envFlags.push('-e', `${key}=${value}`);
-        }
-
-        const dockerArgs: string[] = [
-          'run', '--rm',
-          '--name', containerName,
-          '--memory', '4g',
-          '--cpus', '2',
-          '-v', `${outputDir}:/output`,
-          ...envFlags,
-          this.image,
-          ...this.commandArgs,
-        ];
-
-        console.log(`[ScriptContainer] Spawning: docker ${dockerArgs.join(' ')}`);
-
-        const strategy = getDockerSpawnStrategy();
-        spawnResult = await strategy.spawn({
-          dockerArgs,
-          stdinPayload: null,
-          timeoutMs,
-          containerName,
-          processInstanceId: this.context.processInstanceId,
-          stepId: this.context.stepId,
-          outputDir,
-          logFile: null,
-          imageBuild: this.imageBuild,
-        });
+      const envFlags: string[] = [];
+      for (const [key, value] of Object.entries(this.resolvedEnv.vars)) {
+        envFlags.push('-e', `${key}=${value}`);
       }
+
+      const dockerArgs: string[] = [
+        'run', '--rm',
+        '--name', containerName,
+        '--memory', '4g',
+        '--cpus', '2',
+        '-v', `${outputDir}:/output`,
+        ...envFlags,
+        this.image,
+        ...this.commandArgs,
+      ];
+
+      console.log(`[ScriptContainer] Spawning: docker ${dockerArgs.join(' ')}`);
+
+      // Delegate container execution to the spawn strategy.
+      const strategy = getDockerSpawnStrategy();
+      const spawnResult = await strategy.spawn({
+        dockerArgs,
+        stdinPayload: null,
+        timeoutMs,
+        containerName,
+        processInstanceId: this.context.processInstanceId,
+        stepId: this.context.stepId,
+        outputDir,
+        logFile: null,
+        imageBuild: this.imageBuild,
+      });
 
       // Emit stdout/stderr as batched events to avoid Firestore write contention.
       // Previously each line was a separate setDoc() call, causing transaction lock
@@ -316,35 +281,5 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         await rm(outputDir, { recursive: true, force: true }).catch(() => {});
       }
     }
-  }
-
-  private spawnLocalScript(
-    cmdArgs: string[],
-    cwd: string,
-    timeoutMs: number,
-  ): Promise<{ stdout: string; stderr: string; exitCode: number | null; signal: string | null }> {
-    return new Promise((resolve) => {
-      const [cmd, ...args] = cmdArgs;
-      const child = spawn(cmd, args, {
-        cwd,
-        env: { ...process.env, ...this.resolvedEnv.vars },
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
-      child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-
-      const timer = setTimeout(() => {
-        child.kill('SIGTERM');
-        setTimeout(() => { if (!child.killed) child.kill('SIGKILL'); }, 5_000);
-      }, timeoutMs);
-
-      child.on('close', (exitCode, signal) => {
-        clearTimeout(timer);
-        resolve({ stdout, stderr, exitCode, signal: signal ?? null });
-      });
-    });
   }
 }
