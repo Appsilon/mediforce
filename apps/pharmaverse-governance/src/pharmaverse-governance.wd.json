@@ -1,8 +1,8 @@
 {
   "name": "pharmaverse-governance",
   "title": "Pharmaverse Semiannual Package Governance Review",
-  "description": "Automated Track B semiannual review cycle for pharmaverse packages. Discovers all R packages in the pharmaverse GitHub org, collects maintenance and quality metrics, assesses each package against governance criteria (status tags, quality badges, renewal triggers), and produces a council-ready summary report. Approved state is persisted back to GitHub as org custom properties.",
-  "preamble": "## Domain Context\n\nThis workflow implements the pharmaverse Package Governance Working Model v1.2 — specifically Track B (Semiannual Review Cycle). All assessments reference stable criteria IDs from the governance specification.\n\n### Status Tags (one per package, reviewed semiannually)\n\n- **Stable** (ST-1..ST-5): Settled API, actively maintained, quality badges active. User signal: \"Safe to adopt.\"\n- **Maturing** (MA-1..MA-5): Under active development, approved via RFC. Submission-Suitability not assessed. Must achieve Quality Reviewed within 12 months. User signal: \"Assess fit carefully.\"\n- **Watch** (WA-1..WA-4): Documented concern raised, placed by majority vote. 30-day appeal window. User signal: \"Use with caution.\"\n- **At Risk** (AR-1..AR-5): Failing standards after ≥1 Watch quarter. Remediation plan required within 1 quarter. User signal: \"Avoid for new work.\"\n- **Archived** (AV-1..AV-4): Endorsement withdrawn. Automatic (no plan by next review) or direct (2/3 supermajority). User signal: \"Do not use.\"\n\n### Quality Badges (three independent dimensions)\n\n**Dimension 1 — Submission Readiness** (Stable only):\n- Submission-Suitable (SS-1..SS-4): Validation artifacts, CDISC compliance, stability/versioning, regulatory context\n- Submission-Caution (SC-1..SC-3): Unvalidated, dependency risks, regulatory grey areas\n\n**Dimension 2 — Maintenance Health** (all packages):\n- Actively Maintained (AM-1..AM-5): Critical issues ≤30d, non-critical ≤90d, ≥1 release/term, 2-quarter deprecation notice\n- Low Maintenance (LM-1..LM-4): Response times exceed thresholds, no releases, unresponsive\n\n**Dimension 3 — Technical Quality** (all packages):\n- Quality Reviewed (QR-0..QR-4): R CMD check clean, coverage ≥70%, vignettes, maintainable code, documentation current\n- Review Pending (RP-1..RP-3): Expected for Maturing; concern if long-standing for Stable\n\n### Renewal Triggers\n- RT-1: 18-month calendar limit\n- RT-2: Major version release (breaking API change)\n- RT-3: Council-initiated (credible concerns)\n\n### Renewal Assessment Dimensions\n- RC-1: Value proposition still holds\n- RC-2: Maintenance covenant met (30/90 day thresholds, release cadence, breaking change notices, docs)\n- RC-3: Quality badges status and trajectory\n- RC-4: User adoption evidence (community engagement, organizational use, trends vs alternatives)\n\n### Decision Thresholds (quorum = 60% present)\n- New package approval: majority\n- Watch placement/removal: majority\n- At Risk: majority (after ≥1 Watch quarter)\n- Remediation plan approval: majority\n- Endorsement renewal: majority\n- Archived from At Risk: automatic (no plan)\n- Archived direct: 2/3 supermajority\n\n### Governance State Storage\nStatus tags, quality badges, and review dates are stored as GitHub Organization Custom Properties on each repo. The apply-governance-state step writes approved values back after council review.\n\nAll medical/pharmaceutical terminology in this workflow refers to R package metadata and governance criteria — not patient data.",
+  "description": "Automated Track B semiannual review cycle for pharmaverse packages. Discovers all R packages in the pharmaverse GitHub org, collects maintenance and quality metrics, assesses each package against governance criteria, produces a council-ready summary report, generates per-package PDFs, and notifies maintainers.",
+  "preamble": "## Domain Context\n\nThis workflow implements the pharmaverse Package Governance Working Model v1.2 — specifically Track B (Semiannual Review Cycle). All assessments reference stable criteria IDs from the governance specification.\n\n### Status Tags (one per package, reviewed semiannually)\n\n- **Stable** (ST-1..ST-5): Settled API, actively maintained, quality badges active. User signal: \"Safe to adopt.\"\n- **Maturing** (MA-1..MA-5): Under active development, approved via RFC. Submission-Suitability not assessed. Must achieve Quality Reviewed within 12 months. User signal: \"Assess fit carefully.\"\n- **Watch** (WA-1..WA-4): Documented concern raised, placed by majority vote. 30-day appeal window. User signal: \"Use with caution.\"\n- **At Risk** (AR-1..AR-5): Failing standards after ≥1 Watch quarter. Remediation plan required within 1 quarter. User signal: \"Avoid for new work.\"\n- **Archived** (AV-1..AV-4): Endorsement withdrawn. Automatic (no plan by next review) or direct (2/3 supermajority). User signal: \"Do not use.\"\n\n### Quality Badges (three independent dimensions)\n\n**Dimension 1 — Submission Readiness** (Stable only):\n- Submission-Suitable (SS-1..SS-4): Validation artifacts, CDISC compliance, stability/versioning, regulatory context\n- Submission-Caution (SC-1..SC-3): Unvalidated, dependency risks, regulatory grey areas\n\n**Dimension 2 — Maintenance Health** (all packages):\n- Actively Maintained (AM-1..AM-5): Critical issues ≤30d, non-critical ≤90d, ≥1 release/term, 2-quarter deprecation notice\n- Low Maintenance (LM-1..LM-4): Response times exceed thresholds, no releases, unresponsive\n\n**Dimension 3 — Technical Quality** (all packages):\n- Quality Reviewed (QR-0..QR-4): R CMD check clean, coverage ≥70%, vignettes, maintainable code, documentation current\n- Review Pending (RP-1..RP-3): Expected for Maturing; concern if long-standing for Stable\n\n### Renewal Triggers\n- RT-1: 18-month calendar limit\n- RT-2: Major version release (breaking API change)\n- RT-3: Council-initiated (credible concerns)\n\n### Decision Thresholds (quorum = 60% present)\n- New package approval: majority\n- Watch placement/removal: majority\n- At Risk: majority (after ≥1 Watch quarter)\n- Archived direct: 2/3 supermajority\n\nAll medical/pharmaceutical terminology in this workflow refers to R package metadata and governance criteria — not patient data.",
   "triggers": [
     { "name": "semiannual-review", "type": "cron", "schedule": "0 8 1 1,7 *" },
     { "name": "manual", "type": "manual" }
@@ -19,7 +19,7 @@
       "executor": "script",
       "autonomyLevel": "L4",
       "plugin": "script-container",
-      "description": "Call GitHub API to list all repos in the pharmaverse org. Filter to R packages (repos containing a DESCRIPTION file). Exclude non-package repos (blog, website, .github, logos). Output: list of package names with repo metadata and DESCRIPTION fields.",
+      "description": "Call GitHub API to list all repos in the pharmaverse org. Filter to R packages. Extract maintainer name and email from DESCRIPTION files. Output: list of package names with repo metadata, maintainer info.",
       "agent": {
         "image": "mediforce-agent:pharmaverse-governance",
         "command": "node /app/discover-packages.js"
@@ -32,7 +32,7 @@
       "executor": "script",
       "autonomyLevel": "L4",
       "plugin": "script-container",
-      "description": "For each discovered package, collect: current governance custom properties (status tag, badges, review dates), releases (dates, versions, major bumps), issue response times (critical/non-critical), PR activity, CRAN check status (primary source), test coverage, vignette presence, documentation state, contributor activity, CRAN/Bioconductor publication status. Handles GitHub API rate limiting with exponential backoff. NOTE: For testing, only admiral and rhino are processed.",
+      "description": "For each discovered package, collect governance properties, releases, issue response times, PR activity, CRAN checks, test coverage, vignette presence, documentation state, contributor activity. NOTE: For testing, only admiral and rhino are processed.",
       "agent": {
         "image": "mediforce-agent:pharmaverse-governance",
         "command": "node /app/collect-metrics.js"
@@ -45,7 +45,7 @@
       "executor": "agent",
       "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
-      "description": "Apply governance criteria to each package's metrics. Compare proposed state against current custom properties to detect changes. Propose status tag, quality badges (all 3 dimensions), and flag items needing council attention (tag changes, renewals due, early warnings). Generate per-package report with criteria ID references.",
+      "description": "Apply governance criteria to each package's metrics. Propose status tags, quality badges, and flag items needing council attention.",
       "env": {
         "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}"
       },
@@ -64,7 +64,7 @@
       "executor": "agent",
       "autonomyLevel": "L4",
       "plugin": "claude-code-agent",
-      "description": "Aggregate all package assessment reports into a council-ready summary document: consent agenda (healthy packages), proposed tag changes (with evidence and criteria IDs), renewal assessments due (with RC-1..RC-4 dimensions), early warnings, and specific action items for council members. Output a clear, readable report suitable for PDF download.",
+      "description": "Aggregate assessments into a council-ready summary with consent agenda, proposed changes, early warnings, and action items. Tracks council decisions across revision cycles.",
       "env": {
         "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}"
       },
@@ -73,8 +73,6 @@
         "skillsDir": "apps/pharmaverse-governance/plugins/pharmaverse-governance/skills",
         "model": "sonnet",
         "image": "mediforce-golden-image",
-        "confidenceThreshold": 0.7,
-        "fallbackBehavior": "escalate_to_human",
         "timeoutMinutes": 20
       }
     },
@@ -84,10 +82,51 @@
       "type": "review",
       "executor": "human",
       "allowedRoles": ["governance-lead"],
-      "description": "Governance lead reviews the final council summary before distribution. Verify that consent agenda, tag change proposals, renewal assessments, and action items are accurate and complete. The report is downloadable as PDF. Approve to persist governance state to GitHub, or revise to regenerate with feedback.",
+      "description": "Governance lead reviews the council summary. Revise with council decisions (e.g. 'admiral approved, rhino option A selected'). Approve when all action items are resolved to proceed to report generation.",
       "verdicts": {
-        "approve": { "target": "apply-governance-state" },
+        "approve": { "target": "generate-package-reports" },
         "revise": { "target": "generate-council-summary" }
+      }
+    },
+    {
+      "id": "generate-package-reports",
+      "name": "Generate Per-Package Reports",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "description": "Generate individual governance report PDFs for each reviewed package. Each PDF contains the package's status, quality badges, metrics summary, assessment evidence, and council decisions.",
+      "agent": {
+        "image": "mediforce-agent:pharmaverse-governance",
+        "command": "node /app/generate-package-reports.js"
+      }
+    },
+    {
+      "id": "review-notifications",
+      "name": "Review & Approve Notifications",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["governance-lead"],
+      "description": "Review the generated per-package reports and approve sending notification emails to maintainers. For testing, only the rhino maintainer will be notified. Verify the email content and PDF attachments before approving.",
+      "verdicts": {
+        "approve": { "target": "notify-maintainers" },
+        "revise": { "target": "generate-package-reports" }
+      }
+    },
+    {
+      "id": "notify-maintainers",
+      "name": "Notify Package Maintainers",
+      "type": "creation",
+      "executor": "script",
+      "autonomyLevel": "L4",
+      "plugin": "script-container",
+      "description": "Send governance report PDFs to package maintainers via email. NOTE: For testing, only rhino maintainer is notified.",
+      "env": {
+        "SENDGRID_API_KEY": "{{SENDGRID_API_KEY}}"
+      },
+      "agent": {
+        "image": "mediforce-agent:pharmaverse-governance",
+        "command": "node /app/notify-maintainers.js"
       }
     },
     {
@@ -97,10 +136,10 @@
       "executor": "script",
       "autonomyLevel": "L4",
       "plugin": "script-container",
-      "description": "Write approved governance state (status tags, quality badges, review date) to GitHub org custom properties on each pharmaverse repo. NOTE: Currently a no-op for testing — no changes are written to GitHub.",
+      "description": "Dry-run: compute what governance state changes would be applied to GitHub org custom properties. Reports diffs without making changes.",
       "agent": {
         "image": "mediforce-agent:pharmaverse-governance",
-        "command": "node -e \"const fs = require('fs'); const input = JSON.parse(fs.readFileSync('/output/prev-review-council-summary-packages.json','utf8')); fs.writeFileSync('/output/result.json', JSON.stringify({ skipped: true, reason: 'testing-mode', packageCount: 0, message: 'Apply step disabled for testing — no changes written to GitHub' })); console.log('Apply step skipped (testing mode)');\""
+        "command": "node /app/apply-governance-state.js"
       }
     },
     {
@@ -115,6 +154,8 @@
     { "from": "collect-metrics", "to": "assess-packages" },
     { "from": "assess-packages", "to": "generate-council-summary" },
     { "from": "generate-council-summary", "to": "review-council-summary" },
+    { "from": "generate-package-reports", "to": "review-notifications" },
+    { "from": "notify-maintainers", "to": "apply-governance-state" },
     { "from": "apply-governance-state", "to": "done" }
   ]
 }
