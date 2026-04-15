@@ -235,7 +235,7 @@ Store and display all iterations of agent output within a step execution. When a
 
 - **The execution flow is solid.** The Pharmaverse governance workflow runs correctly end-to-end. The iterative generate-review-revise loop works as intended.
 - **Presentation output is powerful.** The `presentation` field in agent output (HTML rendering) produces readable, professional reports. This feature was discovered by accident — it should be more prominent.
-- **Step-by-step workflow building works.** Despite UX friction, a non-developer was able to build a multi-step workflow with scripts and agents. The platform's expressiveness is sufficient.
+- **Step-by-step workflow building works.** Despite UX friction, a developer (Marcin) was able to build a multi-step workflow with scripts and agents — though ultimately via Claude Code rather than the UI. The platform's expressiveness is sufficient, but the UI didn't carry the workflow creation on its own.
 - **Autonomy levels are a compelling pitch.** "Start safe, increase trust gradually" resonates with pharma stakeholders. The concept should be preserved even as the levels are simplified.
 
 ### What causes the most friction
