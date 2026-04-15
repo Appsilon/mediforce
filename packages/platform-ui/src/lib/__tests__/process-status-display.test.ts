@@ -72,23 +72,23 @@ describe('getProcessStatusDisplay', () => {
 
   // --- Paused: error/blocked reasons (resumable) ---
 
-  it('paused + step_failure → Blocked / red / resumable', () => {
+  it('paused + step_failure → Error / red / resumable', () => {
     const result = getProcessStatusDisplay('paused', 'step_failure');
-    expect(result.label).toBe('Blocked');
+    expect(result.label).toBe('Error');
     expect(result.colorKey).toBe('blocked');
     expect(result.resumable).toBe(true);
   });
 
-  it('paused + routing_error → Blocked / red / resumable', () => {
+  it('paused + routing_error → Error / red / resumable', () => {
     const result = getProcessStatusDisplay('paused', 'routing_error');
-    expect(result.label).toBe('Blocked');
+    expect(result.label).toBe('Error');
     expect(result.colorKey).toBe('blocked');
     expect(result.resumable).toBe(true);
   });
 
-  it('paused + max_iterations_exceeded → Blocked / red / resumable', () => {
+  it('paused + max_iterations_exceeded → Error / red / resumable', () => {
     const result = getProcessStatusDisplay('paused', 'max_iterations_exceeded');
-    expect(result.label).toBe('Blocked');
+    expect(result.label).toBe('Error');
     expect(result.colorKey).toBe('blocked');
     expect(result.resumable).toBe(true);
   });

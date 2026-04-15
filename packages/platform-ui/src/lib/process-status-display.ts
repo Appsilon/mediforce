@@ -23,9 +23,9 @@ const PAUSE_REASON_DISPLAY: Record<string, StatusDisplay> = {
   missing_env:              { label: 'Missing config',      colorKey: 'waiting', resumable: false },
   agent_escalated:          { label: 'Waiting for action',  colorKey: 'waiting', resumable: true },
   agent_paused:             { label: 'Waiting for action',  colorKey: 'waiting', resumable: true },
-  step_failure:             { label: 'Blocked',             colorKey: 'blocked', resumable: true },
-  routing_error:            { label: 'Blocked',             colorKey: 'blocked', resumable: true },
-  max_iterations_exceeded:  { label: 'Blocked',             colorKey: 'blocked', resumable: true },
+  step_failure:             { label: 'Error',              colorKey: 'blocked', resumable: true },
+  routing_error:            { label: 'Error',              colorKey: 'blocked', resumable: true },
+  max_iterations_exceeded:  { label: 'Error',              colorKey: 'blocked', resumable: true },
 };
 
 const BASE_STATUS_DISPLAY: Record<string, StatusDisplay> = {
