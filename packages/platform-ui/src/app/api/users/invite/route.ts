@@ -8,34 +8,50 @@ async function sendInviteEmail(params: {
   temporaryPassword: string;
   appUrl: string;
   fromEmail: string;
-  sgApiKey: string;
+  mailgunApiKey: string;
+  mailgunDomain: string;
 }): Promise<void> {
-  const sgMail = (await import('@sendgrid/mail')).default;
-  sgMail.setApiKey(params.sgApiKey);
-  await sgMail.send({
-    to: params.toEmail,
-    from: params.fromEmail,
-    subject: "You've been invited to Mediforce",
-    text: [
-      "You've been invited to Mediforce.",
-      '',
-      `Login: ${params.toEmail}`,
-      `Temporary password: ${params.temporaryPassword}`,
-      '',
-      `Sign in at: ${params.appUrl}/login`,
-      '',
-      'Please change your password after first sign-in using the "Forgot password?" link.',
-    ].join('\n'),
-    html: `
-      <p>You've been invited to <strong>Mediforce</strong>.</p>
-      <table style="border-collapse:collapse;margin:16px 0">
-        <tr><td style="padding:4px 12px 4px 0;color:#666">Login</td><td style="padding:4px 0"><strong>${params.toEmail}</strong></td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#666">Temporary password</td><td style="padding:4px 0"><strong>${params.temporaryPassword}</strong></td></tr>
-      </table>
-      <p><a href="${params.appUrl}/login" style="background:#000;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;display:inline-block">Sign in to Mediforce</a></p>
-      <p style="color:#666;font-size:12px">Please change your password after first sign-in using the "Forgot password?" link on the login page.</p>
-    `,
-  });
+  const formData = new URLSearchParams();
+  formData.append('from', params.fromEmail);
+  formData.append('to', params.toEmail);
+  formData.append("subject", "You've been invited to Mediforce");
+  formData.append('text', [
+    "You've been invited to Mediforce.",
+    '',
+    `Login: ${params.toEmail}`,
+    `Temporary password: ${params.temporaryPassword}`,
+    '',
+    `Sign in at: ${params.appUrl}/login`,
+    '',
+    'Please change your password after first sign-in using the "Forgot password?" link.',
+  ].join('\n'));
+  formData.append('html', `
+    <p>You've been invited to <strong>Mediforce</strong>.</p>
+    <table style="border-collapse:collapse;margin:16px 0">
+      <tr><td style="padding:4px 12px 4px 0;color:#666">Login</td><td style="padding:4px 0"><strong>${params.toEmail}</strong></td></tr>
+      <tr><td style="padding:4px 12px 4px 0;color:#666">Temporary password</td><td style="padding:4px 0"><strong>${params.temporaryPassword}</strong></td></tr>
+    </table>
+    <p><a href="${params.appUrl}/login" style="background:#000;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;display:inline-block">Sign in to Mediforce</a></p>
+    <p style="color:#666;font-size:12px">Please change your password after first sign-in using the "Forgot password?" link on the login page.</p>
+  `);
+
+  const credentials = Buffer.from(`api:${params.mailgunApiKey}`).toString('base64');
+  const response = await fetch(
+    `https://api.mailgun.net/v3/${params.mailgunDomain}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Mailgun error ${response.status}: ${text}`);
+  }
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -100,18 +116,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     let emailSent = false;
-    const sgApiKey = process.env.SENDGRID_API_KEY;
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
+    const mailgunApiKey = process.env.MAILGUN_API_KEY;
+    const mailgunDomain = process.env.MAILGUN_DOMAIN;
+    const fromEmail = process.env.MAILGUN_FROM_EMAIL;
+    const appUrl = process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
 
-    if (typeof sgApiKey === 'string' && sgApiKey !== '' && typeof fromEmail === 'string' && fromEmail !== '') {
+    if (
+      typeof mailgunApiKey === 'string' && mailgunApiKey !== '' &&
+      typeof mailgunDomain === 'string' && mailgunDomain !== '' &&
+      typeof fromEmail === 'string' && fromEmail !== ''
+    ) {
       try {
         await sendInviteEmail({
           toEmail: email.trim().toLowerCase(),
           temporaryPassword,
           appUrl,
           fromEmail,
-          sgApiKey,
+          mailgunApiKey,
+          mailgunDomain,
         });
         emailSent = true;
       } catch {
