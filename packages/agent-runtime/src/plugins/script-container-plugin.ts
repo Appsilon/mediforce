@@ -1,10 +1,12 @@
 import { readFile, mkdtemp, writeFile, rm, realpath, mkdir, appendFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, type ContainerPluginInit } from './container-plugin.js';
+import { isLocalExecutionAllowed } from './base-container-agent-plugin.js';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
@@ -47,6 +49,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
   private commandDisplay!: string;
   private inlineScript: string | null = null;
   private runtime: string | null = null;
+  private isLocalMode = false;
 
   constructor(init: ContainerPluginInit = {}) {
     super(init);
@@ -102,10 +105,21 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
       this.inlineScript = agentConfig.inlineScript;
       this.runtime = runtime;
-      this.image = agentConfig.image ?? runtimeCfg.image;
-      const scriptPath = `/output/script${runtimeCfg.ext}`;
-      this.commandArgs = runtimeCfg.cmd(scriptPath);
-      this.commandDisplay = this.commandArgs.join(' ');
+
+      if (!agentConfig.image && isLocalExecutionAllowed()) {
+        // Local mode: run the script as a child process on the host. Gated by
+        // ALLOW_LOCAL_AGENTS=true. No container isolation — dev only. Mirrors
+        // the same gate used in BaseContainerAgentPlugin for AI agents.
+        this.isLocalMode = true;
+        this.image = 'local';
+        this.commandArgs = [];
+        this.commandDisplay = `${runtimeCfg.cmd('script' + runtimeCfg.ext).join(' ')} (local)`;
+      } else {
+        this.image = agentConfig.image ?? runtimeCfg.image;
+        const scriptPath = `/output/script${runtimeCfg.ext}`;
+        this.commandArgs = runtimeCfg.cmd(scriptPath);
+        this.commandDisplay = this.commandArgs.join(' ');
+      }
     } else if (agentConfig.command) {
       // Command mode — existing behavior
       if (!agentConfig.image) {
@@ -180,29 +194,6 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       const timeoutMs = typeof timeoutMinutes === 'number' && timeoutMinutes > 0
         ? timeoutMinutes * 60_000
         : DEFAULT_TIMEOUT_MS;
-      const containerName = `mediforce-script-${this.context.processInstanceId}-${this.context.stepId}`.slice(0, 63);
-
-      const envFlags: string[] = [];
-      envFlags.push('-e', `RUN_ID=${this.context.processInstanceId}`);
-      envFlags.push('-e', `STEP_ID=${this.context.stepId}`);
-      for (const [key, value] of Object.entries(this.resolvedEnv.vars)) {
-        envFlags.push('-e', `${key}=${value}`);
-      }
-
-      const dockerArgs: string[] = [
-        'run', '--rm',
-        '--name', containerName,
-        '--memory', '8g',
-        '--cpus', '2',
-        '-v', `${outputDir}:/output`,
-        '-v', `${this.runWorkspaceHandle!.path}:/workspace`,
-        '-w', '/workspace',
-        ...envFlags,
-        this.image,
-        ...this.commandArgs,
-      ];
-
-      console.log(`[ScriptContainer] Spawning: docker ${dockerArgs.join(' ')}`);
 
       const logsDir = join(tmpdir(), 'mediforce-step-logs');
       await mkdir(logsDir, { recursive: true });
@@ -214,15 +205,6 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         payload: `agent activity log: ${logFile}`,
         timestamp: new Date().toISOString(),
       });
-
-      // Delegate container execution to the spawn strategy. Each stdout/stderr line
-      // is forwarded to the activity feed as it arrives (local strategy) or replayed
-      // line-for-line after exit (queued strategy) — payloads are byte-identical, only
-      // the timing differs. We don't await `emit` inside the callback (would block
-      // stream consumption); FirestoreAgentEventLog serializes per-step writes so
-      // sequence numbers stay monotonic, and the final `await emit({type:'result'})`
-      // below waits for all in-flight live emits to land before resolving.
-      const strategy = getDockerSpawnStrategy();
 
       const emitLine = (text: string): void => {
         const entry = JSON.stringify({
@@ -241,19 +223,76 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         });
       };
 
-      const spawnResult = await strategy.spawn({
-        dockerArgs,
-        stdinPayload: null,
-        timeoutMs,
-        containerName,
-        processInstanceId: this.context.processInstanceId,
-        stepId: this.context.stepId,
-        outputDir,
-        logFile,
-        imageBuild: this.imageBuild,
-        onStdoutLine: emitLine,
-        onStderrLine: (line) => emitLine(`[stderr] ${line}`),
-      });
+      let spawnResult: { stdout: string; stderr: string; exitCode: number | null; signal: string | null };
+
+      if (this.isLocalMode && this.inlineScript && this.runtime) {
+        // Local execution: run the inline script as a child process. The
+        // /output mount is replaced by the host outputDir, so we rewrite any
+        // hard-coded `/output/` references in the script source to point at
+        // the temp dir. No Docker, no /workspace mount.
+        const runtimeCfg = RUNTIME_CONFIG[this.runtime];
+        const rewrittenScript = this.inlineScript.replaceAll('/output/', `${outputDir}/`);
+        const localScriptPath = join(outputDir, `script${runtimeCfg.ext}`);
+        await writeFile(localScriptPath, rewrittenScript, 'utf-8');
+
+        const cmdArgs = runtimeCfg.cmd(localScriptPath);
+        console.log(`[ScriptContainer] Spawning LOCAL: ${cmdArgs.join(' ')}`);
+
+        await emit({
+          type: 'status',
+          payload: 'running locally (no Docker) — ALLOW_LOCAL_AGENTS=true',
+          timestamp: new Date().toISOString(),
+        });
+
+        spawnResult = await this.spawnLocalScript(cmdArgs, outputDir, timeoutMs, emitLine);
+      } else {
+        const containerName = `mediforce-script-${this.context.processInstanceId}-${this.context.stepId}`.slice(0, 63);
+
+        const envFlags: string[] = [];
+        envFlags.push('-e', `RUN_ID=${this.context.processInstanceId}`);
+        envFlags.push('-e', `STEP_ID=${this.context.stepId}`);
+        for (const [key, value] of Object.entries(this.resolvedEnv.vars)) {
+          envFlags.push('-e', `${key}=${value}`);
+        }
+
+        const dockerArgs: string[] = [
+          'run', '--rm',
+          '--name', containerName,
+          '--memory', '8g',
+          '--cpus', '2',
+          '-v', `${outputDir}:/output`,
+          '-v', `${this.runWorkspaceHandle!.path}:/workspace`,
+          '-w', '/workspace',
+          ...envFlags,
+          this.image,
+          ...this.commandArgs,
+        ];
+
+        console.log(`[ScriptContainer] Spawning: docker ${dockerArgs.join(' ')}`);
+
+        // Delegate container execution to the spawn strategy. Each stdout/stderr line
+        // is forwarded to the activity feed as it arrives (local strategy) or replayed
+        // line-for-line after exit (queued strategy) — payloads are byte-identical, only
+        // the timing differs. We don't await `emit` inside the callback (would block
+        // stream consumption); FirestoreAgentEventLog serializes per-step writes so
+        // sequence numbers stay monotonic, and the final `await emit({type:'result'})`
+        // below waits for all in-flight live emits to land before resolving.
+        const strategy = getDockerSpawnStrategy();
+
+        spawnResult = await strategy.spawn({
+          dockerArgs,
+          stdinPayload: null,
+          timeoutMs,
+          containerName,
+          processInstanceId: this.context.processInstanceId,
+          stepId: this.context.stepId,
+          outputDir,
+          logFile,
+          imageBuild: this.imageBuild,
+          onStdoutLine: emitLine,
+          onStderrLine: (line) => emitLine(`[stderr] ${line}`),
+        });
+      }
 
       if (spawnResult.exitCode !== 0) {
         const exitInfo = spawnResult.signal
@@ -287,6 +326,15 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         result = { raw: containerOutput };
       }
 
+      // Read presentation.html if the script wrote one — surfaces in the
+      // review-step iframe via the agentOutput.presentation field.
+      let presentation: string | null = null;
+      try {
+        presentation = await readFile(join(outputDir, 'presentation.html'), 'utf-8');
+      } catch {
+        // No presentation file — fine
+      }
+
       const durationMs = Date.now() - startTime;
 
       await emit({
@@ -303,6 +351,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           model: 'script',
           duration_ms: durationMs,
           result,
+          ...(presentation ? { presentation } : {}),
         },
         timestamp: new Date().toISOString(),
       });
@@ -334,5 +383,102 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         await rm(outputDir, { recursive: true, force: true }).catch(() => {});
       }
     }
+  }
+
+  /**
+   * Spawn the script as a host child process (local mode). Live-streams
+   * stdout/stderr via emitLine for parity with the docker spawn path.
+   * Resolves with the same shape as DockerSpawnStrategy so the caller
+   * doesn't branch.
+   */
+  private spawnLocalScript(
+    cmdArgs: string[],
+    cwd: string,
+    timeoutMs: number,
+    emitLine: (text: string) => void,
+  ): Promise<{ stdout: string; stderr: string; exitCode: number | null; signal: string | null }> {
+    return new Promise((resolve) => {
+      const [cmd, ...args] = cmdArgs;
+      const child = spawn(cmd, args, {
+        cwd,
+        env: {
+          ...process.env,
+          ...this.resolvedEnv.vars,
+          RUN_ID: this.context.processInstanceId,
+          STEP_ID: this.context.stepId,
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      let stdout = '';
+      let stderr = '';
+      let stdoutBuf = '';
+      let stderrBuf = '';
+      let settled = false;
+
+      const flushLines = (buf: string, prefix: string): string => {
+        const lines = buf.split('\n');
+        const trailing = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line.length > 0) emitLine(prefix ? `${prefix}${line}` : line);
+        }
+        return trailing;
+      };
+
+      const flushBuffers = (): void => {
+        if (stdoutBuf.length > 0) {
+          emitLine(stdoutBuf);
+          stdoutBuf = '';
+        }
+        if (stderrBuf.length > 0) {
+          emitLine(`[stderr] ${stderrBuf}`);
+          stderrBuf = '';
+        }
+      };
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        const text = chunk.toString();
+        stdout += text;
+        stdoutBuf = flushLines(stdoutBuf + text, '');
+      });
+      child.stderr.on('data', (chunk: Buffer) => {
+        const text = chunk.toString();
+        stderr += text;
+        stderrBuf = flushLines(stderrBuf + text, '[stderr] ');
+      });
+
+      const timer = setTimeout(() => {
+        child.kill('SIGTERM');
+        setTimeout(() => { if (!child.killed) child.kill('SIGKILL'); }, 5_000);
+      }, timeoutMs);
+
+      // Spawn errors (e.g. ENOENT when the runtime binary isn't installed)
+      // fire 'error' but never 'close'. Without this listener the Promise
+      // would hang until the step-level timeout. Resolve with a synthetic
+      // failure so the caller throws "Script container failed (...)" with
+      // the underlying message.
+      child.on('error', (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        flushBuffers();
+        const msg = err instanceof Error ? err.message : String(err);
+        emitLine(`[stderr] spawn failed: ${msg}`);
+        resolve({
+          stdout,
+          stderr: stderr ? `${stderr}\n${msg}` : msg,
+          exitCode: null,
+          signal: null,
+        });
+      });
+
+      child.on('close', (exitCode, signal) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        flushBuffers();
+        resolve({ stdout, stderr, exitCode, signal: signal ?? null });
+      });
+    });
   }
 }
