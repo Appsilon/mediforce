@@ -22,8 +22,31 @@ export default function LoginPage() {
     }
   }, [loading, firebaseUser, router]);
 
-  function stripFirebaseError(msg: string): string {
-    return msg.replace('Firebase: ', '').replace(/\(auth\/.*\)\.?/, '').trim();
+  function friendlyAuthError(err: unknown): string {
+    const code = (err !== null && typeof err === 'object' && 'code' in err)
+      ? String((err as { code: unknown }).code)
+      : '';
+    switch (code) {
+      case 'auth/invalid-credential':
+      case 'auth/wrong-password':
+        return 'Incorrect email or password.';
+      case 'auth/user-not-found':
+        return 'No account found with this email.';
+      case 'auth/user-disabled':
+        return 'This account has been disabled. Contact your administrator.';
+      case 'auth/too-many-requests':
+        return 'Too many failed attempts. Please wait a moment and try again.';
+      case 'auth/network-request-failed':
+        return 'Connection error. Check your internet connection and try again.';
+      case 'auth/invalid-email':
+        return 'Invalid email address.';
+      case 'auth/popup-closed-by-user':
+        return 'Sign-in window was closed. Please try again.';
+      default:
+        return err instanceof Error
+          ? err.message.replace('Firebase: ', '').replace(/\(auth\/.*\)\.?/, '').trim()
+          : 'Sign in failed.';
+    }
   }
 
   async function handleGoogleSignIn() {
@@ -33,7 +56,7 @@ export default function LoginPage() {
       await signInWithGoogle();
       router.replace('/redirect');
     } catch (err: unknown) {
-      setError(stripFirebaseError(err instanceof Error ? err.message : 'Sign in failed'));
+      setError(friendlyAuthError(err));
     } finally {
       setPending(false);
     }
@@ -47,7 +70,7 @@ export default function LoginPage() {
       await signInWithEmail(email.trim(), password);
       router.replace('/redirect');
     } catch (err: unknown) {
-      setError(stripFirebaseError(err instanceof Error ? err.message : 'Sign in failed'));
+      setError(friendlyAuthError(err));
     } finally {
       setPending(false);
     }
@@ -63,7 +86,7 @@ export default function LoginPage() {
       setInfo('Password reset email sent. Check your inbox.');
       setResetEmail('');
     } catch (err: unknown) {
-      setError(stripFirebaseError(err instanceof Error ? err.message : 'Failed to send reset email'));
+      setError(friendlyAuthError(err));
     } finally {
       setPending(false);
     }
