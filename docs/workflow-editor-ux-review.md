@@ -109,6 +109,24 @@ In the Pharmaverse workflow, "revise" doesn't mean "you did bad work, redo it." 
 
 When a step goes through multiple revise cycles (e.g., council makes decisions across three rounds), it's unclear whether previous versions of the agent's output are accessible. Only the latest iteration is visible.
 
+### P15. Presentation shows wrong iteration in step view (Bug)
+
+**Severity: High**
+
+In the step detail view within a workflow run, when switching between iterations (e.g., after multiple revise cycles), the user's feedback/input updates correctly per iteration, but the **presentation HTML always shows the latest iteration's output**. It should show the presentation that corresponds to the selected iteration. This is likely because the presentation is loaded from the most recent `agentOutput.presentation` rather than from the specific `stepExecution` record for that iteration.
+
+### P16. Revise semantics don't match the interaction pattern
+
+**Severity: Medium**
+
+In the Pharmaverse workflow, the revise action is used not to correct mistakes but to feed new information back to the agent ("we decided option A for Rhino, confirm stable for Admiral"). The user's input during revise is additive — council decisions, meeting notes, confirmations — not corrections. The current "revise" framing implies the agent did something wrong. A label like "Update" or "Add input" would better match the actual usage pattern.
+
+### P17. Workflow run not launchable from edit screen
+
+**Severity: Medium**
+
+After editing a workflow definition, the user must navigate to a separate screen to start a run. The version management and run-launching screens are disconnected from the editor, requiring unnecessary context-switching. Ideally the user could trigger a run directly from the editor, especially during iterative development.
+
 ---
 
 ## Conceptual Issues
@@ -225,3 +243,13 @@ Store and display all iterations of agent output within a step execution. When a
 - **Too many concepts to juggle simultaneously.** Executor type + autonomy level + step type + plugin + skill + agent = cognitive overload. Unifying these (see C1, C2) is the highest-leverage improvement.
 - **Technical details exposed to non-technical users.** Docker images, runtime selectors, and command fields are implementation details that most users shouldn't need to see.
 - **Form-first editing for what should be a conversation.** The natural interaction for configuring a step is "I want this step to collect metrics from GitHub" — not filling in 8 form fields.
+
+---
+
+## Bugs Found
+
+| ID | Description | Location | Severity |
+|----|-------------|----------|----------|
+| B1 | Presentation HTML shows latest iteration instead of selected iteration | Step detail view in workflow run | High |
+| B2 | Input fields lose focus on every keystroke in env vars / step editor | Step editor, environment variables section | High |
+| B3 | "End" step type still selectable in step editor (removed from add-step) | Step editor, collapsed step definition section | Low |
