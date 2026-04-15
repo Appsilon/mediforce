@@ -19,6 +19,7 @@
     "test:e2e:gif": "fuser -k 9007/tcp 2>/dev/null || lsof -ti:9007 | xargs kill 2>/dev/null; NEXT_PUBLIC_USE_EMULATORS=true E2E_RECORD=true playwright test --project=authenticated --workers=1 && python3 scripts/e2e-to-gif.py",
     "test:e2e:check-gifs": "python3 scripts/check-gif-freshness.py",
     "emulators": "bash scripts/start-emulators.sh",
+    "seed:dev": "npx tsx scripts/seed-dev-data.ts",
     "deploy": "pnpm build && firebase deploy --only hosting"
   },
   "dependencies": {
