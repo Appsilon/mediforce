@@ -18,9 +18,11 @@ export class FirebaseInviteService {
     email: string,
     displayName?: string,
     password?: string,
-  ): Promise<{ uid: string; temporaryPassword: string }> {
+  ): Promise<{ uid: string; temporaryPassword: string; isExisting: boolean }> {
     const actualPassword = password ?? generateTemporaryPassword();
     let uid: string;
+    let isExisting = false;
+
     try {
       const userRecord = await this.adminAuth.createUser({
         email,
@@ -30,7 +32,7 @@ export class FirebaseInviteService {
       });
       uid = userRecord.uid;
     } catch (err: unknown) {
-      // If user already exists in Firebase Auth, get their uid
+      // User already exists in Firebase Auth — add them to the workspace without touching their password
       if (
         err !== null &&
         typeof err === 'object' &&
@@ -39,6 +41,7 @@ export class FirebaseInviteService {
       ) {
         const existing = await this.adminAuth.getUserByEmail(email);
         uid = existing.uid;
+        isExisting = true;
       } else {
         throw err;
       }
@@ -50,13 +53,21 @@ export class FirebaseInviteService {
       {
         uid,
         email,
-        ...(displayName !== undefined ? { displayName } : {}),
-        mustChangePassword: true,
+        ...(displayName !== undefined && !isExisting ? { displayName } : {}),
+        ...(!isExisting ? { mustChangePassword: true } : {}),
       },
       { merge: true },
     );
 
-    return { uid, temporaryPassword: actualPassword };
+    return { uid, temporaryPassword: isExisting ? '' : actualPassword, isExisting };
+  }
+
+  async resetInvitePassword(uid: string): Promise<string> {
+    const temporaryPassword = generateTemporaryPassword();
+    await this.adminAuth.updateUser(uid, { password: temporaryPassword });
+    const userRef = this.adminDb.collection('users').doc(uid);
+    await userRef.set({ mustChangePassword: true }, { merge: true });
+    return temporaryPassword;
   }
 
   async getUsersLastSignIn(uids: string[]): Promise<Map<string, string | null>> {
