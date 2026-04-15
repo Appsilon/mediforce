@@ -556,6 +556,44 @@ async function generatePdf(htmlPath: string, pdfPath: string, browser: Browser):
 }
 
 // ---------------------------------------------------------------------------
+// Maintainer info fallback — fetch from GitHub DESCRIPTION if not in input
+// ---------------------------------------------------------------------------
+
+async function fetchMaintainerInfo(repo: string): Promise<{ name: string | null; email: string | null }> {
+  const token = process.env.GITHUB_TOKEN;
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github.v3+json',
+    'User-Agent': 'mediforce-pharmaverse-governance',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${repo}/contents/DESCRIPTION`,
+      { headers },
+    );
+    if (!response.ok) return { name: null, email: null };
+
+    const data = (await response.json()) as { content?: string; encoding?: string };
+    if (!data.content || data.encoding !== 'base64') return { name: null, email: null };
+
+    const content = Buffer.from(data.content, 'base64').toString('utf-8');
+    const maintainerMatch = content.match(/^Maintainer:\s*(.+)/m);
+    if (maintainerMatch) {
+      const raw = maintainerMatch[1].trim();
+      const emailMatch = raw.match(/<([^>]+)>/);
+      return {
+        name: raw.replace(/<[^>]+>/, '').trim() || null,
+        email: emailMatch ? emailMatch[1] : null,
+      };
+    }
+  } catch {
+    // Ignore — fallback will use 'Unknown'
+  }
+  return { name: null, email: null };
+}
+
+// ---------------------------------------------------------------------------
 // Notification Review Presentation
 // ---------------------------------------------------------------------------
 
@@ -722,13 +760,23 @@ async function main(): Promise<void> {
     const html = generatePackageHtml(assessment, metrics, discovered, decision, reviewDate);
     await writeFile(htmlPath, html, 'utf-8');
 
+    // Use discover-packages data if available, otherwise fetch directly from GitHub
+    let maintainerName = discovered?.maintainerName ?? null;
+    let maintainerEmail = discovered?.maintainerEmail ?? null;
+    if (!maintainerEmail && assessment.repo) {
+      console.log(`  Fetching maintainer info for ${packageName} from GitHub...`);
+      const fetched = await fetchMaintainerInfo(assessment.repo);
+      maintainerName = fetched.name;
+      maintainerEmail = fetched.email;
+    }
+
     const entry: ReportEntry = {
       packageName,
       htmlPath,
       pdfPath: `${REPORTS_DIR}/${packageName}.pdf`,
       status: assessment.proposedStatus,
-      maintainerName: discovered?.maintainerName ?? 'Unknown',
-      maintainerEmail: discovered?.maintainerEmail ?? 'N/A',
+      maintainerName: maintainerName ?? 'Unknown',
+      maintainerEmail: maintainerEmail ?? 'N/A',
     };
     reports.push(entry);
     reportHtmlContents.push({ entry, html });
