@@ -6,6 +6,7 @@ import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDow
 import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-core';
 import { AutonomyBadge } from '../agents/autonomy-badge';
 import { cn } from '@/lib/utils';
+import { getProcessStatusDisplay } from '@/lib/process-status-display';
 
 interface AgentEventItem {
   id: string;
@@ -62,14 +63,13 @@ function getEffectiveStatus(
 
   if (exec) {
     if (exec.status === 'running' || exec.status === 'pending') {
-      // If instance is paused on this step, show 'waiting' instead of 'running'
-      // (e.g. L3 agent step paused for human review — execution record stays 'running')
+      // If instance is paused on this step, show status based on pause reason
       if (
         instance.currentStepId === step.id
         && instance.status === 'paused'
-        && (instance.pauseReason === 'waiting_for_human' || instance.pauseReason === 'awaiting_agent_approval')
       ) {
-        return 'waiting';
+        const display = getProcessStatusDisplay(instance.status, instance.pauseReason);
+        return display.colorKey === 'blocked' ? 'failed' : 'waiting';
       }
       return 'running';
     }
@@ -80,11 +80,9 @@ function getEffectiveStatus(
 
   // No execution record yet — derive from instance state
   if (instance.currentStepId === step.id) {
-    if (instance.status === 'paused' && (
-      instance.pauseReason === 'waiting_for_human'
-      || instance.pauseReason === 'awaiting_agent_approval'
-    )) {
-      return 'waiting';
+    if (instance.status === 'paused') {
+      const display = getProcessStatusDisplay(instance.status, instance.pauseReason);
+      return display.colorKey === 'blocked' ? 'failed' : 'waiting';
     }
     if (instance.status === 'running') {
       return 'running';

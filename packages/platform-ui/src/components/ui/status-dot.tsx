@@ -7,6 +7,8 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-gray-400',
   running: 'bg-blue-500 animate-pulse',
   paused: 'bg-amber-500',
+  blocked: 'bg-red-500',
+  waiting: 'bg-amber-500',
   failed: 'bg-red-500',
   created: 'bg-gray-400',
 };

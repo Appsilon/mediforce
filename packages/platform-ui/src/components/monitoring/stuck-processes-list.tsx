@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { getProcessStatusDisplay } from '@/lib/process-status-display';
 
 export function StuckProcessesList({
   processes,
@@ -56,7 +57,7 @@ export function StuckProcessesList({
               </div>
               {inst.pauseReason && (
                 <div className="text-xs text-amber-700 dark:text-amber-300">
-                  Reason: {inst.pauseReason.replace(/_/g, ' ')}
+                  {getProcessStatusDisplay(inst.status, inst.pauseReason).label}
                 </div>
               )}
               {inst.currentStepId && (

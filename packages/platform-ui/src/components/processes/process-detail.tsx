@@ -12,7 +12,8 @@ import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
-import { cancelProcessRun } from '@/app/actions/processes';
+import { cancelProcessRun, resumeProcessRun } from '@/app/actions/processes';
+import { getProcessStatusDisplay } from '@/lib/process-status-display';
 import { useActiveCoworkSession } from '@/hooks/use-tasks';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
@@ -64,6 +65,7 @@ export function ProcessDetail({
 }) {
   const handle = useHandleFromPath();
   const { goBack } = useBackNavigation(backHref);
+  const statusDisplay = getProcessStatusDisplay(instance.status, instance.pauseReason);
   const needsHumanAction = instance.pauseReason === 'waiting_for_human'
     || instance.pauseReason === 'awaiting_agent_approval';
   const { task: blockingTask } = useActiveTaskForInstance(
@@ -101,6 +103,19 @@ export function ProcessDetail({
   const [cancelError, setCancelError] = React.useState<string | null>(null);
 
   const canCancel = instance.status === 'running' || instance.status === 'paused';
+  const canResume = instance.status === 'paused' && statusDisplay.resumable;
+  const [resuming, setResuming] = React.useState(false);
+  const [resumeError, setResumeError] = React.useState<string | null>(null);
+
+  async function handleResume() {
+    setResuming(true);
+    setResumeError(null);
+    const result = await resumeProcessRun(instance.id);
+    if (!result.success) {
+      setResumeError(result.error ?? 'Resume failed');
+    }
+    setResuming(false);
+  }
 
   async function handleConfirmCancel() {
     setCancelStep(2);
@@ -173,6 +188,20 @@ export function ProcessDetail({
           {cancelError && (
             <span className="text-xs text-destructive shrink-0">{cancelError}</span>
           )}
+          {canResume && !resuming && (
+            <button
+              onClick={handleResume}
+              className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors shrink-0"
+            >
+              Resume
+            </button>
+          )}
+          {resuming && (
+            <span className="text-xs text-muted-foreground shrink-0">Resuming...</span>
+          )}
+          {resumeError && (
+            <span className="text-xs text-destructive shrink-0">{resumeError}</span>
+          )}
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <span>Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span></span>
@@ -222,9 +251,15 @@ export function ProcessDetail({
           />
         )}
         {instance.pauseReason && !needsHumanAction && !needsCowork && instance.pauseReason !== 'missing_env' && (
-          <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-            Paused
-          </div>
+          statusDisplay.colorKey === 'blocked' ? (
+            <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-800 dark:text-red-300">
+              {statusDisplay.label} — {instance.pauseReason.replace(/_/g, ' ')}
+            </div>
+          ) : (
+            <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+              {statusDisplay.label}
+            </div>
+          )
         )}
         {instance.error && instance.pauseReason !== 'missing_env' && (
           <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-800 dark:text-red-300">
