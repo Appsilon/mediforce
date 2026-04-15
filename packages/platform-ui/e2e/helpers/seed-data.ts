@@ -146,7 +146,7 @@ export function buildSeedData(testUserId: string) {
       createdAt: twoDaysAgo,
       updatedAt: oneHourAgo,
       createdBy: 'webhook',
-      pauseReason: 'agent_escalation',
+      pauseReason: 'agent_escalated',
       error: null,
       assignedRoles: ['analyst', 'reviewer'],
     },
@@ -867,6 +867,26 @@ export function buildSeedData(testUserId: string) {
     pauseReason: 'cowork_in_progress',
     error: null,
     assignedRoles: ['analyst'],
+  };
+
+  // Process instance paused due to step failure — tests "Error" label + Resume button
+  processInstances['proc-step-failure'] = {
+    id: 'proc-step-failure',
+    definitionName: 'Supply Chain Review',
+    definitionVersion: '1.0.0',
+    configName: 'all-human',
+    configVersion: '1',
+    status: 'paused',
+    currentStepId: 'risk-scoring',
+    variables: {},
+    triggerType: 'manual',
+    triggerPayload: {},
+    createdAt: oneHourAgo,
+    updatedAt: now,
+    createdBy: 'system',
+    pauseReason: 'step_failure',
+    error: 'Agent timed out after 30s',
+    assignedRoles: ['reviewer'],
   };
 
   // Workflow definition with a cowork step
