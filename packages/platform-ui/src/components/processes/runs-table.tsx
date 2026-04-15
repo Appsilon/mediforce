@@ -104,7 +104,7 @@ export function RunsTable({
                 )}
               </td>
               <td className="px-4 py-3">
-                <ProcessStatusBadge status={run.status} />
+                <ProcessStatusBadge status={run.status} pauseReason={run.pauseReason} />
               </td>
               <td className="px-4 py-3 text-xs text-muted-foreground">
                 {run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy.slice(0, 8)) : '—'}
