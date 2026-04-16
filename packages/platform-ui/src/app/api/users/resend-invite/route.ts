@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue } from 'firebase-admin/firestore';
 import { validateApiKey } from '@/lib/platform-services';
 import { getAdminAuth, getAdminFirestore, FirebaseInviteService } from '@mediforce/platform-infra';
 import { sendInviteEmail } from '@/lib/send-invite-email';
@@ -19,50 +18,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (
     typeof body !== 'object' ||
     body === null ||
-    typeof (body as Record<string, unknown>).email !== 'string'
+    typeof (body as Record<string, unknown>).uid !== 'string'
   ) {
-    return NextResponse.json({ error: 'email is required' }, { status: 400 });
+    return NextResponse.json({ error: 'uid is required' }, { status: 400 });
   }
 
-  const { email, displayName, namespaceHandle, role } = body as {
-    email: string;
-    displayName?: string;
-    namespaceHandle?: string;
-    role?: string;
-  };
+  const { uid } = body as { uid: string };
 
   try {
     const adminAuth = getAdminAuth();
     const adminDb = getAdminFirestore();
     const inviteService = new FirebaseInviteService(adminAuth, adminDb);
-    const { uid, temporaryPassword } = await inviteService.createInvitedUser(
-      email.trim().toLowerCase(),
-      typeof displayName === 'string' && displayName.trim() !== '' ? displayName.trim() : undefined,
-      undefined,
-    );
 
-    if (typeof namespaceHandle === 'string' && namespaceHandle.trim() !== '') {
-      await adminDb
-        .collection('namespaces')
-        .doc(namespaceHandle)
-        .collection('members')
-        .doc(uid)
-        .set(
-          {
-            uid,
-            role: role ?? 'member',
-            ...(typeof displayName === 'string' && displayName.trim() !== ''
-              ? { displayName: displayName.trim() }
-              : {}),
-            joinedAt: new Date().toISOString(),
-          },
-          { merge: true },
-        );
+    // Reset password and get user email in parallel
+    const [temporaryPassword, userRecord] = await Promise.all([
+      inviteService.resetInvitePassword(uid),
+      adminAuth.getUser(uid),
+    ]);
 
-      await adminDb.collection('users').doc(uid).set(
-        { organizations: FieldValue.arrayUnion(namespaceHandle) },
-        { merge: true },
-      );
+    const email = userRecord.email;
+    if (email === undefined || email === '') {
+      return NextResponse.json({ error: 'User has no email address' }, { status: 400 });
     }
 
     let emailSent = false;
@@ -79,7 +55,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ) {
       try {
         await sendInviteEmail({
-          toEmail: email.trim().toLowerCase(),
+          toEmail: email,
           temporaryPassword,
           appUrl,
           fromEmail,
@@ -93,7 +69,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
-    return NextResponse.json({ uid, email: email.trim().toLowerCase(), temporaryPassword, emailSent }, { status: 201 });
+    return NextResponse.json({ uid, email, temporaryPassword, emailSent });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
