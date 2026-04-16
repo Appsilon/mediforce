@@ -102,6 +102,7 @@ interface AuthContextValue {
   firebaseUser: FirebaseUser | null;
   loading: boolean;
   mustChangePassword: boolean;
+  emailAuthEnabled: boolean | null; // null = probe in progress
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
@@ -111,10 +112,30 @@ interface AuthContextValue {
 
 const AuthContext = React.createContext<AuthContextValue | undefined>(undefined);
 
+async function probeEmailAuth(): Promise<boolean> {
+  try {
+    await signInWithEmailAndPassword(auth, 'probe@probe.probe', 'probe');
+    return true; // account exists against all odds — email auth is on
+  } catch (err: unknown) {
+    const code =
+      err !== null && typeof err === 'object' && 'code' in err
+        ? String((err as { code: unknown }).code)
+        : '';
+    // operation-not-allowed means the provider is disabled; everything else
+    // (user-not-found, invalid-credential, wrong-password) means it is enabled
+    return code !== 'auth/operation-not-allowed';
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = React.useState<FirebaseUser | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [mustChangePassword, setMustChangePassword] = React.useState(false);
+  const [emailAuthEnabled, setEmailAuthEnabled] = React.useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    probeEmailAuth().then(setEmailAuthEnabled).catch(() => setEmailAuthEnabled(false));
+  }, []);
 
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -170,7 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ firebaseUser, loading, mustChangePassword, signInWithGoogle, signInWithEmail, sendPasswordReset, clearMustChangePassword, signOut }}>
+    <AuthContext.Provider value={{ firebaseUser, loading, mustChangePassword, emailAuthEnabled, signInWithGoogle, signInWithEmail, sendPasswordReset, clearMustChangePassword, signOut }}>
       {children}
     </AuthContext.Provider>
   );
