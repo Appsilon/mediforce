@@ -11,7 +11,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import Link from 'next/link';
-import { ArrowLeft, Check, ClipboardCopy, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, Check, ClipboardCopy, MailIcon, Trash2, Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -28,6 +28,12 @@ interface MemberWithLastSignIn extends NamespaceMemberWithId {
 }
 
 interface InviteResult {
+  email: string;
+  temporaryPassword: string;
+  emailSent: boolean;
+}
+
+interface ResendResult {
   email: string;
   temporaryPassword: string;
   emailSent: boolean;
@@ -186,6 +192,8 @@ export default function MembersPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [resendingUid, setResendingUid] = useState<string | null>(null);
+  const [resendResult, setResendResult] = useState<ResendResult | null>(null);
 
   async function handleInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -231,6 +239,31 @@ export default function MembersPage() {
       setError(err instanceof Error ? err.message : 'Failed to send invite.');
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleResendInvite(memberUid: string) {
+    setResendResult(null);
+    setResendingUid(memberUid);
+    try {
+      const platformApiKey = process.env.NEXT_PUBLIC_PLATFORM_API_KEY ?? '';
+      const res = await fetch('/api/users/resend-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': platformApiKey },
+        body: JSON.stringify({ uid: memberUid }),
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        setError(data.error ?? 'Failed to resend invite.');
+        return;
+      }
+      const data = (await res.json()) as { email: string; temporaryPassword: string; emailSent: boolean };
+      setResendResult({ email: data.email, temporaryPassword: data.temporaryPassword, emailSent: data.emailSent });
+      void fetchLastSignIn();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to resend invite.');
+    } finally {
+      setResendingUid(null);
     }
   }
 
@@ -288,6 +321,42 @@ export default function MembersPage() {
             </button>
           )}
         </div>
+
+        {/* Resend result card */}
+        {resendResult !== null && (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 px-4 py-4">
+            <div className="flex items-start gap-2">
+              <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+              <div className="space-y-1 min-w-0">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  Invite resent to {resendResult.email}
+                </p>
+                <div className="text-sm text-blue-700 dark:text-blue-300 space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p>
+                      New temporary password:{' '}
+                      <span className="font-mono font-semibold">{resendResult.temporaryPassword}</span>
+                    </p>
+                    <CopyButton text={resendResult.temporaryPassword} />
+                  </div>
+                </div>
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  {resendResult.emailSent
+                    ? 'Email sent ✓'
+                    : 'Email not sent — share credentials manually'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResendResult(null)}
+                className="ml-auto text-blue-400 hover:text-blue-600 transition-colors text-lg leading-none"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Invite result card */}
         {inviteResult !== null && (
@@ -348,8 +417,8 @@ export default function MembersPage() {
               <span className="text-xs font-medium text-muted-foreground flex-1 min-w-0">User</span>
               <span className="text-xs font-medium text-muted-foreground w-16 shrink-0">Role</span>
               <span className="text-xs font-medium text-muted-foreground w-24 shrink-0">Joined</span>
-              <span className="text-xs font-medium text-muted-foreground w-24 shrink-0">Last sign-in</span>
-              <span className="sr-only w-8 shrink-0">Actions</span>
+              <span className="text-xs font-medium text-muted-foreground w-32 shrink-0">Status</span>
+              <span className="sr-only w-16 shrink-0">Actions</span>
             </div>
             <div className="divide-y">
               {members.map((member) => {
@@ -404,25 +473,46 @@ export default function MembersPage() {
                       {formatDate(member.joinedAt)}
                     </div>
 
-                    {/* Last sign-in cell */}
-                    <div className="text-xs text-muted-foreground whitespace-nowrap sm:w-24 sm:shrink-0">
-                      <span className="sm:hidden text-muted-foreground/70">Last sign-in: </span>
-                      {formatLastSignIn(member.lastSignInTime)}
+                    {/* Status cell */}
+                    <div className="sm:w-32 sm:shrink-0">
+                      {member.lastSignInTime === null || member.lastSignInTime === undefined ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                          Pending activation
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          <span className="sm:hidden text-muted-foreground/70">Last sign-in: </span>
+                          {formatLastSignIn(member.lastSignInTime)}
+                        </span>
+                      )}
                     </div>
 
                     {/* Actions cell */}
-                    <div className="flex justify-end sm:w-8 sm:shrink-0">
+                    <div className="flex items-center justify-end gap-1 sm:w-16 sm:shrink-0">
                       {canManageMembers && member.role !== 'owner' && member.uid !== firebaseUser?.uid ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMember(member.uid)}
-                          className="shrink-0 rounded p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                          aria-label={`Remove ${name}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleResendInvite(member.uid)}
+                            disabled={resendingUid === member.uid}
+                            title="Resend invite"
+                            className="rounded p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+                            aria-label={`Resend invite to ${name}`}
+                          >
+                            <MailIcon className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMember(member.uid)}
+                            title="Remove member"
+                            className="rounded p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            aria-label={`Remove ${name}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
                       ) : (
-                        <div className="w-8" />
+                        <div className="w-16" />
                       )}
                     </div>
                   </div>
