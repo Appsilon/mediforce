@@ -23,6 +23,7 @@ type NamespaceMemberWithId = NamespaceMember & { id: string };
 type MemberRole = 'member' | 'admin';
 
 interface MemberWithLastSignIn extends NamespaceMemberWithId {
+  email?: string | null;
   lastSignInTime?: string | null;
 }
 
@@ -120,8 +121,9 @@ export default function MembersPage() {
     return unsubscribe;
   }, [handle]);
 
-  // API fetch for lastSignInTime
+  // API fetch for lastSignInTime + email
   const [lastSignInMap, setLastSignInMap] = useState<Map<string, string | null>>(new Map());
+  const [emailMap, setEmailMap] = useState<Map<string, string | null>>(new Map());
 
   const fetchLastSignIn = useCallback(async () => {
     if (handle === '') return;
@@ -131,12 +133,15 @@ export default function MembersPage() {
         headers: { 'X-Api-Key': platformApiKey },
       });
       if (!res.ok) return;
-      const data = (await res.json()) as { members: Array<{ uid: string; lastSignInTime: string | null }> };
+      const data = (await res.json()) as { members: Array<{ uid: string; email: string | null; lastSignInTime: string | null }> };
       const map = new Map<string, string | null>();
+      const emailMapLocal = new Map<string, string | null>();
       for (const member of data.members) {
         map.set(member.uid, member.lastSignInTime);
+        emailMapLocal.set(member.uid, member.email);
       }
       setLastSignInMap(map);
+      setEmailMap(emailMapLocal);
     } catch {
       // non-fatal — lastSignIn just won't show
     }
@@ -146,11 +151,12 @@ export default function MembersPage() {
     void fetchLastSignIn();
   }, [fetchLastSignIn]);
 
-  // Merge realtime members with lastSignInTime from API
+  // Merge realtime members with email + lastSignInTime from API
   const members = useMemo((): MemberWithLastSignIn[] => {
     return realtimeMembers
       .map((member) => ({
         ...member,
+        email: emailMap.get(member.uid),
         lastSignInTime: lastSignInMap.get(member.uid),
       }))
       .sort((memberA, memberB) => {
@@ -338,12 +344,12 @@ export default function MembersPage() {
         ) : (
           <div className="overflow-hidden rounded-lg border bg-card">
             {/* Table header — hidden on mobile */}
-            <div className="hidden sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-2 border-b bg-muted/50">
-              <span className="text-xs font-medium text-muted-foreground">User</span>
-              <span className="text-xs font-medium text-muted-foreground">Role</span>
-              <span className="text-xs font-medium text-muted-foreground">Joined</span>
-              <span className="text-xs font-medium text-muted-foreground">Last sign-in</span>
-              <span className="sr-only">Actions</span>
+            <div className="hidden sm:flex sm:items-center px-4 py-2 border-b bg-muted/50 gap-4">
+              <span className="text-xs font-medium text-muted-foreground flex-1 min-w-0">User</span>
+              <span className="text-xs font-medium text-muted-foreground w-16 shrink-0">Role</span>
+              <span className="text-xs font-medium text-muted-foreground w-24 shrink-0">Joined</span>
+              <span className="text-xs font-medium text-muted-foreground w-24 shrink-0">Last sign-in</span>
+              <span className="sr-only w-8 shrink-0">Actions</span>
             </div>
             <div className="divide-y">
               {members.map((member) => {
@@ -356,10 +362,10 @@ export default function MembersPage() {
                 return (
                   <div
                     key={member.id}
-                    className="flex flex-col gap-2 px-4 py-3 sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-center sm:gap-x-4"
+                    className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
                   >
                     {/* User cell */}
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                       {avatar !== undefined ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={avatar} alt={name} className="h-8 w-8 shrink-0 rounded-full object-cover" />
@@ -370,11 +376,14 @@ export default function MembersPage() {
                       )}
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{name}</p>
+                        {member.email !== null && member.email !== undefined && (
+                          <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                        )}
                       </div>
                     </div>
 
                     {/* Role cell */}
-                    <div>
+                    <div className="sm:w-16 sm:shrink-0">
                       {isOwner && member.role !== 'owner' ? (
                         <button
                           type="button"
@@ -390,19 +399,19 @@ export default function MembersPage() {
                     </div>
 
                     {/* Joined cell */}
-                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                    <div className="text-xs text-muted-foreground whitespace-nowrap sm:w-24 sm:shrink-0">
                       <span className="sm:hidden text-muted-foreground/70">Joined </span>
                       {formatDate(member.joinedAt)}
                     </div>
 
                     {/* Last sign-in cell */}
-                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                    <div className="text-xs text-muted-foreground whitespace-nowrap sm:w-24 sm:shrink-0">
                       <span className="sm:hidden text-muted-foreground/70">Last sign-in: </span>
                       {formatLastSignIn(member.lastSignInTime)}
                     </div>
 
                     {/* Actions cell */}
-                    <div className="flex justify-end">
+                    <div className="flex justify-end sm:w-8 sm:shrink-0">
                       {canManageMembers && member.role !== 'owner' && member.uid !== firebaseUser?.uid ? (
                         <button
                           type="button"
