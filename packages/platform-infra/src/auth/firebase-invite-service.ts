@@ -70,6 +70,14 @@ export class FirebaseInviteService {
     return temporaryPassword;
   }
 
+  async resetInvitePassword(uid: string): Promise<string> {
+    const temporaryPassword = generateTemporaryPassword();
+    await this.adminAuth.updateUser(uid, { password: temporaryPassword });
+    const userRef = this.adminDb.collection('users').doc(uid);
+    await userRef.set({ mustChangePassword: true }, { merge: true });
+    return temporaryPassword;
+  }
+
   async getUsersLastSignIn(uids: string[]): Promise<Map<string, string | null>> {
     const result = new Map<string, string | null>();
     await Promise.all(
