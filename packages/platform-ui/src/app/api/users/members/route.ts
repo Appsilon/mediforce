@@ -11,6 +11,7 @@ interface MemberDoc {
 }
 
 interface MemberResponse extends MemberDoc {
+  email: string | null;
   lastSignInTime: string | null;
 }
 
@@ -52,10 +53,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     });
 
     const uids = memberDocs.map((m) => m.uid);
-    const lastSignInMap = await inviteService.getUsersLastSignIn(uids);
+    const [lastSignInMap, userRecords] = await Promise.all([
+      inviteService.getUsersLastSignIn(uids),
+      Promise.all(uids.map((uid) => adminAuth.getUser(uid).catch(() => null))),
+    ]);
+    const emailMap = new Map<string, string | null>();
+    for (const record of userRecords) {
+      if (record !== null) {
+        emailMap.set(record.uid, record.email ?? null);
+      }
+    }
 
     const members: MemberResponse[] = memberDocs.map((memberDoc) => ({
       ...memberDoc,
+      email: emailMap.get(memberDoc.uid) ?? null,
       lastSignInTime: lastSignInMap.get(memberDoc.uid) ?? null,
     }));
 
