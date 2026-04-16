@@ -106,7 +106,7 @@ export function TaskDetail({
         uploadedFiles.push({
           name: file.name,
           size: file.size,
-          type: file.type,
+          type: file.type || 'application/octet-stream',
           storagePath,
           downloadUrl,
         });

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import type { WorkflowStep } from '@mediforce/platform-core';
+import { Plus, Trash2 } from 'lucide-react';
+import type { WorkflowStep, McpServerConfig } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { EditableField, Section } from './step-editor-fields';
 
@@ -130,9 +131,161 @@ export function CoworkSection({
           onChange={(schema) => patchCowork({ outputSchema: schema })}
         />
       </div>
+
+      {/* MCP Servers */}
+      <McpServersEditor
+        servers={cowork.mcpServers ?? []}
+        onChange={(servers) => patchCowork({ mcpServers: servers.length > 0 ? servers : undefined })}
+      />
     </Section>
   );
 }
+
+// ---------------------------------------------------------------------------
+// MCP Servers editor
+// ---------------------------------------------------------------------------
+
+function McpServersEditor({
+  servers,
+  onChange,
+}: {
+  servers: McpServerConfig[];
+  onChange: (servers: McpServerConfig[]) => void;
+}) {
+  const addServer = () => {
+    // Empty name/command are UI placeholders; schema validation enforces non-empty at save time.
+    onChange([...servers, { name: '', command: undefined, args: [] }]);
+  };
+
+  const removeServer = (index: number) => {
+    onChange(servers.filter((_, i) => i !== index));
+  };
+
+  const updateServer = (index: number, patch: Partial<McpServerConfig>) => {
+    const updated = servers.map((s, i) => (i === index ? { ...s, ...patch } : s));
+    onChange(updated);
+  };
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[11px] text-muted-foreground">MCP Servers</p>
+        <button
+          onClick={addServer}
+          className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors"
+        >
+          <Plus className="h-3 w-3" />
+          Add
+        </button>
+      </div>
+
+      {servers.length === 0 && (
+        <p className="text-[10px] text-muted-foreground/60 italic">
+          No MCP servers configured. Add one to give the AI access to external tools.
+        </p>
+      )}
+
+      <div className="space-y-2">
+        {servers.map((server, index) => (
+          <McpServerEntry
+            key={index}
+            server={server}
+            onChange={(patch) => updateServer(index, patch)}
+            onRemove={() => removeServer(index)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function McpServerEntry({
+  server,
+  onChange,
+  onRemove,
+}: {
+  server: McpServerConfig;
+  onChange: (patch: Partial<McpServerConfig>) => void;
+  onRemove: () => void;
+}) {
+  // Transport mode is UI state — derived initially from the data, but then tracked
+  // locally so that an in-progress empty field doesn't flip the mode back.
+  const [transportMode, setTransportMode] = useState<'command' | 'url'>(
+    server.url !== undefined ? 'url' : 'command',
+  );
+
+  const toggleTransport = () => {
+    if (transportMode === 'command') {
+      setTransportMode('url');
+      onChange({ command: undefined });
+    } else {
+      setTransportMode('command');
+      onChange({ url: undefined });
+    }
+  };
+
+  return (
+    <div className="rounded-md bg-muted/50 p-2 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <input
+          value={server.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          placeholder="server-name"
+          className="bg-transparent text-xs font-medium border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-32"
+        />
+        <div className="flex items-center gap-1">
+          <button
+            onClick={toggleTransport}
+            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1"
+            title={`Switch to ${transportMode === 'command' ? 'URL' : 'command'} transport`}
+          >
+            {transportMode === 'command' ? 'stdio' : 'http'}
+          </button>
+          <button
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+
+      {transportMode === 'command' ? (
+        <input
+          value={server.command ?? ''}
+          onChange={(e) => onChange({ command: e.target.value || undefined })}
+          placeholder="e.g. tealflow-mcp"
+          className="w-full bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors"
+        />
+      ) : (
+        <input
+          value={server.url ?? ''}
+          onChange={(e) => onChange({ url: e.target.value || undefined })}
+          placeholder="e.g. http://localhost:8080/mcp"
+          className="w-full bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors"
+        />
+      )}
+
+      <input
+        value={server.allowedTools?.join(', ') ?? ''}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw.trim() === '') {
+            onChange({ allowedTools: undefined });
+          } else {
+            onChange({ allowedTools: raw.split(',').map((t) => t.trim()).filter(Boolean) });
+          }
+        }}
+        placeholder="Allowed tools (comma-separated, empty = all)"
+        className="w-full bg-transparent text-[11px] border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors text-muted-foreground"
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Output schema editor
+// ---------------------------------------------------------------------------
 
 function CoworkOutputSchemaEditor({
   value,

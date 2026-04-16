@@ -72,10 +72,16 @@ export async function POST(
   });
 
   // Reload session to get updated turns
-  const updatedSession = (await coworkSessionRepo.getById(sessionId))!;
+  const updatedSession = await coworkSessionRepo.getById(sessionId);
+  if (!updatedSession) {
+    return new Response(
+      JSON.stringify({ error: 'Session disappeared after saving human turn' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
 
   // Build messages for the model
-  const messages = buildMessages(updatedSession, humanMessage, stepContext);
+  const messages = buildMessages(updatedSession, stepContext);
   const model = session.model ?? 'anthropic/claude-sonnet-4';
 
   // Stream from OpenRouter
@@ -184,10 +190,19 @@ export async function POST(
         let artifactDelta: Record<string, unknown> | null = null;
         if (hasToolCall && toolCallArgs.length > 0) {
           try {
-            const parsed = JSON.parse(toolCallArgs) as { artifact: Record<string, unknown> };
-            artifactDelta = parsed.artifact;
+            const parsed = JSON.parse(toolCallArgs) as { artifact: Record<string, unknown> | string };
+            // Model sometimes returns artifact as JSON string — parse it
+            let rawArtifact = parsed.artifact;
+            if (typeof rawArtifact === 'string') {
+              rawArtifact = JSON.parse(rawArtifact) as Record<string, unknown>;
+            }
+            artifactDelta = typeof rawArtifact === 'object' && rawArtifact !== null
+              ? rawArtifact as Record<string, unknown>
+              : null;
 
-            await coworkSessionRepo.updateArtifact(sessionId, artifactDelta);
+            if (artifactDelta) {
+              await coworkSessionRepo.updateArtifact(sessionId, artifactDelta);
+            }
 
             controller.enqueue(
               encoder.encode(

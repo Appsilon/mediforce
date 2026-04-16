@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildMessages, ARTIFACT_TOOL } from '../build-messages.js';
-import type { CoworkSession } from '@mediforce/platform-core';
+import type { CoworkSession, ConversationTurn } from '@mediforce/platform-core';
 
 function makeSession(overrides?: Partial<CoworkSession>): CoworkSession {
   return {
@@ -10,10 +10,13 @@ function makeSession(overrides?: Partial<CoworkSession>): CoworkSession {
     assignedRole: 'analyst',
     assignedUserId: null,
     status: 'active',
+    agent: 'chat',
     model: null,
     systemPrompt: null,
     outputSchema: null,
+    voiceConfig: null,
     artifact: null,
+    mcpServers: null,
     turns: [],
     createdAt: '2026-01-15T10:00:00Z',
     updatedAt: '2026-01-15T10:00:00Z',
@@ -22,19 +25,39 @@ function makeSession(overrides?: Partial<CoworkSession>): CoworkSession {
   };
 }
 
+function humanTurn(content: string, id = 'h1', ts = '2026-01-15T10:01:00Z'): ConversationTurn {
+  return { id, role: 'human', content, timestamp: ts, artifactDelta: null };
+}
+
+function agentTurn(content: string, id = 'a1', ts = '2026-01-15T10:01:05Z'): ConversationTurn {
+  return { id, role: 'agent', content, timestamp: ts, artifactDelta: null };
+}
+
 describe('buildMessages', () => {
-  it('builds minimal messages with just a new human message', () => {
-    const session = makeSession();
-    const messages = buildMessages(session, 'Hello agent');
+  it('builds minimal messages with just a new human turn', () => {
+    const session = makeSession({ turns: [humanTurn('Hello agent')] });
+    const messages = buildMessages(session);
 
     expect(messages).toHaveLength(2);
     expect(messages[0].role).toBe('system');
     expect(messages[1]).toEqual({ role: 'user', content: 'Hello agent' });
   });
 
+  it('does not duplicate the latest human turn', () => {
+    const session = makeSession({ turns: [humanTurn('Only once, please')] });
+    const messages = buildMessages(session);
+
+    const userMessages = messages.filter((m) => m.role === 'user');
+    expect(userMessages).toHaveLength(1);
+    expect(userMessages[0].content).toBe('Only once, please');
+  });
+
   it('includes system prompt from session config', () => {
-    const session = makeSession({ systemPrompt: 'Help design a workflow.' });
-    const messages = buildMessages(session, 'Start');
+    const session = makeSession({
+      systemPrompt: 'Help design a workflow.',
+      turns: [humanTurn('Start')],
+    });
+    const messages = buildMessages(session);
 
     expect(messages[0].content).toContain('Help design a workflow.');
   });
@@ -42,17 +65,18 @@ describe('buildMessages', () => {
   it('includes output schema in system prompt', () => {
     const session = makeSession({
       outputSchema: { type: 'object', properties: { name: { type: 'string' } } },
+      turns: [humanTurn('Start')],
     });
-    const messages = buildMessages(session, 'Start');
+    const messages = buildMessages(session);
 
     expect(messages[0].content).toContain('"type": "object"');
     expect(messages[0].content).toContain('Output Schema');
   });
 
   it('includes step context from previous step', () => {
-    const session = makeSession();
+    const session = makeSession({ turns: [humanTurn('Start')] });
     const stepContext = { idea: 'safety review process', priority: 'high' };
-    const messages = buildMessages(session, 'Start', stepContext);
+    const messages = buildMessages(session, stepContext);
 
     expect(messages[0].content).toContain('Context from previous step');
     expect(messages[0].content).toContain('"idea": "safety review process"');
@@ -61,26 +85,21 @@ describe('buildMessages', () => {
   it('includes current artifact state when present', () => {
     const session = makeSession({
       artifact: { name: 'my-workflow', steps: ['intake', 'review'] },
+      turns: [humanTurn('Add a terminal step')],
     });
-    const messages = buildMessages(session, 'Add a terminal step');
+    const messages = buildMessages(session);
 
-    // System prompt + artifact context + new message = 3
+    // system + artifact context + human turn = 3
     expect(messages).toHaveLength(3);
     expect(messages[1].role).toBe('system');
     expect(messages[1].content).toContain('Current artifact state');
     expect(messages[1].content).toContain('my-workflow');
   });
 
-  it('includes conversation history as user/assistant messages', () => {
+  it('includes full conversation history as user/assistant messages', () => {
     const session = makeSession({
       turns: [
-        {
-          id: 't1',
-          role: 'human',
-          content: 'I want a safety review',
-          timestamp: '2026-01-15T10:01:00Z',
-          artifactDelta: null,
-        },
+        humanTurn('I want a safety review', 't1'),
         {
           id: 't2',
           role: 'agent',
@@ -88,12 +107,13 @@ describe('buildMessages', () => {
           timestamp: '2026-01-15T10:01:05Z',
           artifactDelta: { name: 'safety-review' },
         },
+        humanTurn('Change the name', 't3', '2026-01-15T10:01:10Z'),
       ],
     });
 
-    const messages = buildMessages(session, 'Change the name');
+    const messages = buildMessages(session);
 
-    // system + turn1(user) + turn2(assistant) + new message = 4
+    // system + t1(user) + t2(assistant) + t3(user) = 4
     expect(messages).toHaveLength(4);
     expect(messages[1]).toEqual({ role: 'user', content: 'I want a safety review' });
     expect(messages[2]).toEqual({ role: 'assistant', content: 'Here is a draft.' });
@@ -103,33 +123,61 @@ describe('buildMessages', () => {
   it('maps turn roles correctly: human → user, agent → assistant', () => {
     const session = makeSession({
       turns: [
-        { id: 't1', role: 'human', content: 'q', timestamp: '2026-01-15T10:00:00Z', artifactDelta: null },
-        { id: 't2', role: 'agent', content: 'a', timestamp: '2026-01-15T10:00:01Z', artifactDelta: null },
+        humanTurn('q', 't1', '2026-01-15T10:00:00Z'),
+        agentTurn('a', 't2', '2026-01-15T10:00:01Z'),
+        humanTurn('follow up', 't3', '2026-01-15T10:00:02Z'),
       ],
     });
 
-    const messages = buildMessages(session, 'follow up');
+    const messages = buildMessages(session);
 
     const turnMessages = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
     expect(turnMessages[0].role).toBe('user');
     expect(turnMessages[1].role).toBe('assistant');
-    expect(turnMessages[2].role).toBe('user'); // new message
+    expect(turnMessages[2].role).toBe('user');
   });
 
-  it('handles full scenario: system prompt + schema + artifact + history + new message', () => {
+  it('skips tool turns — they are intermediate Firestore state', () => {
+    const session = makeSession({
+      turns: [
+        humanTurn('Run the tool', 't1'),
+        {
+          id: 't2',
+          role: 'tool',
+          content: '',
+          timestamp: '2026-01-15T10:01:05Z',
+          artifactDelta: null,
+          toolName: 'svr__do_it',
+          toolArgs: {},
+          toolStatus: 'success',
+          toolResult: 'ok',
+          serverName: 'svr',
+        },
+      ],
+    });
+
+    const messages = buildMessages(session);
+
+    // system + human turn only (tool turn filtered)
+    expect(messages).toHaveLength(2);
+    expect(messages.some((m) => m.role === 'tool')).toBe(false);
+  });
+
+  it('handles full scenario: system prompt + schema + artifact + history', () => {
     const session = makeSession({
       systemPrompt: 'Design a clinical trial workflow.',
       outputSchema: { type: 'object' },
       artifact: { name: 'trial-workflow' },
       turns: [
-        { id: 't1', role: 'human', content: 'Start with intake', timestamp: '2026-01-15T10:00:00Z', artifactDelta: null },
-        { id: 't2', role: 'agent', content: 'Added intake step.', timestamp: '2026-01-15T10:00:01Z', artifactDelta: null },
+        humanTurn('Start with intake', 't1', '2026-01-15T10:00:00Z'),
+        agentTurn('Added intake step.', 't2', '2026-01-15T10:00:01Z'),
+        humanTurn('Now add review', 't3', '2026-01-15T10:00:02Z'),
       ],
     });
 
-    const messages = buildMessages(session, 'Now add review', { protocolId: 'P-001' });
+    const messages = buildMessages(session, { protocolId: 'P-001' });
 
-    // system + artifact_context + t1 + t2 + new = 5
+    // system + artifact_context + t1 + t2 + t3 = 5
     expect(messages).toHaveLength(5);
     expect(messages[0].role).toBe('system');
     expect(messages[0].content).toContain('Design a clinical trial workflow');
@@ -139,8 +187,8 @@ describe('buildMessages', () => {
   });
 
   it('skips step context when empty', () => {
-    const session = makeSession();
-    const messages = buildMessages(session, 'Hello', {});
+    const session = makeSession({ turns: [humanTurn('Hello')] });
+    const messages = buildMessages(session, {});
 
     expect(messages[0].content).not.toContain('Context from previous step');
   });

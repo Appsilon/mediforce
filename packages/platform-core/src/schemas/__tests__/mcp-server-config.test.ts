@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { McpServerConfigSchema } from '../mcp-server-config.js';
-import { WorkflowAgentConfigSchema } from '../workflow-definition.js';
+import { WorkflowAgentConfigSchema, WorkflowCoworkConfigSchema } from '../workflow-definition.js';
 
 describe('McpServerConfigSchema', () => {
-  it('should parse a valid MCP server config', () => {
+  it('should parse a valid stdio MCP server config', () => {
     const result = McpServerConfigSchema.safeParse({
       name: 'cdisc-library',
       command: 'npx',
@@ -18,7 +18,7 @@ describe('McpServerConfigSchema', () => {
     }
   });
 
-  it('should parse minimal config (name + command only)', () => {
+  it('should parse minimal stdio config (name + command only)', () => {
     const result = McpServerConfigSchema.safeParse({
       name: 'filesystem',
       command: 'node',
@@ -30,6 +30,28 @@ describe('McpServerConfigSchema', () => {
     }
   });
 
+  it('should parse HTTP-only config (url, no command)', () => {
+    const result = McpServerConfigSchema.safeParse({
+      name: 'remote-server',
+      url: 'https://mcp.example.com/v1',
+      description: 'Remote MCP server via HTTP',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.url).toBe('https://mcp.example.com/v1');
+      expect(result.data.command).toBeUndefined();
+    }
+  });
+
+  it('should parse config with both command and url', () => {
+    const result = McpServerConfigSchema.safeParse({
+      name: 'hybrid',
+      command: 'npx',
+      url: 'https://mcp.example.com/v1',
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('should reject empty name', () => {
     const result = McpServerConfigSchema.safeParse({
       name: '',
@@ -38,9 +60,17 @@ describe('McpServerConfigSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('should reject missing command', () => {
+  it('should reject config with neither command nor url', () => {
     const result = McpServerConfigSchema.safeParse({
-      name: 'test',
+      name: 'invalid',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid url', () => {
+    const result = McpServerConfigSchema.safeParse({
+      name: 'bad-url',
+      url: 'not-a-url',
     });
     expect(result.success).toBe(false);
   });
@@ -115,5 +145,49 @@ describe('WorkflowAgentConfigSchema with mcpServers', () => {
       mcpServers: [{ name: '' }],
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('WorkflowCoworkConfigSchema with mcpServers', () => {
+  it('should accept cowork config with mcpServers', () => {
+    const result = WorkflowCoworkConfigSchema.safeParse({
+      agent: 'chat',
+      systemPrompt: 'Help the user explore teal modules.',
+      mcpServers: [
+        {
+          name: 'tealflow',
+          command: 'tealflow-mcp',
+          description: 'Tealflow MCP — teal module discovery',
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.mcpServers).toHaveLength(1);
+      expect(result.data.mcpServers![0].name).toBe('tealflow');
+    }
+  });
+
+  it('should accept cowork config without mcpServers', () => {
+    const result = WorkflowCoworkConfigSchema.safeParse({
+      agent: 'chat',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.mcpServers).toBeUndefined();
+    }
+  });
+
+  it('should accept cowork config with HTTP MCP server', () => {
+    const result = WorkflowCoworkConfigSchema.safeParse({
+      agent: 'chat',
+      mcpServers: [
+        {
+          name: 'remote-tools',
+          url: 'https://mcp.example.com/v1',
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
   });
 });

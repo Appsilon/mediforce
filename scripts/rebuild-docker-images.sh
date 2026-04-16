@@ -17,6 +17,13 @@ docker build \
   "$REPO_ROOT/apps/protocol-to-tfl/container"
 
 echo ""
+echo "=== Building tealflow agent image ==="
+docker build \
+  -f "$REPO_ROOT/apps/tealflow/container/Dockerfile" \
+  -t mediforce-agent:tealflow \
+  "$REPO_ROOT/apps/tealflow/container"
+
+echo ""
 echo "=== Building community-digest agent image ==="
 docker build \
   -f "$REPO_ROOT/apps/community-digest/container/Dockerfile" \

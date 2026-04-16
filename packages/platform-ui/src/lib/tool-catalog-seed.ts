@@ -60,6 +60,15 @@ export const TOOL_CATALOG: CatalogTool[] = [
     description: 'Look up SDTM/ADaM variable metadata, controlled terminology, and CDISC standards.',
     category: 'Clinical Data',
   },
+  {
+    id: 'tealflow',
+    name: 'TealFlow',
+    command: 'tealflow-mcp',
+    args: [],
+    description:
+      'Discover Teal modules, inspect datasets, generate Teal Shiny app code, and validate R environments. Powers automated clinical trial app creation.',
+    category: 'Clinical Data',
+  },
 ];
 
 export function getToolById(id: string): CatalogTool | undefined {

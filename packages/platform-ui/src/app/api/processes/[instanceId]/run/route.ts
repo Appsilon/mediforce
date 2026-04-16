@@ -206,6 +206,7 @@ export async function POST(
             outputSchema: currentStep.cowork?.outputSchema ?? null,
             voiceConfig,
             artifact: null,
+            mcpServers: currentStep.cowork?.mcpServers ?? null,
             turns: [],
             createdAt: now,
             updatedAt: now,

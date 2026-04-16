@@ -1,4 +1,5 @@
 import type { CoworkSession } from '@mediforce/platform-core';
+import type { McpToolDefinition } from '@mediforce/mcp-client';
 
 /**
  * Message format compatible with OpenRouter / OpenAI chat completions API.
@@ -7,6 +8,12 @@ export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   tool_call_id?: string;
+  /** Tool calls made by the assistant (for multi-turn tool use) */
+  tool_calls?: Array<{
+    id: string;
+    type: 'function';
+    function: { name: string; arguments: string };
+  }>;
 }
 
 /**
@@ -74,23 +81,22 @@ function buildSystemPrompt(session: CoworkSession): string {
  * 1. System message (task + schema + instructions)
  * 2. If artifact exists: inject it as context
  * 3. Conversation history (turns → user/assistant messages)
- * 4. New human message
+ *
+ * The caller must persist the new human turn to the session before calling this —
+ * `session.turns` is the single source of truth for conversation state.
  */
 export function buildMessages(
   session: CoworkSession,
-  newMessage: string,
   stepContext?: Record<string, unknown>,
 ): ChatMessage[] {
   const messages: ChatMessage[] = [];
 
-  // System prompt
   let systemContent = buildSystemPrompt(session);
   if (stepContext && Object.keys(stepContext).length > 0) {
     systemContent += `\n\n## Context from previous step\n\`\`\`json\n${JSON.stringify(stepContext, null, 2)}\n\`\`\``;
   }
   messages.push({ role: 'system', content: systemContent });
 
-  // Current artifact state (if any)
   if (session.artifact) {
     messages.push({
       role: 'system',
@@ -98,16 +104,34 @@ export function buildMessages(
     });
   }
 
-  // Conversation history
   for (const turn of session.turns) {
+    if (turn.role === 'tool') continue;
     messages.push({
       role: turn.role === 'human' ? 'user' : 'assistant',
       content: turn.content,
     });
   }
 
-  // New human message
-  messages.push({ role: 'user', content: newMessage });
-
   return messages;
+}
+
+/**
+ * Build the tools array for OpenRouter, combining the artifact tool with MCP tools.
+ */
+export function buildToolsArray(mcpTools?: McpToolDefinition[]): Array<typeof ARTIFACT_TOOL | McpToolDefinition> {
+  if (!mcpTools || mcpTools.length === 0) return [ARTIFACT_TOOL];
+  return [ARTIFACT_TOOL, ...mcpTools];
+}
+
+/**
+ * Build a system prompt section listing available MCP servers.
+ */
+export function buildMcpSystemPromptSection(serverNames: string[]): string {
+  if (serverNames.length === 0) return '';
+  return (
+    '\n\n## Available MCP Tools\n' +
+    `You have access to external tools from the following MCP servers: ${serverNames.join(', ')}.\n` +
+    'Use these tools to gather information, query external systems, or perform actions as needed. ' +
+    'Tool names are prefixed with the server name (e.g., servername__toolname).'
+  );
 }
