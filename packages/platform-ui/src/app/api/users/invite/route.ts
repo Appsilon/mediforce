@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { FieldValue } from 'firebase-admin/firestore';
 import { validateApiKey } from '@/lib/platform-services';
 import { getAdminAuth, getAdminFirestore, FirebaseInviteService } from '@mediforce/platform-infra';
 import { sendInviteEmail, sendWorkspaceNotificationEmail } from '@/lib/send-invite-email';
+
+const InviteBodySchema = z.object({
+  email: z.string().email(),
+  displayName: z.string().min(1).optional(),
+  namespaceHandle: z.string().min(1).optional(),
+  role: z.enum(['member', 'admin']).optional().default('member'),
+  inviterName: z.string().min(1).optional(),
+});
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!validateApiKey(req)) {
@@ -16,21 +25,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    typeof (body as Record<string, unknown>).email !== 'string'
-  ) {
-    return NextResponse.json({ error: 'email is required' }, { status: 400 });
+  const parsed = InviteBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' }, { status: 400 });
   }
 
-  const { email, displayName, namespaceHandle, role, inviterName } = body as {
-    email: string;
-    displayName?: string;
-    namespaceHandle?: string;
-    role?: string;
-    inviterName?: string;
-  };
+  const { email, displayName, namespaceHandle, role, inviterName } = parsed.data;
 
   try {
     const adminAuth = getAdminAuth();
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .set(
           {
             uid,
-            role: role ?? 'member',
+            role,
             ...(typeof displayName === 'string' && displayName.trim() !== ''
               ? { displayName: displayName.trim() }
               : {}),

@@ -3,7 +3,9 @@ import type { Firestore } from 'firebase-admin/firestore';
 
 function generateTemporaryPassword(): string {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  return 'Mf-' + Array.from({ length: 9 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const randomBytes = new Uint32Array(9);
+  crypto.getRandomValues(randomBytes);
+  return 'Mf-' + Array.from(randomBytes, (byte) => chars[byte % chars.length]).join('');
 }
 
 export class FirebaseInviteService {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateApiKey } from '@/lib/platform-services';
-import { getAdminAuth, getAdminFirestore, FirebaseInviteService } from '@mediforce/platform-infra';
+import { getAdminAuth, getAdminFirestore } from '@mediforce/platform-infra';
 
 interface MemberDoc {
   uid: string;
@@ -28,7 +28,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const adminAuth = getAdminAuth();
     const adminDb = getAdminFirestore();
-    const inviteService = new FirebaseInviteService(adminAuth, adminDb);
 
     const membersSnap = await adminDb
       .collection('namespaces')
@@ -53,21 +52,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     });
 
     const uids = memberDocs.map((m) => m.uid);
-    const [lastSignInMap, userRecords] = await Promise.all([
-      inviteService.getUsersLastSignIn(uids),
-      Promise.all(uids.map((uid) => adminAuth.getUser(uid).catch(() => null))),
-    ]);
-    const emailMap = new Map<string, string | null>();
+    const userRecords = await Promise.all(
+      uids.map((uid) => adminAuth.getUser(uid).catch(() => null)),
+    );
+    const authDataMap = new Map<string, { email: string | null; lastSignInTime: string | null }>();
     for (const record of userRecords) {
       if (record !== null) {
-        emailMap.set(record.uid, record.email ?? null);
+        authDataMap.set(record.uid, {
+          email: record.email ?? null,
+          lastSignInTime: record.metadata.lastSignInTime ?? null,
+        });
       }
     }
 
     const members: MemberResponse[] = memberDocs.map((memberDoc) => ({
       ...memberDoc,
-      email: emailMap.get(memberDoc.uid) ?? null,
-      lastSignInTime: lastSignInMap.get(memberDoc.uid) ?? null,
+      email: authDataMap.get(memberDoc.uid)?.email ?? null,
+      lastSignInTime: authDataMap.get(memberDoc.uid)?.lastSignInTime ?? null,
     }));
 
     return NextResponse.json({ members });

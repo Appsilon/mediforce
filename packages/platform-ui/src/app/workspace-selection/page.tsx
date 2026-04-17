@@ -4,12 +4,12 @@ import * as React from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { User } from 'lucide-react';
-import { getWorkspaceIcon } from '@/lib/workspace-icons';
+import { getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import type { Namespace } from '@mediforce/platform-core';
 
-const ALWAYS_KEY = 'alwaysNamespace';
+const ALWAYS_KEY = WORKSPACE_DEFAULT_KEY;
 
 function OrgCard({
   namespace,

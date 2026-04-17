@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { validateApiKey } from '@/lib/platform-services';
 import { getAdminAuth, getAdminFirestore, FirebaseInviteService } from '@mediforce/platform-infra';
 import { sendInviteEmail } from '@/lib/send-invite-email';
+
+const ResendInviteBodySchema = z.object({
+  uid: z.string().min(1),
+});
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!validateApiKey(req)) {
@@ -15,15 +20,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    typeof (body as Record<string, unknown>).uid !== 'string'
-  ) {
-    return NextResponse.json({ error: 'uid is required' }, { status: 400 });
+  const parsed = ResendInviteBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' }, { status: 400 });
   }
 
-  const { uid } = body as { uid: string };
+  const { uid } = parsed.data;
 
   try {
     const adminAuth = getAdminAuth();

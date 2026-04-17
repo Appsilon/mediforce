@@ -22,6 +22,9 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+/** localStorage key used to remember the user's default workspace across pages. */
+export const WORKSPACE_DEFAULT_KEY = 'alwaysNamespace';
+
 export const WORKSPACE_ICONS: Record<string, LucideIcon> = {
   Activity,
   Atom,
