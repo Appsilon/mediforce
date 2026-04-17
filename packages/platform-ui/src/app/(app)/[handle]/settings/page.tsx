@@ -46,6 +46,7 @@ interface InviteResult {
   email: string;
   temporaryPassword: string;
   emailSent: boolean;
+  isExisting: boolean;
 }
 
 interface ResendResult {
@@ -307,6 +308,7 @@ export default function WorkspaceConfigPage() {
           displayName: inviteName.trim() !== '' ? inviteName.trim() : undefined,
           namespaceHandle: handle,
           role: inviteRole,
+          inviterName: firebaseUser?.displayName ?? firebaseUser?.email ?? undefined,
         }),
       });
 
@@ -316,8 +318,8 @@ export default function WorkspaceConfigPage() {
         return;
       }
 
-      const data = (await res.json()) as { uid: string; email: string; temporaryPassword: string; emailSent: boolean };
-      setInviteResult({ email: data.email, temporaryPassword: data.temporaryPassword, emailSent: data.emailSent });
+      const data = (await res.json()) as { uid: string; email: string; temporaryPassword: string; emailSent: boolean; isExisting: boolean };
+      setInviteResult({ email: data.email, temporaryPassword: data.temporaryPassword, emailSent: data.emailSent, isExisting: data.isExisting });
       setShowInviteForm(false);
       setInviteEmail('');
       setInviteName('');
@@ -626,22 +628,28 @@ export default function WorkspaceConfigPage() {
                 <Check className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
                 <div className="space-y-1 min-w-0">
                   <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                    Invite sent to {inviteResult.email}
+                    {inviteResult.isExisting
+                      ? `${inviteResult.email} added to workspace`
+                      : `Invite sent to ${inviteResult.email}`}
                   </p>
-                  <div className="text-sm text-green-700 dark:text-green-300 space-y-0.5">
-                    <p>Login: <span className="font-mono">{inviteResult.email}</span></p>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p>
-                        Temporary password:{' '}
-                        <span className="font-mono font-semibold">{inviteResult.temporaryPassword}</span>
-                      </p>
-                      <CopyButton text={inviteResult.temporaryPassword} />
+                  {!inviteResult.isExisting && (
+                    <div className="text-sm text-green-700 dark:text-green-300 space-y-0.5">
+                      <p>Login: <span className="font-mono">{inviteResult.email}</span></p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p>
+                          Temporary password:{' '}
+                          <span className="font-mono font-semibold">{inviteResult.temporaryPassword}</span>
+                        </p>
+                        <CopyButton text={inviteResult.temporaryPassword} />
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <p className="text-xs text-green-600 dark:text-green-400">
                     {inviteResult.emailSent
                       ? 'Email sent ✓'
-                      : 'Email not sent — share credentials manually'}
+                      : inviteResult.isExisting
+                        ? 'Email not sent'
+                        : 'Email not sent — share credentials manually'}
                   </p>
                 </div>
               </div>
