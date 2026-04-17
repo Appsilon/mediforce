@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function LoginPage() {
-  const { signInWithGoogle, signInWithEmail, sendPasswordReset, firebaseUser, loading, emailAuthEnabled } = useAuth();
+  const { signInWithGoogle, signInWithEmail, sendPasswordReset, firebaseUser, loading, emailAuthEnabled, pendingGoogleLink } = useAuth();
   const router = useRouter();
 
   const [mode, setMode] = React.useState<'signin' | 'forgot'>('signin');
@@ -42,6 +42,10 @@ export default function LoginPage() {
         return 'Invalid email address.';
       case 'auth/popup-closed-by-user':
         return 'Sign-in window was closed. Please try again.';
+      case 'auth/needs-link':
+        return 'This Google account shares an email with your password account. Sign in with your password below — Google will be linked automatically.';
+      case 'auth/account-exists-with-different-credential':
+        return 'This email is already registered with a different sign-in method. Sign in with your password below.';
       default:
         return err instanceof Error
           ? err.message.replace('Firebase: ', '').replace(/\(auth\/.*\)\.?/, '').trim()
@@ -99,6 +103,12 @@ export default function LoginPage() {
           <h1 className="text-2xl font-headline font-semibold tracking-tight">Mediforce</h1>
           <p className="text-sm text-muted-foreground">Sign in to continue</p>
         </div>
+
+        {pendingGoogleLink && error === null && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 text-center">
+            Sign in with your password to link your Google account.
+          </div>
+        )}
 
         {error !== null && (
           <p className="text-sm text-destructive text-center" role="alert">{error}</p>
