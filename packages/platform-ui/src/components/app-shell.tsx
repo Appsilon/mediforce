@@ -74,8 +74,7 @@ function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Cru
   if (s0 === 'runs') return [workflows, { label: 'All Runs', href: null }];
   if (s0 === 'tasks') return [workflows, { label: 'Tasks', href: null }];
   if (s0 === 'monitoring') return [workflows, { label: 'Monitoring', href: null }];
-  if (s0 === 'settings') return [workflows, { label: 'Settings', href: null }];
-  if (s0 === 'members') return [workflows, { label: 'Members', href: null }];
+  if (s0 === 'settings') return [{ label: 'Workspace settings', href: null }];
   if (s0 === 'catalog') return [workflows, { label: 'Catalog', href: null }];
 
   if (s0 === 'agents') {
@@ -262,7 +261,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Popover.Root>
         {activeNamespace !== null && activeNamespace.type === 'organization' && (
           <Link
-            href={`/${handleFromPath}/members`}
+            href={`/${handleFromPath}/settings`}
             title="Workspace settings"
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
           >
