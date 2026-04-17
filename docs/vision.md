@@ -18,7 +18,7 @@ Three things converged that make this the right moment:
 
 **AI in pharma isn't a technology problem — it's an infrastructure problem.** The models are ready. What's missing is the methodology, the compliance layer, and proven examples of what good looks like.
 
-**Humans stay in control.** Agents assist, draft, flag, and execute — but always within boundaries set by the organization. The system enforces this at the infrastructure level, not as an afterthought.
+**Humans stay in control.** Agents assist, draft, flag, and execute — but always within boundaries set by the workspace. The system enforces this at the infrastructure level, not as an afterthought.
 
 **Compliance shouldn't be a separate project.** When you build on Mediforce, audit trails, accountability, and data integrity come with the platform. You don't validate AI compliance separately — it's built in.
 
@@ -48,7 +48,7 @@ Every one of these agents operates under human oversight. You define what it's a
 
 Mediforce aims to become the standard infrastructure for deploying AI agents into regulated business processes. Not a hosted SaaS — an open-source platform you own, deploy, and customize.
 
-**The model:** 80% ready, 20% yours. You get production-grade process templates out of the box. Deploy them, adapt to your organization's specific needs and regulations, done. Want to build something entirely new? Use the same platform, the same compliance infrastructure, the same agent runtime.
+**The model:** 80% ready, 20% yours. You get production-grade process templates out of the box. Deploy them, adapt to your workspace's specific needs and regulations, done. Want to build something entirely new? Use the same platform, the same compliance infrastructure, the same agent runtime.
 
 Each new process is easier than the last. The compliance infrastructure and agent runtime are already in place. The first process is the hardest; each subsequent one is incremental.
 

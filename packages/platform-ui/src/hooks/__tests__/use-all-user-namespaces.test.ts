@@ -81,7 +81,7 @@ describe('useAllUserNamespaces', () => {
     expect(mockOnSnapshot).not.toHaveBeenCalled();
   });
 
-  it('[DATA] returns personal namespace when user has no organizations', async () => {
+  it('[DATA] returns personal namespace when user has no workspaces', async () => {
     setupOnSnapshot({ email: 'alice@test.com' });
     mockGetDocs.mockResolvedValueOnce(makeFakeSnapshot([makeFakeDoc(personalNamespace)]));
 

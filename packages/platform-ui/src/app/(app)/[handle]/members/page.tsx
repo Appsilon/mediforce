@@ -306,7 +306,7 @@ export default function MembersPage() {
               <h1 className="text-xl font-semibold">Members</h1>
               {namespace !== null && namespace.type === 'organization' && (
                 <p className="text-sm text-muted-foreground">
-                  Manage who has access to this organization.
+                  Manage who has access to this workspace.
                 </p>
               )}
             </div>

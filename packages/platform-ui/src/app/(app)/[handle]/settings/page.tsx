@@ -15,7 +15,7 @@ import type { NamespaceMember } from '@mediforce/platform-core';
 
 type NamespaceMemberWithId = NamespaceMember & { id: string };
 
-export default function OrgSettingsPage() {
+export default function WorkspaceSettingsPage() {
   const params = useParams();
   const rawHandle = params.handle;
   const handle = Array.isArray(rawHandle) ? rawHandle[0] : (rawHandle ?? '');
@@ -45,7 +45,7 @@ export default function OrgSettingsPage() {
   const [logoError, setLogoError] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleDeleteOrg() {
+  async function handleDeleteWorkspace() {
     if (!confirmDelete) {
       setConfirmDelete(true);
       return;
@@ -76,7 +76,7 @@ export default function OrgSettingsPage() {
     }
   }
 
-  async function handleLeaveOrg() {
+  async function handleLeaveWorkspace() {
     if (firebaseUser === null) return;
     setLeaving(true);
     try {
@@ -134,7 +134,7 @@ export default function OrgSettingsPage() {
   if (namespace === null) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
-        <h1 className="text-xl font-semibold">Organization not found</h1>
+        <h1 className="text-xl font-semibold">Workspace not found</h1>
       </div>
     );
   }
@@ -142,7 +142,7 @@ export default function OrgSettingsPage() {
   if (!isMember) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
-        <p className="text-sm text-muted-foreground">You are not a member of this organization.</p>
+        <p className="text-sm text-muted-foreground">You are not a member of this workspace.</p>
       </div>
     );
   }
@@ -152,14 +152,14 @@ export default function OrgSettingsPage() {
       <div className="mx-auto w-full max-w-2xl">
         <div className="mb-8">
           <p className="text-sm text-muted-foreground">
-            Manage organization settings for <span className="font-semibold">@{handle}</span>.
+            Manage workspace settings for <span className="font-semibold">@{handle}</span>.
           </p>
         </div>
 
         {/* Logo */}
         {(isOwner || currentUserMember?.role === 'admin') && (
           <div className="rounded-lg border bg-card px-4 py-5 mb-6">
-            <h2 className="text-sm font-semibold mb-3">Organization logo</h2>
+            <h2 className="text-sm font-semibold mb-3">Workspace logo</h2>
             <div className="flex items-center gap-4">
               {namespace.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -210,25 +210,25 @@ export default function OrgSettingsPage() {
 
         {!isOwner && (
           <div className="rounded-lg border border-destructive/30 bg-card px-4 py-5">
-            <h2 className="text-sm font-semibold mb-1">Leave organization</h2>
+            <h2 className="text-sm font-semibold mb-1">Leave workspace</h2>
             <p className="text-xs text-muted-foreground mb-3">
-              You will lose access to this organization&apos;s resources.
+              You will lose access to this workspace&apos;s resources.
             </p>
             <button
               type="button"
-              onClick={handleLeaveOrg}
+              onClick={handleLeaveWorkspace}
               disabled={leaving}
               className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
             >
               <LogOut className="h-3.5 w-3.5" />
-              {leaving ? 'Leaving…' : 'Leave organization'}
+              {leaving ? 'Leaving…' : 'Leave workspace'}
             </button>
           </div>
         )}
 
         {isOwner && (
           <div className="rounded-lg border border-destructive/30 bg-card px-4 py-5">
-            <h2 className="text-sm font-semibold mb-1 text-destructive">Delete organization</h2>
+            <h2 className="text-sm font-semibold mb-1 text-destructive">Delete workspace</h2>
             <p className="text-xs text-muted-foreground mb-3">
               This will permanently delete <span className="font-semibold">@{handle}</span>, remove all members, and cannot be undone.
             </p>
@@ -236,7 +236,7 @@ export default function OrgSettingsPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleDeleteOrg}
+                  onClick={handleDeleteWorkspace}
                   disabled={deleting}
                   className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
                 >
@@ -255,11 +255,11 @@ export default function OrgSettingsPage() {
             ) : (
               <button
                 type="button"
-                onClick={handleDeleteOrg}
+                onClick={handleDeleteWorkspace}
                 className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                Delete organization
+                Delete workspace
               </button>
             )}
           </div>
