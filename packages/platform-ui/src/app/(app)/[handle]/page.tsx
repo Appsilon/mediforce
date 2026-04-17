@@ -162,6 +162,38 @@ function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member:
   );
 }
 
+const ALWAYS_KEY = 'alwaysNamespace';
+
+function DefaultWorkspaceToggle({ handle }: { handle: string }) {
+  const [isDefault, setIsDefault] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsDefault(localStorage.getItem(ALWAYS_KEY) === handle);
+  }, [handle]);
+
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (event.target.checked) {
+      localStorage.setItem(ALWAYS_KEY, handle);
+      setIsDefault(true);
+    } else {
+      localStorage.removeItem(ALWAYS_KEY);
+      setIsDefault(false);
+    }
+  }
+
+  return (
+    <label className="mt-3 flex items-center gap-2 cursor-pointer select-none w-fit">
+      <input
+        type="checkbox"
+        checked={isDefault}
+        onChange={handleChange}
+        className="h-3.5 w-3.5 rounded border-input accent-primary cursor-pointer"
+      />
+      <span className="text-xs text-muted-foreground">Open this workspace by default</span>
+    </label>
+  );
+}
+
 function MemberAvatars({ namespace }: { namespace: Namespace }) {
   const { members, totalCount } = useWorkspaceMembers(
     namespace.handle,
@@ -606,6 +638,10 @@ export default function ProfilePage() {
           <InlineEditableBio namespace={namespace} canEdit={canEdit} />
 
           <MemberAvatars namespace={namespace} />
+
+          {namespace.type === 'organization' && (
+            <DefaultWorkspaceToggle handle={namespace.handle} />
+          )}
         </div>
       </div>
 
