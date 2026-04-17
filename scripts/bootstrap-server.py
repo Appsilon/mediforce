@@ -6,14 +6,21 @@ Every prerequisite follows the same pattern: detect first, offer to use
 what was found, otherwise guide the user (clear YOUR TURN / MY TURN
 handoffs) through creating or providing it.
 
+Targets the public Appsilon/mediforce repo by default. For private forks
+(per-customer deployments), pass --repo Org/Name. Switching an existing
+deployment to a different repo is supported: the script rewires the deploy
+key and the git remote on the server (renaming the old origin to 'upstream'
+so sync flows keep working).
+
 State is persisted at ~/.mediforce/bootstrap-<host>.json so the run is
 resumable after Ctrl+C or a network hiccup.
 
 Usage:
-    python3 scripts/bootstrap-server.py              # fully interactive
+    python3 scripts/bootstrap-server.py                                # interactive
     python3 scripts/bootstrap-server.py --host 1.2.3.4
-    python3 scripts/bootstrap-server.py --resume     # force resume prompt
-    python3 scripts/bootstrap-server.py --from-step 5
+    python3 scripts/bootstrap-server.py --repo Appsilon/mediforce-pharmaverse
+    python3 scripts/bootstrap-server.py --branch main --from-step 6
+    python3 scripts/bootstrap-server.py --resume                       # force resume prompt
 """
 
 from __future__ import annotations
@@ -38,9 +45,15 @@ from typing import Callable, Optional
 # Constants
 # ──────────────────────────────────────────────────────────────────────────
 
-REPO_SLUG = "Appsilon/mediforce"
+DEFAULT_REPO = "Appsilon/mediforce"
+DEFAULT_BRANCH = "main"
 REMOTE_DEPLOY_DIR = "/opt/mediforce"
 STATE_DIR = Path.home() / ".mediforce"
+
+
+def _repo_slug_kebab(repo: str) -> str:
+    """Turn 'Org/Repo_Name' into 'org-repo-name' for use in filenames/titles."""
+    return re.sub(r"[^a-z0-9]+", "-", repo.lower()).strip("-")
 
 # ──────────────────────────────────────────────────────────────────────────
 # Output primitives (color-aware)
@@ -264,6 +277,17 @@ def scp_upload(ctx: "Context", local: Path, remote: str,
         ssh(ctx, f"chmod {mode} {shlex.quote(remote)}", check=True)
 
 
+def _safe_host_slug(host: str) -> str:
+    """Sanitize a host string for use in filenames and shell-embedded strings.
+
+    Keeps letters, digits, dot, dash, underscore. Typical hostnames and IPv4
+    addresses pass through unchanged; anything else becomes `_`. Protects
+    against path traversal in state filenames and argv injection in the deploy
+    key comment passed to ssh-keygen.
+    """
+    return re.sub(r"[^A-Za-z0-9._-]", "_", host)
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # State
 # ──────────────────────────────────────────────────────────────────────────
@@ -275,6 +299,8 @@ class State:
     host: str = ""
     user: str = "root"
     ssh_key_path: str = ""
+    repo: str = ""
+    branch: str = DEFAULT_BRANCH
     github_deploy_key_id: Optional[int] = None
     firebase_account: str = ""
     firebase_project_id: str = ""
@@ -287,7 +313,7 @@ class State:
 
     @classmethod
     def load(cls, host: str) -> "State":
-        path = STATE_DIR / f"bootstrap-{host}.json"
+        path = STATE_DIR / f"bootstrap-{_safe_host_slug(host)}.json"
         if not path.exists():
             return cls(host=host, started_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
         raw = json.loads(path.read_text())
@@ -299,7 +325,7 @@ class State:
 
     def save(self) -> None:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
-        path = STATE_DIR / f"bootstrap-{self.host}.json"
+        path = STATE_DIR / f"bootstrap-{_safe_host_slug(self.host)}.json"
         path.write_text(json.dumps(self.__dict__, indent=2))
         path.chmod(0o600)
 
@@ -421,11 +447,14 @@ def step_target_server(ctx: Context) -> None:
         detected = _list_local_ssh_keys()
 
         if confirm("Do you already have an SSH key for this server?", default=bool(detected)):
-            options: list[tuple[str, str]] = [
-                (str(k), f"use {k.name}  ({k})") for k in detected
-            ]
-            options.append(("__provide__", "enter a path to a different key"))
-            choice = menu("Which key?", options) if options[:-1] else "__provide__"
+            if detected:
+                options: list[tuple[str, str]] = [
+                    (str(k), f"use {k.name}  ({k})") for k in detected
+                ]
+                options.append(("__provide__", "enter a path to a different key"))
+                choice = menu("Which key?", options)
+            else:
+                choice = "__provide__"
             if choice == "__provide__":
                 raw = ask(
                     "Path to private key",
@@ -521,7 +550,9 @@ def step_system_packages(ctx: Context) -> None:
         info(f"[dry-run] would apt-get update && install: {' '.join(missing)}")
         return
     info("Running apt-get update …")
-    ssh(ctx, f"{APT_ENV} && apt-get update -qq", capture=False, stream=True)
+    update = ssh(ctx, f"{APT_ENV} && apt-get update -qq", capture=False, stream=True)
+    if update.rc != 0:
+        raise RuntimeError(f"apt-get update failed (rc={update.rc})")
     info(f"Installing {len(missing)} package(s) …")
     _apt_install(ctx, missing)
     ok(f"installed: {', '.join(missing)}")
@@ -619,7 +650,10 @@ def step_deploy_user(ctx: Context) -> None:
 
 
 def _deploy_key_title(ctx: Context) -> str:
-    return f"mediforce-bootstrap-{ctx.host}"
+    # Repo slug in title so targeting a different fork from the same host
+    # doesn't collide at title-match lookup. Host is sanitized because it
+    # flows into an ssh-keygen -C argument inside a nested bash -c '…' string.
+    return f"mediforce-bootstrap-{_safe_host_slug(ctx.host)}-{_repo_slug_kebab(ctx.state.repo)}"
 
 
 def _gh_auth_ok() -> bool:
@@ -674,8 +708,9 @@ def step_github_access(ctx: Context) -> None:
     pub = ssh(ctx, f"sudo -u deploy cat {key_path}.pub", check=True).stdout.strip()
 
     # Check if already registered in repo (match by title).
+    repo = ctx.state.repo
     title = _deploy_key_title(ctx)
-    existing = run(["gh", "api", f"repos/{REPO_SLUG}/keys", "--paginate"], check=True)
+    existing = run(["gh", "api", f"repos/{repo}/keys", "--paginate"], check=True)
     registered_id: Optional[int] = None
     for entry in json.loads(existing.stdout):
         if entry.get("title") == title:
@@ -684,14 +719,14 @@ def step_github_access(ctx: Context) -> None:
     if registered_id is not None:
         ctx.state.github_deploy_key_id = registered_id
         ctx.state.save()
-        ok(f"deploy key already registered on {REPO_SLUG} (id={registered_id})")
+        ok(f"deploy key already registered on {repo} (id={registered_id})")
     else:
         if ctx.dry_run:
-            info(f"[dry-run] would POST key '{title}' to repos/{REPO_SLUG}/keys")
+            info(f"[dry-run] would POST key '{title}' to repos/{repo}/keys")
         else:
-            info(f"Registering deploy key on {REPO_SLUG} as '{title}'")
+            info(f"Registering deploy key on {repo} as '{title}'")
             result = run(
-                ["gh", "api", "-X", "POST", f"repos/{REPO_SLUG}/keys",
+                ["gh", "api", "-X", "POST", f"repos/{repo}/keys",
                  "-f", f"title={title}",
                  "-f", f"key={pub}",
                  "-F", "read_only=true"],
@@ -712,21 +747,80 @@ def step_github_access(ctx: Context) -> None:
             raise SystemExit("github key not working")
 
 
+def _deploy_git(ctx: Context, git_cmd: str, *, check: bool = False,
+                capture: bool = True, stream: bool = False) -> RunResult:
+    """Run a git command as the deploy user inside REMOTE_DEPLOY_DIR."""
+    wrapped = f"sudo -u deploy bash -c 'cd {REMOTE_DEPLOY_DIR} && git {git_cmd}'"
+    return ssh(ctx, wrapped, check=check, capture=capture, stream=stream)
+
+
 def step_clone_repo(ctx: Context) -> None:
+    repo = ctx.state.repo
+    branch = ctx.state.branch or DEFAULT_BRANCH
+    expected_url = f"git@github.com:{repo}.git"
+
     probe = ssh(ctx, f"test -d {REMOTE_DEPLOY_DIR}/.git && echo HAVE || echo NONE")
     if "HAVE" in probe.stdout:
-        branch = ssh(ctx, f"sudo -u deploy bash -c 'cd {REMOTE_DEPLOY_DIR} && git rev-parse --abbrev-ref HEAD'", check=True).stdout.strip()
-        ok(f"repo already cloned at {REMOTE_DEPLOY_DIR} (branch: {branch})")
+        current_url = _deploy_git(ctx, "remote get-url origin", check=True).stdout.strip()
+        current_branch = _deploy_git(ctx, "rev-parse --abbrev-ref HEAD", check=True).stdout.strip()
+
+        if current_url == expected_url:
+            ok(f"repo already cloned at {REMOTE_DEPLOY_DIR} (origin={repo}, branch={current_branch})")
+        else:
+            warn(f"Existing clone points to a different remote:")
+            info(f"  current origin: {current_url}")
+            info(f"  configured:     {expected_url}")
+            choice = menu(
+                "Switch remote?",
+                [
+                    ("re-remote", "Rename current 'origin' to 'upstream', set origin to configured repo"),
+                    ("abort",     "Abort — I want to change --repo instead"),
+                ],
+            )
+            if choice == "abort":
+                raise SystemExit("aborted — existing clone points to a different repo")
+            if ctx.dry_run:
+                info(f"[dry-run] would rename origin→upstream and set origin to {expected_url}")
+                return
+            # If an 'upstream' remote already exists (previous re-remote), drop it
+            # to make room for the rename.
+            existing_upstream = _deploy_git(ctx, "remote get-url upstream 2>/dev/null || true")
+            if existing_upstream.stdout.strip():
+                info(f"removing pre-existing upstream remote ({existing_upstream.stdout.strip()})")
+                _deploy_git(ctx, "remote remove upstream", check=True)
+            _deploy_git(ctx, "remote rename origin upstream", check=True)
+            _deploy_git(ctx, f"remote add origin {expected_url}", check=True)
+            ok(f"origin → {expected_url}, previous origin preserved as 'upstream'")
+            # Invalidate old deploy-key id — it belonged to the previous repo.
+            ctx.state.github_deploy_key_id = None
+            ctx.state.save()
+            # Verify we can fetch from the new origin.
+            fetch = _deploy_git(ctx, "fetch origin", capture=False, stream=True)
+            if fetch.rc != 0:
+                raise RuntimeError(
+                    "fetch from new origin failed — is the deploy key registered on the new repo?"
+                )
+            ok("fetch from new origin succeeded")
+
+        # Align branch if it differs from configured.
+        current_branch = _deploy_git(ctx, "rev-parse --abbrev-ref HEAD", check=True).stdout.strip()
+        if current_branch != branch:
+            warn(f"Current checkout is {current_branch!r}, configured branch is {branch!r}")
+            if confirm(f"Check out {branch!r}?", default=True):
+                _deploy_git(ctx, f"fetch origin {branch}", check=True)
+                _deploy_git(ctx, f"checkout {branch}", check=True)
+                ok(f"checked out {branch}")
         return
+
     if ctx.dry_run:
-        info(f"[dry-run] would clone git@github.com:{REPO_SLUG}.git to {REMOTE_DEPLOY_DIR}")
+        info(f"[dry-run] would clone {expected_url} (branch {branch}) to {REMOTE_DEPLOY_DIR}")
         return
-    info(f"Cloning {REPO_SLUG} into {REMOTE_DEPLOY_DIR}")
+    info(f"Cloning {repo} (branch {branch}) into {REMOTE_DEPLOY_DIR}")
     ssh(ctx, f"mkdir -p {REMOTE_DEPLOY_DIR} && chown deploy:deploy {REMOTE_DEPLOY_DIR}", check=True)
     ssh(ctx,
-        f"sudo -u deploy git clone git@github.com:{REPO_SLUG}.git {REMOTE_DEPLOY_DIR}",
+        f"sudo -u deploy git clone --branch {shlex.quote(branch)} {expected_url} {REMOTE_DEPLOY_DIR}",
         capture=False, stream=True, check=False)
-    verify = ssh(ctx, f"sudo -u deploy bash -c 'cd {REMOTE_DEPLOY_DIR} && git rev-parse HEAD'")
+    verify = _deploy_git(ctx, "rev-parse HEAD")
     if not verify.ok or not verify.stdout.strip():
         raise RuntimeError(f"clone verification failed: {verify.stderr.strip()[:200]}")
     sha = verify.stdout.strip()[:12]
@@ -1000,22 +1094,30 @@ def step_domain(ctx: Context) -> None:
             if choice == "change":
                 continue
             # fall through to save with warning
-        elif ctx.host not in ips:
-            warn(f"{domain} resolves to {ips} but target host is {ctx.host}.")
-            choice = menu(
-                "What next?",
-                [
-                    ("retry", "Retry (I'll fix DNS)"),
-                    ("continue", "Continue anyway (Caddy's cert will fail until DNS matches)"),
-                    ("change", "Type a different domain"),
-                ],
-            )
-            if choice == "retry":
-                continue
-            if choice == "change":
-                continue
         else:
-            ok(f"{domain} resolves to {ctx.host}")
+            if ctx.host == domain:
+                matches = True
+            elif re.fullmatch(r"\d+\.\d+\.\d+\.\d+", ctx.host):
+                matches = ctx.host in ips
+            else:
+                host_ips = _resolve_a_records(ctx.host)
+                matches = bool(set(host_ips) & set(ips))
+            if not matches:
+                warn(f"{domain} resolves to {ips} but target host is {ctx.host}.")
+                choice = menu(
+                    "What next?",
+                    [
+                        ("retry", "Retry (I'll fix DNS)"),
+                        ("continue", "Continue anyway (Caddy's cert will fail until DNS matches)"),
+                        ("change", "Type a different domain"),
+                    ],
+                )
+                if choice == "retry":
+                    continue
+                if choice == "change":
+                    continue
+            else:
+                ok(f"{domain} resolves to {ips}")
 
         ctx.state.domain = domain
         ctx.state.save()
@@ -1081,6 +1183,7 @@ def _render_compose_env(ctx: Context) -> str:
         "",
         "# Runtime env for platform-ui / agent-worker containers",
         f"PLATFORM_API_KEY={ctx.collected.get('PLATFORM_API_KEY', '')}",
+        f"SECRETS_ENCRYPTION_KEY={ctx.collected.get('SECRETS_ENCRYPTION_KEY', '')}",
         f"DOCKER_OPENROUTER_API_KEY={openrouter}",
         "DOCKER_DEEPSEEK_API_KEY=",
         "",
@@ -1169,6 +1272,10 @@ def _ensure_api_keys(ctx: Context) -> None:
     if not ctx.collected.get("PLATFORM_API_KEY"):
         ctx.collected["PLATFORM_API_KEY"] = secrets.token_urlsafe(32)
         ok("PLATFORM_API_KEY auto-generated (32 bytes base64url)")
+
+    if not ctx.collected.get("SECRETS_ENCRYPTION_KEY"):
+        ctx.collected["SECRETS_ENCRYPTION_KEY"] = secrets.token_hex(32)
+        ok("SECRETS_ENCRYPTION_KEY auto-generated (32 bytes hex) — back this up; losing it makes stored workflow secrets unrecoverable")
 
 
 def step_env_local(ctx: Context) -> None:
@@ -1290,18 +1397,30 @@ def step_first_deploy(ctx: Context) -> None:
 def step_smoke_test(ctx: Context) -> None:
     # Check compose ps first — gives quick visibility on container state.
     ps = ssh(ctx, f"cd {REMOTE_DEPLOY_DIR} && docker compose -f docker-compose.prod.yml ps --format json 2>/dev/null || true")
-    lines = [line for line in ps.stdout.strip().splitlines() if line.startswith("{")]
-    if lines:
-        info(f"Running containers: {len(lines)}")
-        for line in lines:
+    # Compose emits line-delimited JSON in older versions and a JSON array
+    # from v2.20+ (when stdout is not a TTY — always the case over ssh).
+    raw = ps.stdout.strip()
+    entries: list[dict] = []
+    if raw.startswith("["):
+        try:
+            entries = json.loads(raw)
+        except json.JSONDecodeError:
+            pass
+    else:
+        for line in raw.splitlines():
+            if not line.startswith("{"):
+                continue
             try:
-                entry = json.loads(line)
-                state = entry.get("State", "?")
-                service = entry.get("Service", entry.get("Name", "?"))
-                symbol = "✓" if state == "running" else "!"
-                print(f"    {symbol} {service}: {state}")
-            except Exception:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
                 pass
+    if entries:
+        info(f"Running containers: {len(entries)}")
+        for entry in entries:
+            state = entry.get("State", "?")
+            service = entry.get("Service", entry.get("Name", "?"))
+            symbol = "✓" if state == "running" else "!"
+            print(f"    {symbol} {service}: {state}")
 
     # Hit the platform-ui over HTTP from the remote machine (avoids firewall issues on client).
     probe_cmd = (
@@ -1411,6 +1530,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--host", help="Target server IP or hostname (asked if omitted).")
     p.add_argument("--user", default="root", help="Remote user (default: root).")
     p.add_argument("--ssh-key", help="Path to SSH private key for --user@--host.")
+    p.add_argument("--repo", help=f"GitHub repo to deploy, e.g. Org/Name (default: {DEFAULT_REPO}).")
+    p.add_argument("--branch", help=f"Branch to deploy (default: {DEFAULT_BRANCH}).")
     p.add_argument("--from-step", type=int, help="Skip to step number N (1-based).")
     p.add_argument("--resume", action="store_true", help="Force resume prompt even if state looks fresh.")
     p.add_argument("--dry-run", action="store_true", help="Describe actions without making changes.")
@@ -1441,8 +1562,13 @@ def resolve_start_index(args: argparse.Namespace, state: State) -> int:
         remaining = [n for n, _, _ in STEPS if n not in state.completed_steps]
         info(f"Resuming — last completed step: {last!r}. Remaining: {len(remaining)}")
         if args.resume or confirm("Continue from there?", default=True):
-            done_count = len(state.completed_steps)
-            return done_count
+            # First step whose name isn't in completed_steps. Using the length
+            # of completed_steps would silently skip steps when completion was
+            # non-contiguous (e.g. after a prior `--from-step N` run).
+            return next(
+                (i for i, (n, _, _) in enumerate(STEPS) if n not in state.completed_steps),
+                len(STEPS),
+            )
         if confirm("Start over from step 1?", default=False):
             state.completed_steps.clear()
             state.last_step = ""
@@ -1450,6 +1576,32 @@ def resolve_start_index(args: argparse.Namespace, state: State) -> int:
             return 0
         raise SystemExit("Nothing to do.")
     return 0
+
+
+REPO_SENSITIVE_STEPS = ("github_access", "clone_repo", "first_deploy", "smoke_test")
+
+
+def _resolve_repo_and_branch(args: argparse.Namespace, state: State) -> None:
+    """Reconcile --repo / --branch with what's in state.
+
+    Precedence: CLI arg > state > default. Changing the repo on a state file
+    that already tracks one requires confirmation, invalidates the deploy-key
+    ID, and drops completed-step markers for steps whose side-effects are tied
+    to a specific remote.
+    """
+    state.branch = args.branch or state.branch or DEFAULT_BRANCH
+
+    effective_repo = args.repo or state.repo or DEFAULT_REPO
+    if state.repo and effective_repo != state.repo:
+        warn(f"Repo switch: {state.repo!r} → {effective_repo!r}")
+        info("This will rewire deploy key, remote, and trigger a redeploy.")
+        if not confirm("Switch the deployment to this repo?", default=True):
+            raise SystemExit("aborted at repo switch")
+        state.github_deploy_key_id = None
+        state.completed_steps = [s for s in state.completed_steps if s not in REPO_SENSITIVE_STEPS]
+
+    state.repo = effective_repo
+    state.save()
 
 
 def main() -> int:
@@ -1463,7 +1615,9 @@ def main() -> int:
     state.user = args.user
     if args.ssh_key:
         state.ssh_key_path = str(Path(args.ssh_key).expanduser())
-    state.save()
+    _resolve_repo_and_branch(args, state)
+
+    info(f"Deploying {state.repo}@{state.branch} to {host}")
 
     ctx = Context(
         host=host,
