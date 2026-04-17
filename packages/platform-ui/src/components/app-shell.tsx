@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench, Settings } from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
@@ -152,11 +152,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Namespace context switcher — below logo */}
       <div className="border-b px-3 py-3">
+        <div className="flex items-center gap-1">
         <Popover.Root>
           <Popover.Trigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent transition-colors"
+              className="flex flex-1 items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent transition-colors"
               aria-label="Switch namespace"
             >
               {(() => {
@@ -259,6 +260,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>
+        {activeNamespace !== null && activeNamespace.type === 'organization' && (
+          <Link
+            href={`/${handleFromPath}/members`}
+            title="Workspace settings"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
+        )}
+        </div>
       </div>
 
       {/* Nav */}
