@@ -33,7 +33,7 @@ type MemberPreview = {
 
 const MAX_AVATAR_MEMBERS = 20;
 
-function useOrgMembers(handle: string, enabled: boolean) {
+function useWorkspaceMembers(handle: string, enabled: boolean) {
   const [members, setMembers] = React.useState<MemberPreview[]>([]);
   const [totalCount, setTotalCount] = React.useState<number | null>(null);
 
@@ -163,7 +163,7 @@ function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member:
 }
 
 function MemberAvatars({ namespace }: { namespace: Namespace }) {
-  const { members, totalCount } = useOrgMembers(
+  const { members, totalCount } = useWorkspaceMembers(
     namespace.handle,
     namespace.type === 'organization',
   );
@@ -267,7 +267,7 @@ function InlineEditableBio({
           rows={3}
           disabled={saving}
           className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none disabled:opacity-50"
-          placeholder={namespace.type === 'organization' ? 'Describe this organization…' : 'Write a bio…'}
+          placeholder={namespace.type === 'organization' ? 'Describe this workspace…' : 'Write a bio…'}
         />
         <div className="flex items-center gap-2 mt-1.5">
           <button
@@ -303,7 +303,7 @@ function InlineEditableBio({
         onClick={() => setEditing(true)}
         className="mt-2 text-sm text-muted-foreground hover:text-foreground transition-colors italic"
       >
-        {namespace.type === 'organization' ? 'Add a description…' : 'Add a bio…'}
+        {namespace.type === 'organization' ? 'Add a workspace description…' : 'Add a bio…'}
       </button>
     );
   }
@@ -328,15 +328,15 @@ function InlineEditableBio({
 }
 
 // ---------------------------------------------------------------------------
-// User organizations
+// User workspaces
 // ---------------------------------------------------------------------------
 
-function useUserOrganizations(namespace: Namespace) {
-  const [orgs, setOrgs] = React.useState<Namespace[]>([]);
+function useUserWorkspaces(namespace: Namespace) {
+  const [workspaces, setWorkspaces] = React.useState<Namespace[]>([]);
 
   React.useEffect(() => {
     if (namespace.type !== 'personal' || namespace.linkedUserId === undefined) {
-      setOrgs([]);
+      setWorkspaces([]);
       return;
     }
 
@@ -345,13 +345,13 @@ function useUserOrganizations(namespace: Namespace) {
         if (!userSnap.exists()) return;
         const data = userSnap.data();
         const handles = Array.isArray(data.organizations) ? data.organizations : [];
-        const orgDocs = await Promise.all(
+        const workspaceDocs = await Promise.all(
           handles
             .filter((h: unknown): h is string => typeof h === 'string')
             .map((h) => getDoc(doc(db, 'namespaces', h))),
         );
-        setOrgs(
-          orgDocs
+        setWorkspaces(
+          workspaceDocs
             .filter((d) => d.exists())
             .map((d) => {
               const parsed = NamespaceSchema.safeParse(d.data());
@@ -360,30 +360,30 @@ function useUserOrganizations(namespace: Namespace) {
             .filter((ns): ns is Namespace => ns !== null),
         );
       })
-      .catch(() => setOrgs([]));
+      .catch(() => setWorkspaces([]));
   }, [namespace]);
 
-  return orgs;
+  return workspaces;
 }
 
-function UserOrganizations({ namespace }: { namespace: Namespace }) {
-  const orgs = useUserOrganizations(namespace);
+function UserWorkspaces({ namespace }: { namespace: Namespace }) {
+  const workspaces = useUserWorkspaces(namespace);
 
-  if (namespace.type !== 'personal' || orgs.length === 0) return null;
+  if (namespace.type !== 'personal' || workspaces.length === 0) return null;
 
   return (
     <div className="mt-6">
-      <h2 className="text-sm font-semibold mb-3">Organizations</h2>
+      <h2 className="text-sm font-semibold mb-3">Workspaces</h2>
       <div className="space-y-1">
-        {orgs.map((org) => (
+        {workspaces.map((ws) => (
           <Link
-            key={org.handle}
-            href={`/${org.handle}`}
+            key={ws.handle}
+            href={`/${ws.handle}`}
             className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
           >
             <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="font-medium truncate">{org.displayName}</span>
-            <span className="text-xs text-muted-foreground ml-auto shrink-0">@{org.handle}</span>
+            <span className="font-medium truncate">{ws.displayName}</span>
+            <span className="text-xs text-muted-foreground ml-auto shrink-0">@{ws.handle}</span>
           </Link>
         ))}
       </div>
@@ -589,7 +589,7 @@ export default function ProfilePage() {
                   : 'bg-muted text-muted-foreground',
               )}
             >
-              {namespace.type === 'organization' ? 'Organization' : 'Personal'}
+              {namespace.type === 'organization' ? 'Workspace' : 'Personal'}
             </span>
             {canEdit && namespace.type === 'organization' && (
               <Link
@@ -609,7 +609,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <UserOrganizations namespace={namespace} />
+      <UserWorkspaces namespace={namespace} />
 
       {/* Workflow catalog */}
       <WorkflowCatalog handle={handle ?? ''} namespace={namespace} />

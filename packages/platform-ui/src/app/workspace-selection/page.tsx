@@ -143,7 +143,7 @@ export default function WorkspaceSelectionPage() {
         <h1 className="text-2xl font-headline font-semibold tracking-tight">
           Welcome back{displayName !== null ? `, ${displayName}` : ''}
         </h1>
-        <p className="text-sm text-muted-foreground">Choose an organization to continue</p>
+        <p className="text-sm text-muted-foreground">Choose a workspace to continue</p>
       </div>
 
       <div className="flex flex-wrap justify-center gap-8 max-w-2xl">

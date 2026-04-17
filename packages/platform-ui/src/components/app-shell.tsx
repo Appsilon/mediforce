@@ -248,11 +248,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="my-1 border-t" />
                 <Popover.Close asChild>
                   <Link
-                    href="/orgs/new"
+                    href="/workspaces/new"
                     className="flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                   >
                     <Building2 className="h-4 w-4 shrink-0" />
-                    <span>Create organization</span>
+                    <span>Create workspace</span>
                   </Link>
                 </Popover.Close>
               </div>

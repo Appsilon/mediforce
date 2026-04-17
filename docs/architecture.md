@@ -6,7 +6,7 @@
 
 Mediforce is a platform for codifying business processes as structured human + AI collaboration workflows. The core insight: processes can be decomposed into **steps**, and each step can be performed by a human, an AI agent, or both — with configurable autonomy, escalation, and auditability.
 
-The architecture separates **what** happens (the process definition) from **who** does it (the organization's configuration). This separation is what makes processes sharable and reusable across organizations.
+The architecture separates **what** happens (the process definition) from **who** does it (the workspace's configuration). This separation is what makes processes sharable and reusable across workspaces.
 
 ## Core Concepts
 
@@ -16,11 +16,11 @@ A step is the smallest unit of work in a process. It defines what needs to happe
 
 ### Processes — reusable templates
 
-A process is a graph of steps. It's reusable, sharable, and open-sourceable. A process defines the workflow and data model but says nothing about who executes each step. Think of it as a template that any organization can adopt.
+A process is a graph of steps. It's reusable, sharable, and open-sourceable. A process defines the workflow and data model but says nothing about who executes each step. Think of it as a template that any workspace can adopt.
 
 ### Configuration — who does what
 
-Each organization configures processes for their own context. The same process template, deployed with different configurations, produces different behaviors. A large pharma company might want full human oversight on every step. A smaller biotech might give agents more autonomy. The process stays the same; the rules change.
+Each workspace configures processes for their own context. The same process template, deployed with different configurations, produces different behaviors. A large pharma company might want full human oversight on every step. A smaller biotech might give agents more autonomy. The process stays the same; the rules change.
 
 ## Agent Autonomy
 
