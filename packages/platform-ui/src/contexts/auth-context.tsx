@@ -139,6 +139,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [pendingGoogleCredential, setPendingGoogleCredential] = React.useState<OAuthCredential | null>(null);
 
   React.useEffect(() => {
+    // In emulator mode email/password is always enabled — skip the probe to avoid
+    // a spurious 400 console error that breaks E2E tests.
+    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
+      setEmailAuthEnabled(true);
+      return;
+    }
     probeEmailAuth().then(setEmailAuthEnabled).catch(() => setEmailAuthEnabled(false));
   }, []);
 
