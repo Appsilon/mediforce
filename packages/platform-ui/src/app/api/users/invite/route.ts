@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { validateApiKey } from '@/lib/platform-services';
 import { getAdminAuth, getAdminFirestore, FirebaseInviteService } from '@mediforce/platform-infra';
-import { sendInviteEmail } from '@/lib/send-invite-email';
+import { sendInviteEmail, sendWorkspaceNotificationEmail } from '@/lib/send-invite-email';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!validateApiKey(req)) {
@@ -24,18 +24,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'email is required' }, { status: 400 });
   }
 
-  const { email, displayName, namespaceHandle, role } = body as {
+  const { email, displayName, namespaceHandle, role, inviterName } = body as {
     email: string;
     displayName?: string;
     namespaceHandle?: string;
     role?: string;
+    inviterName?: string;
   };
 
   try {
     const adminAuth = getAdminAuth();
     const adminDb = getAdminFirestore();
     const inviteService = new FirebaseInviteService(adminAuth, adminDb);
-    const { uid, temporaryPassword } = await inviteService.createInvitedUser(
+    const { uid, temporaryPassword, isExisting } = await inviteService.createInvitedUser(
       email.trim().toLowerCase(),
       typeof displayName === 'string' && displayName.trim() !== '' ? displayName.trim() : undefined,
       undefined,
@@ -72,28 +73,55 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const senderName = process.env.MAILGUN_SENDER_NAME ?? 'Mediforce';
     const appUrl = process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
 
-    if (
+    const mailgunConfigured =
       typeof mailgunApiKey === 'string' && mailgunApiKey !== '' &&
       typeof mailgunDomain === 'string' && mailgunDomain !== '' &&
-      typeof fromEmail === 'string' && fromEmail !== ''
-    ) {
+      typeof fromEmail === 'string' && fromEmail !== '';
+
+    if (mailgunConfigured) {
       try {
-        await sendInviteEmail({
-          toEmail: email.trim().toLowerCase(),
-          temporaryPassword,
-          appUrl,
-          fromEmail,
-          senderName,
-          mailgunApiKey,
-          mailgunDomain,
-        });
+        if (isExisting && typeof namespaceHandle === 'string' && namespaceHandle.trim() !== '') {
+          // Existing user — look up workspace display name, send notification email only
+          const namespaceDoc = await adminDb.collection('namespaces').doc(namespaceHandle).get();
+          const workspaceName = namespaceDoc.exists
+            ? (namespaceDoc.data()?.displayName as string | undefined ?? namespaceHandle)
+            : namespaceHandle;
+
+          await sendWorkspaceNotificationEmail({
+            toEmail: email.trim().toLowerCase(),
+            inviterName: typeof inviterName === 'string' && inviterName.trim() !== ''
+              ? inviterName.trim()
+              : senderName,
+            workspaceName,
+            workspaceUrl: `${appUrl}/${namespaceHandle}`,
+            appUrl,
+            fromEmail: fromEmail as string,
+            senderName,
+            mailgunApiKey: mailgunApiKey as string,
+            mailgunDomain: mailgunDomain as string,
+          });
+        } else {
+          // New user — send credentials email
+          await sendInviteEmail({
+            toEmail: email.trim().toLowerCase(),
+            temporaryPassword,
+            appUrl,
+            fromEmail: fromEmail as string,
+            senderName,
+            mailgunApiKey: mailgunApiKey as string,
+            mailgunDomain: mailgunDomain as string,
+          });
+        }
         emailSent = true;
       } catch {
         emailSent = false;
       }
     }
 
-    return NextResponse.json({ uid, email: email.trim().toLowerCase(), temporaryPassword, emailSent }, { status: 201 });
+    return NextResponse.json(
+      { uid, email: email.trim().toLowerCase(), temporaryPassword, emailSent, isExisting },
+      { status: 201 },
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
