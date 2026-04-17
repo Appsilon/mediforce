@@ -3,7 +3,8 @@
 import * as React from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Building2, User } from 'lucide-react';
+import { User } from 'lucide-react';
+import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import type { Namespace } from '@mediforce/platform-core';
@@ -33,22 +34,24 @@ function OrgCard({
         className="group flex flex-col items-center gap-3 p-2 rounded-lg transition-transform duration-150 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-lg overflow-hidden border-2 border-transparent group-hover:border-primary transition-colors duration-150">
-          {namespace.avatarUrl !== undefined ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={namespace.avatarUrl}
-              alt={label}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="h-full w-full flex items-center justify-center bg-muted">
-              {isPersonal ? (
-                <User className="h-10 w-10 text-muted-foreground" />
+          {(() => {
+            if (isPersonal) {
+              return namespace.avatarUrl !== undefined ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={namespace.avatarUrl} alt={label} className="h-full w-full object-cover" />
               ) : (
-                <Building2 className="h-10 w-10 text-muted-foreground" />
-              )}
-            </div>
-          )}
+                <div className="h-full w-full flex items-center justify-center bg-muted">
+                  <User className="h-10 w-10 text-muted-foreground" />
+                </div>
+              );
+            }
+            const Icon = getWorkspaceIcon(namespace.icon);
+            return (
+              <div className="h-full w-full flex items-center justify-center bg-primary/10">
+                <Icon className="h-10 w-10 text-primary" />
+              </div>
+            );
+          })()}
         </div>
         <span className="text-sm font-medium text-center leading-tight w-28 break-words whitespace-normal line-clamp-2 h-[2.5rem]">
           {label}

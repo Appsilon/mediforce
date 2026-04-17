@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench } from 'lucide-react';
+import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
@@ -163,7 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 const avatarFallback = (
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold">
                     {activeNamespace !== null && activeNamespace.type === 'organization' ? (
-                      <Building2 className="h-3.5 w-3.5" />
+                      (() => { const Icon = getWorkspaceIcon(activeNamespace.icon); return <Icon className="h-3.5 w-3.5" />; })()
                     ) : (
                       firebaseUser?.displayName
                         ? firebaseUser.displayName
@@ -230,11 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           isActive ? 'text-foreground' : 'text-muted-foreground',
                         )}
                       >
-                        {ns.avatarUrl ? (
-                          <ImgWithFallback src={ns.avatarUrl} className="h-5 w-5 shrink-0 rounded object-cover" fallback={<Building2 className="h-4 w-4 shrink-0" />} />
-                        ) : (
-                          <Building2 className="h-4 w-4 shrink-0" />
-                        )}
+                        {(() => { const Icon = getWorkspaceIcon(ns.icon); return <Icon className="h-4 w-4 shrink-0" />; })()}
                         <span className="flex-1 truncate">
                           <span className="block font-medium text-foreground">{ns.displayName}</span>
                           <span className="block text-xs text-muted-foreground">@{ns.handle}</span>

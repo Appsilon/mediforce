@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   arrayRemove,
@@ -13,25 +13,23 @@ import {
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Link from 'next/link';
 import {
   ArrowLeft,
-  Building2,
   Check,
   ClipboardCopy,
   LogOut,
   MailIcon,
   Trash2,
-  Upload,
   Users,
-  X,
 } from 'lucide-react';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
+import { WORKSPACE_ICONS, WORKSPACE_ICON_KEYS, getWorkspaceIcon } from '@/lib/workspace-icons';
 import { NamespaceMemberSchema } from '@mediforce/platform-core';
 import type { NamespaceMember } from '@mediforce/platform-core';
+import { cn } from '@/lib/utils';
 
 type NamespaceMemberWithId = NamespaceMember & { id: string };
 
@@ -211,6 +209,7 @@ export default function WorkspaceConfigPage() {
   // ── Workspace profile editing ──────────────────────────────────────────────
   const [profileDisplayName, setProfileDisplayName] = useState('');
   const [profileBio, setProfileBio] = useState('');
+  const [profileIcon, setProfileIcon] = useState('Building2');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
 
@@ -219,6 +218,7 @@ export default function WorkspaceConfigPage() {
     if (namespace !== null) {
       setProfileDisplayName(namespace.displayName);
       setProfileBio(namespace.bio ?? '');
+      setProfileIcon(namespace.icon ?? 'Building2');
     }
   }, [namespace]);
 
@@ -239,49 +239,14 @@ export default function WorkspaceConfigPage() {
     }
   }
 
-  // ── Logo upload ────────────────────────────────────────────────────────────
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [removingLogo, setRemovingLogo] = useState(false);
-  const [logoError, setLogoError] = useState<string | null>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
-
-  async function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (file === undefined) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      setLogoError('File is too large. Maximum size is 2 MB.');
-      return;
-    }
-
-    // Some browsers return empty string for file.type on certain formats.
-    // Fall back to image/jpeg so the Storage rule contentType check passes.
-    const contentType = file.type !== '' ? file.type : 'image/jpeg';
-
-    setUploadingLogo(true);
-    setLogoError(null);
+  // ── Icon picker ────────────────────────────────────────────────────────────
+  async function handleIconChange(iconKey: string) {
+    setProfileIcon(iconKey);
     try {
-      const storagePath = `namespaces/${handle}/logo/${file.name}`;
-      const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, file, { contentType });
-      const downloadUrl = await getDownloadURL(storageRef);
-      await updateDoc(doc(db, 'namespaces', handle), { avatarUrl: downloadUrl });
-    } catch (err: unknown) {
-      console.error('[logo upload]', err);
-      const detail = err instanceof Error ? err.message : String(err);
-      setLogoError(`Upload failed: ${detail}`);
-    } finally {
-      setUploadingLogo(false);
-      if (logoInputRef.current !== null) logoInputRef.current.value = '';
-    }
-  }
-
-  async function handleRemoveLogo() {
-    setRemovingLogo(true);
-    try {
-      await updateDoc(doc(db, 'namespaces', handle), { avatarUrl: deleteField() });
-    } finally {
-      setRemovingLogo(false);
+      await updateDoc(doc(db, 'namespaces', handle), { icon: iconKey });
+    } catch {
+      // Revert to last saved value on error
+      setProfileIcon(namespace?.icon ?? 'Building2');
     }
   }
 
@@ -530,55 +495,43 @@ export default function WorkspaceConfigPage() {
               </form>
             </div>
 
-            {/* Logo */}
-            <div className="rounded-lg border bg-card px-4 py-5">
-              <h3 className="text-sm font-semibold mb-3">Logo</h3>
-              <div className="flex items-center gap-4">
-                {namespace.avatarUrl !== undefined ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={namespace.avatarUrl}
-                    alt={namespace.displayName}
-                    className="h-16 w-16 rounded-lg object-cover border"
-                  />
-                ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-lg border bg-muted">
-                    <Building2 className="h-6 w-6 text-muted-foreground" />
+            {/* Icon picker */}
+            {namespace.type === 'organization' && (
+              <div className="rounded-lg border bg-card px-4 py-5">
+                <h3 className="text-sm font-semibold mb-4">Workspace icon</h3>
+                <div className="flex items-center gap-6">
+                  {/* Preview */}
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                    {(() => {
+                      const Icon = getWorkspaceIcon(profileIcon);
+                      return <Icon className="h-7 w-7 text-primary" />;
+                    })()}
                   </div>
-                )}
-                <div className="flex flex-col gap-2">
-                  <input
-                    ref={logoInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => logoInputRef.current?.click()}
-                    disabled={uploadingLogo}
-                    className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50 transition-colors"
-                  >
-                    <Upload className="h-3.5 w-3.5" />
-                    {uploadingLogo ? 'Uploading…' : 'Upload logo'}
-                  </button>
-                  {namespace.avatarUrl !== undefined && (
-                    <button
-                      type="button"
-                      onClick={handleRemoveLogo}
-                      disabled={removingLogo}
-                      className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50 transition-colors"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      {removingLogo ? 'Removing…' : 'Remove logo'}
-                    </button>
-                  )}
-                  <p className="text-[11px] text-muted-foreground">Recommended: square image, at least 128×128 px</p>
-                  {logoError !== null && <p className="text-xs font-medium text-destructive">{logoError}</p>}
+                  {/* Grid */}
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {WORKSPACE_ICON_KEYS.map((key) => {
+                      const Icon = WORKSPACE_ICONS[key]!;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          title={key}
+                          onClick={() => handleIconChange(key)}
+                          className={cn(
+                            'flex h-9 w-9 items-center justify-center rounded-lg border-2 transition-colors',
+                            profileIcon === key
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-transparent bg-muted text-muted-foreground hover:border-border hover:text-foreground',
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
