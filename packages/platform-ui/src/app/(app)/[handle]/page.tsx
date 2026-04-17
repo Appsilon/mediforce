@@ -626,7 +626,7 @@ export default function ProfilePage() {
             >
               {namespace.type === 'organization' ? 'Workspace' : 'Personal'}
             </span>
-            {canEdit && namespace.type === 'organization' && (
+            {currentRole === 'owner' && namespace.type === 'organization' && (
               <Link
                 href={`/${namespace.handle}/settings`}
                 className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
