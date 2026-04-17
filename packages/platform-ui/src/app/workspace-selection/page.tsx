@@ -50,7 +50,7 @@ function OrgCard({
             </div>
           )}
         </div>
-        <span className="text-sm font-medium text-center leading-tight w-28 break-words whitespace-normal">
+        <span className="text-sm font-medium text-center leading-tight w-28 break-words whitespace-normal line-clamp-2 h-[2.5rem]">
           {label}
         </span>
       </button>
@@ -62,7 +62,7 @@ function OrgCard({
           onChange={(e) => onAlwaysChange(namespace.handle, e.target.checked)}
           className="h-3.5 w-3.5 rounded border-input accent-primary cursor-pointer"
         />
-        <span className="text-xs text-muted-foreground">Always use this</span>
+        <span className="text-xs text-muted-foreground">Set as default</span>
       </label>
     </div>
   );
