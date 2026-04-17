@@ -411,114 +411,115 @@ export default function MembersPage() {
             <p className="text-sm text-muted-foreground">No members yet.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border bg-card">
-            {/* Table header — hidden on mobile */}
-            <div className="hidden sm:flex sm:items-center px-4 py-2 border-b bg-muted/50 gap-4">
-              <span className="text-xs font-medium text-muted-foreground flex-1 min-w-0">User</span>
-              <span className="text-xs font-medium text-muted-foreground w-16 shrink-0">Role</span>
-              <span className="text-xs font-medium text-muted-foreground w-24 shrink-0">Joined</span>
-              <span className="text-xs font-medium text-muted-foreground w-32 shrink-0">Status</span>
-              <span className="sr-only w-16 shrink-0">Actions</span>
-            </div>
-            <div className="divide-y">
-              {members.map((member) => {
-                const name = member.displayName ?? member.uid;
-                const avatar = member.avatarUrl;
-                const initials = name.includes(' ')
-                  ? `${name.split(' ')[0]?.[0] ?? ''}${name.split(' ')[1]?.[0] ?? ''}`.toUpperCase()
-                  : name.slice(0, 2).toUpperCase();
+          <div className="overflow-x-auto rounded-lg border bg-card">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">User</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Email</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Role</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Joined</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap sr-only">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {members.map((member) => {
+                  const name = member.displayName ?? member.uid;
+                  const avatar = member.avatarUrl;
+                  const initials = name.includes(' ')
+                    ? `${name.split(' ')[0]?.[0] ?? ''}${name.split(' ')[1]?.[0] ?? ''}`.toUpperCase()
+                    : name.slice(0, 2).toUpperCase();
 
-                return (
-                  <div
-                    key={member.id}
-                    className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
-                  >
-                    {/* User cell */}
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      {avatar !== undefined ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={avatar} alt={name} className="h-8 w-8 shrink-0 rounded-full object-cover" />
-                      ) : (
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                          {initials}
+                  return (
+                    <tr key={member.id} className="hover:bg-muted/30 transition-colors">
+                      {/* User */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2.5">
+                          {avatar !== undefined ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={avatar} alt={name} className="h-7 w-7 shrink-0 rounded-full object-cover" />
+                          ) : (
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-semibold">
+                              {initials}
+                            </div>
+                          )}
+                          <span className="font-medium">{name}</span>
                         </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{name}</p>
-                        {member.email !== null && member.email !== undefined && (
-                          <p className="text-xs text-muted-foreground truncate">{member.email}</p>
-                        )}
-                      </div>
-                    </div>
+                      </td>
 
-                    {/* Role cell */}
-                    <div className="sm:w-16 sm:shrink-0">
-                      {isOwner && member.role !== 'owner' ? (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleRole(member.uid, member.role)}
-                          title={`Click to change to ${member.role === 'admin' ? 'member' : 'admin'}`}
-                          className="cursor-pointer"
-                        >
+                      {/* Email */}
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {member.email ?? '—'}
+                      </td>
+
+                      {/* Role */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {isOwner && member.role !== 'owner' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleRole(member.uid, member.role)}
+                            title={`Click to change to ${member.role === 'admin' ? 'member' : 'admin'}`}
+                            className="cursor-pointer"
+                          >
+                            <RoleBadge role={member.role} />
+                          </button>
+                        ) : (
                           <RoleBadge role={member.role} />
-                        </button>
-                      ) : (
-                        <RoleBadge role={member.role} />
-                      )}
-                    </div>
+                        )}
+                      </td>
 
-                    {/* Joined cell */}
-                    <div className="text-xs text-muted-foreground whitespace-nowrap sm:w-24 sm:shrink-0">
-                      <span className="sm:hidden text-muted-foreground/70">Joined </span>
-                      {formatDate(member.joinedAt)}
-                    </div>
+                      {/* Joined */}
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {formatDate(member.joinedAt)}
+                      </td>
 
-                    {/* Status cell */}
-                    <div className="sm:w-32 sm:shrink-0">
-                      {member.lastSignInTime === null || member.lastSignInTime === undefined ? (
-                        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                          Pending activation
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          <span className="sm:hidden text-muted-foreground/70">Last sign-in: </span>
-                          {formatLastSignIn(member.lastSignInTime)}
-                        </span>
-                      )}
-                    </div>
+                      {/* Status */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {member.lastSignInTime === null || member.lastSignInTime === undefined ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                            Pending activation
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {formatLastSignIn(member.lastSignInTime)}
+                          </span>
+                        )}
+                      </td>
 
-                    {/* Actions cell */}
-                    <div className="flex items-center justify-end gap-1 sm:w-16 sm:shrink-0">
-                      {canManageMembers && member.role !== 'owner' && member.uid !== firebaseUser?.uid ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleResendInvite(member.uid)}
-                            disabled={resendingUid === member.uid}
-                            title="Resend invite"
-                            className="rounded p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
-                            aria-label={`Resend invite to ${name}`}
-                          >
-                            <MailIcon className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveMember(member.uid)}
-                            title="Remove member"
-                            className="rounded p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                            aria-label={`Remove ${name}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </>
-                      ) : (
-                        <div className="w-16" />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                      {/* Actions */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          {canManageMembers && member.role !== 'owner' && member.uid !== firebaseUser?.uid ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleResendInvite(member.uid)}
+                                disabled={resendingUid === member.uid}
+                                title="Resend invite"
+                                className="rounded p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+                                aria-label={`Resend invite to ${name}`}
+                              >
+                                <MailIcon className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMember(member.uid)}
+                                title="Remove member"
+                                className="rounded p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                aria-label={`Remove ${name}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
