@@ -3,19 +3,19 @@ runConfig:
 
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyAEGHwntSrWq-Z-j412clbKhsYfvgedP04
+    value: AIzaSyDTdfm-1wQgUfmZGC2ExSinK-fUd8YYT-s
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: mediforce-for-pharmaverse.firebaseapp.com
+    value: mediforce-1c761.firebaseapp.com
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: mediforce-for-pharmaverse
+    value: mediforce-1c761
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: mediforce-for-pharmaverse.firebasestorage.app
+    value: mediforce-1c761.firebasestorage.app
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "402907948635"
+    value: "1044281777485"
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "1:402907948635:web:fafb70d6ce9b16691c817e"
+    value: "1:1044281777485:web:848f62c06d9376c75f6b04"
   - variable: NEXT_PUBLIC_PLATFORM_URL
-    value: https://pharmaverse.mediforce.ai
+    value: https://staging.mediforce.ai
   - variable: NEXT_PUBLIC_PLATFORM_API_KEY
     secret: PLATFORM_API_KEY
   - variable: PLATFORM_API_KEY
@@ -29,4 +29,4 @@ env:
   - variable: MAILGUN_FROM_EMAIL
     value: mediforce@appsilon.com
   - variable: MAILGUN_SENDER_NAME
-    value: Mediforce Pharmaverse
+    value: Mediforce
