@@ -8,6 +8,9 @@ import {
   sendPasswordResetEmail,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
+  linkWithCredential,
+  type OAuthCredential,
+  type AuthError,
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
@@ -103,6 +106,7 @@ interface AuthContextValue {
   loading: boolean;
   mustChangePassword: boolean;
   emailAuthEnabled: boolean | null; // null = probe in progress
+  pendingGoogleLink: boolean; // true when Google SSO hit email conflict — sign in with password to link
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
@@ -132,6 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = React.useState(true);
   const [mustChangePassword, setMustChangePassword] = React.useState(false);
   const [emailAuthEnabled, setEmailAuthEnabled] = React.useState<boolean | null>(null);
+  const [pendingGoogleCredential, setPendingGoogleCredential] = React.useState<OAuthCredential | null>(null);
 
   React.useEffect(() => {
     probeEmailAuth().then(setEmailAuthEnabled).catch(() => setEmailAuthEnabled(false));
@@ -168,12 +173,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = React.useCallback(async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    try {
+      await signInWithPopup(auth, provider);
+      setPendingGoogleCredential(null);
+    } catch (err: unknown) {
+      // Firebase "one account per email" mode: Google email matches an existing
+      // email/password account. Store the Google credential so we can link it
+      // after the user signs in with their password.
+      if (
+        err !== null &&
+        typeof err === 'object' &&
+        'code' in err &&
+        (err as { code: string }).code === 'auth/account-exists-with-different-credential'
+      ) {
+        const credential = GoogleAuthProvider.credentialFromError(err as AuthError);
+        if (credential !== null) {
+          setPendingGoogleCredential(credential);
+        }
+        const linkError = new Error('auth/needs-link') as Error & { code: string };
+        linkError.code = 'auth/needs-link';
+        throw linkError;
+      }
+      throw err;
+    }
   }, []);
 
   const signInWithEmail = React.useCallback(async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
-  }, []);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    // If a Google credential is pending (from a previous failed SSO attempt),
+    // link it now so both sign-in methods work going forward.
+    if (pendingGoogleCredential !== null) {
+      try {
+        await linkWithCredential(userCredential.user, pendingGoogleCredential);
+      } catch {
+        // Linking failed (e.g. already linked) — sign-in still succeeded, ignore.
+      }
+      setPendingGoogleCredential(null);
+    }
+  }, [pendingGoogleCredential]);
 
   const sendPasswordReset = React.useCallback(async (email: string) => {
     await sendPasswordResetEmail(auth, email);
@@ -187,11 +224,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = React.useCallback(async () => {
+    setPendingGoogleCredential(null);
     await firebaseSignOut(auth);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ firebaseUser, loading, mustChangePassword, emailAuthEnabled, signInWithGoogle, signInWithEmail, sendPasswordReset, clearMustChangePassword, signOut }}>
+    <AuthContext.Provider value={{ firebaseUser, loading, mustChangePassword, emailAuthEnabled, pendingGoogleLink: pendingGoogleCredential !== null, signInWithGoogle, signInWithEmail, sendPasswordReset, clearMustChangePassword, signOut }}>
       {children}
     </AuthContext.Provider>
   );
