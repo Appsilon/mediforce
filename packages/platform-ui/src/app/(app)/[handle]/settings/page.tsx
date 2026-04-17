@@ -199,6 +199,14 @@ export default function WorkspaceConfigPage() {
     currentUserMember !== undefined &&
     (currentUserMember.role === 'owner' || currentUserMember.role === 'admin');
 
+  // Personal namespaces have no member docs — ownership is via linkedUserId
+  const isPersonalOwner =
+    namespace !== null &&
+    namespace.type === 'personal' &&
+    namespace.linkedUserId === firebaseUser?.uid;
+
+  const canEditProfile = canManageMembers || isPersonalOwner;
+
   // ── Workspace profile editing ──────────────────────────────────────────────
   const [profileDisplayName, setProfileDisplayName] = useState('');
   const [profileBio, setProfileBio] = useState('');
@@ -452,7 +460,7 @@ export default function WorkspaceConfigPage() {
         </div>
 
         {/* ── Section 1: Workspace profile ─────────────────────────────────── */}
-        {canManageMembers && (
+        {canEditProfile && (
           <div className="mb-10 space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Profile</h2>
 
