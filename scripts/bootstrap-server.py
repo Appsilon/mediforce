@@ -23,12 +23,14 @@ import getpass
 import json
 import os
 import re
+import secrets
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -140,11 +142,10 @@ def handoff(
     steps: list[str],
     verify: Callable[[], tuple[bool, str]],
     save_to: Optional[str] = None,
-    skippable: bool = False,
 ) -> bool:
-    """Clear ball-handoff to the user. Returns True on verify ok or skip.
+    """Clear ball-handoff to the user. Returns True when verify succeeds.
 
-    Loops with retry/help/edit/abort options on verify failure.
+    Loops with retry/help/abort options on verify failure.
     """
     while True:
         print()
@@ -156,14 +157,10 @@ def handoff(
         print(f"  {bold('Steps:')}")
         for i, stp in enumerate(steps, 1):
             print(f"     {i}. {stp}")
-        hint = "q=abort, s=skip" if skippable else "q=abort"
-        print(f"\n  Press Enter when done ({hint}) ", end="", flush=True)
+        print(f"\n  Press Enter when done (q=abort) ", end="", flush=True)
         raw = input().strip().lower()
         if raw == "q":
             raise KeyboardInterrupt("aborted at handoff")
-        if raw == "s" and skippable:
-            warn("Skipped.")
-            return True
 
         print(f"\n  {bold(cyan('── MY TURN ──────────────────────────────────────────'))}")
         passed, msg = verify()
@@ -222,17 +219,34 @@ def run(cmd: list[str] | str, input_: Optional[str] = None,
     return result
 
 
-def ssh(ctx: "Context", remote_cmd: str, *, check: bool = False,
-        capture: bool = True, stream: bool = False) -> RunResult:
-    base = [
-        "ssh",
+def _sudo_prefix(ctx: "Context") -> str:
+    """Empty when connected as root, 'sudo ' otherwise. Deploy has NOPASSWD sudo."""
+    return "" if ctx.user == "root" else "sudo "
+
+
+def _ssh_base_opts(ctx: "Context") -> list[str]:
+    """Common SSH options, including ControlMaster multiplexing so follow-up
+    calls to the same host reuse the first TCP/SSH handshake. Cuts overall
+    bootstrap time by several seconds on a slow RTT.
+
+    StrictHostKeyChecking=accept-new is pragmatic for a fresh server we're
+    about to configure — trust-on-first-use, prints the host key once, then
+    pins it in ~/.ssh/known_hosts for later runs.
+    """
+    return [
         "-i", str(ctx.ssh_key_path),
         "-o", "IdentitiesOnly=yes",
         "-o", "StrictHostKeyChecking=accept-new",
         "-o", "ConnectTimeout=10",
-        f"{ctx.user}@{ctx.host}",
-        remote_cmd,
+        "-o", "ControlMaster=auto",
+        "-o", f"ControlPath={tempfile.gettempdir()}/mediforce-ssh-%r@%h:%p",
+        "-o", "ControlPersist=60",
     ]
+
+
+def ssh(ctx: "Context", remote_cmd: str, *, check: bool = False,
+        capture: bool = True, stream: bool = False) -> RunResult:
+    base = ["ssh", *_ssh_base_opts(ctx), f"{ctx.user}@{ctx.host}", remote_cmd]
     if stream:
         proc = subprocess.run(base)
         return RunResult(proc.returncode, "", "")
@@ -242,14 +256,7 @@ def ssh(ctx: "Context", remote_cmd: str, *, check: bool = False,
 def scp_upload(ctx: "Context", local: Path, remote: str,
                mode: Optional[str] = None) -> None:
     assert local.exists(), f"local file missing: {local}"
-    cmd = [
-        "scp",
-        "-i", str(ctx.ssh_key_path),
-        "-o", "IdentitiesOnly=yes",
-        "-o", "StrictHostKeyChecking=accept-new",
-        str(local),
-        f"{ctx.user}@{ctx.host}:{remote}",
-    ]
+    cmd = ["scp", *_ssh_base_opts(ctx), str(local), f"{ctx.user}@{ctx.host}:{remote}"]
     result = run(cmd)
     if not result.ok:
         raise RuntimeError(f"scp failed: {result.stderr}")
@@ -273,6 +280,7 @@ class State:
     firebase_project_id: str = ""
     firebase_web_config: dict = field(default_factory=dict)
     firebase_sa_path: str = ""
+    domain: str = ""
     completed_steps: list[str] = field(default_factory=list)
     last_step: str = ""
     started_at: str = ""
@@ -283,12 +291,17 @@ class State:
         if not path.exists():
             return cls(host=host, started_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
         raw = json.loads(path.read_text())
-        return cls(**raw)
+        # Forgiving loader: ignore unknown keys (older state files from before a field
+        # was removed) and let missing keys fall back to the dataclass defaults.
+        known = {f.name for f in fields(cls)}
+        filtered = {k: v for k, v in raw.items() if k in known}
+        return cls(**filtered)
 
     def save(self) -> None:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         path = STATE_DIR / f"bootstrap-{self.host}.json"
         path.write_text(json.dumps(self.__dict__, indent=2))
+        path.chmod(0o600)
 
     def mark(self, step_name: str) -> None:
         if step_name not in self.completed_steps:
@@ -334,7 +347,6 @@ OPTIONAL_LOCAL_TOOLS = {
 
 
 def step_local_prereqs(ctx: Context) -> None:
-    section("1. Local tooling")
     missing_required = [t for t in REQUIRED_LOCAL_TOOLS if shutil.which(t) is None]
     if missing_required:
         error(f"Missing required local tools: {', '.join(missing_required)}")
@@ -402,8 +414,6 @@ def _generate_ssh_key(host: str) -> Path:
 
 
 def step_target_server(ctx: Context) -> None:
-    section("2. Target server + SSH access")
-
     # Resolve the SSH key to use.
     if not ctx.ssh_key_path or not ctx.ssh_key_path.exists():
         print()
@@ -442,6 +452,12 @@ def step_target_server(ctx: Context) -> None:
         print(f"  {bold('Public key to add:')}")
         print(f"  {dim(pub)}")
         print()
+        def _verify_ssh() -> tuple[bool, str]:
+            r = _test_ssh(ctx)
+            if r.ok:
+                return True, "SSH probe now works."
+            return False, f"SSH still fails: {r.stderr.strip()[:200]}"
+
         handoff(
             what=f"Authorize this key on {ctx.user}@{ctx.host}",
             where="Hetzner Cloud Console → Servers → your server → details, or SSH in with an existing credential",
@@ -450,9 +466,7 @@ def step_target_server(ctx: Context) -> None:
                 "Option B (existing root access): append the pub key above to /root/.ssh/authorized_keys on the server",
                 f"Option C (ssh-copy-id if password auth is allowed): ssh-copy-id -i {ctx.ssh_key_path}.pub {ctx.user}@{ctx.host}",
             ],
-            verify=lambda: (_test_ssh(ctx).ok, "SSH probe now works."
-                            if _test_ssh(ctx).ok else
-                            f"SSH still fails: {_test_ssh(ctx).stderr.strip()[:200]}"),
+            verify=_verify_ssh,
         )
         result = _test_ssh(ctx)
 
@@ -492,7 +506,6 @@ def _apt_install(ctx: Context, packages: list[str]) -> None:
 
 
 def step_system_packages(ctx: Context) -> None:
-    section("3. System packages (apt)")
     missing_cmd = (
         "missing=(); for p in " + " ".join(BASE_PACKAGES) + "; do "
         "dpkg -s \"$p\" >/dev/null 2>&1 || missing+=(\"$p\"); done; "
@@ -515,7 +528,6 @@ def step_system_packages(ctx: Context) -> None:
 
 
 def step_docker(ctx: Context) -> None:
-    section("4. Docker CE + compose plugin")
     probe = ssh(ctx, "docker --version 2>/dev/null; docker compose version 2>/dev/null")
     lines = [line for line in probe.stdout.strip().splitlines() if line]
     if len(lines) >= 2:
@@ -554,12 +566,21 @@ systemctl enable --now docker
 
 
 def step_deploy_user(ctx: Context) -> None:
-    section("5. deploy user")
     probe = ssh(ctx, "getent passwd deploy || true")
     if probe.stdout.strip():
         ok("user 'deploy' already exists")
     else:
-        info("Creating 'deploy' user with home, docker + sudo groups")
+        info("About to create a 'deploy' user with the following privileges:")
+        info("  • home dir /home/deploy, shell /bin/bash")
+        info("  • groups:   docker (can run docker without sudo)")
+        info("              sudo   (member of the sudo group)")
+        info("  • ssh:      authorized_keys copied from /root/.ssh/authorized_keys")
+        info("              → the same SSH key that reaches root will reach deploy")
+        warn("  • sudoers:  NOPASSWD:ALL — deploy can become root without a password.")
+        warn("              This is a trust decision. The script needs it so deploy.sh")
+        warn("              can manage Docker + CI-style restarts non-interactively.")
+        if not confirm("Create deploy user with these privileges?", default=True):
+            raise SystemExit("aborted at deploy-user creation")
         if ctx.dry_run:
             info("[dry-run] would: useradd -m -s /bin/bash -G docker,sudo deploy")
             return
@@ -571,7 +592,6 @@ def step_deploy_user(ctx: Context) -> None:
             "chmod 600 /home/deploy/.ssh/authorized_keys && "
             "chown -R deploy:deploy /home/deploy/.ssh",
             check=True)
-        # Passwordless sudo so deploy.sh can do privileged things (docker is already groupd).
         ssh(ctx,
             "echo 'deploy ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/deploy && "
             "chmod 0440 /etc/sudoers.d/deploy",
@@ -607,8 +627,6 @@ def _gh_auth_ok() -> bool:
 
 
 def step_github_access(ctx: Context) -> None:
-    section("6. GitHub deploy key")
-
     # Ensure local gh is authenticated.
     if not shutil.which("gh"):
         error("`gh` CLI missing locally — install it (e.g. `brew install gh`) and re-run step 6.")
@@ -695,7 +713,6 @@ def step_github_access(ctx: Context) -> None:
 
 
 def step_clone_repo(ctx: Context) -> None:
-    section("7. Clone repo to /opt/mediforce")
     probe = ssh(ctx, f"test -d {REMOTE_DEPLOY_DIR}/.git && echo HAVE || echo NONE")
     if "HAVE" in probe.stdout:
         branch = ssh(ctx, f"sudo -u deploy bash -c 'cd {REMOTE_DEPLOY_DIR} && git rev-parse --abbrev-ref HEAD'", check=True).stdout.strip()
@@ -731,14 +748,27 @@ def _fb(account: str, *args: str) -> list[str]:
 
 
 def _firebase_login_accounts() -> tuple[Optional[str], list[str]]:
-    """Return (active_account, other_accounts). Both None/[] if nobody is logged in."""
+    """Return (active_account, other_accounts). Both None/[] if nobody is logged in.
+
+    Parses the plain-text output of `firebase login:list`. The CLI doesn't have
+    a --json variant for this subcommand as of firebase-tools 13.x, so format
+    changes in a future release would break this. If that happens, the caller
+    will see (None, []) and fall through to the login-add flow; we additionally
+    print the raw output as a debugging aid so the operator can recognize drift.
+    """
     result = run(["firebase", "login:list"], check=False)
     text = (result.stdout or "") + "\n" + (result.stderr or "")
     active_match = re.search(r"Logged in as\s+([\w.+\-]+@[\w.\-]+)", text)
     others = re.findall(r"^\s*-\s+([\w.+\-]+@[\w.\-]+)", text, re.MULTILINE)
-    if active_match:
-        return active_match.group(1), others
-    return None, others
+    if active_match or others:
+        return (active_match.group(1) if active_match else None), others
+    if "no authorized accounts" in text.lower() or "not currently logged in" in text.lower():
+        return None, []
+    # Neither matches nor known "nothing logged in" marker — could be a CLI
+    # format change. Surface the raw output so the operator can see.
+    warn("Couldn't parse `firebase login:list` output — the CLI format may have changed.")
+    info(f"Raw output (first 300 chars): {text[:300]!r}")
+    return None, []
 
 
 def _firebase_list_projects(account: str) -> list[dict]:
@@ -771,8 +801,6 @@ def _firebase_pick_account(ctx: Context) -> str:
 
 
 def step_firebase(ctx: Context) -> None:
-    section("8. Firebase project + web SDK config")
-
     if not shutil.which("firebase"):
         error("`firebase` CLI not installed — run step 1's install hint and retry this step.")
         raise SystemExit(1)
@@ -840,6 +868,12 @@ def _firebase_create_project_flow(ctx: Context, account: str) -> str:
         check=False, capture=False,
     )
     if not result.ok:
+        def _verify_project_visible() -> tuple[bool, str]:
+            visible = any(p["projectId"] == suggested for p in _firebase_list_projects(account))
+            if visible:
+                return True, f"Project {suggested!r} visible to firebase CLI"
+            return False, f"Still don't see project {suggested!r} — make sure it's created under {account}"
+
         handoff(
             what="Create the Firebase project manually",
             where="https://console.firebase.google.com/",
@@ -850,12 +884,7 @@ def _firebase_create_project_flow(ctx: Context, account: str) -> str:
                 f"Display name: {display}",
                 "Complete the creation wizard (Google Analytics is optional)",
             ],
-            verify=lambda: (
-                any(p["projectId"] == suggested for p in _firebase_list_projects(account)),
-                f"Project {suggested!r} visible to firebase CLI"
-                if any(p["projectId"] == suggested for p in _firebase_list_projects(account))
-                else f"Still don't see project {suggested!r} — make sure it's created under {account}",
-            ),
+            verify=_verify_project_visible,
         )
     return suggested
 
@@ -880,6 +909,12 @@ def _firebase_get_web_config(ctx: Context, account: str, project_id: str) -> dic
         check=False, capture=False,
     )
     if not create.ok:
+        def _verify_web_app() -> tuple[bool, str]:
+            r = run(_fb(account, "apps:sdkconfig", "web", "--project", project_id, "--json"), check=False)
+            if r.ok:
+                return True, "web app now registered"
+            return False, "still no web app — try again in the Console"
+
         handoff(
             what="Register a Web app on the Firebase project",
             where=f"https://console.firebase.google.com/project/{project_id}/settings/general",
@@ -890,12 +925,7 @@ def _firebase_get_web_config(ctx: Context, account: str, project_id: str) -> dic
                 "Skip Firebase Hosting setup (we run our own)",
                 "Click 'Register app'",
             ],
-            verify=lambda: (
-                run(_fb(account, "apps:sdkconfig", "web", "--project", project_id, "--json"), check=False).ok,
-                "web app now registered"
-                if run(_fb(account, "apps:sdkconfig", "web", "--project", project_id, "--json"), check=False).ok
-                else "still no web app — try again in the Console",
-            ),
+            verify=_verify_web_app,
         )
 
     retry = run(
@@ -915,35 +945,95 @@ def _looks_like_key(value: str, prefix: str) -> Optional[str]:
 
 
 def step_api_keys(ctx: Context) -> None:
-    section("9. API keys")
+    _ensure_api_keys(ctx)
 
-    # OpenRouter — required
-    openrouter = ask(
-        "OpenRouter API key (starts with sk-or-…) — get one at https://openrouter.ai/keys",
-        secret=True,
-        validate=lambda v: _looks_like_key(v, "sk-or-"),
-    )
-    ctx.collected["OPENROUTER_API_KEY"] = openrouter
-    ok("OpenRouter key accepted")
 
-    # OpenAI — optional
-    if confirm("Provide an OpenAI API key (sk-…)? Optional — used by some agent plugins.", default=False):
-        openai = ask(
-            "OpenAI API key",
-            secret=True,
-            validate=lambda v: _looks_like_key(v, "sk-"),
+def _resolve_a_records(domain: str) -> list[str]:
+    """Return IPv4 A records for `domain` (empty list on failure or none)."""
+    result = run(["dig", "+short", "A", domain], check=False)
+    if not result.ok:
+        return []
+    ips: list[str] = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", line):
+            ips.append(line)
+    return ips
+
+
+def step_domain(ctx: Context) -> None:
+    existing = ctx.state.domain
+    if existing:
+        info(f"Domain from state: {existing}")
+        if confirm("Keep using this domain?", default=True):
+            ctx.collected["domain"] = existing
+            ok(f"using domain: {existing}")
+            return
+        ctx.state.domain = ""
+        ctx.state.save()
+
+    info("A real domain gives you a Let's Encrypt TLS cert automatically via Caddy.")
+    info("Without one, Caddy serves a self-signed cert and browsers will show a warning.")
+    if not confirm("Do you have a domain pointing to this server?", default=True):
+        ctx.collected["domain"] = ""
+        warn("No domain — will use IP with self-signed TLS.")
+        return
+
+    while True:
+        domain = ask(
+            "Domain (e.g. app.example.com)",
+            validate=lambda s: None if re.fullmatch(r"[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+", s) else "doesn't look like a valid hostname",
         )
-        ctx.collected["OPENAI_API_KEY"] = openai
-        ok("OpenAI key accepted")
-    else:
-        ctx.collected["OPENAI_API_KEY"] = ""
-        info("Skipped (field left empty)")
+        ips = _resolve_a_records(domain)
+        if not ips:
+            warn(f"{domain} doesn't resolve to any A record yet (DNS may be propagating or not set).")
+            choice = menu(
+                "What next?",
+                [
+                    ("retry", "Retry after setting/propagating DNS"),
+                    ("continue", "Continue anyway (ACME HTTP-01 will fail until DNS is correct — Caddy will retry)"),
+                    ("change", "Type a different domain"),
+                ],
+            )
+            if choice == "retry":
+                continue
+            if choice == "change":
+                continue
+            # fall through to save with warning
+        elif ctx.host not in ips:
+            warn(f"{domain} resolves to {ips} but target host is {ctx.host}.")
+            choice = menu(
+                "What next?",
+                [
+                    ("retry", "Retry (I'll fix DNS)"),
+                    ("continue", "Continue anyway (Caddy's cert will fail until DNS matches)"),
+                    ("change", "Type a different domain"),
+                ],
+            )
+            if choice == "retry":
+                continue
+            if choice == "change":
+                continue
+        else:
+            ok(f"{domain} resolves to {ctx.host}")
 
-    # Internal API key — auto-generate
-    import secrets
-    platform_key = secrets.token_urlsafe(32)
-    ctx.collected["PLATFORM_API_KEY"] = platform_key
-    ok(f"PLATFORM_API_KEY auto-generated (32 bytes base64url)")
+        ctx.state.domain = domain
+        ctx.state.save()
+        ctx.collected["domain"] = domain
+        ok(f"domain set: {domain}")
+        return
+
+
+def _public_base_url(ctx: Context) -> str:
+    domain = ctx.collected.get("domain") or ctx.state.domain
+    if domain:
+        return f"https://{domain}"
+    return f"http://{ctx.host}"
+
+
+def _caddy_site(ctx: Context) -> str:
+    """Value for Caddy's site block matcher — real domain if set, else IP."""
+    return ctx.collected.get("domain") or ctx.state.domain or ctx.host
 
 
 def _render_env_local(ctx: Context) -> str:
@@ -963,7 +1053,7 @@ def _render_env_local(ctx: Context) -> str:
         f"OPENROUTER_API_KEY={ctx.collected.get('OPENROUTER_API_KEY', '')}",
         f"OPENAI_API_KEY={ctx.collected.get('OPENAI_API_KEY', '')}",
         f"PLATFORM_API_KEY={ctx.collected.get('PLATFORM_API_KEY', '')}",
-        f"APP_BASE_URL=http://{ctx.host}",
+        f"APP_BASE_URL={_public_base_url(ctx)}",
         "NAMESPACE=",
         "",
     ]
@@ -987,15 +1077,15 @@ def _render_compose_env(ctx: Context) -> str:
         f"NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET={fb.get('storageBucket', '')}",
         f"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID={fb.get('messagingSenderId', '')}",
         f"NEXT_PUBLIC_FIREBASE_APP_ID={fb.get('appId', '')}",
-        f"NEXT_PUBLIC_APP_URL=http://{ctx.host}",
+        f"NEXT_PUBLIC_APP_URL={_public_base_url(ctx)}",
         "",
         "# Runtime env for platform-ui / agent-worker containers",
         f"PLATFORM_API_KEY={ctx.collected.get('PLATFORM_API_KEY', '')}",
         f"DOCKER_OPENROUTER_API_KEY={openrouter}",
         "DOCKER_DEEPSEEK_API_KEY=",
         "",
-        "# Caddy",
-        f"DOMAIN={ctx.host}",
+        "# Caddy — site block matcher (real domain → Let's Encrypt cert, IP → self-signed)",
+        f"DOMAIN={_caddy_site(ctx)}",
         "",
     ]
     return "\n".join(lines)
@@ -1009,13 +1099,26 @@ def _mask(value: str) -> str:
     return f"{value[:4]}…{value[-4:]} ({len(value)} chars)"
 
 
+def _is_sensitive_key(key: str) -> bool:
+    """A key name that should be masked in previews.
+
+    NEXT_PUBLIC_* variables are intentionally client-visible (they end up in
+    the browser bundle at build time), so showing them unmasked is fine and
+    helps the operator sanity-check what's being uploaded. Everything else
+    whose name carries a secret-shaped marker gets masked.
+    """
+    if key.startswith("NEXT_PUBLIC_"):
+        return False
+    upper = key.upper()
+    return any(marker in upper for marker in ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL"))
+
+
 def _preview_env(rendered: str) -> str:
     out_lines: list[str] = []
-    sensitive = ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "PLATFORM_API_KEY")
     for line in rendered.splitlines():
         if "=" in line and not line.startswith("#"):
             key, _, val = line.partition("=")
-            if key in sensitive:
+            if _is_sensitive_key(key.strip()):
                 out_lines.append(f"{key}={_mask(val)}")
                 continue
         out_lines.append(line)
@@ -1023,22 +1126,53 @@ def _preview_env(rendered: str) -> str:
 
 
 def _upload_env_file(ctx: Context, rendered: str, remote_path: str) -> None:
-    import tempfile
     with tempfile.NamedTemporaryFile("w", delete=False) as tf:
         tf.write(rendered)
         tmp_path = Path(tf.name)
     os.chmod(tmp_path, 0o600)
     try:
         scp_upload(ctx, tmp_path, remote_path, mode="0600")
-        ssh(ctx, f"chown deploy:deploy {shlex.quote(remote_path)}", check=True)
+        # Only chown when uploading as root — if uploaded by deploy itself, the file
+        # is already deploy:deploy and non-root can't chown.
+        if ctx.user != "deploy":
+            ssh(ctx, f"{_sudo_prefix(ctx)}chown deploy:deploy {shlex.quote(remote_path)}", check=True)
     finally:
         tmp_path.unlink(missing_ok=True)
 
 
-def step_env_local(ctx: Context) -> None:
-    section("10. Assemble and upload env files")
+def _ensure_api_keys(ctx: Context) -> None:
+    """Prompt for keys not yet in ctx.collected. Idempotent.
 
-    # Hydrate firebase config from state on resumed runs.
+    API keys are intentionally not persisted to local state — this is the
+    authoritative place where they are collected, and step_env_local calls
+    through here on resumed runs (when --from-step skipped step_api_keys).
+    """
+    if not ctx.collected.get("OPENROUTER_API_KEY"):
+        ctx.collected["OPENROUTER_API_KEY"] = ask(
+            "OpenRouter API key (starts with sk-or-…) — get one at https://openrouter.ai/keys",
+            secret=True,
+            validate=lambda v: _looks_like_key(v, "sk-or-"),
+        )
+        ok("OpenRouter key accepted")
+
+    if "OPENAI_API_KEY" not in ctx.collected:
+        if confirm("Provide an OpenAI API key (sk-…)? Optional — used by some agent plugins.", default=False):
+            ctx.collected["OPENAI_API_KEY"] = ask(
+                "OpenAI API key",
+                secret=True,
+                validate=lambda v: _looks_like_key(v, "sk-"),
+            )
+            ok("OpenAI key accepted")
+        else:
+            ctx.collected["OPENAI_API_KEY"] = ""
+
+    if not ctx.collected.get("PLATFORM_API_KEY"):
+        ctx.collected["PLATFORM_API_KEY"] = secrets.token_urlsafe(32)
+        ok("PLATFORM_API_KEY auto-generated (32 bytes base64url)")
+
+
+def step_env_local(ctx: Context) -> None:
+    # --- Hydrate firebase config from state on resumed runs ---
     if not ctx.collected.get("firebase_config"):
         if ctx.state.firebase_web_config:
             ctx.collected["firebase_config"] = ctx.state.firebase_web_config
@@ -1054,6 +1188,14 @@ def step_env_local(ctx: Context) -> None:
         else:
             error("Firebase config missing from memory and state — rerun step 8 first (--from-step 8).")
             raise SystemExit(1)
+
+    # --- Re-prompt for API keys not collected in this session ---
+    # Secrets aren't in state by design, so on --from-step ≥ 11 they're empty.
+    # Running through the same collection flow keeps the script the single
+    # source of prompts (no server-side read, no silent empty uploads).
+    if not ctx.collected.get("OPENROUTER_API_KEY"):
+        info("API keys weren't collected this session (resumed past step 9) — prompting now.")
+        _ensure_api_keys(ctx)
 
     env_local = _render_env_local(ctx)
     compose_env = _render_compose_env(ctx)
@@ -1085,8 +1227,8 @@ def step_env_local(ctx: Context) -> None:
 
 
 def step_firewall(ctx: Context) -> None:
-    section("11. Firewall (UFW)")
-    status = ssh(ctx, "ufw status 2>/dev/null || true")
+    sp = _sudo_prefix(ctx)
+    status = ssh(ctx, f"{sp}ufw status 2>/dev/null || true")
     if "Status: active" in status.stdout and \
        "22/tcp" in status.stdout and \
        "80/tcp" in status.stdout and \
@@ -1097,11 +1239,11 @@ def step_firewall(ctx: Context) -> None:
         info("[dry-run] would allow 22, 80, 443 and enable UFW")
         return
     script = (
-        "ufw allow 22/tcp && "
-        "ufw allow 80/tcp && "
-        "ufw allow 443/tcp && "
-        "ufw --force enable && "
-        "ufw status verbose"
+        f"{sp}ufw allow 22/tcp && "
+        f"{sp}ufw allow 80/tcp && "
+        f"{sp}ufw allow 443/tcp && "
+        f"{sp}ufw --force enable && "
+        f"{sp}ufw status verbose"
     )
     result = ssh(ctx, script, capture=True)
     if not result.ok:
@@ -1110,8 +1252,6 @@ def step_firewall(ctx: Context) -> None:
 
 
 def step_first_deploy(ctx: Context) -> None:
-    section("12. First deploy (running scripts/deploy.sh)")
-
     # Sanity: docker-compose.prod.yml present?
     probe = ssh(ctx, f"test -f {REMOTE_DEPLOY_DIR}/docker-compose.prod.yml && echo YES || echo NO")
     if "YES" not in probe.stdout:
@@ -1148,7 +1288,6 @@ def step_first_deploy(ctx: Context) -> None:
 
 
 def step_smoke_test(ctx: Context) -> None:
-    section("13. Smoke test")
     # Check compose ps first — gives quick visibility on container state.
     ps = ssh(ctx, f"cd {REMOTE_DEPLOY_DIR} && docker compose -f docker-compose.prod.yml ps --format json 2>/dev/null || true")
     lines = [line for line in ps.stdout.strip().splitlines() if line.startswith("{")]
@@ -1184,27 +1323,81 @@ def step_smoke_test(ctx: Context) -> None:
             continue
 
     success = any(code.startswith(("2", "3")) for _, code in reachable)
+    public_url = _public_base_url(ctx)
     if success:
-        ok(f"App responded on {ctx.host}. See http://{ctx.host}/")
+        ok(f"App responded on {ctx.host}. Try: {public_url}")
     else:
         warn("No port returned a 2xx/3xx response — the app may still be starting. Check:")
         info("  ssh root@{} 'docker compose -f {}/docker-compose.prod.yml logs --tail 50'".format(ctx.host, REMOTE_DEPLOY_DIR))
 
+    # If a domain is configured, verify public HTTPS reachability from outside the
+    # server too (catches firewall, DNS, and Caddy cert provisioning problems).
+    # Retry with backoff — Caddy's first ACME HTTP-01 can take minutes under
+    # rate limits or while DNS propagates.
+    domain = ctx.collected.get("domain") or ctx.state.domain
+    if domain:
+        _probe_public_url_with_retry(ctx, public_url, attempts=3, wait_seconds=120)
 
-STEPS: list[tuple[str, Callable[[Context], None]]] = [
-    ("local_prereqs", step_local_prereqs),
-    ("target_server", step_target_server),
-    ("system_packages", step_system_packages),
-    ("docker", step_docker),
-    ("deploy_user", step_deploy_user),
-    ("github_access", step_github_access),
-    ("clone_repo", step_clone_repo),
-    ("firebase", step_firebase),
-    ("api_keys", step_api_keys),
-    ("env_local", step_env_local),
-    ("firewall", step_firewall),
-    ("first_deploy", step_first_deploy),
-    ("smoke_test", step_smoke_test),
+
+def _probe_public_url_with_retry(
+    ctx: Context, public_url: str, *, attempts: int, wait_seconds: int,
+) -> None:
+    for attempt in range(1, attempts + 1):
+        info(f"Attempt {attempt}/{attempts}: curl {public_url}")
+        probe = run(
+            ["curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}|%{ssl_verify_result}",
+             "-m", "45", public_url],
+            check=False,
+        )
+        if probe.ok and probe.stdout:
+            code, _, ssl_rc = probe.stdout.partition("|")
+            ssl_rc = ssl_rc.strip()
+            if code.startswith(("2", "3")) and ssl_rc == "0":
+                ok(f"{public_url} → HTTP {code}, TLS verified")
+                return
+            if code.startswith(("2", "3")):
+                warn(f"{public_url} → HTTP {code} but TLS verify returned {ssl_rc} (self-signed or pending LE cert)")
+                # Self-signed while LE is pending is a real transient — keep retrying.
+                last_reason = f"TLS verify rc={ssl_rc}"
+            else:
+                warn(f"{public_url} → HTTP {code or 'no response'} (ssl_rc={ssl_rc})")
+                last_reason = f"HTTP {code or 'no response'}"
+        else:
+            warn(f"Couldn't reach {public_url} — curl failed ({probe.stderr.strip()[:120]})")
+            last_reason = "curl failed"
+
+        if attempt == attempts:
+            break
+
+        info(f"Waiting {wait_seconds}s before retry — press Ctrl+C to stop waiting and finish.")
+        try:
+            # Wake up often so Ctrl+C feels responsive.
+            for _ in range(wait_seconds):
+                time.sleep(1)
+        except KeyboardInterrupt:
+            warn("Interrupted — skipping remaining retries.")
+            break
+
+    warn(f"Public URL didn't respond after {attempt} attempt(s). Last reason: {last_reason}")
+    info("Investigate with:")
+    info(f"  ssh {ctx.user}@{ctx.host} 'docker compose -f {REMOTE_DEPLOY_DIR}/docker-compose.prod.yml logs caddy --tail 80'")
+
+
+STEPS: list[tuple[str, str, Callable[[Context], None]]] = [
+    ("local_prereqs",    "Local tooling",                        step_local_prereqs),
+    ("target_server",    "Target server + SSH access",           step_target_server),
+    ("system_packages",  "System packages (apt)",                step_system_packages),
+    ("docker",           "Docker CE + compose plugin",           step_docker),
+    ("deploy_user",      "deploy user",                          step_deploy_user),
+    ("github_access",    "GitHub deploy key",                    step_github_access),
+    ("clone_repo",       "Clone repo to /opt/mediforce",         step_clone_repo),
+    ("firebase",         "Firebase project + web SDK config",    step_firebase),
+    ("api_keys",         "API keys",                             step_api_keys),
+    ("domain",           "Domain",                               step_domain),
+    ("env_local",        "Assemble and upload env files",        step_env_local),
+    ("firewall",         "Firewall (UFW)",                       step_firewall),
+    ("first_deploy",     "First deploy (running scripts/deploy.sh)", step_first_deploy),
+    ("smoke_test",       "Smoke test",                           step_smoke_test),
 ]
 
 
@@ -1238,10 +1431,14 @@ def welcome() -> None:
 def resolve_start_index(args: argparse.Namespace, state: State) -> int:
     """Determine which step to start from."""
     if args.from_step:
-        return max(0, args.from_step - 1)
+        if args.from_step < 1 or args.from_step > len(STEPS):
+            raise SystemExit(
+                f"--from-step {args.from_step} out of range (1..{len(STEPS)})"
+            )
+        return args.from_step - 1
     if state.completed_steps:
         last = state.last_step
-        remaining = [n for n, _ in STEPS if n not in state.completed_steps]
+        remaining = [n for n, _, _ in STEPS if n not in state.completed_steps]
         info(f"Resuming — last completed step: {last!r}. Remaining: {len(remaining)}")
         if args.resume or confirm("Continue from there?", default=True):
             done_count = len(state.completed_steps)
@@ -1278,7 +1475,8 @@ def main() -> int:
 
     start = resolve_start_index(args, state)
     try:
-        for name, fn in STEPS[start:]:
+        for idx, (name, title, fn) in enumerate(STEPS[start:], start=start + 1):
+            section(f"{idx}. {title}")
             fn(ctx)
             state.mark(name)
     except KeyboardInterrupt as exc:
@@ -1286,10 +1484,6 @@ def main() -> int:
         warn(f"Aborted: {exc}")
         info(f"State saved to {STATE_DIR}/bootstrap-{state.host}.json — rerun to resume.")
         return 130
-    except NotImplementedError as exc:
-        print()
-        warn(f"Stopped at unimplemented step: {exc}")
-        return 2
 
     print()
     ok(bold("All steps completed."))
