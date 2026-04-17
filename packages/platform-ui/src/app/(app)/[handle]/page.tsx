@@ -182,7 +182,7 @@ function DefaultWorkspaceToggle({ handle }: { handle: string }) {
   }
 
   return (
-    <label className="mt-3 flex items-center gap-2 cursor-pointer select-none w-fit">
+    <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
       <input
         type="checkbox"
         checked={isDefault}
@@ -194,14 +194,16 @@ function DefaultWorkspaceToggle({ handle }: { handle: string }) {
   );
 }
 
-function MemberAvatars({ namespace }: { namespace: Namespace }) {
+function MemberAvatars({ namespace, trailing }: { namespace: Namespace; trailing?: React.ReactNode }) {
   const { members, totalCount } = useWorkspaceMembers(
     namespace.handle,
     namespace.type === 'organization',
   );
   const userProfiles = useUserProfiles();
 
-  if (namespace.type !== 'organization') return null;
+  if (namespace.type !== 'organization') {
+    return trailing !== undefined ? <div className="mt-3">{trailing}</div> : null;
+  }
   if (totalCount === null) return null;
 
   function resolveName(member: MemberPreview): string {
@@ -213,7 +215,7 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
   }
 
   return (
-    <div className="mt-3">
+    <div className="mt-3 flex items-center gap-4 flex-wrap">
       <Link
         href={`/${namespace.handle}/settings`}
         className="group inline-flex items-center gap-2.5"
@@ -233,6 +235,7 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
           {totalCount} {totalCount === 1 ? 'member' : 'members'}
         </span>
       </Link>
+      {trailing}
     </div>
   );
 }
@@ -637,11 +640,10 @@ export default function ProfilePage() {
 
           <InlineEditableBio namespace={namespace} canEdit={canEdit} />
 
-          <MemberAvatars namespace={namespace} />
-
-          {namespace.type === 'organization' && (
-            <DefaultWorkspaceToggle handle={namespace.handle} />
-          )}
+          <MemberAvatars
+            namespace={namespace}
+            trailing={<DefaultWorkspaceToggle handle={namespace.handle} />}
+          />
         </div>
       </div>
 
