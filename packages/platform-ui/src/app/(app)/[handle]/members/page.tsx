@@ -47,16 +47,15 @@ function formatDate(isoString: string): string {
   });
 }
 
-function formatLastSignIn(isoString: string | null | undefined): string {
-  if (isoString === null || isoString === undefined) return 'Never';
-  const date = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / 86400000);
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+function formatLastSignIn(isoString: string): string {
+  return new Date(isoString).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
 }
 
 function RoleBadge({ role }: { role: NamespaceMember['role'] }) {
@@ -419,7 +418,7 @@ export default function MembersPage() {
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Email</th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Role</th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Joined</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Last sign in</th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap sr-only">Actions</th>
                 </tr>
               </thead>
@@ -474,17 +473,11 @@ export default function MembersPage() {
                         {formatDate(member.joinedAt)}
                       </td>
 
-                      {/* Status */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {member.lastSignInTime === null || member.lastSignInTime === undefined ? (
-                          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                            Pending activation
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            {formatLastSignIn(member.lastSignInTime)}
-                          </span>
-                        )}
+                      {/* Last sign in */}
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                        {member.lastSignInTime === null || member.lastSignInTime === undefined
+                          ? <span className="text-muted-foreground/50">Never</span>
+                          : formatLastSignIn(member.lastSignInTime)}
                       </td>
 
                       {/* Actions */}
