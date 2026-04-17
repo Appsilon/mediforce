@@ -215,7 +215,7 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
   return (
     <div className="mt-3">
       <Link
-        href={`/${namespace.handle}/members`}
+        href={`/${namespace.handle}/settings`}
         className="group inline-flex items-center gap-2.5"
       >
         {members.length > 0 && (
