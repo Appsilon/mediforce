@@ -23,7 +23,7 @@ export default function ChangePasswordPage() {
     }
     // If they don't need to change password, send them in normally
     if (!mustChangePassword) {
-      router.replace('/redirect');
+      router.replace('/workspace-selection');
     }
   }, [loading, firebaseUser, mustChangePassword, router]);
 
@@ -46,7 +46,7 @@ export default function ChangePasswordPage() {
       if (currentUser === null) throw new Error('Not signed in.');
       await updatePassword(currentUser, newPassword);
       await clearMustChangePassword();
-      router.replace('/redirect');
+      router.replace('/workspace-selection');
     } catch (err: unknown) {
       if (err instanceof Error) {
         const code = (err as { code?: string }).code ?? '';

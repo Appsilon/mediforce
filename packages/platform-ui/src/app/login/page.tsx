@@ -18,7 +18,7 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     if (!loading && firebaseUser) {
-      router.replace('/redirect');
+      router.replace('/workspace-selection');
     }
   }, [loading, firebaseUser, router]);
 
@@ -54,7 +54,7 @@ export default function LoginPage() {
     setPending(true);
     try {
       await signInWithGoogle();
-      router.replace('/redirect');
+      router.replace('/workspace-selection');
     } catch (err: unknown) {
       setError(friendlyAuthError(err));
     } finally {
@@ -68,7 +68,7 @@ export default function LoginPage() {
     setPending(true);
     try {
       await signInWithEmail(email.trim(), password);
-      router.replace('/redirect');
+      router.replace('/workspace-selection');
     } catch (err: unknown) {
       setError(friendlyAuthError(err));
     } finally {
