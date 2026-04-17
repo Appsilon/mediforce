@@ -791,9 +791,6 @@ def step_clone_repo(ctx: Context) -> None:
             _deploy_git(ctx, "remote rename origin upstream", check=True)
             _deploy_git(ctx, f"remote add origin {expected_url}", check=True)
             ok(f"origin → {expected_url}, previous origin preserved as 'upstream'")
-            # Invalidate old deploy-key id — it belonged to the previous repo.
-            ctx.state.github_deploy_key_id = None
-            ctx.state.save()
             # Verify we can fetch from the new origin.
             fetch = _deploy_git(ctx, "fetch origin", capture=False, stream=True)
             if fetch.rc != 0:
