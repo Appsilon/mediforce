@@ -7,6 +7,7 @@ export const NamespaceSchema = z.object({
   type: NamespaceTypeSchema,
   displayName: z.string().min(1),
   avatarUrl: z.string().url().optional(),
+  icon: z.string().optional(),
   linkedUserId: z.string().optional(),
   bio: z.string().optional(),
   createdAt: z.string().datetime(),

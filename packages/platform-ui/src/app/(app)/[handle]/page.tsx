@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc, where } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Pencil, Check, X, Settings, GitBranch, Building2, Plus } from 'lucide-react';
+import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
+import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -416,7 +417,7 @@ function UserWorkspaces({ namespace }: { namespace: Namespace }) {
             href={`/${ws.handle}`}
             className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
           >
-            <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            {(() => { const Icon = getWorkspaceIcon(ws.icon); return <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />; })()}
             <span className="font-medium truncate">{ws.displayName}</span>
             <span className="text-xs text-muted-foreground ml-auto shrink-0">@{ws.handle}</span>
           </Link>
@@ -600,7 +601,15 @@ export default function ProfilePage() {
       {/* Profile header */}
       <div className="flex items-start gap-4">
         {(() => {
-          const avatarSrc = namespace.avatarUrl ?? (namespace.type === 'personal' ? firebaseUser?.photoURL : undefined) ?? undefined;
+          if (namespace.type === 'organization') {
+            const Icon = getWorkspaceIcon(namespace.icon);
+            return (
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <Icon className="h-7 w-7 text-primary" />
+              </div>
+            );
+          }
+          const avatarSrc = namespace.avatarUrl ?? firebaseUser?.photoURL ?? undefined;
           return avatarSrc !== undefined && avatarSrc !== '' ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
