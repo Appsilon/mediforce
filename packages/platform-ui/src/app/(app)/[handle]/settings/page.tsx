@@ -248,16 +248,28 @@ export default function WorkspaceConfigPage() {
   async function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (file === undefined) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoError('File is too large. Maximum size is 2 MB.');
+      return;
+    }
+
+    // Some browsers return empty string for file.type on certain formats.
+    // Fall back to image/jpeg so the Storage rule contentType check passes.
+    const contentType = file.type !== '' ? file.type : 'image/jpeg';
+
     setUploadingLogo(true);
     setLogoError(null);
     try {
       const storagePath = `namespaces/${handle}/logo/${file.name}`;
       const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, file, { contentType: file.type });
+      await uploadBytes(storageRef, file, { contentType });
       const downloadUrl = await getDownloadURL(storageRef);
       await updateDoc(doc(db, 'namespaces', handle), { avatarUrl: downloadUrl });
-    } catch {
-      setLogoError('Failed to upload logo. Make sure the file is an image under 2 MB.');
+    } catch (err: unknown) {
+      console.error('[logo upload]', err);
+      const detail = err instanceof Error ? err.message : String(err);
+      setLogoError(`Upload failed: ${detail}`);
     } finally {
       setUploadingLogo(false);
       if (logoInputRef.current !== null) logoInputRef.current.value = '';
@@ -563,7 +575,7 @@ export default function WorkspaceConfigPage() {
                     </button>
                   )}
                   <p className="text-[11px] text-muted-foreground">Recommended: square image, at least 128×128 px</p>
-                  {logoError !== null && <p className="text-[11px] text-destructive">{logoError}</p>}
+                  {logoError !== null && <p className="text-xs font-medium text-destructive">{logoError}</p>}
                 </div>
               </div>
             </div>
