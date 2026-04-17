@@ -11,6 +11,7 @@ COPY packages/platform-infra/package.json packages/platform-infra/
 COPY packages/workflow-engine/package.json packages/workflow-engine/
 COPY packages/agent-runtime/package.json packages/agent-runtime/
 COPY packages/agent-queue/package.json packages/agent-queue/
+COPY packages/mcp-client/package.json packages/mcp-client/
 COPY packages/supply-intelligence/package.json packages/supply-intelligence/
 COPY packages/supply-intelligence-plugins/package.json packages/supply-intelligence-plugins/
 COPY packages/platform-ui/package.json packages/platform-ui/
