@@ -8,7 +8,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import type { Namespace } from '@mediforce/platform-core';
 
-const SESSION_KEY = 'lastNamespace';
 const ALWAYS_KEY = 'alwaysNamespace';
 
 function OrgCard({
@@ -76,9 +75,8 @@ export default function WorkspaceSelectionPage() {
   const [alwaysHandle, setAlwaysHandle] = React.useState<string | null>(null);
   const [ready, setReady] = React.useState(false);
 
-  // Read persisted preferences once on mount
+  // Read localStorage once on mount (SSR-safe)
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
     setAlwaysHandle(localStorage.getItem(ALWAYS_KEY));
     setReady(true);
   }, []);
@@ -91,7 +89,7 @@ export default function WorkspaceSelectionPage() {
       return;
     }
 
-    // Single namespace — skip the picker entirely
+    // Single namespace — no choice needed, go straight there
     if (namespaces.length <= 1) {
       const target = namespaces[0]?.handle;
       if (target !== undefined) {
@@ -100,16 +98,14 @@ export default function WorkspaceSelectionPage() {
       return;
     }
 
-    // "Always use" preference set and valid
-    const saved = localStorage.getItem(ALWAYS_KEY);
-    if (saved !== null && saved !== '' && namespaces.some((ns) => ns.handle === saved)) {
-      sessionStorage.setItem(SESSION_KEY, saved);
-      router.replace(`/${saved}`);
+    // Preferred workspace set — skip the picker
+    const preferred = localStorage.getItem(ALWAYS_KEY);
+    if (preferred !== null && preferred !== '' && namespaces.some((ns) => ns.handle === preferred)) {
+      router.replace(`/${preferred}`);
     }
   }, [authLoading, nsLoading, ready, firebaseUser, namespaces, router]);
 
   function handleSelect(handle: string) {
-    sessionStorage.setItem(SESSION_KEY, handle);
     router.replace(`/${handle}`);
   }
 
