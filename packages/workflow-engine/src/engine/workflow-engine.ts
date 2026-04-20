@@ -546,6 +546,67 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
+  /**
+   * Retry a failed step in-place: flip the instance back to 'running' so the
+   * auto-runner re-enters `currentStepId`. Variables from earlier steps are
+   * kept as-is; the retried step will create a fresh StepExecution when the
+   * runner dispatches it.
+   *
+   * Retry is only allowed when the instance is 'failed', the requested step
+   * matches `currentStepId`, and the latest execution for that step failed.
+   */
+  async retryStep(
+    instanceId: string,
+    stepId: string,
+    actor: StepActor,
+  ): Promise<ProcessInstance> {
+    const instance = await this.loadInstance(instanceId);
+
+    if (instance.status !== 'failed') {
+      throw new InvalidTransitionError(instance.status, 'retryStep');
+    }
+    if (instance.currentStepId !== stepId) {
+      throw new Error(
+        `Step '${stepId}' is not the current step (currentStepId='${instance.currentStepId}')`,
+      );
+    }
+
+    const latestExecution = await this.instanceRepository.getLatestStepExecution(
+      instanceId,
+      stepId,
+    );
+    if (!latestExecution || latestExecution.status !== 'failed') {
+      throw new Error(
+        `Latest execution for step '${stepId}' is not failed (status='${latestExecution?.status ?? 'none'}')`,
+      );
+    }
+
+    const now = new Date().toISOString();
+    await this.instanceRepository.update(instanceId, {
+      status: 'running',
+      error: null,
+      updatedAt: now,
+    });
+
+    await this.auditRepository.append({
+      actorId: actor.id,
+      actorType: 'user',
+      actorRole: actor.role,
+      action: 'step.retried',
+      description: `Retried failed step '${stepId}' on instance '${instanceId}'`,
+      timestamp: now,
+      inputSnapshot: { instanceId, stepId, previousError: latestExecution.error },
+      outputSnapshot: {},
+      basis: 'Operator triggered retry after step failure',
+      entityType: 'stepExecution',
+      entityId: stepId,
+      processInstanceId: instanceId,
+      processDefinitionVersion: instance.definitionVersion,
+    });
+
+    return this.loadInstance(instanceId);
+  }
+
   private async loadInstance(instanceId: string): Promise<ProcessInstance> {
     const instance = await this.instanceRepository.getById(instanceId);
     if (!instance) {

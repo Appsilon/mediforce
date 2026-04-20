@@ -153,6 +153,33 @@ export async function resumeProcessRun(
   }
 }
 
+export async function retryFailedStep(
+  instanceId: string,
+  stepId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { engine } = getPlatformServices();
+    await engine.retryStep(instanceId, stepId, { id: 'user', role: 'operator' });
+
+    const baseUrl = getAppBaseUrl();
+    fetch(`${baseUrl}/api/processes/${instanceId}/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
+      },
+      body: JSON.stringify({ triggeredBy: 'user' }),
+    }).catch(() => {});
+
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
+}
+
 export async function cancelProcessRun(
   instanceId: string,
 ): Promise<{ success: boolean; error?: string }> {
