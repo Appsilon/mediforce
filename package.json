@@ -43,19 +43,7 @@
       "next": "16.2.3",
       "vite": "8.0.5"
     },
-    "minimumReleaseAgeExclude": [
-      "axios",
-      "protobufjs",
-      "hono",
-      "@hono/node-server",
-      "fast-xml-parser",
-      "node-forge",
-      "follow-redirects",
-      "brace-expansion",
-      "@tootallnate/once",
-      "next",
-      "vite"
-    ]
+    "minimumReleaseAgeExclude": ["axios", "protobufjs", "hono"]
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
