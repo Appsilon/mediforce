@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { RotateCw } from 'lucide-react';
+import { RotateCw, Check } from 'lucide-react';
 import { retryFailedStep } from '@/app/actions/processes';
 import { cn } from '@/lib/utils';
 
@@ -11,37 +11,62 @@ interface RetryStepButtonProps {
   stepId: string;
 }
 
+type Status = 'idle' | 'submitting' | 'refreshing' | 'success' | 'error';
+
 export function RetryStepButton({ instanceId, stepId }: RetryStepButtonProps) {
   const router = useRouter();
-  const [pending, setPending] = React.useState(false);
+  const [, startTransition] = React.useTransition();
+  const [status, setStatus] = React.useState<Status>('idle');
   const [error, setError] = React.useState<string | null>(null);
 
   async function handleClick(event: React.MouseEvent) {
     event.stopPropagation();
-    setPending(true);
+    setStatus('submitting');
     setError(null);
+
     const result = await retryFailedStep(instanceId, stepId);
-    setPending(false);
+
     if (!result.success) {
       setError(result.error ?? 'Retry failed');
+      setStatus('error');
       return;
     }
-    router.refresh();
+
+    setStatus('success');
+    startTransition(() => {
+      router.refresh();
+    });
+    window.setTimeout(() => {
+      setStatus((current) => (current === 'success' ? 'refreshing' : current));
+    }, 1200);
   }
+
+  const busy = status === 'submitting' || status === 'refreshing' || status === 'success';
+  const label =
+    status === 'submitting' ? 'Queuing retry\u2026'
+    : status === 'success' ? 'Retry queued'
+    : status === 'refreshing' ? 'Restarting step\u2026'
+    : 'Retry';
 
   return (
     <div className="inline-flex items-center gap-2">
       <button
         type="button"
-        disabled={pending}
+        disabled={busy}
         onClick={handleClick}
+        aria-busy={busy}
         className={cn(
-          'inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium',
-          'hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed',
+          'inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium shadow-sm',
+          'bg-background hover:bg-muted disabled:cursor-not-allowed',
+          status === 'success' && 'border-emerald-500/60 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+          busy && status !== 'success' && 'bg-muted',
         )}
       >
-        <RotateCw className={cn('h-3 w-3', pending && 'animate-spin')} />
-        {pending ? 'Retrying\u2026' : 'Retry'}
+        {status === 'success'
+          ? <Check className="h-3.5 w-3.5" />
+          : <RotateCw className={cn('h-3.5 w-3.5', busy && 'animate-spin')} />
+        }
+        {label}
       </button>
       {error !== null && <span className="text-xs text-destructive">{error}</span>}
     </div>

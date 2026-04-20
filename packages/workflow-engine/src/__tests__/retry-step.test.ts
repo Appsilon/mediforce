@@ -104,7 +104,9 @@ describe('WorkflowEngine.retryStep', () => {
 
     const events = auditRepo.getAll().filter((e) => e.action === 'step.retried');
     expect(events).toHaveLength(1);
-    expect(events[0].entityId).toBe('deploy');
+    expect(events[0].entityType).toBe('stepExecution');
+    expect(events[0].entityId).toBe('exec-1');
+    expect(events[0].inputSnapshot).toMatchObject({ stepId: 'deploy' });
     expect(events[0].processInstanceId).toBe(instanceId);
     expect(events[0].actorId).toBe('user-1');
   });
@@ -118,9 +120,12 @@ describe('WorkflowEngine.retryStep', () => {
     );
   });
 
-  it('also works when the instance was paused by the fallback handler on agent error', async () => {
+  it.each([
+    ['step_failure'],
+    ['routing_error'],
+  ])('also works when the instance was paused with pauseReason=%s', async (pauseReason) => {
     const instanceId = await seedFailedInstance(instanceRepo);
-    await instanceRepo.update(instanceId, { status: 'paused', pauseReason: 'agent_error' });
+    await instanceRepo.update(instanceId, { status: 'paused', pauseReason });
 
     const result = await engine.retryStep(instanceId, 'deploy', actor);
 
@@ -131,6 +136,9 @@ describe('WorkflowEngine.retryStep', () => {
   it('refuses to retry a step that is not the current step', async () => {
     const instanceId = await seedFailedInstance(instanceRepo, 'deploy');
 
+    await expect(engine.retryStep(instanceId, 'upload', actor)).rejects.toThrow(
+      InvalidTransitionError,
+    );
     await expect(engine.retryStep(instanceId, 'upload', actor)).rejects.toThrow(
       /not the current step/i,
     );
@@ -144,7 +152,19 @@ describe('WorkflowEngine.retryStep', () => {
     });
 
     await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(
+      InvalidTransitionError,
+    );
+    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(
       /latest execution.*not failed/i,
+    );
+  });
+
+  it('refuses to retry when paused for a non-agent reason (e.g. waiting_for_human)', async () => {
+    const instanceId = await seedFailedInstance(instanceRepo);
+    await instanceRepo.update(instanceId, { status: 'paused', pauseReason: 'waiting_for_human' });
+
+    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(
+      InvalidTransitionError,
     );
   });
 });

@@ -10,6 +10,13 @@ docker build \
   "$REPO_ROOT/packages/agent-runtime/container"
 
 echo ""
+echo "=== Building script-container node runtime ==="
+docker build \
+  -f "$REPO_ROOT/packages/agent-runtime/container/Dockerfile.node" \
+  -t mediforce-node:latest \
+  "$REPO_ROOT/packages/agent-runtime/container"
+
+echo ""
 echo "=== Building protocol-to-tfl agent image ==="
 docker build \
   -f "$REPO_ROOT/apps/protocol-to-tfl/container/Dockerfile" \

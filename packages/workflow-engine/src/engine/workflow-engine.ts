@@ -552,9 +552,13 @@ export class WorkflowEngine {
    * kept as-is; the retried step will create a fresh StepExecution when the
    * runner dispatches it.
    *
-   * Retry is allowed when the instance is 'failed' or 'paused' (the fallback
-   * handler pauses on agent errors), the requested step matches
-   * `currentStepId`, and the latest execution for that step failed.
+   * Retry is allowed when the instance is 'failed', or 'paused' with
+   * pauseReason in {step_failure, routing_error} — the two pause reasons the
+   * step-executor sets on an execution failure. Other pause reasons
+   * (waiting_for_human, missing_env, cowork_in_progress, agent_paused,
+   * agent_escalated, awaiting_agent_approval) aren't failures and must be
+   * resolved through their own flows. The requested step must match
+   * `currentStepId`, and the latest execution for that step must have failed.
    */
   async retryStep(
     instanceId: string,
@@ -563,12 +567,19 @@ export class WorkflowEngine {
   ): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
 
-    if (instance.status !== 'failed' && instance.status !== 'paused') {
+    const retryablePauseReasons = new Set(['step_failure', 'routing_error']);
+    const isFailed = instance.status === 'failed';
+    const isRetryablePause =
+      instance.status === 'paused' &&
+      instance.pauseReason !== null &&
+      retryablePauseReasons.has(instance.pauseReason);
+    if (!isFailed && !isRetryablePause) {
       throw new InvalidTransitionError(instance.status, 'retryStep');
     }
     if (instance.currentStepId !== stepId) {
-      throw new Error(
-        `Step '${stepId}' is not the current step (currentStepId='${instance.currentStepId}')`,
+      throw new InvalidTransitionError(
+        instance.status,
+        `retryStep: '${stepId}' is not the current step (currentStepId='${instance.currentStepId}')`,
       );
     }
 
@@ -577,8 +588,9 @@ export class WorkflowEngine {
       .filter((e) => e.stepId === stepId)
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
     if (!latestExecution || latestExecution.status !== 'failed') {
-      throw new Error(
-        `Latest execution for step '${stepId}' is not failed (status='${latestExecution?.status ?? 'none'}')`,
+      throw new InvalidTransitionError(
+        instance.status,
+        `retryStep: latest execution for '${stepId}' is not failed (status='${latestExecution?.status ?? 'none'}')`,
       );
     }
 
@@ -601,7 +613,7 @@ export class WorkflowEngine {
       outputSnapshot: {},
       basis: 'Operator triggered retry after step failure',
       entityType: 'stepExecution',
-      entityId: stepId,
+      entityId: latestExecution.id,
       processInstanceId: instanceId,
       processDefinitionVersion: instance.definitionVersion,
     });
