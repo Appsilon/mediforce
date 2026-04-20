@@ -5,7 +5,7 @@
  * Subclasses: BaseContainerAgentPlugin (LLM agents), ScriptContainerPlugin (deterministic scripts).
  */
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, cpSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, chmodSync, copyFileSync } from 'node:fs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
@@ -14,6 +14,28 @@ import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '..
 import type { AgentConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
 import type { ImageBuildMeta } from './docker-spawn-strategy.js';
+
+let preparedDeployKeyPath: string | null = null;
+
+/**
+ * Returns a deploy-key path that ssh will accept — copies the configured key
+ * to a private tmp file with 0600 perms so host-side mount modes can't break us.
+ *
+ * NOTE: Keep in sync with the duplicated copy in
+ * `packages/agent-queue/src/docker-image-builder.ts` — agent-queue cannot
+ * import from agent-runtime without dragging in Firebase deps.
+ */
+export function prepareDeployKeyPath(): string {
+  const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
+  if (!existsSync(source)) return source;
+  if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath)) return preparedDeployKeyPath;
+  const dir = mkdtempSync(join(tmpdir(), 'mediforce-ssh-'));
+  const dest = join(dir, 'deploy_key');
+  copyFileSync(source, dest);
+  chmodSync(dest, 0o600);
+  preparedDeployKeyPath = dest;
+  return dest;
+}
 
 /** Normalize a repo reference to SSH clone URL and HTTPS browsable URL.
  *  Supports: "org/repo", "git@github.com:org/repo.git", "https://github.com/org/repo", "/path/to/bare.git" */
@@ -162,10 +184,10 @@ export abstract class ContainerPlugin implements AgentPlugin {
 
     try {
       const cloneUrl = repoToken ? toHttpsWithToken(repoUrl, repoToken) : repoUrl;
-      const deployKeyPath = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
+      const deployKeyPath = prepareDeployKeyPath();
       const execOpts = {
         stdio: 'pipe' as const,
-        env: { ...process.env, GIT_SSH_COMMAND: `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no` },
+        env: { ...process.env, GIT_SSH_COMMAND: `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes` },
       };
 
       execSync(`git init "${cloneDir}"`, execOpts);

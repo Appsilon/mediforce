@@ -7,9 +7,9 @@
  */
 import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { tmpdir, homedir } from 'node:os';
-import { toHttpsWithToken } from './container-plugin.js';
+import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { prepareDeployKeyPath, toHttpsWithToken } from './container-plugin.js';
 
 export interface BuildImageOptions {
   image: string;
@@ -33,8 +33,7 @@ const BUILD_COMMIT_LABEL = 'mediforce.build.commit';
 const buildLocks = new Map<string, Promise<void>>();
 
 function getGitSshCommand(): string {
-  const deployKeyPath = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-  return `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no`;
+  return `ssh -i ${prepareDeployKeyPath()} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes`;
 }
 
 export async function imageExistsLocally(image: string): Promise<boolean> {

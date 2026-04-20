@@ -6,14 +6,33 @@
  */
 import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { chmodSync, copyFileSync, existsSync, mkdtempSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 
 const BUILD_COMMIT_LABEL = 'mediforce.build.commit';
 
+let preparedDeployKeyPath: string | null = null;
+
+/**
+ * NOTE: Keep in sync with the exported copy in
+ * `packages/agent-runtime/src/plugins/container-plugin.ts`.
+ * Duplicated so agent-queue stays free of agent-runtime (and Firebase) deps.
+ */
+function prepareDeployKeyPath(): string {
+  const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
+  if (!existsSync(source)) return source;
+  if (preparedDeployKeyPath && existsSync(preparedDeployKeyPath)) return preparedDeployKeyPath;
+  const dir = mkdtempSync(join(tmpdir(), 'mediforce-ssh-'));
+  const dest = join(dir, 'deploy_key');
+  copyFileSync(source, dest);
+  chmodSync(dest, 0o600);
+  preparedDeployKeyPath = dest;
+  return dest;
+}
+
 function getGitSshCommand(): string {
-  const deployKeyPath = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-  return `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no`;
+  return `ssh -i ${prepareDeployKeyPath()} -o StrictHostKeyChecking=no -o IdentitiesOnly=yes`;
 }
 
 export async function imageExistsLocally(image: string): Promise<boolean> {
