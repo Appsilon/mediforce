@@ -572,10 +572,10 @@ export class WorkflowEngine {
       );
     }
 
-    const latestExecution = await this.instanceRepository.getLatestStepExecution(
-      instanceId,
-      stepId,
-    );
+    const executions = await this.instanceRepository.getStepExecutions(instanceId);
+    const latestExecution = executions
+      .filter((e) => e.stepId === stepId)
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
     if (!latestExecution || latestExecution.status !== 'failed') {
       throw new Error(
         `Latest execution for step '${stepId}' is not failed (status='${latestExecution?.status ?? 'none'}')`,
