@@ -20,6 +20,10 @@ let preparedDeployKeyPath: string | null = null;
 /**
  * Returns a deploy-key path that ssh will accept — copies the configured key
  * to a private tmp file with 0600 perms so host-side mount modes can't break us.
+ *
+ * NOTE: Keep in sync with the duplicated copy in
+ * `packages/agent-queue/src/docker-image-builder.ts` — agent-queue cannot
+ * import from agent-runtime without dragging in Firebase deps.
  */
 export function prepareDeployKeyPath(): string {
   const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
