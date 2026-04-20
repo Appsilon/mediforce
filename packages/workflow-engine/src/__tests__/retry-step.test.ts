@@ -109,13 +109,23 @@ describe('WorkflowEngine.retryStep', () => {
     expect(events[0].actorId).toBe('user-1');
   });
 
-  it('refuses to retry when the instance is not in failed status', async () => {
+  it('refuses to retry when the instance is running or completed', async () => {
     const instanceId = await seedFailedInstance(instanceRepo);
     await instanceRepo.update(instanceId, { status: 'running' });
 
     await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(
       InvalidTransitionError,
     );
+  });
+
+  it('also works when the instance was paused by the fallback handler on agent error', async () => {
+    const instanceId = await seedFailedInstance(instanceRepo);
+    await instanceRepo.update(instanceId, { status: 'paused', pauseReason: 'agent_error' });
+
+    const result = await engine.retryStep(instanceId, 'deploy', actor);
+
+    expect(result.status).toBe('running');
+    expect(result.pauseReason).toBeNull();
   });
 
   it('refuses to retry a step that is not the current step', async () => {

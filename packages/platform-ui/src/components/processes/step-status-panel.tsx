@@ -413,7 +413,7 @@ export function StepStatusPanel({
                       ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                       : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
-                  {status === 'failed' && instance.currentStepId === step.id && instance.status === 'failed' && (
+                  {status === 'failed' && instance.currentStepId === step.id && (
                     <RetryStepButton instanceId={instance.id} stepId={step.id} />
                   )}
                 </div>

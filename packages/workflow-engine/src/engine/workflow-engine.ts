@@ -552,8 +552,9 @@ export class WorkflowEngine {
    * kept as-is; the retried step will create a fresh StepExecution when the
    * runner dispatches it.
    *
-   * Retry is only allowed when the instance is 'failed', the requested step
-   * matches `currentStepId`, and the latest execution for that step failed.
+   * Retry is allowed when the instance is 'failed' or 'paused' (the fallback
+   * handler pauses on agent errors), the requested step matches
+   * `currentStepId`, and the latest execution for that step failed.
    */
   async retryStep(
     instanceId: string,
@@ -562,7 +563,7 @@ export class WorkflowEngine {
   ): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
 
-    if (instance.status !== 'failed') {
+    if (instance.status !== 'failed' && instance.status !== 'paused') {
       throw new InvalidTransitionError(instance.status, 'retryStep');
     }
     if (instance.currentStepId !== stepId) {
@@ -584,6 +585,7 @@ export class WorkflowEngine {
     const now = new Date().toISOString();
     await this.instanceRepository.update(instanceId, {
       status: 'running',
+      pauseReason: null,
       error: null,
       updatedAt: now,
     });
