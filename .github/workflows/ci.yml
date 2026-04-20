@@ -115,7 +115,7 @@ jobs:
           path: packages/platform-ui/playwright-report/
           retention-days: 14
 
-  supply-chain-audit:
+  supply-chain-deps-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:

@@ -31,9 +31,31 @@
       "@firebase/util"
     ],
     "overrides": {
-      "axios": ">=1.15.0"
+      "axios": ">=1.15.0",
+      "protobufjs": "7.5.5",
+      "hono": "4.12.14",
+      "@hono/node-server": "1.19.13",
+      "fast-xml-parser": "5.5.7",
+      "node-forge": "1.4.0",
+      "follow-redirects": "1.16.0",
+      "brace-expansion": "2.0.3",
+      "@tootallnate/once": "3.0.1",
+      "next": "16.2.3",
+      "vite": "8.0.5"
     },
-    "minimumReleaseAgeExclude": ["axios"]
+    "minimumReleaseAgeExclude": [
+      "axios",
+      "protobufjs",
+      "hono",
+      "@hono/node-server",
+      "fast-xml-parser",
+      "node-forge",
+      "follow-redirects",
+      "brace-expansion",
+      "@tootallnate/once",
+      "next",
+      "vite"
+    ]
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
