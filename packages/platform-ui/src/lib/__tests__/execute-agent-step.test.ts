@@ -49,6 +49,7 @@ const mockAuditRepo = {
 };
 const mockEngine = {
   advanceStep: vi.fn(),
+  submitReviewVerdict: vi.fn(),
 };
 const mockHumanTaskRepo = {
   create: vi.fn(),
@@ -390,6 +391,224 @@ describe('executeAgentStep', () => {
       await executeAgentStep('inst-wf-001', 'gather-data', l3WithReview, {}, 'user-1');
 
       expect(mockHumanTaskRepo.create).toHaveBeenCalled();
+    });
+
+    it('[DATA] L3 with review.type=agent + escalated (low_confidence) still creates HumanTask with escalationReason', async () => {
+      const l3AgentReview: WorkflowStep = { ...l3Step, review: { type: 'agent' } };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: 'low_confidence',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3AgentReview, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creationReason: 'agent_review_l3',
+          completionData: expect.objectContaining({
+            agentOutput: expect.objectContaining({
+              escalationReason: 'low_confidence',
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('[DATA] L3 with review.type=agent + paused (no escalation) does NOT create HumanTask', async () => {
+      const l3AgentReview: WorkflowStep = { ...l3Step, review: { type: 'agent' } };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: null,
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3AgentReview, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] L3 escalated saves step execution as completed (not failed) when envelope is valid', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: 'low_confidence',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-1');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-1',
+        expect.objectContaining({ status: 'completed' }),
+      );
+    });
+
+    it('[DATA] L3 + review.type=agent + non-review step + completed + appliedToWorkflow=true calls advanceStep', async () => {
+      // Non-review step (type=creation) with review.type=agent falls through to
+      // advanceStep — there's no verdict to submit on a creation step.
+      const l3AgentReview: WorkflowStep = { ...l3Step, review: { type: 'agent' } };
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { verdict: 'approve', summary: 'LGTM' },
+      });
+      const runResult = {
+        status: 'completed' as const,
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue(runResult);
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3AgentReview, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+      expect(mockEngine.submitReviewVerdict).not.toHaveBeenCalled();
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
+        'inst-wf-001',
+        { verdict: 'approve', summary: 'LGTM' },
+        { id: 'user-1', role: 'agent' },
+        undefined,
+        runResult,
+      );
+    });
+
+    // ---- L3 + review.type=agent on a REVIEW step: iteration loop via submitReviewVerdict ----
+
+    const l3ReviewAgentStep: WorkflowStep = {
+      id: 'review-pr',
+      name: 'Review PR',
+      type: 'review',
+      executor: 'agent',
+      autonomyLevel: 'L3',
+      allowedRoles: ['senior-reviewer'],
+      review: { type: 'agent', maxIterations: 3 },
+    };
+
+    it('[DATA] L3 + review.type=agent + review step + verdict=approve calls submitReviewVerdict', async () => {
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { verdict: 'approve', comment: 'LGTM' },
+      });
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'completed',
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      });
+      const updatedInstance = buildProcessInstance({
+        id: 'inst-wf-001',
+        status: 'running',
+        currentStepId: 'done',
+      });
+      mockEngine.submitReviewVerdict.mockResolvedValue(updatedInstance);
+
+      const result = await executeAgentStep('inst-wf-001', 'review-pr', l3ReviewAgentStep, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+      expect(mockEngine.advanceStep).not.toHaveBeenCalled();
+      expect(mockEngine.submitReviewVerdict).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'review-pr',
+        expect.objectContaining({
+          reviewerId: 'agent:review-pr',
+          reviewerRole: 'agent',
+          verdict: 'approve',
+          comment: 'LGTM',
+        }),
+        { id: 'agent:review-pr', role: 'agent' },
+      );
+      expect(result.currentStepId).toBe('done');
+      expect(result.agentRunStatus).toBe('completed');
+    });
+
+    it('[DATA] L3 + review.type=agent + review step + verdict=revise calls submitReviewVerdict (engine loops back)', async () => {
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { verdict: 'revise', comment: 'Please add tests' },
+      });
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'completed',
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      });
+      const loopedInstance = buildProcessInstance({
+        id: 'inst-wf-001',
+        status: 'running',
+        currentStepId: 'gather-data', // looped back to creation step
+      });
+      mockEngine.submitReviewVerdict.mockResolvedValue(loopedInstance);
+
+      const result = await executeAgentStep('inst-wf-001', 'review-pr', l3ReviewAgentStep, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+      expect(mockEngine.submitReviewVerdict).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'review-pr',
+        expect.objectContaining({ verdict: 'revise', comment: 'Please add tests' }),
+        expect.any(Object),
+      );
+      expect(result.currentStepId).toBe('gather-data');
+    });
+
+    it('[DATA] L3 + review.type=agent + review step + missing verdict creates HumanTask with escalationReason=error', async () => {
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { summary: 'looks ok' }, // no verdict field
+      });
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'completed',
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      });
+
+      const result = await executeAgentStep('inst-wf-001', 'review-pr', l3ReviewAgentStep, {}, 'user-1');
+
+      expect(mockEngine.submitReviewVerdict).not.toHaveBeenCalled();
+      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creationReason: 'agent_review_l3',
+          completionData: expect.objectContaining({
+            agentOutput: expect.objectContaining({ escalationReason: 'error' }),
+          }),
+        }),
+      );
+      expect(result.status).toBe('paused');
+      expect(result.agentRunStatus).toBe('escalated');
+    });
+
+    it('[DATA] L3 + review.type=agent + review step + max_iterations_exceeded creates HumanTask with escalationReason=iterations_limit', async () => {
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { verdict: 'revise', comment: 'still missing tests' },
+      });
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'completed',
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      });
+      const exhaustedInstance = buildProcessInstance({
+        id: 'inst-wf-001',
+        status: 'paused',
+        pauseReason: 'max_iterations_exceeded',
+        currentStepId: 'review-pr',
+      });
+      mockEngine.submitReviewVerdict.mockResolvedValue(exhaustedInstance);
+
+      const result = await executeAgentStep('inst-wf-001', 'review-pr', l3ReviewAgentStep, {}, 'user-1');
+
+      expect(mockEngine.submitReviewVerdict).toHaveBeenCalled();
+      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creationReason: 'agent_review_l3',
+          completionData: expect.objectContaining({
+            agentOutput: expect.objectContaining({ escalationReason: 'iterations_limit' }),
+          }),
+        }),
+      );
+      expect(result.status).toBe('paused');
+      expect(result.agentRunStatus).toBe('escalated');
     });
   });
 
