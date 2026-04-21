@@ -7,7 +7,7 @@ import { sendInviteEmail, sendWorkspaceNotificationEmail } from '@/lib/send-invi
 const InviteBodySchema = z.object({
   email: z.string().email(),
   displayName: z.string().min(1).optional(),
-  namespaceHandle: z.string().min(1),
+  namespaceHandle: z.string().min(1).regex(/^[a-z0-9-]+$/, 'namespaceHandle must be lowercase alphanumeric with hyphens only'),
   role: z.enum(['member', 'admin']).optional().default('member'),
   inviterName: z.string().min(1).optional(),
 });
@@ -134,7 +134,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           });
         }
         emailSent = true;
-      } catch {
+      } catch (emailErr) {
+        console.error('[invite] Failed to send email:', emailErr);
         emailSent = false;
       }
     }

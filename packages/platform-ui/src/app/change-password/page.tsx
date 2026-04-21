@@ -53,7 +53,7 @@ export default function ChangePasswordPage() {
         if (code === 'auth/requires-recent-login') {
           setError('Session expired. Please sign out and sign in again to change your password.');
         } else if (code === 'auth/weak-password') {
-          setError('Password is too weak. Use at least 8 characters with a mix of letters and numbers.');
+          setError('Password is too weak. Please choose a longer or more complex password.');
         } else {
           setError(err.message);
         }

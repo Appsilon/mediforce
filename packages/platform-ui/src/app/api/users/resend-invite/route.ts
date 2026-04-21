@@ -5,7 +5,7 @@ import { sendInviteEmail } from '@/lib/send-invite-email';
 
 const ResendInviteBodySchema = z.object({
   uid: z.string().min(1),
-  namespaceHandle: z.string().min(1),
+  namespaceHandle: z.string().min(1).regex(/^[a-z0-9-]+$/, 'namespaceHandle must be lowercase alphanumeric with hyphens only'),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -100,7 +100,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           mailgunDomain,
         });
         emailSent = true;
-      } catch {
+      } catch (emailErr) {
+        console.error('[resend-invite] Failed to send email:', emailErr);
         emailSent = false;
       }
     }
