@@ -69,6 +69,9 @@ def ensure_env_local() -> bool:
         "NEXT_PUBLIC_FIREBASE_APP_ID=1:000000000000:web:0000000000000000\n"
         "OPENROUTER_API_KEY=fake-openrouter-key\n"
         "PLATFORM_API_KEY=test-api-key\n"
+        # 64 hex chars — satisfies validateSecretsKey() fail-fast check.
+        # No real secrets are encrypted/decrypted during E2E runs.
+        "SECRETS_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000\n"
     )
     log(f"Created {ENV_LOCAL} with demo credentials")
     return True

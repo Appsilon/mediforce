@@ -112,6 +112,10 @@ jobs:
           # of the self-fetch, so validateApiKey passes. Only used locally within
           # the Next.js process — no real secret needed.
           PLATFORM_API_KEY: ci-e2e-test-key
+          # Fake 64-hex-char key to satisfy validateSecretsKey() fail-fast check
+          # in getPlatformServices(). No real workflow secrets are encrypted/decrypted
+          # during E2E runs — this just has to be present and well-formed.
+          SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
 
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
