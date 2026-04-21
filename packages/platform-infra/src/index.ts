@@ -23,7 +23,9 @@ export { WebhookNotificationService } from './notifications/webhook-notification
 export { FirestoreAgentDefinitionRepository } from './firestore/agent-definition-repository.js';
 export { FirestoreNamespaceRepository } from './firestore/namespace-repository.js';
 export { FirestoreWorkflowSecretsRepository } from './firestore/workflow-secrets-repository.js';
-export { FirestoreCoworkSessionRepository } from './firestore/cowork-session-repository.js';export { FirestoreCronTriggerStateRepository } from './firestore/cron-trigger-state-repository.js';
+export { FirestoreCoworkSessionRepository } from './firestore/cowork-session-repository.js';
+export { FirestoreCronTriggerStateRepository } from './firestore/cron-trigger-state-repository.js';
+export { validateSecretsKey } from './crypto/secrets-cipher.js';
 export { getAdminAuth, getAdminFirestore } from './auth/firebase-admin-init.js';
 export { FirebaseInviteService } from './auth/firebase-invite-service.js';
 

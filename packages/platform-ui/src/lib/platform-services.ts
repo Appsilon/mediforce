@@ -10,6 +10,7 @@ import {
   FirestoreCronTriggerStateRepository,
   initializeFirebase,
   getFirestoreDb,
+  validateSecretsKey,
 } from '@mediforce/platform-infra';
 import { connectFirestoreEmulator } from 'firebase/firestore';
 import type { CronTriggerStateRepository } from '@mediforce/platform-core';
@@ -52,6 +53,10 @@ export interface PlatformServices {
 
 export function getPlatformServices(): PlatformServices {
   if (services) return services;
+
+  // Fail fast if the encryption key is missing or malformed — better to crash here
+  // than to boot successfully and fail opaquely mid-workflow.
+  validateSecretsKey();
 
   // Initialize platform Firebase project (env vars set in platform-ui)
   initializeFirebase({
