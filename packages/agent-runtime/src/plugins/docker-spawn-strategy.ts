@@ -30,6 +30,12 @@ export interface DockerSpawnRequest {
   stepId: string;
   outputDir: string;
   logFile: string | null;
+  /**
+   * When provided, each raw stdout line is passed through this function before being written
+   * to the log file. Returns an array of JSONL strings to write (empty = skip the line).
+   * Used by LocalDockerSpawnStrategy to write parsed log entries in real-time.
+   */
+  lineProcessor?: (rawLine: string) => string[];
   /** When present, strategy ensures the image exists (lazy build) before docker run. */
   imageBuild?: ImageBuildMeta;
 }
@@ -89,14 +95,18 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
           stdoutBuffer += chunk.toString('utf-8');
           const lines = stdoutBuffer.split('\n');
           stdoutBuffer = lines.pop() ?? '';
-          void logDirReady.then(() =>
-            Promise.all(
-              lines
-                .map((l) => l.trim())
-                .filter((l) => l.length > 0)
-                .map((l) => appendFile(logFile, l + '\n')),
-            ),
-          );
+          const trimmedLines = lines.map((l) => l.trim()).filter((l) => l.length > 0);
+          if (trimmedLines.length === 0) return;
+          if (request.lineProcessor) {
+            const entries = trimmedLines.flatMap((l) => request.lineProcessor!(l));
+            if (entries.length > 0) {
+              void logDirReady.then(() => appendFile(logFile, entries.join('\n') + '\n'));
+            }
+          } else {
+            void logDirReady.then(() =>
+              Promise.all(trimmedLines.map((l) => appendFile(logFile, l + '\n'))),
+            );
+          }
         }
       });
 
@@ -119,9 +129,16 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
         settled = true;
         clearTimeout(timeoutHandle);
 
+        const remaining = stdoutBuffer.trim();
         const flush =
-          logFile && logDirReady && stdoutBuffer.trim()
-            ? logDirReady.then(() => appendFile(logFile, stdoutBuffer.trim() + '\n'))
+          logFile && logDirReady && remaining
+            ? logDirReady.then(() => {
+                if (request.lineProcessor) {
+                  const entries = request.lineProcessor(remaining);
+                  return entries.length > 0 ? appendFile(logFile, entries.join('\n') + '\n') : undefined;
+                }
+                return appendFile(logFile, remaining + '\n');
+              })
             : Promise.resolve();
 
         void flush.then(() => {

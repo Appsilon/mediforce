@@ -1282,18 +1282,22 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       outputDir,
       logFile,
       imageBuild,
+      // Pass lineProcessor so LocalDockerSpawnStrategy writes JSONL entries in real-time.
+      // QueuedDockerSpawnStrategy ignores this (can't pass functions through Redis).
+      lineProcessor: (line) => this.processOutputLine(line),
     });
 
-    // Process stdout lines for activity logging (batch mode — lines arrive after completion
-    // when using the queued strategy; for local strategy this is equivalent to the old behavior
-    // minus real-time streaming, which is an acceptable v1 trade-off)
+    // Build rawLines for parseAgentOutput. For LocalDockerSpawnStrategy the log file was
+    // already written in real-time via lineProcessor; for QueuedDockerSpawnStrategy we
+    // do a batch write here since the worker cannot use the callback.
+    const isQueuedStrategy = Boolean(process.env.REDIS_URL);
     const rawLines: string[] = [];
     for (const line of spawnResult.stdout.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       rawLines.push(trimmed);
 
-      if (logFile) {
+      if (logFile && isQueuedStrategy) {
         const logEntries = this.processOutputLine(trimmed);
         if (logEntries.length > 0) {
           await appendFile(logFile, logEntries.join('\n') + '\n');
