@@ -106,6 +106,7 @@ interface AuthContextValue {
   loading: boolean;
   mustChangePassword: boolean;
   emailAuthEnabled: boolean | null; // null = probe in progress
+  googleAuthEnabled: boolean | null; // null = probe in progress
   pendingGoogleLink: boolean; // true when Google SSO hit email conflict — sign in with password to link
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -115,6 +116,32 @@ interface AuthContextValue {
 }
 
 const AuthContext = React.createContext<AuthContextValue | undefined>(undefined);
+
+async function probeGoogleAuth(): Promise<boolean> {
+  const apiKey = auth.app.options.apiKey;
+  if (typeof apiKey !== 'string' || apiKey === '') return false;
+  try {
+    const response = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerId: 'google.com', continueUri: 'http://localhost' }),
+      },
+    );
+    const data: unknown = await response.json();
+    if (
+      data !== null && typeof data === 'object' &&
+      'error' in data && data.error !== null && typeof data.error === 'object' &&
+      'message' in data.error && data.error.message === 'OPERATION_NOT_ALLOWED'
+    ) {
+      return false;
+    }
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
 
 async function probeEmailAuth(): Promise<boolean> {
   try {
@@ -136,16 +163,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = React.useState(true);
   const [mustChangePassword, setMustChangePassword] = React.useState(false);
   const [emailAuthEnabled, setEmailAuthEnabled] = React.useState<boolean | null>(null);
+  const [googleAuthEnabled, setGoogleAuthEnabled] = React.useState<boolean | null>(null);
   const [pendingGoogleCredential, setPendingGoogleCredential] = React.useState<OAuthCredential | null>(null);
 
   React.useEffect(() => {
-    // In emulator mode email/password is always enabled — skip the probe to avoid
-    // a spurious 400 console error that breaks E2E tests.
+    // In emulator mode both providers are always enabled — skip probes to avoid
+    // spurious 400 console errors that break E2E tests.
     if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
       setEmailAuthEnabled(true);
+      setGoogleAuthEnabled(true);
       return;
     }
     probeEmailAuth().then(setEmailAuthEnabled).catch(() => setEmailAuthEnabled(false));
+    probeGoogleAuth().then(setGoogleAuthEnabled).catch(() => setGoogleAuthEnabled(false));
   }, []);
 
   React.useEffect(() => {
@@ -235,7 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ firebaseUser, loading, mustChangePassword, emailAuthEnabled, pendingGoogleLink: pendingGoogleCredential !== null, signInWithGoogle, signInWithEmail, sendPasswordReset, clearMustChangePassword, signOut }}>
+    <AuthContext.Provider value={{ firebaseUser, loading, mustChangePassword, emailAuthEnabled, googleAuthEnabled, pendingGoogleLink: pendingGoogleCredential !== null, signInWithGoogle, signInWithEmail, sendPasswordReset, clearMustChangePassword, signOut }}>
       {children}
     </AuthContext.Provider>
   );
