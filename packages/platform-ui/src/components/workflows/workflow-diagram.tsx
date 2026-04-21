@@ -59,7 +59,7 @@ const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: st
 };
 
 const STEP_TYPE_CONFIG: Record<string, { icon: typeof PenLine; label: string; color: string }> = {
-  creation: { icon: PenLine,    label: 'Input',    color: 'text-blue-500 dark:text-blue-400' },
+  creation: { icon: PenLine,    label: 'Creation', color: 'text-blue-500 dark:text-blue-400' },
   review:   { icon: Search,     label: 'Review',   color: 'text-amber-500 dark:text-amber-400' },
   decision: { icon: GitBranch,  label: 'Decision', color: 'text-purple-500 dark:text-purple-400' },
   terminal: { icon: Flag,       label: 'End',      color: 'text-emerald-500 dark:text-emerald-400' },
@@ -196,7 +196,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                 {{ human: 'Human', agent: 'Agent', script: 'Script', cowork: 'Cowork' }[data.executor] ?? data.executor}
               </span>
-              {data.autonomyLevel && (
+              {data.autonomyLevel && data.executor === 'agent' && (
                 <span className="text-[10px] font-mono text-muted-foreground/70">
                   {data.autonomyLevel}
                 </span>
