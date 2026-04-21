@@ -257,6 +257,25 @@ export function buildSeedData(testUserId: string) {
       error: null,
       assignedRoles: ['operator'],
     },
+    // Dedicated instance for retry-step test — seeded as failed on a human step
+    // so clicking Retry flips it to running; the auto-runner then creates a
+    // HumanTask and pauses the instance. No plugin or Docker involved.
+    'proc-retry-test': {
+      id: 'proc-retry-test',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1',
+      status: 'failed',
+      currentStepId: 'human-review',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: threeDaysAgo,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: 'Simulated step failure for retry journey',
+      assignedRoles: ['reviewer'],
+    },
   };
 
   const agentRuns: Record<string, Record<string, unknown>> = {
@@ -424,6 +443,25 @@ export function buildSeedData(testUserId: string) {
       iterationNumber: 0,
       gateResult: null,
       error: null,
+    },
+  };
+
+  const retryTestStepExecutions: Record<string, Record<string, unknown>> = {
+    // Seed a single failed execution so retryStep's latestExecution guard is satisfied
+    'exec-retry-fail-1': {
+      id: 'exec-retry-fail-1',
+      instanceId: 'proc-retry-test',
+      stepId: 'human-review',
+      status: 'failed',
+      input: {},
+      output: null,
+      verdict: null,
+      executedBy: 'auto-runner',
+      startedAt: threeDaysAgo,
+      completedAt: threeDaysAgo,
+      iterationNumber: 0,
+      gateResult: null,
+      error: 'Simulated step failure for retry journey',
     },
   };
 
@@ -905,5 +943,5 @@ export function buildSeedData(testUserId: string) {
     createdAt: twoDaysAgo,
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions, namespaces, namespaceMembers, coworkSessions };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions, namespaces, namespaceMembers, coworkSessions };
 }
