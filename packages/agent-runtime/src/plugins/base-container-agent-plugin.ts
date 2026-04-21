@@ -1269,8 +1269,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     }
 
     // Delegate container execution to the spawn strategy.
-    // LocalDockerSpawnStrategy: direct child process (default, same as before)
-    // QueuedDockerSpawnStrategy: enqueues to BullMQ worker (when REDIS_URL is set)
+    // LocalDockerSpawnStrategy: direct child process (default, streams stdout in real time)
+    // QueuedDockerSpawnStrategy: enqueues to BullMQ worker (replays stdout after job finishes)
     const strategy = getDockerSpawnStrategy();
     const spawnResult = await strategy.spawn({
       dockerArgs,
@@ -1282,27 +1282,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       outputDir,
       logFile,
       imageBuild,
+      onStdoutLine: logFile
+        ? (line) => {
+            const logEntries = this.processOutputLine(line);
+            if (logEntries.length === 0) return;
+            appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
+          }
+        : undefined,
     });
 
-    // Process stdout lines for activity logging (batch mode — lines arrive after completion
-    // when using the queued strategy; for local strategy this is equivalent to the old behavior
-    // minus real-time streaming, which is an acceptable v1 trade-off)
-    const rawLines: string[] = [];
-    for (const line of spawnResult.stdout.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      rawLines.push(trimmed);
-
-      if (logFile) {
-        const logEntries = this.processOutputLine(trimmed);
-        if (logEntries.length > 0) {
-          await appendFile(logFile, logEntries.join('\n') + '\n');
-        }
-      }
-    }
-
-    const rawStdout = rawLines.join('\n');
-    const finalResult = this.parseAgentOutput(rawStdout);
+    const finalResult = this.parseAgentOutput(spawnResult.stdout);
     const timeoutMinutes = Math.round(timeoutMs / 60_000);
 
     if (spawnResult.exitCode !== 0) {

@@ -32,6 +32,11 @@ export interface DockerSpawnRequest {
   logFile: string | null;
   /** When present, strategy ensures the image exists (lazy build) before docker run. */
   imageBuild?: ImageBuildMeta;
+  /** Called for each stdout line as soon as it is observable.
+   *  LocalDockerSpawnStrategy invokes this in real time while the container runs.
+   *  QueuedDockerSpawnStrategy invokes it once per line after the job completes
+   *  (the worker ran remotely; real-time streaming is not available). */
+  onStdoutLine?: (line: string) => void | Promise<void>;
 }
 
 export interface DockerSpawnResult {
@@ -75,9 +80,27 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
 
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
+      let lineBuffer = '';
 
       child.stdout.on('data', (chunk: Buffer) => {
         stdoutChunks.push(chunk);
+
+        if (!request.onStdoutLine) return;
+        lineBuffer += chunk.toString('utf-8');
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop() ?? '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const maybe = request.onStdoutLine(trimmed);
+            if (maybe && typeof (maybe as Promise<void>).then === 'function') {
+              (maybe as Promise<void>).catch(() => {});
+            }
+          } catch {
+            // swallow — streaming log writes must not crash the spawn
+          }
+        }
       });
 
       child.stderr.on('data', (chunk: Buffer) => {
@@ -98,6 +121,19 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
       child.on('close', (code, signal) => {
         settled = true;
         clearTimeout(timeoutHandle);
+
+        // Flush any trailing unterminated line to the streaming callback.
+        if (request.onStdoutLine && lineBuffer.trim()) {
+          try {
+            const maybe = request.onStdoutLine(lineBuffer.trim());
+            if (maybe && typeof (maybe as Promise<void>).then === 'function') {
+              (maybe as Promise<void>).catch(() => {});
+            }
+          } catch {
+            // swallow
+          }
+          lineBuffer = '';
+        }
 
         resolve({
           stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
@@ -163,6 +199,16 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       await mkdir(request.outputDir, { recursive: true });
       for (const [name, content] of Object.entries(result.outputFiles)) {
         await writeFile(join(request.outputDir, name), content, 'utf-8');
+      }
+    }
+
+    // Queued mode can't stream in real time — replay stdout lines through the
+    // callback after completion so the log file still gets populated.
+    if (request.onStdoutLine && result.stdout) {
+      for (const line of result.stdout.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        await request.onStdoutLine(trimmed);
       }
     }
 
