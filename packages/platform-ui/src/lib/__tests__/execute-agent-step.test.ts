@@ -391,6 +391,85 @@ describe('executeAgentStep', () => {
 
       expect(mockHumanTaskRepo.create).toHaveBeenCalled();
     });
+
+    it('[DATA] L3 with review.type=agent + escalated (low_confidence) still creates HumanTask with escalationReason', async () => {
+      const l3AgentReview: WorkflowStep = { ...l3Step, review: { type: 'agent' } };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: 'low_confidence',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3AgentReview, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creationReason: 'agent_review_l3',
+          completionData: expect.objectContaining({
+            agentOutput: expect.objectContaining({
+              escalationReason: 'low_confidence',
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('[DATA] L3 with review.type=agent + paused (no escalation) does NOT create HumanTask', async () => {
+      const l3AgentReview: WorkflowStep = { ...l3Step, review: { type: 'agent' } };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: null,
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3AgentReview, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] L3 escalated saves step execution as completed (not failed) when envelope is valid', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: 'low_confidence',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-1');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-1',
+        expect.objectContaining({ status: 'completed' }),
+      );
+    });
+
+    it('[DATA] L3 + review.type=agent + completed + appliedToWorkflow=true calls advanceStep (agent verdict is authoritative)', async () => {
+      const l3AgentReview: WorkflowStep = { ...l3Step, review: { type: 'agent' } };
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { verdict: 'approve', summary: 'LGTM' },
+      });
+      const runResult = {
+        status: 'completed' as const,
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue(runResult);
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3AgentReview, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
+        'inst-wf-001',
+        { verdict: 'approve', summary: 'LGTM' },
+        { id: 'user-1', role: 'agent' },
+        undefined,
+        runResult,
+      );
+    });
   });
 
   // ---- Escalation/Pause (non-L3) ----

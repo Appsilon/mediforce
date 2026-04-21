@@ -64,6 +64,12 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
         }
       : null;
 
+  const escalationReason = agentOutput.escalationReason;
+  const normalizedEscalation: EscalationReason =
+    escalationReason === 'low_confidence' || escalationReason === 'timeout' || escalationReason === 'error'
+      ? escalationReason
+      : null;
+
   return {
     confidence: typeof agentOutput.confidence === 'number' ? agentOutput.confidence : null,
     confidence_rationale: typeof agentOutput.confidence_rationale === 'string' ? agentOutput.confidence_rationale : null,
@@ -73,6 +79,7 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
     duration_ms: typeof agentOutput.duration_ms === 'number' ? agentOutput.duration_ms : null,
     gitMetadata,
     presentation: typeof agentOutput.presentation === 'string' ? agentOutput.presentation : null,
+    escalationReason: normalizedEscalation,
   };
 }
 
@@ -104,6 +111,8 @@ export interface GitMetadataData {
   repoUrl: string;
 }
 
+export type EscalationReason = 'low_confidence' | 'timeout' | 'error' | null;
+
 export interface AgentOutputData {
   confidence: number | null;
   confidence_rationale: string | null;
@@ -113,4 +122,5 @@ export interface AgentOutputData {
   duration_ms: number | null;
   gitMetadata: GitMetadataData | null;
   presentation: string | null;
+  escalationReason: EscalationReason;
 }

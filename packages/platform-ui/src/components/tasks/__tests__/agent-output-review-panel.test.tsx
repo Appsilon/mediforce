@@ -13,6 +13,7 @@ function buildAgentOutput(overrides: Partial<AgentOutputData> = {}): AgentOutput
     duration_ms: null,
     gitMetadata: null,
     presentation: null,
+    escalationReason: null,
     ...overrides,
   };
 }
@@ -106,6 +107,30 @@ describe('AgentOutputReviewPanel', () => {
 
     const srcdoc = document.querySelector('iframe')!.getAttribute('srcdoc')!;
     expect(srcdoc).toContain('@tailwindcss/browser@4');
+  });
+
+  it('renders escalation badge when escalationReason is set', () => {
+    const agentOutput = buildAgentOutput({
+      result: { verdict: 'approve' },
+      confidence: 0.72,
+      escalationReason: 'low_confidence',
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
+
+    expect(screen.getByText(/escalated: low confidence/i)).toBeInTheDocument();
+  });
+
+  it('omits escalation badge when escalationReason is null', () => {
+    const agentOutput = buildAgentOutput({
+      result: { verdict: 'approve' },
+      confidence: 0.9,
+      escalationReason: null,
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
+
+    expect(screen.queryByText(/escalated/i)).not.toBeInTheDocument();
   });
 
   it('escapes closing script tags in result data', () => {

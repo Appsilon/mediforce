@@ -117,9 +117,12 @@ export async function executeAgentStep(
   const envelope = runResult.envelope;
   if (stepExecutionId) {
     const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
+    // L3 + escalated (non-error) routes to human review below, so the execution
+    // is not a failure — the run produced a usable envelope, just flagged for review.
+    const isEscalatedToL3Review = autonomyLevel === 'L3' && runResult.status === 'escalated' && !isFailed;
     await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {
       output: envelope?.result ?? null,
-      status: !isFailed && (runResult.status === 'completed' || runResult.status === 'paused') ? 'completed' : 'failed',
+      status: !isFailed && (runResult.status === 'completed' || runResult.status === 'paused' || isEscalatedToL3Review) ? 'completed' : 'failed',
       completedAt: new Date().toISOString(),
       ...(isFailed && runResult.errorMessage ? { error: runResult.errorMessage } : {}),
       agentOutput: envelope
@@ -150,10 +153,14 @@ export async function executeAgentStep(
   }
 
   // ---- L3 Review Routing (skip when agent errored — nothing to review) ----
+  // Escalation from fallback handler (status='escalated') always needs a human,
+  // even when review.type='agent' — the whole point of escalate_to_human is that
+  // the agent couldn't self-resolve.
   if ((runResult.status === 'paused' || runResult.status === 'escalated') && autonomyLevel === 'L3' && runResult.fallbackReason !== 'error') {
     const reviewerType = workflowStep.review?.type ?? 'human';
+    const isEscalation = runResult.status === 'escalated';
 
-    if (reviewerType === 'human' || reviewerType === 'none') {
+    if (reviewerType === 'human' || reviewerType === 'none' || isEscalation) {
       const reviewTaskId = crypto.randomUUID();
       const reviewTaskNow = new Date().toISOString();
 
@@ -179,6 +186,7 @@ export async function executeAgentStep(
             duration_ms: runResult.envelope?.duration_ms ?? null,
             gitMetadata: runResult.envelope?.gitMetadata ?? null,
             presentation: runResult.envelope?.presentation ?? null,
+            escalationReason: isEscalation ? runResult.fallbackReason : null,
           },
           iterationNumber: 0,
         },
