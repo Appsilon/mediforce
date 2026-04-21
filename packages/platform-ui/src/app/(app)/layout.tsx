@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { AppShell } from '@/components/app-shell';
+import { CommandPaletteProvider, ToastProvider } from '@/components/command-palette';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { firebaseUser, loading, mustChangePassword } = useAuth();
@@ -31,5 +32,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!firebaseUser) return null;
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <ToastProvider>
+      <CommandPaletteProvider>
+        <AppShell>{children}</AppShell>
+      </CommandPaletteProvider>
+    </ToastProvider>
+  );
 }

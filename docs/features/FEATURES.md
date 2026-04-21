@@ -52,6 +52,10 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
 - [New Agent Form](#new-agent-form) — creating a new agent definition
 
+**Platform shortcuts** — keyboard-first utilities available everywhere
+- [Command Palette — New Ticket](#command-palette--new-ticket) — file a bug/idea/question from the command palette
+- [Command Palette — Shortcuts](#command-palette--shortcuts) — discoverable list of all keyboard shortcuts
+
 ---
 
 ## Authentication & Workspaces
@@ -279,3 +283,17 @@ When an agent reports low confidence (here 0.45), the run is escalated for human
 Registration form for new agent definitions. Fill in name, select foundation model. This is the entry point for adding custom agents to the platform.
 
 ![agent-new-form](agent-new-form.gif)
+
+## Platform shortcuts
+
+### Command Palette — New Ticket
+
+Press `⌘K` (or `Ctrl+K`) from anywhere in the app to open the command palette. Select "New ticket" to file a bug, idea, or question as a GitHub issue in `appsilon/mediforce`. The form auto-attaches the current page and the filer's name as removable context chips, and switches the description template when you change the ticket type. On submit the palette closes and a toast links to the created issue.
+
+![command-palette-new-ticket](command-palette-new-ticket.gif)
+
+### Command Palette — Shortcuts
+
+Press `?` anywhere (outside text inputs) to open the keyboard shortcuts overlay. Sections populate automatically from the command registry — as new commands register shortcuts, they appear here without any extra wiring.
+
+![command-palette-shortcuts](command-palette-shortcuts.gif)

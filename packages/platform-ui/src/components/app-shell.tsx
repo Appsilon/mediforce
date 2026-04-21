@@ -10,6 +10,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { ThemeToggle } from './theme-toggle';
+import { CommandPaletteTrigger } from './command-palette';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -369,6 +370,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <CommandPaletteTrigger />
             <ThemeToggle />
             {firebaseUser && (
               <>
