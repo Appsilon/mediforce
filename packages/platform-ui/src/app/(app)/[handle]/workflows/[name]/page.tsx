@@ -40,7 +40,7 @@ export default function ProcessDefinitionPage() {
     return map;
   }, [activeTasks]);
 
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
   const { namespaces } = useAllUserNamespaces(firebaseUser?.uid);
 
   const [archiving, setArchiving] = React.useState(false);
@@ -68,7 +68,7 @@ export default function ProcessDefinitionPage() {
     (trigger: { type: string }) => trigger.type === 'manual',
   ) ?? false;
 
-  if (versionsLoading) {
+  if (versionsLoading || authLoading) {
     return (
       <div className="p-6 space-y-4 animate-pulse">
         <div className="h-4 w-20 rounded bg-muted" />
@@ -78,7 +78,7 @@ export default function ProcessDefinitionPage() {
     );
   }
 
-  if (!versionsLoading && versions.length === 0) {
+  if (!versionsLoading && !authLoading && versions.length === 0) {
     return (
       <div className="p-6 text-center text-sm text-muted-foreground">
         Workflow &ldquo;{decodedName}&rdquo; not found.{' '}
