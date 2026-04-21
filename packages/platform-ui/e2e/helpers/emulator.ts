@@ -78,6 +78,14 @@ function toFirestoreFields(doc: Record<string, unknown>): Record<string, unknown
   return fields;
 }
 
+// Firestore emulator accepts `Authorization: Bearer owner` to bypass security rules.
+// Required for seed / fixture writes — without it, rules that require `request.auth != null`
+// reject unauthenticated REST calls with PERMISSION_DENIED.
+const EMULATOR_ADMIN_HEADERS = {
+  'Content-Type': 'application/json',
+  Authorization: 'Bearer owner',
+};
+
 export async function seedCollection(
   collection: string,
   documents: Record<string, Record<string, unknown>>,
@@ -87,7 +95,7 @@ export async function seedCollection(
     // Use PATCH to upsert — avoids errors if document already exists from a previous run
     const res = await fetch(`${basePath}/${collection}/${encodeURIComponent(docId)}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: EMULATOR_ADMIN_HEADERS,
       body: JSON.stringify({ fields: toFirestoreFields(docData) }),
     });
     if (!res.ok) {
@@ -120,7 +128,7 @@ export async function patchDocumentFields(
     `${basePath}/${collection}/${encodeURIComponent(docId)}?${updateMask}`,
     {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: EMULATOR_ADMIN_HEADERS,
       body: JSON.stringify({ fields: toFirestoreFields(fields) }),
     },
   );
@@ -142,7 +150,7 @@ export async function seedSubcollection(
       `${basePath}/${parentCollection}/${parentId}/${subcollection}/${docId}`,
       {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: EMULATOR_ADMIN_HEADERS,
         body: JSON.stringify({ fields: toFirestoreFields(docData) }),
       },
     );

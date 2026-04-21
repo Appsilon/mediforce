@@ -75,9 +75,20 @@ def ensure_env_local() -> bool:
 
 
 def ensure_firebase_config() -> None:
-    """Create Firebase emulator config without UI (avoids proxy/download issues)."""
+    """Create Firebase emulator config without UI (avoids proxy/download issues).
+
+    Uses absolute path for firestore.rules so the emulator finds it regardless
+    of cwd. A relative path would be resolved against the config file location
+    (/tmp/) which has no rules file, so the emulator falls back to default
+    deny-all — that silently breaks all authenticated tests.
+    """
+    rules_path = ROOT / "firestore.rules"
+    if not rules_path.exists():
+        log(f"firestore.rules not found at {rules_path}", RED)
+        sys.exit(1)
+
     config = {
-        "firestore": {"rules": "firestore.rules"},
+        "firestore": {"rules": str(rules_path)},
         "emulators": {
             "auth": {"port": AUTH_PORT},
             "firestore": {"port": FIRESTORE_PORT},
