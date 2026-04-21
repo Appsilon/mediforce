@@ -16,7 +16,7 @@ type FormErrors = {
   bio?: string;
 };
 
-export default function NewOrgPage() {
+export default function NewWorkspacePage() {
   const router = useRouter();
   const { firebaseUser, loading: authLoading } = useAuth();
 
@@ -38,7 +38,7 @@ export default function NewOrgPage() {
   if (firebaseUser === null) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
-        <p className="text-sm text-muted-foreground">Sign in to create an organization.</p>
+        <p className="text-sm text-muted-foreground">Sign in to create a workspace.</p>
       </div>
     );
   }
@@ -131,7 +131,7 @@ export default function NewOrgPage() {
           <ArrowLeft className="h-3.5 w-3.5" />
           Home
         </Link>
-        <h1 className="text-xl font-headline font-semibold">New Organization</h1>
+        <h1 className="text-xl font-headline font-semibold">New Workspace</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
           Create a shared namespace for your team.
         </p>
@@ -148,7 +148,7 @@ export default function NewOrgPage() {
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
             maxLength={39}
-            placeholder="my-org"
+            placeholder="my-workspace"
             className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             disabled={submitting}
           />
@@ -156,7 +156,7 @@ export default function NewOrgPage() {
             <p className="text-xs text-destructive">{errors.handle}</p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Your org will be at @{handle !== '' ? handle : 'handle'}
+              Your workspace will be at @{handle !== '' ? handle : 'handle'}
             </p>
           )}
         </div>
@@ -171,7 +171,7 @@ export default function NewOrgPage() {
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             maxLength={100}
-            placeholder="My Organization"
+            placeholder="My Workspace"
             className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             disabled={submitting}
           />
@@ -191,7 +191,7 @@ export default function NewOrgPage() {
             onChange={(e) => setBio(e.target.value)}
             maxLength={280}
             rows={3}
-            placeholder="A short description of your organization"
+            placeholder="A short description of your workspace"
             className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 resize-none"
             disabled={submitting}
           />
@@ -210,7 +210,7 @@ export default function NewOrgPage() {
             disabled={submitting}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
-            {submitting ? 'Creating…' : 'Create organization'}
+            {submitting ? 'Creating…' : 'Create workspace'}
           </button>
         </div>
       </form>

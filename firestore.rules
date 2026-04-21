@@ -31,16 +31,26 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Namespaces: read by authenticated, write by authenticated
+    // Namespaces: read by authenticated; create/update by authenticated; delete by owner only
     match /namespaces/{handle} {
       allow read: if request.auth != null;
       allow create, update: if request.auth != null;
-      allow delete: if false;
+      // Only an owner of the namespace may delete it
+      allow delete: if request.auth != null
+        && get(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid)).data.role == 'owner';
 
       match /members/{memberId} {
         allow read: if request.auth != null;
-        allow create, update: if request.auth != null;
-        allow delete: if request.auth != null;
+        // Owner/admin can add or update members; role cannot be elevated to 'owner'
+        // except by an existing owner.
+        allow create, update: if request.auth != null
+          && get(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid)).data.role in ['owner', 'admin']
+          && (request.resource.data.role != 'owner'
+              || get(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid)).data.role == 'owner');
+        // Owner/admin can remove any member; any member may remove themselves (leave).
+        allow delete: if request.auth != null
+          && (get(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid)).data.role in ['owner', 'admin']
+              || request.auth.uid == memberId);
       }
 
       // Workflow secrets: only namespace members (server actions enforce this via Admin SDK;

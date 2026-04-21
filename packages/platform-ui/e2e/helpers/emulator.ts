@@ -96,6 +96,39 @@ export async function seedCollection(
   }
 }
 
+export async function getUserIdByEmail(email: string): Promise<string | null> {
+  const res = await fetch(
+    `${AUTH_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/accounts`,
+    { signal: AbortSignal.timeout(5000) },
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as { userInfo?: Array<{ localId: string; email?: string }> };
+  const user = data.userInfo?.find((u) => u.email === email);
+  return user?.localId ?? null;
+}
+
+export async function patchDocumentFields(
+  collection: string,
+  docId: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  const basePath = `${FIRESTORE_EMULATOR}/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+  const updateMask = Object.keys(fields)
+    .map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`)
+    .join('&');
+  const res = await fetch(
+    `${basePath}/${collection}/${encodeURIComponent(docId)}?${updateMask}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: toFirestoreFields(fields) }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to patch ${collection}/${docId}: ${await res.text()}`);
+  }
+}
+
 export async function seedSubcollection(
   parentCollection: string,
   parentId: string,

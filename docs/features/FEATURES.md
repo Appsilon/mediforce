@@ -4,6 +4,11 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 
 ## Contents
 
+**Authentication & Workspaces** — sign-in, workspace selection, and account setup
+- [Sign In](#sign-in) — email/password sign-in with redirect to workspace
+- [Workspace Selection](#workspace-selection) — choosing between personal and org workspaces
+- [Forced Password Change](#forced-password-change) — invited user sets a permanent password on first sign-in
+
 **Tasks** — human review queue for workflow steps requiring human input
 - [Task Browsing & Grouping](#task-browsing--grouping) — reviewers find their tasks across workflows
 - [Task Approve Flow](#task-approve-flow) — reviewer sees context, submits verdict
@@ -45,6 +50,28 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Agent Catalog & History](#agent-catalog--history) — discovering agents and reviewing their past runs
 - [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
 - [New Agent Form](#new-agent-form) — creating a new agent definition
+
+---
+
+## Authentication & Workspaces
+
+### Sign In
+
+Users sign in with their email and password. After successful authentication, the app redirects to workspace selection, which auto-routes to the personal workspace when there is only one workspace.
+
+![sign-in](sign-in.gif)
+
+### Workspace Selection
+
+Users with multiple workspaces (personal + org memberships) see a picker on sign-in. Each workspace is shown as a card. Selecting one navigates directly into that workspace. A "Set as default" checkbox lets users skip the picker on future sign-ins.
+
+![workspace-selection](workspace-selection.gif)
+
+### Forced Password Change
+
+When an admin invites a user and sets a temporary password, `mustChangePassword` is flagged in Firestore. On first sign-in the app intercepts the navigation and redirects to a mandatory password-change screen. The user sets a permanent password and is then routed into their workspace normally.
+
+![forced-password-change](forced-password-change.gif)
 
 ---
 
