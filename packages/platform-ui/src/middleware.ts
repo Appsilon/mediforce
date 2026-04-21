@@ -10,10 +10,29 @@ const PRODUCTION_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '')
   .map((s) => s.trim())
   .filter(Boolean);
 
+const PUBLIC_ROUTES = new Set<string>(['/api/health', '/api/oauth/callback']);
+
 function isOriginAllowed(origin: string): boolean {
   return LOCALHOST_RE.test(origin)
     || PRODUCTION_ORIGINS.includes(origin)
     || (HOSTED_APP_RE !== null && HOSTED_APP_RE.test(origin));
+}
+
+function requireApiKey(req: NextRequest): NextResponse | null {
+  const provided = req.headers.get('X-Api-Key');
+  const expected = process.env.PLATFORM_API_KEY;
+  if (!provided || !expected || provided !== expected) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return null;
+}
+
+function applyCorsHeaders(res: NextResponse, origin: string, isAllowed: boolean): void {
+  if (isAllowed) {
+    res.headers.set('Access-Control-Allow-Origin', origin);
+    res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.headers.set('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key');
+  }
 }
 
 export function middleware(req: NextRequest) {
@@ -32,13 +51,25 @@ export function middleware(req: NextRequest) {
     return res;
   }
 
+  // Auth guard: applies to all non-OPTIONS /api/* requests unless public
+  const pathname = req.nextUrl.pathname;
+  if (!PUBLIC_ROUTES.has(pathname)) {
+    let authResponse: NextResponse | null;
+    if (pathname.startsWith('/api/admin/')) {
+      // TODO(#218): tighten to PLATFORM_ADMIN_API_KEY when tier split lands
+      authResponse = requireApiKey(req);
+    } else {
+      authResponse = requireApiKey(req);
+    }
+    if (authResponse !== null) {
+      applyCorsHeaders(authResponse, origin, isAllowed);
+      return authResponse;
+    }
+  }
+
   // Add CORS headers to actual responses
   const res = NextResponse.next();
-  if (isAllowed) {
-    res.headers.set('Access-Control-Allow-Origin', origin);
-    res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.headers.set('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key');
-  }
+  applyCorsHeaders(res, origin, isAllowed);
   return res;
 }
 
