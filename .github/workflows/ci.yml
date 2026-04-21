@@ -107,6 +107,11 @@ jobs:
           FIREBASE_PROJECT_ID: demo-mediforce
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
           NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
+          # Fake key for server-to-server auth between server actions and /api routes
+          # (e.g. retryFailedStep → /api/processes/:id/run). Same value on both sides
+          # of the self-fetch, so validateApiKey passes. Only used locally within
+          # the Next.js process — no real secret needed.
+          PLATFORM_API_KEY: ci-e2e-test-key
 
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
