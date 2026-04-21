@@ -62,6 +62,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'User has no email address' }, { status: 400 });
     }
 
+    // Guard against resetting an active user's password — only allow if the user
+    // has never signed in (lastSignInTime null) or still has mustChangePassword set,
+    // meaning their invite is genuinely pending.
+    const userDoc = await adminDb.collection('users').doc(uid).get();
+    const mustChangePassword = userDoc.exists ? userDoc.data()?.mustChangePassword === true : false;
+    const hasNeverSignedIn = userRecord.metadata.lastSignInTime === null || userRecord.metadata.lastSignInTime === '';
+    if (!mustChangePassword && !hasNeverSignedIn) {
+      return NextResponse.json(
+        { error: 'Cannot resend invite: user has already activated their account' },
+        { status: 409 },
+      );
+    }
+
     const temporaryPassword = await inviteService.resetInvitePassword(uid);
 
     let emailSent = false;

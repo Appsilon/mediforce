@@ -5,6 +5,7 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signInWithEmailAndPassword,
+  fetchSignInMethodsForEmail,
   sendPasswordResetEmail,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
@@ -145,15 +146,16 @@ async function probeGoogleAuth(): Promise<boolean> {
 
 async function probeEmailAuth(): Promise<boolean> {
   try {
-    await signInWithEmailAndPassword(auth, 'probe@probe.probe', 'probe');
-    return true; // account exists against all odds — email auth is on
+    // fetchSignInMethodsForEmail is a read-only probe — no failed-auth side effects,
+    // no rate-limit pressure, no audit-log noise. An OPERATION_NOT_ALLOWED error
+    // means email/password sign-in is disabled; anything else means it's enabled.
+    await fetchSignInMethodsForEmail(auth, 'probe@probe.probe');
+    return true;
   } catch (err: unknown) {
     const code =
       err !== null && typeof err === 'object' && 'code' in err
         ? String((err as { code: unknown }).code)
         : '';
-    // operation-not-allowed means the provider is disabled; everything else
-    // (user-not-found, invalid-credential, wrong-password) means it is enabled
     return code !== 'auth/operation-not-allowed';
   }
 }
@@ -198,14 +200,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setMustChangePassword(snap.data().mustChangePassword === true);
           }
           if (Object.keys(profile).length > 0) {
-            setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch(() => {});
+            setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch((err) => {
+              console.error('[auth] Failed to update user profile doc:', err);
+            });
           }
-          ensurePersonalNamespace(user).catch(() => {});
-        }).catch(() => {
+          ensurePersonalNamespace(user).catch((err) => {
+            console.error('[auth] ensurePersonalNamespace failed:', err);
+          });
+        }).catch((err) => {
+          // Fail-closed: if we cannot read mustChangePassword, assume it is true so
+          // the forced-reset gate is never silently bypassed by a rules rejection or
+          // transient network error.
+          console.error('[auth] Failed to read user doc for mustChangePassword — failing closed:', err);
+          setMustChangePassword(true);
           if (Object.keys(profile).length > 0) {
-            setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch(() => {});
+            setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch((writeErr) => {
+              console.error('[auth] Failed to update user profile doc:', writeErr);
+            });
           }
-          ensurePersonalNamespace(user).catch(() => {});
+          ensurePersonalNamespace(user).catch((nsErr) => {
+            console.error('[auth] ensurePersonalNamespace failed:', nsErr);
+          });
         });
       } else {
         setMustChangePassword(false);
