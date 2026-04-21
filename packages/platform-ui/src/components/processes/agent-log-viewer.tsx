@@ -402,10 +402,15 @@ function AgentTabContent({ section }: { section: AgentLogSection }) {
   );
 }
 
+function allSectionsFinished(sections: AgentLogSection[]): boolean {
+  if (sections.length === 0) return false;
+  return sections.every((s) => s.entries.some((e) => classifyEntry(e) === 'result'));
+}
+
 export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps) {
   const [sections, setSections] = React.useState<AgentLogSection[]>([]);
   const [loading, setLoading] = React.useState(false);
-  const [autoRefresh, setAutoRefresh] = React.useState(false);
+  const [autoRefresh, setAutoRefresh] = React.useState(logFiles.length > 0);
   const [activeTab, setActiveTab] = React.useState(0);
   const [copied, setCopied] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -430,12 +435,18 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
         }),
       );
       setSections(results);
+      if (allSectionsFinished(results)) {
+        setAutoRefresh(false);
+      }
     } finally {
       setLoading(false);
     }
   }, [logFiles]);
 
-  React.useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  React.useEffect(() => {
+    if (logFiles.length > 0) setAutoRefresh(true);
+    fetchLogs();
+  }, [fetchLogs, logFiles.length]);
 
   React.useEffect(() => {
     if (!autoRefresh || logFiles.length === 0) return;

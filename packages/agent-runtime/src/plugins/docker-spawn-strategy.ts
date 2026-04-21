@@ -8,8 +8,8 @@
  * The queued strategy is activated when REDIS_URL is set.
  */
 import { spawn } from 'node:child_process';
-import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { appendFile, readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { ensureImage } from './docker-image-builder.js';
 
 export interface ImageBuildMeta {
@@ -55,6 +55,12 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
       await ensureImage(request.imageBuild);
     }
 
+    const { logFile } = request;
+    let logDirReady: Promise<void> | null = null;
+    if (logFile) {
+      logDirReady = mkdir(dirname(logFile), { recursive: true }).then(() => {});
+    }
+
     return new Promise<DockerSpawnResult>((resolve, reject) => {
       const child = spawn('docker', request.dockerArgs, {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -76,8 +82,22 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
 
+      let stdoutBuffer = '';
       child.stdout.on('data', (chunk: Buffer) => {
         stdoutChunks.push(chunk);
+        if (logFile && logDirReady) {
+          stdoutBuffer += chunk.toString('utf-8');
+          const lines = stdoutBuffer.split('\n');
+          stdoutBuffer = lines.pop() ?? '';
+          void logDirReady.then(() =>
+            Promise.all(
+              lines
+                .map((l) => l.trim())
+                .filter((l) => l.length > 0)
+                .map((l) => appendFile(logFile, l + '\n')),
+            ),
+          );
+        }
       });
 
       child.stderr.on('data', (chunk: Buffer) => {
@@ -99,11 +119,18 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
         settled = true;
         clearTimeout(timeoutHandle);
 
-        resolve({
-          stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
-          stderr: Buffer.concat(stderrChunks).toString('utf-8'),
-          exitCode: code,
-          signal: signal ?? null,
+        const flush =
+          logFile && logDirReady && stdoutBuffer.trim()
+            ? logDirReady.then(() => appendFile(logFile, stdoutBuffer.trim() + '\n'))
+            : Promise.resolve();
+
+        void flush.then(() => {
+          resolve({
+            stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
+            stderr: Buffer.concat(stderrChunks).toString('utf-8'),
+            exitCode: code,
+            signal: signal ?? null,
+          });
         });
       });
 
