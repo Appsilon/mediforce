@@ -6,8 +6,7 @@ export const AUTONOMY_LEVELS = [
   { value: 'L4', label: 'L4 — Full autonomy' },
 ] as const;
 
-export const STEP_TYPES = ['creation', 'review', 'decision', 'terminal'] as const;
-export const STEP_TYPE_LABELS: Record<string, string> = { creation: 'Input', review: 'Review', decision: 'Decision', terminal: 'End' };
+export const STEP_TYPE_LABELS: Record<string, string> = { creation: 'Creation', review: 'Review', decision: 'Decision', terminal: 'End' };
 
 export const FALLBACK_OPTIONS = [
   { value: '', label: 'Default' },
