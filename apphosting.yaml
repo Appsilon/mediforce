@@ -16,8 +16,6 @@ env:
     value: "1:1044281777485:web:848f62c06d9376c75f6b04"
   - variable: NEXT_PUBLIC_PLATFORM_URL
     value: https://staging.mediforce.ai
-  - variable: NEXT_PUBLIC_PLATFORM_API_KEY
-    secret: PLATFORM_API_KEY
   - variable: PLATFORM_API_KEY
     secret: PLATFORM_API_KEY
   - variable: OPENROUTER_API_KEY

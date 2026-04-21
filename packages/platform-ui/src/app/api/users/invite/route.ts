@@ -1,20 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { FieldValue } from 'firebase-admin/firestore';
-import { validateApiKey } from '@/lib/platform-services';
 import { getAdminAuth, getAdminFirestore, FirebaseInviteService } from '@mediforce/platform-infra';
 import { sendInviteEmail, sendWorkspaceNotificationEmail } from '@/lib/send-invite-email';
 
 const InviteBodySchema = z.object({
   email: z.string().email(),
   displayName: z.string().min(1).optional(),
-  namespaceHandle: z.string().min(1).optional(),
+  namespaceHandle: z.string().min(1),
   role: z.enum(['member', 'admin']).optional().default('member'),
   inviterName: z.string().min(1).optional(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
+  const adminAuth = getAdminAuth();
+
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (token === '') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let callerUid: string;
+  try {
+    const decoded = await adminAuth.verifyIdToken(token);
+    callerUid = decoded.uid;
+  } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -33,8 +44,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const { email, displayName, namespaceHandle, role, inviterName } = parsed.data;
 
   try {
-    const adminAuth = getAdminAuth();
     const adminDb = getAdminFirestore();
+
+    const memberSnap = await adminDb
+      .collection('namespaces')
+      .doc(namespaceHandle)
+      .collection('members')
+      .doc(callerUid)
+      .get();
+    const memberRole = memberSnap.exists ? (memberSnap.data()?.role as string | undefined) : undefined;
+    if (memberRole !== 'owner' && memberRole !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const inviteService = new FirebaseInviteService(adminAuth, adminDb);
     const { uid, temporaryPassword, isExisting } = await inviteService.createInvitedUser(
       email.trim().toLowerCase(),

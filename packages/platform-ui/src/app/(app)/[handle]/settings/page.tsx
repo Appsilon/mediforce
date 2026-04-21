@@ -146,11 +146,11 @@ export default function WorkspaceConfigPage() {
   const [emailMap, setEmailMap] = useState<Map<string, string | null>>(new Map());
 
   const fetchLastSignIn = useCallback(async () => {
-    if (handle === '') return;
-    const platformApiKey = process.env.NEXT_PUBLIC_PLATFORM_API_KEY ?? '';
+    if (handle === '' || firebaseUser === null) return;
     try {
+      const idToken = await firebaseUser.getIdToken();
       const res = await fetch(`/api/users/members?handle=${encodeURIComponent(handle)}`, {
-        headers: { 'X-Api-Key': platformApiKey },
+        headers: { 'Authorization': `Bearer ${idToken}` },
       });
       if (!res.ok) return;
       const data = (await res.json()) as { members: Array<{ uid: string; email: string | null; lastSignInTime: string | null }> };
@@ -165,7 +165,7 @@ export default function WorkspaceConfigPage() {
     } catch {
       // non-fatal — lastSignIn just won't show
     }
-  }, [handle]);
+  }, [handle, firebaseUser]);
 
   useEffect(() => {
     void fetchLastSignIn();
@@ -273,12 +273,12 @@ export default function WorkspaceConfigPage() {
 
     setInviting(true);
     try {
-      const platformApiKey = process.env.NEXT_PUBLIC_PLATFORM_API_KEY ?? '';
+      const idToken = firebaseUser !== null ? await firebaseUser.getIdToken() : '';
       const res = await fetch('/api/users/invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Api-Key': platformApiKey,
+          'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           email: trimmedEmail,
@@ -313,11 +313,11 @@ export default function WorkspaceConfigPage() {
     setResendResult(null);
     setResendingUid(memberUid);
     try {
-      const platformApiKey = process.env.NEXT_PUBLIC_PLATFORM_API_KEY ?? '';
+      const idToken = firebaseUser !== null ? await firebaseUser.getIdToken() : '';
       const res = await fetch('/api/users/resend-invite', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Api-Key': platformApiKey },
-        body: JSON.stringify({ uid: memberUid }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ uid: memberUid, namespaceHandle: handle }),
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };

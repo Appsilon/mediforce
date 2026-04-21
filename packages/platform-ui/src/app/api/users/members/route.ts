@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateApiKey } from '@/lib/platform-services';
 import { getAdminAuth, getAdminFirestore } from '@mediforce/platform-infra';
 
 interface MemberDoc {
@@ -16,7 +15,17 @@ interface MemberResponse extends MemberDoc {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
+  const adminAuth = getAdminAuth();
+
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (token === '') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    await adminAuth.verifyIdToken(token);
+  } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -26,7 +35,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const adminAuth = getAdminAuth();
     const adminDb = getAdminFirestore();
 
     const membersSnap = await adminDb
