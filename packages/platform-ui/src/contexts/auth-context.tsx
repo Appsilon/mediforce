@@ -189,17 +189,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (user.photoURL !== null) profile.photoURL = user.photoURL;
         if (user.email !== null) profile.email = user.email;
         profile.uid = user.uid;
-        if (Object.keys(profile).length > 0) {
-          setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch(() => {});
-        }
-        ensurePersonalNamespace(user).catch(() => {});
 
-        // Check if user must change their temporary password
+        // Read mustChangePassword FIRST before any writes — pending writes to the same
+        // document can cause the Firestore SDK to return an optimistic local snapshot that
+        // omits server-side fields the client hasn't seen yet (e.g. mustChangePassword).
         getDoc(doc(db, 'users', user.uid)).then((snap) => {
           if (snap.exists()) {
             setMustChangePassword(snap.data().mustChangePassword === true);
           }
-        }).catch(() => {});
+          if (Object.keys(profile).length > 0) {
+            setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch(() => {});
+          }
+          ensurePersonalNamespace(user).catch(() => {});
+        }).catch(() => {
+          if (Object.keys(profile).length > 0) {
+            setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch(() => {});
+          }
+          ensurePersonalNamespace(user).catch(() => {});
+        });
       } else {
         setMustChangePassword(false);
       }
