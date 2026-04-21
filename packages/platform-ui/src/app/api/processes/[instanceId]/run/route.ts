@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { validateWorkflowEnv } from '@mediforce/agent-runtime';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
@@ -14,10 +14,6 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ instanceId: string }> },
 ): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const { instanceId } = await params;
   const { instanceRepo, processRepo, auditRepo } = getPlatformServices();
   let stepsExecuted = 0;

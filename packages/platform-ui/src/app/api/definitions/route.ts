@@ -2,13 +2,9 @@ import { NextResponse } from 'next/server';
 import { parseProcessDefinition } from '@mediforce/platform-core';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { DefinitionVersionAlreadyExistsError, ConfigVersionAlreadyExistsError } from '@mediforce/platform-infra';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 
 export async function PUT(request: Request): Promise<NextResponse> {
-  if (!validateApiKey(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const yaml = await request.text();
   if (!yaml.trim()) {
     return NextResponse.json({ error: 'YAML body is required' }, { status: 400 });

@@ -13,7 +13,6 @@ vi.mock('@/lib/platform-services', () => ({
       getByRole: mockGetByRole,
     },
   }),
-  validateApiKey: () => true,
 }));
 
 import { GET } from '../route';

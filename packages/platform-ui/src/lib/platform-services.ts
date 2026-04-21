@@ -161,12 +161,6 @@ export function getPlatformServices(): PlatformServices {
   return services;
 }
 
-// API key validation helper — shared API key for cross-app server-to-server auth
-export function validateApiKey(request: Request): boolean {
-  const key = request.headers.get('X-Api-Key');
-  return key !== null && key === process.env.PLATFORM_API_KEY;
-}
-
 /** Base URL for internal server-to-server calls (e.g. auto-runner trigger).
  *  Reads NEXT_PUBLIC_APP_URL, falls back to localhost with PORT env var. */
 export function getAppBaseUrl(): string {

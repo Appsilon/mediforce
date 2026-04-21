@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
+import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
 import type { WorkflowDefinition, Trigger } from '@mediforce/platform-core';
 
@@ -17,11 +17,7 @@ interface SkippedEntry {
   reason: string;
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export async function POST(_req: NextRequest): Promise<NextResponse> {
   const { processRepo, cronTrigger, cronTriggerStateRepo } = getPlatformServices();
   const now = new Date();
   const triggered: TriggeredEntry[] = [];

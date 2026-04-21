@@ -6,7 +6,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockWorkflowStep = { id: 'compliance-check', name: 'Compliance Check', type: 'creation', executor: 'agent', autonomyLevel: 'L2' };
 
 vi.mock('@/lib/platform-services', () => ({
-  validateApiKey: () => true,
   getPlatformServices: () => ({
     instanceRepo: {
       getById: vi.fn().mockResolvedValue({

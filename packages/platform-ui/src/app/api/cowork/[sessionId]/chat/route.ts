@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 import { buildMessages, buildToolsArray, buildMcpSystemPromptSection } from '@/lib/cowork/build-messages';
 import { callOpenRouter } from '@/lib/cowork/openrouter';
 import { McpClientManager } from '@mediforce/mcp-client';
@@ -26,10 +26,6 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> },
 ): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const { sessionId } = await params;
   const { coworkSessionRepo, instanceRepo } = getPlatformServices();
 

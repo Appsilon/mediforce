@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 import type { StepExecution } from '@mediforce/platform-core';
 
 /**
@@ -29,13 +29,9 @@ interface StepEntry {
 }
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ instanceId: string }> },
 ): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
     const { instanceId } = await params;
     const { instanceRepo, processRepo } = getPlatformServices();

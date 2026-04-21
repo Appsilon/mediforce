@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 
 /**
  * POST /api/tasks/:taskId/claim
@@ -12,10 +12,6 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ taskId: string }> },
 ): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
     const { taskId } = await params;
     const body = (await req.json()) as { userId?: string };
