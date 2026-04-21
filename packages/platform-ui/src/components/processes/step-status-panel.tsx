@@ -413,7 +413,13 @@ export function StepStatusPanel({
                       ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                       : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
-                  {status === 'failed' && instance.currentStepId === step.id && (
+                  {status === 'failed'
+                    && instance.currentStepId === step.id
+                    // Don't offer Retry on explicitly cancelled runs — cancelProcessRun
+                    // sets status='failed' with this exact error, but the user's intent
+                    // was to stop, not to retry. (Until we introduce a distinct 'cancelled'
+                    // status in the schema, this string check is the cheapest gate.)
+                    && instance.error !== 'Cancelled by user' && (
                     <RetryStepButton instanceId={instance.id} stepId={step.id} />
                   )}
                 </div>

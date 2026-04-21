@@ -11,7 +11,7 @@ interface RetryStepButtonProps {
   stepId: string;
 }
 
-type Status = 'idle' | 'submitting' | 'refreshing' | 'success' | 'error';
+type Status = 'idle' | 'submitting' | 'success' | 'error';
 
 export function RetryStepButton({ instanceId, stepId }: RetryStepButtonProps) {
   const router = useRouter();
@@ -32,20 +32,21 @@ export function RetryStepButton({ instanceId, stepId }: RetryStepButtonProps) {
       return;
     }
 
+    // router.refresh() re-renders the run detail; once the server reflects
+    // the flipped status, either the step card leaves the 'failed' branch
+    // (and this component unmounts) or the button remains — either way the
+    // 'success' chip is the final user-visible state. No timed transition:
+    // it leaked state updates when the component unmounted inside the delay.
     setStatus('success');
     startTransition(() => {
       router.refresh();
     });
-    window.setTimeout(() => {
-      setStatus((current) => (current === 'success' ? 'refreshing' : current));
-    }, 1200);
   }
 
-  const busy = status === 'submitting' || status === 'refreshing' || status === 'success';
+  const busy = status === 'submitting' || status === 'success';
   const label =
     status === 'submitting' ? 'Queuing retry\u2026'
     : status === 'success' ? 'Retry queued'
-    : status === 'refreshing' ? 'Restarting step\u2026'
     : 'Retry';
 
   return (

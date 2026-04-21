@@ -552,13 +552,20 @@ export class WorkflowEngine {
    * kept as-is; the retried step will create a fresh StepExecution when the
    * runner dispatches it.
    *
-   * Retry is allowed when the instance is 'failed', or 'paused' with
-   * pauseReason in {step_failure, routing_error} — the two pause reasons the
-   * step-executor sets on an execution failure. Other pause reasons
-   * (waiting_for_human, missing_env, cowork_in_progress, agent_paused,
-   * agent_escalated, awaiting_agent_approval) aren't failures and must be
-   * resolved through their own flows. The requested step must match
-   * `currentStepId`, and the latest execution for that step must have failed.
+   * Retry is allowed when the instance is 'failed', or 'paused' with a
+   * failure-like pauseReason:
+   *   - step_failure, routing_error — set by the legacy step-executor path
+   *   - agent_escalated, agent_paused — set by the fallback handler when an
+   *     agent plugin errors or escalates (this is the common real-world path:
+   *     docker daemon down, network flaky, LLM output invalid)
+   *
+   * Other pause reasons aren't failures and must be resolved through their
+   * own flows: waiting_for_human (user task), missing_env (configure secrets),
+   * cowork_in_progress (active session), awaiting_agent_approval (L3 review),
+   * max_iterations_exceeded (loop guard — retry wouldn't help).
+   *
+   * The requested step must match `currentStepId`, and the latest execution
+   * for that step must have failed.
    */
   async retryStep(
     instanceId: string,
@@ -567,7 +574,12 @@ export class WorkflowEngine {
   ): Promise<ProcessInstance> {
     const instance = await this.loadInstance(instanceId);
 
-    const retryablePauseReasons = new Set(['step_failure', 'routing_error']);
+    const retryablePauseReasons = new Set([
+      'step_failure',
+      'routing_error',
+      'agent_escalated',
+      'agent_paused',
+    ]);
     const isFailed = instance.status === 'failed';
     const isRetryablePause =
       instance.status === 'paused' &&

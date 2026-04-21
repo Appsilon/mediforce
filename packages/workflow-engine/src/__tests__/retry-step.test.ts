@@ -123,6 +123,8 @@ describe('WorkflowEngine.retryStep', () => {
   it.each([
     ['step_failure'],
     ['routing_error'],
+    ['agent_escalated'],
+    ['agent_paused'],
   ])('also works when the instance was paused with pauseReason=%s', async (pauseReason) => {
     const instanceId = await seedFailedInstance(instanceRepo);
     await instanceRepo.update(instanceId, { status: 'paused', pauseReason });
@@ -131,6 +133,21 @@ describe('WorkflowEngine.retryStep', () => {
 
     expect(result.status).toBe('running');
     expect(result.pauseReason).toBeNull();
+  });
+
+  it.each([
+    ['waiting_for_human'],
+    ['missing_env'],
+    ['cowork_in_progress'],
+    ['awaiting_agent_approval'],
+    ['max_iterations_exceeded'],
+  ])('refuses to retry when paused for non-failure reason: %s', async (pauseReason) => {
+    const instanceId = await seedFailedInstance(instanceRepo);
+    await instanceRepo.update(instanceId, { status: 'paused', pauseReason });
+
+    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(
+      InvalidTransitionError,
+    );
   });
 
   it('refuses to retry a step that is not the current step', async () => {
@@ -159,12 +176,4 @@ describe('WorkflowEngine.retryStep', () => {
     );
   });
 
-  it('refuses to retry when paused for a non-agent reason (e.g. waiting_for_human)', async () => {
-    const instanceId = await seedFailedInstance(instanceRepo);
-    await instanceRepo.update(instanceId, { status: 'paused', pauseReason: 'waiting_for_human' });
-
-    await expect(engine.retryStep(instanceId, 'deploy', actor)).rejects.toThrow(
-      InvalidTransitionError,
-    );
-  });
 });
