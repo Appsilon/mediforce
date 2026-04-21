@@ -1285,8 +1285,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       onStdoutLine: logFile
         ? (line) => {
             const logEntries = this.processOutputLine(line);
-            if (logEntries.length === 0) return;
-            appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
+            if (logEntries.length === 0) return undefined;
+            // Returning the promise lets the strategy (and tests) observe the
+            // write completing; the local strategy fire-and-forgets it so the
+            // container stdout stream is not blocked by disk I/O.
+            return appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
           }
         : undefined,
     });
