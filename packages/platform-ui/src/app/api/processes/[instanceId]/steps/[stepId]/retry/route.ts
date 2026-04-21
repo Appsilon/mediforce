@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { InvalidTransitionError } from '@mediforce/workflow-engine';
-import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
+import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 
 /**
  * POST /api/processes/:instanceId/steps/:stepId/retry
@@ -10,13 +10,9 @@ import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platfo
  * of prior steps.
  */
 export async function POST(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ instanceId: string; stepId: string }> },
 ): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
     const { instanceId, stepId } = await params;
     const { engine } = getPlatformServices();
