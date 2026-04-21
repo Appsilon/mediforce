@@ -30,6 +30,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Run Detail — Completed](#run-detail--completed) — verifying all steps finished successfully
 - [Run Detail — Autonomy Badges](#run-detail--autonomy-badges) — seeing which steps are agent-driven vs human
 - [Cancel Run](#cancel-run) — safely stopping a running process with confirmation
+- [Retry Failed Step](#retry-failed-step) — re-running a failed step in place without restarting the workflow
 - [Run Report](#run-report) — post-completion summary with timing and step outputs
 - [Report Unavailable](#report-unavailable) — guard preventing report access on in-progress runs
 
@@ -183,6 +184,12 @@ Steps display their autonomy level (L1–L4) from the process config. L2 means a
 Stopping a running process requires double confirmation to prevent accidental cancellation. First click shows warning ("cannot be undone"), "Keep running" dismisses back to idle. Second attempt confirms and the run status changes.
 
 ![cancel-run](cancel-run.gif)
+
+### Retry Failed Step
+
+When a step fails (docker daemon down, flaky network, etc.), clicking Retry on the failed step flips the instance back to running and the auto-runner re-dispatches that step — without restarting from the beginning. Variables from earlier steps are preserved.
+
+![retry-step](retry-step.gif)
 
 ### Run Report
 
