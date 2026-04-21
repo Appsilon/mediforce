@@ -126,7 +126,6 @@ export function NewTicketView({ ctx }: CommandViewProps) {
           description,
           type,
           context: chips.map((chip) => ({ label: chip.label, value: chip.value })),
-          filedBy: filedByLabel,
         }),
       });
 

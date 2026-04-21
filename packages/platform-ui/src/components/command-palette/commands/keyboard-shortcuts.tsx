@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCommandPalette } from '../provider';
-import { KbdRow } from '../kbd';
+import { Kbd, KbdRow } from '../kbd';
 import type { CommandViewProps, Shortcut } from '../types';
 
 const SECTION_LABEL: Record<string, string> = {
@@ -60,16 +60,8 @@ export function KeyboardShortcutsView(_props: CommandViewProps) {
         </div>
       ))}
       <p className="text-[11px] text-muted-foreground">
-        Tip: press <KbdInline>⌘</KbdInline> <KbdInline>K</KbdInline> anywhere in the app to open the command palette.
+        Tip: press <Kbd size="sm">⌘</Kbd> <Kbd size="sm">K</Kbd> anywhere in the app to open the command palette.
       </p>
     </div>
-  );
-}
-
-function KbdInline({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd className="inline-flex h-4 min-w-4 items-center justify-center rounded border bg-muted px-1 font-mono text-[10px] text-muted-foreground">
-      {children}
-    </kbd>
   );
 }

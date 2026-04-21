@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { useToast } from './toast-provider';
+import { ToastProvider, useToast } from './toast-provider';
 import { CommandPalette } from './palette';
 import { COMMANDS } from './commands';
 import type { Command, CommandContext, Shortcut } from './types';
@@ -19,7 +19,6 @@ type CommandPaletteContextValue = {
   openCommand: (commandId: string) => void;
   state: PaletteState;
   commands: readonly Command[];
-  /** Global shortcuts not tied to a specific command (shown in shortcuts overlay). */
   globalShortcuts: readonly Shortcut[];
 };
 
@@ -33,18 +32,24 @@ export function useCommandPalette(): CommandPaletteContextValue {
   return ctx;
 }
 
-/** True when focus is inside an input, textarea, or contenteditable. */
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
   if (target.isContentEditable) return true;
-  // CodeMirror / Monaco
   if (target.closest('.cm-editor, .monaco-editor') !== null) return true;
   return false;
 }
 
 export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <ToastProvider>
+      <CommandPaletteProviderInner>{children}</CommandPaletteProviderInner>
+    </ToastProvider>
+  );
+}
+
+function CommandPaletteProviderInner({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<PaletteState>({ kind: 'closed' });
   const pathname = usePathname();
   const { firebaseUser } = useAuth();
@@ -56,7 +61,6 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
     setState({ kind: 'command', commandId });
   }, []);
 
-  // Global shortcuts (shown in the shortcuts overlay, bound globally).
   const globalShortcuts = React.useMemo<readonly Shortcut[]>(
     () => [
       {
@@ -74,7 +78,8 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
       },
       {
         display: ['Esc'],
-        matches: () => false, // handled by Dialog itself
+        // Handled by Radix Dialog itself; listed here purely for the shortcuts overlay.
+        matches: () => false,
         label: 'Close palette / overlay',
         section: 'global',
       },
@@ -82,18 +87,15 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
     [],
   );
 
-  // Global keyboard listener — triggers shortcuts registered on commands,
-  // plus the two meta-shortcuts ⌘K and ?.
   React.useEffect(() => {
     function handler(event: KeyboardEvent): void {
-      // ⌘K / Ctrl+K works even inside editable fields (common palette convention).
+      // ⌘K / Ctrl+K works even inside editable fields — standard palette convention.
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setState((prev) => (prev.kind === 'closed' ? { kind: 'list' } : { kind: 'closed' }));
         return;
       }
 
-      // Single-key shortcuts are suppressed inside editable fields.
       if (isEditableTarget(event.target)) return;
 
       if (event.key === '?' && !event.metaKey && !event.ctrlKey) {
@@ -147,3 +149,5 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
     </Ctx.Provider>
   );
 }
+
+export { isEditableTarget };

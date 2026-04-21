@@ -19,8 +19,37 @@ const TicketBodySchema = z.object({
     .array(z.object({ label: z.string().min(1).max(80), value: z.string().min(1).max(500) }))
     .max(10)
     .default([]),
-  filedBy: z.string().min(1).max(200),
 });
+
+const DAILY_LIMIT = 50;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+type RateLimitBucket = { count: number; windowStart: number };
+
+// Per-instance in-memory limiter. On multi-instance deployments the effective
+// cap is DAILY_LIMIT × instances — acceptable for an anti-spam ceiling; move to
+// Firestore if stricter enforcement becomes necessary.
+const rateLimitBuckets = new Map<string, RateLimitBucket>();
+
+export function __resetRateLimitsForTests(): void {
+  rateLimitBuckets.clear();
+}
+
+type RateLimitResult = { ok: true } | { ok: false; retryAfterSeconds: number };
+
+function consumeRateLimit(uid: string, now: number): RateLimitResult {
+  const bucket = rateLimitBuckets.get(uid);
+  if (bucket === undefined || now - bucket.windowStart >= DAY_MS) {
+    rateLimitBuckets.set(uid, { count: 1, windowStart: now });
+    return { ok: true };
+  }
+  if (bucket.count >= DAILY_LIMIT) {
+    const retryAfterSeconds = Math.ceil((bucket.windowStart + DAY_MS - now) / 1000);
+    return { ok: false, retryAfterSeconds: Math.max(retryAfterSeconds, 1) };
+  }
+  bucket.count += 1;
+  return { ok: true };
+}
 
 function buildIssueBody(params: {
   description: string;
@@ -55,10 +84,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  let decoded: { uid: string; name?: string; email?: string };
   try {
-    await adminAuth.verifyIdToken(token);
+    decoded = await adminAuth.verifyIdToken(token);
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const rateLimit = consumeRateLimit(decoded.uid, Date.now());
+  if (!rateLimit.ok) {
+    return NextResponse.json(
+      { error: `Daily ticket limit of ${DAILY_LIMIT} reached. Try again tomorrow.` },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+    );
   }
 
   let body: unknown;
@@ -73,7 +111,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' }, { status: 400 });
   }
 
-  const { title, description, type, context, filedBy } = parsed.data;
+  const { title, description, type, context } = parsed.data;
+  const filedBy = decoded.name ?? decoded.email ?? decoded.uid;
 
   const githubToken = process.env.GITHUB_TOKEN ?? '';
   const repo = process.env.GITHUB_REPO ?? 'appsilon/mediforce';
@@ -114,8 +153,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const data = (await response.json()) as { number: number; html_url: string };
     return NextResponse.json({ number: data.number, url: data.html_url }, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[tickets] Unexpected error:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[tickets] Unexpected error:', err);
+    return NextResponse.json({ error: 'Failed to create ticket' }, { status: 500 });
   }
 }

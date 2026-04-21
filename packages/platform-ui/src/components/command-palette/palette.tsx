@@ -81,14 +81,14 @@ function CommandList({ ctx, onSelect }: { ctx: CommandContext; onSelect: (comman
   }, []);
 
   const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (q === '') return commands;
+    const normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery === '') return commands;
     return commands.filter((command) => {
-      if (command.title.toLowerCase().includes(q)) return true;
-      if (typeof command.description === 'string' && command.description.toLowerCase().includes(q)) return true;
+      if (command.title.toLowerCase().includes(normalizedQuery)) return true;
+      if (typeof command.description === 'string' && command.description.toLowerCase().includes(normalizedQuery)) return true;
       if (command.keywords !== undefined) {
         for (const keyword of command.keywords) {
-          if (keyword.toLowerCase().includes(q)) return true;
+          if (keyword.toLowerCase().includes(normalizedQuery)) return true;
         }
       }
       return false;
@@ -159,15 +159,15 @@ function CommandList({ ctx, onSelect }: { ctx: CommandContext; onSelect: (comman
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">No commands match.</div>
         )}
 
-        {grouped.map(([section, sectionCommands]) => {
-          const startIndex = filtered.indexOf(sectionCommands[0]);
-          return (
+        {(() => {
+          let runningIndex = 0;
+          return grouped.map(([section, sectionCommands]) => (
             <div key={section} className="py-1">
               <div className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {SECTION_LABEL[section] ?? section}
               </div>
-              {sectionCommands.map((command, offset) => {
-                const index = startIndex + offset;
+              {sectionCommands.map((command) => {
+                const index = runningIndex++;
                 const Icon = command.icon;
                 return (
                   <button
@@ -189,8 +189,8 @@ function CommandList({ ctx, onSelect }: { ctx: CommandContext; onSelect: (comman
                 );
               })}
             </div>
-          );
-        })}
+          ));
+        })()}
       </div>
 
       <div className="flex items-center justify-between border-t px-4 py-2 text-[11px] text-muted-foreground">

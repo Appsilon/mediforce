@@ -6,7 +6,7 @@ import { CheckCircle2, AlertCircle, Info, X, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToastOpts, ToastVariant } from './types';
 
-type ToastItem = ToastOpts & { id: number };
+type ToastItem = ToastOpts & { id: string };
 
 type ToastContextValue = {
   toast: (opts: ToastOpts) => void;
@@ -22,13 +22,18 @@ export function useToast(): ToastContextValue {
   return ctx;
 }
 
-let nextId = 1;
+function generateToastId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = React.useState<ToastItem[]>([]);
 
   const toast = React.useCallback((opts: ToastOpts) => {
-    const id = nextId++;
+    const id = generateToastId();
     setItems((prev) => [...prev, { ...opts, id }]);
   }, []);
 

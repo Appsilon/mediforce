@@ -1,11 +1,27 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-export function Kbd({ children, className }: { children: React.ReactNode; className?: string }) {
+type KbdSize = 'sm' | 'md';
+
+const SIZE_STYLES: Record<KbdSize, string> = {
+  sm: 'h-4 min-w-4 px-1 text-[10px]',
+  md: 'h-5 min-w-5 px-1.5 text-[11px] font-medium',
+};
+
+export function Kbd({
+  children,
+  className,
+  size = 'md',
+}: {
+  children: React.ReactNode;
+  className?: string;
+  size?: KbdSize;
+}) {
   return (
     <kbd
       className={cn(
-        'inline-flex h-5 min-w-5 select-none items-center justify-center rounded border bg-muted px-1.5 font-mono text-[11px] font-medium text-muted-foreground',
+        'inline-flex select-none items-center justify-center rounded border bg-muted font-mono text-muted-foreground',
+        SIZE_STYLES[size],
         className,
       )}
     >
@@ -14,11 +30,19 @@ export function Kbd({ children, className }: { children: React.ReactNode; classN
   );
 }
 
-export function KbdRow({ keys, className }: { keys: string[]; className?: string }) {
+export function KbdRow({
+  keys,
+  className,
+  size,
+}: {
+  keys: string[];
+  className?: string;
+  size?: KbdSize;
+}) {
   return (
     <span className={cn('inline-flex items-center gap-1', className)}>
-      {keys.map((key, i) => (
-        <Kbd key={`${key}-${i}`}>{key}</Kbd>
+      {keys.map((key, index) => (
+        <Kbd key={`${key}-${index}`} size={size}>{key}</Kbd>
       ))}
     </span>
   );
