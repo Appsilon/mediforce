@@ -66,7 +66,10 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
 
   const escalationReason = agentOutput.escalationReason;
   const normalizedEscalation: EscalationReason =
-    escalationReason === 'low_confidence' || escalationReason === 'timeout' || escalationReason === 'error'
+    escalationReason === 'low_confidence' ||
+    escalationReason === 'timeout' ||
+    escalationReason === 'error' ||
+    escalationReason === 'iterations_limit'
       ? escalationReason
       : null;
 
@@ -111,7 +114,7 @@ export interface GitMetadataData {
   repoUrl: string;
 }
 
-export type EscalationReason = 'low_confidence' | 'timeout' | 'error' | null;
+export type EscalationReason = 'low_confidence' | 'timeout' | 'error' | 'iterations_limit' | null;
 
 export interface AgentOutputData {
   confidence: number | null;

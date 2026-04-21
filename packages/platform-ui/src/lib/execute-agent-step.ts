@@ -152,6 +152,72 @@ export async function executeAgentStep(
     }
   }
 
+  // Create a human review task for an L3 step, append audit, pause instance.
+  // Used for: (a) paused/escalated agent run, (b) agent reviewer returned no
+  // verdict, (c) agent reviewer exhausted the iteration limit.
+  const createAgentReviewHumanTask = async (
+    escalationReason: 'low_confidence' | 'timeout' | 'error' | 'iterations_limit' | null,
+    auditBasis: string,
+  ): Promise<void> => {
+    const reviewTaskId = crypto.randomUUID();
+    const reviewTaskNow = new Date().toISOString();
+    const assignedRole = workflowStep.allowedRoles?.[0] ?? 'reviewer';
+
+    await humanTaskRepo.create({
+      id: reviewTaskId,
+      processInstanceId: instanceId,
+      stepId,
+      assignedRole,
+      assignedUserId: null,
+      status: 'pending',
+      deadline: null,
+      createdAt: reviewTaskNow,
+      updatedAt: reviewTaskNow,
+      completedAt: null,
+      completionData: {
+        reviewType: 'agent_output_review',
+        agentOutput: {
+          confidence: envelope?.confidence ?? null,
+          reasoning: envelope?.reasoning_summary ?? null,
+          result: envelope?.result ?? null,
+          model: envelope?.model ?? null,
+          annotations: envelope?.annotations ?? null,
+          duration_ms: envelope?.duration_ms ?? null,
+          gitMetadata: envelope?.gitMetadata ?? null,
+          presentation: envelope?.presentation ?? null,
+          escalationReason,
+        },
+        iterationNumber: 0,
+      },
+      creationReason: 'agent_review_l3',
+    });
+
+    await auditRepo.append({
+      actorId: `agent:${pluginId}`,
+      actorType: 'agent',
+      actorRole: autonomyLevel,
+      action: 'task.created',
+      description: `Human task created for workflow step '${stepId}' (reason: agent_review_l3)`,
+      timestamp: reviewTaskNow,
+      inputSnapshot: { taskId: reviewTaskId, stepId, reason: 'agent_review_l3', assignedRole },
+      outputSnapshot: {},
+      basis: auditBasis,
+      entityType: 'humanTask',
+      entityId: reviewTaskId,
+      processInstanceId: instanceId,
+      stepId,
+      processDefinitionVersion: instance.definitionVersion,
+      executorType: 'agent',
+      reviewerType: 'human',
+    });
+
+    await instanceRepo.update(instanceId, {
+      status: 'paused',
+      pauseReason: 'waiting_for_human',
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   // ---- L3 Review Routing (skip when agent errored — nothing to review) ----
   // Escalation from fallback handler (status='escalated') always needs a human,
   // even when review.type='agent' — the whole point of escalate_to_human is that
@@ -161,64 +227,10 @@ export async function executeAgentStep(
     const isEscalation = runResult.status === 'escalated';
 
     if (reviewerType === 'human' || reviewerType === 'none' || isEscalation) {
-      const reviewTaskId = crypto.randomUUID();
-      const reviewTaskNow = new Date().toISOString();
-
-      await humanTaskRepo.create({
-        id: reviewTaskId,
-        processInstanceId: instanceId,
-        stepId,
-        assignedRole: workflowStep.allowedRoles?.[0] ?? 'reviewer',
-        assignedUserId: null,
-        status: 'pending',
-        deadline: null,
-        createdAt: reviewTaskNow,
-        updatedAt: reviewTaskNow,
-        completedAt: null,
-        completionData: {
-          reviewType: 'agent_output_review',
-          agentOutput: {
-            confidence: runResult.envelope?.confidence ?? null,
-            reasoning: runResult.envelope?.reasoning_summary ?? null,
-            result: runResult.envelope?.result ?? null,
-            model: runResult.envelope?.model ?? null,
-            annotations: runResult.envelope?.annotations ?? null,
-            duration_ms: runResult.envelope?.duration_ms ?? null,
-            gitMetadata: runResult.envelope?.gitMetadata ?? null,
-            presentation: runResult.envelope?.presentation ?? null,
-            escalationReason: isEscalation ? runResult.fallbackReason : null,
-          },
-          iterationNumber: 0,
-        },
-        creationReason: 'agent_review_l3',
-      });
-
-      await auditRepo.append({
-        actorId: `agent:${pluginId}`,
-        actorType: 'agent',
-        actorRole: autonomyLevel,
-        action: 'task.created',
-        description: `Human task created for workflow step '${stepId}' (reason: agent_review_l3)`,
-        timestamp: reviewTaskNow,
-        inputSnapshot: { taskId: reviewTaskId, stepId, reason: 'agent_review_l3', assignedRole: workflowStep.allowedRoles?.[0] ?? 'reviewer' },
-        outputSnapshot: {},
-        basis: 'L3 workflow agent step paused — human reviewer task created',
-        entityType: 'humanTask',
-        entityId: reviewTaskId,
-        processInstanceId: instanceId,
-        stepId,
-        processDefinitionVersion: instance.definitionVersion,
-        executorType: 'agent',
-        reviewerType: 'human',
-      });
-
-      // Pause instance so resolve-task can resume it after human approval
-      await instanceRepo.update(instanceId, {
-        status: 'paused',
-        pauseReason: 'waiting_for_human',
-        updatedAt: new Date().toISOString(),
-      });
-
+      await createAgentReviewHumanTask(
+        isEscalation ? runResult.fallbackReason : null,
+        'L3 workflow agent step paused — human reviewer task created',
+      );
       return {
         instanceId,
         status: 'paused',
@@ -226,6 +238,73 @@ export async function executeAgentStep(
         agentRunStatus: runResult.status,
       };
     }
+  }
+
+  // ---- L3 Agent-as-Reviewer: submit verdict via engine.submitReviewVerdict ----
+  // review.type='agent' on a review step: the agent's verdict flows through
+  // ReviewTracker so iteration counting and maxIterations enforcement fire.
+  // On verdict='revise' the step routes back to a prior creation step; when
+  // iterations are exhausted, the engine pauses with max_iterations_exceeded
+  // and we create a human escalation task so the process stays actionable.
+  if (
+    autonomyLevel === 'L3' &&
+    workflowStep.review?.type === 'agent' &&
+    workflowStep.type === 'review' &&
+    runResult.status === 'completed' &&
+    runResult.appliedToWorkflow
+  ) {
+    const resultObj =
+      envelope?.result && typeof envelope.result === 'object' ? (envelope.result as Record<string, unknown>) : null;
+    const verdictValue = typeof resultObj?.verdict === 'string' ? resultObj.verdict : null;
+
+    if (verdictValue === null || verdictValue.length === 0) {
+      await createAgentReviewHumanTask(
+        'error',
+        `Agent reviewer for step '${stepId}' returned envelope without a verdict`,
+      );
+      return {
+        instanceId,
+        status: 'paused',
+        currentStepId: stepId,
+        agentRunStatus: 'escalated',
+      };
+    }
+
+    const commentValue = typeof resultObj?.comment === 'string' ? resultObj.comment : null;
+    const reviewerId = `agent:${pluginId}`;
+
+    const updated = await engine.submitReviewVerdict(
+      instanceId,
+      stepId,
+      {
+        reviewerId,
+        reviewerRole: 'agent',
+        verdict: verdictValue,
+        comment: commentValue,
+        timestamp: new Date().toISOString(),
+      },
+      { id: reviewerId, role: 'agent' },
+    );
+
+    if (updated.status === 'paused' && updated.pauseReason === 'max_iterations_exceeded') {
+      await createAgentReviewHumanTask(
+        'iterations_limit',
+        `Agent reviewer for step '${stepId}' exhausted iteration limit`,
+      );
+      return {
+        instanceId,
+        status: 'paused',
+        currentStepId: stepId,
+        agentRunStatus: 'escalated',
+      };
+    }
+
+    return {
+      instanceId,
+      status: updated.status,
+      currentStepId: updated.currentStepId,
+      agentRunStatus: 'completed',
+    };
   }
 
   // ---- Escalation/Pause (non-L3) ----

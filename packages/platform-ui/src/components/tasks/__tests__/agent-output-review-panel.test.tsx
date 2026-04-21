@@ -133,6 +133,17 @@ describe('AgentOutputReviewPanel', () => {
     expect(screen.queryByText(/escalated/i)).not.toBeInTheDocument();
   });
 
+  it('renders iterations_limit escalation badge', () => {
+    const agentOutput = buildAgentOutput({
+      result: { verdict: 'revise' },
+      escalationReason: 'iterations_limit',
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
+
+    expect(screen.getByText(/escalated: iterations limit reached/i)).toBeInTheDocument();
+  });
+
   it('escapes closing script tags in result data', () => {
     const result = { html: '</script><script>alert(1)</script>' };
     const agentOutput = buildAgentOutput({

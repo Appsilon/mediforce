@@ -611,11 +611,12 @@ function formatKey(key: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatEscalationReason(reason: 'low_confidence' | 'timeout' | 'error'): string {
+function formatEscalationReason(reason: 'low_confidence' | 'timeout' | 'error' | 'iterations_limit'): string {
   switch (reason) {
     case 'low_confidence': return 'low confidence';
     case 'timeout': return 'timeout';
     case 'error': return 'error';
+    case 'iterations_limit': return 'iterations limit reached';
   }
 }
 
