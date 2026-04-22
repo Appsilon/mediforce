@@ -7,7 +7,6 @@ import { ArrowLeft, FileBarChart } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import type { ProcessInstance, StepExecution, AuditEvent, Step } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
-import { StepHistoryTabs } from './step-history-tabs';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
@@ -92,8 +91,7 @@ export function ProcessDetail({
     return unsorted.sort((a, b) => (stepOrder.get(a.stepId) ?? 0) - (stepOrder.get(b.stepId) ?? 0));
   }, [agentEvents, definitionSteps]);
 
-  // Controlled tab state for graph-to-history interaction
-  const [activeTab, setActiveTab] = React.useState('history');
+  const [activeTab, setActiveTab] = React.useState('audit');
   const [agentLogStepId, setAgentLogStepId] = React.useState<string | null>(null);
 
   // Cancel double-confirm: 0 = idle, 1 = first confirm shown, 2 = cancelling in progress
@@ -113,21 +111,6 @@ export function ProcessDetail({
       setCancelStep(0);
     }
   }
-
-  const handleStepClick = React.useCallback((stepId: string) => {
-    // Switch to history tab if not already active
-    setActiveTab('history');
-    // After a brief delay (to allow tab content to render), scroll to the step
-    setTimeout(() => {
-      const el = document.getElementById(`step-history-${stepId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // Briefly highlight the element
-        el.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
-        setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 2000);
-      }
-    }, 100);
-  }, []);
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
@@ -241,7 +224,6 @@ export function ProcessDetail({
           definitionSteps={definitionSteps}
           stepExecutions={stepExecutions}
           agentEvents={agentEvents}
-          onStepClick={handleStepClick}
           stepConfigMap={stepConfigMap}
           stepDetailBaseHref={runDetailHref}
           onAgentLogClick={agentLogFiles.length > 0 ? (stepId: string) => { setAgentLogStepId(stepId); setActiveTab('agent-log'); } : undefined}
@@ -264,11 +246,10 @@ export function ProcessDetail({
         </Link>
       )}
 
-      {/* Tabs: Step History | Audit Log */}
+      {/* Tabs: Audit Log | Agent Log */}
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
         <Tabs.List className="flex gap-1 border-b mb-6">
           {[
-            { value: 'history', label: 'Step History' },
             { value: 'audit', label: 'Audit Log' },
             ...(agentLogFiles.length > 0 ? [{ value: 'agent-log', label: 'Agent Log' }] : []),
           ].map(({ value, label }) => (
@@ -281,10 +262,6 @@ export function ProcessDetail({
             </Tabs.Trigger>
           ))}
         </Tabs.List>
-
-        <Tabs.Content value="history">
-          <StepHistoryTabs steps={stepExecutions} loading={stepExecutionsLoading} processInstanceId={instance.id} />
-        </Tabs.Content>
 
         <Tabs.Content value="audit">
           <AuditLogTab events={auditEvents} loading={auditEventsLoading} error={auditEventsError} />

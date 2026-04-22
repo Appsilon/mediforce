@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { format } from 'date-fns';
+import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-core';
 import { AutonomyBadge } from '../agents/autonomy-badge';
 import { RetryStepButton } from './retry-step-button';
@@ -164,6 +165,38 @@ function TypeBadge({ type, executorType }: { type: Step['type']; executorType?: 
     <span className="inline-flex items-center gap-0.5 text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5">
       <Cog className="h-3 w-3" />
       {type}
+    </span>
+  );
+}
+
+function ExecutedBy({ executedBy, executorType, plugin, autonomyLevel }: {
+  executedBy: string;
+  executorType?: string;
+  plugin?: string;
+  autonomyLevel?: string;
+}) {
+  if (executorType === 'agent') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <Bot className="h-3 w-3 shrink-0" />
+        <span>{plugin ?? 'Agent'}</span>
+        {autonomyLevel && <AutonomyBadge level={autonomyLevel} />}
+      </span>
+    );
+  }
+  if (executorType === 'script') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <FileCode className="h-3 w-3 shrink-0" />
+        Script
+      </span>
+    );
+  }
+  const displayName = executedBy === 'api-user' ? 'System' : executedBy;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <User className="h-3 w-3 shrink-0" />
+      {displayName}
     </span>
   );
 }
@@ -350,6 +383,9 @@ export function StepStatusPanel({
           const stepConfig = stepConfigMap?.get(step.id);
           const isExpanded = expandedStepId === step.id;
           const hasConfig = stepConfig && stepConfig.executorType === 'agent';
+          const latestExec = stepExecutions
+            .filter((e) => e.stepId === step.id)
+            .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
           const hasAgentLog = agentEvents.some(
             (e) => e.stepId === step.id && e.type === 'status' && String(e.payload).startsWith('agent activity log:'),
           );
@@ -424,6 +460,30 @@ export function StepStatusPanel({
                   )}
                 </div>
                 <div className="text-xs font-mono text-muted-foreground mt-0.5">{step.id}</div>
+                {latestExec && (
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-xs text-muted-foreground">
+                      <span className="text-muted-foreground/60 mr-1">Started</span>
+                      {format(new Date(latestExec.startedAt), 'MMM d, HH:mm')}
+                    </span>
+                    {latestExec.completedAt && (
+                      <>
+                        <span className="text-muted-foreground/40">·</span>
+                        <span className="text-xs text-muted-foreground">
+                          <span className="text-muted-foreground/60 mr-1">Completed</span>
+                          {format(new Date(latestExec.completedAt), 'MMM d, HH:mm')}
+                        </span>
+                      </>
+                    )}
+                    <span className="text-muted-foreground/40">·</span>
+                    <ExecutedBy
+                      executedBy={latestExec.executedBy}
+                      executorType={stepConfig?.executorType}
+                      plugin={stepConfig?.plugin}
+                      autonomyLevel={stepConfig?.autonomyLevel}
+                    />
+                  </div>
+                )}
                 {status === 'running' && stepConfigMap?.get(step.id)?.executorType === 'agent' && (
                   <StepProgress stepId={step.id} agentEvents={agentEvents} />
                 )}
