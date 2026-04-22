@@ -10,6 +10,7 @@ import {
   FirestoreCronTriggerStateRepository,
   getAdminFirestore,
   validateSecretsKey,
+  detectCredentialMode,
 } from '@mediforce/platform-infra';
 import type { CronTriggerStateRepository } from '@mediforce/platform-core';
 import {
@@ -55,6 +56,10 @@ export function getPlatformServices(): PlatformServices {
   // Fail fast if the encryption key is missing or malformed — better to crash here
   // than to boot successfully and fail opaquely mid-workflow.
   validateSecretsKey();
+
+  console.log(
+    `[platform-services] Firebase Admin SDK: ${detectCredentialMode()}`,
+  );
 
   const db = getAdminFirestore();
 

@@ -22,6 +22,21 @@ cp packages/platform-ui/.env.local.example packages/platform-ui/.env.local
 
 Fill in your Firebase project values. Get them from: Firebase Console > Project Settings > General > Your apps.
 
+### Firebase credentials
+
+The server-side Firebase Admin SDK needs credentials to talk to Firestore and Auth. On boot, `packages/platform-infra/src/auth/firebase-admin-init.ts` checks that at least one of these is present and fails fast with an actionable message otherwise.
+
+Pick one of:
+
+| Option | When to use | Setup |
+|--------|-------------|-------|
+| **ADC (gcloud)** | Local development | `gcloud auth application-default login` — writes `~/.config/gcloud/application_default_credentials.json` |
+| **Service account file** | CI, containers, non-gcloud environments | `export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json` |
+| **Emulators** | Offline work, E2E tests, first-time setup | `NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:local` — no real credentials needed |
+| **GCP runtime** | Firebase App Hosting / Cloud Run | Automatic — `K_SERVICE` / `GOOGLE_CLOUD_PROJECT` set by platform |
+
+On startup `platform-services` logs which mode was detected, e.g. `[platform-services] Firebase Admin SDK: ADC (gcloud)`.
+
 | Variable | Description |
 |----------|-------------|
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase API key |

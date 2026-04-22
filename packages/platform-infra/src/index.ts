@@ -26,6 +26,11 @@ export { FirestoreWorkflowSecretsRepository } from './firestore/workflow-secrets
 export { FirestoreCoworkSessionRepository } from './firestore/cowork-session-repository.js';
 export { FirestoreCronTriggerStateRepository } from './firestore/cron-trigger-state-repository.js';
 export { validateSecretsKey } from './crypto/secrets-cipher.js';
-export { getAdminAuth, getAdminFirestore } from './auth/firebase-admin-init.js';
+export {
+  getAdminAuth,
+  getAdminFirestore,
+  detectCredentialMode,
+} from './auth/firebase-admin-init.js';
+export type { CredentialMode } from './auth/firebase-admin-init.js';
 export { FirebaseInviteService } from './auth/firebase-invite-service.js';
 

@@ -270,6 +270,7 @@ The `skills/_registry.yml` indexes development skills. Runtime skills have per-a
 - Node.js 20+, pnpm 10+ (`corepack enable`)
 - Firebase CLI (`npm i -g firebase-tools`)
 - `cp packages/platform-ui/.env.local.example packages/platform-ui/.env.local` and fill Firebase + OpenRouter keys
+- Firebase Admin SDK credentials — see [docs/development.md#firebase-credentials](docs/development.md#firebase-credentials) (ADC, service account, or emulators)
 - Deploys via Firebase App Hosting (`apphosting.yaml`)
 
 ## Skills Router
