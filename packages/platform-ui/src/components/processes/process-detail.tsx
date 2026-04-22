@@ -20,6 +20,7 @@ import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { useBackNavigation } from '@/hooks/use-back-navigation';
 import { formatStepName } from '@/components/tasks/task-utils';
 import { MissingEnvBanner } from './missing-env-banner';
+import { PreviousRunBanner } from './previous-run-banner';
 
 type AuditEventWithId = AuditEvent & { id: string };
 
@@ -230,6 +231,17 @@ export function ProcessDetail({
           <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-800 dark:text-red-300">
             Error: {instance.error}
           </div>
+        )}
+        {instance.previousRun !== undefined && (
+          <PreviousRunBanner
+            values={instance.previousRun}
+            sourceId={instance.previousRunSourceId}
+            sourceHref={
+              instance.previousRunSourceId !== undefined
+                ? `/${handle}/workflows/${instance.definitionName}/runs/${instance.previousRunSourceId}`
+                : undefined
+            }
+          />
         )}
 
       </div>
