@@ -10,6 +10,7 @@ import {
 } from './process-definition.js';
 import { ProcessNotificationConfigSchema } from './process-config.js';
 import { McpServerConfigSchema } from './mcp-server-config.js';
+import { StepMcpRestrictionSchema } from './agent-mcp-binding.js';
 
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
@@ -82,6 +83,10 @@ export const WorkflowStepSchema = z.object({
   cowork: WorkflowCoworkConfigSchema.optional(),
   stepParams: z.record(z.string(), z.unknown()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+  /** Step-level subtractive MCP restrictions, keyed by server name
+   *  (matching AgentDefinition.mcpServers). Can only disable servers or
+   *  deny specific tools — the shape has no allow/broaden field. */
+  mcpRestrictions: StepMcpRestrictionSchema.optional(),
 });
 
 export const WorkflowDefinitionSchema = z.object({

@@ -199,6 +199,14 @@ export {
 export { validateProcessConfig } from './validation/config-validator.js';
 export type { ConfigValidationResult } from './validation/config-validator.js';
 
+// MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
+export {
+  resolveEffectiveMcp,
+  CatalogEntryNotFoundError,
+  type ResolvedMcpConfig,
+  type ResolvedMcpServer,
+} from './mcp/resolve-effective-mcp.js';
+
 // Collaboration (handoff registry, RBAC)
 export { handoffTypeRegistry, RbacService, RbacError } from './collaboration/index.js';
 export type { HandoffTypeRegistration } from './collaboration/index.js';
