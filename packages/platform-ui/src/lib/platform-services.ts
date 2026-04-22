@@ -30,6 +30,7 @@ import {
 } from '@mediforce/agent-runtime';
 import { registerSupplyIntelligencePlugins } from '@mediforce/supply-intelligence-plugins';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
+import { seedBuiltinToolCatalog } from './seed-tool-catalog.js';
 
 let services: PlatformServices | null = null;
 let seedingStarted = false;
@@ -138,6 +139,9 @@ export function getPlatformServices(): PlatformServices {
     seedingStarted = true;
     seedBuiltinAgentDefinitions(agentDefinitionRepo).catch((err) => {
       console.error('[platform-services] Failed to seed built-in agent definitions:', err);
+    });
+    seedBuiltinToolCatalog(toolCatalogRepo).catch((err) => {
+      console.error('[platform-services] Failed to seed built-in tool catalog:', err);
     });
   }
 

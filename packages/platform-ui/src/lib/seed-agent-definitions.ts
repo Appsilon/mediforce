@@ -70,6 +70,25 @@ const BUILTIN_AGENTS: Record<string, CreateAgentDefinitionInput> = {
     systemPrompt: '',
     skillFileNames: [],
   },
+  // Per-workflow AgentDefinition referenced by tealflow-cowork.wd.json via
+  // step.agentId. Sits in the same seed file for Step 2 scope; Step 3+ will
+  // move per-workflow definitions into sibling files next to their wd.json.
+  'tealflow-cowork-chat': {
+    kind: 'cowork',
+    runtimeId: 'chat',
+    name: 'Tealflow Cowork Chat',
+    iconName: 'MessageCircle',
+    description:
+      'Chat cowork agent with the tealflow MCP server attached for teal module exploration.',
+    inputDescription: 'User messages and artifact state',
+    outputDescription: 'Teal module selection artifact',
+    foundationModel: 'anthropic/claude-sonnet-4',
+    systemPrompt: '',
+    skillFileNames: [],
+    mcpServers: {
+      tealflow: { type: 'stdio', catalogId: 'tealflow-mcp' },
+    },
+  },
 };
 
 export async function seedBuiltinAgentDefinitions(
