@@ -513,30 +513,30 @@ export function WorkflowEditorCanvas({
         </button>
 
         {/* Workflow source code tab */}
-        <button
-          onClick={() => setRightPanelView('yaml')}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-            rightPanelView === 'yaml' && !selectedStepId
-              ? 'bg-muted text-foreground border-muted-foreground/30'
-              : 'hover:bg-muted text-muted-foreground hover:text-foreground',
-          )}
-        >
-          <Code2 className="h-3.5 w-3.5" />
-          Workflow source code
-          <span className="group relative inline-flex items-center ml-0.5">
-            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40" />
-            <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
-              <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
-              <p>You can author workflows three ways:</p>
-              <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
-                <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
-                <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
-              </ul>
-            </span>
+        <span className="group relative inline-flex">
+          <button
+            onClick={() => setRightPanelView('yaml')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
+              rightPanelView === 'yaml' && !selectedStepId
+                ? 'bg-muted text-foreground border-muted-foreground/30'
+                : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Code2 className="h-3.5 w-3.5" />
+            Workflow source code
+            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40 ml-0.5" />
+          </button>
+          <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
+            <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
+            <p>You can author workflows three ways:</p>
+            <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+              <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
+              <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
+              <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
+            </ul>
           </span>
-        </button>
+        </span>
 
         {/* Apply YAML — only visible when YAML panel is active and no step is selected */}
         {!selectedStepId && rightPanelView === 'yaml' && (
@@ -568,7 +568,7 @@ export function WorkflowEditorCanvas({
             onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
             onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
             onEdgeAdd={(fromStepId, type, executor) => addStep(type, executor, fromStepId)}
-            onPaneClick={() => setSelectedStepId(null)}
+            onPaneClick={() => { setSelectedStepId(null); setRightPanelView('yaml'); }}
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
             canMoveUp={canMoveUpSet}
@@ -600,7 +600,15 @@ export function WorkflowEditorCanvas({
               </>
             ) : rightPanelView === 'secrets' ? (
               <>
-                <h2 className="text-sm font-semibold">Secrets</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">Secrets</h2>
+                  <button
+                    onClick={() => setRightPanelView('yaml')}
+                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
                 {namespace && userId && workflowName ? (
                   <WorkflowSecretsEditor
                     namespace={namespace}
