@@ -150,7 +150,9 @@ export type {
   UserDirectoryService,
   DirectoryUser,
   AgentRunRepository,
-  CoworkSessionRepository,  CronTriggerStateRepository,
+  CoworkSessionRepository,
+  CronTriggerStateRepository,
+  ToolCatalogRepository,
 } from './interfaces/index.js';
 
 // Agent definition schema + repository interface
