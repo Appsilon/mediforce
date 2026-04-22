@@ -38,8 +38,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const content = await readFile(resolved, 'utf-8');
-    return NextResponse.json({ content, path: resolved });
+    const buffer = await readFile(resolved);
+    const ext = resolved.split('.').pop()?.toLowerCase() ?? '';
+    const contentTypeMap: Record<string, string> = {
+      html: 'text/html; charset=utf-8',
+      htm: 'text/html; charset=utf-8',
+      pdf: 'application/pdf',
+      csv: 'text/csv; charset=utf-8',
+      md: 'text/markdown; charset=utf-8',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+    const contentType = contentTypeMap[ext] ?? 'application/octet-stream';
+    const filename = resolved.split('/').pop() ?? 'download';
+
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    });
   } catch {
     return NextResponse.json({ content: '', path: resolved, error: 'File not found' }, { status: 404 });
   }

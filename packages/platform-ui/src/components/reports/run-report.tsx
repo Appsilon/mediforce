@@ -429,14 +429,29 @@ function DeliverablesSection({
 
   const { stepId, output, result } = finalOutput;
   const git = output.gitMetadata;
+  const deliverableFile = output.deliverableFile ?? null;
+  const resultOutputFile = typeof result?.output_file === 'string' ? result.output_file : null;
+  const effectiveDeliverableFile = deliverableFile ?? resultOutputFile;
 
   return (
     <section>
       <h2 className="text-lg font-headline font-semibold mb-4">Deliverables</h2>
       <div className="rounded-lg border bg-card p-4 space-y-4">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-          <span>From {formatStepName(stepId)}</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <span>From {formatStepName(stepId)}</span>
+          </div>
+          {effectiveDeliverableFile && (
+            <a
+              href={`/api/agent-output-file?path=${encodeURIComponent(effectiveDeliverableFile)}`}
+              download
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <FileText className="h-4 w-4" />
+              Download Report
+            </a>
+          )}
         </div>
 
         {git && (

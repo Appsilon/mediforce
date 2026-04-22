@@ -382,6 +382,61 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     });
   }
 
+  /**
+   * Scan outputDir for deliverable files (HTML, PDF, CSV, etc.) — excluding
+   * internal agent files. Copy the first match to a stable temp location so
+   * it survives output-dir cleanup, and return the absolute copied path.
+   * Returns null if nothing found.
+   */
+  protected async persistDeliverableFile(
+    outputDir: string,
+    instanceId: string,
+    stepId: string,
+  ): Promise<string | null> {
+    const INTERNAL_NAMES = new Set([
+      'opencode.json', 'auth.json', 'prompt.txt', 'result.json',
+      'git-result.json', 'mock-result.json', 'presentation.html',
+    ]);
+    const DELIVERABLE_EXTS = new Set(['.html', '.htm', '.pdf', '.csv', '.xlsx', '.md']);
+
+    let entries: string[];
+    try {
+      entries = await readdir(outputDir);
+    } catch {
+      return null;
+    }
+
+    for (const name of entries) {
+      if (INTERNAL_NAMES.has(name)) continue;
+      if (name.startsWith('.')) continue;
+      const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+      if (!DELIVERABLE_EXTS.has(ext)) continue;
+
+      const srcPath = join(outputDir, name);
+      const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
+      await mkdir(destDir, { recursive: true });
+      const destPath = join(destDir, name);
+      try {
+        await cp(srcPath, destPath);
+        return destPath;
+      } catch {
+        return null;
+      }
+    }
+
+    // Also handle presentation.html (already read as spawnResult.presentation but path needed)
+    const presentationPath = join(outputDir, 'presentation.html');
+    try {
+      const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
+      await mkdir(destDir, { recursive: true });
+      const destPath = join(destDir, `${stepId}-presentation.html`);
+      await cp(presentationPath, destPath);
+      return destPath;
+    } catch {
+      return null;
+    }
+  }
+
   /** Resolve the host path to the mock-fixtures directory for this step's plugin.
    *  Returns null if skillsDir is not set. */
   protected getMockFixturesDir(): string | null {
@@ -703,6 +758,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // Strip envelope-level fields from result to avoid duplication in UI
       const { confidence: _c, confidence_rationale: _cr, ...cleanResult } = parsedResult;
 
+      // Persist any deliverable file from the output dir before it gets cleaned up
+      const deliverableFile = await this.persistDeliverableFile(
+        dockerOutputDir ?? spawnResult.outputDir ?? '',
+        instanceId,
+        this.context.stepId,
+      );
+
       await emit({
         type: 'result',
         payload: {
@@ -726,6 +788,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           result: cleanResult,
           ...(spawnResult.gitMetadata ? { gitMetadata: spawnResult.gitMetadata } : {}),
           ...(spawnResult.presentation ? { presentation: spawnResult.presentation } : {}),
+          ...(deliverableFile ? { deliverableFile } : {}),
         },
         timestamp: new Date().toISOString(),
       });

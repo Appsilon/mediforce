@@ -144,6 +144,7 @@ export async function executeAgentStep(
             model: envelope.model ?? null,
             duration_ms: envelope.duration_ms ?? null,
             gitMetadata: envelope.gitMetadata ?? null,
+            deliverableFile: (envelope.deliverableFile as string | undefined) ?? null,
           }
         : null,
     });
