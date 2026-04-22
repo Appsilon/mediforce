@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 
 interface LogEntry {
@@ -307,7 +308,7 @@ function LogGroupList({ groups }: { groups: LogGroup[] }) {
 
 async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
   try {
-    const response = await fetch(`/api/agent-logs?file=${encodeURIComponent(file)}`);
+    const response = await apiFetch(`/api/agent-logs?file=${encodeURIComponent(file)}`);
     const data = await response.json() as { content: string; error?: string };
     if (data.error && !data.content) {
       return { entries: [], rawContent: null, error: data.error };

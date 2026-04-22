@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { AlertTriangle, Bot, Code, ExternalLink, FileText, Gauge, GitBranch, Loader2, MonitorPlay } from 'lucide-react';
 import type { AgentOutputData } from './task-utils';
 import { formatStepName } from './task-utils';
+import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 
 interface AgentOutputReviewPanelProps {
@@ -126,7 +127,7 @@ export function AgentOutputReviewPanel({
   React.useEffect(() => {
     if (!outputFilePath) return;
     setFileLoading(true);
-    fetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}`)
+    apiFetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}`)
       .then((res) => res.json() as Promise<{ content?: string; error?: string }>)
       .then((data) => {
         if (data.error && !data.content) {

@@ -8,6 +8,7 @@ import { useParams } from 'next/navigation';
 import { useAgentRuns, useProcessNameMap } from '@/hooks/use-agent-runs';
 import { AgentRunListTable } from '@/components/agents/agent-run-list-table';
 import { getModelDisplayName } from '@/lib/agent-models';
+import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
@@ -201,11 +202,11 @@ function AgentCatalog({ handle }: { handle: string }) {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/plugins').then((res) => {
+      apiFetch('/api/plugins').then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch plugins: ${res.status}`);
         return res.json() as Promise<{ plugins: AgentEntry[] }>;
       }),
-      fetch('/api/agent-definitions').then((res) => {
+      apiFetch('/api/agent-definitions').then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch agent definitions: ${res.status}`);
         return res.json() as Promise<{ agents: AgentDefinition[] }>;
       }),

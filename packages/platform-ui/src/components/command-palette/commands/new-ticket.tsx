@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { Loader2, Bug, Lightbulb, HelpCircle, MapPin, User as UserIcon, X as XIcon } from 'lucide-react';
+import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 import type { CommandViewProps } from '../types';
 
@@ -115,12 +116,9 @@ export function NewTicketView({ ctx }: CommandViewProps) {
         return;
       }
 
-      const response = await fetch('/api/tickets', {
+      const response = await apiFetch('/api/tickets', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: trimmedTitle,
           description,
