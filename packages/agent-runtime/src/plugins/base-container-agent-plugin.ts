@@ -387,6 +387,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    * internal agent files. Copy the first match to a stable temp location so
    * it survives output-dir cleanup, and return the absolute copied path.
    * Returns null if nothing found.
+   *
+   * Two-phase logic:
+   * 1. Loop over known deliverable extensions, skipping INTERNAL_NAMES.
+   *    `presentation.html` is in INTERNAL_NAMES so it's skipped here.
+   * 2. Fallback: try `presentation.html` separately. It's excluded from the
+   *    loop because it's already read into spawnResult.presentation, but we
+   *    still need a persisted path so the Download Report button can serve it.
    */
   protected async persistDeliverableFile(
     outputDir: string,
