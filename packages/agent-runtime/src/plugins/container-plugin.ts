@@ -1,8 +1,55 @@
 /**
  * Abstract base class for plugins that run Docker containers.
  *
- * Shared logic: image build metadata resolution, env var resolution, context storage.
- * Subclasses: BaseContainerAgentPlugin (LLM agents), ScriptContainerPlugin (deterministic scripts).
+ * Shared logic: image build metadata resolution, env var resolution, context storage,
+ * workspace lifecycle. Subclasses: BaseContainerAgentPlugin (LLM agents),
+ * ScriptContainerPlugin (deterministic scripts).
+ *
+ * ## Container mounts — the `/workspace` vs `/output` split
+ *
+ * Every step container gets two bind mounts with distinct lifecycles and purposes.
+ * Keeping them separate is deliberate — merging them would blur several concerns
+ * that deserve to stay apart.
+ *
+ *   /workspace (host path = run worktree)
+ *     - Git worktree for the run, shared across all its steps.
+ *     - rw, persistent for the life of the run, tracked in git.
+ *     - Commit happens at step boundaries; ignored files are wiped between steps.
+ *     - This is where the agent / script writes *deliverables* — code, data,
+ *       reports — whatever the workflow produces for its user.
+ *
+ *   /output (host path = per-step tempdir)
+ *     - Ephemeral I/O channel between the engine and the step. Born on step
+ *       start, deleted on step end. Never touched by git.
+ *     - Host seeds inputs here before the container starts: `input.json`
+ *       (stepInput), `previous_run.json` (carry-over), `prompt.txt` (agent
+ *       plugins), `script.<ext>` (inline script mode), `mcp-config.json`.
+ *     - The container writes the result contract: `result.json`.
+ *     - Host reads `result.json` + optional `presentation.html` + `git-result.json`
+ *       (written by the host itself post-commit) after the container exits.
+ *
+ * ### Why separate
+ *
+ * - **Commit history stays about user work.** Inputs / prompts / previous-run
+ *   payloads are engine plumbing. Committing them on every step would flood
+ *   the run branch with housekeeping noise.
+ * - **No naming conflicts.** A step that wants to write its own `input.json`
+ *   or `result.json` as a deliverable can do so in `/workspace/...` without
+ *   colliding with engine-owned files.
+ * - **Control-plane vs data-plane.** `/output` is how the engine talks to the
+ *   step; `/workspace` is what the step produces. Mixing them makes both
+ *   harder to reason about.
+ * - **Replay reproducibility is not weakened.** stepInput lives in Firestore
+ *   (`processInstances/<id>/stepExecutions`). `/output/input.json` is a
+ *   derivative — writing it to git would be duplication, not extra truth.
+ *
+ * ### Naming caveat
+ *
+ * The `/output` name is imperfect — it carries both inputs and outputs. If we
+ * renamed it today we'd pick `/io` or `/step-io`. The current name is kept
+ * because every existing `SKILL.md`, workflow definition, and prompt hardcodes
+ * `/output/result.json`. A rename is a breaking change across all those and
+ * belongs in its own PR.
  */
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, cpSync, chmodSync, copyFileSync } from 'node:fs';
@@ -12,8 +59,11 @@ import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+import { writeFile } from 'node:fs/promises';
+import type { GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
 import type { ImageBuildMeta } from './docker-spawn-strategy.js';
+import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace/workspace-manager.js';
 
 let preparedDeployKeyPath: string | null = null;
 
@@ -134,6 +184,22 @@ export function toHttpsWithToken(sshUrl: string, token: string): string {
   return sshUrl.replace('https://', `https://x-access-token:${token}@`);
 }
 
+export interface CommitRunWorkspaceOptions {
+  status?: 'success' | 'failed';
+  /** Force the terminal marker (✓). Auto-detected from transitions when omitted. */
+  isTerminal?: boolean;
+  /** Optional agent reasoning summary — shown on the commit subject line. */
+  reasoningSummary?: string;
+  /** Error message for failed commits — placed in the commit body. */
+  error?: string;
+  /** Wall-clock step duration in milliseconds. Emitted as a trailer. */
+  durationMs?: number;
+  /** Plugin identifier override. Defaults to the subclass's `metadata.name`. */
+  agentPlugin?: string;
+  /** Docker image reference. Emitted as a trailer. */
+  agentImage?: string;
+}
+
 export abstract class ContainerPlugin implements AgentPlugin {
   abstract readonly metadata: PluginCapabilityMetadata;
 
@@ -142,9 +208,119 @@ export abstract class ContainerPlugin implements AgentPlugin {
   protected imageBuild: ImageBuildMeta | undefined;
   /** Cached skills dir path fetched from git repo. */
   protected repoSkillsDir: string | null = null;
+  /** Run-scoped git worktree — populated by `resolveRunWorkspace` at run start. */
+  protected runWorkspaceHandle: RunWorkspaceHandle | null = null;
+  protected workspaceManager: WorkspaceManager | null = null;
 
   abstract initialize(context: AgentContext | WorkflowAgentContext): Promise<void>;
   abstract run(emit: EmitFn): Promise<void>;
+
+  /**
+   * Provision a per-run git worktree. Every step gets one — if the WD has no
+   * `workspace` config, the runtime uses a default empty workspace (local-only
+   * bare repo). Idempotent across the run's steps: subsequent calls re-attach
+   * to the same worktree.
+   */
+  protected async resolveRunWorkspace(): Promise<void> {
+    const workspaceConfig = isWorkflowAgentContext(this.context)
+      ? (this.context.workflowDefinition.workspace ?? {})
+      : {};
+
+    const name = isWorkflowAgentContext(this.context)
+      ? this.context.workflowDefinition.name
+      : this.context.config.processName;
+    const namespace = isWorkflowAgentContext(this.context)
+      ? this.context.workflowDefinition.namespace
+      : undefined;
+
+    if (!this.workspaceManager) {
+      this.workspaceManager = new WorkspaceManager();
+    }
+
+    const remoteToken = workspaceConfig.remoteAuth
+      ? this.resolvedEnv.vars[workspaceConfig.remoteAuth]
+      : undefined;
+
+    this.runWorkspaceHandle = await this.workspaceManager.createRunWorkspace(
+      { name, namespace, workspace: workspaceConfig },
+      this.context.processInstanceId,
+      { remoteToken },
+    );
+  }
+
+  /**
+   * Commit the step's workspace changes — ALWAYS, even on failure and even
+   * when nothing changed. The run branch is meant to be a complete audit
+   * trail of what the engine dispatched; `--allow-empty` keeps it isomorphic
+   * to the step timeline.
+   *
+   * Marker selection:
+   *   ◆ regular success
+   *   ✓ last agent step of the run (no more agents will touch the workspace)
+   *   ✗ failed — commits whatever the step produced before the error
+   *
+   * Writes `git-result.json` into `outputDir` for downstream consumers.
+   * Never pushes — run branches stay local for now.
+   */
+  protected async commitRunWorkspace(
+    outputDir: string,
+    opts: CommitRunWorkspaceOptions = {},
+  ): Promise<GitMetadata | null> {
+    if (!this.runWorkspaceHandle || !this.workspaceManager) return null;
+
+    const commit = await this.workspaceManager.commitStep(this.runWorkspaceHandle, {
+      stepId: this.context.stepId,
+      stepName: this.resolveStepName(),
+      status: opts.status ?? 'success',
+      isTerminal: opts.isTerminal ?? this.detectLastAgentStep(),
+      reasoningSummary: opts.reasoningSummary,
+      error: opts.error,
+      durationMs: opts.durationMs,
+      agentPlugin: opts.agentPlugin ?? this.metadata.name,
+      agentImage: opts.agentImage,
+    });
+
+    const metadata: GitMetadata = {
+      commitSha: commit.commitSha,
+      branch: this.runWorkspaceHandle.branch,
+      changedFiles: commit.changedFiles,
+      repoUrl: this.runWorkspaceHandle.remoteUrl ?? this.runWorkspaceHandle.bareRepoPath,
+    };
+
+    await writeFile(join(outputDir, 'git-result.json'), JSON.stringify(metadata, null, 2), 'utf-8');
+    return metadata;
+  }
+
+  /** Resolve the display name of the current step (falls back to stepId). */
+  private resolveStepName(): string {
+    if (isWorkflowAgentContext(this.context)) {
+      return this.context.step.name ?? this.context.step.id;
+    }
+    return this.context.stepId;
+  }
+
+  /**
+   * Last agent step = no outgoing transition leads to another non-terminal,
+   * non-human step. We look at all outgoing transitions from the current step;
+   * if every reachable next step is either `type: terminal` or `executor: human`,
+   * this plugin invocation is the last one to touch the workspace, so its
+   * commit gets the ✓ marker.
+   *
+   * Conditional transitions with mixed targets keep the regular ◆ marker —
+   * we'd need to evaluate the condition to decide, and that's the engine's
+   * job, not the plugin's.
+   */
+  private detectLastAgentStep(): boolean {
+    if (!isWorkflowAgentContext(this.context)) return false;
+    const { workflowDefinition, step } = this.context;
+    const outgoing = workflowDefinition.transitions.filter((t) => t.from === step.id);
+    if (outgoing.length === 0) return true;
+    return outgoing.every((t) => {
+      const next = workflowDefinition.steps.find((s) => s.id === t.to);
+      if (!next) return true;
+      return next.type === 'terminal' || next.executor === 'human';
+    });
+  }
 
   /**
    * Resolve environment variables from definition-level + step-level env + workflow secrets.
