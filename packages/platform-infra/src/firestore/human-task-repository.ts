@@ -1,15 +1,4 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  type Firestore,
-} from 'firebase/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 import { HumanTaskSchema, type HumanTask, type HumanTaskRepository } from '@mediforce/platform-core';
 
 export class FirestoreHumanTaskRepository implements HumanTaskRepository {
@@ -18,41 +7,37 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
   constructor(private readonly db: Firestore) {}
 
   async create(task: HumanTask): Promise<HumanTask> {
-    const docRef = doc(this.db, this.collectionName, task.id);
-    await setDoc(docRef, task);
+    await this.db.collection(this.collectionName).doc(task.id).set(task);
     return task;
   }
 
   async getById(taskId: string): Promise<HumanTask | null> {
-    const docRef = doc(this.db, this.collectionName, taskId);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) return null;
+    const snap = await this.db.collection(this.collectionName).doc(taskId).get();
+    if (!snap.exists) return null;
     return HumanTaskSchema.parse(snap.data());
   }
 
   async getByRole(role: string): Promise<HumanTask[]> {
     // Requires composite index: (assignedRole ASC, status ASC, createdAt ASC)
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(
-      colRef,
-      where('assignedRole', '==', role),
-      where('status', 'in', ['pending', 'claimed']),
-      orderBy('createdAt', 'asc'),
-    );
-    const snap = await getDocs(q);
+    const snap = await this.db
+      .collection(this.collectionName)
+      .where('assignedRole', '==', role)
+      .where('status', 'in', ['pending', 'claimed'])
+      .orderBy('createdAt', 'asc')
+      .get();
     return snap.docs.map((d) => HumanTaskSchema.parse(d.data()));
   }
 
   async getByInstanceId(instanceId: string): Promise<HumanTask[]> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(colRef, where('processInstanceId', '==', instanceId));
-    const snap = await getDocs(q);
+    const snap = await this.db
+      .collection(this.collectionName)
+      .where('processInstanceId', '==', instanceId)
+      .get();
     return snap.docs.map((d) => HumanTaskSchema.parse(d.data()));
   }
 
   async claim(taskId: string, userId: string): Promise<HumanTask> {
-    const docRef = doc(this.db, this.collectionName, taskId);
-    await updateDoc(docRef, {
+    await this.db.collection(this.collectionName).doc(taskId).update({
       assignedUserId: userId,
       status: 'claimed',
       updatedAt: new Date().toISOString(),
@@ -62,8 +47,7 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
 
   async complete(taskId: string, completionData: Record<string, unknown>): Promise<HumanTask> {
     const now = new Date().toISOString();
-    const docRef = doc(this.db, this.collectionName, taskId);
-    await updateDoc(docRef, {
+    await this.db.collection(this.collectionName).doc(taskId).update({
       status: 'completed',
       completionData,
       completedAt: now,
@@ -73,8 +57,7 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
   }
 
   async cancel(taskId: string): Promise<HumanTask> {
-    const docRef = doc(this.db, this.collectionName, taskId);
-    await updateDoc(docRef, {
+    await this.db.collection(this.collectionName).doc(taskId).update({
       status: 'cancelled',
       updatedAt: new Date().toISOString(),
     });
@@ -86,11 +69,12 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     // Firestore 'in' queries support max 30 values per batch
     for (let i = 0; i < instanceIds.length; i += 30) {
       const batch = instanceIds.slice(i, i + 30);
-      const colRef = collection(this.db, this.collectionName);
-      const q = query(colRef, where('processInstanceId', 'in', batch));
-      const snap = await getDocs(q);
+      const snap = await this.db
+        .collection(this.collectionName)
+        .where('processInstanceId', 'in', batch)
+        .get();
       for (const d of snap.docs) {
-        await updateDoc(doc(this.db, this.collectionName, d.id), { deleted });
+        await this.db.collection(this.collectionName).doc(d.id).update({ deleted });
       }
     }
   }

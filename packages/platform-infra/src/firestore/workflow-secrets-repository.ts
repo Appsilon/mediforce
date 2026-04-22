@@ -2,13 +2,7 @@ import {
   WorkflowSecretsSchema,
   type WorkflowSecrets,
 } from '@mediforce/platform-core';
-import {
-  doc,
-  getDoc,
-  setDoc,
-  deleteDoc,
-  type Firestore,
-} from 'firebase/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 import { encrypt, decrypt } from '../crypto/secrets-cipher.js';
 
 /**
@@ -21,7 +15,11 @@ export class FirestoreWorkflowSecretsRepository {
   constructor(private readonly db: Firestore) {}
 
   private docRef(namespace: string, workflowName: string) {
-    return doc(this.db, 'namespaces', namespace, 'workflowSecrets', workflowName);
+    return this.db
+      .collection('namespaces')
+      .doc(namespace)
+      .collection('workflowSecrets')
+      .doc(workflowName);
   }
 
   private decryptSecrets(encrypted: Record<string, string>): Record<string, string> {
@@ -41,8 +39,8 @@ export class FirestoreWorkflowSecretsRepository {
   }
 
   async getSecrets(namespace: string, workflowName: string): Promise<Record<string, string>> {
-    const snapshot = await getDoc(this.docRef(namespace, workflowName));
-    if (!snapshot.exists()) return {};
+    const snapshot = await this.docRef(namespace, workflowName).get();
+    if (!snapshot.exists) return {};
     const data = snapshot.data();
     if (!data?.secrets || typeof data.secrets !== 'object') return {};
     const parsed = WorkflowSecretsSchema.parse(data);
@@ -50,8 +48,8 @@ export class FirestoreWorkflowSecretsRepository {
   }
 
   async getSecretKeys(namespace: string, workflowName: string): Promise<string[]> {
-    const snapshot = await getDoc(this.docRef(namespace, workflowName));
-    if (!snapshot.exists()) return [];
+    const snapshot = await this.docRef(namespace, workflowName).get();
+    if (!snapshot.exists) return [];
     const data = snapshot.data();
     if (!data?.secrets || typeof data.secrets !== 'object') return [];
     const parsed = WorkflowSecretsSchema.parse(data);
@@ -69,10 +67,10 @@ export class FirestoreWorkflowSecretsRepository {
       secrets: this.encryptSecrets(secrets),
       updatedAt: new Date().toISOString(),
     };
-    await setDoc(this.docRef(namespace, workflowName), data);
+    await this.docRef(namespace, workflowName).set(data);
   }
 
   async deleteSecrets(namespace: string, workflowName: string): Promise<void> {
-    await deleteDoc(this.docRef(namespace, workflowName));
+    await this.docRef(namespace, workflowName).delete();
   }
 }

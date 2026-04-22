@@ -1,14 +1,4 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  getDocs,
-  query,
-  where,
-  type Firestore,
-} from 'firebase/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 import {
   HandoffEntitySchema,
   type HandoffEntity,
@@ -22,39 +12,35 @@ export class FirestoreHandoffRepository implements HandoffRepository {
   constructor(private readonly db: Firestore) {}
 
   async create(entity: HandoffEntity): Promise<HandoffEntity> {
-    const docRef = doc(this.db, this.collectionName, entity.id);
-    await setDoc(docRef, entity);
+    await this.db.collection(this.collectionName).doc(entity.id).set(entity);
     return entity;
   }
 
   async getById(entityId: string): Promise<HandoffEntity | null> {
-    const docRef = doc(this.db, this.collectionName, entityId);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) return null;
+    const snap = await this.db.collection(this.collectionName).doc(entityId).get();
+    if (!snap.exists) return null;
     return HandoffEntitySchema.parse(snap.data());
   }
 
   async getByRole(role: string): Promise<HandoffEntity[]> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(
-      colRef,
-      where('assignedRole', '==', role),
-      where('status', 'in', ['created', 'acknowledged']),
-    );
-    const snap = await getDocs(q);
+    const snap = await this.db
+      .collection(this.collectionName)
+      .where('assignedRole', '==', role)
+      .where('status', 'in', ['created', 'acknowledged'])
+      .get();
     return snap.docs.map((d) => HandoffEntitySchema.parse(d.data()));
   }
 
   async getByInstanceId(instanceId: string): Promise<HandoffEntity[]> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(colRef, where('processInstanceId', '==', instanceId));
-    const snap = await getDocs(q);
+    const snap = await this.db
+      .collection(this.collectionName)
+      .where('processInstanceId', '==', instanceId)
+      .get();
     return snap.docs.map((d) => HandoffEntitySchema.parse(d.data()));
   }
 
   async claim(entityId: string, userId: string): Promise<HandoffEntity> {
-    const docRef = doc(this.db, this.collectionName, entityId);
-    await updateDoc(docRef, {
+    await this.db.collection(this.collectionName).doc(entityId).update({
       assignedUserId: userId,
       status: 'acknowledged',
       updatedAt: new Date().toISOString(),
@@ -70,8 +56,10 @@ export class FirestoreHandoffRepository implements HandoffRepository {
         `User '${userId}' cannot acknowledge handoff '${entityId}': assigned to '${entity.assignedUserId}'`,
       );
     }
-    const docRef = doc(this.db, this.collectionName, entityId);
-    await updateDoc(docRef, { status: 'acknowledged', updatedAt: new Date().toISOString() });
+    await this.db
+      .collection(this.collectionName)
+      .doc(entityId)
+      .update({ status: 'acknowledged', updatedAt: new Date().toISOString() });
     return (await this.getById(entityId))!;
   }
 
@@ -87,13 +75,14 @@ export class FirestoreHandoffRepository implements HandoffRepository {
         `User '${userId}' cannot resolve handoff '${entityId}': assigned to '${entity.assignedUserId}'`,
       );
     }
-    // Validate resolution against app-registered schema
     const resolutionSchema = handoffTypeRegistry.getResolutionSchema(entity.type);
     resolutionSchema.parse(resolution);
 
     const now = new Date().toISOString();
-    const docRef = doc(this.db, this.collectionName, entityId);
-    await updateDoc(docRef, { status: 'resolved', resolution, resolvedAt: now, updatedAt: now });
+    await this.db
+      .collection(this.collectionName)
+      .doc(entityId)
+      .update({ status: 'resolved', resolution, resolvedAt: now, updatedAt: now });
     return (await this.getById(entityId))!;
   }
 }

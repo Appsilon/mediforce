@@ -197,9 +197,9 @@ importers:
       '@mediforce/platform-core':
         specifier: workspace:*
         version: link:../platform-core
-      firebase:
-        specifier: ^12.0.0
-        version: 12.11.0
+      firebase-admin:
+        specifier: ^13.6.1
+        version: 13.7.0
     devDependencies:
       '@types/node':
         specifier: ^25.3.0
