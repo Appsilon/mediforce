@@ -415,7 +415,7 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
   const [activeTab, setActiveTab] = React.useState(0);
   const [copied, setCopied] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
-  const prevLogFilesLengthRef = React.useRef(logFiles.length);
+  const prevSectionsLengthRef = React.useRef(0);
 
   // When initialStepId changes, select the matching tab
   React.useEffect(() => {
@@ -426,14 +426,16 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
     }
   }, [initialStepId, sections]);
 
-  // Auto-switch to newest agent tab when a new step starts
+  // Auto-switch to newest agent tab when a new section is loaded.
+  // Intentionally based on sections (post-fetch) not logFiles (pre-fetch) so
+  // the clamp effect can't immediately override the new index before data arrives.
   React.useEffect(() => {
-    const prev = prevLogFilesLengthRef.current;
-    prevLogFilesLengthRef.current = logFiles.length;
-    if (logFiles.length > prev) {
-      setActiveTab(logFiles.length - 1);
+    const prev = prevSectionsLengthRef.current;
+    prevSectionsLengthRef.current = sections.length;
+    if (sections.length > prev) {
+      setActiveTab(sections.length - 1);
     }
-  }, [logFiles.length]);
+  }, [sections.length]);
 
   const fetchLogs = React.useCallback(async () => {
     if (logFiles.length === 0) return;
