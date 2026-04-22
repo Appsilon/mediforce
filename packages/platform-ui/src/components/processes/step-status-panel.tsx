@@ -45,7 +45,6 @@ interface StepStatusPanelProps {
   definitionSteps: Step[];
   stepExecutions: StepExecution[];
   agentEvents?: AgentEventItem[];
-  onStepClick?: (stepId: string) => void;
   stepConfigMap?: Map<string, StepConfigInfo>;
   onAgentLogClick?: (stepId: string) => void;
   /** Base href for step detail links, e.g. "/workflows/foo/runs/abc". Steps link to `{base}/steps/{stepId}`. */
@@ -360,7 +359,6 @@ export function StepStatusPanel({
   definitionSteps,
   stepExecutions,
   agentEvents = [],
-  onStepClick,
   stepConfigMap,
   onAgentLogClick,
   stepDetailBaseHref,
@@ -421,8 +419,6 @@ export function StepStatusPanel({
               onClick={() => {
                 if (hasConfig) {
                   setExpandedStepId(isExpanded ? null : step.id);
-                } else if (onStepClick) {
-                  onStepClick(step.id);
                 }
               }}
             >
