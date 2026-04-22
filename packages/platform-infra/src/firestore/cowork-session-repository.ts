@@ -1,16 +1,4 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  arrayUnion,
-  type Firestore,
-} from 'firebase/firestore';
+import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import {
   CoworkSessionSchema,
   type CoworkSession,
@@ -51,46 +39,39 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
   constructor(private readonly db: Firestore) {}
 
   async create(session: CoworkSession): Promise<CoworkSession> {
-    const docRef = doc(this.db, this.collectionName, session.id);
-    await setDoc(docRef, session);
+    await this.db.collection(this.collectionName).doc(session.id).set(session);
     return session;
   }
 
   async getById(sessionId: string): Promise<CoworkSession | null> {
-    const docRef = doc(this.db, this.collectionName, sessionId);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) return null;
-    return CoworkSessionSchema.parse(sanitizeSessionData(snap.data()));
+    const snap = await this.db.collection(this.collectionName).doc(sessionId).get();
+    if (!snap.exists) return null;
+    return CoworkSessionSchema.parse(sanitizeSessionData(snap.data() as Record<string, unknown>));
   }
 
   async getByInstanceId(instanceId: string): Promise<CoworkSession[]> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(
-      colRef,
-      where('processInstanceId', '==', instanceId),
-      orderBy('createdAt', 'asc'),
-    );
-    const snap = await getDocs(q);
+    const snap = await this.db
+      .collection(this.collectionName)
+      .where('processInstanceId', '==', instanceId)
+      .orderBy('createdAt', 'asc')
+      .get();
     return snap.docs.map((d) => CoworkSessionSchema.parse(sanitizeSessionData(d.data())));
   }
 
   async findMostRecentActive(instanceId: string): Promise<CoworkSession | null> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(
-      colRef,
-      where('processInstanceId', '==', instanceId),
-      where('status', '==', 'active'),
-      orderBy('createdAt', 'desc'),
-    );
-    const snap = await getDocs(q);
+    const snap = await this.db
+      .collection(this.collectionName)
+      .where('processInstanceId', '==', instanceId)
+      .where('status', '==', 'active')
+      .orderBy('createdAt', 'desc')
+      .get();
     if (snap.empty) return null;
     return CoworkSessionSchema.parse(sanitizeSessionData(snap.docs[0].data()));
   }
 
   async addTurn(sessionId: string, turn: ConversationTurn): Promise<CoworkSession> {
-    const docRef = doc(this.db, this.collectionName, sessionId);
-    await updateDoc(docRef, {
-      turns: arrayUnion(turn),
+    await this.db.collection(this.collectionName).doc(sessionId).update({
+      turns: FieldValue.arrayUnion(turn),
       updatedAt: new Date().toISOString(),
     });
     return (await this.getById(sessionId))!;
@@ -106,12 +87,10 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
     if (!session) throw new Error(`CoworkSession not found: ${sessionId}`);
     const index = session.turns.findIndex((t) => t.id === turnId);
     if (index === -1) throw new Error(`Turn not found: ${turnId}`);
-    // role is the discriminant — patch cannot change it, and id stays fixed.
     const existing = session.turns[index];
     const merged = { ...existing, ...patch, id: existing.id, role: existing.role } as ConversationTurn;
     const updatedTurns: ConversationTurn[] = session.turns.map((t, i) => (i === index ? merged : t));
-    const docRef = doc(this.db, this.collectionName, sessionId);
-    await updateDoc(docRef, {
+    await this.db.collection(this.collectionName).doc(sessionId).update({
       turns: updatedTurns,
       updatedAt: new Date().toISOString(),
     });
@@ -119,8 +98,7 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
   }
 
   async updateArtifact(sessionId: string, artifact: Record<string, unknown>): Promise<CoworkSession> {
-    const docRef = doc(this.db, this.collectionName, sessionId);
-    await updateDoc(docRef, {
+    await this.db.collection(this.collectionName).doc(sessionId).update({
       artifact,
       updatedAt: new Date().toISOString(),
     });
@@ -129,8 +107,7 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
 
   async finalize(sessionId: string, artifact: Record<string, unknown>): Promise<CoworkSession> {
     const now = new Date().toISOString();
-    const docRef = doc(this.db, this.collectionName, sessionId);
-    await updateDoc(docRef, {
+    await this.db.collection(this.collectionName).doc(sessionId).update({
       status: 'finalized',
       finalizedAt: now,
       artifact,
@@ -140,8 +117,7 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
   }
 
   async abandon(sessionId: string): Promise<CoworkSession> {
-    const docRef = doc(this.db, this.collectionName, sessionId);
-    await updateDoc(docRef, {
+    await this.db.collection(this.collectionName).doc(sessionId).update({
       status: 'abandoned',
       updatedAt: new Date().toISOString(),
     });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 
 /**
  * GET /api/tasks/:taskId
@@ -7,13 +7,9 @@ import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
  * Returns full task details including completionData (agent output for review tasks).
  */
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ taskId: string }> },
 ): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
     const { taskId } = await params;
     const { humanTaskRepo } = getPlatformServices();

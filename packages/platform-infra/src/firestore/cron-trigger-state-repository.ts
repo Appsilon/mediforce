@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, type Firestore } from 'firebase/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 import {
   CronTriggerStateSchema,
   type CronTriggerState,
@@ -15,21 +15,18 @@ export class FirestoreCronTriggerStateRepository implements CronTriggerStateRepo
   }
 
   async get(definitionName: string, triggerName: string): Promise<CronTriggerState | null> {
-    const snap = await getDoc(
-      doc(this.db, this.collectionName, this.docKey(definitionName, triggerName)),
-    );
-    if (!snap.exists()) return null;
+    const snap = await this.db
+      .collection(this.collectionName)
+      .doc(this.docKey(definitionName, triggerName))
+      .get();
+    if (!snap.exists) return null;
     return CronTriggerStateSchema.parse(snap.data());
   }
 
   async set(state: CronTriggerState): Promise<void> {
-    await setDoc(
-      doc(
-        this.db,
-        this.collectionName,
-        this.docKey(state.definitionName, state.triggerName),
-      ),
-      state,
-    );
+    await this.db
+      .collection(this.collectionName)
+      .doc(this.docKey(state.definitionName, state.triggerName))
+      .set(state);
   }
 }

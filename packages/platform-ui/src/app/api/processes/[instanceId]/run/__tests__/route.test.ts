@@ -34,7 +34,6 @@ vi.mock('@/lib/platform-services', () => ({
       getByInstanceId: mockHumanTaskGetByInstanceId,
     },
   }),
-  validateApiKey: () => true,
 }));
 
 // Mock executeAgentStep — the unified agent step executor

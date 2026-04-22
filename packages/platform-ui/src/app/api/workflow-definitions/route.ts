@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
 import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 
 /**
  * GET /api/workflow-definitions
@@ -10,11 +10,7 @@ import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
  * version as a full WorkflowDefinition object, suitable for loading into
  * the Workflow Designer edit flow.
  */
-export async function GET(request: Request): Promise<NextResponse> {
-  if (!validateApiKey(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export async function GET(): Promise<NextResponse> {
   const { processRepo } = getPlatformServices();
   const { definitions } = await processRepo.listWorkflowDefinitions();
 
@@ -42,10 +38,6 @@ export async function GET(request: Request): Promise<NextResponse> {
  * It overrides any `namespace` field in the request body.
  */
 export async function POST(request: Request): Promise<NextResponse> {
-  if (!validateApiKey(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const url = new URL(request.url);
   const namespace = url.searchParams.get('namespace');
   if (!namespace) {

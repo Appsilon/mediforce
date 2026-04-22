@@ -24,6 +24,7 @@ import {
   Users,
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
+import { apiFetch } from '@/lib/api-fetch';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
 import { WORKSPACE_ICONS, WORKSPACE_ICON_KEYS, getWorkspaceIcon } from '@/lib/workspace-icons';
@@ -148,10 +149,7 @@ export default function WorkspaceConfigPage() {
   const fetchLastSignIn = useCallback(async () => {
     if (handle === '' || firebaseUser === null) return;
     try {
-      const idToken = await firebaseUser.getIdToken();
-      const res = await fetch(`/api/users/members?handle=${encodeURIComponent(handle)}`, {
-        headers: { 'Authorization': `Bearer ${idToken}` },
-      });
+      const res = await apiFetch(`/api/users/members?handle=${encodeURIComponent(handle)}`);
       if (!res.ok) return;
       const data = (await res.json()) as { members: Array<{ uid: string; email: string | null; lastSignInTime: string | null }> };
       const map = new Map<string, string | null>();
@@ -273,13 +271,9 @@ export default function WorkspaceConfigPage() {
 
     setInviting(true);
     try {
-      const idToken = firebaseUser !== null ? await firebaseUser.getIdToken() : '';
-      const res = await fetch('/api/users/invite', {
+      const res = await apiFetch('/api/users/invite', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: trimmedEmail,
           displayName: inviteName.trim() !== '' ? inviteName.trim() : undefined,
@@ -313,10 +307,9 @@ export default function WorkspaceConfigPage() {
     setResendResult(null);
     setResendingUid(memberUid);
     try {
-      const idToken = firebaseUser !== null ? await firebaseUser.getIdToken() : '';
-      const res = await fetch('/api/users/resend-invite', {
+      const res = await apiFetch('/api/users/resend-invite', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: memberUid, namespaceHandle: handle }),
       });
       if (!res.ok) {

@@ -8,11 +8,9 @@ import {
   FirestoreAgentDefinitionRepository,
   FirestoreCoworkSessionRepository,
   FirestoreCronTriggerStateRepository,
-  initializeFirebase,
-  getFirestoreDb,
+  getAdminFirestore,
   validateSecretsKey,
 } from '@mediforce/platform-infra';
-import { connectFirestoreEmulator } from 'firebase/firestore';
 import type { CronTriggerStateRepository } from '@mediforce/platform-core';
 import {
   WorkflowEngine,
@@ -58,33 +56,14 @@ export function getPlatformServices(): PlatformServices {
   // than to boot successfully and fail opaquely mid-workflow.
   validateSecretsKey();
 
-  // Initialize platform Firebase project (env vars set in platform-ui)
-  initializeFirebase({
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  });
-
-  const db = getFirestoreDb();
-
-  // Connect to Firestore emulator on the server side when running locally
-  if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
-    try {
-      connectFirestoreEmulator(db, '127.0.0.1', 8080);
-    } catch {
-      // Already connected — safe to ignore
-    }
-  }
+  const db = getAdminFirestore();
 
   const processRepo = new FirestoreProcessRepository(db);
   const instanceRepo = new FirestoreProcessInstanceRepository(db);
   const auditRepo = new FirestoreAuditRepository(db);
   const agentRunRepo = new FirestoreAgentRunRepository(db);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db);
-  const agentDefinitionRepo = new FirestoreAgentDefinitionRepository();
+  const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
   const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);
   const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
@@ -159,12 +138,6 @@ export function getPlatformServices(): PlatformServices {
   }
 
   return services;
-}
-
-// API key validation helper — shared API key for cross-app server-to-server auth
-export function validateApiKey(request: Request): boolean {
-  const key = request.headers.get('X-Api-Key');
-  return key !== null && key === process.env.PLATFORM_API_KEY;
 }
 
 /** Base URL for internal server-to-server calls (e.g. auto-runner trigger).

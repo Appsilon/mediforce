@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
+import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 
 /**
  * POST /api/processes/:instanceId/resume
@@ -7,13 +7,9 @@ import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platfo
  * Resumes a paused instance (e.g. after agent escalation) and re-triggers the auto-runner.
  */
 export async function POST(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ instanceId: string }> },
 ): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
     const { instanceId } = await params;
     const { instanceRepo, auditRepo } = getPlatformServices();

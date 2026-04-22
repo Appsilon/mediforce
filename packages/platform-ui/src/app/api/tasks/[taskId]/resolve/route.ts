@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateApiKey } from '@/lib/platform-services';
 import { resolveTask, isResolveError } from '@/lib/resolve-task';
 
 /**
@@ -16,10 +15,6 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ taskId: string }> },
 ): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
     const { taskId } = await params;
     const body = (await req.json()) as Record<string, unknown>;

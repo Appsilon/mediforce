@@ -1,25 +1,9 @@
 import type { AuditRepository, AuditEvent } from '@mediforce/platform-core';
-import {
-  collection,
-  addDoc,
-  query,
-  where,
-  getDocs,
-  orderBy,
-  limit as firestoreLimit,
-  serverTimestamp,
-  getDoc,
-  doc,
-  type Firestore,
-  type Timestamp,
-} from 'firebase/firestore';
+import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore';
 
 /**
  * Firestore implementation of the AuditRepository interface.
  * Provides append-only audit event storage with ALCOA+ field preservation.
- *
- * Receives a Firestore instance via constructor injection —
- * never imports or creates Firebase instances globally.
  */
 export class FirestoreAuditRepository implements AuditRepository {
   private readonly collectionName = 'auditEvents';
@@ -29,15 +13,14 @@ export class FirestoreAuditRepository implements AuditRepository {
   async append(
     event: Omit<AuditEvent, 'serverTimestamp'>,
   ): Promise<AuditEvent> {
-    const colRef = collection(this.db, this.collectionName);
+    const colRef = this.db.collection(this.collectionName);
 
-    const docRef = await addDoc(colRef, {
+    const docRef = await colRef.add({
       ...event,
-      serverTimestamp: serverTimestamp(),
+      serverTimestamp: FieldValue.serverTimestamp(),
     });
 
-    // Re-read the document to get the server-populated serverTimestamp
-    const snapshot = await getDoc(doc(this.db, this.collectionName, docRef.id));
+    const snapshot = await docRef.get();
     const data = snapshot.data()!;
 
     return {
@@ -52,26 +35,20 @@ export class FirestoreAuditRepository implements AuditRepository {
     entityType: string,
     entityId: string,
   ): Promise<AuditEvent[]> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(
-      colRef,
-      where('entityType', '==', entityType),
-      where('entityId', '==', entityId),
-      orderBy('timestamp', 'desc'),
-    );
-
-    const snapshot = await getDocs(q);
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .where('entityType', '==', entityType)
+      .where('entityId', '==', entityId)
+      .orderBy('timestamp', 'desc')
+      .get();
     return snapshot.docs.map((d) => this.docToAuditEvent(d.data()));
   }
 
   async getByProcess(processInstanceId: string): Promise<AuditEvent[]> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(
-      colRef,
-      where('processInstanceId', '==', processInstanceId),
-    );
-
-    const snapshot = await getDocs(q);
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .where('processInstanceId', '==', processInstanceId)
+      .get();
     return snapshot.docs
       .map((d) => this.docToAuditEvent(d.data()))
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
@@ -81,22 +58,14 @@ export class FirestoreAuditRepository implements AuditRepository {
     actorId: string,
     options?: { limit?: number },
   ): Promise<AuditEvent[]> {
-    const colRef = collection(this.db, this.collectionName);
-
-    const q = options?.limit
-      ? query(
-          colRef,
-          where('actorId', '==', actorId),
-          orderBy('timestamp', 'desc'),
-          firestoreLimit(options.limit),
-        )
-      : query(
-          colRef,
-          where('actorId', '==', actorId),
-          orderBy('timestamp', 'desc'),
-        );
-
-    const snapshot = await getDocs(q);
+    let q = this.db
+      .collection(this.collectionName)
+      .where('actorId', '==', actorId)
+      .orderBy('timestamp', 'desc');
+    if (options?.limit) {
+      q = q.limit(options.limit);
+    }
+    const snapshot = await q.get();
     return snapshot.docs.map((d) => this.docToAuditEvent(d.data()));
   }
 

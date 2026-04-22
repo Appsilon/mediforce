@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ref, uploadBytes } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
+import { apiFetch } from '@/lib/api-fetch';
 import { FOUNDATION_MODELS } from '@/lib/agent-models';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
@@ -93,7 +94,7 @@ export default function NewAgentPage() {
         systemPrompt: prompt,
         skillFileNames,
       };
-      await fetch('/api/agent-definitions', {
+      await apiFetch('/api/agent-definitions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

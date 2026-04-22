@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 
 /**
  * GET /api/tasks
@@ -12,10 +12,6 @@ import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
  * At least one filter is required.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
     const { searchParams } = new URL(req.url);
     const instanceId = searchParams.get('instanceId');

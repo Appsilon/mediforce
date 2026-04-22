@@ -1,7 +1,7 @@
 'use server';
 
 import {
-  getFirestoreDb,
+  getAdminFirestore,
   FirestoreWorkflowSecretsRepository,
   FirestoreNamespaceRepository,
 } from '@mediforce/platform-infra';
@@ -9,12 +9,12 @@ import { getPlatformServices } from '@/lib/platform-services';
 
 function getRepo() {
   getPlatformServices();
-  return new FirestoreWorkflowSecretsRepository(getFirestoreDb());
+  return new FirestoreWorkflowSecretsRepository(getAdminFirestore());
 }
 
 async function requireNamespaceMember(namespace: string, userId: string): Promise<void> {
   getPlatformServices();
-  const db = getFirestoreDb();
+  const db = getAdminFirestore();
   const namespaceRepo = new FirestoreNamespaceRepository(db);
 
   // Check member doc first

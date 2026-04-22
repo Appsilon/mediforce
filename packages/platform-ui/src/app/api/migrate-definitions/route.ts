@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { ProcessDefinition, ProcessConfig, WorkflowDefinition } from '@mediforce/platform-core';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 
 function mergeDefinitionAndConfig(
   legacyDef: ProcessDefinition,
@@ -78,10 +78,6 @@ function mergeDefinitionAndConfig(
  *   curl -s -X POST -H "X-Api-Key: $MEDIFORCE_API_KEY" "http://localhost:9003/api/migrate-definitions?commit=true"
  */
 export async function POST(request: Request): Promise<NextResponse> {
-  if (!validateApiKey(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const url = new URL(request.url);
   const commit = url.searchParams.get('commit') === 'true';
   const force = url.searchParams.get('force') === 'true';

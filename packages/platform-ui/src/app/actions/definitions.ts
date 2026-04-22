@@ -1,11 +1,10 @@
 'use server';
 
 import { stringify as yamlStringify, parse as parseYaml } from 'yaml';
-import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { getPlatformServices } from '@/lib/platform-services';
 import { parseProcessDefinition, WorkflowDefinitionSchema } from '@mediforce/platform-core';
 import type { ProcessDefinition, ProcessConfig, WorkflowDefinition } from '@mediforce/platform-core';
-import { DefinitionVersionAlreadyExistsError, WorkflowDefinitionVersionAlreadyExistsError, getFirestoreDb } from '@mediforce/platform-infra';
+import { DefinitionVersionAlreadyExistsError, WorkflowDefinitionVersionAlreadyExistsError, getAdminFirestore } from '@mediforce/platform-infra';
 
 export type SaveDefinitionResult =
   | { success: true; name: string; version: string }
@@ -291,14 +290,13 @@ export async function transferWorkflowNamespace(
   try {
     // Ensure platform services are initialized (this also initializes Firebase)
     getPlatformServices();
-    const db = getFirestoreDb();
+    const db = getAdminFirestore();
 
     // Query all versions of this workflow
-    const workflowQ = query(
-      collection(db, 'workflowDefinitions'),
-      where('name', '==', workflowName),
-    );
-    const snapshot = await getDocs(workflowQ);
+    const snapshot = await db
+      .collection('workflowDefinitions')
+      .where('name', '==', workflowName)
+      .get();
 
     if (snapshot.empty) {
       return { success: false, error: `No workflow found with name "${workflowName}".` };
@@ -306,7 +304,7 @@ export async function transferWorkflowNamespace(
 
     // Update each version with the new namespace
     for (const docSnap of snapshot.docs) {
-      await updateDoc(doc(db, 'workflowDefinitions', docSnap.id), { namespace: newNamespace });
+      await db.collection('workflowDefinitions').doc(docSnap.id).update({ namespace: newNamespace });
     }
 
     return { success: true };

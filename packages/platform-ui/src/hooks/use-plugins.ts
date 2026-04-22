@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface PluginMetadata {
   name: string;
@@ -25,7 +26,7 @@ export function usePlugins() {
 
     async function fetchPlugins() {
       try {
-        const res = await fetch('/api/plugins');
+        const res = await apiFetch('/api/plugins');
         if (!res.ok) throw new Error(`Failed to fetch plugins: ${res.status}`);
         const data = await res.json();
         if (!cancelled) {
