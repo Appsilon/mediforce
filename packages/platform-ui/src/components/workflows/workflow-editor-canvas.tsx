@@ -502,10 +502,8 @@ export function WorkflowEditorCanvas({
           onClick={() => setRightPanelView('secrets')}
           title="Workflow secrets"
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-            rightPanelView === 'secrets' && !selectedStepId
-              ? 'bg-muted text-foreground border-muted-foreground/30'
-              : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground',
+            rightPanelView === 'secrets' && !selectedStepId && 'bg-muted border-muted-foreground/30',
           )}
         >
           <KeyRound className="h-3.5 w-3.5" />
@@ -517,10 +515,8 @@ export function WorkflowEditorCanvas({
           <button
             onClick={() => setRightPanelView('yaml')}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-              rightPanelView === 'yaml' && !selectedStepId
-                ? 'bg-muted text-foreground border-muted-foreground/30'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground',
+              rightPanelView === 'yaml' && !selectedStepId && 'bg-muted border-muted-foreground/30',
             )}
           >
             <Code2 className="h-3.5 w-3.5" />
