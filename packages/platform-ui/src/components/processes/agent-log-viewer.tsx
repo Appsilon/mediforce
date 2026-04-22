@@ -390,7 +390,7 @@ function AgentTabContent({ section }: { section: AgentLogSection }) {
 
       {isEmpty && !section.error && (
         <p className="text-xs text-muted-foreground py-2">
-          Waiting for agent activity...
+          Initializing agent log...
         </p>
       )}
 

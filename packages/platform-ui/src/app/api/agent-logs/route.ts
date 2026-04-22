@@ -21,6 +21,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const content = await readFile(filePath, 'utf-8');
     return NextResponse.json({ content, path: filePath });
   } catch {
-    return NextResponse.json({ content: '', path: filePath, error: 'Log file not found or not yet created' });
+    return NextResponse.json({ content: '', path: filePath });
   }
 }

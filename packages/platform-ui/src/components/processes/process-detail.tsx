@@ -189,7 +189,9 @@ export function ProcessDetail({
             )}
             <span title={instance.id}>ID: <span className="font-mono text-foreground text-xs">{instance.id.slice(0, 8)}</span></span>
             <span>Created: <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span></span>
-            <span>Duration: <span className="text-foreground">{formatDuration(runDurationMs)}</span></span>
+            {instance.status !== 'running' && instance.status !== 'paused' && (
+              <span>Duration: <span className="text-foreground">{formatDuration(runDurationMs)}</span></span>
+            )}
             {instance.status === 'completed' && (
               <Link
                 href={`/${handle}/workflows/${encodeURIComponent(instance.definitionName)}/runs/${instance.id}/report`}
