@@ -247,6 +247,34 @@ importers:
         specifier: ^4.0.0
         version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.12.0)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2)(vite@8.0.8(@types/node@24.12.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
 
+  packages/platform-api:
+    dependencies:
+      '@mediforce/agent-runtime':
+        specifier: workspace:*
+        version: link:../agent-runtime
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../platform-core
+      '@mediforce/platform-infra':
+        specifier: workspace:*
+        version: link:../platform-infra
+      '@mediforce/supply-intelligence-plugins':
+        specifier: workspace:*
+        version: link:../supply-intelligence-plugins
+      '@mediforce/workflow-engine':
+        specifier: workspace:*
+        version: link:../workflow-engine
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.4(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2)(vite@8.0.5(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+
   packages/platform-core:
     dependencies:
       yaml:
@@ -314,6 +342,9 @@ importers:
       '@mediforce/mcp-client':
         specifier: workspace:*
         version: link:../mcp-client
+      '@mediforce/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
       '@mediforce/platform-core':
         specifier: workspace:*
         version: link:../platform-core
