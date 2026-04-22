@@ -16,6 +16,7 @@ import {
   FirestoreNamespaceSecretsRepository,
   getAdminFirestore,
   validateSecretsKey,
+  detectCredentialMode,
   createMailgunSender,
   MailgunNotificationService,
   FirebaseUserDirectoryService,
@@ -82,6 +83,12 @@ export function getPlatformServices(): PlatformServices {
   // Fail fast if the encryption key is missing or malformed — better to crash here
   // than to boot successfully and fail opaquely mid-workflow.
   validateSecretsKey();
+
+  // Startup diagnostic — surfaces which credential source the Admin SDK picked
+  // up, so credential-related boot failures are easy to triage.
+  console.info(
+    `[platform-services] Firebase Admin SDK: ${detectCredentialMode()}`,
+  );
 
   const db = getAdminFirestore();
 

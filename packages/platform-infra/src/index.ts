@@ -31,7 +31,12 @@ export { FirestoreToolCatalogRepository } from './firestore/tool-catalog-reposit
 export { FirestoreOAuthProviderRepository } from './firestore/oauth-provider-repository.js';
 export { FirestoreAgentOAuthTokenRepository } from './firestore/agent-oauth-token-repository.js';
 export { validateSecretsKey } from './crypto/secrets-cipher.js';
-export { getAdminAuth, getAdminFirestore } from './auth/firebase-admin-init.js';
+export {
+  getAdminAuth,
+  getAdminFirestore,
+  detectCredentialMode,
+} from './auth/firebase-admin-init.js';
+export type { CredentialMode } from './auth/firebase-admin-init.js';
 export { FirebaseInviteService } from './auth/firebase-invite-service.js';
 export { backfillInstanceNamespaces } from './migrations/backfill-instance-namespaces.js';
 export { FirestoreModelRegistryRepository } from './firestore/model-registry-repository.js';
