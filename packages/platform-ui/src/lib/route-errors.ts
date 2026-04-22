@@ -3,21 +3,18 @@ export interface ClassifiedError {
   body: { error: string; hint?: string };
 }
 
-interface FirebaseLikeError {
-  code?: string;
-  message?: string;
-}
-
-function asFirebaseLike(err: unknown): FirebaseLikeError {
-  if (err && typeof err === 'object') return err as FirebaseLikeError;
-  return {};
+function readStringField(err: unknown, key: string): string | undefined {
+  if (err === null || typeof err !== 'object') return undefined;
+  const value = (err as Record<string, unknown>)[key];
+  return typeof value === 'string' ? value : undefined;
 }
 
 export function classifyError(err: unknown): ClassifiedError {
-  const { code, message } = asFirebaseLike(err);
+  const code = readStringField(err, 'code');
+  const message = readStringField(err, 'message');
   const inDev = process.env.NODE_ENV !== 'production';
 
-  if (code === 'app/no-app' || (message && message.includes('Unable to detect a Project Id'))) {
+  if (code === 'app/no-app' || (message !== undefined && message.includes('Unable to detect a Project Id'))) {
     const body: ClassifiedError['body'] = {
       error: 'Server misconfigured: Firebase Admin SDK credentials missing',
     };

@@ -65,5 +65,15 @@ describe('classifyError', () => {
       const result = classifyError('not an error');
       expect(result.body.error).toBe('Internal error');
     });
+
+    it('handles error-shaped object with non-string message without throwing', () => {
+      const result = classifyError({ code: 'weird', message: 42 });
+      expect(result.body.error).toBe('Internal error');
+    });
+
+    it('handles null without throwing', () => {
+      const result = classifyError(null);
+      expect(result.body.error).toBe('Internal error');
+    });
   });
 });
