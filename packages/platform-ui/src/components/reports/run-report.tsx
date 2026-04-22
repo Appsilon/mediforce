@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -425,6 +426,8 @@ function DeliverablesSection({
 }: {
   finalOutput: ReturnType<typeof findFinalAgentOutput>;
 }) {
+  const { firebaseUser } = useAuth();
+
   if (!finalOutput) return null;
 
   const { stepId, output, result } = finalOutput;
@@ -432,6 +435,23 @@ function DeliverablesSection({
   const deliverableFile = output.deliverableFile ?? null;
   const resultOutputFile = typeof result?.output_file === 'string' ? result.output_file : null;
   const effectiveDeliverableFile = deliverableFile ?? resultOutputFile;
+
+  async function handleDownload() {
+    if (!effectiveDeliverableFile) return;
+    const authToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+    const response = await fetch(
+      `/api/agent-output-file?path=${encodeURIComponent(effectiveDeliverableFile)}`,
+      { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} },
+    );
+    if (!response.ok) return;
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = effectiveDeliverableFile.split('/').pop() ?? 'download';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <section>
@@ -443,14 +463,13 @@ function DeliverablesSection({
             <span>From {formatStepName(stepId)}</span>
           </div>
           {effectiveDeliverableFile && (
-            <a
-              href={`/api/agent-output-file?path=${encodeURIComponent(effectiveDeliverableFile)}`}
-              download
+            <button
+              onClick={handleDownload}
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <FileText className="h-4 w-4" />
               Download Report
-            </a>
+            </button>
           )}
         </div>
 

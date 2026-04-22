@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { getAdminAuth } from '@mediforce/platform-infra';
 
 /**
  * Serves agent output files from allowed directories.
@@ -21,6 +22,14 @@ const ALLOWED_PREFIXES = [
 ];
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const authHeader = request.headers.get('Authorization') ?? '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  try {
+    await getAdminAuth().verifyIdToken(token);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const filePath = request.nextUrl.searchParams.get('path');
   if (!filePath) {
     return NextResponse.json({ error: 'Missing path parameter' }, { status: 400 });
