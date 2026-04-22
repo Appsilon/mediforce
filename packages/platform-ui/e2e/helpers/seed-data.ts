@@ -732,84 +732,6 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
-  const agentDefinitions: Record<string, Record<string, unknown>> = {
-    'agent-def-driver': {
-      id: 'agent-def-driver',
-      kind: 'plugin',
-      runtimeId: 'supply-intelligence/driver-agent',
-      name: 'Driver Agent',
-      iconName: 'Chart',
-      description: 'Orchestrates multi-step supply chain review workflows by coordinating data collection, analysis, and reporting agents.',
-      inputDescription: 'Workflow trigger payload with study identifiers',
-      outputDescription: 'Completed workflow result with step summaries',
-      foundationModel: 'anthropic/claude-sonnet-4',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-risk-detection': {
-      id: 'agent-def-risk-detection',
-      kind: 'plugin',
-      runtimeId: 'supply-intelligence/risk-detection',
-      name: 'Risk Detection',
-      iconName: 'Chart',
-      description: 'Analyzes vendor submissions and supply chain data to identify potential risks, anomalies, and compliance issues.',
-      inputDescription: 'Vendor submission records and historical data',
-      outputDescription: 'Risk scores, flagged issues, and recommendations',
-      foundationModel: 'anthropic/claude-sonnet-4',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-claude-code': {
-      id: 'agent-def-claude-code',
-      kind: 'plugin',
-      runtimeId: 'claude-code-agent',
-      name: 'Claude Code Agent',
-      iconName: 'Bot',
-      description: 'Executes code generation, analysis, and automated software tasks using Claude\'s advanced coding capabilities.',
-      inputDescription: 'Task description and relevant code context',
-      outputDescription: 'Generated code, analysis results, or task completion report',
-      foundationModel: 'anthropic/claude-sonnet-4',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-opencode': {
-      id: 'agent-def-opencode',
-      kind: 'plugin',
-      runtimeId: 'opencode-agent',
-      name: 'OpenCode Agent',
-      iconName: 'Cpu',
-      description: 'Open-source code execution agent powered by DeepSeek for cost-efficient automated development tasks.',
-      inputDescription: 'Code task description and project context',
-      outputDescription: 'Implemented code changes and execution results',
-      foundationModel: 'deepseek/deepseek-chat',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-script-container': {
-      id: 'agent-def-script-container',
-      kind: 'plugin',
-      runtimeId: 'script-container',
-      name: 'Script Container',
-      iconName: 'Terminal',
-      description: 'Sandboxed execution environment for running custom scripts, data transformations, and automation tasks.',
-      inputDescription: 'Script definition and input parameters',
-      outputDescription: 'Script execution output and exit status',
-      foundationModel: 'anthropic/claude-sonnet-4',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-  };
-
   const namespaces: Record<string, Record<string, unknown>> = {
     test: {
       id: 'test',
@@ -948,5 +870,5 @@ export function buildSeedData(testUserId: string) {
     createdAt: twoDaysAgo,
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions, namespaces, namespaceMembers, coworkSessions };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions };
 }

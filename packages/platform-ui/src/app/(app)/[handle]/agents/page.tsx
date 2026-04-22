@@ -212,18 +212,22 @@ function AgentCatalog({ handle }: { handle: string }) {
       }),
     ])
       .then(([pluginsData, definitionsData]) => {
-        const definitionEntries = (definitionsData.agents ?? []).map(agentDefinitionToEntry);
-        // Map from runtimeId → definition entry (for dedup and Configure link)
+        // Map from runtimeId → definition entry. Dedups definitions that share a
+        // runtimeId (e.g. an older seeded doc + the builtin-seeded doc) and also
+        // backs the plugin filter below.
         const definitionByRuntimeId = new Map(
-          definitionEntries.map((e) => [e.name, e]),
+          (definitionsData.agents ?? []).map((def) => {
+            const entry = agentDefinitionToEntry(def);
+            return [entry.name, entry] as const;
+          }),
         );
-        // For plugins not covered by a definition, include them as-is
-        // For plugins that have a matching definition, the definition entry (with Configure button) wins
+        // For plugins not covered by a definition, include them as-is.
+        // For plugins that have a matching definition, the definition entry (with Configure button) wins.
         const coveredRuntimeIds = new Set(definitionByRuntimeId.keys());
         const uncoveredPlugins = (pluginsData.plugins ?? []).filter(
           (p) => !coveredRuntimeIds.has(p.name),
         );
-        setAgents([...definitionEntries, ...uncoveredPlugins]);
+        setAgents([...definitionByRuntimeId.values(), ...uncoveredPlugins]);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unknown error');
