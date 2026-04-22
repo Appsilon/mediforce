@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/format';
 import { useUserDisplayNames } from '@/hooks/use-users';
 
+const SYSTEM_ACTOR_IDS = new Set(['auto-runner', 'api-user', 'system']);
+
 interface AgentEventItem {
   id: string;
   stepId: string;
@@ -201,8 +203,7 @@ function ExecutedBy({ executedBy, executorType, plugin, autonomyLevel, runtime }
       </span>
     );
   }
-  const systemIds = new Set(['auto-runner', 'api-user', 'system']);
-  const resolvedName = systemIds.has(executedBy)
+  const resolvedName = SYSTEM_ACTOR_IDS.has(executedBy)
     ? null
     : (userNames.get(executedBy) ?? executedBy);
   const displayName = resolvedName ?? 'User unknown';
