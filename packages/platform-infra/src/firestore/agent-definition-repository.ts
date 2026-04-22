@@ -48,6 +48,16 @@ export class FirestoreAgentDefinitionRepository implements AgentDefinitionReposi
     return toAgentDefinition(ref.id, snap.data() as Record<string, unknown>);
   }
 
+  async upsert(id: string, input: CreateAgentDefinitionInput): Promise<AgentDefinition> {
+    const ref = this.col.doc(id);
+    const now = FieldValue.serverTimestamp();
+    const existing = await ref.get();
+    const createdAt = existing.exists ? (existing.data()?.createdAt ?? now) : now;
+    await ref.set({ ...input, createdAt, updatedAt: now });
+    const snap = await ref.get();
+    return toAgentDefinition(snap.id, snap.data() as Record<string, unknown>);
+  }
+
   async getById(id: string): Promise<AgentDefinition | null> {
     const snap = await this.col.doc(id).get();
     if (!snap.exists) return null;

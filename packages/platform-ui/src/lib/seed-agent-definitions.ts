@@ -1,8 +1,12 @@
 import type { FirestoreAgentDefinitionRepository } from '@mediforce/platform-infra';
+import type { CreateAgentDefinitionInput } from '@mediforce/platform-core';
 
-const BUILTIN_AGENTS = [
-  {
-    kind: 'plugin' as const,
+/** Deterministic slug → AgentDefinition body. Slug doubles as Firestore
+ *  doc id so wd.json files can reference it via step.agentId without
+ *  fear of IDs shifting between environments. */
+const BUILTIN_AGENTS: Record<string, CreateAgentDefinitionInput> = {
+  'supply-intelligence-driver-agent': {
+    kind: 'plugin',
     runtimeId: 'supply-intelligence/driver-agent',
     name: 'Driver Agent',
     iconName: 'Chart',
@@ -12,10 +16,10 @@ const BUILTIN_AGENTS = [
     outputDescription: 'Completed workflow result with step summaries',
     foundationModel: 'anthropic/claude-sonnet-4',
     systemPrompt: '',
-    skillFileNames: [] as string[],
+    skillFileNames: [],
   },
-  {
-    kind: 'plugin' as const,
+  'supply-intelligence-risk-detection': {
+    kind: 'plugin',
     runtimeId: 'supply-intelligence/risk-detection',
     name: 'Risk Detection',
     iconName: 'Chart',
@@ -25,10 +29,10 @@ const BUILTIN_AGENTS = [
     outputDescription: 'Risk scores, flagged issues, and recommendations',
     foundationModel: 'anthropic/claude-sonnet-4',
     systemPrompt: '',
-    skillFileNames: [] as string[],
+    skillFileNames: [],
   },
-  {
-    kind: 'plugin' as const,
+  'claude-code-agent': {
+    kind: 'plugin',
     runtimeId: 'claude-code-agent',
     name: 'Claude Code Agent',
     iconName: 'Bot',
@@ -38,10 +42,10 @@ const BUILTIN_AGENTS = [
     outputDescription: 'Generated code, analysis results, or task completion report',
     foundationModel: 'anthropic/claude-sonnet-4',
     systemPrompt: '',
-    skillFileNames: [] as string[],
+    skillFileNames: [],
   },
-  {
-    kind: 'plugin' as const,
+  'opencode-agent': {
+    kind: 'plugin',
     runtimeId: 'opencode-agent',
     name: 'OpenCode Agent',
     iconName: 'Cpu',
@@ -51,10 +55,10 @@ const BUILTIN_AGENTS = [
     outputDescription: 'Implemented code changes and execution results',
     foundationModel: 'deepseek/deepseek-chat',
     systemPrompt: '',
-    skillFileNames: [] as string[],
+    skillFileNames: [],
   },
-  {
-    kind: 'plugin' as const,
+  'script-container': {
+    kind: 'plugin',
     runtimeId: 'script-container',
     name: 'Script Container',
     iconName: 'Terminal',
@@ -64,24 +68,14 @@ const BUILTIN_AGENTS = [
     outputDescription: 'Script execution output and exit status',
     foundationModel: 'anthropic/claude-sonnet-4',
     systemPrompt: '',
-    skillFileNames: [] as string[],
+    skillFileNames: [],
   },
-];
+};
 
 export async function seedBuiltinAgentDefinitions(
   repo: FirestoreAgentDefinitionRepository,
 ): Promise<void> {
-  const existing = await repo.list();
-  const existingByRuntimeId = new Map(
-    existing.filter((a) => a.runtimeId !== undefined).map((a) => [a.runtimeId!, a]),
-  );
-
   await Promise.all(
-    BUILTIN_AGENTS.map(async (agent) => {
-      const existingAgent = existingByRuntimeId.get(agent.runtimeId);
-      if (existingAgent === undefined) {
-        await repo.create(agent);
-      }
-    }),
+    Object.entries(BUILTIN_AGENTS).map(([id, body]) => repo.upsert(id, body)),
   );
 }
