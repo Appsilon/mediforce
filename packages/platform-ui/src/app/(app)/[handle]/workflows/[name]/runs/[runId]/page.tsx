@@ -20,7 +20,7 @@ export default function RunDetailPage() {
   const decodedName = name ? decodeURIComponent(name) : '';
 
   const { data: instance, loading: instanceLoading } = useProcessInstance(runId ?? null);
-  const { data: stepExecutions, loading: stepsLoading } = useSubcollection<StepExecutionWithId>(
+  const { data: stepExecutions } = useSubcollection<StepExecutionWithId>(
     runId ? `processInstances/${runId}` : '',
     'stepExecutions',
   );
@@ -121,7 +121,6 @@ export default function RunDetailPage() {
     <ProcessDetail
       instance={instance}
       stepExecutions={stepExecutions}
-      stepExecutionsLoading={stepsLoading}
       auditEvents={auditEvents as AuditEventWithId[]}
       auditEventsLoading={auditLoading}
       auditEventsError={auditError}

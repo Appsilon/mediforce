@@ -38,7 +38,6 @@ export interface AgentEventItem {
 export function ProcessDetail({
   instance,
   stepExecutions,
-  stepExecutionsLoading,
   auditEvents,
   auditEventsLoading,
   auditEventsError,
@@ -50,7 +49,6 @@ export function ProcessDetail({
 }: {
   instance: ProcessInstance;
   stepExecutions: StepExecution[];
-  stepExecutionsLoading: boolean;
   auditEvents: AuditEventWithId[];
   auditEventsLoading: boolean;
   auditEventsError?: Error | null;
