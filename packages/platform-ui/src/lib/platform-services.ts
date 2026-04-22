@@ -8,6 +8,7 @@ import {
   FirestoreAgentDefinitionRepository,
   FirestoreCoworkSessionRepository,
   FirestoreCronTriggerStateRepository,
+  FirestoreToolCatalogRepository,
   getAdminFirestore,
   validateSecretsKey,
 } from '@mediforce/platform-infra';
@@ -47,6 +48,7 @@ export interface PlatformServices {
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
   coworkSessionRepo: FirestoreCoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
+  toolCatalogRepo: FirestoreToolCatalogRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -66,6 +68,7 @@ export function getPlatformServices(): PlatformServices {
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
   const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);
   const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
+  const toolCatalogRepo = new FirestoreToolCatalogRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -128,6 +131,7 @@ export function getPlatformServices(): PlatformServices {
     agentDefinitionRepo,
     coworkSessionRepo,
     cronTriggerStateRepo,
+    toolCatalogRepo,
   };
 
   if (!seedingStarted) {
