@@ -30,8 +30,11 @@ export const WorkflowAgentConfigSchema = z.object({
   repoAuth: z.string().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
-  /** MCP servers available to this agent step. Each entry defines a server
-   *  the agent can connect to during execution (stdio transport). */
+  /** @deprecated Step-level MCP configuration is being removed.
+   *  Move servers onto the agent via AgentDefinition.mcpServers and
+   *  narrow them at the step via WorkflowStep.mcpRestrictions.
+   *  Step 2 of the MCP permissions refactor will migrate existing
+   *  workflows and drop this field. Still parsed for backward-compat. */
   mcpServers: z.array(McpServerConfigSchema).optional(),
 });
 
@@ -53,7 +56,10 @@ export const WorkflowCoworkConfigSchema = z.object({
   outputSchema: z.record(z.string(), z.unknown()).optional(),
   chat: CoworkChatConfigSchema.optional(),
   voiceRealtime: CoworkVoiceRealtimeConfigSchema.optional(),
-  /** MCP servers available to the LLM during this cowork step */
+  /** @deprecated Step-level MCP configuration is being removed.
+   *  Attach servers to the cowork agent definition and narrow per step
+   *  via WorkflowStep.mcpRestrictions. Retained for backward-compat
+   *  until the Step 2 migrator runs. */
   mcpServers: z.array(McpServerConfigSchema).optional(),
 });
 

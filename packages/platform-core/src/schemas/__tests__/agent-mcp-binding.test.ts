@@ -6,6 +6,7 @@ import {
   ToolCatalogEntrySchema,
 } from '../agent-mcp-binding.js';
 import { AgentDefinitionSchema } from '../agent-definition.js';
+import { WorkflowDefinitionSchema } from '../workflow-definition.js';
 
 describe('AgentMcpBindingSchema', () => {
   describe('stdio variant', () => {
@@ -304,5 +305,57 @@ describe('AgentDefinitionSchema with mcpServers', () => {
       },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('WorkflowDefinitionSchema with step.mcpRestrictions', () => {
+  it('parses a workflow whose step carries mcpRestrictions', () => {
+    const result = WorkflowDefinitionSchema.safeParse({
+      name: 'test-workflow',
+      version: 1,
+      steps: [
+        {
+          id: 'extract',
+          name: 'Extract',
+          type: 'creation',
+          executor: 'agent',
+          mcpRestrictions: {
+            github: { denyTools: ['delete_repo'] },
+            postgres: { disable: true },
+          },
+        },
+      ],
+      transitions: [],
+      triggers: [{ type: 'manual', name: 'Start' }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const step = result.data.steps[0];
+      expect(step.mcpRestrictions?.github?.denyTools).toEqual(['delete_repo']);
+      expect(step.mcpRestrictions?.postgres?.disable).toBe(true);
+    }
+  });
+
+  it('continues to parse workflows without mcpRestrictions (backward-compat)', () => {
+    const result = WorkflowDefinitionSchema.safeParse({
+      name: 'legacy-workflow',
+      version: 1,
+      steps: [
+        {
+          id: 'extract',
+          name: 'Extract',
+          type: 'creation',
+          executor: 'agent',
+          agent: {
+            model: 'sonnet',
+            // Legacy step-level mcpServers still accepted (deprecated)
+            mcpServers: [{ name: 'legacy', command: 'legacy-mcp' }],
+          },
+        },
+      ],
+      transitions: [],
+      triggers: [{ type: 'manual', name: 'Start' }],
+    });
+    expect(result.success).toBe(true);
   });
 });
