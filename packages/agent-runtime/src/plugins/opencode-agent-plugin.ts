@@ -1,5 +1,5 @@
 import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 import {
   BaseContainerAgentPlugin,
@@ -44,6 +44,14 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       OPENCODE_CONFIG: '/output/opencode.json',
       // XDG override so OpenCode writes auth.json where we mount it
       XDG_DATA_HOME: '/output/.local/share',
+    };
+  }
+
+  protected override getLocalInternalEnvVars(outputDir: string): Record<string, string> {
+    const absOutputDir = resolve(outputDir);
+    return {
+      OPENCODE_CONFIG: join(absOutputDir, 'opencode.json'),
+      XDG_DATA_HOME: join(absOutputDir, '.local', 'share'),
     };
   }
 

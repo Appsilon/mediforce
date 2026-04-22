@@ -161,6 +161,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     return {};
   }
 
+  /** Return plugin-internal env vars for local (non-Docker) execution.
+   *  Override when container paths differ from host paths (e.g. /output/ vs actual outputDir).
+   *  Default: delegates to getInternalEnvVars(). */
+  protected getLocalInternalEnvVars(_outputDir: string): Record<string, string> {
+    return this.getInternalEnvVars();
+  }
+
   /** Return the CLI command spec to run the agent inside the container.
    *  @param promptFilePath — container path to the prompt file (/output/prompt.txt) */
   abstract getAgentCommand(promptFilePath: string, options?: SpawnCliOptions): AgentCommandSpec;
@@ -1066,14 +1073,17 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     }
 
     // --- Spawn the agent CLI ---
-    // Local mode: inherit host env (agent CLI uses host auth)
     const commandSpec = this.getAgentCommand(promptFilePath, options);
 
     const cliOutput = await new Promise<string>((resolve, reject) => {
       const child = spawn(commandSpec.args[0], commandSpec.args.slice(1), {
         cwd: workingDir,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env },
+        env: {
+          ...process.env,
+          ...this.resolvedEnv.vars,
+          ...this.getLocalInternalEnvVars(outputDir),
+        },
       });
 
       let settled = false;
