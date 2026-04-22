@@ -59,11 +59,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     };
     const contentType = contentTypeMap[ext] ?? 'application/octet-stream';
     const filename = resolved.split('/').pop() ?? 'download';
+    // RFC 6266: use filename* with percent-encoding for full Unicode and special-char safety.
+    const encodedFilename = encodeURIComponent(filename);
 
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `attachment; filename="${filename.replace(/"/g, '\\"')}"; filename*=UTF-8''${encodedFilename}`,
       },
     });
   } catch {
