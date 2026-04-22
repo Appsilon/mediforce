@@ -42,6 +42,7 @@ packages/
   platform-core/       # Shared types, domain models, test factories
   platform-ui/         # Next.js UI — the main web application
   platform-infra/      # Firebase/Firestore infrastructure layer
+  platform-api/        # API contract schemas + pure handlers (framework-free)
   agent-runtime/       # Agent execution engine
   workflow-engine/     # Process orchestration engine
   example-agent/       # Reference agent implementation
@@ -79,6 +80,10 @@ pnpm test:coverage
 # Type checking
 pnpm typecheck
 ```
+
+### Contract tests
+
+Handlers in `platform-api` are tested against in-memory repositories from `@mediforce/platform-core/testing` — no mocks, no HTTP, no Firebase emulators, no dev server. The real win over E2E is not raw wall-clock time but zero ceremony: run the file, get the answer. Each handler is a pure function `(input, deps) => Promise<output>` with per-handler dependency injection, so tests read like the spec: set up repo state, call handler, assert on the return value. The canonical example is `packages/platform-api/src/handlers/tasks/__tests__/list-tasks.test.ts`, which exercises the `listTasks` handler backing `GET /api/tasks`.
 
 ### E2E tests (Playwright)
 

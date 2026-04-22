@@ -9,6 +9,7 @@ packages/
   platform-core/       # Shared types, domain models, test factories
   platform-ui/         # Next.js UI — the main web application
   platform-infra/      # Firebase/Firestore infrastructure layer
+  platform-api/        # API contract schemas + pure handlers (framework-free)
   agent-runtime/       # Agent execution engine
   workflow-engine/     # Process orchestration engine
   example-agent/       # Reference agent implementation
@@ -40,6 +41,7 @@ Workflow + agent orchestration platform for pharma. Processes decompose into ste
 platform-core  (zod schemas, repository interfaces, test factories — zero mediforce deps)
   ├── workflow-engine    (WorkflowEngine, StepExecutor, TransitionResolver, expression evaluator)
   ├── platform-infra     (Firestore repos, Firebase auth, SendGrid notifications)
+  ├── platform-api       (API contract schemas + pure handlers — depends only on platform-core + zod)
   ├── agent-runtime      (AgentRunner, PluginRegistry, Docker spawn strategies)
   │     └── agent-queue  (optional — BullMQ, activated by REDIS_URL)
   └── supply-intelligence (pure domain: SKU, warehouse, batch, risk — no Firebase)
@@ -48,7 +50,7 @@ supply-intelligence-plugins  (DriverAgent, RiskDetection — registers with Plug
   └── depends on: supply-intelligence, platform-core
 
 platform-ui  (Next.js 15 App Router, port 9003)
-  └── depends on: platform-infra, workflow-engine, agent-runtime, supply-intelligence-plugins
+  └── depends on: platform-api (contract types + handler runtime), platform-infra, workflow-engine, agent-runtime, supply-intelligence-plugins
 ```
 
 ### How inter-package imports work
@@ -114,6 +116,7 @@ In practice: receive a task → break it down → dispatch subagents → verify 
 | Layer | What it catches | Where |
 |-------|----------------|-------|
 | **Unit** | Schema validation, pure functions, expression eval | `packages/*/src/**/__tests__/` |
+| **Contract** | Handler behavior + Zod I/O shapes, against in-memory repos | `packages/platform-api/src/handlers/**/__tests__/` |
 | **Engine integration** | Full workflow loops, transitions, step routing | `packages/workflow-engine/src/__tests__/` |
 | **API journey** | Multi-endpoint user journeys composed at handler level with in-memory repos — deterministic, no browser, no emulators | `packages/platform-ui/src/test/*-journey.test.ts` |
 | **Real-LLM E2E** | Opt-in roundtrip: admin REST → resolver → spawned MCP server → real LLM tool_call → result. Not on CI — manual regression guard | `packages/platform-ui/e2e/api/*.test.ts`, run via `pnpm test:mcp-real` (cd packages/platform-ui) with `OPENROUTER_API_KEY` set |
