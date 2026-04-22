@@ -923,6 +923,21 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     parts.push('## Input Data');
     parts.push(JSON.stringify(input, null, 2));
 
+    // 5b. Previous run outputs — carry-over snapshot from the last successful
+    // run of this workflow (see WD.inputForNextRun). Distinct from "previous
+    // step outputs" (same run). Inline always — bounded by design.
+    if (isWorkflowAgentContext(this.context) && this.context.previousRun !== undefined) {
+      parts.push(
+        '## Previous Run Outputs\n' +
+        'Values carried over from the last successfully completed run of this ' +
+        'workflow, per the workflow definition\'s `inputForNextRun` declaration. ' +
+        '`{}` means no predecessor qualified (first run, all previous failed, ' +
+        'or chain reset). Use this to resume where the previous run left off ' +
+        '(e.g. a cursor, last-seen hash, etc.).',
+      );
+      parts.push(JSON.stringify(this.context.previousRun, null, 2));
+    }
+
     // 6. Previous step outputs — write large values to files instead of inlining
     if (hasPreviousOutputs && outputDir) {
       const INLINE_THRESHOLD = 5_000; // characters

@@ -61,6 +61,13 @@ export interface WorkflowAgentContext {
    *  restrictions + tool catalog collapsed into a flat map of server
    *  name → launch spec. undefined when step.agentId is unset. */
   resolvedMcpConfig?: ResolvedMcpConfig;
+  /**
+   * Snapshot of outputs carried over from the last successfully completed run
+   * of the same workflow name, per the WD's `inputForNextRun` declarations.
+   * `{}` when carry-over is declared but no predecessor qualified (first run,
+   * or all previous failed). Undefined when the WD declares no carry-over.
+   */
+  previousRun?: Record<string, unknown>;
 }
 
 // EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp
