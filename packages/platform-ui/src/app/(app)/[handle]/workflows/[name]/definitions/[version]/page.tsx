@@ -8,7 +8,7 @@ import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { saveWorkflowDefinition, setDefaultWorkflowVersion } from '@/app/actions/definitions';
 import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -62,7 +62,7 @@ export default function WorkflowDefinitionVersionPage() {
     [],
   );
 
-  const handleSave = useCallback(async (title: string) => {
+  const handleSave = useCallback(async (title: string, setAsDefault: boolean) => {
     if (!definition) return;
     const steps = currentStepsRef.current;
     const transitions = currentTransitionsRef.current;
@@ -97,6 +97,9 @@ export default function WorkflowDefinitionVersionPage() {
     });
 
     if (result.success) {
+      if (setAsDefault) {
+        await setDefaultWorkflowVersion(definition.name, result.version);
+      }
       setSaveState({ status: 'saved', version: result.version });
       redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
