@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { executeAgentStep } from '@/lib/execute-agent-step';
-import { validateWorkflowEnv } from '@mediforce/agent-runtime';
+import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv } from '@mediforce/agent-runtime';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '@/lib/loop-guard';
 
@@ -156,7 +156,7 @@ export async function POST(
 
         if (currentStep.executor === 'cowork') {
           // Guard: skip if an active cowork session already exists for this step
-          const { coworkSessionRepo } = getPlatformServices();
+          const { coworkSessionRepo, agentDefinitionRepo, toolCatalogRepo } = getPlatformServices();
           const existingSessions = await coworkSessionRepo.getByInstanceId(instanceId);
           const hasActiveSession = existingSessions.some(
             (s) => s.stepId === instance.currentStepId && s.status === 'active',
@@ -175,6 +175,20 @@ export async function POST(
 
           const now = new Date().toISOString();
           const sessionId = crypto.randomUUID();
+
+          // Resolve MCP config for the step if it points at an AgentDefinition.
+          // Falls back to legacy inline cowork.mcpServers when agentId is unset
+          // (workflows not yet migrated).
+          const resolvedMcp = workflowDefinition.namespace
+            ? await resolveMcpForStep(currentStep, {
+                agentDefinitionRepo,
+                toolCatalogRepo,
+                namespace: workflowDefinition.namespace,
+              })
+            : null;
+          const sessionMcpServers = resolvedMcp !== null
+            ? flattenResolvedMcpToLegacy(resolvedMcp)
+            : (currentStep.cowork?.mcpServers ?? null);
 
           const agentType = currentStep.cowork?.agent ?? 'chat';
           const model = agentType === 'voice-realtime'
@@ -202,7 +216,7 @@ export async function POST(
             outputSchema: currentStep.cowork?.outputSchema ?? null,
             voiceConfig,
             artifact: null,
-            mcpServers: currentStep.cowork?.mcpServers ?? null,
+            mcpServers: sessionMcpServers,
             turns: [],
             createdAt: now,
             updatedAt: now,
