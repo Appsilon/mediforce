@@ -61,6 +61,17 @@ describe('AgentMcpBindingSchema', () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it('rejects stdio binding with empty allowedTools array', () => {
+      // An empty allowlist means "zero tools permitted" — indistinguishable
+      // from omitting the server entirely. Force authors to omit the field.
+      const result = AgentMcpBindingSchema.safeParse({
+        type: 'stdio',
+        catalogId: 'gh',
+        allowedTools: [],
+      });
+      expect(result.success).toBe(false);
+    });
   });
 
   describe('http variant', () => {
@@ -123,6 +134,15 @@ describe('AgentMcpBindingSchema', () => {
         type: 'http',
         url: 'https://mcp.example.com/v1',
         catalogId: 'oops',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects http binding with empty allowedTools array', () => {
+      const result = AgentMcpBindingSchema.safeParse({
+        type: 'http',
+        url: 'https://mcp.example.com/v1',
+        allowedTools: [],
       });
       expect(result.success).toBe(false);
     });

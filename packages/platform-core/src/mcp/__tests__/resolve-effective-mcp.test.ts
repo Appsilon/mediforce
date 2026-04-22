@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   CatalogEntryNotFoundError,
+  UnknownRestrictionTargetError,
   resolveEffectiveMcp,
+  type ResolvedMcpServer,
+  type ResolvedStdioMcpServer,
+  type ResolvedHttpMcpServer,
 } from '../resolve-effective-mcp.js';
 import type {
   AgentMcpBindingMap,
@@ -9,7 +13,10 @@ import type {
   ToolCatalogEntry,
 } from '../../schemas/agent-mcp-binding.js';
 import type { AgentDefinition } from '../../schemas/agent-definition.js';
-import type { WorkflowStep } from '../../schemas/workflow-definition.js';
+import {
+  WorkflowStepSchema,
+  type WorkflowStep,
+} from '../../schemas/workflow-definition.js';
 
 function makeAgent(mcpServers?: AgentMcpBindingMap): AgentDefinition {
   return {
@@ -29,17 +36,31 @@ function makeAgent(mcpServers?: AgentMcpBindingMap): AgentDefinition {
 }
 
 function makeStep(mcpRestrictions?: StepMcpRestriction): WorkflowStep {
-  return {
+  return WorkflowStepSchema.parse({
     id: 'step-1',
     name: 'Step 1',
     type: 'creation',
     executor: 'agent',
     mcpRestrictions,
-  } as WorkflowStep;
+  });
 }
 
 function makeCatalog(entries: ToolCatalogEntry[]): Map<string, ToolCatalogEntry> {
   return new Map(entries.map(entry => [entry.id, entry]));
+}
+
+function asStdio(server: ResolvedMcpServer | undefined): ResolvedStdioMcpServer {
+  if (server?.type !== 'stdio') {
+    throw new Error(`expected stdio server, got ${server?.type ?? 'undefined'}`);
+  }
+  return server;
+}
+
+function asHttp(server: ResolvedMcpServer | undefined): ResolvedHttpMcpServer {
+  if (server?.type !== 'http') {
+    throw new Error(`expected http server, got ${server?.type ?? 'undefined'}`);
+  }
+  return server;
 }
 
 describe('resolveEffectiveMcp', () => {
@@ -63,11 +84,10 @@ describe('resolveEffectiveMcp', () => {
         cdisc: { type: 'stdio', catalogId: 'cdisc-library' },
       });
       const result = resolveEffectiveMcp(agent, makeStep(), catalog);
-      expect(result.servers.cdisc).toBeDefined();
-      expect(result.servers.cdisc?.type).toBe('stdio');
-      expect(result.servers.cdisc?.command).toBe('npx');
-      expect(result.servers.cdisc?.args).toEqual(['-y', '@cdisc/mcp-server']);
-      expect(result.servers.cdisc?.env).toEqual({ API_KEY: '{{SECRET:cdisc_key}}' });
+      const cdisc = asStdio(result.servers.cdisc);
+      expect(cdisc.command).toBe('npx');
+      expect(cdisc.args).toEqual(['-y', '@cdisc/mcp-server']);
+      expect(cdisc.env).toEqual({ API_KEY: '{{SECRET:cdisc_key}}' });
     });
 
     it('resolves http bindings without catalog lookup', () => {
@@ -79,11 +99,9 @@ describe('resolveEffectiveMcp', () => {
         },
       });
       const result = resolveEffectiveMcp(agent, makeStep(), new Map());
-      expect(result.servers.remote?.type).toBe('http');
-      expect(result.servers.remote?.url).toBe('https://mcp.example.com/v1');
-      expect(result.servers.remote?.auth?.headers?.Authorization).toBe(
-        'Bearer {{SECRET:tok}}',
-      );
+      const remote = asHttp(result.servers.remote);
+      expect(remote.url).toBe('https://mcp.example.com/v1');
+      expect(remote.auth?.headers?.Authorization).toBe('Bearer {{SECRET:tok}}');
     });
 
     it('resolves a mix of 2 stdio + 1 http servers', () => {
@@ -98,9 +116,9 @@ describe('resolveEffectiveMcp', () => {
       });
       const result = resolveEffectiveMcp(agent, makeStep(), catalog);
       expect(Object.keys(result.servers)).toHaveLength(3);
-      expect(result.servers.alpha?.command).toBe('cmd-a');
-      expect(result.servers.beta?.command).toBe('cmd-b');
-      expect(result.servers.gamma?.url).toBe('https://example.com');
+      expect(asStdio(result.servers.alpha).command).toBe('cmd-a');
+      expect(asStdio(result.servers.beta).command).toBe('cmd-b');
+      expect(asHttp(result.servers.gamma).url).toBe('https://example.com');
     });
 
     it('carries binding.allowedTools through when no step restriction', () => {
@@ -113,8 +131,9 @@ describe('resolveEffectiveMcp', () => {
         },
       });
       const result = resolveEffectiveMcp(agent, makeStep(), catalog);
-      expect(result.servers.github?.allowedTools).toEqual(['search_code', 'get_file']);
-      expect(result.servers.github?.deniedTools).toBeUndefined();
+      const github = asStdio(result.servers.github);
+      expect(github.allowedTools).toEqual(['search_code', 'get_file']);
+      expect(github.deniedTools).toBeUndefined();
     });
   });
 
@@ -155,11 +174,12 @@ describe('resolveEffectiveMcp', () => {
       });
       const step = makeStep({ github: { denyTools: ['create_pr'] } });
       const result = resolveEffectiveMcp(agent, step, catalog);
-      expect(result.servers.github?.allowedTools).toEqual(['search_code', 'get_file']);
-      expect(result.servers.github?.deniedTools).toBeUndefined();
+      const github = asStdio(result.servers.github);
+      expect(github.allowedTools).toEqual(['search_code', 'get_file']);
+      expect(github.deniedTools).toBeUndefined();
     });
 
-    it('ignores denyTools that reference tools not in binding.allowedTools', () => {
+    it('drops server entirely when denyTools empties the allowlist', () => {
       const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
       const agent = makeAgent({
         github: {
@@ -170,8 +190,24 @@ describe('resolveEffectiveMcp', () => {
       });
       const step = makeStep({ github: { denyTools: ['delete_repo', 'search_code'] } });
       const result = resolveEffectiveMcp(agent, step, catalog);
-      // search_code removed; delete_repo ignored silently (not in allowlist)
-      expect(result.servers.github?.allowedTools).toEqual([]);
+      // search_code removed → allowlist becomes empty → server dropped entirely.
+      // delete_repo is ignored silently (not in allowlist).
+      expect(result.servers.github).toBeUndefined();
+    });
+
+    it('drops only the emptied server, keeps siblings intact', () => {
+      const catalog = makeCatalog([
+        { id: 'gh', command: 'gh-mcp' },
+        { id: 'pg', command: 'pg-mcp' },
+      ]);
+      const agent = makeAgent({
+        github: { type: 'stdio', catalogId: 'gh', allowedTools: ['search'] },
+        postgres: { type: 'stdio', catalogId: 'pg', allowedTools: ['query'] },
+      });
+      const step = makeStep({ github: { denyTools: ['search'] } });
+      const result = resolveEffectiveMcp(agent, step, catalog);
+      expect(result.servers.github).toBeUndefined();
+      expect(Object.keys(result.servers)).toEqual(['postgres']);
     });
 
     it('carries denyTools forward as deniedTools when binding has no allowedTools', () => {
@@ -186,8 +222,9 @@ describe('resolveEffectiveMcp', () => {
       });
       const step = makeStep({ github: { denyTools: ['delete_repo'] } });
       const result = resolveEffectiveMcp(agent, step, catalog);
-      expect(result.servers.github?.allowedTools).toBeUndefined();
-      expect(result.servers.github?.deniedTools).toEqual(['delete_repo']);
+      const github = asStdio(result.servers.github);
+      expect(github.allowedTools).toBeUndefined();
+      expect(github.deniedTools).toEqual(['delete_repo']);
     });
 
     it('applies denyTools to http bindings the same way', () => {
@@ -200,7 +237,7 @@ describe('resolveEffectiveMcp', () => {
       });
       const step = makeStep({ remote: { denyTools: ['push'] } });
       const result = resolveEffectiveMcp(agent, step, new Map());
-      expect(result.servers.remote?.allowedTools).toEqual(['fetch']);
+      expect(asHttp(result.servers.remote).allowedTools).toEqual(['fetch']);
     });
   });
 
@@ -237,6 +274,58 @@ describe('resolveEffectiveMcp', () => {
       });
       const step = makeStep({ ghost: { disable: true } });
       expect(() => resolveEffectiveMcp(agent, step, new Map())).not.toThrow();
+    });
+  });
+
+  describe('unknown restriction targets', () => {
+    it('throws UnknownRestrictionTargetError when restriction references unknown server', () => {
+      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const agent = makeAgent({ github: { type: 'stdio', catalogId: 'gh' } });
+      const step = makeStep({ githuub: { disable: true } });
+      expect(() => resolveEffectiveMcp(agent, step, catalog)).toThrow(
+        UnknownRestrictionTargetError,
+      );
+    });
+
+    it('UnknownRestrictionTargetError exposes serverName and knownServerNames', () => {
+      const catalog = makeCatalog([
+        { id: 'gh', command: 'gh-mcp' },
+        { id: 'pg', command: 'pg-mcp' },
+      ]);
+      const agent = makeAgent({
+        github: { type: 'stdio', catalogId: 'gh' },
+        postgres: { type: 'stdio', catalogId: 'pg' },
+      });
+      const step = makeStep({ githuub: { denyTools: ['x'] } });
+      try {
+        resolveEffectiveMcp(agent, step, catalog);
+        expect.fail('expected throw');
+      } catch (err) {
+        expect(err).toBeInstanceOf(UnknownRestrictionTargetError);
+        if (err instanceof UnknownRestrictionTargetError) {
+          expect(err.serverName).toBe('githuub');
+          expect(err.knownServerNames).toEqual(['github', 'postgres']);
+        }
+      }
+    });
+
+    it('throws even when the agent has no mcpServers at all', () => {
+      const step = makeStep({ github: { disable: true } });
+      expect(() => resolveEffectiveMcp(makeAgent(), step, new Map())).toThrow(
+        UnknownRestrictionTargetError,
+      );
+    });
+
+    it('throws before any catalog lookup', () => {
+      // Typo check runs first — unknown restriction target wins over a valid
+      // server with a bad catalogId, so callers see the actionable error.
+      const agent = makeAgent({
+        ghost: { type: 'stdio', catalogId: 'not-in-catalog' },
+      });
+      const step = makeStep({ typo: { disable: true } });
+      expect(() => resolveEffectiveMcp(agent, step, new Map())).toThrow(
+        UnknownRestrictionTargetError,
+      );
     });
   });
 

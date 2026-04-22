@@ -15,7 +15,7 @@ export type HttpAuthConfig = z.infer<typeof HttpAuthConfigSchema>;
 export const StdioAgentMcpBindingSchema = z.object({
   type: z.literal('stdio'),
   catalogId: z.string().min(1),
-  allowedTools: z.array(z.string()).optional(),
+  allowedTools: z.array(z.string()).min(1).optional(),
 }).strict();
 
 export type StdioAgentMcpBinding = z.infer<typeof StdioAgentMcpBindingSchema>;
@@ -25,7 +25,7 @@ export type StdioAgentMcpBinding = z.infer<typeof StdioAgentMcpBindingSchema>;
 export const HttpAgentMcpBindingSchema = z.object({
   type: z.literal('http'),
   url: z.string().url(),
-  allowedTools: z.array(z.string()).optional(),
+  allowedTools: z.array(z.string()).min(1).optional(),
   auth: HttpAuthConfigSchema.optional(),
 }).strict();
 

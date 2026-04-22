@@ -203,8 +203,11 @@ export type { ConfigValidationResult } from './validation/config-validator.js';
 export {
   resolveEffectiveMcp,
   CatalogEntryNotFoundError,
+  UnknownRestrictionTargetError,
   type ResolvedMcpConfig,
   type ResolvedMcpServer,
+  type ResolvedStdioMcpServer,
+  type ResolvedHttpMcpServer,
 } from './mcp/resolve-effective-mcp.js';
 
 // Collaboration (handoff registry, RBAC)
