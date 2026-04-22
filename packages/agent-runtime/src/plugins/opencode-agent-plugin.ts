@@ -62,12 +62,38 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     // shell argument length limits on the docker run command itself.
     // The expansion happens inside the container's bash, where ARG_MAX is ~2MB.
     const model = this.agentConfig.model ?? DEFAULT_MODEL;
+
+    // OpenCode's --model flag format is "providerID/modelID" — the first path
+    // segment is the provider, the rest is the model ID within that provider.
+    // "deepseek/deepseek-chat" means provider=deepseek, model=deepseek-chat.
+    // When routing through OpenRouter, we must prefix with "openrouter/" so
+    // OpenCode resolves provider=openrouter, model=deepseek/deepseek-chat.
+    const modelArg = this.resolveModelArg(model);
+
     const args = [
       'bash', '-c',
-      `opencode run "$(cat ${promptFilePath})" --format json --model ${model}`,
+      `opencode run "$(cat ${promptFilePath})" --format json --model ${modelArg}`,
     ];
 
     return { args, promptDelivery: 'file' };
+  }
+
+  /** Build the full provider/model string for the --model CLI flag. */
+  private resolveModelArg(model: string): string {
+    // Already has a recognised provider prefix — use as-is.
+    if (model.startsWith('openrouter/') || !model.includes('/')) {
+      return model;
+    }
+    const workflowSecrets = isWorkflowAgentContext(this.context)
+      ? this.context.workflowSecrets
+      : undefined;
+    const openrouterKey = this.resolvedEnv.vars.OPENROUTER_API_KEY ?? workflowSecrets?.OPENROUTER_API_KEY;
+    if (openrouterKey) {
+      // model is e.g. "deepseek/deepseek-chat" (an OpenRouter model path).
+      // Prefix with "openrouter/" so OpenCode routes to the openrouter provider.
+      return `openrouter/${model}`;
+    }
+    return model;
   }
 
   getMockDockerArgs(stepId: string, isGitMode: boolean): string[] {
