@@ -468,16 +468,6 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
     }
   }, [sections, activeTab]);
 
-  if (logFiles.length === 0) {
-    return (
-      <div className="text-sm text-muted-foreground py-8 text-center">
-        No agent log available for this run.
-      </div>
-    );
-  }
-
-  const totalEvents = sections.reduce((sum, section) => sum + section.entries.length, 0);
-  const hasTabs = sections.length > 1;
   const activeSection = sections[activeTab] ?? null;
 
   const handleCopy = React.useCallback(async () => {
@@ -488,10 +478,21 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
     setTimeout(() => setCopied(false), 2000);
   }, [activeSection]);
 
+  if (logFiles.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground py-8 text-center">
+        No agent log available for this run.
+      </div>
+    );
+  }
+
+  const totalEvents = sections.reduce((sum, section) => sum + section.entries.length, 0);
+  const hasTabs = sections.length > 1;
+
   return (
-    <div className="space-y-0">
+    <div className="flex flex-col h-full">
       {/* Controls bar */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 shrink-0">
         <div className="text-xs text-muted-foreground">
           {totalEvents > 0 && <span>{totalEvents} events across {sections.length} agent{sections.length > 1 ? 's' : ''}</span>}
         </div>
@@ -508,10 +509,10 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
       </div>
 
       {/* Terminal-style container */}
-      <div className="border rounded-md overflow-hidden bg-background">
+      <div className="flex flex-col flex-1 min-h-0 border rounded-md overflow-hidden bg-background">
         {/* Tab bar — only shown when multiple agents */}
         {hasTabs && (
-          <div className="flex items-stretch bg-muted/60 border-b overflow-x-auto">
+          <div className="flex items-stretch bg-muted/60 border-b overflow-x-auto shrink-0">
             {sections.map((section, index) => {
               const isActive = index === activeTab;
               return (
@@ -543,10 +544,10 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
           </div>
         )}
 
-        {/* Log content area */}
+        {/* Log content area — fills remaining height, scrolls, auto-scrolled to bottom */}
         <div
           ref={scrollRef}
-          className="p-3 overflow-auto max-h-[500px] space-y-0.5"
+          className="p-3 overflow-auto flex-1 min-h-0 space-y-0.5"
         >
           {sections.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-4">

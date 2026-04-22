@@ -8,6 +8,7 @@ import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-c
 import { AutonomyBadge } from '../agents/autonomy-badge';
 import { RetryStepButton } from './retry-step-button';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/lib/format';
 
 interface AgentEventItem {
   id: string;
@@ -472,6 +473,10 @@ export function StepStatusPanel({
                         <span className="text-xs text-muted-foreground">
                           <span className="text-muted-foreground/60 mr-1">Completed</span>
                           {format(new Date(latestExec.completedAt), 'MMM d, HH:mm')}
+                        </span>
+                        <span className="text-muted-foreground/40">·</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDuration(new Date(latestExec.completedAt).getTime() - new Date(latestExec.startedAt).getTime())}
                         </span>
                       </>
                     )}
