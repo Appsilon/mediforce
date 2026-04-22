@@ -7,6 +7,7 @@ import { Save } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
+import { StartRunButton } from '@/components/processes/start-run-button';
 import { saveWorkflowDefinition } from '@/app/actions/definitions';
 import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
 import { cn } from '@/lib/utils';
@@ -170,7 +171,8 @@ export default function WorkflowDefinitionVersionPage() {
           </div>
 
           {/* Right: save controls */}
-          <div className="flex items-center gap-2 shrink-0 pt-0.5">
+          <div className="flex items-center gap-3 shrink-0 pt-0.5">
+            <StartRunButton workflowName={decodedName} version={definition.version} />
             {saveState.status === 'saved' && (
               <span className="text-sm text-green-600 dark:text-green-400 font-medium">
                 Saved as v{saveState.version}
