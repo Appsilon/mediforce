@@ -9,7 +9,13 @@ if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
 
 function ensureAdminApp() {
   if (!getApps().length) {
-    initializeApp();
+    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
+      initializeApp({
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'demo-mediforce',
+      });
+    } else {
+      initializeApp();
+    }
   }
   return getApp();
 }
