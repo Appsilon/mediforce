@@ -2,7 +2,8 @@ import type { FirestoreAgentDefinitionRepository } from '@mediforce/platform-inf
 
 const BUILTIN_AGENTS = [
   {
-    pluginId: 'supply-intelligence/driver-agent',
+    kind: 'plugin' as const,
+    runtimeId: 'supply-intelligence/driver-agent',
     name: 'Driver Agent',
     iconName: 'Chart',
     description:
@@ -14,7 +15,8 @@ const BUILTIN_AGENTS = [
     skillFileNames: [] as string[],
   },
   {
-    pluginId: 'supply-intelligence/risk-detection',
+    kind: 'plugin' as const,
+    runtimeId: 'supply-intelligence/risk-detection',
     name: 'Risk Detection',
     iconName: 'Chart',
     description:
@@ -26,7 +28,8 @@ const BUILTIN_AGENTS = [
     skillFileNames: [] as string[],
   },
   {
-    pluginId: 'claude-code-agent',
+    kind: 'plugin' as const,
+    runtimeId: 'claude-code-agent',
     name: 'Claude Code Agent',
     iconName: 'Bot',
     description:
@@ -38,7 +41,8 @@ const BUILTIN_AGENTS = [
     skillFileNames: [] as string[],
   },
   {
-    pluginId: 'opencode-agent',
+    kind: 'plugin' as const,
+    runtimeId: 'opencode-agent',
     name: 'OpenCode Agent',
     iconName: 'Cpu',
     description:
@@ -50,7 +54,8 @@ const BUILTIN_AGENTS = [
     skillFileNames: [] as string[],
   },
   {
-    pluginId: 'script-container',
+    kind: 'plugin' as const,
+    runtimeId: 'script-container',
     name: 'Script Container',
     iconName: 'Terminal',
     description:
@@ -67,13 +72,13 @@ export async function seedBuiltinAgentDefinitions(
   repo: FirestoreAgentDefinitionRepository,
 ): Promise<void> {
   const existing = await repo.list();
-  const existingByPluginId = new Map(
-    existing.filter((a) => a.pluginId !== undefined).map((a) => [a.pluginId!, a]),
+  const existingByRuntimeId = new Map(
+    existing.filter((a) => a.runtimeId !== undefined).map((a) => [a.runtimeId!, a]),
   );
 
   await Promise.all(
     BUILTIN_AGENTS.map(async (agent) => {
-      const existingAgent = existingByPluginId.get(agent.pluginId);
+      const existingAgent = existingByRuntimeId.get(agent.runtimeId);
       if (existingAgent === undefined) {
         await repo.create(agent);
       }

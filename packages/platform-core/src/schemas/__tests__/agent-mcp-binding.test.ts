@@ -326,6 +326,38 @@ describe('AgentDefinitionSchema with mcpServers', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('defaults kind to "plugin" when omitted (backcompat)', () => {
+    const result = AgentDefinitionSchema.safeParse(base);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.kind).toBe('plugin');
+    }
+  });
+
+  it('parses cowork-kind agent with runtimeId', () => {
+    const result = AgentDefinitionSchema.safeParse({
+      ...base,
+      kind: 'cowork',
+      runtimeId: 'chat',
+      mcpServers: {
+        tealflow: { type: 'stdio', catalogId: 'tealflow-mcp' },
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.kind).toBe('cowork');
+      expect(result.data.runtimeId).toBe('chat');
+    }
+  });
+
+  it('rejects unknown kind values', () => {
+    const result = AgentDefinitionSchema.safeParse({
+      ...base,
+      kind: 'daemon',
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('WorkflowDefinitionSchema with step.mcpRestrictions', () => {
@@ -353,6 +385,29 @@ describe('WorkflowDefinitionSchema with step.mcpRestrictions', () => {
       const step = result.data.steps[0];
       expect(step.mcpRestrictions?.github?.denyTools).toEqual(['delete_repo']);
       expect(step.mcpRestrictions?.postgres?.disable).toBe(true);
+    }
+  });
+
+  it('parses a step with agentId pointer', () => {
+    const result = WorkflowDefinitionSchema.safeParse({
+      name: 'test-workflow',
+      version: 1,
+      steps: [
+        {
+          id: 'explore',
+          name: 'Explore',
+          type: 'creation',
+          executor: 'cowork',
+          agentId: 'tealflow-cowork-chat',
+          cowork: { agent: 'chat' },
+        },
+      ],
+      transitions: [],
+      triggers: [{ type: 'manual', name: 'Start' }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.steps[0].agentId).toBe('tealflow-cowork-chat');
     }
   });
 

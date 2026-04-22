@@ -83,6 +83,11 @@ export const WorkflowStepSchema = z.object({
   executor: z.enum(['human', 'agent', 'script', 'cowork']),
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(),
   plugin: z.string().optional(),
+  /** References an AgentDefinition by its deterministic slug (doc id).
+   *  The referenced definition carries canonical MCP server bindings
+   *  and runtime identity. Step-level mcpRestrictions narrow further.
+   *  When unset, no MCP resolution runs for this step. */
+  agentId: z.string().optional(),
   allowedRoles: z.array(z.string()).optional(),
   agent: WorkflowAgentConfigSchema.optional(),
   review: WorkflowReviewConfigSchema.optional(),

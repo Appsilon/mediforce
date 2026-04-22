@@ -8,13 +8,21 @@ import {
 } from '@mediforce/platform-core';
 
 function toAgentDefinition(id: string, data: Record<string, unknown>): AgentDefinition {
+  // Legacy rows wrote this field as `pluginId`; new rows write `runtimeId`.
+  // Normalize on read so orphan rows with the old field still parse.
+  const runtimeId =
+    typeof data.runtimeId === 'string'
+      ? data.runtimeId
+      : typeof data.pluginId === 'string'
+        ? data.pluginId
+        : undefined;
   return AgentDefinitionSchema.parse({
     ...data,
     id,
+    runtimeId,
     inputDescription: data.inputDescription ?? '',
     outputDescription: data.outputDescription ?? '',
     skillFileNames: data.skillFileNames ?? [],
-    pluginId: typeof data.pluginId === 'string' ? data.pluginId : undefined,
     createdAt:
       data.createdAt instanceof Timestamp
         ? data.createdAt.toDate().toISOString()

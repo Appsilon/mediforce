@@ -21,6 +21,7 @@ import {
 function makeAgent(mcpServers?: AgentMcpBindingMap): AgentDefinition {
   return {
     id: 'agent-1',
+    kind: 'plugin',
     name: 'Test Agent',
     iconName: 'bot',
     description: '',
