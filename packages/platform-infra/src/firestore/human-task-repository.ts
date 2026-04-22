@@ -18,11 +18,11 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
   }
 
   async getByRole(role: string): Promise<HumanTask[]> {
-    // Requires composite index: (assignedRole ASC, status ASC, createdAt ASC)
+    // Requires composite index: (assignedRole ASC, createdAt ASC).
+    // No status filter — callers narrow explicitly if they need actionable-only.
     const snap = await this.db
       .collection(this.collectionName)
       .where('assignedRole', '==', role)
-      .where('status', 'in', ['pending', 'claimed'])
       .orderBy('createdAt', 'asc')
       .get();
     return snap.docs.map((d) => HumanTaskSchema.parse(d.data()));
