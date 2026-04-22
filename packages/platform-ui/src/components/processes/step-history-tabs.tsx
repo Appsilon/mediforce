@@ -3,9 +3,8 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { where } from 'firebase/firestore';
-import type { StepExecution, HumanTask } from '@mediforce/platform-core';
-import { useCollection } from '@/hooks/use-collection';
+import type { StepExecution } from '@mediforce/platform-core';
+import { useInstanceTasks } from '@/hooks/use-instance-tasks';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
@@ -19,22 +18,14 @@ function statusBadgeClass(status: string) {
 export function StepHistoryTabs({ steps, loading, processInstanceId }: { steps: StepExecution[]; loading: boolean; processInstanceId?: string }) {
   const handle = useHandleFromPath();
 
-  const taskConstraints = useMemo(
-    () =>
-      processInstanceId
-        ? [where('processInstanceId', '==', processInstanceId)]
-        : [],
-    [processInstanceId],
-  );
-  const { data: tasks } = useCollection<HumanTask>(
-    processInstanceId ? 'humanTasks' : '',
-    taskConstraints,
-  );
+  // Historical view — one-shot read through the typed apiClient is enough;
+  // the realtime equivalent (useCollection) is overkill here.
+  const { tasks } = useInstanceTasks(processInstanceId);
 
   const taskByStepId = useMemo(() => {
     const map = new Map<string, string>();
     for (const task of tasks) {
-      if (!task.deleted) {
+      if (task.deleted !== true) {
         map.set(task.stepId, task.id);
       }
     }
