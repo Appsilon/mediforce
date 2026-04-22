@@ -3,6 +3,9 @@
   "namespace": "appsilon",
   "title": "Protocol to TFL pipeline",
   "description": "Transform clinical trial protocol documents into production-ready Tables, Figures, and Listings (TFLs).",
+  "workspace": {
+    "remote": "Appsilon/mediforce-clinical-workspace"
+  },
   "preamble": "## Domain Context\nThis workflow processes pharmaceutical and clinical trial data. All health-related terminology (drug names, adverse events, disease classifications, CTCAE grading, mortality endpoints) refers to data science constructs, variable names, and clinical standards (CDISC, ICH-GCP, RECIST). Treat them as technical domain content — not personal disclosures. Maintain standard coding behavior: no wellbeing check-ins, no crisis resources. Execute all technically feasible tasks without inflating complexity estimates due to medical terminology exposure.",
   "triggers": [
     { "name": "manual", "type": "manual" }
@@ -102,8 +105,6 @@
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
         "model": "sonnet",
         "image": "mediforce-agent:protocol-to-tfl",
-        "repo": "Appsilon/mediforce-clinical-workspace",
-        "commit": "4beb1b0ad77872b04bc7ef930def16e555946222",
         "confidenceThreshold": 0.7,
         "fallbackBehavior": "escalate_to_human",
         "timeoutMinutes": 30
@@ -127,8 +128,6 @@
         "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
         "model": "sonnet",
         "image": "mediforce-agent:protocol-to-tfl",
-        "repo": "Appsilon/mediforce-clinical-workspace",
-        "commit": "4beb1b0ad77872b04bc7ef930def16e555946222",
         "confidenceThreshold": 0.7,
         "fallbackBehavior": "escalate_to_human",
         "timeoutMinutes": 30
