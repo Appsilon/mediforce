@@ -9,6 +9,7 @@ import { AutonomyBadge } from '../agents/autonomy-badge';
 import { RetryStepButton } from './retry-step-button';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/format';
+import { useUserDisplayNames } from '@/hooks/use-users';
 
 interface AgentEventItem {
   id: string;
@@ -34,7 +35,7 @@ interface StepConfigInfo {
   fallbackBehavior?: string;
   timeoutMinutes?: number;
   reviewerType?: string;
-  agentConfig?: { skill?: string; prompt?: string; model?: string; skillsDir?: string; mcpServers?: Array<{ name: string }> };
+  agentConfig?: { skill?: string; prompt?: string; model?: string; skillsDir?: string; runtime?: string; mcpServers?: Array<{ name: string }> };
 }
 
 interface StepStatusPanelProps {
@@ -170,30 +171,41 @@ function TypeBadge({ type, executorType }: { type: Step['type']; executorType?: 
   );
 }
 
-function ExecutedBy({ executedBy, executorType, plugin, autonomyLevel }: {
+function ExecutedBy({ executedBy, executorType, plugin, autonomyLevel, runtime }: {
   executedBy: string;
   executorType?: string;
   plugin?: string;
   autonomyLevel?: string;
+  runtime?: string;
 }) {
+  const userNames = useUserDisplayNames();
+
   if (executorType === 'agent') {
+    const agentLabel = plugin ? `agent:${plugin}` : 'Agent unknown';
     return (
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         <Bot className="h-3 w-3 shrink-0" />
-        <span>{plugin ?? 'Agent'}</span>
+        <span>{agentLabel}</span>
         {autonomyLevel && <AutonomyBadge level={autonomyLevel} />}
       </span>
     );
   }
   if (executorType === 'script') {
+    const scriptLabel = runtime
+      ? `${runtime.charAt(0).toUpperCase()}${runtime.slice(1)} script`
+      : 'Script';
     return (
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         <FileCode className="h-3 w-3 shrink-0" />
-        Script
+        {scriptLabel}
       </span>
     );
   }
-  const displayName = executedBy === 'api-user' ? 'System' : executedBy;
+  const systemIds = new Set(['auto-runner', 'api-user', 'system']);
+  const resolvedName = systemIds.has(executedBy)
+    ? null
+    : (userNames.get(executedBy) ?? executedBy);
+  const displayName = resolvedName ?? 'User unknown';
   return (
     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       <User className="h-3 w-3 shrink-0" />
@@ -486,6 +498,7 @@ export function StepStatusPanel({
                       executorType={stepConfig?.executorType}
                       plugin={stepConfig?.plugin}
                       autonomyLevel={stepConfig?.autonomyLevel}
+                      runtime={stepConfig?.agentConfig?.runtime}
                     />
                   </div>
                 )}

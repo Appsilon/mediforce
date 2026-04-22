@@ -112,9 +112,10 @@ export async function unclaimTask(
 export async function completeParamsTask(
   taskId: string,
   paramValues: Record<string, unknown>,
+  userId?: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const result = await resolveTask(taskId, { paramValues });
+    const result = await resolveTask(taskId, { paramValues }, userId);
     if (isResolveError(result)) {
       return { success: false, error: result.error };
     }
@@ -135,13 +136,14 @@ export async function completeTask(
   verdict: 'approve' | 'revise',
   comment: string,
   selectedIndex?: number,
+  userId?: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const body: Record<string, unknown> = { verdict, comment };
     if (selectedIndex !== undefined) {
       body.selectedIndex = selectedIndex;
     }
-    const result = await resolveTask(taskId, body);
+    const result = await resolveTask(taskId, body, userId);
     if (isResolveError(result)) {
       return { success: false, error: result.error };
     }
@@ -168,9 +170,10 @@ interface FileInfo {
 export async function completeUploadTask(
   taskId: string,
   files: FileInfo[],
+  userId?: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const result = await resolveTask(taskId, { attachments: files });
+    const result = await resolveTask(taskId, { attachments: files }, userId);
     if (isResolveError(result)) {
       return { success: false, error: result.error };
     }

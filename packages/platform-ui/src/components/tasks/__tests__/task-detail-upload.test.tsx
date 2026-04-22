@@ -217,6 +217,7 @@ describe('TaskDetail — file upload integration', () => {
     expect(mockCompleteUploadTask).toHaveBeenCalledWith(
       task.id,
       [expect.objectContaining({ name: 'protocol.pdf', downloadUrl: 'https://storage.example.com/file.pdf' })],
+      expect.any(String),
     );
   });
 

@@ -114,7 +114,7 @@ export function TaskDetail({
       }
 
       // Complete the task with file metadata
-      const result = await completeUploadTask(task.id, uploadedFiles);
+      const result = await completeUploadTask(task.id, uploadedFiles, currentUserId);
       if (result.success) {
         setUploadComplete(true);
       } else {
@@ -362,6 +362,7 @@ export function TaskDetail({
             taskId={task.id}
             options={task.options!}
             remainingTaskCount={remainingTaskCount}
+            userId={currentUserId}
           />
         )}
 
@@ -370,6 +371,7 @@ export function TaskDetail({
             taskId={task.id}
             params={task.params!}
             remainingTaskCount={remainingTaskCount}
+            userId={currentUserId}
           />
         )}
 
@@ -378,6 +380,7 @@ export function TaskDetail({
             taskId={task.id}
             disabled={false}
             remainingTaskCount={remainingTaskCount}
+            userId={currentUserId}
           />
         )}
 

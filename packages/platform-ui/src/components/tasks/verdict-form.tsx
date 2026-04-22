@@ -13,6 +13,7 @@ interface VerdictFormProps {
   disabled: boolean; // True when no content to review
   remainingTaskCount?: number;
   onCompleted?: () => void;
+  userId?: string;
 }
 
 interface SubmittedData {
@@ -32,6 +33,7 @@ export function VerdictForm({
   disabled,
   remainingTaskCount,
   onCompleted,
+  userId,
 }: VerdictFormProps) {
   const handle = useHandleFromPath();
   const [verdict, setVerdict] = React.useState<'approve' | 'revise' | null>(null);
@@ -48,7 +50,7 @@ export function VerdictForm({
     setSubmitting(true);
     setError(null);
 
-    const result = await completeTask(taskId, verdict, comment.trim());
+    const result = await completeTask(taskId, verdict, comment.trim(), undefined, userId);
 
     if (result.success) {
       const data: SubmittedData = {

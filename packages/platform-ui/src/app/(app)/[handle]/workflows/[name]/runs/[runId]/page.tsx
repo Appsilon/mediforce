@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useMemo } from 'react';
-import type { StepExecution, AuditEvent, Step } from '@mediforce/platform-core';
+import type { StepExecution, AuditEvent, Step, WorkflowStep } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useAuditEvents } from '@/hooks/use-audit-events';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
@@ -48,24 +48,55 @@ export default function RunDetailPage() {
   );
 
   const stepConfigMap = useMemo(() => {
-    if (!processConfig?.stepConfigs) return undefined;
-    return new Map(
-      processConfig.stepConfigs.map((sc) => [
-        sc.stepId,
-        {
-          executorType: sc.executorType,
-          autonomyLevel: sc.autonomyLevel,
-          plugin: sc.plugin,
-          model: sc.model,
-          confidenceThreshold: sc.confidenceThreshold,
-          fallbackBehavior: sc.fallbackBehavior,
-          timeoutMinutes: sc.timeoutMinutes,
-          reviewerType: sc.reviewerType,
-          agentConfig: sc.agentConfig,
-        },
-      ]),
-    );
-  }, [processConfig]);
+    // Legacy: config stored separately in processConfigs collection
+    if (processConfig?.stepConfigs) {
+      return new Map(
+        processConfig.stepConfigs.map((sc) => [
+          sc.stepId,
+          {
+            executorType: sc.executorType,
+            autonomyLevel: sc.autonomyLevel,
+            plugin: sc.plugin,
+            model: sc.model,
+            confidenceThreshold: sc.confidenceThreshold,
+            fallbackBehavior: sc.fallbackBehavior,
+            timeoutMinutes: sc.timeoutMinutes,
+            reviewerType: sc.reviewerType,
+            agentConfig: sc.agentConfig,
+          },
+        ]),
+      );
+    }
+
+    // New-style: step config is embedded directly in WorkflowStep definitions.
+    // definitionSteps is typed as Step[] but at runtime holds WorkflowStep objects
+    // for new-style workflow runs, so we cast to access the extra fields.
+    if (definitionSteps.length > 0) {
+      const entries = definitionSteps
+        .map((s) => {
+          const ws = s as unknown as WorkflowStep;
+          if (!ws.executor) return null;
+          return [
+            ws.id,
+            {
+              executorType: ws.executor,
+              autonomyLevel: ws.autonomyLevel,
+              plugin: ws.plugin,
+              model: ws.agent?.model,
+              confidenceThreshold: ws.agent?.confidenceThreshold,
+              fallbackBehavior: ws.agent?.fallbackBehavior,
+              timeoutMinutes: ws.agent?.timeoutMinutes ?? (ws.agent?.timeoutMs !== undefined ? ws.agent.timeoutMs / 60000 : undefined),
+              reviewerType: ws.review?.type,
+              agentConfig: ws.agent,
+            },
+          ] as const;
+        })
+        .filter((e): e is NonNullable<typeof e> => e !== null);
+      if (entries.length > 0) return new Map(entries);
+    }
+
+    return undefined;
+  }, [processConfig, definitionSteps]);
 
 
   if (instanceLoading) {

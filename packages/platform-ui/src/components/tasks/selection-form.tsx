@@ -13,6 +13,7 @@ interface SelectionFormProps {
   options: Record<string, unknown>[];
   remainingTaskCount?: number;
   onCompleted?: () => void;
+  userId?: string;
 }
 
 interface SubmittedData {
@@ -28,6 +29,7 @@ export function SelectionForm({
   options,
   remainingTaskCount,
   onCompleted,
+  userId,
 }: SelectionFormProps) {
   const handle = useHandleFromPath();
   const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
@@ -42,7 +44,7 @@ export function SelectionForm({
     setSubmitting(true);
     setError(null);
 
-    const result = await completeTask(taskId, 'approve', '', selectedIndex);
+    const result = await completeTask(taskId, 'approve', '', selectedIndex, userId);
 
     if (result.success) {
       const selected = options[selectedIndex];
@@ -65,7 +67,7 @@ export function SelectionForm({
     setSubmitting(true);
     setError(null);
 
-    const result = await completeTask(taskId, 'revise', comment.trim());
+    const result = await completeTask(taskId, 'revise', comment.trim(), undefined, userId);
 
     if (result.success) {
       setSubmitted({

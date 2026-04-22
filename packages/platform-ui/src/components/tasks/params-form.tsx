@@ -14,6 +14,7 @@ interface ParamsFormProps {
   params: StepParam[];
   remainingTaskCount?: number;
   onCompleted?: () => void;
+  userId?: string;
 }
 
 interface SubmittedValues {
@@ -26,6 +27,7 @@ export function ParamsForm({
   params,
   remainingTaskCount,
   onCompleted,
+  userId,
 }: ParamsFormProps) {
   const handle = useHandleFromPath();
   const [values, setValues] = React.useState<Record<string, unknown>>(() => {
@@ -71,7 +73,7 @@ export function ParamsForm({
       }
     }
 
-    const result = await completeParamsTask(taskId, coerced);
+    const result = await completeParamsTask(taskId, coerced, userId);
 
     if (result.success) {
       setSubmitted({ values: coerced, timestamp: new Date().toISOString() });
