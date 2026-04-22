@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2 } from 'lucide-react';
+import { FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2, Clock } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 
@@ -408,6 +408,39 @@ function allSectionsFinished(sections: AgentLogSection[]): boolean {
   return sections.every((s) => s.entries.some((e) => classifyEntry(e) === 'result'));
 }
 
+/** True when no more output is expected from this section. */
+function isSectionTerminal(section: AgentLogSection): boolean {
+  if (section.entries.some((e) => classifyEntry(e) === 'result')) return true;
+  if (section.error !== null) return true;
+  return false;
+}
+
+const THINKING_TEXT = 'Thinking...';
+
+function ThinkingIndicator() {
+  const [charCount, setCharCount] = React.useState(0);
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setCharCount((prev) => (prev >= THINKING_TEXT.length ? 0 : prev + 1));
+    }, 120);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 py-2 mt-1">
+      <Clock className="h-3.5 w-3.5 text-primary animate-spin shrink-0" />
+      {/* Use visibility:hidden (not display:none) at char 0 so layout height stays constant — prevents scrollbar jump. */}
+      <span
+        className={cn('text-xs font-bold text-primary', charCount === 0 && 'invisible')}
+        style={{ minWidth: '5.5rem' }}
+      >
+        {THINKING_TEXT.slice(0, Math.max(charCount, 1))}
+      </span>
+    </div>
+  );
+}
+
 export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps) {
   const [sections, setSections] = React.useState<AgentLogSection[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -575,6 +608,11 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
           {/* Multiple agents — show active tab */}
           {hasTabs && activeSection && (
             <AgentTabContent section={activeSection} />
+          )}
+
+          {/* Thinking indicator — only when agent is genuinely still running */}
+          {pollingActive && activeSection && !isSectionTerminal(activeSection) && (
+            <ThinkingIndicator />
           )}
         </div>
       </div>
