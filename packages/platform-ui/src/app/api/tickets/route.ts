@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAdminAuth } from '@mediforce/platform-infra';
+import { consumeRateLimit, DAILY_LIMIT } from './rate-limit';
 
 const TICKET_TYPES = ['bug', 'idea', 'question'] as const;
 type TicketType = (typeof TICKET_TYPES)[number];
@@ -20,36 +21,6 @@ const TicketBodySchema = z.object({
     .max(10)
     .default([]),
 });
-
-const DAILY_LIMIT = 50;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-type RateLimitBucket = { count: number; windowStart: number };
-
-// Per-instance in-memory limiter. On multi-instance deployments the effective
-// cap is DAILY_LIMIT × instances — acceptable for an anti-spam ceiling; move to
-// Firestore if stricter enforcement becomes necessary.
-const rateLimitBuckets = new Map<string, RateLimitBucket>();
-
-export function __resetRateLimitsForTests(): void {
-  rateLimitBuckets.clear();
-}
-
-type RateLimitResult = { ok: true } | { ok: false; retryAfterSeconds: number };
-
-function consumeRateLimit(uid: string, now: number): RateLimitResult {
-  const bucket = rateLimitBuckets.get(uid);
-  if (bucket === undefined || now - bucket.windowStart >= DAY_MS) {
-    rateLimitBuckets.set(uid, { count: 1, windowStart: now });
-    return { ok: true };
-  }
-  if (bucket.count >= DAILY_LIMIT) {
-    const retryAfterSeconds = Math.ceil((bucket.windowStart + DAY_MS - now) / 1000);
-    return { ok: false, retryAfterSeconds: Math.max(retryAfterSeconds, 1) };
-  }
-  bucket.count += 1;
-  return { ok: true };
-}
 
 function buildIssueBody(params: {
   description: string;

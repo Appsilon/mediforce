@@ -10,7 +10,8 @@ vi.mock('@mediforce/platform-infra', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-import { POST, __resetRateLimitsForTests } from '../route';
+import { POST } from '../route';
+import { __resetRateLimitsForTests } from '../rate-limit';
 
 function makePostRequest(body: unknown, headers: Record<string, string> = {}): NextRequest {
   return new Request('http://localhost/api/tickets', {
