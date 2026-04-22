@@ -61,6 +61,7 @@ function makeRequest(body?: unknown): NextRequest {
 const workflowDefinition = {
   name: 'community-digest',
   version: 1,
+  namespace: 'test',
   steps: [
     { id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
     { id: 'human-review', name: 'Human Review', type: 'creation', executor: 'human', allowedRoles: ['reviewer'] },

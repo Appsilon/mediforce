@@ -103,7 +103,11 @@ export const WorkflowStepSchema = z.object({
 export const WorkflowDefinitionSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
-  namespace: z.string().optional(),
+  /** Workspace namespace that owns this definition. Required because
+   *  MCP resolution, workflow secret lookups, and the namespace-scoped
+   *  tool catalog all key off this field — a workflow without one is
+   *  not a runnable workflow. */
+  namespace: z.string().min(1),
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   preamble: z.string().optional(),

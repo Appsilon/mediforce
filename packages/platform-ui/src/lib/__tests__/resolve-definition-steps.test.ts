@@ -13,6 +13,7 @@ const makeLegacy = (version: string, stepIds: string[]) => ({
 const makeWorkflow = (version: number, stepIds: string[]): WorkflowDefinition => ({
   name: 'test',
   version,
+  namespace: 'test',
   steps: stepIds.map(workflowStep),
   transitions: [],
   triggers: [{ type: 'manual', name: 'start' }],

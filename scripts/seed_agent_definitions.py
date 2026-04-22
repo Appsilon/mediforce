@@ -10,6 +10,9 @@ Dev-only: targets the Firestore emulator via its REST API (no auth).
 For non-emulator environments, rely on platform-ui's startup seed
 (seedBuiltinAgentDefinitions in platform-services.ts).
 
+Source data: data/seeds/agent-definitions.json (shared with the TS seed
+in packages/platform-ui/src/lib/seed-agent-definitions.ts).
+
 Usage:
     FIRESTORE_EMULATOR_HOST=localhost:8080 \\
     python3 scripts/seed_agent_definitions.py
@@ -24,113 +27,20 @@ import json
 import os
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 DEFAULT_PROJECT_ID = "demo-mediforce"
 
-# Keep these entries in sync with
-# packages/platform-ui/src/lib/seed-agent-definitions.ts.
-# The TS seed is authoritative for non-emulator environments; this
-# script primes the emulator so a fresh dev box can be readied before
-# platform-ui starts.
-AGENT_DEFINITIONS: dict[str, dict[str, Any]] = {
-    "claude-code-agent": {
-        "kind": "plugin",
-        "runtimeId": "claude-code-agent",
-        "name": "Claude Code Agent",
-        "iconName": "Bot",
-        "description": (
-            "Executes code generation, analysis, and automated software "
-            "tasks using Claude's advanced coding capabilities."
-        ),
-        "inputDescription": "Task description and relevant code context",
-        "outputDescription": "Generated code, analysis results, or task completion report",
-        "foundationModel": "anthropic/claude-sonnet-4",
-        "systemPrompt": "",
-        "skillFileNames": [],
-    },
-    "opencode-agent": {
-        "kind": "plugin",
-        "runtimeId": "opencode-agent",
-        "name": "OpenCode Agent",
-        "iconName": "Cpu",
-        "description": (
-            "Open-source code execution agent powered by DeepSeek for "
-            "cost-efficient automated development tasks."
-        ),
-        "inputDescription": "Code task description and project context",
-        "outputDescription": "Implemented code changes and execution results",
-        "foundationModel": "deepseek/deepseek-chat",
-        "systemPrompt": "",
-        "skillFileNames": [],
-    },
-    "script-container": {
-        "kind": "plugin",
-        "runtimeId": "script-container",
-        "name": "Script Container",
-        "iconName": "Terminal",
-        "description": (
-            "Sandboxed execution environment for running custom scripts, "
-            "data transformations, and automation tasks."
-        ),
-        "inputDescription": "Script definition and input parameters",
-        "outputDescription": "Script execution output and exit status",
-        "foundationModel": "anthropic/claude-sonnet-4",
-        "systemPrompt": "",
-        "skillFileNames": [],
-    },
-    "supply-intelligence-driver-agent": {
-        "kind": "plugin",
-        "runtimeId": "supply-intelligence/driver-agent",
-        "name": "Driver Agent",
-        "iconName": "Chart",
-        "description": (
-            "Orchestrates multi-step supply chain review workflows by "
-            "coordinating data collection, analysis, and reporting agents."
-        ),
-        "inputDescription": "Workflow trigger payload with study identifiers",
-        "outputDescription": "Completed workflow result with step summaries",
-        "foundationModel": "anthropic/claude-sonnet-4",
-        "systemPrompt": "",
-        "skillFileNames": [],
-    },
-    "supply-intelligence-risk-detection": {
-        "kind": "plugin",
-        "runtimeId": "supply-intelligence/risk-detection",
-        "name": "Risk Detection",
-        "iconName": "Chart",
-        "description": (
-            "Analyzes vendor submissions and supply chain data to identify "
-            "potential risks, anomalies, and compliance issues."
-        ),
-        "inputDescription": "Vendor submission records and historical data",
-        "outputDescription": "Risk scores, flagged issues, and recommendations",
-        "foundationModel": "anthropic/claude-sonnet-4",
-        "systemPrompt": "",
-        "skillFileNames": [],
-    },
-    # Per-workflow AgentDefinition referenced by tealflow-cowork.wd.json.
-    "tealflow-cowork-chat": {
-        "kind": "cowork",
-        "runtimeId": "chat",
-        "name": "Tealflow Cowork Chat",
-        "iconName": "MessageCircle",
-        "description": (
-            "Chat cowork agent with the tealflow MCP server attached for "
-            "teal module exploration."
-        ),
-        "inputDescription": "User messages and artifact state",
-        "outputDescription": "Teal module selection artifact",
-        "foundationModel": "anthropic/claude-sonnet-4",
-        "systemPrompt": "",
-        "skillFileNames": [],
-        "mcpServers": {
-            "tealflow": {"type": "stdio", "catalogId": "tealflow-mcp"},
-        },
-    },
-}
+REPO_ROOT = Path(__file__).parent.parent
+SEED_PATH = REPO_ROOT / "data" / "seeds" / "agent-definitions.json"
+
+
+def _load_agent_definitions() -> dict[str, dict[str, Any]]:
+    with SEED_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def _typed_value(value: Any) -> dict[str, Any]:
@@ -197,10 +107,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    for doc_id, entry in AGENT_DEFINITIONS.items():
+    agent_definitions = _load_agent_definitions()
+    for doc_id, entry in agent_definitions.items():
         _upsert(args.emulator_host, args.project_id, doc_id, entry)
         print(f"Upserted agentDefinitions/{doc_id}")
-    print(f"Done: {len(AGENT_DEFINITIONS)} agent definitions seeded.")
+    print(f"Done: {len(agent_definitions)} agent definitions seeded.")
     return 0
 
 

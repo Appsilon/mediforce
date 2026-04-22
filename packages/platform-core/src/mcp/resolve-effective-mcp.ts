@@ -44,16 +44,36 @@ export class UnknownRestrictionTargetError extends Error {
   }
 }
 
+/** Raised when a step applies `denyTools` to a server whose agent-level
+ *  binding does not carry an explicit `allowedTools`. Such state has no
+ *  serializable representation in either `mcp-config.json` or
+ *  `McpServerConfig` — there's no way to express "all tools minus X" at
+ *  the downstream layer, so the deny list would be silently dropped at
+ *  spawn time, creating an authorization gap. Authors must either add
+ *  `allowedTools` to the binding (so the subtraction can materialize)
+ *  or replace `denyTools` with `disable: true`. */
+export class DenyToolsWithoutAllowedToolsError extends Error {
+  public readonly serverName: string;
+  public readonly denyTools: readonly string[];
+
+  constructor(serverName: string, denyTools: readonly string[]) {
+    super(
+      `Step mcpRestrictions.${serverName}.denyTools is set (${denyTools.join(', ')}), ` +
+      `but the agent's binding for "${serverName}" has no allowedTools to subtract from. ` +
+      `Add allowedTools to the binding (so the deny list can be applied) or use disable: true.`,
+    );
+    this.name = 'DenyToolsWithoutAllowedToolsError';
+    this.serverName = serverName;
+    this.denyTools = denyTools;
+  }
+}
+
 type ResolvedMcpServerShared = {
   /** Explicit allowlist after applying step-level denyTools subtraction.
-   *  undefined means "all tools from the server" (deniedTools may still
-   *  apply a second-stage filter). Never an empty array — servers whose
-   *  allowlist was emptied by denyTools are dropped from the result. */
+   *  undefined means "all tools from the server". Never an empty array —
+   *  servers whose allowlist was emptied by denyTools are dropped from
+   *  the result. */
   allowedTools?: string[];
-  /** Tools denied at step level when binding did not carry an explicit
-   *  allowlist to subtract from. Runtime layer should apply this as a
-   *  subtractive filter after discovering the server's full tool set. */
-  deniedTools?: string[];
 };
 
 export type ResolvedStdioMcpServer = ResolvedMcpServerShared & {
@@ -82,17 +102,11 @@ export type ResolvedMcpConfig = {
  *  servers (disable) or tools (denyTools). Step 2 will feed this result
  *  into writeMcpConfig() at agent spawn time.
  *
- *  Two-phase subtractive model for denyTools:
- *    - If the binding has an explicit allowedTools, denyTools is applied
- *      immediately (set-difference) and the result surfaces as
- *      ResolvedMcpServer.allowedTools. If that difference is empty, the
- *      server is dropped from the output entirely (no point spawning a
- *      subprocess that exposes zero tools).
- *    - If the binding has no allowedTools (meaning "all tools from
- *      server"), the resolver cannot materialize an explicit allowlist
- *      without knowing the server's full tool set. It forwards the deny
- *      list as ResolvedMcpServer.deniedTools; the runtime layer applies
- *      the second-stage filter after tool discovery. */
+ *  denyTools is only meaningful when the agent's binding already carries
+ *  an explicit allowedTools (otherwise the subtraction has no materialized
+ *  list to operate on and would silently lose the deny list at the
+ *  downstream writer). Attempts to use denyTools without binding
+ *  allowedTools throw DenyToolsWithoutAllowedToolsError. */
 export function resolveEffectiveMcp(
   agent: AgentDefinition,
   step: WorkflowStep,
@@ -110,12 +124,26 @@ export function resolveEffectiveMcp(
     }
   }
 
+  // Surface denyTools-without-allowedTools early, before any catalog
+  // lookup: the resolver cannot materialize an explicit allowlist for
+  // such bindings, so letting it through would silently drop the deny
+  // list at serialization time.
+  for (const [name, restriction] of Object.entries(restrictions)) {
+    if (restriction?.disable === true) continue;
+    const denyTools = restriction?.denyTools;
+    if (denyTools === undefined || denyTools.length === 0) continue;
+    const binding = mcpServers[name];
+    if (binding !== undefined && binding.allowedTools === undefined) {
+      throw new DenyToolsWithoutAllowedToolsError(name, denyTools);
+    }
+  }
+
   for (const [name, binding] of Object.entries(mcpServers)) {
     const restriction = restrictions[name];
     if (restriction?.disable === true) continue;
 
     const resolved = resolveBinding(name, binding, catalog);
-    applyDenyTools(resolved, binding, restriction?.denyTools);
+    applyDenyTools(resolved, restriction?.denyTools);
 
     if (resolved.allowedTools !== undefined && resolved.allowedTools.length === 0) {
       continue;
@@ -154,20 +182,17 @@ function resolveBinding(
   };
 }
 
+/** Apply a step-level denyTools subtraction to a resolved server. Safe
+ *  by the time we reach here — resolveEffectiveMcp has already rejected
+ *  bindings that lack allowedTools, so every call here has a materialized
+ *  allowlist to filter. */
 function applyDenyTools(
   resolved: ResolvedMcpServer,
-  binding: AgentMcpBinding,
   denyTools: readonly string[] | undefined,
 ): void {
   if (denyTools === undefined || denyTools.length === 0) return;
-
-  if (binding.allowedTools !== undefined) {
-    const denySet = new Set(denyTools);
-    resolved.allowedTools = (resolved.allowedTools ?? []).filter(
-      tool => denySet.has(tool) === false,
-    );
-    return;
-  }
-
-  resolved.deniedTools = [...denyTools];
+  const denySet = new Set(denyTools);
+  resolved.allowedTools = (resolved.allowedTools ?? []).filter(
+    tool => denySet.has(tool) === false,
+  );
 }

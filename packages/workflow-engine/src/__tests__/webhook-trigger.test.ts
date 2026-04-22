@@ -16,6 +16,7 @@ import type { WorkflowTriggerContext } from '../index.js';
 const webhookDef: WorkflowDefinition = {
   name: 'webhook-process',
   version: 1,
+  namespace: 'test',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'process', name: 'Process', type: 'creation', executor: 'human' },

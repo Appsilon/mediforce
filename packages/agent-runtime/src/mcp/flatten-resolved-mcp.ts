@@ -5,11 +5,6 @@ import type { McpServerConfig, ResolvedMcpConfig } from '@mediforce/platform-cor
  *  still expect. The server name, which is the map key in the resolved
  *  config, becomes the `name` field.
  *
- *  The resolver's `deniedTools` field (2nd-stage post-discovery filter)
- *  has no representation in McpServerConfig and is dropped here. That's
- *  accepted scope for Step 2 — cowork workflows today don't use
- *  denyTools without an explicit allowedTools to subtract from.
- *
  *  Returns an empty array when the resolved config has no servers. */
 export function flattenResolvedMcpToLegacy(
   resolved: ResolvedMcpConfig,

@@ -85,20 +85,19 @@ export async function executeAgentStep(
   });
 
   // Pre-fetch workflow secrets for {{TEMPLATE}} resolution
-  const workflowSecrets = workflowDefinition.namespace
-    ? await getWorkflowSecretsForRuntime(workflowDefinition.namespace, workflowDefinition.name)
-    : {};
+  const workflowSecrets = await getWorkflowSecretsForRuntime(
+    workflowDefinition.namespace,
+    workflowDefinition.name,
+  );
 
   // Pre-resolve MCP configuration from the agent definition + step restrictions
   // + tool catalog. undefined when step.agentId is unset. Namespace-scoped
   // catalog lookups use the workflow's namespace.
-  const resolvedMcpConfig = workflowDefinition.namespace
-    ? (await resolveMcpForStep(workflowStep, {
-        agentDefinitionRepo,
-        toolCatalogRepo,
-        namespace: workflowDefinition.namespace,
-      })) ?? undefined
-    : undefined;
+  const resolvedMcpConfig = (await resolveMcpForStep(workflowStep, {
+    agentDefinitionRepo,
+    toolCatalogRepo,
+    namespace: workflowDefinition.namespace,
+  })) ?? undefined;
 
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,

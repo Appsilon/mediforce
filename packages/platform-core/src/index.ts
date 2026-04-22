@@ -206,6 +206,7 @@ export {
   resolveEffectiveMcp,
   CatalogEntryNotFoundError,
   UnknownRestrictionTargetError,
+  DenyToolsWithoutAllowedToolsError,
   type ResolvedMcpConfig,
   type ResolvedMcpServer,
   type ResolvedStdioMcpServer,

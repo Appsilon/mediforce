@@ -9,6 +9,9 @@ Dev-only: targets the Firestore emulator via its REST API (no auth).
 For non-emulator environments, wait for platform-ui startup — it
 auto-seeds via seedBuiltinToolCatalog in platform-services.ts.
 
+Source data: data/seeds/tool-catalog.json (shared with the TS seed in
+packages/platform-ui/src/lib/seed-tool-catalog.ts).
+
 Usage:
     # With emulators running (firebase emulators:start)
     FIRESTORE_EMULATOR_HOST=localhost:8080 \\
@@ -24,28 +27,20 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 DEFAULT_PROJECT_ID = "demo-mediforce"
 
-# Each entry mirrors ToolCatalogEntry and is keyed by the namespace it
-# belongs to. Keep this in sync with
-# packages/platform-ui/src/lib/seed-tool-catalog.ts (single source of
-# truth per Step 2 — duplication reviewed via PR).
-CATALOG: dict[str, list[dict[str, Any]]] = {
-    "appsilon": [
-        {
-            "id": "tealflow-mcp",
-            "command": "tealflow-mcp",
-            "description": (
-                "Tealflow MCP — lists and describes available teal modules "
-                "for clinical trial data exploration."
-            ),
-        },
-    ],
-}
+REPO_ROOT = Path(__file__).parent.parent
+SEED_PATH = REPO_ROOT / "data" / "seeds" / "tool-catalog.json"
+
+
+def _load_catalog() -> dict[str, list[dict[str, Any]]]:
+    with SEED_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def _typed_value(value: Any) -> dict[str, Any]:
@@ -107,8 +102,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    catalog = _load_catalog()
     total = 0
-    for namespace, entries in CATALOG.items():
+    for namespace, entries in catalog.items():
         for entry in entries:
             _upsert(args.emulator_host, args.project_id, namespace, entry)
             print(f"Upserted namespaces/{namespace}/toolCatalog/{entry['id']}")

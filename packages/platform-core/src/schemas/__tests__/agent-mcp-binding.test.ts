@@ -365,6 +365,7 @@ describe('WorkflowDefinitionSchema with step.mcpRestrictions', () => {
     const result = WorkflowDefinitionSchema.safeParse({
       name: 'test-workflow',
       version: 1,
+      namespace: 'test',
       steps: [
         {
           id: 'extract',
@@ -392,6 +393,7 @@ describe('WorkflowDefinitionSchema with step.mcpRestrictions', () => {
     const result = WorkflowDefinitionSchema.safeParse({
       name: 'test-workflow',
       version: 1,
+      namespace: 'test',
       steps: [
         {
           id: 'explore',
@@ -415,6 +417,7 @@ describe('WorkflowDefinitionSchema with step.mcpRestrictions', () => {
     const result = WorkflowDefinitionSchema.safeParse({
       name: 'legacy-workflow',
       version: 1,
+      namespace: 'test',
       steps: [
         {
           id: 'extract',

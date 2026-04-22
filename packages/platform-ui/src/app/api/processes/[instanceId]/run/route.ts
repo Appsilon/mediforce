@@ -58,10 +58,10 @@ export async function POST(
 
     // Pre-flight: validate all env templates are resolvable before executing anything
     {
-      const namespace = workflowDefinition.namespace ?? '';
-      const secrets = namespace
-        ? await getWorkflowSecretsForRuntime(namespace, workflowDefinition.name)
-        : {};
+      const secrets = await getWorkflowSecretsForRuntime(
+        workflowDefinition.namespace,
+        workflowDefinition.name,
+      );
       const missingEnv = validateWorkflowEnv(workflowDefinition, secrets);
       if (missingEnv.length > 0) {
         const names = missingEnv.map((m) => m.secretName);
@@ -179,13 +179,11 @@ export async function POST(
           // Resolve MCP config for the step if it points at an AgentDefinition.
           // Falls back to legacy inline cowork.mcpServers when agentId is unset
           // (workflows not yet migrated).
-          const resolvedMcp = workflowDefinition.namespace
-            ? await resolveMcpForStep(currentStep, {
-                agentDefinitionRepo,
-                toolCatalogRepo,
-                namespace: workflowDefinition.namespace,
-              })
-            : null;
+          const resolvedMcp = await resolveMcpForStep(currentStep, {
+            agentDefinitionRepo,
+            toolCatalogRepo,
+            namespace: workflowDefinition.namespace,
+          });
           const sessionMcpServers = resolvedMcp !== null
             ? flattenResolvedMcpToLegacy(resolvedMcp)
             : (currentStep.cowork?.mcpServers ?? null);

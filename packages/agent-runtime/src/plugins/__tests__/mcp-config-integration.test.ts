@@ -57,6 +57,7 @@ function buildMockWorkflowAgentContext(
   const workflowDefinition: WorkflowDefinition = {
     name: 'test-workflow',
     version: 1,
+    namespace: 'test',
     steps: [step],
     transitions: [],
     triggers: [{ type: 'manual', name: 'start' }],

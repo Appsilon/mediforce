@@ -1,0 +1,9 @@
+{
+  "appsilon": [
+    {
+      "id": "tealflow-mcp",
+      "command": "tealflow-mcp",
+      "description": "Tealflow MCP — lists and describes available teal modules for clinical trial data exploration."
+    }
+  ]
+}
