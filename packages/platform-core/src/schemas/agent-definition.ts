@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AgentMcpBindingMapSchema } from './agent-mcp-binding.js';
 
 export const AgentDefinitionSchema = z.object({
   id: z.string(),
@@ -11,6 +12,10 @@ export const AgentDefinitionSchema = z.object({
   outputDescription: z.string(),
   skillFileNames: z.array(z.string()),
   pluginId: z.string().optional(),
+  /** Canonical MCP server configuration for this agent. Map of server
+   *  name → AgentMcpBinding. Step-level restrictions can only narrow
+   *  (disable servers or deny tools) — they cannot broaden. */
+  mcpServers: AgentMcpBindingMapSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

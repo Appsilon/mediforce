@@ -112,6 +112,25 @@ export {
 } from './mcp-server-config.js';
 
 export {
+  AgentMcpBindingSchema,
+  AgentMcpBindingMapSchema,
+  StdioAgentMcpBindingSchema,
+  HttpAgentMcpBindingSchema,
+  HttpAuthConfigSchema,
+  StepMcpRestrictionSchema,
+  StepMcpRestrictionEntrySchema,
+  ToolCatalogEntrySchema,
+  type AgentMcpBinding,
+  type AgentMcpBindingMap,
+  type StdioAgentMcpBinding,
+  type HttpAgentMcpBinding,
+  type HttpAuthConfig,
+  type StepMcpRestriction,
+  type StepMcpRestrictionEntry,
+  type ToolCatalogEntry,
+} from './agent-mcp-binding.js';
+
+export {
   WorkflowAgentConfigSchema,
   WorkflowCoworkConfigSchema,
   WorkflowReviewConfigSchema,

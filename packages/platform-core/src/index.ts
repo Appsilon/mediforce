@@ -54,6 +54,14 @@ export {
   WorkflowSecretsSchema,
   CronTriggerStateSchema,
   McpServerConfigSchema,
+  AgentMcpBindingSchema,
+  AgentMcpBindingMapSchema,
+  StdioAgentMcpBindingSchema,
+  HttpAgentMcpBindingSchema,
+  HttpAuthConfigSchema,
+  StepMcpRestrictionSchema,
+  StepMcpRestrictionEntrySchema,
+  ToolCatalogEntrySchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -114,6 +122,14 @@ export type {
   WorkflowSecrets,
   CronTriggerState,
   McpServerConfig,
+  AgentMcpBinding,
+  AgentMcpBindingMap,
+  StdioAgentMcpBinding,
+  HttpAgentMcpBinding,
+  HttpAuthConfig,
+  StepMcpRestriction,
+  StepMcpRestrictionEntry,
+  ToolCatalogEntry,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)
