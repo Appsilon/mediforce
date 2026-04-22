@@ -27,6 +27,15 @@ export const ProcessInstanceSchema = z.object({
   error: z.string().nullable(),
   assignedRoles: z.array(z.string()).default([]),
   deleted: z.boolean().optional(),
+  /**
+   * Snapshot of outputs carried over from the last successfully completed
+   * run of the same workflow name, per the WD's `inputForNextRun` declarations.
+   * Empty object when the WD declares carry-over but no predecessor qualifies.
+   * Undefined when the WD does not declare any.
+   */
+  previousRun: z.record(z.string(), z.unknown()).optional(),
+  /** ID of the ProcessInstance whose outputs populated `previousRun`. */
+  previousRunSourceId: z.string().optional(),
 });
 
 export type InstanceStatus = z.infer<typeof InstanceStatusSchema>;

@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
+import {
+  WorkflowDefinitionBaseSchema,
+  validateInputForNextRun,
+} from '@mediforce/platform-core';
 import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
 import { getPlatformServices } from '@/lib/platform-services';
 
@@ -52,10 +55,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'JSON body is required' }, { status: 400 });
   }
 
-  const parsed = WorkflowDefinitionSchema.omit({ version: true, createdAt: true }).safeParse({
-    ...body,
-    namespace,
-  });
+  const parsed = WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true })
+    .superRefine(validateInputForNextRun)
+    .safeParse({
+      ...body,
+      namespace,
+    });
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Validation failed', issues: parsed.error.issues },

@@ -100,7 +100,60 @@ export const WorkflowStepSchema = z.object({
   mcpRestrictions: StepMcpRestrictionSchema.optional(),
 });
 
-export const WorkflowDefinitionSchema = z.object({
+/**
+ * Declares which step outputs of the current run are exposed to the next run
+ * under ProcessInstance.previousRun. Each entry reads: from step `stepId`,
+ * take output key `output`, expose it as `as` on the next run.
+ */
+export const InputForNextRunEntrySchema = z.object({
+  stepId: z.string().min(1),
+  output: z.string().min(1),
+  as: z.string().min(1),
+});
+
+/**
+ * Cross-field validation for `inputForNextRun`:
+ *   - every stepId must match an existing step
+ *   - every `as` must be unique within the block
+ *
+ * Applied via superRefine on the top-level schema (and also exported so that
+ * callers using `.omit()` or `.partial()` on the base object can re-apply it).
+ */
+function validateInputForNextRun(
+  wd: {
+    steps: Array<{ id: string }>;
+    inputForNextRun?: Array<{ stepId: string; as: string }>;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (!wd.inputForNextRun) return;
+  const stepIds = new Set(wd.steps.map((s) => s.id));
+  const seenAs = new Set<string>();
+  wd.inputForNextRun.forEach((entry, i) => {
+    if (!stepIds.has(entry.stepId)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['inputForNextRun', i, 'stepId'],
+        message: `inputForNextRun[${i}].stepId '${entry.stepId}' does not match any step id`,
+      });
+    }
+    if (seenAs.has(entry.as)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['inputForNextRun', i, 'as'],
+        message: `inputForNextRun[${i}].as '${entry.as}' is duplicated (must be unique within inputForNextRun)`,
+      });
+    }
+    seenAs.add(entry.as);
+  });
+}
+
+/**
+ * Base WorkflowDefinition schema (no cross-field refinements). Exposed so
+ * callers can `.omit()` / `.partial()` and then re-apply validation via
+ * `.superRefine(validateInputForNextRun)`.
+ */
+export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
   /** Workspace namespace that owns this definition. Required because
@@ -123,10 +176,17 @@ export const WorkflowDefinitionSchema = z.object({
   archived: z.boolean().optional(),
   deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
+  inputForNextRun: z.array(InputForNextRunEntrySchema).optional(),
 });
+
+export const WorkflowDefinitionSchema =
+  WorkflowDefinitionBaseSchema.superRefine(validateInputForNextRun);
+
+export { validateInputForNextRun };
 
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
 export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;
 export type WorkflowReviewConfig = z.infer<typeof WorkflowReviewConfigSchema>;
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
+export type InputForNextRunEntry = z.infer<typeof InputForNextRunEntrySchema>;

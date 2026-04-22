@@ -2,7 +2,11 @@
 
 import { stringify as yamlStringify, parse as parseYaml } from 'yaml';
 import { getPlatformServices } from '@/lib/platform-services';
-import { parseProcessDefinition, WorkflowDefinitionSchema } from '@mediforce/platform-core';
+import {
+  parseProcessDefinition,
+  WorkflowDefinitionBaseSchema,
+  validateInputForNextRun,
+} from '@mediforce/platform-core';
 import type { ProcessDefinition, ProcessConfig, WorkflowDefinition } from '@mediforce/platform-core';
 import { DefinitionVersionAlreadyExistsError, WorkflowDefinitionVersionAlreadyExistsError, getAdminFirestore } from '@mediforce/platform-infra';
 
@@ -104,7 +108,10 @@ export type SaveWorkflowDefinitionResult =
 export async function saveWorkflowDefinition(
   input: unknown,
 ): Promise<SaveWorkflowDefinitionResult> {
-  const parsed = WorkflowDefinitionSchema.omit({ version: true, createdAt: true }).safeParse(input);
+  const parsed = WorkflowDefinitionBaseSchema
+    .omit({ version: true, createdAt: true })
+    .superRefine(validateInputForNextRun)
+    .safeParse(input);
   if (!parsed.success) {
     return {
       success: false,

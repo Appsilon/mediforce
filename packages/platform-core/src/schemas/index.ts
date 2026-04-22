@@ -136,11 +136,15 @@ export {
   WorkflowReviewConfigSchema,
   WorkflowStepSchema,
   WorkflowDefinitionSchema,
+  WorkflowDefinitionBaseSchema,
+  InputForNextRunEntrySchema,
+  validateInputForNextRun,
   type WorkflowAgentConfig,
   type WorkflowCoworkConfig,
   type WorkflowReviewConfig,
   type WorkflowStep,
   type WorkflowDefinition,
+  type InputForNextRunEntry,
 } from './workflow-definition.js';
 
 export {
