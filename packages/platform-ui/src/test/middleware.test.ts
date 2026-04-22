@@ -7,6 +7,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { middleware } from '../middleware';
 
+const EMULATOR_ISS = 'https://securetoken.google.com/demo-mediforce';
+const EMULATOR_AUD = 'demo-mediforce';
+
+function base64urlEncode(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function buildEmulatorToken(payload: Record<string, unknown>): string {
+  const header = base64urlEncode(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+  const body = base64urlEncode(JSON.stringify(payload));
+  return `${header}.${body}.`;
+}
+
+function validEmulatorPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    iss: EMULATOR_ISS,
+    aud: EMULATOR_AUD,
+    sub: 'test-user-uid',
+    iat: now - 10,
+    exp: now + 3600,
+    email: 'test@mediforce.dev',
+    ...overrides,
+  };
+}
+
 function makeRequest(
   path: string,
   options: { method?: string; headers?: Record<string, string> } = {},
@@ -101,5 +127,65 @@ describe('middleware preflight', () => {
   it('allows OPTIONS preflight without auth', async () => {
     const res = await middleware(makeRequest('/api/workflow-definitions', { method: 'OPTIONS' }));
     expect(res.status).toBe(204);
+  });
+});
+
+describe('middleware Firebase ID token (emulator mode)', () => {
+  beforeEach(() => {
+    vi.stubEnv('PLATFORM_API_KEY', 'test-secret-key');
+    vi.stubEnv('NEXT_PUBLIC_USE_EMULATORS', 'true');
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'demo-mediforce');
+  });
+
+  it('passes when Authorization: Bearer carries a valid emulator ID token', async () => {
+    const token = buildEmulatorToken(validEmulatorPayload());
+    const res = await middleware(
+      makeRequest('/api/agent-definitions', { headers: { Authorization: `Bearer ${token}` } }),
+    );
+    expect(res.status).not.toBe(401);
+  });
+
+  it('returns 401 when Bearer token is malformed (not a JWT)', async () => {
+    const res = await middleware(
+      makeRequest('/api/agent-definitions', { headers: { Authorization: 'Bearer not-a-jwt' } }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 when Bearer token is expired', async () => {
+    const token = buildEmulatorToken(
+      validEmulatorPayload({ exp: Math.floor(Date.now() / 1000) - 10, iat: Math.floor(Date.now() / 1000) - 3610 }),
+    );
+    const res = await middleware(
+      makeRequest('/api/agent-definitions', { headers: { Authorization: `Bearer ${token}` } }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 when Bearer token aud does not match project', async () => {
+    const token = buildEmulatorToken(validEmulatorPayload({ aud: 'other-project' }));
+    const res = await middleware(
+      makeRequest('/api/agent-definitions', { headers: { Authorization: `Bearer ${token}` } }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('accepts X-Api-Key when present even if Authorization is missing', async () => {
+    // Regression guard: adding Bearer support must not break server-to-server X-Api-Key auth
+    const res = await middleware(
+      makeRequest('/api/agent-definitions', { headers: { 'X-Api-Key': 'test-secret-key' } }),
+    );
+    expect(res.status).not.toBe(401);
+  });
+
+  it('accepts valid Bearer even when X-Api-Key is wrong', async () => {
+    // Either credential is sufficient
+    const token = buildEmulatorToken(validEmulatorPayload());
+    const res = await middleware(
+      makeRequest('/api/agent-definitions', {
+        headers: { Authorization: `Bearer ${token}`, 'X-Api-Key': 'wrong' },
+      }),
+    );
+    expect(res.status).not.toBe(401);
   });
 });
