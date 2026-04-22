@@ -8,6 +8,12 @@ export interface ProcessInstanceRepository {
   update(instanceId: string, updates: Partial<ProcessInstance>): Promise<void>;
   getByStatus(status: InstanceStatus): Promise<ProcessInstance[]>;
   getByDefinition(name: string, version: string): Promise<ProcessInstance[]>;
+  /**
+   * Most recently completed run of a workflow (by name, across versions),
+   * ordered by updatedAt desc. Used by the previous-run-outputs resolver to
+   * find the predecessor whose outputs feed `ProcessInstance.previousRun`.
+   */
+  getLastCompletedByDefinitionName(name: string): Promise<ProcessInstance | null>;
 
   // Step execution subcollection
   addStepExecution(

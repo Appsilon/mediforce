@@ -82,6 +82,15 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "finalizedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "processInstances",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "definitionName", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

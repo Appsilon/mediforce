@@ -50,6 +50,20 @@ export class InMemoryProcessInstanceRepository
     );
   }
 
+  async getLastCompletedByDefinitionName(
+    name: string,
+  ): Promise<ProcessInstance | null> {
+    const matching = [...this.instances.values()].filter(
+      (i) =>
+        i.definitionName === name &&
+        i.status === 'completed' &&
+        i.deleted !== true,
+    );
+    if (matching.length === 0) return null;
+    matching.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+    return { ...matching[0] };
+  }
+
   async addStepExecution(
     instanceId: string,
     execution: StepExecution,

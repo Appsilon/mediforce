@@ -70,6 +70,31 @@ export class FirestoreProcessInstanceRepository
     return snapshot.docs.map((d) => ProcessInstanceSchema.parse(d.data()));
   }
 
+  async getLastCompletedByDefinitionName(
+    name: string,
+  ): Promise<ProcessInstance | null> {
+    // Requires composite index: (definitionName, status, updatedAt desc).
+    // Indexed in firestore.indexes.json.
+    //
+    // `deleted === true` runs are exceptional (only set by
+    // setDeletedByDefinitionName). If the current top-by-updatedAt is
+    // tombstoned we fall through to the next few — small cap keeps the read
+    // cheap and covers the realistic case.
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .where('definitionName', '==', name)
+      .where('status', '==', 'completed')
+      .orderBy('updatedAt', 'desc')
+      .limit(5)
+      .get();
+    for (const d of snapshot.docs) {
+      const parsed = ProcessInstanceSchema.parse(d.data());
+      if (parsed.deleted === true) continue;
+      return parsed;
+    }
+    return null;
+  }
+
   async addStepExecution(
     instanceId: string,
     execution: StepExecution,
