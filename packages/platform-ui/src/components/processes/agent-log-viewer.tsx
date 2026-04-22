@@ -415,6 +415,7 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
   const [activeTab, setActiveTab] = React.useState(0);
   const [copied, setCopied] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const prevLogFilesLengthRef = React.useRef(logFiles.length);
 
   // When initialStepId changes, select the matching tab
   React.useEffect(() => {
@@ -424,6 +425,15 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
       setActiveTab(index);
     }
   }, [initialStepId, sections]);
+
+  // Auto-switch to newest agent tab when a new step starts
+  React.useEffect(() => {
+    const prev = prevLogFilesLengthRef.current;
+    prevLogFilesLengthRef.current = logFiles.length;
+    if (logFiles.length > prev) {
+      setActiveTab(logFiles.length - 1);
+    }
+  }, [logFiles.length]);
 
   const fetchLogs = React.useCallback(async () => {
     if (logFiles.length === 0) return;
