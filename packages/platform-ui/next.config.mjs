@@ -18,6 +18,12 @@ const nextConfig = {
     '@mediforce/supply-intelligence-plugins',
     '@mediforce/supply-intelligence',
     '@mediforce/mcp-client',
+    // @hookform/resolvers/zod imports `zod/v4/core` without declaring zod
+    // as a peer dep. In pnpm's isolated layout, webpack on Vercel can't
+    // walk out of the resolver's .pnpm dir to find zod — transpiling it
+    // here forces Next.js to resolve zod against platform-ui's own
+    // node_modules, where the symlink exists.
+    '@hookform/resolvers',
   ],
   serverExternalPackages: ['bullmq', 'ioredis'],
   webpack: (config) => {
@@ -35,6 +41,13 @@ const nextConfig = {
       '@mediforce/supply-intelligence-plugins': path.join(packagesDir, 'supply-intelligence-plugins/src/index.ts'),
       '@mediforce/supply-intelligence': path.join(packagesDir, 'supply-intelligence/src/index.ts'),
       '@mediforce/mcp-client': path.join(packagesDir, 'mcp-client/src/index.ts'),
+      // Pin zod to platform-ui's own copy so `@hookform/resolvers/zod` (which
+      // imports `zod/v4/core` without declaring zod as a peer dep) resolves
+      // on Vercel. Without this, webpack walks up from the resolver's .pnpm
+      // dir and fails — pnpm's `.pnpm/node_modules` hoist isn't reliably on
+      // Vercel's resolve path. Subpaths like `zod/v4/core` map through this
+      // alias automatically.
+      zod: path.join(__dirname, 'node_modules/zod'),
     };
     return config;
   },

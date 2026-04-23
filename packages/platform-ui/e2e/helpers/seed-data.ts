@@ -752,6 +752,92 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
+  // Namespace-scoped tool catalog — seed entries under
+  // `namespaces/{TEST_ORG_HANDLE}/toolCatalog/{entryId}`. Doc id IS the entry id,
+  // so we strip `id` from the payload to match FirestoreToolCatalogRepository
+  // (see packages/platform-infra/src/firestore/tool-catalog-repository.ts).
+  const toolCatalog: Record<string, Record<string, unknown>> = {
+    filesystem: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'],
+      description: 'Read and write files in a scoped directory.',
+    },
+    postgres: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-postgres'],
+      env: { DATABASE_URL: '{{SECRET:DATABASE_URL}}' },
+      description: 'Execute read-only SQL queries against a PostgreSQL database.',
+    },
+  };
+
+  // Top-level agentDefinitions collection — pre-seed `claude-code-agent` so the
+  // agent MCP journey is deterministic. Without this, the page relies on the
+  // fire-and-forget `seedBuiltinAgentDefinitions` in platform-services, which
+  // races with the first GET `/api/agent-definitions/:id` request.
+  //
+  // `mcp-test-agent` is a fixture consumed by step-mcp-restrictions.journey.ts —
+  // it ships with one pre-bound stdio server so the Restrictions section has
+  // something to narrow. Journey 2 uses `claude-code-agent`, which must start
+  // binding-free for its "empty state" assertion; hence the split.
+  const agentDefinitions: Record<string, Record<string, unknown>> = {
+    'claude-code-agent': {
+      kind: 'plugin',
+      runtimeId: 'claude-code-agent',
+      name: 'Claude Code Agent',
+      iconName: 'Bot',
+      description:
+        "Executes code generation, analysis, and automated software tasks using Claude's advanced coding capabilities.",
+      inputDescription: 'Task description and relevant code context',
+      outputDescription: 'Generated code, analysis results, or task completion report',
+      foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: '',
+      skillFileNames: [],
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+    },
+    'mcp-test-agent': {
+      kind: 'plugin',
+      runtimeId: 'script-container',
+      name: 'MCP Test Agent',
+      iconName: 'Terminal',
+      description: 'Fixture agent for step-level MCP restrictions journey.',
+      inputDescription: 'test input',
+      outputDescription: 'test output',
+      foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: '',
+      skillFileNames: [],
+      mcpServers: {
+        filesystem: { type: 'stdio', catalogId: 'filesystem' },
+      },
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+    },
+  };
+
+  // Minimal workflow with one agent step referencing `mcp-test-agent`, used
+  // only by step-mcp-restrictions.journey.ts.
+  workflowDefinitions['MCP Restrictions Test:1'] = {
+    name: 'MCP Restrictions Test',
+    namespace: 'test',
+    version: 1,
+    description: 'Fixture workflow for step-level MCP restrictions journey',
+    steps: [
+      {
+        id: 'process',
+        name: 'Process',
+        type: 'creation',
+        executor: 'agent',
+        autonomyLevel: 'L2',
+        plugin: 'script-container',
+        agentId: 'mcp-test-agent',
+      },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'process', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start' }],
+    createdAt: twoDaysAgo,
+  };
+
   // -------------------------------------------------------------------------
   // Cowork sessions — collaborative human+AI artifact building
   // -------------------------------------------------------------------------
@@ -870,5 +956,5 @@ export function buildSeedData(testUserId: string) {
     createdAt: twoDaysAgo,
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, agentDefinitions };
 }

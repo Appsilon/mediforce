@@ -318,7 +318,11 @@ describe('MCP lifecycle — admin REST API composed with runtime resolver', () =
     expect(bindingsBody.mcpServers.evil).toBeUndefined();
   });
 
-  it('[JOURNEY] plugin-kind agents cannot receive MCP bindings — enforced at route, not schema', async () => {
+  it('[JOURNEY] plugin-kind agents can receive MCP bindings (J1 — route gate removed)', async () => {
+    // Schema and writeMcpConfig were already kind-agnostic; the API route
+    // was the sole blocker. Use case: scope an autonomous docker-spawned
+    // plugin agent (claude-code, opencode) to a curated read-only MCP
+    // surface via AgentMcpBinding.allowedTools.
     fake.state.agents.set(PLUGIN_AGENT.id, { ...PLUGIN_AGENT });
     await seedTealflowCatalog();
 
@@ -326,13 +330,17 @@ describe('MCP lifecycle — admin REST API composed with runtime resolver', () =
       jsonRequest(
         'PUT',
         '/api/agent-definitions/claude-code-agent/mcp-servers/tealflow',
-        { type: 'stdio', catalogId: 'tealflow-mcp' },
+        { type: 'stdio', catalogId: 'tealflow-mcp', allowedTools: ['list_apps'] },
       ),
       { params: Promise.resolve({ id: 'claude-code-agent', name: 'tealflow' }) },
     );
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error).toContain('cowork');
+    expect(body.mcpServers.tealflow).toEqual({
+      type: 'stdio',
+      catalogId: 'tealflow-mcp',
+      allowedTools: ['list_apps'],
+    });
   });
 
   it('[JOURNEY] step-level denyTools narrows the agent-level allowedTools — restrictions are strictly subtractive', async () => {

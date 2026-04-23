@@ -17,6 +17,7 @@ import {
 } from './constants';
 import { CoworkSection } from './cowork-section';
 import { EditableField, Section } from './step-editor-fields';
+import { McpRestrictionsSection } from './mcp-restrictions-section';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -380,6 +381,16 @@ export function StepEditor({
             </button>
           </div>
         </Section>
+      )}
+
+      {/* MCP restrictions — only meaningful when the step binds to an agent
+           definition via agentId. Section owns its own loading/empty state. */}
+      {isAgent && step.agentId !== undefined && step.agentId !== '' && (
+        <McpRestrictionsSection
+          agentId={step.agentId}
+          restrictions={step.mcpRestrictions}
+          onChange={(next) => onChange({ mcpRestrictions: next })}
+        />
       )}
 
       {/* Agent section */}

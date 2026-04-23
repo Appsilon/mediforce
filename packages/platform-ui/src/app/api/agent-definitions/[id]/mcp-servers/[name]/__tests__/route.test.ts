@@ -162,18 +162,27 @@ describe('PUT /api/agent-definitions/:id/mcp-servers/:name', () => {
     expect(res.status).toBe(404);
   });
 
-  it('[ERROR] 400 when agent kind is plugin', async () => {
+  it('[DATA] creates a binding on a plugin agent (gate removed — J1)', async () => {
+    // Plugin agents (e.g. claude-code-agent, opencode-agent) can carry MCP
+    // bindings. Schema + writeMcpConfig are kind-agnostic; the old API-level
+    // gate was the only blocker. Use case: autonomous docker agent scoped to
+    // read-only tool restrictions via AgentMcpBinding.allowedTools.
     mockAgentGetById.mockResolvedValue(pluginAgent);
+    mockAgentUpdate.mockImplementation((_id: string, patch: { mcpServers?: unknown }) =>
+      Promise.resolve({ ...pluginAgent, mcpServers: patch.mcpServers }),
+    );
 
     const res = await PUT(
-      makePutRequest('claude-code-agent', 'x', stdioBinding),
-      { params: makeParams('claude-code-agent', 'x') },
+      makePutRequest('claude-code-agent', 'readonly-docs', stdioBinding),
+      { params: makeParams('claude-code-agent', 'readonly-docs') },
     );
     const json = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('cowork');
-    expect(mockAgentUpdate).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(json.mcpServers).toEqual({ 'readonly-docs': stdioBinding });
+    expect(mockAgentUpdate).toHaveBeenCalledWith('claude-code-agent', {
+      mcpServers: { 'readonly-docs': stdioBinding },
+    });
   });
 });
 
@@ -209,14 +218,24 @@ describe('DELETE /api/agent-definitions/:id/mcp-servers/:name', () => {
     expect(res.status).toBe(404);
   });
 
-  it('[ERROR] 400 when agent kind is plugin', async () => {
-    mockAgentGetById.mockResolvedValue(pluginAgent);
+  it('[DATA] removes a binding on a plugin agent (gate removed — J1)', async () => {
+    const pluginWithBinding = {
+      ...pluginAgent,
+      mcpServers: { 'readonly-docs': { type: 'stdio' as const, catalogId: 'docs' } },
+    };
+    mockAgentGetById.mockResolvedValue(pluginWithBinding);
+    mockAgentUpdate.mockImplementation((_id: string, patch: { mcpServers?: unknown }) =>
+      Promise.resolve({ ...pluginWithBinding, mcpServers: patch.mcpServers }),
+    );
 
     const res = await DELETE(
-      makeDeleteRequest('claude-code-agent', 'x'),
-      { params: makeParams('claude-code-agent', 'x') },
+      makeDeleteRequest('claude-code-agent', 'readonly-docs'),
+      { params: makeParams('claude-code-agent', 'readonly-docs') },
     );
-    expect(res.status).toBe(400);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.mcpServers).toEqual({});
   });
 
   it('[DATA] idempotent — 200 with unchanged bindings when name does not exist', async () => {
