@@ -143,18 +143,19 @@ Testing strategies:
 1. `pnpm typecheck`
 2. `pnpm test:affected` — tests for changed files only
 3. `pnpm test` — all unit tests
+4. **Knowledge base** — if the change matches a wiki trigger (architectural change, gotcha discovered, decision made, multi-source synthesis), update `docs/knowledge-base/wiki/` via `/knowledge-base`. See the [Knowledge Base section](#knowledge-base) for full triggers.
 
 **Before pushing (if UI or E2E tests changed):**
-4. Check if any `packages/platform-ui/src/` or `e2e/journeys/` files changed:
+5. Check if any `packages/platform-ui/src/` or `e2e/journeys/` files changed:
    ```bash
    git diff --name-only origin/main...HEAD | grep -qE 'platform-ui/src/|e2e/journeys/' && echo "E2E needed"
    ```
-5. **Bootstrap the E2E environment** (idempotent — safe to run every time):
+6. **Bootstrap the E2E environment** (idempotent — safe to run every time):
    ```bash
    python3 packages/platform-ui/scripts/bootstrap_e2e.py
    ```
    This creates `.env.local` with demo credentials, starts Firebase emulators, installs Playwright browsers, and installs ffmpeg. See [Remote E2E setup](#remote-e2e-setup) for details.
-6. `cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth` — all E2E journey + smoke tests (60s)
+7. `cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth` — all E2E journey + smoke tests (60s)
 
 **When adding/modifying UI features (TDD):**
 1. **RED** — Write the journey test first in `e2e/journeys/<feature>.journey.ts`. Use `showStep`/`showResult` from `helpers/recording.ts` at key moments for pacing during recordings.
@@ -274,6 +275,31 @@ The `skills/_registry.yml` indexes development skills. Runtime skills have per-a
 - `cp packages/platform-ui/.env.local.example packages/platform-ui/.env.local` and fill Firebase + OpenRouter keys
 - Deploys via Firebase App Hosting (`apphosting.yaml`)
 
+## Knowledge Base
+
+The repo maintains an LLM-compiled wiki at `docs/knowledge-base/wiki/` following the [LLM Wiki pattern](docs/knowledge-base/LLM-WIKI.md) (Karpathy, April 2026). The Mediforce-specific schema — raw-source locations, page types, frontmatter, ingest/query/lint flows — lives in [`docs/knowledge-base/SCHEMA.md`](docs/knowledge-base/SCHEMA.md). **Read `SCHEMA.md` before touching the wiki.**
+
+The wiki is an architectural artifact, not notes. Treat it like production code: every claim has a citation, every cross-reference is checked, every page has frontmatter.
+
+**Agents MUST update the wiki after:**
+- A non-trivial architectural change (new plugin, package, moved boundary) → update the entity page.
+- Discovering a gotcha (>15 min chasing something non-obvious) → add `wiki/gotchas/<slug>.md`.
+- A lasting decision (library pick, pattern change, "we chose not to do X") → add `wiki/decisions/YYYY-MM-DD-<slug>.md`.
+- A synthesis answer pulled from ≥2 sources → file under `wiki/syntheses/` (file-back rule).
+
+**Agents MUST consult the wiki before:**
+- Answering "how does X work / why did we choose Y" questions — read `wiki/index.md` first.
+- Starting work in an unfamiliar package — check `wiki/entities/packages/<pkg>.md`.
+- Making a decision that echoes a previous one — grep `wiki/decisions/`.
+
+If the wiki has nothing on the topic, that's a signal to file new knowledge once the work is done.
+
+**Lint the wiki:**
+- Before pushing any PR that touches `docs/knowledge-base/wiki/` pages — run `/knowledge-base lint`.
+- Weekly (at minimum) on the whole wiki.
+
+Use the [`knowledge-base` skill](skills/knowledge-base/SKILL.md) for all wiki operations: `/knowledge-base ingest <src>`, `/knowledge-base query <q>`, `/knowledge-base file <topic>`, `/knowledge-base lint`.
+
 ## Skills Router
 
 When a task matches one of these, invoke the skill before starting work:
@@ -286,6 +312,7 @@ When a task matches one of these, invoke the skill before starting work:
 | Review a Renovate dependency PR | `/renovate-review` → `skills/renovate-review/SKILL.md` |
 | Write a Discord community update | `/community` → `skills/community/SKILL.md` |
 | Generate a pitch deck | `/generate-pitch` → `skills/generate-pitch/SKILL.md` |
+| Ingest/query/lint the knowledge base | `/knowledge-base` → `skills/knowledge-base/SKILL.md` |
 
 ## Core Principles
 
