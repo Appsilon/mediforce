@@ -1,7 +1,7 @@
 version: "1.0"
-generated: "2026-03-25"
+generated: "2026-04-23"
 standard: "agentskills.io/specification"
-total_skills: 6
+total_skills: 7
 
 # Runtime skills have their own per-app registries:
 #   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml
@@ -42,3 +42,8 @@ domains:
         complexity: basic
         language: multi
         description: Review and validate Renovate dependency PRs
+      - id: knowledge-base
+        path: skills/knowledge-base/SKILL.md
+        complexity: basic
+        language: multi
+        description: Ingest, query, and lint the LLM-compiled wiki (Karpathy LLM Wiki pattern)

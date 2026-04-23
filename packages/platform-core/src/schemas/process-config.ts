@@ -27,6 +27,7 @@ export const AgentConfigSchema = z.object({
   commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
   repoAuth: z.string().optional(),
   mcpServers: z.array(McpServerConfigSchema).optional(),
+  allowedTools: z.array(z.string()).optional(),
 });
 
 export const StepConfigSchema = z.object({

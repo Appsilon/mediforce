@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, HelpCircle, Save, Undo2, Redo2 } from 'lucide-react';
+import { X, HelpCircle, Save, Undo2, Redo2, KeyRound, Code2 } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { WorkflowStepSchema, TransitionSchema } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { StepEditor } from './workflow-editor/step-editor';
+import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
 
 // ---------------------------------------------------------------------------
@@ -110,6 +111,10 @@ export interface WorkflowEditorCanvasProps {
    * Pass undefined for new (unsaved) workflows.
    */
   workflowName?: string;
+  /** Namespace handle — required for the in-editor secrets panel. */
+  namespace?: string;
+  /** Authenticated user ID — required for the in-editor secrets panel. */
+  userId?: string;
   /**
    * Render prop for save controls shown at the bottom of the YAML panel.
    * Receives the current steps + transitions + a discard callback.
@@ -137,12 +142,15 @@ export function WorkflowEditorCanvas({
   initialTransitions,
   yamlFields,
   workflowName,
+  namespace,
+  userId,
   renderSavePanel,
   onChange,
   stepErrors,
 }: WorkflowEditorCanvasProps) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
+  const [rightPanelView, setRightPanelView] = useState<'yaml' | 'secrets'>('yaml');
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [editHistory, setEditHistory] = useState<Array<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] }>>([]);
@@ -460,125 +468,170 @@ export function WorkflowEditorCanvas({
       {/* ── Unified sticky toolbar ── */}
       <div className="shrink-0 border-b px-4 py-2 flex items-center gap-1.5 flex-wrap bg-background">
 
+        {/* Left: undo/redo + panel tabs */}
         <button
-            onClick={undoEdit}
-            disabled={editHistory.length === 0}
-            title="Undo last change (Ctrl+Z)"
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-              editHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
-            )}
-          >
-            <Undo2 className="h-3.5 w-3.5" />
-            Undo
-          </button>
-
-          <button
-            onClick={redoEdit}
-            disabled={redoHistory.length === 0}
-            title="Redo last change (Ctrl+Shift+Z)"
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
-              redoHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
-            )}
-          >
-            <Redo2 className="h-3.5 w-3.5" />
-            Redo
-          </button>
-
-          {/* Right section: YAML title + save (hidden when a step is selected) */}
-          {!selectedStepId && (
-            <div className="ml-auto flex items-center gap-2">
-              <div className="w-px h-4 bg-border" />
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-semibold">Workflow source code</span>
-                <span className="group relative inline-flex items-center">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40" />
-                  <span className="pointer-events-none absolute top-full right-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
-                    <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
-                    <p>You can author workflows three ways:</p>
-                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                      <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
-                      <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
-                      <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
-                    </ul>
-                  </span>
-                </span>
-              </div>
-              {yamlError && (
-                <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
-              )}
-              <button
-                onClick={applyYaml}
-                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border hover:bg-muted text-foreground transition-colors"
-              >
-                <Save className="h-3.5 w-3.5" />
-                Apply YAML to canvas
-              </button>
-            </div>
+          onClick={undoEdit}
+          disabled={editHistory.length === 0}
+          title="Undo last change (Ctrl+Z)"
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
+            editHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
           )}
-        </div>{/* end unified toolbar */}
+        >
+          <Undo2 className="h-3.5 w-3.5" />
+          Undo
+        </button>
 
-        {/* ── Two-column content area ── */}
-        <div className="flex flex-1 overflow-y-auto items-start">
+        <button
+          onClick={redoEdit}
+          disabled={redoHistory.length === 0}
+          title="Redo last change (Ctrl+Shift+Z)"
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors',
+            redoHistory.length > 0 ? 'hover:bg-muted text-foreground' : 'opacity-40 cursor-not-allowed text-muted-foreground',
+          )}
+        >
+          <Redo2 className="h-3.5 w-3.5" />
+          Redo
+        </button>
 
-          {/* Diagram column */}
-          <div className="flex-1 p-6 pt-4">
-            <WorkflowDiagram
-              definition={diagramDefinition}
-              className="border-0"
-              onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
-              onNodeDelete={removeStep}
-              onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
-              onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
-              onEdgeAdd={(fromStepId, type, executor) => addStep(type, executor, fromStepId)}
-              onPaneClick={() => setSelectedStepId(null)}
-              selectedStepId={selectedStepId}
-              errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
-              canMoveUp={canMoveUpSet}
-              canMoveDown={canMoveDownSet}
-            />
+        <div className="w-px h-4 bg-border mx-1" />
+
+        {/* Secrets tab */}
+        <button
+          onClick={() => setRightPanelView('secrets')}
+          title="Workflow secrets"
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground',
+            rightPanelView === 'secrets' && !selectedStepId && 'bg-muted border-muted-foreground/30',
+          )}
+        >
+          <KeyRound className="h-3.5 w-3.5" />
+          Secrets
+        </button>
+
+        {/* Workflow source code tab */}
+        <span className="group relative inline-flex">
+          <button
+            onClick={() => setRightPanelView('yaml')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground',
+              rightPanelView === 'yaml' && !selectedStepId && 'bg-muted border-muted-foreground/30',
+            )}
+          >
+            <Code2 className="h-3.5 w-3.5" />
+            Workflow source code
+            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/40 ml-0.5" />
+          </button>
+          <span className="pointer-events-none absolute top-full left-0 mt-1.5 w-96 rounded-md border bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 leading-relaxed space-y-1.5">
+            <p>Mediforce workflows are defined in <strong>YAML</strong> — a human-readable format that captures every step, transition, and configuration.</p>
+            <p>You can author workflows three ways:</p>
+            <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+              <li>Use the <strong className="text-foreground">visual editor</strong> on the left</li>
+              <li>Generate with <strong className="text-foreground">AI</strong> via the Workflow Designer workflow</li>
+              <li>Write directly in the <strong className="text-foreground">code editor</strong> below</li>
+            </ul>
+          </span>
+        </span>
+
+        {/* Apply YAML — only visible when YAML panel is active and no step is selected */}
+        {!selectedStepId && rightPanelView === 'yaml' && (
+          <div className="ml-auto flex items-center gap-2">
+            {yamlError && (
+              <p className="text-xs text-red-600 dark:text-red-400">{yamlError}</p>
+            )}
+            <button
+              onClick={applyYaml}
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border hover:bg-muted text-foreground transition-colors"
+            >
+              <Save className="h-3.5 w-3.5" />
+              Apply YAML to canvas
+            </button>
           </div>
+        )}
+      </div>{/* end unified toolbar */}
 
-          {/* Side panel */}
-          <div className="w-1/2 shrink-0 border-l bg-background">
-            <div className="p-4 space-y-4">
-              {selectedStep ? (
-                <>
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold">Edit step</h2>
-                    <button
-                      onClick={() => setSelectedStepId(null)}
-                      className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <StepEditor
-                    step={selectedStep}
-                    allSteps={editedSteps}
+      {/* ── Two-column content area ── */}
+      <div className="flex flex-1 overflow-y-auto items-start">
+
+        {/* Diagram column */}
+        <div className="flex-1 p-6 pt-4">
+          <WorkflowDiagram
+            definition={diagramDefinition}
+            className="border-0"
+            onNodeClick={(stepId) => setSelectedStepId(stepId === selectedStepId ? null : stepId)}
+            onNodeDelete={removeStep}
+            onNodeMoveUp={(stepId) => moveStep(stepId, 'up')}
+            onNodeMoveDown={(stepId) => moveStep(stepId, 'down')}
+            onEdgeAdd={(fromStepId, type, executor) => addStep(type, executor, fromStepId)}
+            onPaneClick={() => { setSelectedStepId(null); setRightPanelView('yaml'); }}
+            selectedStepId={selectedStepId}
+            errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
+            canMoveUp={canMoveUpSet}
+            canMoveDown={canMoveDownSet}
+          />
+        </div>
+
+        {/* Side panel */}
+        <div className="w-1/2 shrink-0 border-l bg-background">
+          <div className="p-4 space-y-4">
+            {selectedStep ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">Edit step</h2>
+                  <button
+                    onClick={() => setSelectedStepId(null)}
+                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <StepEditor
+                  step={selectedStep}
+                  allSteps={editedSteps}
+                  workflowName={workflowName}
+                  onChange={(patch) => updateStep(selectedStep.id, patch)}
+                  errors={stepErrors?.[selectedStep.id]}
+                />
+              </>
+            ) : rightPanelView === 'secrets' ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">Secrets</h2>
+                  <button
+                    onClick={() => setRightPanelView('yaml')}
+                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {namespace && userId && workflowName ? (
+                  <WorkflowSecretsEditor
+                    namespace={namespace}
                     workflowName={workflowName}
-                    onChange={(patch) => updateStep(selectedStep.id, patch)}
-                    errors={stepErrors?.[selectedStep.id]}
+                    userId={userId}
                   />
-                </>
-              ) : (
-                <>
-                  <YamlCodeEditor
-                    value={yamlDraft}
-                    onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
-                  />
-                  {savePanel && (
-                    <div className="border-t pt-4">
-                      {savePanel}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Save the workflow first to manage secrets.</p>
+                )}
+              </>
+            ) : (
+              <>
+                <YamlCodeEditor
+                  value={yamlDraft}
+                  onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
+                />
+                {savePanel && (
+                  <div className="border-t pt-4">
+                    {savePanel}
+                  </div>
+                )}
+              </>
+            )}
           </div>
+        </div>
 
-        </div>{/* end two-column */}
+      </div>{/* end two-column */}
     </div>
   );
 }

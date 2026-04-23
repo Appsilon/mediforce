@@ -46,6 +46,24 @@ packages/
   example-agent/       # Reference agent implementation
 ```
 
+## Local agent execution
+
+When running with `ALLOW_LOCAL_AGENTS=true` (via `pnpm dev:local`), the platform spawns agent CLIs directly as local processes instead of Docker containers. The following tools must be installed and on your `PATH`:
+
+| Tool | Used by | Install |
+|------|---------|---------|
+| `claude` | `ClaudeCodeAgent` workflow steps | [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code) — `npm install -g @anthropic-ai/claude-code` |
+| `opencode` | `OpenCodeAgent` workflow steps | `npm install -g opencode-ai` |
+
+Verify both are available after installing:
+
+```bash
+claude --version
+opencode --version
+```
+
+Without `ALLOW_LOCAL_AGENTS=true`, agents run inside Docker containers instead. In that case you need **Docker** installed and running, but not the CLIs above.
+
 ## Running the app
 
 ```bash
