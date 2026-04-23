@@ -2,7 +2,7 @@
 
 Catalog of every page in the Mediforce knowledge base. Agents update this on every ingest. Read this first when answering a query.
 
-Conventions and workflow: see [`../SCHEMA.md`](../SCHEMA.md). Abstract pattern: see [`../LLM-WIKI.md`](../LLM-WIKI.md).
+Conventions: [`../SCHEMA.md`](../SCHEMA.md). Writing style: [`../STYLE.md`](../STYLE.md). Abstract pattern: [`../LLM-WIKI.md`](../LLM-WIKI.md).
 
 ## TODO (pending work flagged by lint)
 

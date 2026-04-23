@@ -29,7 +29,7 @@ Maintains `docs/knowledge-base/wiki/` following the [LLM Wiki pattern](../../doc
 1. Read the source end-to-end.
 2. Read `docs/knowledge-base/wiki/index.md` to identify existing pages this source touches.
 3. For each affected page: update inline. Preserve existing citations; add new ones.
-4. If the source introduces a new entity / concept / decision / gotcha: create the page under the right bucket (`entities/`, `concepts/`, `decisions/`, `gotchas/`) with required sections per `SCHEMA.md`.
+4. If the source introduces a new entity / concept / decision / gotcha: create the page under the right bucket (`entities/`, `concepts/`, `decisions/`, `gotchas/`). Match the section shape of existing pages in that bucket — examples beat rules. Filename patterns + frontmatter per `SCHEMA.md`.
 5. Update `wiki/index.md` (new entries, bump counts, remove stale TODOs).
 6. Append a log entry:
    ```

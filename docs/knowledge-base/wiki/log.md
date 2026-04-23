@@ -153,3 +153,18 @@ Lint after rewrite: 38 files, 0 broken links, 0 orphans.
 
 touched: 26 existing pages rewritten + `log.md`.
 summary: wiki now fully in caveman, consistent across all 38 pages. Context-frugal for in-session agent reads.
+
+## [2026-04-23] lint | SCHEMA trim + STYLE split
+
+`SCHEMA.md` trimmed 209 → 93 lines (−56% lines, −66% words). Caveman writing rules moved to their own `STYLE.md` (32 lines). Rationale: Karpathy's own LLM-WIKI.md is 77 lines and says "the exact directory structure, schema conventions, page formats — all of that will depend on your domain… everything above is optional and modular". Our original SCHEMA was 3× Karpathy's size and duplicated:
+
+- MUST-update / MUST-consult triggers (authoritative copy in `AGENTS.md` / personal `CLAUDE.local.md`).
+- Ingest / query / lint step-by-step (authoritative in `skills/knowledge-base/SKILL.md`).
+- Caveman prompt (now only in `STYLE.md`).
+
+New SCHEMA keeps only what's unique to this repo: layout, raw-source locations, page buckets with filename patterns, frontmatter, conventions, pharma-domain pointer, scale note.
+
+Also: removed "required sections per SCHEMA.md" wording from SKILL.md — replaced with "match the section shape of existing pages; examples beat rules". Fewer rules, better adherence.
+
+touched: `SCHEMA.md` (rewrite), `STYLE.md` (new), `skills/knowledge-base/SKILL.md` (one line), `wiki/index.md` (header pointers).
+summary: single source of truth for each rule; wiki docs are lean.
