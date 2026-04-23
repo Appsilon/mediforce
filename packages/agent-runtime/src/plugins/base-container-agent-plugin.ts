@@ -427,7 +427,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         await cp(srcPath, destPath);
         return destPath;
       } catch {
-        return null;
+        continue;
       }
     }
 
