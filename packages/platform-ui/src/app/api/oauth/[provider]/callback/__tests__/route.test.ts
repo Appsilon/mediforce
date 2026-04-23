@@ -136,9 +136,10 @@ describe('GET /api/oauth/:provider/callback', () => {
     const tokenBody = (tokenInit.body as string) ?? '';
     expect(tokenBody).toContain('grant_type=authorization_code');
     expect(tokenBody).toContain('code=dummy-code');
-    expect(tokenBody).toContain('client_id=client-id-xyz');
-    // Default token_endpoint_auth_method is client_secret_basic — the secret
-    // must be sent via Authorization: Basic, not in the form body.
+    // Default token_endpoint_auth_method is client_secret_basic — per RFC 6749
+    // §2.3.1, client_id + client_secret are carried in Authorization: Basic,
+    // not in the form body.
+    expect(tokenBody).not.toContain('client_id=');
     expect(tokenBody).not.toContain('client_secret=');
     const tokenHeaders = tokenInit.headers as Record<string, string>;
     const expectedBasic = `Basic ${Buffer.from('client-id-xyz:client-secret-xyz').toString('base64')}`;

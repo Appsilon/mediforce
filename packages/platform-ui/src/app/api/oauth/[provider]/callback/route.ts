@@ -59,7 +59,6 @@ async function exchangeCode(params: {
   const bodyFields: Record<string, string> = {
     grant_type: 'authorization_code',
     code,
-    client_id: provider.clientId,
     redirect_uri: redirectUri,
   };
   const authMethod = provider.tokenEndpointAuthMethod ?? 'client_secret_basic';
@@ -68,10 +67,15 @@ async function exchangeCode(params: {
     Accept: 'application/json',
   };
   if (authMethod === 'client_secret_basic' && provider.clientSecret !== undefined) {
+    // RFC 6749 §2.3.1: with HTTP Basic, the client_id/client_secret are
+    // carried in the Authorization header only — not in the body.
     const credentials = `${provider.clientId}:${provider.clientSecret}`;
     headers.Authorization = `Basic ${Buffer.from(credentials).toString('base64')}`;
-  } else if (provider.clientSecret !== undefined) {
-    bodyFields.client_secret = provider.clientSecret;
+  } else {
+    bodyFields.client_id = provider.clientId;
+    if (provider.clientSecret !== undefined) {
+      bodyFields.client_secret = provider.clientSecret;
+    }
   }
   const body = new URLSearchParams(bodyFields);
   try {
