@@ -115,6 +115,8 @@ In practice: receive a task → break it down → dispatch subagents → verify 
 |-------|----------------|-------|
 | **Unit** | Schema validation, pure functions, expression eval | `packages/*/src/**/__tests__/` |
 | **Engine integration** | Full workflow loops, transitions, step routing | `packages/workflow-engine/src/__tests__/` |
+| **API journey** | Multi-endpoint user journeys composed at handler level with in-memory repos — deterministic, no browser, no emulators | `packages/platform-ui/src/test/*-journey.test.ts` |
+| **Real-LLM E2E** | Opt-in roundtrip: admin REST → resolver → spawned MCP server → real LLM tool_call → result. Not on CI — manual regression guard | `packages/platform-ui/e2e/api/*.test.ts`, run via `pnpm test:mcp-real` (cd packages/platform-ui) with `OPENROUTER_API_KEY` set |
 | **E2E journeys** | Full user flows with state changes | `packages/platform-ui/e2e/journeys/` |
 | **E2E smoke** | Login page, auth redirect (no emulators) | `packages/platform-ui/e2e/smoke.spec.ts` |
 
