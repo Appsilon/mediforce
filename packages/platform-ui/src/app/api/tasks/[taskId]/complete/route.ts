@@ -1,158 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
+import { NextRequest } from 'next/server';
+import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter, readJsonBody } from '@/lib/route-adapter';
+import { completeTask } from '@mediforce/platform-api/handlers';
+import { CompleteTaskInputSchema } from '@mediforce/platform-api/contract';
+import type { CompleteTaskInput } from '@mediforce/platform-api/contract';
+import { triggerAutoRunner } from '@/lib/trigger-auto-runner';
+
+interface RouteContext {
+  params: Promise<{ taskId: string }>;
+}
 
 /**
  * POST /api/tasks/:taskId/complete
  *
- * Body: { "verdict": "approve" | "revise", "comment": "..." }
- *
- * Completes a claimed task, resumes the process, advances to the next step,
- * and triggers the auto-runner for subsequent agent steps.
+ * Body: `{ verdict: 'approve' | 'revise'; comment?: string }`.
+ * Resumes the paused process instance, advances the engine one step, and
+ * kicks the auto-runner (fire-and-forget).
  */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ taskId: string }> },
-): Promise<NextResponse> {
-  try {
-    const { taskId } = await params;
-    const body = (await req.json()) as {
-      verdict?: string;
-      comment?: string;
+export const POST = createRouteAdapter<
+  typeof CompleteTaskInputSchema,
+  CompleteTaskInput,
+  RouteContext
+>(
+  CompleteTaskInputSchema,
+  async (req: NextRequest, ctx) => {
+    const body = (await readJsonBody(req)) as Record<string, unknown>;
+    return {
+      taskId: (await ctx.params).taskId,
+      verdict: body.verdict,
+      comment: body.comment,
     };
-
-    const verdict = body.verdict;
-    if (verdict !== 'approve' && verdict !== 'revise') {
-      return NextResponse.json(
-        { error: 'verdict must be "approve" or "revise"' },
-        { status: 400 },
-      );
-    }
-
-    const comment = body.comment ?? '';
-
+  },
+  (input) => {
     const { humanTaskRepo, instanceRepo, auditRepo, engine } =
       getPlatformServices();
-
-    // 1. Load and validate task
-    const task = await humanTaskRepo.getById(taskId);
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-    }
-
-    if (task.status !== 'claimed') {
-      return NextResponse.json(
-        { error: `Cannot complete a ${task.status} task — must be claimed first` },
-        { status: 409 },
-      );
-    }
-
-    const now = new Date().toISOString();
-    const completionData = {
-      verdict,
-      comment,
-      completedBy: task.assignedUserId,
-      completedAt: now,
-    };
-
-    // 2. Mark task as completed
-    await humanTaskRepo.complete(taskId, completionData);
-
-    // 3. Write audit event
-    await auditRepo.append({
-      actorId: task.assignedUserId ?? 'api-user',
-      actorType: 'user',
-      actorRole: 'operator',
-      action: 'task.completed',
-      description: `Task '${taskId}' completed with verdict '${verdict}' for step '${task.stepId}'`,
-      timestamp: now,
-      inputSnapshot: { taskId, verdict, comment, stepId: task.stepId },
-      outputSnapshot: { status: 'completed', completionData },
-      basis: 'User submitted verdict via API',
-      entityType: 'humanTask',
-      entityId: taskId,
-      processInstanceId: task.processInstanceId,
+    return completeTask(input, {
+      humanTaskRepo,
+      instanceRepo,
+      auditRepo,
+      engine,
+      triggerRun: triggerAutoRunner,
     });
-
-    // 4. Resume the paused process instance
-    const instance = await instanceRepo.getById(task.processInstanceId);
-    if (!instance) {
-      return NextResponse.json(
-        { error: `Process instance '${task.processInstanceId}' not found` },
-        { status: 404 },
-      );
-    }
-
-    if (instance.status !== 'paused') {
-      return NextResponse.json(
-        { error: `Process instance is '${instance.status}', expected 'paused'` },
-        { status: 409 },
-      );
-    }
-
-    // Set instance back to running so advanceStep works
-    await instanceRepo.update(task.processInstanceId, {
-      status: 'running',
-      pauseReason: null,
-      updatedAt: now,
-    });
-
-    // 5. Advance to next step — include agent output for L3 review tasks
-    const stepOutput: Record<string, unknown> = { verdict, comment, taskId };
-    const agentReviewData = task.completionData as Record<string, unknown> | null;
-    if (agentReviewData?.reviewType === 'agent_output_review') {
-      const agentOutput = agentReviewData.agentOutput as Record<string, unknown> | undefined;
-      if (agentOutput?.result) {
-        stepOutput.agentOutput = agentOutput.result;
-      }
-    }
-
-    await engine.advanceStep(
-      task.processInstanceId,
-      stepOutput,
-      { id: task.assignedUserId ?? 'api-user', role: 'human' },
-    );
-
-    // 6. Write process resumed audit event
-    await auditRepo.append({
-      actorId: task.assignedUserId ?? 'api-user',
-      actorType: 'user',
-      actorRole: 'operator',
-      action: 'process.resumed_after_task',
-      description: `Process '${task.processInstanceId}' resumed after task verdict '${verdict}'`,
-      timestamp: new Date().toISOString(),
-      inputSnapshot: {
-        taskId,
-        verdict,
-        processInstanceId: task.processInstanceId,
-      },
-      outputSnapshot: {},
-      basis: 'Task completion via API triggered process advancement',
-      entityType: 'processInstance',
-      entityId: task.processInstanceId,
-      processInstanceId: task.processInstanceId,
-    });
-
-    // 7. Fire-and-forget: trigger auto-runner for next steps
-    const appUrl = getAppBaseUrl();
-    fetch(`${appUrl}/api/processes/${task.processInstanceId}/run`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
-      },
-      body: JSON.stringify({
-        triggeredBy: task.assignedUserId ?? 'api-user',
-      }),
-    }).catch(() => {});
-
-    return NextResponse.json({
-      ok: true,
-      taskId,
-      verdict,
-      processInstanceId: task.processInstanceId,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+  },
+);

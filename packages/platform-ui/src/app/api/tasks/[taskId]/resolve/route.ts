@@ -1,36 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { resolveTask, isResolveError } from '@/lib/resolve-task';
+import { NextRequest } from 'next/server';
+import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter, readJsonBody } from '@/lib/route-adapter';
+import { resolveTask } from '@mediforce/platform-api/handlers';
+import { ResolveTaskInputSchema } from '@mediforce/platform-api/contract';
+import type { ResolveTaskInput } from '@mediforce/platform-api/contract';
+import { triggerAutoRunner } from '@/lib/trigger-auto-runner';
+
+interface RouteContext {
+  params: Promise<{ taskId: string }>;
+}
 
 /**
  * POST /api/tasks/:taskId/resolve
  *
- * Thin HTTP wrapper around resolveTask(). See resolve-task.ts for logic.
- *
- * Body shapes:
- * - Verdict:     { "verdict": "approve" | "revise", "comment": "..." }
- * - Params:      { "paramValues": { ... } }
- * - File upload: { "attachments": [{ name, size, type, storagePath, downloadUrl }] }
+ * One endpoint, three body shapes (verdict / paramValues / attachments).
+ * Handler picks the path at runtime based on the task's own shape.
  */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ taskId: string }> },
-): Promise<NextResponse> {
-  try {
-    const { taskId } = await params;
-    const body = (await req.json()) as Record<string, unknown>;
-
-    const result = await resolveTask(taskId, body);
-
-    if (isResolveError(result)) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.httpStatus },
-      );
-    }
-
-    return NextResponse.json(result);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+export const POST = createRouteAdapter<
+  typeof ResolveTaskInputSchema,
+  ResolveTaskInput,
+  RouteContext
+>(
+  ResolveTaskInputSchema,
+  async (req: NextRequest, ctx) => {
+    const body = (await readJsonBody(req)) as Record<string, unknown>;
+    return { ...body, taskId: (await ctx.params).taskId };
+  },
+  (input) => {
+    const { humanTaskRepo, instanceRepo, auditRepo, engine } =
+      getPlatformServices();
+    return resolveTask(input, {
+      humanTaskRepo,
+      instanceRepo,
+      auditRepo,
+      engine,
+      triggerRun: triggerAutoRunner,
+    });
+  },
+);

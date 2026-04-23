@@ -68,3 +68,81 @@ export const GetTaskOutputSchema = HumanTaskSchema;
 
 export type GetTaskInput = z.infer<typeof GetTaskInputSchema>;
 export type GetTaskOutput = z.infer<typeof GetTaskOutputSchema>;
+
+/**
+ * Contract for `POST /api/tasks/:taskId/claim`.
+ *
+ * `userId` defaults to `'api-user'` server-side when omitted; the schema keeps
+ * it optional so clients without an identity claim can still hit the endpoint
+ * (preserves pre-migration behaviour).
+ */
+export const ClaimTaskInputSchema = z.object({
+  taskId: z.string().min(1),
+  userId: z.string().min(1).optional(),
+});
+
+export const ClaimTaskOutputSchema = HumanTaskSchema;
+
+export type ClaimTaskInput = z.infer<typeof ClaimTaskInputSchema>;
+export type ClaimTaskOutput = z.infer<typeof ClaimTaskOutputSchema>;
+
+/**
+ * Contract for `POST /api/tasks/:taskId/complete`.
+ *
+ * State-machine precondition: the task must be in `claimed` status. Other
+ * statuses return `ConflictError` (409). On success the handler also resumes
+ * the paused instance, advances the engine, and fires `/run` out-of-band.
+ */
+export const CompleteTaskInputSchema = z.object({
+  taskId: z.string().min(1),
+  verdict: z.enum(['approve', 'revise']),
+  comment: z.string().optional(),
+});
+
+export const CompleteTaskOutputSchema = z.object({
+  ok: z.literal(true),
+  taskId: z.string(),
+  verdict: z.enum(['approve', 'revise']),
+  processInstanceId: z.string(),
+});
+
+export type CompleteTaskInput = z.infer<typeof CompleteTaskInputSchema>;
+export type CompleteTaskOutput = z.infer<typeof CompleteTaskOutputSchema>;
+
+/**
+ * Contract for `POST /api/tasks/:taskId/resolve`.
+ *
+ * Single endpoint, three body shapes (verdict / paramValues / attachments).
+ * Handler validates the body against the task's expected shape at runtime;
+ * the Zod schema is permissive here because what counts as "valid" depends on
+ * task.ui.component + task.params, which are only known after the task is
+ * loaded.
+ */
+const AttachmentSchema = z.object({
+  name: z.string().min(1),
+  size: z.number().positive(),
+  type: z.string().min(1),
+  storagePath: z.string().optional(),
+  downloadUrl: z.string().optional(),
+});
+
+export const ResolveTaskInputSchema = z.object({
+  taskId: z.string().min(1),
+  verdict: z.enum(['approve', 'revise']).optional(),
+  comment: z.string().optional(),
+  selectedIndex: z.number().int().nonnegative().optional(),
+  paramValues: z.record(z.string(), z.unknown()).optional(),
+  attachments: z.array(AttachmentSchema).optional(),
+});
+
+export const ResolveTaskOutputSchema = z.object({
+  ok: z.literal(true),
+  taskId: z.string(),
+  resolvedStepId: z.string(),
+  processInstanceId: z.string(),
+  nextStepId: z.string().nullable(),
+  status: z.string(),
+});
+
+export type ResolveTaskInput = z.infer<typeof ResolveTaskInputSchema>;
+export type ResolveTaskOutput = z.infer<typeof ResolveTaskOutputSchema>;

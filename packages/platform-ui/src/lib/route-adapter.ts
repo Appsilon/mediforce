@@ -3,6 +3,19 @@ import { z } from 'zod';
 import { HandlerError } from '@mediforce/platform-api/handlers';
 
 /**
+ * Parse a request body as JSON, returning `{}` on an empty or malformed body.
+ * Kept here (not inside the handler) because the adapter is the only Next.js
+ * seam that touches `NextRequest`; handlers stay framework-free.
+ */
+export async function readJsonBody(req: NextRequest): Promise<unknown> {
+  try {
+    return await req.json();
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Wraps a pure handler (from `@mediforce/platform-api`) into a Next.js route.
  *
  * Auth is handled globally by `src/middleware.ts` (X-Api-Key or Firebase ID

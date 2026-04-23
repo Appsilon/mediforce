@@ -3,10 +3,22 @@ export {
   ListTasksOutputSchema,
   GetTaskInputSchema,
   GetTaskOutputSchema,
+  ClaimTaskInputSchema,
+  ClaimTaskOutputSchema,
+  CompleteTaskInputSchema,
+  CompleteTaskOutputSchema,
+  ResolveTaskInputSchema,
+  ResolveTaskOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
   type GetTaskOutput,
+  type ClaimTaskInput,
+  type ClaimTaskOutput,
+  type CompleteTaskInput,
+  type CompleteTaskOutput,
+  type ResolveTaskInput,
+  type ResolveTaskOutput,
 } from './tasks.js';
 
 export {

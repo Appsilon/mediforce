@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createRouteAdapter } from '../route-adapter';
-import { HandlerError, NotFoundError } from '@mediforce/platform-api/handlers';
+import {
+  HandlerError,
+  NotFoundError,
+  ConflictError,
+  ForbiddenError,
+  ValidationError,
+} from '@mediforce/platform-api/handlers';
 
 const InputSchema = z.object({ name: z.string().min(1) });
 
@@ -111,6 +117,48 @@ describe('createRouteAdapter', () => {
       await GET(makeRequest({ name: 'alice' }));
 
       expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    it('maps ConflictError to 409 with the original message', async () => {
+      const handler = vi.fn().mockRejectedValue(new ConflictError('Task already claimed'));
+      const GET = createRouteAdapter(
+        InputSchema,
+        (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+        handler,
+      );
+
+      const res = await GET(makeRequest({ name: 'alice' }));
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: 'Task already claimed' });
+    });
+
+    it('maps ForbiddenError to 403 with the original message', async () => {
+      const handler = vi.fn().mockRejectedValue(new ForbiddenError('Not your role'));
+      const GET = createRouteAdapter(
+        InputSchema,
+        (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+        handler,
+      );
+
+      const res = await GET(makeRequest({ name: 'alice' }));
+
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: 'Not your role' });
+    });
+
+    it('maps ValidationError to 400 with the original message', async () => {
+      const handler = vi.fn().mockRejectedValue(new ValidationError('Duplicate config for workflow'));
+      const GET = createRouteAdapter(
+        InputSchema,
+        (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+        handler,
+      );
+
+      const res = await GET(makeRequest({ name: 'alice' }));
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'Duplicate config for workflow' });
     });
   });
 

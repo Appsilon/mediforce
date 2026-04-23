@@ -1,5 +1,12 @@
 export { listTasks, type ListTasksDeps } from './tasks/list-tasks.js';
 export { getTask, type GetTaskDeps } from './tasks/get-task.js';
+export { claimTask, type ClaimTaskDeps } from './tasks/claim-task.js';
+export {
+  completeTask,
+  type CompleteTaskDeps,
+  type TriggerRun,
+} from './tasks/complete-task.js';
+export { resolveTask, type ResolveTaskDeps } from './tasks/resolve-task.js';
 export { getProcess, type GetProcessDeps } from './processes/get-process.js';
 export {
   listAuditEvents,
@@ -42,4 +49,10 @@ export {
 // Typed errors a handler may throw — re-exported here so the route adapter
 // (the one place that imports `@mediforce/platform-api/handlers`) has a
 // single import surface for both behaviour and error mapping.
-export { HandlerError, NotFoundError } from '../errors.js';
+export {
+  HandlerError,
+  NotFoundError,
+  ConflictError,
+  ForbiddenError,
+  ValidationError,
+} from '../errors.js';
