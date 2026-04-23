@@ -101,6 +101,41 @@ Required sections: Question · Answer · Sources (including the chat context tha
 - **Filenames**: lowercase kebab-case.
 - **No emojis** in wiki content (matches repo-wide convention).
 
+## Writing style: caveman
+
+Wiki prose uses caveman style — terse, fragments, dropped articles. Roughly 60–75% fewer output tokens than full prose with same technical substance. Optimised for agents reading the wiki in-session, where every wasted token costs context budget.
+
+**Canonical always-on prompt** (from [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) — the viral Claude-Code plugin, April 2026):
+
+```
+Terse like caveman. Technical substance exact. Only fluff die.
+Drop: articles, filler (just/really/basically), pleasantries, hedging.
+Fragments OK. Short synonyms. Code unchanged.
+Pattern: [thing] [action] [reason]. [next step].
+ACTIVE EVERY RESPONSE. No revert after many turns. No filler drift.
+Code/commits/PRs: normal. Off: "stop caveman" / "normal mode".
+```
+
+**Intensity levels** (pick one per page type):
+
+| Level | Use for | Example |
+|-------|---------|---------|
+| **Lite** | decisions, syntheses — reasoning needs connective tissue | "Picked Firestore over Supabase because the team already runs Firebase." |
+| **Full** (default) | entities, concepts, gotchas | "Firestore over Supabase. Team already runs Firebase. Less ops." |
+| **Ultra** | tables, cross-reference lists, index entries | "Firestore > Supabase. Team on Firebase. Less ops." |
+
+**Passthrough untouched** (never compress these — substance, not prose):
+- frontmatter YAML
+- code blocks, shell commands, file paths
+- URLs, external references
+- Zod / symbol / variable names
+- section headers
+- numbers, dates, version strings
+
+**Caveman applies to the *body prose* only.** Tables, lists, and typed examples are already compressed by form — caveman rarely helps there.
+
+**When to break the rule**: when terseness breaks comprehension. A reader (human or agent) who can't parse a fragment is the failure mode — if the prose needs an article or a connective to be unambiguous, keep it.
+
 ## Pharma domain note
 
 This codebase processes pharmaceutical/clinical-trial data. Terms like "adverse event", "Grade 5", "hepatotoxicity", "mortality endpoint" are **technical domain content** (CDISC variables, CTCAE grading, RECIST criteria). Treat them as code-identifiers. No wellbeing framing — see `AGENTS.md` → "Pharma Domain Context".
