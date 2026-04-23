@@ -40,7 +40,7 @@ export function OAuthConnectionStatus({
   agentId,
   serverName,
   provider,
-  namespace: _namespace,
+  namespace,
 }: OAuthConnectionStatusProps) {
   const router = useRouter();
   const search = useSearchParams();
@@ -54,7 +54,7 @@ export function OAuthConnectionStatus({
   const refresh = useCallback(async () => {
     setLoadState({ kind: 'loading' });
     try {
-      const tokens = await listAgentOAuthTokens(agentId);
+      const tokens = await listAgentOAuthTokens(agentId, namespace);
       const match = tokens.find(
         (entry) => entry.serverName === serverName && entry.provider === provider,
       );
@@ -65,7 +65,7 @@ export function OAuthConnectionStatus({
         message: err instanceof Error ? err.message : 'Failed to load connection status.',
       });
     }
-  }, [agentId, serverName, provider]);
+  }, [agentId, serverName, provider, namespace]);
 
   useEffect(() => {
     void refresh();
@@ -90,7 +90,7 @@ export function OAuthConnectionStatus({
     setMutationError(null);
     setMutating(true);
     try {
-      const { authorizeUrl } = await startOAuthFlow(agentId, provider, serverName);
+      const { authorizeUrl } = await startOAuthFlow(agentId, provider, serverName, namespace);
       window.location.href = authorizeUrl;
     } catch (err: unknown) {
       setMutationError(err instanceof Error ? err.message : 'Failed to start OAuth flow.');
@@ -102,7 +102,9 @@ export function OAuthConnectionStatus({
     setMutationError(null);
     setMutating(true);
     try {
-      await disconnectOAuthToken(agentId, provider, serverName, { revokeAtProvider: false });
+      await disconnectOAuthToken(agentId, provider, serverName, namespace, {
+        revokeAtProvider: false,
+      });
       await refresh();
     } catch (err: unknown) {
       setMutationError(err instanceof Error ? err.message : 'Failed to disconnect.');
@@ -117,7 +119,9 @@ export function OAuthConnectionStatus({
     // Close dialog BEFORE awaiting — Radix deadlock rule.
     setRevokeOpen(false);
     try {
-      await disconnectOAuthToken(agentId, provider, serverName, { revokeAtProvider: true });
+      await disconnectOAuthToken(agentId, provider, serverName, namespace, {
+        revokeAtProvider: true,
+      });
       await refresh();
     } catch (err: unknown) {
       setMutationError(err instanceof Error ? err.message : 'Failed to revoke.');

@@ -31,9 +31,11 @@ export async function startOAuthFlow(
   agentId: string,
   provider: string,
   serverName: string,
+  namespace: string,
 ): Promise<StartOAuthFlowResponse> {
   const res = await apiFetch(
-    `/api/agents/${encodeURIComponent(agentId)}/oauth/${encodeURIComponent(provider)}/start`,
+    `/api/agents/${encodeURIComponent(agentId)}/oauth/${encodeURIComponent(provider)}/start` +
+      `?namespace=${encodeURIComponent(namespace)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -47,9 +49,13 @@ export interface AgentOAuthTokenStatus extends PublicAgentOAuthToken {
   serverName: string;
 }
 
-export async function listAgentOAuthTokens(agentId: string): Promise<AgentOAuthTokenStatus[]> {
+export async function listAgentOAuthTokens(
+  agentId: string,
+  namespace: string,
+): Promise<AgentOAuthTokenStatus[]> {
   const res = await apiFetch(
-    `/api/agents/${encodeURIComponent(agentId)}/oauth`,
+    `/api/agents/${encodeURIComponent(agentId)}/oauth` +
+      `?namespace=${encodeURIComponent(namespace)}`,
   );
   const { tokens } = await parseOrThrow<{ tokens: AgentOAuthTokenStatus[] }>(
     res,
@@ -68,12 +74,14 @@ export async function disconnectOAuthToken(
   agentId: string,
   provider: string,
   serverName: string,
+  namespace: string,
   options: DisconnectOptions = {},
 ): Promise<void> {
   const revoke = options.revokeAtProvider === true ? 'true' : 'false';
   const res = await apiFetch(
     `/api/agents/${encodeURIComponent(agentId)}/oauth/${encodeURIComponent(provider)}` +
-    `?serverName=${encodeURIComponent(serverName)}&revokeAtProvider=${revoke}`,
+      `?namespace=${encodeURIComponent(namespace)}` +
+      `&serverName=${encodeURIComponent(serverName)}&revokeAtProvider=${revoke}`,
     { method: 'DELETE' },
   );
   await parseOrThrow<{ success: true }>(res, 'Disconnect OAuth token');

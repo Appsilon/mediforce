@@ -11,7 +11,17 @@ const PRODUCTION_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '')
   .map((s) => s.trim())
   .filter(Boolean);
 
-const PUBLIC_ROUTES = new Set<string>(['/api/health', '/api/oauth/callback']);
+const PUBLIC_ROUTES = new Set<string>(['/api/health']);
+const PUBLIC_ROUTE_PATTERNS: RegExp[] = [
+  // Per-provider OAuth callback — no user session at this point; the signed
+  // state HMAC inside the callback handler is the sole integrity check.
+  /^\/api\/oauth\/[^/]+\/callback$/,
+];
+
+function isPublicRoute(pathname: string): boolean {
+  if (PUBLIC_ROUTES.has(pathname)) return true;
+  return PUBLIC_ROUTE_PATTERNS.some((pattern) => pattern.test(pathname));
+}
 
 const FIREBASE_JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
@@ -105,7 +115,7 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   // (signed-in user) is sufficient. /api/admin/* will tighten to PLATFORM_ADMIN_API_KEY
   // once #218 lands — both tiers currently share PLATFORM_API_KEY.
   const pathname = req.nextUrl.pathname;
-  if (!PUBLIC_ROUTES.has(pathname)) {
+  if (!isPublicRoute(pathname)) {
     const apiKeyOk = hasValidApiKey(req);
     const bearerOk = apiKeyOk ? true : await hasValidFirebaseToken(req);
     if (!apiKeyOk && !bearerOk) {

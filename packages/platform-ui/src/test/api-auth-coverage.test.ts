@@ -39,7 +39,10 @@ describe('API route auth coverage', () => {
     const source = readFileSync(MIDDLEWARE_PATH, 'utf8');
     expect(source).toMatch(/PUBLIC_ROUTES/);
     expect(source).toMatch(/\/api\/health/);
-    expect(source).toMatch(/\/api\/oauth\/callback/);
+    // Per-provider OAuth callback is public (state HMAC is the sole integrity
+    // check). The middleware matches it via a regex pattern, not a static
+    // string, so assert on the pattern shape.
+    expect(source).toMatch(/\\\/api\\\/oauth\\\/.+callback/);
   });
 
   it('does not contain /api/redis-test/route.ts', () => {

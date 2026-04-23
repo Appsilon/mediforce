@@ -11,6 +11,7 @@ import {
 } from '@/lib/agent-mcp-client';
 import { listCatalogEntries } from '@/lib/mcp-admin-client';
 import { AgentMcpBindingForm } from './agent-mcp-binding-form';
+import { OAuthConnectionStatus } from './oauth-connection-status';
 
 interface AgentMcpSectionProps {
   agentId: string;
@@ -127,6 +128,8 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
               key={name}
               name={name}
               binding={binding}
+              agentId={agentId}
+              namespace={handle}
               onEdit={() => setDialog({ kind: 'edit', name, binding })}
               onRemove={() => setDeleteTarget({ name })}
             />
@@ -235,11 +238,15 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
 function BindingRow({
   name,
   binding,
+  agentId,
+  namespace,
   onEdit,
   onRemove,
 }: {
   name: string;
   binding: AgentMcpBinding;
+  agentId: string;
+  namespace: string;
   onEdit: () => void;
   onRemove: () => void;
 }) {
@@ -249,38 +256,55 @@ function BindingRow({
       ? `catalogId: ${binding.catalogId}`
       : truncateUrl(binding.url);
   const allowedCount = binding.allowedTools?.length ?? 0;
+  const oauthProvider =
+    binding.type === 'http' && binding.auth?.type === 'oauth' ? binding.auth.provider : null;
   return (
-    <li className="flex flex-wrap items-center gap-3 rounded-md border bg-background px-3 py-2">
-      <span className="font-mono text-sm font-semibold">{name}</span>
-      <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {transportLabel}
-      </span>
-      <span className="text-xs text-muted-foreground font-mono truncate max-w-[30ch]" title={detail}>
-        {detail}
-      </span>
-      {allowedCount > 0 && (
-        <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
-          {allowedCount} allowlisted
+    <li className="flex flex-col gap-2 rounded-md border bg-background px-3 py-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="font-mono text-sm font-semibold">{name}</span>
+        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          {transportLabel}
         </span>
-      )}
-      <div className="ml-auto flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label={`Edit ${name}`}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-          aria-label={`Remove ${name}`}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <span className="text-xs text-muted-foreground font-mono truncate max-w-[30ch]" title={detail}>
+          {detail}
+        </span>
+        {allowedCount > 0 && (
+          <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+            {allowedCount} allowlisted
+          </span>
+        )}
+        {oauthProvider !== null && (
+          <span className="inline-flex items-center rounded-full border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[11px] text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300">
+            OAuth: {oauthProvider}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label={`Edit ${name}`}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
+            aria-label={`Remove ${name}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
+      {oauthProvider !== null && (
+        <OAuthConnectionStatus
+          agentId={agentId}
+          serverName={name}
+          provider={oauthProvider}
+          namespace={namespace}
+        />
+      )}
     </li>
   );
 }

@@ -12,7 +12,6 @@ import type {
 } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { listOAuthProviders } from '@/lib/oauth-admin-client';
-import { OAuthConnectionStatus } from './oauth-connection-status';
 
 const nameRegex = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 
@@ -535,18 +534,14 @@ function HttpFields({
             </p>
           )}
 
-          {existingServerName !== null && oauthProviderId !== undefined && oauthProviderId !== '' && (
-            <OAuthConnectionStatus
-              agentId={agentId}
-              serverName={existingServerName}
-              provider={oauthProviderId}
-              namespace={namespace}
-            />
-          )}
-
-          {existingServerName === null && (
+          {existingServerName === null ? (
             <p className="text-xs text-muted-foreground">
-              Save the binding first, then you can connect the account.
+              Save the binding first, then use Connect on the binding row to start the OAuth flow.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Close this dialog — the Connect / Disconnect / Revoke actions live inline on the
+              binding row.
             </p>
           )}
         </div>
