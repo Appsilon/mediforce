@@ -1,28 +1,4 @@
 {
-  "supply-intelligence-driver-agent": {
-    "kind": "plugin",
-    "runtimeId": "supply-intelligence/driver-agent",
-    "name": "Driver Agent",
-    "iconName": "Chart",
-    "description": "Orchestrates multi-step supply chain review workflows by coordinating data collection, analysis, and reporting agents.",
-    "inputDescription": "Workflow trigger payload with study identifiers",
-    "outputDescription": "Completed workflow result with step summaries",
-    "foundationModel": "anthropic/claude-sonnet-4",
-    "systemPrompt": "",
-    "skillFileNames": []
-  },
-  "supply-intelligence-risk-detection": {
-    "kind": "plugin",
-    "runtimeId": "supply-intelligence/risk-detection",
-    "name": "Risk Detection",
-    "iconName": "Chart",
-    "description": "Analyzes vendor submissions and supply chain data to identify potential risks, anomalies, and compliance issues.",
-    "inputDescription": "Vendor submission records and historical data",
-    "outputDescription": "Risk scores, flagged issues, and recommendations",
-    "foundationModel": "anthropic/claude-sonnet-4",
-    "systemPrompt": "",
-    "skillFileNames": []
-  },
   "claude-code-agent": {
     "kind": "plugin",
     "runtimeId": "claude-code-agent",

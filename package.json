@@ -19,7 +19,7 @@
     "dev:worker": "REDIS_URL=redis://localhost:6379 tsx packages/agent-queue/src/worker-entry.ts",
     "dev:ui:queue": "REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
     "typecheck": "tsc -b --noEmit",
-    "start": "if [ \"$APP_NAME\" = \"supply-intelligence\" ]; then pnpm --filter supply-intelligence start; else pnpm --filter @mediforce/platform-ui start; fi",
+    "start": "pnpm --filter @mediforce/platform-ui start",
     "migrate:handles": "tsx scripts/migrate-user-handles.ts"
   },
   "pnpm": {

@@ -15,12 +15,9 @@ COPY packages/workflow-engine/package.json packages/workflow-engine/
 COPY packages/agent-runtime/package.json packages/agent-runtime/
 COPY packages/agent-queue/package.json packages/agent-queue/
 COPY packages/mcp-client/package.json packages/mcp-client/
-COPY packages/supply-intelligence/package.json packages/supply-intelligence/
-COPY packages/supply-intelligence-plugins/package.json packages/supply-intelligence-plugins/
 COPY packages/platform-ui/package.json packages/platform-ui/
 COPY apps/community-digest/package.json apps/community-digest/
 COPY apps/protocol-to-tfl/package.json apps/protocol-to-tfl/
-COPY apps/supply-intelligence/package.json apps/supply-intelligence/
 
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store && \

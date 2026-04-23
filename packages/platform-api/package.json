@@ -48,7 +48,6 @@
     "@mediforce/agent-runtime": "workspace:*",
     "@mediforce/platform-core": "workspace:*",
     "@mediforce/platform-infra": "workspace:*",
-    "@mediforce/supply-intelligence-plugins": "workspace:*",
     "@mediforce/workflow-engine": "workspace:*",
     "zod": "^4.0.0"
   },
