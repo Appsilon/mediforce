@@ -223,6 +223,21 @@ describe('Previous run outputs (inputForNextRun)', () => {
       expect(next.previousRun).toEqual({});
       expect(next.previousRunSourceId).toBeUndefined();
     });
+
+    it('propagates repository errors from createInstance (no silent degradation to {})', async () => {
+      // Infrastructure failure during resolution (Firestore flaking, network,
+      // malformed data) must surface as an exception from createInstance, not
+      // be swallowed into a {} carry-over — a WD that declares inputForNextRun
+      // has opted into required state and shouldn't silently lose it.
+      const repoError = new Error('Firestore unavailable');
+      instanceRepo.getLastCompletedByDefinitionName = async () => {
+        throw repoError;
+      };
+
+      await expect(
+        engine.createInstance('sftp-monitor', 1, 'user-1', 'manual', {}),
+      ).rejects.toThrow(repoError);
+    });
   });
 
   describe('most recent completed run wins', () => {

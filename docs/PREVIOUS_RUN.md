@@ -46,6 +46,13 @@ The step sees the carry-over in its execution context as `previousRun`:
 
 ### First-run and failure handling
 
+Two cases are deliberately distinguished: a **semantic empty** (no prior
+state to carry — legitimate, the run proceeds with `{}`) and an
+**infrastructure failure** (resolution itself broke — the run is not
+created at all).
+
+**Semantic empty — `previousRun` is `{}` or partial, run proceeds:**
+
 - First run ever → `previousRun` is `{}`.
 - Predecessor failed → skipped; resolver takes the next most-recent
   successful run. If none exist, `previousRun` is `{}`.
@@ -55,6 +62,15 @@ The step sees the carry-over in its execution context as `previousRun`:
 Steps that read `previousRun` **must handle the empty-object case explicitly**.
 A cursor-based monitor, for example, would process everything newer than
 `previousRun.cursor ?? <beginning-of-time>`.
+
+**Infrastructure failure — `createInstance` throws:**
+
+If the repository rejects while the resolver is looking up the predecessor
+or its step executions (Firestore unavailable, network error, permissions,
+malformed data), the error propagates out of `createInstance` and the run
+is not created. A WD that declares `inputForNextRun` will not silently
+degrade to `{}` when resolution cannot be performed — the caller (trigger,
+API route, cron) sees the failure and can retry.
 
 ## Validation
 

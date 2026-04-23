@@ -658,9 +658,14 @@ export class WorkflowEngine {
    * predecessor run qualifies (first run ever, all previous runs failed).
    * `sourceId` is only set when a predecessor was found.
    *
-   * Resolution is best-effort: a missing step execution or missing output key
-   * simply omits that key from `values`. Run creation never fails because of
-   * carry-over resolution.
+   * Two cases are deliberately distinguished:
+   * - **Semantic empty** (first run, all predecessors failed, predecessor's
+   *   step didn't produce the declared output): `values` is `{}` or partial
+   *   and the run proceeds. Steps that read `previousRun` must handle this.
+   * - **Infrastructure failure** (repository rejects, network error, etc.):
+   *   the error propagates out of `createInstance`. A WD that declares
+   *   `inputForNextRun` will not silently degrade to `{}` when resolution
+   *   cannot be performed — the run is not created.
    */
   private async resolvePreviousRunOutputs(
     definition: WorkflowDefinition,
