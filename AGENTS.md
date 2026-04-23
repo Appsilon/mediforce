@@ -231,6 +231,20 @@ The script is idempotent (safe to run multiple times) and handles:
 
 `agent-browser` skill at `skills/agent-browser/SKILL.md`. Use for visual verification after Playwright tests pass. Dev server on `http://localhost:9003`.
 
+## API auth — which caller do I use?
+
+Every `/api/*` request is guarded by `packages/platform-ui/src/middleware.ts`, which accepts **either** `X-Api-Key` (server-to-server) **or** `Authorization: Bearer <Firebase ID token>` (signed-in user). The caller side is standardised — pick the row that matches your runtime and the endpoint's migration state:
+
+| Runtime | Endpoint already in `@mediforce/platform-api/contract`? | Use |
+|---|---|---|
+| Browser (`"use client"` / client hook) | Yes | `mediforce.<domain>.<method>()` from `@/lib/mediforce` — typed, Zod-validated, `Authorization: Bearer` |
+| Browser (`"use client"` / client hook) | Not yet | `apiFetch('/api/...')` from `@/lib/api-fetch` — raw fetch wrapper, same `Authorization: Bearer` |
+| Node server-to-server (CLI, agent, MCP server, cron, queue worker) | Yes | `new Mediforce({ apiKey: process.env.PLATFORM_API_KEY, baseUrl })` |
+| Node server-to-server (route handler, server action) | Not yet | `fetch(url, { headers: { 'X-Api-Key': process.env.PLATFORM_API_KEY } })` |
+| Curl / local testing | — | `curl -H "X-Api-Key: $MEDIFORCE_API_KEY" ...` |
+
+**Never** call a raw `fetch('/api/...')` from a client component without going through `apiFetch` or `mediforce` — middleware will 401 silently. Both browser paths share a single `getFirebaseIdToken()` helper (`lib/firebase-id-token.ts`), so the wire-level header is byte-identical.
+
 ## Local API Access
 
 Use the `MEDIFORCE_API_KEY` env var for local API calls (set in shell profile).
