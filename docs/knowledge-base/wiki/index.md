@@ -12,11 +12,17 @@ _Empty — wiki bootstrap. Add TODOs here during lint passes (missing pages, bro
 
 ### Packages
 
-_Pending — ingest per-package READMEs under `packages/` and `apps/` to populate._
+- [platform-core](./entities/packages/platform-core.md) — foundational Zod schemas, repository interfaces, test factories; zero internal deps.
+- [platform-infra](./entities/packages/platform-infra.md) — Firestore repositories, Firebase auth, notifications, secrets cipher.
+- [workflow-engine](./entities/packages/workflow-engine.md) — process instance orchestrator, transition routing, triggers, expression evaluator.
+- [agent-runtime](./entities/packages/agent-runtime.md) — agent execution engine, plugin dispatch, Docker spawn strategies, fallback handling.
+- [platform-ui](./entities/packages/platform-ui.md) — Next.js 15 web app, API routes, `getPlatformServices()` composition root.
+- [supply-intelligence](./entities/packages/supply-intelligence.md) — pure supply-chain domain (SKU, warehouse, batch, FEFO allocation, risk classification).
+- [supply-intelligence-plugins](./entities/packages/supply-intelligence-plugins.md) — LLM narratives + Firestore draft-issue writes wrapping supply-intelligence.
 
 ### Plugins
 
-_Pending — ingest plugins registered in `PluginRegistry` (claude-code, opencode, script-container, supply-intelligence)._
+_Pending commit 2 — claude-code-agent, opencode-agent, script-container, example-agent, supply-intelligence plugins._
 
 ### Workflows
 
@@ -24,11 +30,13 @@ _Pending — ingest `**/*.wd.json` files._
 
 ### Apps
 
-_Pending — ingest `apps/*/` (supply-intelligence, protocol-to-tfl, community-digest, workflow-designer)._
+_Pending commit 3 — supply-intelligence, protocol-to-tfl, community-digest, workflow-designer._
 
 ## Concepts
 
-_Pending — candidate seed list: repository-pattern, plugin-dispatch, autonomy-levels, dual-schema-migration, docker-spawn-strategies, expression-evaluator, cdisc-sdtm, ctcae-grading, recist-v1-1._
+_Pending commit 4 — autonomy-levels, plugin-dispatch, repository-pattern, docker-spawn-strategies, dual-schema-migration, expression-evaluator, service-singleton._
+
+_Pending commit 5 (pharma domain) — cdisc-sdtm, ctcae-grading, recist-v1-1, pharma-domain-context._
 
 ## Decisions
 
@@ -36,7 +44,7 @@ _Pending._
 
 ## Gotchas
 
-_Pending._
+_Pending commit 6 — mediforce-source-custom-condition, remote-e2e-setup, dual-schema-routing._
 
 ## Syntheses
 
