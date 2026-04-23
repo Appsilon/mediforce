@@ -56,10 +56,17 @@ import { HandlerError } from '@mediforce/platform-api/handlers';
  * or the cast becomes a silent lie. If you need a looser supertype rather
  * than a subset, do not use this generic — parse inside the handler instead.
  */
+/**
+ * Default `Context` type — satisfies Next.js 16's `RouteContext` shape
+ * (`{ params: Promise<SegmentParams> }`) for flat (non-dynamic) routes.
+ * Dynamic routes override this with a narrower `{ params: Promise<{ …}> }`.
+ */
+type EmptyRouteContext = { params: Promise<Record<string, never>> };
+
 export function createRouteAdapter<
   InputSchema extends z.ZodType,
   NarrowInput = z.infer<InputSchema>,
-  Context = undefined,
+  Context extends { params: Promise<Record<string, string | string[] | undefined>> } = EmptyRouteContext,
   Output = unknown,
 >(
   inputSchema: InputSchema,
