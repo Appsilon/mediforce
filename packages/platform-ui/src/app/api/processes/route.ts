@@ -1,58 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
+import { NextRequest } from 'next/server';
+import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter, readJsonBody } from '@/lib/route-adapter';
+import { createProcess } from '@mediforce/platform-api/handlers';
+import { CreateProcessInputSchema } from '@mediforce/platform-api/contract';
+import { triggerAutoRunner } from '@/lib/trigger-auto-runner';
 
-interface StartWorkflowBody {
-  definitionName: string;
-  definitionVersion?: number;
-  version?: string | number;
-  triggeredBy: string;
-  triggerName?: string;
-  payload?: Record<string, unknown>;
-}
-
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  try {
-    const body = (await req.json()) as StartWorkflowBody;
-    const { manualTrigger, processRepo } = getPlatformServices();
-
-    let version = body.definitionVersion ?? (body.version ? Number(body.version) : undefined);
-    if (!version) {
-      version = await processRepo.getLatestWorkflowVersion(body.definitionName);
-      if (version === 0) {
-        return NextResponse.json(
-          { error: `No workflow definition found for '${body.definitionName}'` },
-          { status: 404 },
-        );
-      }
-    }
-
-    const result = await manualTrigger.fireWorkflow({
+/**
+ * POST /api/processes
+ *
+ * Body: `{ definitionName: string; definitionVersion?: number; triggerName?: string; triggeredBy: string; payload?: object }`.
+ */
+export const POST = createRouteAdapter(
+  CreateProcessInputSchema,
+  async (req: NextRequest) => {
+    const body = (await readJsonBody(req)) as Record<string, unknown>;
+    // Legacy clients passed `version` as string; normalise to number.
+    const legacyVersion =
+      body.version !== undefined ? Number(body.version) : undefined;
+    return {
       definitionName: body.definitionName,
-      definitionVersion: version,
-      triggerName: body.triggerName ?? 'manual',
+      definitionVersion: body.definitionVersion ?? legacyVersion,
+      triggerName: body.triggerName,
       triggeredBy: body.triggeredBy,
-      payload: body.payload ?? {},
+      payload: body.payload,
+    };
+  },
+  (input) => {
+    const { manualTrigger, processRepo } = getPlatformServices();
+    return createProcess(input, {
+      manualTrigger,
+      processRepo,
+      triggerRun: triggerAutoRunner,
     });
-
-    // Fire-and-forget: trigger auto-runner asynchronously
-    const baseUrl = getAppBaseUrl();
-    fetch(`${baseUrl}/api/processes/${result.instanceId}/run`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
-      },
-      body: JSON.stringify({
-        appContext: body.payload ?? {},
-        triggeredBy: body.triggeredBy,
-      }),
-    }).catch((err) => {
-      console.error(`[auto-runner] Failed to trigger run for ${result.instanceId}:`, err);
-    });
-
-    return NextResponse.json({ instanceId: result.instanceId, status: result.status }, { status: 201 });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+  },
+);

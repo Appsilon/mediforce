@@ -47,6 +47,12 @@ export {
   GetProcessStepsOutputSchema,
   StepEntrySchema,
   StepEntryStatusSchema,
+  CreateProcessInputSchema,
+  CreateProcessOutputSchema,
+  CancelProcessInputSchema,
+  CancelProcessOutputSchema,
+  ResumeProcessInputSchema,
+  ResumeProcessOutputSchema,
   type GetProcessInput,
   type GetProcessOutput,
   type ListAuditEventsInput,
@@ -55,6 +61,12 @@ export {
   type GetProcessStepsOutput,
   type StepEntry,
   type StepEntryStatus,
+  type CreateProcessInput,
+  type CreateProcessOutput,
+  type CancelProcessInput,
+  type CancelProcessOutput,
+  type ResumeProcessInput,
+  type ResumeProcessOutput,
 } from './processes.js';
 
 export {

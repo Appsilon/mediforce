@@ -85,3 +85,54 @@ export type StepEntryStatus = z.infer<typeof StepEntryStatusSchema>;
 export type StepEntry = z.infer<typeof StepEntrySchema>;
 export type GetProcessStepsInput = z.infer<typeof GetProcessStepsInputSchema>;
 export type GetProcessStepsOutput = z.infer<typeof GetProcessStepsOutputSchema>;
+
+// ---- POST /api/processes (create/start) -------------------------------------
+//
+// Start a new process instance from a workflow definition. If `definitionVersion`
+// is omitted, the handler resolves the latest version; a workflow with no
+// versions surfaces as `NotFoundError` (404).
+
+export const CreateProcessInputSchema = z.object({
+  definitionName: z.string().min(1),
+  definitionVersion: z.number().int().positive().optional(),
+  triggerName: z.string().min(1).optional(),
+  triggeredBy: z.string().min(1),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const CreateProcessOutputSchema = z.object({
+  instanceId: z.string(),
+  status: InstanceStatusSchema,
+});
+
+export type CreateProcessInput = z.infer<typeof CreateProcessInputSchema>;
+export type CreateProcessOutput = z.infer<typeof CreateProcessOutputSchema>;
+
+// ---- POST /api/processes/:instanceId/cancel ---------------------------------
+
+export const CancelProcessInputSchema = z.object({
+  instanceId: z.string().min(1),
+});
+
+export const CancelProcessOutputSchema = z.object({
+  instanceId: z.string(),
+  status: InstanceStatusSchema,
+});
+
+export type CancelProcessInput = z.infer<typeof CancelProcessInputSchema>;
+export type CancelProcessOutput = z.infer<typeof CancelProcessOutputSchema>;
+
+// ---- POST /api/processes/:instanceId/resume ---------------------------------
+
+export const ResumeProcessInputSchema = z.object({
+  instanceId: z.string().min(1),
+});
+
+export const ResumeProcessOutputSchema = z.object({
+  ok: z.literal(true),
+  instanceId: z.string(),
+  status: InstanceStatusSchema,
+});
+
+export type ResumeProcessInput = z.infer<typeof ResumeProcessInputSchema>;
+export type ResumeProcessOutput = z.infer<typeof ResumeProcessOutputSchema>;

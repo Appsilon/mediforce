@@ -17,6 +17,19 @@ export {
   type GetProcessStepsDeps,
 } from './processes/get-process-steps.js';
 export {
+  createProcess,
+  type CreateProcessDeps,
+  type ManualTriggerLike,
+} from './processes/create-process.js';
+export {
+  cancelProcess,
+  type CancelProcessDeps,
+} from './processes/cancel-process.js';
+export {
+  resumeProcess,
+  type ResumeProcessDeps,
+} from './processes/resume-process.js';
+export {
   listWorkflowDefinitions,
   type ListWorkflowDefinitionsDeps,
 } from './definitions/list-workflow-definitions.js';

@@ -1,35 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { cancelProcess } from '@mediforce/platform-api/handlers';
+import { CancelProcessInputSchema } from '@mediforce/platform-api/contract';
+import type { CancelProcessInput } from '@mediforce/platform-api/contract';
 
-export async function POST(
-  _req: NextRequest,
-  { params }: { params: Promise<{ instanceId: string }> },
-): Promise<NextResponse> {
-  try {
-    const { instanceId } = await params;
-    const { instanceRepo } = getPlatformServices();
-
-    const instance = await instanceRepo.getById(instanceId);
-    if (!instance) {
-      return NextResponse.json({ error: 'Instance not found' }, { status: 404 });
-    }
-
-    if (instance.status !== 'running' && instance.status !== 'paused') {
-      return NextResponse.json(
-        { error: `Cannot cancel instance in status '${instance.status}'` },
-        { status: 409 },
-      );
-    }
-
-    await instanceRepo.update(instanceId, {
-      status: 'failed',
-      error: 'Cancelled by user',
-      updatedAt: new Date().toISOString(),
-    });
-
-    return NextResponse.json({ instanceId, status: 'failed' });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+interface RouteContext {
+  params: Promise<{ instanceId: string }>;
 }
+
+/**
+ * POST /api/processes/:instanceId/cancel
+ */
+export const POST = createRouteAdapter<
+  typeof CancelProcessInputSchema,
+  CancelProcessInput,
+  RouteContext
+>(
+  CancelProcessInputSchema,
+  async (_req, ctx) => ({ instanceId: (await ctx.params).instanceId }),
+  (input) =>
+    cancelProcess(input, { instanceRepo: getPlatformServices().instanceRepo }),
+);
