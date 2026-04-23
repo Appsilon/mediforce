@@ -64,6 +64,15 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
         }
       : null;
 
+  const escalationReason = agentOutput.escalationReason;
+  const normalizedEscalation: EscalationReason =
+    escalationReason === 'low_confidence' ||
+    escalationReason === 'timeout' ||
+    escalationReason === 'error' ||
+    escalationReason === 'iterations_limit'
+      ? escalationReason
+      : null;
+
   return {
     confidence: typeof agentOutput.confidence === 'number' ? agentOutput.confidence : null,
     confidence_rationale: typeof agentOutput.confidence_rationale === 'string' ? agentOutput.confidence_rationale : null,
@@ -73,17 +82,24 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
     duration_ms: typeof agentOutput.duration_ms === 'number' ? agentOutput.duration_ms : null,
     gitMetadata,
     presentation: typeof agentOutput.presentation === 'string' ? agentOutput.presentation : null,
+    escalationReason: normalizedEscalation,
   };
 }
 
-/** Find agent output from sibling tasks for the same step. */
+/** Find agent output from the closest preceding sibling task for the same step.
+ *  Siblings are expected in createdAt-asc order. We walk backwards from the
+ *  current task's position to find the agent run that produced output for
+ *  this specific iteration (not just the first match). */
 export function getAgentOutputFromSiblings(
   task: HumanTask,
   siblingTasks: HumanTask[],
 ): AgentOutputData | null {
-  // Look for a sibling task with the same stepId that has agent output
-  for (const sibling of siblingTasks) {
-    if (sibling.id === task.id) continue;
+  const taskIndex = siblingTasks.findIndex((s) => s.id === task.id);
+
+  // Walk backwards from the current task to find the nearest preceding sibling
+  // with agent output on the same step — this is the agent run for this iteration.
+  for (let i = (taskIndex === -1 ? siblingTasks.length : taskIndex) - 1; i >= 0; i--) {
+    const sibling = siblingTasks[i];
     if (sibling.stepId !== task.stepId) continue;
     const output = getAgentOutput(sibling);
     if (output) return output;
@@ -98,6 +114,8 @@ export interface GitMetadataData {
   repoUrl: string;
 }
 
+export type EscalationReason = 'low_confidence' | 'timeout' | 'error' | 'iterations_limit' | null;
+
 export interface AgentOutputData {
   confidence: number | null;
   confidence_rationale: string | null;
@@ -107,4 +125,5 @@ export interface AgentOutputData {
   duration_ms: number | null;
   gitMetadata: GitMetadataData | null;
   presentation: string | null;
+  escalationReason: EscalationReason;
 }

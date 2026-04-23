@@ -257,6 +257,25 @@ export function buildSeedData(testUserId: string) {
       error: null,
       assignedRoles: ['operator'],
     },
+    // Dedicated instance for retry-step test — seeded as failed on a human step
+    // so clicking Retry flips it to running; the auto-runner then creates a
+    // HumanTask and pauses the instance. No plugin or Docker involved.
+    'proc-retry-test': {
+      id: 'proc-retry-test',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1',
+      status: 'failed',
+      currentStepId: 'human-review',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: threeDaysAgo,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: 'Simulated step failure for retry journey',
+      assignedRoles: ['reviewer'],
+    },
   };
 
   const agentRuns: Record<string, Record<string, unknown>> = {
@@ -424,6 +443,25 @@ export function buildSeedData(testUserId: string) {
       iterationNumber: 0,
       gateResult: null,
       error: null,
+    },
+  };
+
+  const retryTestStepExecutions: Record<string, Record<string, unknown>> = {
+    // Seed a single failed execution so retryStep's latestExecution guard is satisfied
+    'exec-retry-fail-1': {
+      id: 'exec-retry-fail-1',
+      instanceId: 'proc-retry-test',
+      stepId: 'human-review',
+      status: 'failed',
+      input: {},
+      output: null,
+      verdict: null,
+      executedBy: 'auto-runner',
+      startedAt: threeDaysAgo,
+      completedAt: threeDaysAgo,
+      iterationNumber: 0,
+      gateResult: null,
+      error: 'Simulated step failure for retry journey',
     },
   };
 
@@ -694,79 +732,6 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
-  const agentDefinitions: Record<string, Record<string, unknown>> = {
-    'agent-def-driver': {
-      id: 'agent-def-driver',
-      pluginId: 'supply-intelligence/driver-agent',
-      name: 'Driver Agent',
-      iconName: 'Chart',
-      description: 'Orchestrates multi-step supply chain review workflows by coordinating data collection, analysis, and reporting agents.',
-      inputDescription: 'Workflow trigger payload with study identifiers',
-      outputDescription: 'Completed workflow result with step summaries',
-      foundationModel: 'anthropic/claude-sonnet-4',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-risk-detection': {
-      id: 'agent-def-risk-detection',
-      pluginId: 'supply-intelligence/risk-detection',
-      name: 'Risk Detection',
-      iconName: 'Chart',
-      description: 'Analyzes vendor submissions and supply chain data to identify potential risks, anomalies, and compliance issues.',
-      inputDescription: 'Vendor submission records and historical data',
-      outputDescription: 'Risk scores, flagged issues, and recommendations',
-      foundationModel: 'anthropic/claude-sonnet-4',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-claude-code': {
-      id: 'agent-def-claude-code',
-      pluginId: 'claude-code-agent',
-      name: 'Claude Code Agent',
-      iconName: 'Bot',
-      description: 'Executes code generation, analysis, and automated software tasks using Claude\'s advanced coding capabilities.',
-      inputDescription: 'Task description and relevant code context',
-      outputDescription: 'Generated code, analysis results, or task completion report',
-      foundationModel: 'anthropic/claude-sonnet-4',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-opencode': {
-      id: 'agent-def-opencode',
-      pluginId: 'opencode-agent',
-      name: 'OpenCode Agent',
-      iconName: 'Cpu',
-      description: 'Open-source code execution agent powered by DeepSeek for cost-efficient automated development tasks.',
-      inputDescription: 'Code task description and project context',
-      outputDescription: 'Implemented code changes and execution results',
-      foundationModel: 'deepseek/deepseek-chat',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-script-container': {
-      id: 'agent-def-script-container',
-      pluginId: 'script-container',
-      name: 'Script Container',
-      iconName: 'Terminal',
-      description: 'Sandboxed execution environment for running custom scripts, data transformations, and automation tasks.',
-      inputDescription: 'Script definition and input parameters',
-      outputDescription: 'Script execution output and exit status',
-      foundationModel: 'anthropic/claude-sonnet-4',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-  };
-
   const namespaces: Record<string, Record<string, unknown>> = {
     test: {
       id: 'test',
@@ -785,6 +750,92 @@ export function buildSeedData(testUserId: string) {
       role: 'owner',
       joinedAt: '2024-01-01T00:00:00.000Z',
     },
+  };
+
+  // Namespace-scoped tool catalog — seed entries under
+  // `namespaces/{TEST_ORG_HANDLE}/toolCatalog/{entryId}`. Doc id IS the entry id,
+  // so we strip `id` from the payload to match FirestoreToolCatalogRepository
+  // (see packages/platform-infra/src/firestore/tool-catalog-repository.ts).
+  const toolCatalog: Record<string, Record<string, unknown>> = {
+    filesystem: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'],
+      description: 'Read and write files in a scoped directory.',
+    },
+    postgres: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-postgres'],
+      env: { DATABASE_URL: '{{SECRET:DATABASE_URL}}' },
+      description: 'Execute read-only SQL queries against a PostgreSQL database.',
+    },
+  };
+
+  // Top-level agentDefinitions collection — pre-seed `claude-code-agent` so the
+  // agent MCP journey is deterministic. Without this, the page relies on the
+  // fire-and-forget `seedBuiltinAgentDefinitions` in platform-services, which
+  // races with the first GET `/api/agent-definitions/:id` request.
+  //
+  // `mcp-test-agent` is a fixture consumed by step-mcp-restrictions.journey.ts —
+  // it ships with one pre-bound stdio server so the Restrictions section has
+  // something to narrow. Journey 2 uses `claude-code-agent`, which must start
+  // binding-free for its "empty state" assertion; hence the split.
+  const agentDefinitions: Record<string, Record<string, unknown>> = {
+    'claude-code-agent': {
+      kind: 'plugin',
+      runtimeId: 'claude-code-agent',
+      name: 'Claude Code Agent',
+      iconName: 'Bot',
+      description:
+        "Executes code generation, analysis, and automated software tasks using Claude's advanced coding capabilities.",
+      inputDescription: 'Task description and relevant code context',
+      outputDescription: 'Generated code, analysis results, or task completion report',
+      foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: '',
+      skillFileNames: [],
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+    },
+    'mcp-test-agent': {
+      kind: 'plugin',
+      runtimeId: 'script-container',
+      name: 'MCP Test Agent',
+      iconName: 'Terminal',
+      description: 'Fixture agent for step-level MCP restrictions journey.',
+      inputDescription: 'test input',
+      outputDescription: 'test output',
+      foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: '',
+      skillFileNames: [],
+      mcpServers: {
+        filesystem: { type: 'stdio', catalogId: 'filesystem' },
+      },
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+    },
+  };
+
+  // Minimal workflow with one agent step referencing `mcp-test-agent`, used
+  // only by step-mcp-restrictions.journey.ts.
+  workflowDefinitions['MCP Restrictions Test:1'] = {
+    name: 'MCP Restrictions Test',
+    namespace: 'test',
+    version: 1,
+    description: 'Fixture workflow for step-level MCP restrictions journey',
+    steps: [
+      {
+        id: 'process',
+        name: 'Process',
+        type: 'creation',
+        executor: 'agent',
+        autonomyLevel: 'L2',
+        plugin: 'script-container',
+        agentId: 'mcp-test-agent',
+      },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'process', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start' }],
+    createdAt: twoDaysAgo,
   };
 
   // -------------------------------------------------------------------------
@@ -905,5 +956,5 @@ export function buildSeedData(testUserId: string) {
     createdAt: twoDaysAgo,
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions, namespaces, namespaceMembers, coworkSessions };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, agentDefinitions };
 }

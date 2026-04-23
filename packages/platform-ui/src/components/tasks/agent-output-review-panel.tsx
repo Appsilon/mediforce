@@ -3,9 +3,10 @@
 import * as React from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useTheme } from 'next-themes';
-import { Bot, Code, ExternalLink, FileText, Gauge, GitBranch, Loader2, MonitorPlay } from 'lucide-react';
+import { AlertTriangle, Bot, Code, ExternalLink, FileText, Gauge, GitBranch, Loader2, MonitorPlay } from 'lucide-react';
 import type { AgentOutputData } from './task-utils';
 import { formatStepName } from './task-utils';
+import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 
 interface AgentOutputReviewPanelProps {
@@ -126,7 +127,7 @@ export function AgentOutputReviewPanel({
   React.useEffect(() => {
     if (!outputFilePath) return;
     setFileLoading(true);
-    fetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}`)
+    apiFetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}`)
       .then((res) => res.json() as Promise<{ content?: string; error?: string }>)
       .then((data) => {
         if (data.error && !data.content) {
@@ -178,6 +179,16 @@ export function AgentOutputReviewPanel({
           {stepId && (
             <span className="text-xs font-medium text-foreground">
               — {formatStepName(stepId)}
+            </span>
+          )}
+          {agentOutput.escalationReason !== null && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+              title={`Agent escalated to human because of ${agentOutput.escalationReason.replace(/_/g, ' ')}. Review the recommendation and approve or request revision.`}
+            >
+              <AlertTriangle className="h-3 w-3" />
+              Escalated: {formatEscalationReason(agentOutput.escalationReason)}
+              {agentOutput.escalationReason === 'low_confidence' && confidencePct !== null && ` (${confidencePct}%)`}
             </span>
           )}
         </div>
@@ -599,6 +610,15 @@ function formatKey(key: string): string {
     .replace(/_/g, ' ')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatEscalationReason(reason: 'low_confidence' | 'timeout' | 'error' | 'iterations_limit'): string {
+  switch (reason) {
+    case 'low_confidence': return 'low confidence';
+    case 'timeout': return 'timeout';
+    case 'error': return 'error';
+    case 'iterations_limit': return 'iterations limit reached';
+  }
 }
 
 function formatDuration(ms: number): string {

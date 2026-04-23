@@ -4,6 +4,11 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 
 ## Contents
 
+**Authentication & Workspaces** — sign-in, workspace selection, and account setup
+- [Sign In](#sign-in) — email/password sign-in with redirect to workspace
+- [Workspace Selection](#workspace-selection) — choosing between personal and org workspaces
+- [Forced Password Change](#forced-password-change) — invited user sets a permanent password on first sign-in
+
 **Tasks** — human review queue for workflow steps requiring human input
 - [Task Browsing & Grouping](#task-browsing--grouping) — reviewers find their tasks across workflows
 - [Task Approve Flow](#task-approve-flow) — reviewer sees context, submits verdict
@@ -24,12 +29,14 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Workflow Editor — Executor Switch](#workflow-editor--executor-switch) — changing executor type clears stale fields from the workflow definition
 - [Workflow Editor — Cowork Step](#workflow-editor--cowork-step) — adding a cowork step with human+agent collaboration config
 - [Workflow Editor — Cowork MCP Servers](#workflow-editor--cowork-mcp-servers) — configuring MCP server tools on a cowork step
+- [Workflow Editor — Step MCP Restrictions](#workflow-editor--step-mcp-restrictions) — per-step disable/denyTools overrides on top of the agent's MCP bindings
 
 **Process Runs** — monitoring and controlling workflow executions
 - [Run Detail — Step Graph](#run-detail--step-graph) — tracking progress through workflow steps
 - [Run Detail — Completed](#run-detail--completed) — verifying all steps finished successfully
 - [Run Detail — Autonomy Badges](#run-detail--autonomy-badges) — seeing which steps are agent-driven vs human
 - [Cancel Run](#cancel-run) — safely stopping a running process with confirmation
+- [Retry Failed Step](#retry-failed-step) — re-running a failed step in place without restarting the workflow
 - [Run Report](#run-report) — post-completion summary with timing and step outputs
 - [Report Unavailable](#report-unavailable) — guard preventing report access on in-progress runs
 
@@ -39,12 +46,40 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 
 **Tools** — MCP server catalog with per-step access control
 - [Tool Catalog](#tool-catalog) — browsing, searching, and inspecting MCP tools
+- [Admin Tool Catalog](#admin-tool-catalog) — admins manage namespace-scoped stdio catalog entries (create, edit, delete)
 
 
 **Agents** — AI agent catalog and execution oversight
 - [Agent Catalog & History](#agent-catalog--history) — discovering agents and reviewing their past runs
 - [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
 - [New Agent Form](#new-agent-form) — creating a new agent definition
+- [Agent MCP Bindings](#agent-mcp-bindings) — per-agent stdio (catalog) and HTTP (inline URL) tool bindings with allowlists
+
+**Platform shortcuts** — keyboard-first utilities available everywhere
+- [Command Palette — New Ticket](#command-palette--new-ticket) — file a bug/idea/question from the command palette
+- [Command Palette — Shortcuts](#command-palette--shortcuts) — discoverable list of all keyboard shortcuts
+
+---
+
+## Authentication & Workspaces
+
+### Sign In
+
+Users sign in with their email and password. After successful authentication, the app redirects to workspace selection, which auto-routes to the personal workspace when there is only one workspace.
+
+![sign-in](sign-in.gif)
+
+### Workspace Selection
+
+Users with multiple workspaces (personal + org memberships) see a picker on sign-in. Each workspace is shown as a card. Selecting one navigates directly into that workspace. A "Set as default" checkbox lets users skip the picker on future sign-ins.
+
+![workspace-selection](workspace-selection.gif)
+
+### Forced Password Change
+
+When an admin invites a user and sets a temporary password, `mustChangePassword` is flagged in Firestore. On first sign-in the app intercepts the navigation and redirects to a mandatory password-change screen. The user sets a permanent password and is then routed into their workspace normally.
+
+![forced-password-change](forced-password-change.gif)
 
 ---
 
@@ -156,6 +191,12 @@ The cowork step editor includes an MCP Servers section where the agent's externa
 
 ![workflow-editor-cowork-mcp](workflow-editor-cowork-mcp.gif)
 
+### Workflow Editor — Step MCP Restrictions
+
+Agent steps show an MCP Restrictions panel listing every binding inherited from the step's agent definition (loaded live from `/api/agent-definitions/:id/mcp-servers`). For each binding the workflow author can toggle it off for this step or narrow its `allowedTools` via a deny list, and both overrides surface in the YAML under the step's `mcpRestrictions` block. This keeps agent-level bindings reusable while letting individual steps run with a tighter tool surface.
+
+![step-mcp-restrictions](step-mcp-restrictions.gif)
+
 ---
 
 ## Process Runs
@@ -183,6 +224,12 @@ Steps display their autonomy level (L1–L4) from the process config. L2 means a
 Stopping a running process requires double confirmation to prevent accidental cancellation. First click shows warning ("cannot be undone"), "Keep running" dismisses back to idle. Second attempt confirms and the run status changes.
 
 ![cancel-run](cancel-run.gif)
+
+### Retry Failed Step
+
+When a step fails (docker daemon down, flaky network, etc.), clicking Retry on the failed step flips the instance back to running and the auto-runner re-dispatches that step — without restarting from the beginning. Variables from earlier steps are preserved.
+
+![retry-step](retry-step.gif)
 
 ### Run Report
 
@@ -223,6 +270,12 @@ Organization-level MCP server catalog with three-layer access control. Browse to
 
 ![tool-catalog](tool-catalog.gif)
 
+### Admin Tool Catalog
+
+Admins manage the namespace-scoped MCP catalog from `/[handle]/admin/tool-catalog`. The split-pane layout lists all stdio entries on the left and edits the selected one on the right. A new-entry form collects `id`, `command`, variadic `args`, optional environment variables (with `{{SECRET:…}}` placeholders), and description. Editing updates the entry in place with an auto-save indicator; deleting pops a confirmation dialog and removes the entry from the namespace's `toolCatalog` subcollection.
+
+![admin-tool-catalog](admin-tool-catalog.gif)
+
 ---
 
 
@@ -245,3 +298,23 @@ When an agent reports low confidence (here 0.45), the run is escalated for human
 Registration form for new agent definitions. Fill in name, select foundation model. This is the entry point for adding custom agents to the platform.
 
 ![agent-new-form](agent-new-form.gif)
+
+### Agent MCP Bindings
+
+The agent detail page exposes an MCP Bindings section where authors attach tools to an agent. Stdio bindings pick a catalog entry and add an optional `allowedTools` allowlist; HTTP bindings take an inline URL plus optional allowlist — both are saved to the agent's `mcpBindings` array via `/api/agent-definitions/:id/mcp-servers/:name`. Deleting removes an individual binding, and a reload confirms HTTP bindings persist across sessions. Workflow steps consume these bindings as their baseline surface, which Step MCP Restrictions can further narrow.
+
+![agent-mcp-bindings](agent-mcp-bindings.gif)
+
+## Platform shortcuts
+
+### Command Palette — New Ticket
+
+Press `⌘K` (or `Ctrl+K`) from anywhere in the app to open the command palette. Select "New ticket" to file a bug, idea, or question as a GitHub issue in `appsilon/mediforce`. The form auto-attaches the current page and the filer's name as removable context chips, and switches the description template when you change the ticket type. On submit the palette closes and a toast links to the created issue.
+
+![command-palette-new-ticket](command-palette-new-ticket.gif)
+
+### Command Palette — Shortcuts
+
+Press `?` anywhere (outside text inputs) to open the keyboard shortcuts overlay. Sections populate automatically from the command registry — as new commands register shortcuts, they appear here without any extra wiring.
+
+![command-palette-shortcuts](command-palette-shortcuts.gif)

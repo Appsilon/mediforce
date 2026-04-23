@@ -365,12 +365,21 @@ export class AgentRunner {
       case 'L2':
         return { status: 'completed', envelope, appliedToWorkflow: false, fallbackReason: null };
 
-      case 'L3':
+      case 'L3': {
+        // review.type='agent' means the agent is the authoritative decider — do
+        // not pause for human approval. The executor inspects step.type to pick
+        // the right engine path: submitReviewVerdict (iteration loop with
+        // maxIterations enforcement) for review steps, or advanceStep for others.
+        // Low-confidence or timeout still routes through the fallback handler above.
+        if (context.step.review?.type === 'agent') {
+          return { status: 'completed', envelope, appliedToWorkflow: true, fallbackReason: null };
+        }
         await this.instanceRepository.update(context.processInstanceId, {
           status: 'paused',
           pauseReason: 'awaiting_agent_approval',
         });
         return { status: 'paused', envelope, appliedToWorkflow: false, fallbackReason: null };
+      }
 
       case 'L4':
         return { status: 'completed', envelope, appliedToWorkflow: true, fallbackReason: null };

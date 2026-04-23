@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, getAppBaseUrl, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 
 /**
  * POST /api/cowork/:sessionId/finalize
@@ -13,10 +13,6 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> },
 ): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const { sessionId } = await params;
   const { coworkSessionRepo, instanceRepo, auditRepo, engine } = getPlatformServices();
 

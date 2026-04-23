@@ -34,13 +34,19 @@ vi.mock('@/lib/platform-services', () => ({
       getByInstanceId: mockHumanTaskGetByInstanceId,
     },
   }),
-  validateApiKey: () => true,
 }));
 
 // Mock executeAgentStep — the unified agent step executor
 const mockExecuteAgentStep = vi.fn();
 vi.mock('@/lib/execute-agent-step', () => ({
   executeAgentStep: (...args: unknown[]) => mockExecuteAgentStep(...args),
+}));
+
+// Pre-flight in the route fetches workflow secrets from Firestore. In unit
+// tests we have no emulator and no project id, so we stub the call to return
+// an empty map — template validation covers secret presence separately.
+vi.mock('@/app/actions/workflow-secrets', () => ({
+  getWorkflowSecretsForRuntime: vi.fn().mockResolvedValue({}),
 }));
 
 import { POST } from '../route';
@@ -62,6 +68,7 @@ function makeRequest(body?: unknown): NextRequest {
 const workflowDefinition = {
   name: 'community-digest',
   version: 1,
+  namespace: 'test',
   steps: [
     { id: 'gather-data', name: 'Gather Data', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
     { id: 'human-review', name: 'Human Review', type: 'creation', executor: 'human', allowedRoles: ['reviewer'] },

@@ -14,7 +14,7 @@ export type UseAllUserNamespacesResult = {
 /**
  * Returns all namespaces the user belongs to (real-time):
  * - Personal namespace (namespaces where linkedUserId == uid)
- * - Org namespaces (from users/{uid}.organizations[] — via onSnapshot)
+ * - Workspace namespaces (from users/{uid}.organizations[] — via onSnapshot)
  */
 export function useAllUserNamespaces(uid: string | null | undefined): UseAllUserNamespacesResult {
   const [namespaces, setNamespaces] = useState<Namespace[]>([]);
@@ -48,21 +48,21 @@ export function useAllUserNamespaces(uid: string | null | undefined): UseAllUser
           }
         }
 
-        // 2. Org namespaces from users/{uid}.organizations
+        // 2. Workspace namespaces from users/{uid}.organizations
         if (userSnapshot.exists()) {
           const userData = userSnapshot.data();
-          const orgHandles = Array.isArray(userData.organizations) ? userData.organizations : [];
+          const workspaceHandles = Array.isArray(userData.organizations) ? userData.organizations : [];
 
-          const orgDocs = await Promise.all(
-            orgHandles
+          const workspaceDocs = await Promise.all(
+            workspaceHandles
               .filter((handle: unknown): handle is string => typeof handle === 'string')
               .filter((handle) => !seenHandles.has(handle))
               .map((handle) => getDoc(doc(db, 'namespaces', handle))),
           );
 
-          for (const orgDoc of orgDocs) {
-            if (!orgDoc.exists()) continue;
-            const parsed = NamespaceSchema.safeParse(orgDoc.data());
+          for (const workspaceDoc of workspaceDocs) {
+            if (!workspaceDoc.exists()) continue;
+            const parsed = NamespaceSchema.safeParse(workspaceDoc.data());
             if (parsed.success && !seenHandles.has(parsed.data.handle)) {
               seenHandles.add(parsed.data.handle);
               collected.push(parsed.data);

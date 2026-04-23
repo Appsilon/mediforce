@@ -2,6 +2,7 @@ import type {
   AgentEvent,
   ProcessConfig,
   PluginCapabilityMetadata,
+  ResolvedMcpConfig,
   WorkflowDefinition,
   WorkflowStep,
 } from '@mediforce/platform-core';
@@ -55,6 +56,11 @@ export interface WorkflowAgentContext {
   getPreviousStepOutputs: () => Promise<Record<string, unknown>>;
   /** Pre-fetched workflow secrets for {{TEMPLATE}} resolution */
   workflowSecrets?: Record<string, string>;
+  /** Pre-resolved MCP configuration for this step. Produced by
+   *  resolveMcpForStep at handoff time: AgentDefinition + step
+   *  restrictions + tool catalog collapsed into a flat map of server
+   *  name → launch spec. undefined when step.agentId is unset. */
+  resolvedMcpConfig?: ResolvedMcpConfig;
 }
 
 // EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp

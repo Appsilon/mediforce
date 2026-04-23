@@ -1,15 +1,4 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  Timestamp,
-} from 'firebase/firestore';
-import { getFirestoreDb } from '../config/firebase-init.js';
+import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore';
 import {
   AgentDefinitionSchema,
   type AgentDefinition,
@@ -19,13 +8,21 @@ import {
 } from '@mediforce/platform-core';
 
 function toAgentDefinition(id: string, data: Record<string, unknown>): AgentDefinition {
+  // Legacy rows wrote this field as `pluginId`; new rows write `runtimeId`.
+  // Normalize on read so orphan rows with the old field still parse.
+  const runtimeId =
+    typeof data.runtimeId === 'string'
+      ? data.runtimeId
+      : typeof data.pluginId === 'string'
+        ? data.pluginId
+        : undefined;
   return AgentDefinitionSchema.parse({
     ...data,
     id,
+    runtimeId,
     inputDescription: data.inputDescription ?? '',
     outputDescription: data.outputDescription ?? '',
     skillFileNames: data.skillFileNames ?? [],
-    pluginId: typeof data.pluginId === 'string' ? data.pluginId : undefined,
     createdAt:
       data.createdAt instanceof Timestamp
         ? data.createdAt.toDate().toISOString()
@@ -38,36 +35,48 @@ function toAgentDefinition(id: string, data: Record<string, unknown>): AgentDefi
 }
 
 export class FirestoreAgentDefinitionRepository implements AgentDefinitionRepository {
+  constructor(private readonly db: Firestore) {}
+
   private get col() {
-    return collection(getFirestoreDb(), 'agentDefinitions');
+    return this.db.collection('agentDefinitions');
   }
 
   async create(input: CreateAgentDefinitionInput): Promise<AgentDefinition> {
-    const now = serverTimestamp();
-    const ref = await addDoc(this.col, { ...input, createdAt: now, updatedAt: now });
-    const snap = await getDoc(ref);
+    const now = FieldValue.serverTimestamp();
+    const ref = await this.col.add({ ...input, createdAt: now, updatedAt: now });
+    const snap = await ref.get();
     return toAgentDefinition(ref.id, snap.data() as Record<string, unknown>);
   }
 
+  async upsert(id: string, input: CreateAgentDefinitionInput): Promise<AgentDefinition> {
+    const ref = this.col.doc(id);
+    const now = FieldValue.serverTimestamp();
+    const existing = await ref.get();
+    const createdAt = existing.exists ? (existing.data()?.createdAt ?? now) : now;
+    await ref.set({ ...input, createdAt, updatedAt: now });
+    const snap = await ref.get();
+    return toAgentDefinition(snap.id, snap.data() as Record<string, unknown>);
+  }
+
   async getById(id: string): Promise<AgentDefinition | null> {
-    const snap = await getDoc(doc(this.col, id));
-    if (!snap.exists()) return null;
-    return toAgentDefinition(snap.id, snap.data());
+    const snap = await this.col.doc(id).get();
+    if (!snap.exists) return null;
+    return toAgentDefinition(snap.id, snap.data() as Record<string, unknown>);
   }
 
   async list(): Promise<AgentDefinition[]> {
-    const snap = await getDocs(this.col);
+    const snap = await this.col.get();
     return snap.docs.map((d) => toAgentDefinition(d.id, d.data()));
   }
 
   async update(id: string, input: UpdateAgentDefinitionInput): Promise<AgentDefinition> {
-    const ref = doc(this.col, id);
-    await updateDoc(ref, { ...input, updatedAt: serverTimestamp() });
-    const snap = await getDoc(ref);
+    const ref = this.col.doc(id);
+    await ref.update({ ...input, updatedAt: FieldValue.serverTimestamp() });
+    const snap = await ref.get();
     return toAgentDefinition(snap.id, snap.data() as Record<string, unknown>);
   }
 
   async delete(id: string): Promise<void> {
-    await deleteDoc(doc(this.col, id));
+    await this.col.doc(id).delete();
   }
 }

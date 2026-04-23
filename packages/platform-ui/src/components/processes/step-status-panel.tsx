@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-core';
 import { AutonomyBadge } from '../agents/autonomy-badge';
+import { RetryStepButton } from './retry-step-button';
 import { cn } from '@/lib/utils';
 
 interface AgentEventItem {
@@ -411,6 +412,15 @@ export function StepStatusPanel({
                     isExpanded
                       ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                       : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  )}
+                  {status === 'failed'
+                    && instance.currentStepId === step.id
+                    // Don't offer Retry on explicitly cancelled runs — cancelProcessRun
+                    // sets status='failed' with this exact error, but the user's intent
+                    // was to stop, not to retry. (Until we introduce a distinct 'cancelled'
+                    // status in the schema, this string check is the cheapest gate.)
+                    && instance.error !== 'Cancelled by user' && (
+                    <RetryStepButton instanceId={instance.id} stepId={step.id} />
                   )}
                 </div>
                 <div className="text-xs font-mono text-muted-foreground mt-0.5">{step.id}</div>

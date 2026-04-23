@@ -4,13 +4,9 @@ import {
   validateProcessConfig,
 } from '@mediforce/platform-core';
 import { ConfigVersionAlreadyExistsError } from '@mediforce/platform-infra';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 
 export async function GET(request: Request): Promise<NextResponse> {
-  if (!validateApiKey(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const { searchParams } = new URL(request.url);
   const processName = searchParams.get('processName');
 
@@ -28,10 +24,6 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  if (!validateApiKey(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   let body: unknown;
   try {
     body = await request.json();

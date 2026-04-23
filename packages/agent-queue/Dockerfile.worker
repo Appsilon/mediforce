@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.23
 FROM node:24-slim
 
 # Install Docker CLI so the worker can spawn containers
@@ -5,6 +6,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends docker.io git o
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
 
 WORKDIR /app
 
@@ -13,8 +16,11 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages/agent-queue/package.json packages/agent-queue/
 COPY packages/platform-core/package.json packages/platform-core/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile || pnpm install
+# Install dependencies — pnpm store persisted via BuildKit cache mount
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm config set package-import-method copy && \
+    (pnpm install --frozen-lockfile || pnpm install)
 
 # Copy source
 COPY packages/agent-queue/ packages/agent-queue/

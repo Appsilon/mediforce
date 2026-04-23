@@ -1,8 +1,7 @@
 'use server';
 
 import { getPlatformServices } from '@/lib/platform-services';
-import { getFirestoreDb } from '@mediforce/platform-infra';
-import { doc, updateDoc } from 'firebase/firestore';
+import { getAdminFirestore } from '@mediforce/platform-infra';
 import { resolveTask, isResolveError } from '@/lib/resolve-task';
 
 // --------------------------------------------------------------------------
@@ -75,9 +74,9 @@ export async function unclaimTask(
     }
 
     // HumanTaskRepository has no unclaim method — update Firestore directly
-    const db = getFirestoreDb();
+    const db = getAdminFirestore();
     const now = new Date().toISOString();
-    await updateDoc(doc(db, 'humanTasks', taskId), {
+    await db.collection('humanTasks').doc(taskId).update({
       status: 'pending',
       assignedUserId: null,
       updatedAt: now,

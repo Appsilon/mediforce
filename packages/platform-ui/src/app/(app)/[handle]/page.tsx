@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc, where } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Pencil, Check, X, Settings, GitBranch, Building2, Plus } from 'lucide-react';
+import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
+import { getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -33,7 +34,7 @@ type MemberPreview = {
 
 const MAX_AVATAR_MEMBERS = 20;
 
-function useOrgMembers(handle: string, enabled: boolean) {
+function useWorkspaceMembers(handle: string, enabled: boolean) {
   const [members, setMembers] = React.useState<MemberPreview[]>([]);
   const [totalCount, setTotalCount] = React.useState<number | null>(null);
 
@@ -162,14 +163,48 @@ function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member:
   );
 }
 
-function MemberAvatars({ namespace }: { namespace: Namespace }) {
-  const { members, totalCount } = useOrgMembers(
+const ALWAYS_KEY = WORKSPACE_DEFAULT_KEY;
+
+function DefaultWorkspaceToggle({ handle }: { handle: string }) {
+  const [isDefault, setIsDefault] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsDefault(localStorage.getItem(ALWAYS_KEY) === handle);
+  }, [handle]);
+
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (event.target.checked) {
+      localStorage.setItem(ALWAYS_KEY, handle);
+      setIsDefault(true);
+    } else {
+      localStorage.removeItem(ALWAYS_KEY);
+      setIsDefault(false);
+    }
+  }
+
+  return (
+    <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+      <input
+        type="checkbox"
+        checked={isDefault}
+        onChange={handleChange}
+        className="h-3.5 w-3.5 rounded border-input accent-primary cursor-pointer"
+      />
+      <span className="text-xs text-muted-foreground">Open this workspace by default</span>
+    </label>
+  );
+}
+
+function MemberAvatars({ namespace, trailing }: { namespace: Namespace; trailing?: React.ReactNode }) {
+  const { members, totalCount } = useWorkspaceMembers(
     namespace.handle,
     namespace.type === 'organization',
   );
   const userProfiles = useUserProfiles();
 
-  if (namespace.type !== 'organization') return null;
+  if (namespace.type !== 'organization') {
+    return trailing !== undefined ? <div className="mt-3">{trailing}</div> : null;
+  }
   if (totalCount === null) return null;
 
   function resolveName(member: MemberPreview): string {
@@ -181,9 +216,9 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
   }
 
   return (
-    <div className="mt-3">
+    <div className="mt-3 flex items-center gap-4 flex-wrap">
       <Link
-        href={`/${namespace.handle}/members`}
+        href={`/${namespace.handle}/settings`}
         className="group inline-flex items-center gap-2.5"
       >
         {members.length > 0 && (
@@ -201,6 +236,7 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
           {totalCount} {totalCount === 1 ? 'member' : 'members'}
         </span>
       </Link>
+      {trailing}
     </div>
   );
 }
@@ -267,7 +303,7 @@ function InlineEditableBio({
           rows={3}
           disabled={saving}
           className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none disabled:opacity-50"
-          placeholder={namespace.type === 'organization' ? 'Describe this organization…' : 'Write a bio…'}
+          placeholder={namespace.type === 'organization' ? 'Describe this workspace…' : 'Write a bio…'}
         />
         <div className="flex items-center gap-2 mt-1.5">
           <button
@@ -303,7 +339,7 @@ function InlineEditableBio({
         onClick={() => setEditing(true)}
         className="mt-2 text-sm text-muted-foreground hover:text-foreground transition-colors italic"
       >
-        {namespace.type === 'organization' ? 'Add a description…' : 'Add a bio…'}
+        {namespace.type === 'organization' ? 'Add a workspace description…' : 'Add a bio…'}
       </button>
     );
   }
@@ -328,15 +364,15 @@ function InlineEditableBio({
 }
 
 // ---------------------------------------------------------------------------
-// User organizations
+// User workspaces
 // ---------------------------------------------------------------------------
 
-function useUserOrganizations(namespace: Namespace) {
-  const [orgs, setOrgs] = React.useState<Namespace[]>([]);
+function useUserWorkspaces(namespace: Namespace) {
+  const [workspaces, setWorkspaces] = React.useState<Namespace[]>([]);
 
   React.useEffect(() => {
     if (namespace.type !== 'personal' || namespace.linkedUserId === undefined) {
-      setOrgs([]);
+      setWorkspaces([]);
       return;
     }
 
@@ -345,13 +381,13 @@ function useUserOrganizations(namespace: Namespace) {
         if (!userSnap.exists()) return;
         const data = userSnap.data();
         const handles = Array.isArray(data.organizations) ? data.organizations : [];
-        const orgDocs = await Promise.all(
+        const workspaceDocs = await Promise.all(
           handles
             .filter((h: unknown): h is string => typeof h === 'string')
             .map((h) => getDoc(doc(db, 'namespaces', h))),
         );
-        setOrgs(
-          orgDocs
+        setWorkspaces(
+          workspaceDocs
             .filter((d) => d.exists())
             .map((d) => {
               const parsed = NamespaceSchema.safeParse(d.data());
@@ -360,30 +396,30 @@ function useUserOrganizations(namespace: Namespace) {
             .filter((ns): ns is Namespace => ns !== null),
         );
       })
-      .catch(() => setOrgs([]));
+      .catch(() => setWorkspaces([]));
   }, [namespace]);
 
-  return orgs;
+  return workspaces;
 }
 
-function UserOrganizations({ namespace }: { namespace: Namespace }) {
-  const orgs = useUserOrganizations(namespace);
+function UserWorkspaces({ namespace }: { namespace: Namespace }) {
+  const workspaces = useUserWorkspaces(namespace);
 
-  if (namespace.type !== 'personal' || orgs.length === 0) return null;
+  if (namespace.type !== 'personal' || workspaces.length === 0) return null;
 
   return (
     <div className="mt-6">
-      <h2 className="text-sm font-semibold mb-3">Organizations</h2>
+      <h2 className="text-sm font-semibold mb-3">Workspaces</h2>
       <div className="space-y-1">
-        {orgs.map((org) => (
+        {workspaces.map((ws) => (
           <Link
-            key={org.handle}
-            href={`/${org.handle}`}
+            key={ws.handle}
+            href={`/${ws.handle}`}
             className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
           >
-            <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="font-medium truncate">{org.displayName}</span>
-            <span className="text-xs text-muted-foreground ml-auto shrink-0">@{org.handle}</span>
+            {(() => { const Icon = getWorkspaceIcon(ws.icon); return <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />; })()}
+            <span className="font-medium truncate">{ws.displayName}</span>
+            <span className="text-xs text-muted-foreground ml-auto shrink-0">@{ws.handle}</span>
           </Link>
         ))}
       </div>
@@ -565,7 +601,15 @@ export default function ProfilePage() {
       {/* Profile header */}
       <div className="flex items-start gap-4">
         {(() => {
-          const avatarSrc = namespace.avatarUrl ?? (namespace.type === 'personal' ? firebaseUser?.photoURL : undefined) ?? undefined;
+          if (namespace.type === 'organization') {
+            const Icon = getWorkspaceIcon(namespace.icon);
+            return (
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <Icon className="h-7 w-7 text-primary" />
+              </div>
+            );
+          }
+          const avatarSrc = namespace.avatarUrl ?? firebaseUser?.photoURL ?? undefined;
           return avatarSrc !== undefined && avatarSrc !== '' ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -589,9 +633,9 @@ export default function ProfilePage() {
                   : 'bg-muted text-muted-foreground',
               )}
             >
-              {namespace.type === 'organization' ? 'Organization' : 'Personal'}
+              {namespace.type === 'organization' ? 'Workspace' : 'Personal'}
             </span>
-            {canEdit && namespace.type === 'organization' && (
+            {currentRole === 'owner' && namespace.type === 'organization' && (
               <Link
                 href={`/${namespace.handle}/settings`}
                 className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -605,11 +649,14 @@ export default function ProfilePage() {
 
           <InlineEditableBio namespace={namespace} canEdit={canEdit} />
 
-          <MemberAvatars namespace={namespace} />
+          <MemberAvatars
+            namespace={namespace}
+            trailing={<DefaultWorkspaceToggle handle={namespace.handle} />}
+          />
         </div>
       </div>
 
-      <UserOrganizations namespace={namespace} />
+      <UserWorkspaces namespace={namespace} />
 
       {/* Workflow catalog */}
       <WorkflowCatalog handle={handle ?? ''} namespace={namespace} />

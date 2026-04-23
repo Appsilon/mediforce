@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { User, Bot, Terminal, Users } from 'lucide-react';
+import { User, Bot, Terminal, Users, Lock } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import type { WorkflowStep } from '@mediforce/platform-core';
 import {
   AUTONOMY_LEVELS,
-  STEP_TYPES,
   STEP_TYPE_LABELS,
   FALLBACK_OPTIONS,
   KNOWN_MODELS,
@@ -18,6 +17,7 @@ import {
 } from './constants';
 import { CoworkSection } from './cowork-section';
 import { EditableField, Section } from './step-editor-fields';
+import { McpRestrictionsSection } from './mcp-restrictions-section';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -183,6 +183,15 @@ export function StepEditor({
           rows={2}
           className={cn(inlineInput, 'mt-2 text-sm text-muted-foreground resize-y leading-relaxed placeholder:italic')}
         />
+      </div>
+
+      {/* Step type (read-only) */}
+      <div
+        className="inline-flex items-center gap-1.5 rounded-md border border-muted px-2 py-1 text-[11px] font-medium text-muted-foreground cursor-default"
+        title="Step type is set at creation. To change, remove this step and add a new one."
+      >
+        <Lock className="h-3 w-3 text-muted-foreground/50" />
+        {STEP_TYPE_LABELS[step.type] ?? step.type}
       </div>
 
       {/* Executor toggle */}
@@ -374,6 +383,16 @@ export function StepEditor({
         </Section>
       )}
 
+      {/* MCP restrictions — only meaningful when the step binds to an agent
+           definition via agentId. Section owns its own loading/empty state. */}
+      {isAgent && step.agentId !== undefined && step.agentId !== '' && (
+        <McpRestrictionsSection
+          agentId={step.agentId}
+          restrictions={step.mcpRestrictions}
+          onChange={(next) => onChange({ mcpRestrictions: next })}
+        />
+      )}
+
       {/* Agent section */}
       {isAgent && (
         <Section title="Agent">
@@ -539,8 +558,8 @@ export function StepEditor({
       {/* Environment variables */}
       {step.type !== 'terminal' && (
         <Section title="Environment">
-          {Object.entries(step.env ?? {}).map(([key, val]) => (
-            <div key={key} className="flex items-baseline gap-1.5">
+          {Object.entries(step.env ?? {}).map(([key, val], idx) => (
+            <div key={idx} className="flex items-baseline gap-1.5">
               <input
                 value={key}
                 onChange={(e) => {
@@ -597,31 +616,6 @@ export function StepEditor({
           </button>
         </Section>
       )}
-
-      {/* Step definition (collapsed) */}
-      <details className="group">
-        <summary className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/40 cursor-pointer hover:text-muted-foreground transition-colors select-none">
-          Step definition
-        </summary>
-        <div className="mt-2 space-y-2.5">
-          <div className="flex gap-1">
-            {STEP_TYPES.map((t) => (
-              <button
-                key={t}
-                onClick={() => onChange({ type: t })}
-                className={cn(
-                  'flex-1 rounded-md py-1 text-[11px] font-medium transition-all border',
-                  step.type === t
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-transparent bg-muted/50 text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {STEP_TYPE_LABELS[t] ?? t}
-              </button>
-            ))}
-          </div>
-        </div>
-      </details>
     </div>
   );
 }

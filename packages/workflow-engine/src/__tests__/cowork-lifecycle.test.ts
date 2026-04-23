@@ -21,6 +21,7 @@ import { WorkflowEngine } from '../index.js';
 const coworkDesignerDef: WorkflowDefinition = {
   name: 'cowork-designer-test',
   version: 1,
+  namespace: 'test',
   steps: [
     {
       id: 'intake',

@@ -8,6 +8,7 @@ import { useParams } from 'next/navigation';
 import { useAgentRuns, useProcessNameMap } from '@/hooks/use-agent-runs';
 import { AgentRunListTable } from '@/components/agents/agent-run-list-table';
 import { getModelDisplayName } from '@/lib/agent-models';
+import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
@@ -180,7 +181,7 @@ function agentMatchesQuery(agent: AgentEntry, query: string): boolean {
 
 function agentDefinitionToEntry(def: AgentDefinition): AgentEntry {
   return {
-    name: def.pluginId ?? def.id,
+    name: def.runtimeId ?? def.id,
     definitionId: def.id,
     metadata: {
       name: def.name,
@@ -201,28 +202,32 @@ function AgentCatalog({ handle }: { handle: string }) {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/plugins').then((res) => {
+      apiFetch('/api/plugins').then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch plugins: ${res.status}`);
         return res.json() as Promise<{ plugins: AgentEntry[] }>;
       }),
-      fetch('/api/agent-definitions').then((res) => {
+      apiFetch('/api/agent-definitions').then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch agent definitions: ${res.status}`);
         return res.json() as Promise<{ agents: AgentDefinition[] }>;
       }),
     ])
       .then(([pluginsData, definitionsData]) => {
-        const definitionEntries = (definitionsData.agents ?? []).map(agentDefinitionToEntry);
-        // Map from pluginId → definition entry (for dedup and Configure link)
-        const definitionByPluginId = new Map(
-          definitionEntries.map((e) => [e.name, e]),
+        // Map from runtimeId → definition entry. Dedups definitions that share a
+        // runtimeId (e.g. an older seeded doc + the builtin-seeded doc) and also
+        // backs the plugin filter below.
+        const definitionByRuntimeId = new Map(
+          (definitionsData.agents ?? []).map((def) => {
+            const entry = agentDefinitionToEntry(def);
+            return [entry.name, entry] as const;
+          }),
         );
-        // For plugins not covered by a definition, include them as-is
-        // For plugins that have a matching definition, the definition entry (with Configure button) wins
-        const coveredPluginIds = new Set(definitionByPluginId.keys());
+        // For plugins not covered by a definition, include them as-is.
+        // For plugins that have a matching definition, the definition entry (with Configure button) wins.
+        const coveredRuntimeIds = new Set(definitionByRuntimeId.keys());
         const uncoveredPlugins = (pluginsData.plugins ?? []).filter(
-          (p) => !coveredPluginIds.has(p.name),
+          (p) => !coveredRuntimeIds.has(p.name),
         );
-        setAgents([...definitionEntries, ...uncoveredPlugins]);
+        setAgents([...definitionByRuntimeId.values(), ...uncoveredPlugins]);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unknown error');

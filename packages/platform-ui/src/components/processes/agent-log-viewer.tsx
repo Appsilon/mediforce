@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { RefreshCw, FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2 } from 'lucide-react';
+import { FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 
 interface LogEntry {
@@ -307,7 +308,7 @@ function LogGroupList({ groups }: { groups: LogGroup[] }) {
 
 async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
   try {
-    const response = await fetch(`/api/agent-logs?file=${encodeURIComponent(file)}`);
+    const response = await apiFetch(`/api/agent-logs?file=${encodeURIComponent(file)}`);
     const data = await response.json() as { content: string; error?: string };
     if (data.error && !data.content) {
       return { entries: [], rawContent: null, error: data.error };
@@ -402,10 +403,15 @@ function AgentTabContent({ section }: { section: AgentLogSection }) {
   );
 }
 
+function allSectionsFinished(sections: AgentLogSection[]): boolean {
+  if (sections.length === 0) return false;
+  return sections.every((s) => s.entries.some((e) => classifyEntry(e) === 'result'));
+}
+
 export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps) {
   const [sections, setSections] = React.useState<AgentLogSection[]>([]);
   const [loading, setLoading] = React.useState(false);
-  const [autoRefresh, setAutoRefresh] = React.useState(false);
+  const [pollingActive, setPollingActive] = React.useState(logFiles.length > 0);
   const [activeTab, setActiveTab] = React.useState(0);
   const [copied, setCopied] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -430,18 +436,24 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
         }),
       );
       setSections(results);
+      if (allSectionsFinished(results)) {
+        setPollingActive(false);
+      }
     } finally {
       setLoading(false);
     }
   }, [logFiles]);
 
-  React.useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  React.useEffect(() => {
+    if (logFiles.length > 0) setPollingActive(true);
+    fetchLogs();
+  }, [fetchLogs, logFiles.length]);
 
   React.useEffect(() => {
-    if (!autoRefresh || logFiles.length === 0) return;
+    if (!pollingActive || logFiles.length === 0) return;
     const interval = setInterval(fetchLogs, 3000);
     return () => clearInterval(interval);
-  }, [autoRefresh, logFiles, fetchLogs]);
+  }, [pollingActive, logFiles, fetchLogs]);
 
   React.useEffect(() => {
     if (scrollRef.current) {
@@ -484,23 +496,6 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
           {totalEvents > 0 && <span>{totalEvents} events across {sections.length} agent{sections.length > 1 ? 's' : ''}</span>}
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(event) => setAutoRefresh(event.target.checked)}
-              className="rounded border-border"
-            />
-            Auto-refresh
-          </label>
-          <button
-            onClick={fetchLogs}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
-            Refresh
-          </button>
           <button
             onClick={handleCopy}
             disabled={sections.length === 0}

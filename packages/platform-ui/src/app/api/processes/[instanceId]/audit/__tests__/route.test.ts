@@ -3,16 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockGetByProcess = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
-  validateApiKey: vi.fn(() => true),
   getPlatformServices: () => ({
     auditRepo: { getByProcess: mockGetByProcess },
   }),
 }));
 
 import { GET } from '../route';
-import { validateApiKey } from '@/lib/platform-services';
-
-const mockValidateApiKey = vi.mocked(validateApiKey);
 
 function makeRequest(instanceId: string) {
   const req = new Request(`http://localhost/api/processes/${instanceId}/audit`, {
@@ -24,18 +20,6 @@ function makeRequest(instanceId: string) {
 describe('GET /api/processes/[instanceId]/audit', () => {
   beforeEach(() => {
     mockGetByProcess.mockReset();
-    mockValidateApiKey.mockReturnValue(true);
-  });
-
-  it('[AUTH] returns 401 when API key is invalid', async () => {
-    mockValidateApiKey.mockReturnValue(false);
-    const { req, params } = makeRequest('inst-001');
-
-    const res = await GET(req, { params });
-
-    expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body.error).toBe('Unauthorized');
   });
 
   it('[DATA] returns audit events for a process instance', async () => {

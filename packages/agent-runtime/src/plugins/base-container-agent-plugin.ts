@@ -4,7 +4,7 @@ import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls } from './container-plugin.js';
@@ -241,8 +241,88 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   }
 
   /** Generate mcp-config.json for Claude CLI --mcp-config flag.
-   *  Resolves {{SECRET}} templates in MCP server env vars. */
+   *  Resolves {{SECRET}} templates in MCP server env vars.
+   *
+   *  Two sources, checked in order:
+   *   1. Workflow-mode with a pre-resolved config from resolveMcpForStep
+   *      (context.resolvedMcpConfig). This is the canonical path — bindings
+   *      come from the referenced AgentDefinition + step restrictions.
+   *   2. Legacy inline config on agentConfig.mcpServers (array of
+   *      McpServerConfig). Still used by process-mode steps and
+   *      by workflow steps that predate the migration to agentId. */
   protected async writeMcpConfig(outputDir: string): Promise<void> {
+    const resolved = isWorkflowAgentContext(this.context)
+      ? this.context.resolvedMcpConfig
+      : undefined;
+
+    if (resolved !== undefined) {
+      await this.writeResolvedMcpConfig(outputDir, resolved);
+      return;
+    }
+
+    await this.writeLegacyMcpConfig(outputDir);
+  }
+
+  /** Serialize a resolved MCP config into the flat mcp-config.json shape
+   *  Claude CLI expects. Applies {{SECRET}} template resolution to env
+   *  values on stdio entries at write time. */
+  private async writeResolvedMcpConfig(
+    outputDir: string,
+    resolved: ResolvedMcpConfig,
+  ): Promise<void> {
+    const entries = Object.entries(resolved.servers);
+    if (entries.length === 0) return;
+
+    const workflowSecrets = isWorkflowAgentContext(this.context)
+      ? this.context.workflowSecrets
+      : undefined;
+
+    type StdioEntry = { command: string; args?: string[]; env?: Record<string, string>; allowedTools?: string[] };
+    type HttpEntry = { url: string; allowedTools?: string[] };
+    const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
+
+    for (const [name, server] of entries) {
+      const allowedToolsPart = server.allowedTools && server.allowedTools.length > 0
+        ? { allowedTools: server.allowedTools }
+        : {};
+
+      if (server.type === 'stdio') {
+        const resolvedEnv: Record<string, string> = {};
+        if (server.env) {
+          for (const [key, value] of Object.entries(server.env)) {
+            resolvedEnv[key] = resolveValue(value, workflowSecrets);
+          }
+        }
+        mcpConfig[name] = {
+          command: server.command,
+          ...(server.args !== undefined && server.args.length > 0 ? { args: server.args } : {}),
+          ...(Object.keys(resolvedEnv).length > 0 ? { env: resolvedEnv } : {}),
+          ...allowedToolsPart,
+        };
+      } else {
+        mcpConfig[name] = {
+          url: server.url,
+          ...allowedToolsPart,
+        };
+      }
+    }
+
+    await writeFile(
+      join(outputDir, 'mcp-config.json'),
+      JSON.stringify({ mcpServers: mcpConfig }, null, 2),
+      'utf-8',
+    );
+
+    agentLog('mcp.config', 'MCP config written (resolver-backed)', {
+      stepId: this.context.stepId,
+      servers: entries.map(([name]) => name),
+    });
+  }
+
+  /** Pre-refactor path: serialize agentConfig.mcpServers (array) directly
+   *  into mcp-config.json. Retained for process-mode steps and any
+   *  workflow step that has not yet migrated to agentId. */
+  private async writeLegacyMcpConfig(outputDir: string): Promise<void> {
     const servers = this.agentConfig.mcpServers;
     if (!servers || servers.length === 0) return;
 
@@ -289,7 +369,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       'utf-8',
     );
 
-    agentLog('mcp.config', 'MCP config written', {
+    agentLog('mcp.config', 'MCP config written (legacy)', {
       stepId: this.context.stepId,
       servers: servers.map((s) => s.name),
     });
@@ -1282,18 +1362,22 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       outputDir,
       logFile,
       imageBuild,
+      // Pass lineProcessor so LocalDockerSpawnStrategy writes JSONL entries in real-time.
+      // QueuedDockerSpawnStrategy ignores this (can't pass functions through Redis).
+      lineProcessor: (line) => this.processOutputLine(line),
     });
 
-    // Process stdout lines for activity logging (batch mode — lines arrive after completion
-    // when using the queued strategy; for local strategy this is equivalent to the old behavior
-    // minus real-time streaming, which is an acceptable v1 trade-off)
+    // Build rawLines for parseAgentOutput. For LocalDockerSpawnStrategy the log file was
+    // already written in real-time via lineProcessor; for QueuedDockerSpawnStrategy we
+    // do a batch write here since the worker cannot use the callback.
+    const isQueuedStrategy = Boolean(process.env.REDIS_URL);
     const rawLines: string[] = [];
     for (const line of spawnResult.stdout.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       rawLines.push(trimmed);
 
-      if (logFile) {
+      if (logFile && isQueuedStrategy) {
         const logEntries = this.processOutputLine(trimmed);
         if (logEntries.length > 0) {
           await appendFile(logFile, logEntries.join('\n') + '\n');

@@ -14,7 +14,7 @@ export default function TestLoginPage() {
 
   React.useEffect(() => {
     if (!loading && firebaseUser) {
-      router.replace('/redirect');
+      router.replace('/workspace-selection');
     }
   }, [loading, firebaseUser, router]);
 

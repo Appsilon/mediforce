@@ -10,6 +10,7 @@ import {
 } from './process-definition.js';
 import { ProcessNotificationConfigSchema } from './process-config.js';
 import { McpServerConfigSchema } from './mcp-server-config.js';
+import { StepMcpRestrictionSchema } from './agent-mcp-binding.js';
 
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
@@ -29,8 +30,11 @@ export const WorkflowAgentConfigSchema = z.object({
   repoAuth: z.string().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
-  /** MCP servers available to this agent step. Each entry defines a server
-   *  the agent can connect to during execution (stdio transport). */
+  /** @deprecated Step-level MCP configuration is being removed.
+   *  Move servers onto the agent via AgentDefinition.mcpServers and
+   *  narrow them at the step via WorkflowStep.mcpRestrictions.
+   *  Step 2 of the MCP permissions refactor will migrate existing
+   *  workflows and drop this field. Still parsed for backward-compat. */
   mcpServers: z.array(McpServerConfigSchema).optional(),
 });
 
@@ -52,7 +56,10 @@ export const WorkflowCoworkConfigSchema = z.object({
   outputSchema: z.record(z.string(), z.unknown()).optional(),
   chat: CoworkChatConfigSchema.optional(),
   voiceRealtime: CoworkVoiceRealtimeConfigSchema.optional(),
-  /** MCP servers available to the LLM during this cowork step */
+  /** @deprecated Step-level MCP configuration is being removed.
+   *  Attach servers to the cowork agent definition and narrow per step
+   *  via WorkflowStep.mcpRestrictions. Retained for backward-compat
+   *  until the Step 2 migrator runs. */
   mcpServers: z.array(McpServerConfigSchema).optional(),
 });
 
@@ -76,18 +83,31 @@ export const WorkflowStepSchema = z.object({
   executor: z.enum(['human', 'agent', 'script', 'cowork']),
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(),
   plugin: z.string().optional(),
+  /** References an AgentDefinition by its deterministic slug (doc id).
+   *  The referenced definition carries canonical MCP server bindings
+   *  and runtime identity. Step-level mcpRestrictions narrow further.
+   *  When unset, no MCP resolution runs for this step. */
+  agentId: z.string().optional(),
   allowedRoles: z.array(z.string()).optional(),
   agent: WorkflowAgentConfigSchema.optional(),
   review: WorkflowReviewConfigSchema.optional(),
   cowork: WorkflowCoworkConfigSchema.optional(),
   stepParams: z.record(z.string(), z.unknown()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+  /** Step-level subtractive MCP restrictions, keyed by server name
+   *  (matching AgentDefinition.mcpServers). Can only disable servers or
+   *  deny specific tools — the shape has no allow/broaden field. */
+  mcpRestrictions: StepMcpRestrictionSchema.optional(),
 });
 
 export const WorkflowDefinitionSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
-  namespace: z.string().optional(),
+  /** Workspace namespace that owns this definition. Required because
+   *  MCP resolution, workflow secret lookups, and the namespace-scoped
+   *  tool catalog all key off this field — a workflow without one is
+   *  not a runnable workflow. */
+  namespace: z.string().min(1),
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   preamble: z.string().optional(),

@@ -19,7 +19,6 @@ vi.mock('@/lib/platform-services', () => ({
       list: mockPluginList,
     },
   }),
-  validateApiKey: () => true,
 }));
 
 // Mock validateProcessConfig

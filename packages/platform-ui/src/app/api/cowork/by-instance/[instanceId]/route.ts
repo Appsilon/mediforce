@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
+import { getPlatformServices } from '@/lib/platform-services';
 
 /**
  * GET /api/cowork/by-instance/:instanceId
@@ -7,13 +7,9 @@ import { getPlatformServices, validateApiKey } from '@/lib/platform-services';
  * Returns the most recent active cowork session for a given process instance.
  */
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ instanceId: string }> },
 ): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const { instanceId } = await params;
   const { coworkSessionRepo } = getPlatformServices();
 

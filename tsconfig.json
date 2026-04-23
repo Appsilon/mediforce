@@ -22,6 +22,7 @@
     { "path": "packages/workflow-engine" },
     { "path": "packages/agent-runtime" },
     { "path": "packages/agent-queue" },
+    { "path": "packages/platform-api" },
     { "path": "packages/platform-ui" },
     { "path": "packages/supply-intelligence" },
     { "path": "packages/mcp-client" }

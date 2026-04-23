@@ -18,6 +18,7 @@ import { NextStepCard } from './next-step-card';
 import { getTaskDisplayTitle, isAgentReviewTask, getAgentOutput, getAgentOutputFromSiblings } from './task-utils';
 import { completeUploadTask } from '@/app/actions/tasks';
 import { useCollection } from '@/hooks/use-collection';
+import { useInstanceTasks } from '@/hooks/use-instance-tasks';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { storage } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
@@ -147,18 +148,9 @@ export function TaskDetail({
   );
   const remainingTaskCount = remainingTasks.filter((t) => t.id !== task.id).length;
 
-  // All tasks for the same process run
-  const siblingConstraints = useMemo(
-    () => [
-      where('processInstanceId', '==', task.processInstanceId),
-      orderBy('createdAt', 'asc'),
-    ],
-    [task.processInstanceId],
-  );
-  const { data: siblingTasks } = useCollection<HumanTask>(
-    'humanTasks',
-    siblingConstraints,
-  );
+  // All tasks for the same process run — contextual lookup, one-shot read is
+  // enough (`useInstanceTasks` consumes `apiClient.tasks.list`).
+  const { tasks: siblingTasks } = useInstanceTasks(task.processInstanceId);
 
   const isActionable = task.status === 'claimed' || task.status === 'pending';
   const isCompleted = task.status === 'completed';

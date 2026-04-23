@@ -12,10 +12,12 @@ import {
 } from 'lucide-react';
 import { ref, uploadBytes } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
+import { apiFetch } from '@/lib/api-fetch';
 import { FOUNDATION_MODELS } from '@/lib/agent-models';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
+import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 
 const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
   { icon: Bot,      label: 'Bot'      },
@@ -74,7 +76,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`/api/agent-definitions/${id}`)
+    apiFetch(`/api/agent-definitions/${id}`)
       .then((res) => {
         if (res.status === 404) {
           setNotFound(true);
@@ -147,7 +149,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         systemPrompt: prompt,
         skillFileNames: [...existingSkillPaths, ...uploadedPaths],
       };
-      await fetch(`/api/agent-definitions/${id}`, {
+      await apiFetch(`/api/agent-definitions/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -367,6 +369,9 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               </ul>
             )}
           </div>
+
+          {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}
+          <AgentMcpSection agentId={id} handle={handle} />
 
           {/* 6. System prompt */}
           <div className="space-y-1.5">

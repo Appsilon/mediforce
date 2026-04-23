@@ -8,6 +8,12 @@ const TEST_PASSWORD = 'test123456';
 const TEST_DISPLAY_NAME = 'Test User';
 
 setup('authenticate and seed data', async ({ page }) => {
+  // First-run Next.js route compilation (test-login + redirect) easily eats
+  // 20-30s in a cold dev server, and we still need time for Firestore seeding
+  // + Firebase auth emulator round trips. The default 30s test timeout races
+  // with that. Raise to 120s so the setup is not flaky.
+  setup.setTimeout(120_000);
+
   // 1. Clear all emulator state
   await clearEmulators();
 
@@ -26,11 +32,13 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedCollection('processDefinitions', data.processDefinitions);
   await seedCollection('processConfigs', data.processConfigs);
   await seedCollection('workflowDefinitions', data.workflowDefinitions);
-  await seedCollection('agentDefinitions', data.agentDefinitions);
   await seedCollection('namespaces', data.namespaces);
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
+  await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'toolCatalog', data.toolCatalog);
+  await seedCollection('agentDefinitions', data.agentDefinitions);
   await seedSubcollection('processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions);
   await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);
+  await seedSubcollection('processInstances', 'proc-retry-test', 'stepExecutions', data.retryTestStepExecutions);
   await seedCollection('coworkSessions', data.coworkSessions);
 
   // 4. Sign in via test-login page to capture auth state

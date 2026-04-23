@@ -54,6 +54,14 @@ export {
   WorkflowSecretsSchema,
   CronTriggerStateSchema,
   McpServerConfigSchema,
+  AgentMcpBindingSchema,
+  AgentMcpBindingMapSchema,
+  StdioAgentMcpBindingSchema,
+  HttpAgentMcpBindingSchema,
+  HttpAuthConfigSchema,
+  StepMcpRestrictionSchema,
+  StepMcpRestrictionEntrySchema,
+  ToolCatalogEntrySchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -114,6 +122,14 @@ export type {
   WorkflowSecrets,
   CronTriggerState,
   McpServerConfig,
+  AgentMcpBinding,
+  AgentMcpBindingMap,
+  StdioAgentMcpBinding,
+  HttpAgentMcpBinding,
+  HttpAuthConfig,
+  StepMcpRestriction,
+  StepMcpRestrictionEntry,
+  ToolCatalogEntry,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)
@@ -134,7 +150,9 @@ export type {
   UserDirectoryService,
   DirectoryUser,
   AgentRunRepository,
-  CoworkSessionRepository,  CronTriggerStateRepository,
+  CoworkSessionRepository,
+  CronTriggerStateRepository,
+  ToolCatalogRepository,
 } from './interfaces/index.js';
 
 // Agent definition schema + repository interface
@@ -182,6 +200,18 @@ export {
 // Validation
 export { validateProcessConfig } from './validation/config-validator.js';
 export type { ConfigValidationResult } from './validation/config-validator.js';
+
+// MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
+export {
+  resolveEffectiveMcp,
+  CatalogEntryNotFoundError,
+  UnknownRestrictionTargetError,
+  DenyToolsWithoutAllowedToolsError,
+  type ResolvedMcpConfig,
+  type ResolvedMcpServer,
+  type ResolvedStdioMcpServer,
+  type ResolvedHttpMcpServer,
+} from './mcp/resolve-effective-mcp.js';
 
 // Collaboration (handoff registry, RBAC)
 export { handoffTypeRegistry, RbacService, RbacError } from './collaboration/index.js';

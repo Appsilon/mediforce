@@ -293,6 +293,7 @@ export function buildWorkflowDefinition(
   return {
     name: 'test-workflow',
     version: 1,
+    namespace: 'test',
     steps: [
       {
         id: 'intake',
