@@ -154,7 +154,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       createdAt: twoDaysAgo,
       updatedAt: oneHourAgo,
       createdBy: 'webhook',
-      pauseReason: 'agent_escalation',
+      pauseReason: 'agent_escalated',
       error: null,
       assignedRoles: ['analyst', 'reviewer'],
     },
@@ -264,6 +264,25 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       pauseReason: 'waiting_for_human',
       error: null,
       assignedRoles: ['operator'],
+    },
+    // Dedicated instance for workflow-status-badges test — paused with step_failure
+    // so the Error badge, error banner with reason text, and "Run again this step"
+    // button are all visible without triggering any actual retry.
+    'proc-step-failure': {
+      id: 'proc-step-failure',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1',
+      status: 'paused',
+      currentStepId: 'human-review',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: 'step_failure',
+      error: 'Docker container exited with code 1',
+      assignedRoles: ['reviewer'],
     },
     // Dedicated instance for retry-step test — seeded as failed on a human step
     // so clicking Retry flips it to running; the auto-runner then creates a
@@ -451,6 +470,24 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       iterationNumber: 0,
       gateResult: null,
       error: null,
+    },
+  };
+
+  const stepFailureStepExecutions: Record<string, Record<string, unknown>> = {
+    'exec-step-failure-1': {
+      id: 'exec-step-failure-1',
+      instanceId: 'proc-step-failure',
+      stepId: 'human-review',
+      status: 'failed',
+      input: {},
+      output: null,
+      verdict: null,
+      executedBy: 'agent:script-container',
+      startedAt: oneHourAgo,
+      completedAt: now,
+      iterationNumber: 0,
+      gateResult: null,
+      error: 'Docker container exited with code 1',
     },
   };
 
@@ -1050,5 +1087,5 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions };
 }

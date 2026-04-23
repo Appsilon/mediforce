@@ -63,7 +63,10 @@ export function getWorkflowStatus(instance: {
   }
 
   if (instance.status === 'failed') {
-    return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: false };
+    // cancelProcessRun sets error='Cancelled by user' — the user intentionally stopped the run,
+    // so retry should not be offered. All other failed states are retryable.
+    const isCancelled = error === 'Cancelled by user';
+    return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: !isCancelled };
   }
 
   return { displayStatus: 'in_progress', reason: null, rawReason: null, isRetryable: false };

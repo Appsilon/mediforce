@@ -7,7 +7,7 @@ test.describe('Run Detail Journey', () => {
     await setupRecording(page, 'run-detail-step-graph', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/running/i).first()).toBeVisible();
+    await expect(page.getByText(/in progress/i).first()).toBeVisible();
     await showStep(page);
 
     // All 7 non-terminal steps visible in the step status panel

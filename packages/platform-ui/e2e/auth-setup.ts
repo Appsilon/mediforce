@@ -52,6 +52,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedCollection('agentDefinitions', data.agentDefinitions);
   await seedSubcollection('processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions);
   await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);
+  await seedSubcollection('processInstances', 'proc-step-failure', 'stepExecutions', data.stepFailureStepExecutions);
   await seedSubcollection('processInstances', 'proc-retry-test', 'stepExecutions', data.retryTestStepExecutions);
   await seedSubcollection('processInstances', 'proc-workflow-run-1', 'stepExecutions', data.workflowRunStepExecutions);
   await seedCollection('coworkSessions', data.coworkSessions);

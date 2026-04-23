@@ -99,18 +99,25 @@ describe('getWorkflowStatus', () => {
       expect(result.isRetryable).toBe(false);
     });
 
-    it('status=failed maps to error', () => {
+    it('status=failed with Cancelled by user is not retryable', () => {
       const result = getWorkflowStatus({ status: 'failed', error: 'Cancelled by user' });
       expect(result.displayStatus).toBe('error');
       expect(result.reason).toBe('Cancelled by user');
       expect(result.isRetryable).toBe(false);
     });
 
-    it('status=failed without error uses fallback message', () => {
+    it('status=failed with other error is retryable', () => {
+      const result = getWorkflowStatus({ status: 'failed', error: 'Agent timeout after 30s' });
+      expect(result.displayStatus).toBe('error');
+      expect(result.reason).toBe('Agent timeout after 30s');
+      expect(result.isRetryable).toBe(true);
+    });
+
+    it('status=failed without error uses fallback message and is retryable', () => {
       const result = getWorkflowStatus({ status: 'failed' });
       expect(result.displayStatus).toBe('error');
       expect(result.reason).toBe('Process failed');
-      expect(result.isRetryable).toBe(false);
+      expect(result.isRetryable).toBe(true);
     });
 
     it('unknown pause reason falls back to error', () => {
