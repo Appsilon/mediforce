@@ -22,3 +22,17 @@ export const ListProcessConfigsOutputSchema = z.object({
 
 export type ListProcessConfigsInput = z.infer<typeof ListProcessConfigsInputSchema>;
 export type ListProcessConfigsOutput = z.infer<typeof ListProcessConfigsOutputSchema>;
+
+// ---- POST /api/configs ------------------------------------------------------
+//
+// Register a new version of a ProcessConfig. Handler runs `validateProcessConfig`
+// against the latest ProcessDefinition version before persisting; failures are
+// returned as 400 `ValidationError`s. Version conflicts become 409
+// `ConflictError`.
+
+export const CreateProcessConfigInputSchema = ProcessConfigSchema;
+
+export const CreateProcessConfigOutputSchema = z.object({ ok: z.literal(true) });
+
+export type CreateProcessConfigInput = z.infer<typeof CreateProcessConfigInputSchema>;
+export type CreateProcessConfigOutput = z.infer<typeof CreateProcessConfigOutputSchema>;

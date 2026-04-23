@@ -94,8 +94,12 @@ export {
 export {
   ListProcessConfigsInputSchema,
   ListProcessConfigsOutputSchema,
+  CreateProcessConfigInputSchema,
+  CreateProcessConfigOutputSchema,
   type ListProcessConfigsInput,
   type ListProcessConfigsOutput,
+  type CreateProcessConfigInput,
+  type CreateProcessConfigOutput,
 } from './configs.js';
 
 export {
@@ -106,3 +110,10 @@ export {
   type ListPluginsOutput,
   type PluginSummary,
 } from './plugins.js';
+
+export {
+  HeartbeatInputSchema,
+  HeartbeatOutputSchema,
+  type HeartbeatInput,
+  type HeartbeatOutput,
+} from './cron.js';

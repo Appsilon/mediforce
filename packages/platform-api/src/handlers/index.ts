@@ -66,10 +66,20 @@ export {
   type ListProcessConfigsDeps,
 } from './configs/list-process-configs.js';
 export {
+  createProcessConfig,
+  type CreateProcessConfigDeps,
+} from './configs/create-process-config.js';
+export {
   listPlugins,
   type ListPluginsDeps,
   type PluginRegistryView,
 } from './plugins/list-plugins.js';
+export {
+  heartbeat,
+  type HeartbeatDeps,
+  type CronTriggerLike,
+  type CronScheduleValidator,
+} from './cron/heartbeat.js';
 
 // Typed errors a handler may throw — re-exported here so the route adapter
 // (the one place that imports `@mediforce/platform-api/handlers`) has a
