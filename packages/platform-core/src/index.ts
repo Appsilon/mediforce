@@ -176,6 +176,34 @@ export type {
 } from './schemas/agent-definition.js';
 export type { AgentDefinitionRepository } from './repositories/agent-definition-repository.js';
 
+// OAuth — Step 5
+export {
+  OAuthProviderConfigSchema,
+  PublicOAuthProviderConfigSchema,
+  CreateOAuthProviderInputSchema,
+  UpdateOAuthProviderInputSchema,
+  OAUTH_PROVIDER_PRESETS,
+} from './schemas/oauth-provider.js';
+export type {
+  OAuthProviderConfig,
+  PublicOAuthProviderConfig,
+  CreateOAuthProviderInput,
+  UpdateOAuthProviderInput,
+} from './schemas/oauth-provider.js';
+export {
+  AgentOAuthTokenSchema,
+  PublicAgentOAuthTokenSchema,
+} from './schemas/agent-oauth-token.js';
+export type {
+  AgentOAuthToken,
+  PublicAgentOAuthToken,
+} from './schemas/agent-oauth-token.js';
+export {
+  ProviderAlreadyExistsError,
+  type OAuthProviderRepository,
+} from './repositories/oauth-provider-repository.js';
+export type { AgentOAuthTokenRepository } from './repositories/agent-oauth-token-repository.js';
+
 // Parser (YAML process definition parsing)
 export { parseProcessDefinition, type ParseResult } from './parser/index.js';
 export { formatZodErrors } from './parser/index.js';
@@ -189,7 +217,10 @@ export {
   InMemoryHumanTaskRepository,
   InMemoryHandoffRepository,
   NoopNotificationService,
-  InMemoryCoworkSessionRepository,  InMemoryCronTriggerStateRepository,
+  InMemoryCoworkSessionRepository,
+  InMemoryCronTriggerStateRepository,
+  InMemoryOAuthProviderRepository,
+  InMemoryAgentOAuthTokenRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,

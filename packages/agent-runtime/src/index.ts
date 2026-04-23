@@ -42,6 +42,23 @@ export { resolveMcpForStep, AgentDefinitionNotFoundError } from './mcp/resolve-m
 export type { ResolveMcpForStepDeps } from './mcp/resolve-mcp-for-step.js';
 export { flattenResolvedMcpToLegacy } from './mcp/flatten-resolved-mcp.js';
 
+// OAuth (Step 5)
+export {
+  signState,
+  verifyState,
+  generateNonce,
+  type OAuthStatePayload,
+} from './oauth/state-hmac.js';
+export {
+  REFRESH_MARGIN_MS,
+  RefreshTokenRejectedError,
+  RefreshTokenUnavailableError,
+  renderOAuthHeader,
+  resolveOAuthToken,
+  type ResolvedToken,
+  type ResolveTokenOptions,
+} from './oauth/resolve-oauth-token.js';
+
 // Testing utilities
 export {
   InMemoryAgentEventLog,
