@@ -121,3 +121,17 @@ High-value anti-duplicate-work surface. Each gotcha = "agent burned >15 min on t
 
 touched: `index.md`, 5 new gotcha pages.
 summary: covered the most common reimplement-what-already-exists traps called out by AGENTS.md.
+
+## [2026-04-23] lint | First full pass
+
+Ran relative-`.md`-link + orphan check on all 38 wiki pages.
+
+- Broken links: 3 found, 3 fixed.
+  - `concepts/repository-pattern.md` → `../../../AGENTS.md` — wrong depth; replaced with plain-text reference.
+  - `entities/packages/workflow-engine.md` → `../../../ENGINE-TESTING.md` — wrong depth; replaced with plain-text reference.
+  - `entities/packages/platform-ui.md` → `../../../../packages/platform-ui/src/lib/platform-services.ts` — code-file link with wrong depth; replaced with plain-text reference. Code paths stay in `## Sources` only.
+- Orphan pages: 0.
+- Rule for future edits: don't use relative `.md` links to reach files outside `docs/knowledge-base/wiki/` — cite them in plain text (paths are in `## Sources`). Relative links inside wiki/ are fine.
+
+touched: 3 pages above, `index.md` unchanged.
+summary: 38 pages, 0 broken links, 0 orphans. Ready to push.

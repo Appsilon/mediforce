@@ -39,7 +39,7 @@ Never mock Firestore directly. Use `InMemory*Repository` doubles from `@mediforc
 import { buildProcessInstance, buildHumanTask, buildAgentRun } from '@mediforce/platform-core/testing';
 ```
 
-See [`AGENTS.md` → "Test factories"](../../../AGENTS.md).
+See `AGENTS.md` → "Test factories".
 
 ## Sources
 

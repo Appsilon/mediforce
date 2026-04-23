@@ -33,7 +33,7 @@ Runs the workflow loop. Given a `ProcessInstance`, it advances steps, routes tra
 - `src/graph/` — step graph validator.
 - `src/review/` — `ReviewTracker` (verdict accumulation, decision finalisation).
 - `src/triggers/` — manual / webhook / cron handlers.
-- `src/__tests__/` — engine integration tests (see [`docs/ENGINE-TESTING.md`](../../../ENGINE-TESTING.md)).
+- `src/__tests__/` — engine integration tests (see `docs/ENGINE-TESTING.md`).
 
 ## Relationships
 

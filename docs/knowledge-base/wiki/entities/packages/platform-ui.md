@@ -22,7 +22,7 @@ User-facing entry point. Serves workspace-scoped pages (agents, tasks, processes
 - **Route groups**: `src/app/(app)/[handle]/{agents,catalog,configs,cowork,monitoring,processes,runs,settings,tasks,tools,workflows}`.
 - **Auth pages**: `/login`, `/change-password`, `/test-login`, `/workspace-selection`.
 - **API routes**: `src/app/api/{processes,definitions,tasks,users,configs,cowork,workflow-definitions,agents,tickets,cron,migrations}`.
-- **Service singleton**: [`src/lib/platform-services.ts`](../../../../packages/platform-ui/src/lib/platform-services.ts) — `getPlatformServices()` lazy-creates everything, shared across API routes. Registers the three built-in plugins (`claude-code-agent`, `opencode-agent`, `script-container`) plus supply-intelligence plugins.
+- **Service singleton**: `src/lib/platform-services.ts` — `getPlatformServices()` lazy-creates everything, shared across API routes. Registers the three built-in plugins (`claude-code-agent`, `opencode-agent`, `script-container`) plus supply-intelligence plugins.
 - **Middleware**: `src/middleware.ts` — JWT/API key auth, CORS, Firebase token validation (emulator-aware via `NEXT_PUBLIC_USE_EMULATORS`).
 
 ## Key internal modules
