@@ -139,6 +139,7 @@ export {
   WorkflowDefinitionBaseSchema,
   InputForNextRunEntrySchema,
   validateInputForNextRun,
+  parseWorkflowDefinitionForCreation,
   type WorkflowAgentConfig,
   type WorkflowCoworkConfig,
   type WorkflowReviewConfig,

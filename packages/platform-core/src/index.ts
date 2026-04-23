@@ -46,6 +46,7 @@ export {
   WorkflowDefinitionBaseSchema,
   InputForNextRunEntrySchema,
   validateInputForNextRun,
+  parseWorkflowDefinitionForCreation,
   ConversationTurnSchema,
   CoworkAgentSchema,
   CoworkVoiceConfigSchema,

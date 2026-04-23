@@ -152,6 +152,16 @@ function validateInputForNextRun(
  * Base WorkflowDefinition schema (no cross-field refinements). Exposed so
  * callers can `.omit()` / `.partial()` and then re-apply validation via
  * `.superRefine(validateInputForNextRun)`.
+ *
+ * WARNING: Using this schema directly bypasses the `inputForNextRun`
+ * cross-field validation (unknown stepId, duplicate `as`). If you reshape
+ * the schema (e.g. `.omit()`) you MUST re-apply `.superRefine(validateInputForNextRun)`
+ * or silently accept WDs with broken `inputForNextRun` references — the
+ * engine's resolver swallows unknown keys at runtime with no signal.
+ *
+ * For the common "register a new WD" path (API routes, server actions),
+ * prefer {@link parseWorkflowDefinitionForCreation} which applies the
+ * refinement for you.
  */
 export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
@@ -183,6 +193,21 @@ export const WorkflowDefinitionSchema =
   WorkflowDefinitionBaseSchema.superRefine(validateInputForNextRun);
 
 export { validateInputForNextRun };
+
+/**
+ * Default parse path for registering a new WorkflowDefinition (API routes,
+ * server actions). Omits the server-managed `version` and `createdAt` fields
+ * and re-applies the cross-field `inputForNextRun` validation so callers
+ * cannot accidentally skip it.
+ *
+ * Returns a Zod `SafeParseReturnType` — check `.success` before using
+ * `.data` or `.error`.
+ */
+export function parseWorkflowDefinitionForCreation(input: unknown) {
+  return WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true })
+    .superRefine(validateInputForNextRun)
+    .safeParse(input);
+}
 
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
 export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;
