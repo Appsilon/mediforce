@@ -26,12 +26,6 @@ export async function PUT(
   if (agent === null) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  if (agent.kind !== 'cowork') {
-    return NextResponse.json(
-      { error: 'MCP bindings are only supported on cowork agents.' },
-      { status: 400 },
-    );
-  }
 
   const nextMcpServers = { ...(agent.mcpServers ?? {}), [name]: parsed.data };
   const updated = await agentDefinitionRepo.update(id, { mcpServers: nextMcpServers });
@@ -47,12 +41,6 @@ export async function DELETE(
   const agent = await agentDefinitionRepo.getById(id);
   if (agent === null) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-  if (agent.kind !== 'cowork') {
-    return NextResponse.json(
-      { error: 'MCP bindings are only supported on cowork agents.' },
-      { status: 400 },
-    );
   }
 
   const rest = { ...(agent.mcpServers ?? {}) };
