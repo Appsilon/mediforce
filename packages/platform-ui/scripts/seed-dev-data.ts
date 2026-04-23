@@ -42,7 +42,6 @@ async function main() {
       ['processDefinitions', data.processDefinitions],
       ['processConfigs', data.processConfigs],
       ['workflowDefinitions', data.workflowDefinitions],
-      ['agentDefinitions', data.agentDefinitions],
       ['namespaces', data.namespaces],
       ['coworkSessions', data.coworkSessions],
     ] as const;

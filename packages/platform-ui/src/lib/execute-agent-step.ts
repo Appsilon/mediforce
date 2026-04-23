@@ -6,7 +6,7 @@
 // Called by the auto-runner loop when the instance was created via fireWorkflow (no configName).
 
 import { getPlatformServices } from './platform-services';
-import type { WorkflowAgentContext } from '@mediforce/agent-runtime';
+import { resolveMcpForStep, type WorkflowAgentContext } from '@mediforce/agent-runtime';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 
@@ -31,7 +31,7 @@ export async function executeAgentStep(
   triggeredBy: string,
   stepExecutionId?: string,
 ): Promise<WorkflowAgentStepResult> {
-  const { engine, agentRunner, pluginRegistry, instanceRepo, processRepo, auditRepo, humanTaskRepo, llmClient } =
+  const { engine, agentRunner, pluginRegistry, instanceRepo, processRepo, auditRepo, humanTaskRepo, llmClient, agentDefinitionRepo, toolCatalogRepo } =
     getPlatformServices();
 
   const instance = await instanceRepo.getById(instanceId);
@@ -85,9 +85,19 @@ export async function executeAgentStep(
   });
 
   // Pre-fetch workflow secrets for {{TEMPLATE}} resolution
-  const workflowSecrets = workflowDefinition.namespace
-    ? await getWorkflowSecretsForRuntime(workflowDefinition.namespace, workflowDefinition.name)
-    : {};
+  const workflowSecrets = await getWorkflowSecretsForRuntime(
+    workflowDefinition.namespace,
+    workflowDefinition.name,
+  );
+
+  // Pre-resolve MCP configuration from the agent definition + step restrictions
+  // + tool catalog. undefined when step.agentId is unset. Namespace-scoped
+  // catalog lookups use the workflow's namespace.
+  const resolvedMcpConfig = (await resolveMcpForStep(workflowStep, {
+    agentDefinitionRepo,
+    toolCatalogRepo,
+    namespace: workflowDefinition.namespace,
+  })) ?? undefined;
 
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
@@ -99,6 +109,7 @@ export async function executeAgentStep(
     step: workflowStep,
     llm: llmClient,
     workflowSecrets,
+    resolvedMcpConfig,
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
       const result: Record<string, unknown> = {};

@@ -1,5 +1,6 @@
 {
   "name": "tealflow",
+  "namespace": "appsilon",
   "title": "TealFlow App Builder",
   "description": "Interactively build a Teal Shiny clinical trial app — upload data, define requirements, co-work with AI to build the app, then deploy to GitHub and Posit Connect.",
   "preamble": "## Domain Context\nThis workflow builds clinical trial data exploration apps using the R teal framework. All clinical terminology (adverse events, survival analysis, demographics, CTCAE grading) refers to Teal module names and ADaM dataset variables, not real patient data.",

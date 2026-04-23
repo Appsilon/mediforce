@@ -57,6 +57,7 @@ function buildMockWorkflowAgentContext(
   const workflowDefinition: WorkflowDefinition = {
     name: 'test-workflow',
     version: 1,
+    namespace: 'test',
     steps: [step],
     transitions: [],
     triggers: [{ type: 'manual', name: 'start' }],
@@ -360,5 +361,182 @@ describe('writeMcpConfig integration', () => {
     expect(parsed.mcpServers['remote-http']).not.toHaveProperty('command');
 
     await cleanup();
+  });
+
+  describe('resolver-backed (workflow mode with context.resolvedMcpConfig)', () => {
+    it('[DATA] serializes resolved stdio + http servers in flat shape', async () => {
+      const context = buildMockWorkflowAgentContext({
+        resolvedMcpConfig: {
+          servers: {
+            tealflow: {
+              type: 'stdio',
+              command: 'tealflow-mcp',
+              args: ['--stdio'],
+            },
+            remote: {
+              type: 'http',
+              url: 'https://mcp.example.com/v1',
+              allowedTools: ['search'],
+            },
+          },
+        },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        mcpServers: Record<string, Record<string, unknown>>;
+      };
+
+      expect(parsed.mcpServers.tealflow).toMatchObject({
+        command: 'tealflow-mcp',
+        args: ['--stdio'],
+      });
+      expect(parsed.mcpServers.remote).toMatchObject({
+        url: 'https://mcp.example.com/v1',
+        allowedTools: ['search'],
+      });
+      expect(parsed.mcpServers.remote).not.toHaveProperty('command');
+
+      await cleanup();
+    });
+
+    it('[DATA] preserves allowedTools trimmed by step-level denyTools', async () => {
+      const context = buildMockWorkflowAgentContext({
+        resolvedMcpConfig: {
+          servers: {
+            github: {
+              type: 'stdio',
+              command: 'github-mcp',
+              allowedTools: ['search_code', 'get_file_contents'],
+            },
+          },
+        },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        mcpServers: Record<string, { allowedTools?: string[] }>;
+      };
+      expect(parsed.mcpServers.github?.allowedTools).toEqual([
+        'search_code',
+        'get_file_contents',
+      ]);
+
+      await cleanup();
+    });
+
+    it('[DATA] writes nothing when resolved config has no servers (all disabled)', async () => {
+      const context = buildMockWorkflowAgentContext({
+        resolvedMcpConfig: { servers: {} },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const contents = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8').catch(
+        () => null,
+      );
+      expect(contents).toBeNull();
+
+      await cleanup();
+    });
+
+    it('[DATA] resolver config wins over legacy step.agent.mcpServers', async () => {
+      // step.agent.mcpServers carries a legacy entry; resolvedMcpConfig carries
+      // the post-refactor binding. The resolver path must take precedence so
+      // that once a workflow migrates to agentId, the legacy field is dead weight.
+      const context = buildMockWorkflowAgentContext({
+        step: {
+          id: 'extract',
+          name: 'Extract Step',
+          type: 'creation',
+          executor: 'agent',
+          plugin: 'claude-code-agent',
+          agent: {
+            skill: 'test-skill',
+            skillsDir: '/plugins/test/skills',
+            image: 'mediforce-agent:test',
+            mcpServers: [
+              { name: 'should-be-ignored', command: 'legacy-inline' },
+            ],
+          },
+        } as unknown as WorkflowStep,
+        resolvedMcpConfig: {
+          servers: {
+            canonical: { type: 'stdio', command: 'resolver-path' },
+          },
+        },
+      });
+      context.workflowDefinition.steps[0] = context.step;
+
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        mcpServers: Record<string, Record<string, unknown>>;
+      };
+      expect(parsed.mcpServers).toHaveProperty('canonical');
+      expect(parsed.mcpServers).not.toHaveProperty('should-be-ignored');
+
+      await cleanup();
+    });
+
+    it('[DATA] resolves {{SECRET}} templates in resolved stdio env', async () => {
+      const context = buildMockWorkflowAgentContext({
+        workflowSecrets: { GITHUB_TOKEN: 'gh-secret-value' },
+        resolvedMcpConfig: {
+          servers: {
+            github: {
+              type: 'stdio',
+              command: 'github-mcp',
+              env: { TOKEN: '{{GITHUB_TOKEN}}' },
+            },
+          },
+        },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        mcpServers: Record<string, { env?: Record<string, string> }>;
+      };
+      expect(parsed.mcpServers.github?.env?.TOKEN).toBe('gh-secret-value');
+
+      await cleanup();
+    });
+  });
+
+  describe('legacy path regression (no resolvedMcpConfig)', () => {
+    it('[DATA] legacy process-mode agentConfig.mcpServers still produces mcp-config.json', async () => {
+      // This is the AgentContext (process-mode) path — never has resolvedMcpConfig
+      // and must keep working after Step 2 for non-migrated processConfigs.
+      const context = buildContextWithMcpServers([
+        { name: 'legacy-stdio', command: 'node', args: ['/opt/mcp/legacy.js'] },
+      ]);
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        mcpServers: Record<string, { command: string; args: string[] }>;
+      };
+      expect(parsed.mcpServers['legacy-stdio']).toMatchObject({
+        command: 'node',
+        args: ['/opt/mcp/legacy.js'],
+      });
+
+      await cleanup();
+    });
   });
 });

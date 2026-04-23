@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   CatalogEntryNotFoundError,
+  DenyToolsWithoutAllowedToolsError,
   UnknownRestrictionTargetError,
   resolveEffectiveMcp,
   type ResolvedMcpServer,
@@ -21,6 +22,7 @@ import {
 function makeAgent(mcpServers?: AgentMcpBindingMap): AgentDefinition {
   return {
     id: 'agent-1',
+    kind: 'plugin',
     name: 'Test Agent',
     iconName: 'bot',
     description: '',
@@ -133,7 +135,6 @@ describe('resolveEffectiveMcp', () => {
       const result = resolveEffectiveMcp(agent, makeStep(), catalog);
       const github = asStdio(result.servers.github);
       expect(github.allowedTools).toEqual(['search_code', 'get_file']);
-      expect(github.deniedTools).toBeUndefined();
     });
   });
 
@@ -176,7 +177,6 @@ describe('resolveEffectiveMcp', () => {
       const result = resolveEffectiveMcp(agent, step, catalog);
       const github = asStdio(result.servers.github);
       expect(github.allowedTools).toEqual(['search_code', 'get_file']);
-      expect(github.deniedTools).toBeUndefined();
     });
 
     it('drops server entirely when denyTools empties the allowlist', () => {
@@ -210,23 +210,6 @@ describe('resolveEffectiveMcp', () => {
       expect(Object.keys(result.servers)).toEqual(['postgres']);
     });
 
-    it('carries denyTools forward as deniedTools when binding has no allowedTools', () => {
-      // Convention: binding.allowedTools=undefined means "all tools from server".
-      // With only denyTools available here, the resolver cannot materialize an
-      // explicit allowlist (doesn't know the full tool set). It emits
-      // allowedTools=undefined and deniedTools=[...] so the runtime layer can
-      // apply a second-stage subtractive filter.
-      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
-      const agent = makeAgent({
-        github: { type: 'stdio', catalogId: 'gh' },
-      });
-      const step = makeStep({ github: { denyTools: ['delete_repo'] } });
-      const result = resolveEffectiveMcp(agent, step, catalog);
-      const github = asStdio(result.servers.github);
-      expect(github.allowedTools).toBeUndefined();
-      expect(github.deniedTools).toEqual(['delete_repo']);
-    });
-
     it('applies denyTools to http bindings the same way', () => {
       const agent = makeAgent({
         remote: {
@@ -238,6 +221,61 @@ describe('resolveEffectiveMcp', () => {
       const step = makeStep({ remote: { denyTools: ['push'] } });
       const result = resolveEffectiveMcp(agent, step, new Map());
       expect(asHttp(result.servers.remote).allowedTools).toEqual(['fetch']);
+    });
+
+    it('denyTools without binding allowedTools throws DenyToolsWithoutAllowedToolsError', () => {
+      // Binding has no allowedTools → the resolver cannot materialize an
+      // explicit allowlist to subtract from, and the downstream serializers
+      // (mcp-config.json / McpServerConfig) have no way to express the
+      // "all-minus-X" state. Rejecting at resolution time forces the author
+      // to either add allowedTools to the binding or use disable: true.
+      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const agent = makeAgent({
+        github: { type: 'stdio', catalogId: 'gh' },
+      });
+      const step = makeStep({ github: { denyTools: ['delete_repo'] } });
+      expect(() => resolveEffectiveMcp(agent, step, catalog)).toThrow(
+        DenyToolsWithoutAllowedToolsError,
+      );
+    });
+
+    it('DenyToolsWithoutAllowedToolsError exposes serverName and denyTools', () => {
+      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const agent = makeAgent({
+        github: { type: 'stdio', catalogId: 'gh' },
+      });
+      const step = makeStep({ github: { denyTools: ['delete_repo', 'admin_purge'] } });
+      try {
+        resolveEffectiveMcp(agent, step, catalog);
+        expect.fail('expected throw');
+      } catch (err) {
+        expect(err).toBeInstanceOf(DenyToolsWithoutAllowedToolsError);
+        if (err instanceof DenyToolsWithoutAllowedToolsError) {
+          expect(err.serverName).toBe('github');
+          expect(err.denyTools).toEqual(['delete_repo', 'admin_purge']);
+        }
+      }
+    });
+
+    it('does not throw when denyTools is empty on a binding without allowedTools', () => {
+      // denyTools=[] is a no-op — no authorization gap, nothing to reject.
+      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const agent = makeAgent({
+        github: { type: 'stdio', catalogId: 'gh' },
+      });
+      const step = makeStep({ github: { denyTools: [] } });
+      expect(() => resolveEffectiveMcp(agent, step, catalog)).not.toThrow();
+    });
+
+    it('does not throw when denyTools accompanies disable:true on a binding without allowedTools', () => {
+      // disable short-circuits the server — denyTools is moot, so no error.
+      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const agent = makeAgent({
+        github: { type: 'stdio', catalogId: 'gh' },
+      });
+      const step = makeStep({ github: { disable: true, denyTools: ['delete_repo'] } });
+      const result = resolveEffectiveMcp(agent, step, catalog);
+      expect(result.servers.github).toBeUndefined();
     });
   });
 

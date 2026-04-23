@@ -8,6 +8,7 @@ import {
   FirestoreAgentDefinitionRepository,
   FirestoreCoworkSessionRepository,
   FirestoreCronTriggerStateRepository,
+  FirestoreToolCatalogRepository,
   getAdminFirestore,
   validateSecretsKey,
 } from '@mediforce/platform-infra';
@@ -29,6 +30,7 @@ import {
 } from '@mediforce/agent-runtime';
 import { registerSupplyIntelligencePlugins } from '@mediforce/supply-intelligence-plugins';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
+import { seedBuiltinToolCatalog } from './seed-tool-catalog.js';
 
 let services: PlatformServices | null = null;
 let seedingStarted = false;
@@ -47,6 +49,7 @@ export interface PlatformServices {
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
   coworkSessionRepo: FirestoreCoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
+  toolCatalogRepo: FirestoreToolCatalogRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -66,6 +69,7 @@ export function getPlatformServices(): PlatformServices {
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
   const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);
   const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
+  const toolCatalogRepo = new FirestoreToolCatalogRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -128,12 +132,16 @@ export function getPlatformServices(): PlatformServices {
     agentDefinitionRepo,
     coworkSessionRepo,
     cronTriggerStateRepo,
+    toolCatalogRepo,
   };
 
   if (!seedingStarted) {
     seedingStarted = true;
     seedBuiltinAgentDefinitions(agentDefinitionRepo).catch((err) => {
       console.error('[platform-services] Failed to seed built-in agent definitions:', err);
+    });
+    seedBuiltinToolCatalog(toolCatalogRepo).catch((err) => {
+      console.error('[platform-services] Failed to seed built-in tool catalog:', err);
     });
   }
 

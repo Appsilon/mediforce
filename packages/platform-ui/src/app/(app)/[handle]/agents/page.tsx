@@ -181,7 +181,7 @@ function agentMatchesQuery(agent: AgentEntry, query: string): boolean {
 
 function agentDefinitionToEntry(def: AgentDefinition): AgentEntry {
   return {
-    name: def.pluginId ?? def.id,
+    name: def.runtimeId ?? def.id,
     definitionId: def.id,
     metadata: {
       name: def.name,
@@ -212,18 +212,22 @@ function AgentCatalog({ handle }: { handle: string }) {
       }),
     ])
       .then(([pluginsData, definitionsData]) => {
-        const definitionEntries = (definitionsData.agents ?? []).map(agentDefinitionToEntry);
-        // Map from pluginId → definition entry (for dedup and Configure link)
-        const definitionByPluginId = new Map(
-          definitionEntries.map((e) => [e.name, e]),
+        // Map from runtimeId → definition entry. Dedups definitions that share a
+        // runtimeId (e.g. an older seeded doc + the builtin-seeded doc) and also
+        // backs the plugin filter below.
+        const definitionByRuntimeId = new Map(
+          (definitionsData.agents ?? []).map((def) => {
+            const entry = agentDefinitionToEntry(def);
+            return [entry.name, entry] as const;
+          }),
         );
-        // For plugins not covered by a definition, include them as-is
-        // For plugins that have a matching definition, the definition entry (with Configure button) wins
-        const coveredPluginIds = new Set(definitionByPluginId.keys());
+        // For plugins not covered by a definition, include them as-is.
+        // For plugins that have a matching definition, the definition entry (with Configure button) wins.
+        const coveredRuntimeIds = new Set(definitionByRuntimeId.keys());
         const uncoveredPlugins = (pluginsData.plugins ?? []).filter(
-          (p) => !coveredPluginIds.has(p.name),
+          (p) => !coveredRuntimeIds.has(p.name),
         );
-        setAgents([...definitionEntries, ...uncoveredPlugins]);
+        setAgents([...definitionByRuntimeId.values(), ...uncoveredPlugins]);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unknown error');

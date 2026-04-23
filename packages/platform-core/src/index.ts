@@ -150,7 +150,9 @@ export type {
   UserDirectoryService,
   DirectoryUser,
   AgentRunRepository,
-  CoworkSessionRepository,  CronTriggerStateRepository,
+  CoworkSessionRepository,
+  CronTriggerStateRepository,
+  ToolCatalogRepository,
 } from './interfaces/index.js';
 
 // Agent definition schema + repository interface
@@ -204,6 +206,7 @@ export {
   resolveEffectiveMcp,
   CatalogEntryNotFoundError,
   UnknownRestrictionTargetError,
+  DenyToolsWithoutAllowedToolsError,
   type ResolvedMcpConfig,
   type ResolvedMcpServer,
   type ResolvedStdioMcpServer,

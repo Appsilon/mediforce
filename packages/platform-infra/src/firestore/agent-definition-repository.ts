@@ -8,13 +8,21 @@ import {
 } from '@mediforce/platform-core';
 
 function toAgentDefinition(id: string, data: Record<string, unknown>): AgentDefinition {
+  // Legacy rows wrote this field as `pluginId`; new rows write `runtimeId`.
+  // Normalize on read so orphan rows with the old field still parse.
+  const runtimeId =
+    typeof data.runtimeId === 'string'
+      ? data.runtimeId
+      : typeof data.pluginId === 'string'
+        ? data.pluginId
+        : undefined;
   return AgentDefinitionSchema.parse({
     ...data,
     id,
+    runtimeId,
     inputDescription: data.inputDescription ?? '',
     outputDescription: data.outputDescription ?? '',
     skillFileNames: data.skillFileNames ?? [],
-    pluginId: typeof data.pluginId === 'string' ? data.pluginId : undefined,
     createdAt:
       data.createdAt instanceof Timestamp
         ? data.createdAt.toDate().toISOString()
@@ -38,6 +46,16 @@ export class FirestoreAgentDefinitionRepository implements AgentDefinitionReposi
     const ref = await this.col.add({ ...input, createdAt: now, updatedAt: now });
     const snap = await ref.get();
     return toAgentDefinition(ref.id, snap.data() as Record<string, unknown>);
+  }
+
+  async upsert(id: string, input: CreateAgentDefinitionInput): Promise<AgentDefinition> {
+    const ref = this.col.doc(id);
+    const now = FieldValue.serverTimestamp();
+    const existing = await ref.get();
+    const createdAt = existing.exists ? (existing.data()?.createdAt ?? now) : now;
+    await ref.set({ ...input, createdAt, updatedAt: now });
+    const snap = await ref.get();
+    return toAgentDefinition(snap.id, snap.data() as Record<string, unknown>);
   }
 
   async getById(id: string): Promise<AgentDefinition | null> {
