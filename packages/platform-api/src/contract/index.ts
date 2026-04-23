@@ -44,3 +44,30 @@ export {
   type StepEntry,
   type StepEntryStatus,
 } from './processes.js';
+
+export {
+  GetCoworkSessionInputSchema,
+  GetCoworkSessionOutputSchema,
+  GetCoworkSessionByInstanceInputSchema,
+  GetCoworkSessionByInstanceOutputSchema,
+  type GetCoworkSessionInput,
+  type GetCoworkSessionOutput,
+  type GetCoworkSessionByInstanceInput,
+  type GetCoworkSessionByInstanceOutput,
+} from './cowork.js';
+
+export {
+  ListProcessConfigsInputSchema,
+  ListProcessConfigsOutputSchema,
+  type ListProcessConfigsInput,
+  type ListProcessConfigsOutput,
+} from './configs.js';
+
+export {
+  ListPluginsInputSchema,
+  ListPluginsOutputSchema,
+  PluginSummarySchema,
+  type ListPluginsInput,
+  type ListPluginsOutput,
+  type PluginSummary,
+} from './plugins.js';

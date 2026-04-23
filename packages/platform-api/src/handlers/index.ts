@@ -21,6 +21,23 @@ export {
   getAgentDefinition,
   type GetAgentDefinitionDeps,
 } from './definitions/get-agent-definition.js';
+export {
+  getCoworkSession,
+  type GetCoworkSessionDeps,
+} from './cowork/get-cowork-session.js';
+export {
+  getCoworkSessionByInstance,
+  type GetCoworkSessionByInstanceDeps,
+} from './cowork/get-cowork-session-by-instance.js';
+export {
+  listProcessConfigs,
+  type ListProcessConfigsDeps,
+} from './configs/list-process-configs.js';
+export {
+  listPlugins,
+  type ListPluginsDeps,
+  type PluginRegistryView,
+} from './plugins/list-plugins.js';
 
 // Typed errors a handler may throw — re-exported here so the route adapter
 // (the one place that imports `@mediforce/platform-api/handlers`) has a

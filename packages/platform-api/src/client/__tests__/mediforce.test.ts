@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Mediforce, ApiError, type ClientConfig } from '../index.js';
-import { buildHumanTask } from '@mediforce/platform-core/testing';
+import {
+  buildCoworkSession,
+  buildHumanTask,
+  buildProcessConfig,
+} from '@mediforce/platform-core/testing';
+import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -311,6 +316,161 @@ describe('Mediforce', () => {
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       await expect(mediforce.tasks.get({ taskId: 'task-42' })).rejects.toThrow();
+    });
+  });
+
+  describe('cowork.get', () => {
+    it('calls GET /api/cowork/:sessionId and returns the parsed session', async () => {
+      const session = buildCoworkSession({ id: 'sess-42' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(session));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.cowork.get({ sessionId: 'sess-42' });
+
+      expect(result.id).toBe('sess-42');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/cowork/sess-42`,
+      );
+    });
+
+    it('URL-encodes the sessionId path segment', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(buildCoworkSession({ id: 'a/b' })));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.cowork.get({ sessionId: 'a/b' });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/cowork/a%2Fb`,
+      );
+    });
+
+    it('throws ApiError on 404 with the server message', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ error: 'Cowork session missing not found' }, 404),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const err = await mediforce.cowork
+        .get({ sessionId: 'missing' })
+        .catch((e) => e);
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).status).toBe(404);
+    });
+
+    it('rejects an empty sessionId before firing any request', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await expect(mediforce.cowork.get({ sessionId: '' })).rejects.toThrow();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cowork.getByInstance', () => {
+    it('calls GET /api/cowork/by-instance/:instanceId and returns the parsed session', async () => {
+      const session = buildCoworkSession({ processInstanceId: 'inst-a', status: 'active' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(session));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.cowork.getByInstance({ instanceId: 'inst-a' });
+
+      expect(result.processInstanceId).toBe('inst-a');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/cowork/by-instance/inst-a`,
+      );
+    });
+
+    it('throws ApiError on 404 with the server message', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ error: "No active cowork session found for instance 'inst-a'" }, 404),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const err = await mediforce.cowork
+        .getByInstance({ instanceId: 'inst-a' })
+        .catch((e) => e);
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).status).toBe(404);
+    });
+  });
+
+  describe('configs.list', () => {
+    it('serialises processName into the query string', async () => {
+      const config = buildProcessConfig({ processName: 'supply-chain-review' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ configs: [config] }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.configs.list({ processName: 'supply-chain-review' });
+
+      expect(result.configs).toHaveLength(1);
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/configs?processName=supply-chain-review`,
+      );
+    });
+
+    it('rejects an empty processName before firing any request', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await expect(mediforce.configs.list({ processName: '' })).rejects.toThrow();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('parses the response envelope', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ configs: [] }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.configs.list({ processName: 'p-empty' });
+
+      expect(result.configs).toEqual([]);
+    });
+  });
+
+  describe('plugins.list', () => {
+    const metadata: PluginCapabilityMetadata = {
+      name: 'claude-code-agent',
+      description: 'Runs Claude Code against a workspace',
+      inputDescription: 'Repository path + task prompt',
+      outputDescription: 'Artifact diff + audit log',
+      roles: ['executor'],
+    };
+
+    it('calls GET /api/plugins and parses the envelope', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({
+          plugins: [
+            { name: 'claude-code-agent', metadata },
+            { name: 'opencode-agent' },
+          ],
+        }),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.plugins.list();
+
+      expect(result.plugins).toHaveLength(2);
+      expect(result.plugins[0].name).toBe('claude-code-agent');
+      expect(result.plugins[0].metadata).toEqual(metadata);
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/plugins`);
+    });
+
+    it('rejects responses that do not match the output schema', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ plugins: [{ metadata }] }), // missing `name`
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await expect(mediforce.plugins.list()).rejects.toThrow();
     });
   });
 });

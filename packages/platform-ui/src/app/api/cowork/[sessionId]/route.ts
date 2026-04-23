@@ -1,22 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { getCoworkSession } from '@mediforce/platform-api/handlers';
+import { GetCoworkSessionInputSchema } from '@mediforce/platform-api/contract';
+import type { GetCoworkSessionInput } from '@mediforce/platform-api/contract';
+
+interface RouteContext {
+  params: Promise<{ sessionId: string }>;
+}
 
 /**
  * GET /api/cowork/:sessionId
  *
- * Returns the cowork session including conversation history and current artifact.
+ * Returns the cowork session including conversation history and current
+ * artifact. Missing sessions surface as 404 via `NotFoundError`.
  */
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> },
-): Promise<NextResponse> {
-  const { sessionId } = await params;
-  const { coworkSessionRepo } = getPlatformServices();
-
-  const session = await coworkSessionRepo.getById(sessionId);
-  if (!session) {
-    return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-  }
-
-  return NextResponse.json(session);
-}
+export const GET = createRouteAdapter<
+  typeof GetCoworkSessionInputSchema,
+  GetCoworkSessionInput,
+  RouteContext
+>(
+  GetCoworkSessionInputSchema,
+  async (_req, ctx) => ({ sessionId: (await ctx.params).sessionId }),
+  (input) =>
+    getCoworkSession(input, {
+      coworkSessionRepo: getPlatformServices().coworkSessionRepo,
+    }),
+);
