@@ -59,6 +59,22 @@ export {
   type ResolvedToken,
   type ResolveTokenOptions,
 } from './oauth/resolve-oauth-token.js';
+export {
+  discoverMcpAuthServer,
+  deriveProviderSlug,
+  extractResourceMetadataUrl,
+  McpDiscoveryError,
+  type DiscoveredAuthServer,
+  type ProtectedResourceMetadata,
+  type AuthServerMetadata,
+} from './oauth/mcp-oauth-discovery.js';
+export {
+  registerOAuthClient,
+  pickAuthMethod,
+  DcrError,
+  type DcrRequest,
+  type DcrResponse,
+} from './oauth/dcr-client.js';
 
 // Testing utilities
 export {

@@ -14,8 +14,9 @@ export const OAuthProviderConfigSchema = z.object({
   name: z.string().min(1),
   /** OAuth App client id. */
   clientId: z.string().min(1),
-  /** OAuth App client secret. Stored plaintext in Firestore (encryption-at-rest). */
-  clientSecret: z.string().min(1),
+  /** OAuth App client secret. Optional because DCR-registered public clients
+   *  may use `token_endpoint_auth_method: none` + PKCE and have no secret. */
+  clientSecret: z.string().min(1).optional(),
   /** Provider authorize URL (user consent screen). */
   authorizeUrl: z.string().url(),
   /** Provider token exchange URL (POST code → access/refresh tokens). */
@@ -24,11 +25,28 @@ export const OAuthProviderConfigSchema = z.object({
    *  with revokeAtProvider=true hits this endpoint. */
   revokeUrl: z.string().url().optional(),
   /** User info URL. Called after token exchange to capture providerUserId +
-   *  accountLogin for display. Expected shape: JSON with `{id, login?|email?}`. */
-  userInfoUrl: z.string().url(),
+   *  accountLogin for display. Optional — many MCP authorization servers do
+   *  not expose a userinfo endpoint; callback falls back to server name. */
+  userInfoUrl: z.string().url().optional(),
   /** OAuth scopes requested at authorize time. Space-separated at request,
    *  stored here as an array for editability. */
   scopes: z.array(z.string().min(1)).min(1),
+  /** How to authenticate the client at the token endpoint. Matches RFC 7591
+   *  `token_endpoint_auth_method`. Defaults to 'client_secret_basic' at call
+   *  sites when unset — kept optional so existing preset docs and pre-DCR
+   *  provider rows parse without migration. */
+  tokenEndpointAuthMethod: z
+    .enum(['client_secret_basic', 'client_secret_post', 'none'])
+    .optional(),
+  /** AS issuer URL (from `.well-known/oauth-authorization-server`). Set by
+   *  DCR flow to aid debugging; manual providers typically leave it unset. */
+  issuer: z.string().url().optional(),
+  /** DCR registration endpoint used when this provider was auto-provisioned.
+   *  Set by the discover flow; manual providers leave it unset. */
+  registrationEndpoint: z.string().url().optional(),
+  /** MCP resource URL that triggered DCR (e.g. `https://mcp2.readwise.io/mcp`).
+   *  Lets multiple bindings against the same AS share one provider doc. */
+  resourceUrl: z.string().url().optional(),
   /** Optional icon URL (shown in provider dropdown). */
   iconUrl: z.string().url().optional(),
   /** ISO timestamp of creation. */

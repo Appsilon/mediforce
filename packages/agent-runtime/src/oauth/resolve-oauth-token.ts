@@ -90,12 +90,15 @@ export async function resolveOAuthToken(
     throw new RefreshTokenUnavailableError(provider.id);
   }
 
-  const body = new URLSearchParams({
+  const bodyFields: Record<string, string> = {
     grant_type: 'refresh_token',
     refresh_token: token.refreshToken,
     client_id: provider.clientId,
-    client_secret: provider.clientSecret,
-  });
+  };
+  if (provider.clientSecret !== undefined) {
+    bodyFields.client_secret = provider.clientSecret;
+  }
+  const body = new URLSearchParams(bodyFields);
 
   let response: Response;
   try {

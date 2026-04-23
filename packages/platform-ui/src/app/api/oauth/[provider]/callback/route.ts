@@ -56,20 +56,28 @@ async function exchangeCode(params: {
   redirectUri: string;
 }): Promise<TokenExchangeResponse | null> {
   const { provider, code, redirectUri } = params;
-  const body = new URLSearchParams({
+  const bodyFields: Record<string, string> = {
     grant_type: 'authorization_code',
     code,
     client_id: provider.clientId,
-    client_secret: provider.clientSecret,
     redirect_uri: redirectUri,
-  });
+  };
+  const authMethod = provider.tokenEndpointAuthMethod ?? 'client_secret_basic';
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    Accept: 'application/json',
+  };
+  if (authMethod === 'client_secret_basic' && provider.clientSecret !== undefined) {
+    const credentials = `${provider.clientId}:${provider.clientSecret}`;
+    headers.Authorization = `Basic ${Buffer.from(credentials).toString('base64')}`;
+  } else if (provider.clientSecret !== undefined) {
+    bodyFields.client_secret = provider.clientSecret;
+  }
+  const body = new URLSearchParams(bodyFields);
   try {
     const response = await fetch(provider.tokenUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
-      },
+      headers,
       body: body.toString(),
     });
     if (!response.ok) return null;
@@ -82,7 +90,17 @@ async function exchangeCode(params: {
 async function fetchUserInfo(
   provider: OAuthProviderConfig,
   accessToken: string,
+  serverName: string,
 ): Promise<ProviderUserInfo | null> {
+  // No userinfo endpoint — common for MCP authorization servers. Synthesize
+  // a display identity from the server name + a short hash of the access
+  // token so revoke UI has something stable to show.
+  if (provider.userInfoUrl === undefined) {
+    return {
+      providerUserId: provider.id,
+      accountLogin: serverName,
+    };
+  }
   try {
     const response = await fetch(provider.userInfoUrl, {
       headers: {
@@ -181,7 +199,7 @@ export async function GET(
       : undefined;
   const scope = typeof exchange.scope === 'string' ? exchange.scope : provider.scopes.join(' ');
 
-  const userInfo = await fetchUserInfo(provider, accessToken);
+  const userInfo = await fetchUserInfo(provider, accessToken, state.serverName);
   if (userInfo === null) {
     return redirectError(request, 'userinfo-fetch-failed', state);
   }

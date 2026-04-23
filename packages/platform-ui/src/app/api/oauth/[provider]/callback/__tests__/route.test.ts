@@ -137,7 +137,12 @@ describe('GET /api/oauth/:provider/callback', () => {
     expect(tokenBody).toContain('grant_type=authorization_code');
     expect(tokenBody).toContain('code=dummy-code');
     expect(tokenBody).toContain('client_id=client-id-xyz');
-    expect(tokenBody).toContain('client_secret=client-secret-xyz');
+    // Default token_endpoint_auth_method is client_secret_basic — the secret
+    // must be sent via Authorization: Basic, not in the form body.
+    expect(tokenBody).not.toContain('client_secret=');
+    const tokenHeaders = tokenInit.headers as Record<string, string>;
+    const expectedBasic = `Basic ${Buffer.from('client-id-xyz:client-secret-xyz').toString('base64')}`;
+    expect(tokenHeaders.Authorization).toBe(expectedBasic);
     expect(tokenBody).toMatch(/redirect_uri=.*%2Fapi%2Foauth%2Fgithub%2Fcallback/);
 
     // Userinfo fetch
