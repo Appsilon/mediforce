@@ -136,7 +136,11 @@ Close the loop: UI consumes the same contract it serves.
 
 - Build `packages/platform-ui/src/lib/api-client.ts`:
   - Methods like `apiClient.tasks.list(input)` → `Promise<ListTasksOutput>`.
-  - Uses `apiFetch` (Filip's helper) under the hood — auth via Firebase Bearer.
+  - Shares the browser Bearer path with `apiFetch` (Filip's helper) via the
+    `getFirebaseIdToken()` helper in `lib/firebase-id-token.ts` — one source
+    of truth for `auth.currentUser.getIdToken()`. The typed client itself is
+    Firebase-free; the browser wrapper `lib/mediforce.ts` injects the helper
+    as its `bearerToken` callback.
   - Parses the response through `<Endpoint>OutputSchema` — runtime guarantee.
   - Input type + schema come from `@mediforce/platform-api/contract`.
 - Migrate one non-realtime hook (settings list, archived items, detail view) from `useCollection` / direct Firestore SDK to `apiClient`.
@@ -152,7 +156,7 @@ Close the loop: UI consumes the same contract it serves.
 - `bearerToken: () => Promise<string | null>` → user session (browser). Called per request for rotation; attaches `Authorization: Bearer`.
 - `fetch: typeof fetch` → escape hatch. Test loopback, retry/tracing wrappers with auth baked in via closure. No auth headers added by the client — caller's fetch handles it.
 
-Firebase is never imported by `platform-api/client` — the browser wrapper in `platform-ui/src/lib/mediforce.ts` supplies `bearerToken` that lazily imports Firebase SDK and reads `auth.currentUser.getIdToken()`. For Node consumers, just `new Mediforce({ baseUrl, apiKey })`.
+Firebase is never imported by `platform-api/client` — the browser wrapper in `platform-ui/src/lib/mediforce.ts` supplies `bearerToken` by reference to `getFirebaseIdToken()` (in `lib/firebase-id-token.ts`), which lazily imports the Firebase SDK and reads `auth.currentUser.getIdToken()`. That same helper backs `apiFetch`, so every browser-initiated call — typed or raw — produces byte-identical auth headers. For Node consumers, just `new Mediforce({ baseUrl, apiKey })`.
 
 **Open questions to settle**:
 - Do we keep our own tiny async-hook helper (`useInstanceTasks` pattern — `useState` + `useEffect` + cancelled flag), or adopt an existing library (`@tanstack/react-query` / `swr`) that gives caching, dedup, stale-while-revalidate for free?

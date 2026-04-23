@@ -1,24 +1,25 @@
+import { getFirebaseIdToken } from './firebase-id-token';
+
 /**
  * Client-side fetch wrapper that attaches the current user's Firebase ID token
  * as `Authorization: Bearer <token>` so middleware.ts can authenticate the
  * request without requiring the server-only PLATFORM_API_KEY.
  *
- * Use this for every browser-initiated call to internal `/api/*` routes.
- * Server-to-server calls (route handlers, cron, queue workers) should continue
- * to use the `X-Api-Key: ${PLATFORM_API_KEY}` header instead.
+ * Use this for browser-initiated calls to internal `/api/*` routes that have
+ * not yet been migrated onto the typed `Mediforce` client. Once an endpoint
+ * lives in `@mediforce/platform-api/contract`, prefer `mediforce.X.y()` from
+ * `lib/mediforce.ts` — both paths share the same `getFirebaseIdToken()`
+ * helper, so the wire-level auth header is identical.
  *
- * Firebase auth is imported lazily so unit tests rendering components that
- * transitively depend on this helper do not trigger getAuth() in a
- * node environment without NEXT_PUBLIC_FIREBASE_API_KEY.
+ * Server-to-server calls (route handlers, cron, queue workers) use
+ * `X-Api-Key: ${PLATFORM_API_KEY}` instead — middleware accepts either.
  */
 export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers ?? {});
 
   if (!headers.has('Authorization')) {
-    const { auth } = await import('./firebase');
-    const user = auth.currentUser;
-    if (user !== null) {
-      const token = await user.getIdToken();
+    const token = await getFirebaseIdToken();
+    if (token !== null) {
       headers.set('Authorization', `Bearer ${token}`);
     }
   }
