@@ -12,14 +12,18 @@ import {
  *
  * Exactly one of three auth/transport options must be provided:
  *
- *   - `apiKey`      — server-to-server trust. Uses `globalThis.fetch` and
- *                     attaches `X-Api-Key`.
+ *   - `apiKey`      — server-to-server trust. Uses `globalThis.fetch`,
+ *                     attaches `X-Api-Key`, **requires a non-empty `baseUrl`**
+ *                     (server-to-server always has a remote target;
+ *                     `fetch('/api/...')` throws `Invalid URL` in Node).
  *   - `bearerToken` — user-session auth. Called per request; attaches
  *                     `Authorization: Bearer <token>` (or skips the header
- *                     when the callback returns `null`).
+ *                     when the callback returns `null`). `baseUrl` is optional
+ *                     — same-origin `/api/*` just works in the browser.
  *   - `fetch`       — escape hatch. Supply a fetch-compatible function with
  *                     auth already handled (via closure) or none at all
- *                     (test loopback where middleware is bypassed).
+ *                     (test loopback where middleware is bypassed). `baseUrl`
+ *                     is optional — the injected fetch owns URL resolution.
  *
  * Firebase is never imported by this class — a browser wrapper that reads
  * Firebase ID tokens lives in `packages/platform-ui/src/lib/mediforce.ts`.
@@ -35,9 +39,12 @@ interface BaseClientConfig {
  * Modeled as a discriminated union so TypeScript rejects combinations at the
  * call site; the runtime `authSources !== 1` check in the constructor is
  * kept as defense-in-depth for JS callers / bad casts.
+ *
+ * The `apiKey` variant makes `baseUrl` required because server-to-server
+ * callers always target a remote host — relative paths throw in Node.
  */
 export type ClientConfig =
-  | (BaseClientConfig & { apiKey: string; bearerToken?: never; fetch?: never })
+  | (BaseClientConfig & { apiKey: string; baseUrl: string; bearerToken?: never; fetch?: never })
   | (BaseClientConfig & { bearerToken: () => Promise<string | null>; apiKey?: never; fetch?: never })
   | (BaseClientConfig & { fetch: typeof fetch; apiKey?: never; bearerToken?: never });
 
@@ -76,6 +83,20 @@ export class Mediforce {
           'Use `apiKey` for server-to-server, `bearerToken` for user sessions, ' +
           '`fetch` for tests (loopback) or custom wrappers that bake auth into the closure.',
       );
+    }
+    // apiKey implies server-to-server, which always needs an absolute target.
+    // Same-origin browser calls use bearerToken, not apiKey, so requiring
+    // baseUrl here trades zero flexibility for one less silent failure in
+    // Node ("Invalid URL" from `fetch('/api/...')` is not obviously a config
+    // mistake at the call site).
+    if (safeConfig.apiKey !== undefined) {
+      const baseUrl = (config as BaseClientConfig).baseUrl;
+      if (typeof baseUrl !== 'string' || baseUrl.length === 0) {
+        throw new Error(
+          'Mediforce: `apiKey` requires a non-empty `baseUrl` (server-to-server calls need an absolute target). ' +
+            'Example: new Mediforce({ apiKey, baseUrl: "https://mediforce.example.com" }).',
+        );
+      }
     }
 
     this.tasks = {

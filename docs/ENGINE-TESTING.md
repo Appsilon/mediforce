@@ -39,6 +39,18 @@ Two conventions keep the split from rotting — encoded as a Vitest test that sc
 
 Runs as part of `pnpm test` — no separate CI job.
 
+### Test-name prefixes
+
+Tests in `workflow-engine`, `platform-api`, and `platform-ui` adopt a lightweight tag convention in the `it('…')` string, so `pnpm test -t '\[ERROR\]'` slices by concern at a glance:
+
+| Prefix | What it covers |
+|---|---|
+| `[DATA]` | Happy-path behaviour — correct output for valid input, filtering, transformations, persistence |
+| `[ERROR]` | Failure paths — Zod rejections, 400/500 responses, invariant violations, expected exceptions |
+| `[AUTH]` | Authorisation / middleware behaviour (rare — most auth is covered once in `api-auth-coverage.test.ts`) |
+
+The prefix is optional — use it when a file mixes data-path and error-path tests, skip it when every test in a file is the same category. Do not invent new prefixes without adding a row here.
+
 ## What exists today
 
 **workflow-engine** (12 test files):

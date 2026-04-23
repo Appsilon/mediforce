@@ -34,6 +34,12 @@ const API_HANDLERS = join(
 
 // Files allowed to import handlers from @mediforce/platform-api — they form
 // the thin HTTP adapter layer between Next.js and pure handlers.
+//
+// `app/actions/*.ts` (server actions) are included for symmetry, but note:
+// middleware.ts matches `/api/:path*` only, so server actions are NOT
+// auto-protected. Actions that import handlers must do their own auth check.
+// See the auth-scope note in lib/route-adapter.ts. Tighten this predicate
+// if middleware ever grows to guard `app/actions`.
 function isAdapterFile(absolutePath: string): boolean {
   const rel = relative(UI_SRC, absolutePath);
   if (rel === join('lib', 'route-adapter.ts')) return true;

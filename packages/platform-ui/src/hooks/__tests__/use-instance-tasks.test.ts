@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { HumanTask } from '@mediforce/platform-core';
+import { buildHumanTask } from '@mediforce/platform-core/testing';
 
 const listMock = vi.fn<(...args: unknown[]) => Promise<{ tasks: HumanTask[] }>>();
 vi.mock('@/lib/mediforce', () => ({
@@ -9,21 +10,6 @@ vi.mock('@/lib/mediforce', () => ({
 }));
 
 const { useInstanceTasks } = await import('../use-instance-tasks');
-
-const task = (overrides: Partial<HumanTask> = {}): HumanTask => ({
-  id: 't1',
-  processInstanceId: 'inst-a',
-  stepId: 'review',
-  assignedRole: 'reviewer',
-  assignedUserId: null,
-  status: 'pending',
-  deadline: null,
-  createdAt: '2026-01-15T10:00:00Z',
-  updatedAt: '2026-01-15T10:00:00Z',
-  completedAt: null,
-  completionData: null,
-  ...overrides,
-});
 
 describe('useInstanceTasks', () => {
   beforeEach(() => {
@@ -44,7 +30,7 @@ describe('useInstanceTasks', () => {
   });
 
   it('fetches, populates and clears loading when instanceId is provided', async () => {
-    listMock.mockResolvedValue({ tasks: [task({ id: 't1' }), task({ id: 't2' })] });
+    listMock.mockResolvedValue({ tasks: [buildHumanTask({ id: 't1' }), buildHumanTask({ id: 't2' })] });
 
     const { result } = renderHook(() => useInstanceTasks('inst-a'));
 
@@ -80,7 +66,7 @@ describe('useInstanceTasks', () => {
     );
 
     // Second fetch — resolves immediately with different data
-    listMock.mockResolvedValueOnce({ tasks: [task({ id: 't-new', processInstanceId: 'inst-b' })] });
+    listMock.mockResolvedValueOnce({ tasks: [buildHumanTask({ id: 't-new', processInstanceId: 'inst-b' })] });
     rerender({ id: 'inst-b' });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -88,13 +74,13 @@ describe('useInstanceTasks', () => {
 
     // Late first response arrives — must be ignored.
     await act(async () => {
-      resolveFirst?.({ tasks: [task({ id: 'stale' })] });
+      resolveFirst?.({ tasks: [buildHumanTask({ id: 'stale' })] });
     });
     expect(result.current.tasks.map((t) => t.id)).toEqual(['t-new']);
   });
 
   it('clears state when instanceId becomes undefined again', async () => {
-    listMock.mockResolvedValue({ tasks: [task({ id: 't1' })] });
+    listMock.mockResolvedValue({ tasks: [buildHumanTask({ id: 't1' })] });
 
     const { result, rerender } = renderHook(
       ({ id }: { id: string | undefined }) => useInstanceTasks(id),

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Mediforce, ApiError, type ClientConfig } from '../index.js';
-import type { HumanTask } from '@mediforce/platform-core';
+import { buildHumanTask } from '@mediforce/platform-core/testing';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -9,20 +9,11 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-const validTask = (overrides: Partial<HumanTask> = {}): HumanTask => ({
-  id: 't1',
-  processInstanceId: 'inst-a',
-  stepId: 'review',
-  assignedRole: 'reviewer',
-  assignedUserId: null,
-  status: 'pending',
-  deadline: null,
-  createdAt: '2026-01-15T10:00:00Z',
-  updatedAt: '2026-01-15T10:00:00Z',
-  completedAt: null,
-  completionData: null,
-  ...overrides,
-});
+// Tests reach S2S endpoints through `apiKey` — which now requires a
+// non-empty baseUrl. A localhost target keeps the construction valid
+// without asserting anything meaningful about the URL itself; the
+// `apiKey auth` block has the real baseUrl assertion.
+const TEST_BASE_URL = 'http://localhost';
 
 describe('Mediforce', () => {
   beforeEach(() => {
@@ -52,8 +43,10 @@ describe('Mediforce', () => {
       ).toThrow(/exactly one of/i);
     });
 
-    it('accepts apiKey alone', () => {
-      expect(() => new Mediforce({ apiKey: 'k' })).not.toThrow();
+    it('accepts apiKey with a non-empty baseUrl', () => {
+      expect(
+        () => new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL }),
+      ).not.toThrow();
     });
 
     it('accepts bearerToken alone', () => {
@@ -65,13 +58,28 @@ describe('Mediforce', () => {
     });
   });
 
+  describe('apiKey baseUrl requirement', () => {
+    it('throws when apiKey is provided without baseUrl', () => {
+      expect(
+        // @ts-expect-error — apiKey requires baseUrl at the type level; runtime guard is the backstop
+        () => new Mediforce({ apiKey: 'k' }),
+      ).toThrow(/apiKey.*baseUrl/i);
+    });
+
+    it('throws when apiKey is provided with an empty baseUrl', () => {
+      expect(
+        () => new Mediforce({ apiKey: 'k', baseUrl: '' }),
+      ).toThrow(/apiKey.*baseUrl/i);
+    });
+  });
+
   describe('apiKey auth', () => {
     it('attaches X-Api-Key to every request', async () => {
       const fetchSpy = vi
         .spyOn(globalThis, 'fetch')
         .mockResolvedValue(jsonResponse({ tasks: [] }));
 
-      const mediforce = new Mediforce({ apiKey: 'secret' });
+      const mediforce = new Mediforce({ apiKey: 'secret', baseUrl: TEST_BASE_URL });
       await mediforce.tasks.list({ instanceId: 'inst-a' });
 
       const init = fetchSpy.mock.calls[0]?.[1];
@@ -148,7 +156,7 @@ describe('Mediforce', () => {
     it('uses the injected fetch instead of globalThis.fetch', async () => {
       const fakeFetch = vi
         .fn<typeof fetch>()
-        .mockResolvedValue(jsonResponse({ tasks: [validTask()] }));
+        .mockResolvedValue(jsonResponse({ tasks: [buildHumanTask()] }));
       const globalSpy = vi.spyOn(globalThis, 'fetch');
 
       const mediforce = new Mediforce({ fetch: fakeFetch });
@@ -179,7 +187,7 @@ describe('Mediforce', () => {
     it('rejects contract violations before firing any request', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
-      const mediforce = new Mediforce({ apiKey: 'k' });
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       // Both TS (discriminated union for ListTasksInput) and the Zod refine
       // reject an empty input — the call is type-forbidden, and the refine is
       // the runtime backstop for JS callers / bad casts.
@@ -197,20 +205,21 @@ describe('Mediforce', () => {
         jsonResponse({ tasks: [{ id: 'broken' }] }),
       );
 
-      const mediforce = new Mediforce({ apiKey: 'k' });
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       await expect(mediforce.tasks.list({ instanceId: 'inst-a' })).rejects.toThrow();
     });
 
     it('accepts a well-formed response', async () => {
+      const task = buildHumanTask({ id: 't-out-1' });
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        jsonResponse({ tasks: [validTask()] }),
+        jsonResponse({ tasks: [task] }),
       );
 
-      const mediforce = new Mediforce({ apiKey: 'k' });
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const result = await mediforce.tasks.list({ instanceId: 'inst-a' });
 
       expect(result.tasks).toHaveLength(1);
-      expect(result.tasks[0].id).toBe('t1');
+      expect(result.tasks[0].id).toBe('t-out-1');
     });
   });
 
@@ -220,7 +229,7 @@ describe('Mediforce', () => {
         jsonResponse({ error: 'Exactly one of `instanceId` or `role`' }, 400),
       );
 
-      const mediforce = new Mediforce({ apiKey: 'k' });
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const error = await mediforce.tasks
         .list({ instanceId: 'inst-a' })
         .catch((err) => err);
@@ -233,7 +242,7 @@ describe('Mediforce', () => {
     it('throws ApiError even when the server returns no JSON body', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 500 }));
 
-      const mediforce = new Mediforce({ apiKey: 'k' });
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const error = await mediforce.tasks
         .list({ instanceId: 'inst-a' })
         .catch((err) => err);
@@ -246,7 +255,7 @@ describe('Mediforce', () => {
 
 // Type-level assertion — ClientConfig accepts only the documented options.
 const _configShape: ClientConfig = {
-  baseUrl: '',
+  baseUrl: 'https://mediforce.example.com',
   apiKey: 'x',
 };
 void _configShape;
