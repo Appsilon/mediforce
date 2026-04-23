@@ -34,6 +34,7 @@
     "@lezer/highlight": "^1.2.3",
     "@mediforce/agent-runtime": "workspace:*",
     "@mediforce/mcp-client": "workspace:*",
+    "@mediforce/platform-api": "workspace:*",
     "@mediforce/platform-core": "workspace:*",
     "@mediforce/platform-infra": "workspace:*",
     "@mediforce/supply-intelligence-plugins": "workspace:*",
