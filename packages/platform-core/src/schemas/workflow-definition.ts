@@ -104,7 +104,70 @@ export const WorkflowStepSchema = z.object({
   mcpRestrictions: StepMcpRestrictionSchema.optional(),
 });
 
-export const WorkflowDefinitionSchema = z.object({
+/**
+ * Declares which step outputs of the current run are exposed to the next run
+ * under ProcessInstance.previousRun. Each entry reads: from step `stepId`,
+ * take output key `output`, expose it as `as` on the next run.
+ */
+export const InputForNextRunEntrySchema = z.object({
+  stepId: z.string().min(1),
+  output: z.string().min(1),
+  as: z.string().min(1),
+});
+
+/**
+ * Cross-field validation for `inputForNextRun`:
+ *   - every stepId must match an existing step
+ *   - every `as` must be unique within the block
+ *
+ * Applied via superRefine on the top-level schema (and also exported so that
+ * callers using `.omit()` or `.partial()` on the base object can re-apply it).
+ */
+function validateInputForNextRun(
+  wd: {
+    steps: Array<{ id: string }>;
+    inputForNextRun?: Array<{ stepId: string; as: string }>;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (!wd.inputForNextRun) return;
+  const stepIds = new Set(wd.steps.map((s) => s.id));
+  const seenAs = new Set<string>();
+  wd.inputForNextRun.forEach((entry, i) => {
+    if (!stepIds.has(entry.stepId)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['inputForNextRun', i, 'stepId'],
+        message: `inputForNextRun[${i}].stepId '${entry.stepId}' does not match any step id`,
+      });
+    }
+    if (seenAs.has(entry.as)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['inputForNextRun', i, 'as'],
+        message: `inputForNextRun[${i}].as '${entry.as}' is duplicated (must be unique within inputForNextRun)`,
+      });
+    }
+    seenAs.add(entry.as);
+  });
+}
+
+/**
+ * Base WorkflowDefinition schema (no cross-field refinements). Exposed so
+ * callers can `.omit()` / `.partial()` and then re-apply validation via
+ * `.superRefine(validateInputForNextRun)`.
+ *
+ * WARNING: Using this schema directly bypasses the `inputForNextRun`
+ * cross-field validation (unknown stepId, duplicate `as`). If you reshape
+ * the schema (e.g. `.omit()`) you MUST re-apply `.superRefine(validateInputForNextRun)`
+ * or silently accept WDs with broken `inputForNextRun` references — the
+ * engine's resolver swallows unknown keys at runtime with no signal.
+ *
+ * For the common "register a new WD" path (API routes, server actions),
+ * prefer {@link parseWorkflowDefinitionForCreation} which applies the
+ * refinement for you.
+ */
+export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
   /** Workspace namespace that owns this definition. Required because
@@ -127,10 +190,32 @@ export const WorkflowDefinitionSchema = z.object({
   archived: z.boolean().optional(),
   deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
+  inputForNextRun: z.array(InputForNextRunEntrySchema).optional(),
 });
+
+export const WorkflowDefinitionSchema =
+  WorkflowDefinitionBaseSchema.superRefine(validateInputForNextRun);
+
+export { validateInputForNextRun };
+
+/**
+ * Default parse path for registering a new WorkflowDefinition (API routes,
+ * server actions). Omits the server-managed `version` and `createdAt` fields
+ * and re-applies the cross-field `inputForNextRun` validation so callers
+ * cannot accidentally skip it.
+ *
+ * Returns a Zod `SafeParseReturnType` — check `.success` before using
+ * `.data` or `.error`.
+ */
+export function parseWorkflowDefinitionForCreation(input: unknown) {
+  return WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true })
+    .superRefine(validateInputForNextRun)
+    .safeParse(input);
+}
 
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
 export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;
 export type WorkflowReviewConfig = z.infer<typeof WorkflowReviewConfigSchema>;
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
+export type InputForNextRunEntry = z.infer<typeof InputForNextRunEntrySchema>;

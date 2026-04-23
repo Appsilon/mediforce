@@ -37,7 +37,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
   readonly metadata: PluginCapabilityMetadata = {
     name: 'Script Container',
     description: 'Runs a deterministic script or inline code inside a Docker container — no LLM involved.',
-    inputDescription: 'Step input JSON mounted at /output/input.json inside the container.',
+    inputDescription: 'Step input JSON at /output/input.json; carry-over from WD inputForNextRun (when declared) at /output/previous_run.json.',
     outputDescription: 'Container writes result to /output/result.json; parsed and emitted as the step result.',
     roles: ['executor'],
   };
@@ -145,6 +145,18 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       // Write step input as /output/input.json
       const inputPath = join(outputDir, 'input.json');
       await writeFile(inputPath, JSON.stringify(this.context.stepInput, null, 2), 'utf-8');
+
+      // Write carry-over snapshot as /output/previous_run.json when the
+      // workflow declares inputForNextRun. Always an object — `{}` on first
+      // run. Scripts that don't carry anything simply ignore the file.
+      if (isWorkflowAgentContext(this.context) && this.context.previousRun !== undefined) {
+        const previousRunPath = join(outputDir, 'previous_run.json');
+        await writeFile(
+          previousRunPath,
+          JSON.stringify(this.context.previousRun, null, 2),
+          'utf-8',
+        );
+      }
 
       // Write inline script to /output/script.{ext}
       if (this.inlineScript && this.runtime) {

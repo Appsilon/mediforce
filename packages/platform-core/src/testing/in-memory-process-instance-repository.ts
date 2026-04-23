@@ -50,6 +50,25 @@ export class InMemoryProcessInstanceRepository
     );
   }
 
+  async getLastCompletedByDefinitionName(
+    name: string,
+  ): Promise<ProcessInstance | null> {
+    // Mirrors the Firestore query shape: `deleted === false` excludes both
+    // tombstoned runs (explicitly `true`) and pre-feature docs where the
+    // field is missing. The schema's default(false) means real in-memory
+    // reads materialize `false` for missing, but we keep the check strict
+    // here to match what Firestore does on its own index.
+    const matching = [...this.instances.values()].filter(
+      (i) =>
+        i.definitionName === name &&
+        i.status === 'completed' &&
+        i.deleted === false,
+    );
+    if (matching.length === 0) return null;
+    matching.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+    return { ...matching[0] };
+  }
+
   async addStepExecution(
     instanceId: string,
     execution: StepExecution,

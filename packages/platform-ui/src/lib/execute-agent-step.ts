@@ -110,6 +110,9 @@ export async function executeAgentStep(
     llm: llmClient,
     workflowSecrets,
     resolvedMcpConfig,
+    ...(instance.previousRun !== undefined
+      ? { previousRun: instance.previousRun }
+      : {}),
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
       const result: Record<string, unknown> = {};

@@ -101,6 +101,7 @@ export function buildProcessInstance(
     pauseReason: null,
     error: null,
     assignedRoles: [],
+    deleted: false,
     ...overrides,
   };
 }

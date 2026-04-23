@@ -70,6 +70,34 @@ export class FirestoreProcessInstanceRepository
     return snapshot.docs.map((d) => ProcessInstanceSchema.parse(d.data()));
   }
 
+  async getLastCompletedByDefinitionName(
+    name: string,
+  ): Promise<ProcessInstance | null> {
+    // Server-side tombstone filter avoids the silent-failure mode where N
+    // consecutive soft-deletes at the top would shadow an older valid
+    // predecessor (the previous top-K client-side skip had that flaw).
+    //
+    // Requires composite index:
+    //   (definitionName ASC, deleted ASC, status ASC, updatedAt DESC)
+    // — see firestore.indexes.json.
+    //
+    // New instances always write `deleted: false` explicitly (see
+    // WorkflowEngine.createInstance), so pre-feature docs with the field
+    // missing are excluded from the result set. Those docs could never be
+    // valid carry-over predecessors anyway (pre-feature WDs couldn't
+    // declare inputForNextRun), so no backfill is required.
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .where('definitionName', '==', name)
+      .where('deleted', '==', false)
+      .where('status', '==', 'completed')
+      .orderBy('updatedAt', 'desc')
+      .limit(1)
+      .get();
+    if (snapshot.empty) return null;
+    return ProcessInstanceSchema.parse(snapshot.docs[0].data());
+  }
+
   async addStepExecution(
     instanceId: string,
     execution: StepExecution,

@@ -12,12 +12,14 @@ import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
 import { cancelProcessRun } from '@/app/actions/processes';
 import { useActiveCoworkSession } from '@/hooks/use-tasks';
+import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { useBackNavigation } from '@/hooks/use-back-navigation';
 import { formatStepName } from '@/components/tasks/task-utils';
 import { MissingEnvBanner } from './missing-env-banner';
+import { PreviousRunBanner } from './previous-run-banner';
 import { formatDuration } from '@/lib/format';
 
 type AuditEventWithId = AuditEvent & { id: string };
@@ -70,6 +72,18 @@ export function ProcessDetail({
   const { session: coworkSession } = useActiveCoworkSession(
     needsCowork ? instance.id : null,
   );
+
+  // Probe the source run of a carry-over chain so the banner can render an
+  // "archived" variant (plain text, no link) when the source has been deleted
+  // or tombstoned. Optimistic (linked) while loading to avoid flicker on the
+  // common case where the source is still alive.
+  const { data: sourceInstance, loading: sourceLoading } = useProcessInstance(
+    instance.previousRunSourceId ?? null,
+  );
+  const sourceArchived =
+    instance.previousRunSourceId !== undefined
+    && sourceLoading === false
+    && (sourceInstance === null || sourceInstance.deleted === true);
 
   const agentLogFiles = React.useMemo(() => {
     const logEvents = agentEvents.filter(
@@ -257,6 +271,18 @@ export function ProcessDetail({
             <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-800 dark:text-red-300">
               Error: {instance.error}
             </div>
+          )}
+          {instance.previousRun !== undefined && (
+            <PreviousRunBanner
+              values={instance.previousRun}
+              sourceId={instance.previousRunSourceId}
+              sourceHref={
+                instance.previousRunSourceId !== undefined
+                  ? `/${handle}/workflows/${instance.definitionName}/runs/${instance.previousRunSourceId}`
+                  : undefined
+              }
+              sourceArchived={sourceArchived}
+            />
           )}
         </div>
 

@@ -25,6 +25,7 @@ function createTestInstance(
     pauseReason: null,
     error: null,
     assignedRoles: [],
+    deleted: false,
     ...overrides,
   };
 }

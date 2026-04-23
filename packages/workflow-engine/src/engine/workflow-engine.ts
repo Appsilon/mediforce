@@ -85,6 +85,9 @@ export class WorkflowEngine {
     }
 
     const now = new Date().toISOString();
+
+    const carryOver = await this.resolvePreviousRunOutputs(definition);
+
     const instance: ProcessInstance = {
       id: crypto.randomUUID(),
       definitionName,
@@ -100,6 +103,14 @@ export class WorkflowEngine {
       pauseReason: null,
       error: null,
       assignedRoles: definition.roles ?? [],
+      // Explicit write so Firestore docs carry the field — lets
+      // getLastCompletedByDefinitionName filter on `deleted == false` server-side
+      // without needing a one-time backfill of pre-feature instances.
+      deleted: false,
+      ...(carryOver !== null ? { previousRun: carryOver.values } : {}),
+      ...(carryOver?.sourceId !== undefined
+        ? { previousRunSourceId: carryOver.sourceId }
+        : {}),
     };
 
     await this.instanceRepository.create(instance);
@@ -639,6 +650,56 @@ export class WorkflowEngine {
       throw new Error(`Process instance '${instanceId}' not found`);
     }
     return instance;
+  }
+
+  /**
+   * Build the previous-run-outputs snapshot for a new instance.
+   *
+   * Returns `null` when the workflow does not declare `inputForNextRun` (the
+   * feature is off for this WD and `previousRun` should stay undefined).
+   *
+   * Returns `{ values, sourceId }` otherwise. `values` is `{}` when no
+   * predecessor run qualifies (first run ever, all previous runs failed).
+   * `sourceId` is only set when a predecessor was found.
+   *
+   * Two cases are deliberately distinguished:
+   * - **Semantic empty** (first run, all predecessors failed, predecessor's
+   *   step didn't produce the declared output): `values` is `{}` or partial
+   *   and the run proceeds. Steps that read `previousRun` must handle this.
+   * - **Infrastructure failure** (repository rejects, network error, etc.):
+   *   the error propagates out of `createInstance`. A WD that declares
+   *   `inputForNextRun` will not silently degrade to `{}` when resolution
+   *   cannot be performed — the run is not created.
+   */
+  private async resolvePreviousRunOutputs(
+    definition: WorkflowDefinition,
+  ): Promise<{ values: Record<string, unknown>; sourceId?: string } | null> {
+    if (!definition.inputForNextRun || definition.inputForNextRun.length === 0) {
+      return null;
+    }
+
+    const predecessor = await this.instanceRepository.getLastCompletedByDefinitionName(
+      definition.name,
+    );
+    if (!predecessor) {
+      return { values: {} };
+    }
+
+    const values: Record<string, unknown> = {};
+    for (const entry of definition.inputForNextRun) {
+      // Review loops can run the same step multiple times; we carry the final
+      // output from the latest execution.
+      const latest = await this.instanceRepository.getLatestStepExecution(
+        predecessor.id,
+        entry.stepId,
+      );
+      const output = latest?.output;
+      if (output !== null && typeof output === 'object' && entry.output in output) {
+        values[entry.as] = (output as Record<string, unknown>)[entry.output];
+      }
+    }
+
+    return { values, sourceId: predecessor.id };
   }
 
   /**

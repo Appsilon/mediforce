@@ -46,6 +46,7 @@ async function seedFailedInstance(
     pauseReason: null,
     error: 'Docker daemon not running',
     assignedRoles: [],
+    deleted: false,
   });
   const exec: StepExecution = {
     id: 'exec-1',

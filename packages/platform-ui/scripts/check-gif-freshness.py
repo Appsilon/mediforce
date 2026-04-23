@@ -41,7 +41,10 @@ def last_commit_touching(base: str, pattern: str) -> int | None:
 def main() -> None:
     base = sys.argv[1] if len(sys.argv) > 1 else "origin/main"
 
-    last_journey = last_commit_touching(base, r"e2e/journeys/")
+    # Skip API-only journeys (*-api.journey.ts). By convention these drive
+    # HTTP endpoints via Playwright's `request` fixture without opening a
+    # browser, so a GIF demo is not meaningful.
+    last_journey = last_commit_touching(base, r"e2e/journeys/(?!.*-api\.journey\.ts$).*\.journey\.ts$")
     last_gif = last_commit_touching(base, r"docs/features/.*\.gif")
 
     if last_journey is None:
