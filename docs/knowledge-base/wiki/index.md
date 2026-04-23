@@ -22,7 +22,12 @@ _Empty — wiki bootstrap. Add TODOs here during lint passes (missing pages, bro
 
 ### Plugins
 
-_Pending commit 2 — claude-code-agent, opencode-agent, script-container, example-agent, supply-intelligence plugins._
+- [claude-code-agent](./entities/plugins/claude-code-agent.md) — default container plugin running Claude Code; MOCK_AGENT swaps for fixtures.
+- [opencode-agent](./entities/plugins/opencode-agent.md) — container plugin running OpenCode; local Ollama + cloud providers.
+- [script-container](./entities/plugins/script-container.md) — deterministic scripted container (no LLM); used by community-digest.
+- [example-agent](./entities/plugins/example-agent.md) — reference AgentPlugin template; 50-line event-emission pattern.
+- [supply-intelligence/driver-agent](./entities/plugins/supply-intelligence-driver-agent.md) — narrative risk summaries (SKU, category, overview).
+- [supply-intelligence/risk-detection](./entities/plugins/supply-intelligence-risk-detection.md) — red-flag scanner, writes draft issues to Firestore.
 
 ### Workflows
 

@@ -34,3 +34,18 @@ Forward-linked to concept pages (plugin-dispatch, autonomy-levels, repository-pa
 
 touched: `index.md`, 7 new entity pages.
 summary: covered every `packages/*` directory; `platform-ui` is top of the dependency graph, `platform-core` and `supply-intelligence` are leaves.
+
+## [2026-04-23] ingest | Plugin entities (6)
+
+Sourced from Explore survey of plugin registration mechanism + `packages/supply-intelligence-plugins/src/` + `packages/agent-runtime/src/plugins/`. Filed:
+- `entities/plugins/claude-code-agent.md`
+- `entities/plugins/opencode-agent.md`
+- `entities/plugins/script-container.md`
+- `entities/plugins/example-agent.md`
+- `entities/plugins/supply-intelligence-driver-agent.md`
+- `entities/plugins/supply-intelligence-risk-detection.md`
+
+Key fact worth promoting into a concept page: built-in plugins are registered in `platform-ui` `getPlatformServices()` under names `claude-code-agent`, `opencode-agent`, `script-container`; domain plugins register via `registerSupplyIntelligencePlugins(registry)`. Queued for `concepts/plugin-dispatch.md` (commit 4).
+
+touched: `index.md`, 6 new plugin pages.
+summary: covered the three built-in container plugins, the reference example-agent, and both supply-intelligence plugins.
