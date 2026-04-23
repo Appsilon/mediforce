@@ -14,6 +14,7 @@ import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
 import { cancelProcessRun } from '@/app/actions/processes';
 import { useActiveCoworkSession } from '@/hooks/use-tasks';
+import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
@@ -74,6 +75,18 @@ export function ProcessDetail({
   const { session: coworkSession } = useActiveCoworkSession(
     needsCowork ? instance.id : null,
   );
+
+  // Probe the source run of a carry-over chain so the banner can render an
+  // "archived" variant (plain text, no link) when the source has been deleted
+  // or tombstoned. Optimistic (linked) while loading to avoid flicker on the
+  // common case where the source is still alive.
+  const { data: sourceInstance, loading: sourceLoading } = useProcessInstance(
+    instance.previousRunSourceId ?? null,
+  );
+  const sourceArchived =
+    instance.previousRunSourceId !== undefined
+    && sourceLoading === false
+    && (sourceInstance === null || sourceInstance.deleted === true);
 
   // Extract all agent log filenames from agent status events
   const agentLogFiles = React.useMemo(() => {
@@ -241,6 +254,7 @@ export function ProcessDetail({
                 ? `/${handle}/workflows/${instance.definitionName}/runs/${instance.previousRunSourceId}`
                 : undefined
             }
+            sourceArchived={sourceArchived}
           />
         )}
 

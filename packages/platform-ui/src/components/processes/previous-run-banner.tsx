@@ -13,10 +13,12 @@ export function PreviousRunBanner({
   values,
   sourceId,
   sourceHref,
+  sourceArchived,
 }: {
   values: Record<string, unknown>;
   sourceId?: string;
   sourceHref?: string;
+  sourceArchived?: boolean;
 }): React.ReactElement {
   const [expanded, setExpanded] = React.useState(false);
   const hasValues = Object.keys(values).length > 0;
@@ -32,7 +34,11 @@ export function PreviousRunBanner({
               {sourceId !== undefined && (
                 <>
                   {' — '}
-                  {sourceHref ? (
+                  {sourceArchived === true ? (
+                    <span className="font-mono text-xs">
+                      {sourceId.slice(0, 8)} (archived)
+                    </span>
+                  ) : sourceHref ? (
                     <Link
                       href={sourceHref}
                       className="underline font-mono text-xs hover:text-blue-700 dark:hover:text-blue-100"
