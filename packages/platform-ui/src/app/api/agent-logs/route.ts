@@ -6,6 +6,9 @@ import { getAdminAuth } from '@mediforce/platform-infra';
 const LOGS_DIR = `${tmpdir()}/mediforce-agent-logs`;
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  // Defense-in-depth: verify the Firebase ID token explicitly even though
+  // middleware already enforces Authorization on /api/* routes. This ensures
+  // the file-serving path is protected even if middleware is ever narrowed.
   const authHeader = request.headers.get('Authorization') ?? '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   try {
