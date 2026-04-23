@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { getWorkflowStatus } from '@/lib/workflow-status';
 
 export function StuckProcessesList({
   processes,
@@ -35,7 +36,8 @@ export function StuckProcessesList({
   return (
     <div className="space-y-2">
       {processes.map((inst) => {
-        const pausedSince = inst.createdAt;
+        const wfStatus = getWorkflowStatus(inst);
+        const stuckSince = inst.createdAt;
         return (
           <div
             key={inst.id}
@@ -51,12 +53,12 @@ export function StuckProcessesList({
                   {inst.definitionName}
                 </Link>
                 <span className="text-xs text-muted-foreground shrink-0">
-                  paused {formatDistanceToNow(new Date(pausedSince), { addSuffix: true })}
+                  stuck {formatDistanceToNow(new Date(stuckSince), { addSuffix: true })}
                 </span>
               </div>
-              {inst.pauseReason && (
+              {wfStatus.reason && (
                 <div className="text-xs text-amber-700 dark:text-amber-300">
-                  Reason: {inst.pauseReason.replace(/_/g, ' ')}
+                  {wfStatus.reason}
                 </div>
               )}
               {inst.currentStepId && (

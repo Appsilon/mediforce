@@ -8,6 +8,7 @@ import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-c
 import { AutonomyBadge } from '../agents/autonomy-badge';
 import { RetryStepButton } from './retry-step-button';
 import { cn } from '@/lib/utils';
+import { getWorkflowStatus } from '@/lib/workflow-status';
 import { formatDuration } from '@/lib/format';
 import { useUserDisplayNames } from '@/hooks/use-users';
 
@@ -364,6 +365,7 @@ export function StepStatusPanel({
   stepDetailBaseHref,
 }: StepStatusPanelProps) {
   const [expandedStepId, setExpandedStepId] = React.useState<string | null>(null);
+  const wfStatus = getWorkflowStatus(instance);
 
   // Filter out terminal steps — they aren't meaningful to display
   const visibleSteps = definitionSteps.filter((s) => s.type !== 'terminal');
@@ -459,13 +461,7 @@ export function StepStatusPanel({
                       ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                       : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
-                  {status === 'failed'
-                    && instance.currentStepId === step.id
-                    // Don't offer Retry on explicitly cancelled runs — cancelProcessRun
-                    // sets status='failed' with this exact error, but the user's intent
-                    // was to stop, not to retry. (Until we introduce a distinct 'cancelled'
-                    // status in the schema, this string check is the cheapest gate.)
-                    && instance.error !== 'Cancelled by user' && (
+                  {wfStatus.isRetryable && instance.currentStepId === step.id && (
                     <RetryStepButton instanceId={instance.id} stepId={step.id} />
                   )}
                 </div>

@@ -21,6 +21,7 @@ import { formatStepName } from '@/components/tasks/task-utils';
 import { MissingEnvBanner } from './missing-env-banner';
 import { PreviousRunBanner } from './previous-run-banner';
 import { formatDuration } from '@/lib/format';
+import { getWorkflowStatus } from '@/lib/workflow-status';
 
 type AuditEventWithId = AuditEvent & { id: string };
 
@@ -63,12 +64,12 @@ export function ProcessDetail({
 }) {
   const handle = useHandleFromPath();
   const { goBack } = useBackNavigation(backHref);
-  const needsHumanAction = instance.pauseReason === 'waiting_for_human'
-    || instance.pauseReason === 'awaiting_agent_approval';
+  const wfStatus = getWorkflowStatus(instance);
+  const needsHumanTaskAction = wfStatus.rawReason === 'waiting_for_human' || wfStatus.rawReason === 'awaiting_agent_approval';
   const { task: blockingTask } = useActiveTaskForInstance(
-    needsHumanAction ? instance.id : null,
+    needsHumanTaskAction ? instance.id : null,
   );
-  const needsCowork = instance.pauseReason === 'cowork_in_progress';
+  const needsCowork = wfStatus.rawReason === 'cowork_in_progress';
   const { session: coworkSession } = useActiveCoworkSession(
     needsCowork ? instance.id : null,
   );
@@ -123,7 +124,7 @@ export function ProcessDetail({
   const [cancelStep, setCancelStep] = React.useState<0 | 1 | 2>(0);
   const [cancelError, setCancelError] = React.useState<string | null>(null);
 
-  const canCancel = instance.status === 'running' || instance.status === 'paused';
+  const canCancel = wfStatus.displayStatus === 'in_progress' || wfStatus.displayStatus === 'waiting_for_human';
 
   async function handleConfirmCancel() {
     setCancelStep(2);
@@ -209,7 +210,7 @@ export function ProcessDetail({
             )}
             <span title={instance.id}>ID: <span className="font-mono text-foreground text-xs">{instance.id.slice(0, 8)}</span></span>
             <span>Created: <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span></span>
-            {instance.status !== 'running' && instance.status !== 'paused' && (
+            {wfStatus.displayStatus !== 'in_progress' && (
               <span>Duration: <span className="text-foreground">{formatDuration(runDurationMs)}</span></span>
             )}
             {instance.status === 'completed' && (
@@ -223,7 +224,7 @@ export function ProcessDetail({
             )}
           </div>
 
-          {needsHumanAction && blockingTask && (
+          {needsHumanTaskAction && blockingTask && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
               <div className="text-sm">
                 <span className="font-medium">Waiting for your input</span>
@@ -255,21 +256,21 @@ export function ProcessDetail({
               </Link>
             </div>
           )}
-          {instance.pauseReason === 'missing_env' && instance.error && (
+          {wfStatus.rawReason === 'missing_env' && instance.error && (
             <MissingEnvBanner
               instanceId={instance.id}
               errorJson={instance.error}
               workflowName={instance.definitionName}
             />
           )}
-          {instance.pauseReason && !needsHumanAction && !needsCowork && instance.pauseReason !== 'missing_env' && (
+          {wfStatus.displayStatus === 'waiting_for_human' && !needsHumanTaskAction && !needsCowork && wfStatus.rawReason !== 'missing_env' && (
             <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-              Paused
+              {wfStatus.reason}
             </div>
           )}
-          {instance.error && instance.pauseReason !== 'missing_env' && (
+          {wfStatus.displayStatus === 'error' && wfStatus.rawReason !== 'missing_env' && (
             <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-800 dark:text-red-300">
-              Error: {instance.error}
+              {wfStatus.reason}
             </div>
           )}
           {instance.previousRun !== undefined && (
