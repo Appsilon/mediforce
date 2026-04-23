@@ -10,8 +10,9 @@ test.describe('Admin Tool Catalog Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}/admin/tool-catalog`);
     await expect(page.getByRole('heading', { name: /tool catalog/i })).toBeVisible({ timeout: 15_000 });
 
-    // No entries yet — empty state visible, new-entry CTA visible
-    await expect(page.getByText(/no catalog entries|get started|add your first/i).first()).toBeVisible();
+    // Seeded entries render in the list; the right pane shows the idle
+    // "select or create" state before any selection.
+    await expect(page.getByText(/select an entry to edit|no catalog entries|add your first/i).first()).toBeVisible();
     await showStep(page);
 
     // ── Create ────────────────────────────────────────────────────────────
@@ -54,9 +55,9 @@ test.describe('Admin Tool Catalog Journey', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
     await click(page, page.getByRole('button', { name: /^(delete|confirm)/i }).last());
 
-    // Entry removed from list — back to empty state
+    // Entry removed from list — remaining seeded entries still visible
     await expect(page.getByText('test-mcp')).not.toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/no catalog entries|get started|add your first/i).first()).toBeVisible();
+    await expect(page.getByText(/select an entry to edit|no catalog entries|add your first/i).first()).toBeVisible();
     await showResult(page);
     await endRecording(page);
   });

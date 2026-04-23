@@ -35,6 +35,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedCollection('namespaces', data.namespaces);
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'toolCatalog', data.toolCatalog);
+  await seedCollection('agentDefinitions', data.agentDefinitions);
   await seedSubcollection('processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions);
   await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);
   await seedSubcollection('processInstances', 'proc-retry-test', 'stepExecutions', data.retryTestStepExecutions);

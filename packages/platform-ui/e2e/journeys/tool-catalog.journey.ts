@@ -9,7 +9,8 @@ test.describe('Tool Catalog Journey', () => {
     await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible({ timeout: 10_000 });
 
     // Section heading + seeded stdio catalog entries (ids are shown verbatim).
-    await expect(page.getByRole('heading', { level: 2, name: /stdio servers/i })).toBeVisible();
+    // Long timeout covers the initial admin API fetch + hydration on cold server.
+    await expect(page.getByRole('heading', { level: 2, name: /stdio servers/i })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('heading', { level: 3, name: 'filesystem' })).toBeVisible();
     await expect(page.getByRole('heading', { level: 3, name: 'postgres' })).toBeVisible();
     await showStep(page);

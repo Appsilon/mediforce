@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api-fetch';
 import { listCatalogEntries } from '@/lib/mcp-admin-client';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
+import { useAuth } from '@/contexts/auth-context';
 
 function getStdioIcon(id: string): typeof Database {
   const icons: Record<string, typeof Database> = {
@@ -205,6 +206,7 @@ export default function ToolsPage() {
   const params = useParams<{ handle: string }>();
   const handle = params.handle;
   const { canAdmin } = useNamespaceRole(handle);
+  const { firebaseUser, loading: authLoading } = useAuth();
 
   const [entries, setEntries] = useState<ToolCatalogEntry[]>([]);
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
@@ -232,8 +234,11 @@ export default function ToolsPage() {
   }, [handle]);
 
   useEffect(() => {
+    // Wait for Firebase auth state to settle so apiFetch can attach a Bearer
+    // token — middleware 401s /api/admin/* requests without it.
+    if (authLoading || firebaseUser === null) return;
     void refresh();
-  }, [refresh]);
+  }, [authLoading, firebaseUser, refresh]);
 
   const filteredStdio = useMemo(() => {
     const q = query.trim().toLowerCase();

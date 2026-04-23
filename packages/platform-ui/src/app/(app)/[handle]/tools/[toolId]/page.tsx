@@ -7,12 +7,14 @@ import { ArrowLeft, Lock, Plug, Shield, Terminal, Users } from 'lucide-react';
 import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core';
 import { apiFetch } from '@/lib/api-fetch';
 import { getCatalogEntry } from '@/lib/mcp-admin-client';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function ToolDetailPage() {
   const params = useParams<{ handle: string; toolId: string }>();
   const handle = params.handle;
   const toolId = params.toolId;
 
+  const { firebaseUser, loading: authLoading } = useAuth();
   const [entry, setEntry] = useState<ToolCatalogEntry | null>(null);
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,8 +40,9 @@ export default function ToolDetailPage() {
   }, [handle, toolId]);
 
   useEffect(() => {
+    if (authLoading || firebaseUser === null) return;
     void refresh();
-  }, [refresh]);
+  }, [authLoading, firebaseUser, refresh]);
 
   const usingAgents = useMemo(() => {
     if (entry === null) return [];

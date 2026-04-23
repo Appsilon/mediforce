@@ -770,6 +770,28 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
+  // Top-level agentDefinitions collection — pre-seed `claude-code-agent` so the
+  // agent MCP journey is deterministic. Without this, the page relies on the
+  // fire-and-forget `seedBuiltinAgentDefinitions` in platform-services, which
+  // races with the first GET `/api/agent-definitions/:id` request.
+  const agentDefinitions: Record<string, Record<string, unknown>> = {
+    'claude-code-agent': {
+      kind: 'plugin',
+      runtimeId: 'claude-code-agent',
+      name: 'Claude Code Agent',
+      iconName: 'Bot',
+      description:
+        "Executes code generation, analysis, and automated software tasks using Claude's advanced coding capabilities.",
+      inputDescription: 'Task description and relevant code context',
+      outputDescription: 'Generated code, analysis results, or task completion report',
+      foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: '',
+      skillFileNames: [],
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+    },
+  };
+
   // -------------------------------------------------------------------------
   // Cowork sessions — collaborative human+AI artifact building
   // -------------------------------------------------------------------------
@@ -888,5 +910,5 @@ export function buildSeedData(testUserId: string) {
     createdAt: twoDaysAgo,
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, agentDefinitions };
 }

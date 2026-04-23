@@ -17,6 +17,7 @@ import { FOUNDATION_MODELS } from '@/lib/agent-models';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
+import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 
 const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
   { icon: Bot,      label: 'Bot'      },
@@ -368,6 +369,9 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               </ul>
             )}
           </div>
+
+          {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}
+          <AgentMcpSection agentId={id} handle={handle} />
 
           {/* 6. System prompt */}
           <div className="space-y-1.5">
