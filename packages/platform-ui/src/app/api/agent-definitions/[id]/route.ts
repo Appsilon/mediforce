@@ -1,23 +1,37 @@
 import { NextResponse } from 'next/server';
 import { UpdateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { getAgentDefinition } from '@mediforce/platform-api/handlers';
+import { GetAgentDefinitionInputSchema } from '@mediforce/platform-api/contract';
+import type { GetAgentDefinitionInput } from '@mediforce/platform-api/contract';
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
-  const { id } = await params;
-  const { agentDefinitionRepo } = getPlatformServices();
-  const agent = await agentDefinitionRepo.getById(id);
-  if (!agent) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-  return NextResponse.json({ agent });
+interface RouteContext {
+  params: Promise<{ id: string }>;
 }
 
+/**
+ * GET /api/agent-definitions/:id — single agent definition. Missing → 404.
+ */
+export const GET = createRouteAdapter<
+  typeof GetAgentDefinitionInputSchema,
+  GetAgentDefinitionInput,
+  RouteContext
+>(
+  GetAgentDefinitionInputSchema,
+  async (_req, ctx) => ({ id: (await ctx.params).id }),
+  (input) =>
+    getAgentDefinition(input, {
+      agentDefinitionRepo: getPlatformServices().agentDefinitionRepo,
+    }),
+);
+
+/**
+ * PUT /api/agent-definitions/:id — update. Mutation, still inline until Phase 2.
+ */
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: RouteContext,
 ): Promise<NextResponse> {
   const { id } = await params;
   const body = await request.json();

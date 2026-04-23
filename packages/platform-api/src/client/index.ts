@@ -1,12 +1,32 @@
 import {
+  GetAgentDefinitionInputSchema,
+  GetAgentDefinitionOutputSchema,
+  GetProcessInputSchema,
+  GetProcessOutputSchema,
+  GetProcessStepsInputSchema,
+  GetProcessStepsOutputSchema,
   GetTaskInputSchema,
   GetTaskOutputSchema,
+  ListAgentDefinitionsOutputSchema,
+  ListAuditEventsInputSchema,
+  ListAuditEventsOutputSchema,
   ListTasksInputSchema,
   ListTasksOutputSchema,
+  ListWorkflowDefinitionsOutputSchema,
+  type GetAgentDefinitionInput,
+  type GetAgentDefinitionOutput,
+  type GetProcessInput,
+  type GetProcessOutput,
+  type GetProcessStepsInput,
+  type GetProcessStepsOutput,
   type GetTaskInput,
   type GetTaskOutput,
+  type ListAgentDefinitionsOutput,
+  type ListAuditEventsInput,
+  type ListAuditEventsOutput,
   type ListTasksInput,
   type ListTasksOutput,
+  type ListWorkflowDefinitionsOutput,
 } from '../contract/index.js';
 
 /**
@@ -69,6 +89,21 @@ export class Mediforce {
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
   };
 
+  readonly processes: {
+    get: (input: GetProcessInput) => Promise<GetProcessOutput>;
+    getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
+    listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
+  };
+
+  readonly workflowDefinitions: {
+    list: () => Promise<ListWorkflowDefinitionsOutput>;
+  };
+
+  readonly agentDefinitions: {
+    list: () => Promise<ListAgentDefinitionsOutput>;
+    get: (input: GetAgentDefinitionInput) => Promise<GetAgentDefinitionOutput>;
+  };
+
   constructor(private readonly config: ClientConfig) {
     // Defense-in-depth against JS callers / bad casts that bypass the
     // discriminated union (e.g. `new Mediforce()` with no argument, which the
@@ -124,6 +159,60 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.get');
         return GetTaskOutputSchema.parse(body);
+      },
+    };
+
+    this.processes = {
+      get: async (input) => {
+        const validated = GetProcessInputSchema.parse(input);
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.get');
+        return GetProcessOutputSchema.parse(body);
+      },
+      getSteps: async (input) => {
+        const validated = GetProcessStepsInputSchema.parse(input);
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}/steps`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.getSteps');
+        return GetProcessStepsOutputSchema.parse(body);
+      },
+      listAuditEvents: async (input) => {
+        const validated = ListAuditEventsInputSchema.parse(input);
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}/audit`,
+        );
+        const body = await parseJsonOrThrow(
+          res,
+          'mediforce.processes.listAuditEvents',
+        );
+        return ListAuditEventsOutputSchema.parse(body);
+      },
+    };
+
+    this.workflowDefinitions = {
+      list: async () => {
+        const res = await this.request('/api/workflow-definitions');
+        const body = await parseJsonOrThrow(res, 'mediforce.workflowDefinitions.list');
+        return ListWorkflowDefinitionsOutputSchema.parse(body);
+      },
+    };
+
+    this.agentDefinitions = {
+      list: async () => {
+        const res = await this.request('/api/agent-definitions');
+        const body = await parseJsonOrThrow(res, 'mediforce.agentDefinitions.list');
+        return ListAgentDefinitionsOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetAgentDefinitionInputSchema.parse(input);
+        const res = await this.request(
+          `/api/agent-definitions/${encodeURIComponent(validated.id)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agentDefinitions.get');
+        return GetAgentDefinitionOutputSchema.parse(body);
       },
     };
   }
