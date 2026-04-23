@@ -6,9 +6,72 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Deploy Firestore composite indexes BEFORE the application so production
+  # queries never land before their backing index exists. Rolling an index out
+  # takes minutes on a cold collection and can take much longer on a populated
+  # one, so we also poll until every index has state "READY" before releasing
+  # the SSH deploy gate. See docs/firestore-index-deploy.md for the runbook.
+  deploy-firestore-indexes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install firebase-tools and jq
+        run: |
+          npm install -g firebase-tools@15.15.0
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq
+
+      - name: Deploy Firestore indexes
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_CI_TOKEN }}
+          FIREBASE_PROJECT: ${{ secrets.FIREBASE_PROD_PROJECT }}
+        run: |
+          if [ -z "$FIREBASE_PROJECT" ]; then
+            echo "::error::FIREBASE_PROD_PROJECT secret is not set"
+            exit 1
+          fi
+          if [ -z "$FIREBASE_TOKEN" ]; then
+            echo "::error::FIREBASE_CI_TOKEN secret is not set"
+            exit 1
+          fi
+          firebase deploy --only firestore:indexes \
+            --project "$FIREBASE_PROJECT" \
+            --non-interactive
+
+      - name: Wait for all indexes to report READY
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_CI_TOKEN }}
+          FIREBASE_PROJECT: ${{ secrets.FIREBASE_PROD_PROJECT }}
+        run: |
+          deadline=$(( $(date +%s) + 30 * 60 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            indexes_json=$(firebase firestore:indexes \
+              --project "$FIREBASE_PROJECT" \
+              --json 2>/dev/null || true)
+            pending=$(echo "$indexes_json" \
+              | jq '[.result.indexes[]? | select(.state != "READY")] | length' \
+              2>/dev/null || echo "unknown")
+            if [ "$pending" = "0" ]; then
+              echo "All Firestore indexes are READY"
+              exit 0
+            fi
+            echo "Waiting for $pending index(es) to reach READY..."
+            sleep 20
+          done
+          echo "::error::Timed out after 30 minutes waiting for indexes to become READY"
+          firebase firestore:indexes --project "$FIREBASE_PROJECT" --json || true
+          exit 1
+
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: deploy-firestore-indexes
 
     steps:
       - name: Deploy via SSH
