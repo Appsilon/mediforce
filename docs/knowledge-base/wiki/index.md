@@ -35,7 +35,10 @@ _Pending — ingest `**/*.wd.json` files._
 
 ### Apps
 
-_Pending commit 3 — supply-intelligence, protocol-to-tfl, community-digest, workflow-designer._
+- [supply-intelligence](./entities/apps/supply-intelligence.md) — standalone Next.js dashboard (port 9004); consumes `supply-intelligence` domain.
+- [protocol-to-tfl](./entities/apps/protocol-to-tfl.md) — protocol PDF → TFL pipeline, 6 steps, 5 runtime skills, git-mode commits to `mediforce-clinical-workspace`.
+- [community-digest](./entities/apps/community-digest.md) — cron-triggered GitHub→Discord digest; uses `script-container` plugin.
+- [workflow-designer](./entities/apps/workflow-designer.md) — meta-workflow that designs new WorkflowDefinitions via AI + human review.
 
 ## Concepts
 

@@ -49,3 +49,18 @@ Key fact worth promoting into a concept page: built-in plugins are registered in
 
 touched: `index.md`, 6 new plugin pages.
 summary: covered the three built-in container plugins, the reference example-agent, and both supply-intelligence plugins.
+
+## [2026-04-23] ingest | App entities (4)
+
+Sourced from `apps/*/src/*.wd.json` + `apps/*/plugins/*/skills/_registry.yml`. Filed:
+- `entities/apps/supply-intelligence.md`
+- `entities/apps/protocol-to-tfl.md`
+- `entities/apps/community-digest.md`
+- `entities/apps/workflow-designer.md`
+
+Key facts noted for downstream concepts:
+- Runtime skills (app-specific) resolve via `skillsDir` in `.wd.json`; paths are hardcoded there — this is a potential gotcha worth filing (queued for commit 6: runtime-skill-path-coupling).
+- `protocol-to-tfl` uses `git-mode` steps that commit to an external repo — this is a concept (`git-mode-workflows`) worth filing eventually.
+
+touched: `index.md`, 4 new app pages.
+summary: covered every `apps/*` directory.
