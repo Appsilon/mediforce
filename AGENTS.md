@@ -3,8 +3,6 @@
 ## Repository structure
 
 ```
-apps/
-  supply-intelligence/ # Standalone supply intelligence Next.js app
 packages/
   platform-core/       # Shared types, domain models, test factories
   platform-ui/         # Next.js UI — the main web application
@@ -13,8 +11,6 @@ packages/
   agent-runtime/       # Agent execution engine
   workflow-engine/     # Process orchestration engine
   example-agent/       # Reference agent implementation
-  supply-intelligence/ # Supply intelligence domain package
-  supply-intelligence-plugins/  # Agent plugins for supply intelligence
 docs/                  # Product vision, architecture, strategy
 ```
 
@@ -44,13 +40,9 @@ platform-core  (zod schemas, repository interfaces, test factories — zero medi
   ├── platform-api       (API contract schemas + pure handlers — depends only on platform-core + zod)
   ├── agent-runtime      (AgentRunner, PluginRegistry, Docker spawn strategies)
   │     └── agent-queue  (optional — BullMQ, activated by REDIS_URL)
-  └── supply-intelligence (pure domain: SKU, warehouse, batch, risk — no Firebase)
-
-supply-intelligence-plugins  (DriverAgent, RiskDetection — registers with PluginRegistry)
-  └── depends on: supply-intelligence, platform-core
 
 platform-ui  (Next.js 15 App Router, port 9003)
-  └── depends on: platform-api (contract types + handler runtime), platform-infra, workflow-engine, agent-runtime, supply-intelligence-plugins
+  └── depends on: platform-api (contract types + handler runtime), platform-infra, workflow-engine, agent-runtime
 ```
 
 ### How inter-package imports work
@@ -61,7 +53,7 @@ All packages use `@mediforce/source` custom TypeScript condition. During dev, im
 
 - **Repository pattern**: Interfaces in platform-core, Firestore implementations in platform-infra, in-memory test doubles in `platform-core/testing`. Constructor injection throughout.
 - **Dual-schema migration**: Legacy `processDefinitions` + `processConfigs` coexist with unified `workflowDefinitions`. Resolution logic lives in `platform-ui/src/lib/resolve-definition-steps.ts`.
-- **Plugin system**: Plugins (ClaudeCodeAgent, OpenCodeAgent, ScriptContainer, supply-intelligence) register in `PluginRegistry`. `AgentRunner` dispatches to plugins based on workflow step config. Mock mode via `MOCK_AGENT=true`.
+- **Plugin system**: Plugins (ClaudeCodeAgent, OpenCodeAgent, ScriptContainer) register in `PluginRegistry`. `AgentRunner` dispatches to plugins based on workflow step config. Mock mode via `MOCK_AGENT=true`.
 - **Docker spawn strategies**: `LocalDockerSpawnStrategy` (default, child process) vs `QueuedDockerSpawnStrategy` (BullMQ worker, activated when `REDIS_URL` is set).
 - **Service singleton**: `getPlatformServices()` in `platform-ui/src/lib/platform-services.ts` lazily creates all repos, engine, runners, plugin registry. Shared across API routes.
 - **Immutable versions**: Workflow definition versions are write-once in Firestore.
@@ -262,7 +254,7 @@ curl -s -H "X-Api-Key: $MEDIFORCE_API_KEY" "http://localhost:$PORT/api/..."
 # Run single test file
 npx vitest run path/to/file.test.ts
 
-# Dev with both platform-ui and supply-intelligence
+# Dev (platform-ui on port 9003)
 pnpm dev
 
 # Dev with local agent execution enabled

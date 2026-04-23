@@ -28,10 +28,6 @@ export default defineConfig({
         __dirname,
         '../platform-infra/src/index.ts',
       ),
-      '@mediforce/supply-intelligence-plugins': path.resolve(
-        __dirname,
-        '../supply-intelligence-plugins/src/index.ts',
-      ),
     },
   },
 });

@@ -21,8 +21,6 @@ export default defineConfig({
       '@mediforce/agent-queue': resolve(__dirname, '../agent-queue/src/index.ts'),
       '@mediforce/platform-infra': resolve(__dirname, '../platform-infra/src/index.ts'),
       '@mediforce/mcp-client': resolve(__dirname, '../mcp-client/src/index.ts'),
-      '@mediforce/supply-intelligence-plugins': resolve(__dirname, '../supply-intelligence-plugins/src/index.ts'),
-      '@mediforce/supply-intelligence': resolve(__dirname, '../supply-intelligence/src/index.ts'),
     },
   },
   test: {

@@ -16,8 +16,6 @@ const nextConfig = {
     '@mediforce/workflow-engine',
     '@mediforce/agent-runtime',
     '@mediforce/agent-queue',
-    '@mediforce/supply-intelligence-plugins',
-    '@mediforce/supply-intelligence',
     '@mediforce/mcp-client',
     // @hookform/resolvers/zod imports `zod/v4/core` without declaring zod
     // as a peer dep. In pnpm's isolated layout, webpack on Vercel can't
@@ -44,8 +42,6 @@ const nextConfig = {
       '@mediforce/workflow-engine': path.join(packagesDir, 'workflow-engine/src/index.ts'),
       '@mediforce/agent-runtime': path.join(packagesDir, 'agent-runtime/src/index.ts'),
       '@mediforce/agent-queue': path.join(packagesDir, 'agent-queue/src/index.ts'),
-      '@mediforce/supply-intelligence-plugins': path.join(packagesDir, 'supply-intelligence-plugins/src/index.ts'),
-      '@mediforce/supply-intelligence': path.join(packagesDir, 'supply-intelligence/src/index.ts'),
       '@mediforce/mcp-client': path.join(packagesDir, 'mcp-client/src/index.ts'),
       // Pin zod to platform-ui's own copy so `@hookform/resolvers/zod` (which
       // imports `zod/v4/core` without declaring zod as a peer dep) resolves

@@ -28,7 +28,6 @@ import {
   OpenCodeAgentPlugin,
   ScriptContainerPlugin,
 } from '@mediforce/agent-runtime';
-import { registerSupplyIntelligencePlugins } from '@mediforce/supply-intelligence-plugins';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
 import { seedBuiltinToolCatalog } from './seed-tool-catalog.js';
 
@@ -75,8 +74,6 @@ export function getPlatformServices(): PlatformServices {
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
-
-  registerSupplyIntelligencePlugins(pluginRegistry);
 
   const useMockAgent = process.env.MOCK_AGENT === 'true';
   if (useMockAgent) {

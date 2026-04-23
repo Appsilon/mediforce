@@ -1,6 +1,5 @@
 packages:
   - 'packages/*'
-  - 'packages/supply-intelligence'
   - 'apps/*'
 
 # @firebase/rules-unit-testing@5 declares peer firebase@^12, but we use firebase@11 in platform-ui.

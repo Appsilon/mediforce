@@ -36,8 +36,6 @@ Fill in your Firebase project values. Get them from: Firebase Console > Project 
 ## Monorepo structure
 
 ```
-apps/
-  supply-intelligence/ # Standalone supply intelligence Next.js app
 packages/
   platform-core/       # Shared types, domain models, test factories
   platform-ui/         # Next.js UI — the main web application
@@ -46,8 +44,6 @@ packages/
   agent-runtime/       # Agent execution engine
   workflow-engine/     # Process orchestration engine
   example-agent/       # Reference agent implementation
-  supply-intelligence/ # Supply intelligence domain package
-  supply-intelligence-plugins/  # Agent plugins for supply intelligence
 ```
 
 ## Local agent execution
@@ -73,9 +69,6 @@ Without `ALLOW_LOCAL_AGENTS=true`, agents run inside Docker containers instead. 
 ```bash
 # Platform UI (default, port 9003)
 cd packages/platform-ui && pnpm dev
-
-# Supply Intelligence app
-cd apps/supply-intelligence && pnpm dev
 ```
 
 ## Testing
