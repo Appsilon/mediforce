@@ -23,6 +23,12 @@ import { apiFetch } from '@/lib/api-fetch';
 import { listCatalogEntries } from '@/lib/mcp-admin-client';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useAuth } from '@/contexts/auth-context';
+import {
+  collectHttpBindings,
+  countStdioUsage,
+  hasSecretTemplate,
+  type HttpBindingRow,
+} from './tool-inventory';
 
 function getStdioIcon(id: string): typeof Database {
   const icons: Record<string, typeof Database> = {
@@ -34,11 +40,6 @@ function getStdioIcon(id: string): typeof Database {
     tealflow: FlaskConical,
   };
   return icons[id] ?? Wrench;
-}
-
-function hasSecretTemplate(values: Record<string, string> | undefined): boolean {
-  if (!values) return false;
-  return Object.values(values).some((v) => v.includes('{{'));
 }
 
 type StdioSecurity = {
@@ -59,51 +60,6 @@ function stdioSecurity(entry: ToolCatalogEntry, usedWithAllowlist: boolean): Std
     return { label: 'Secrets required', color: 'text-blue-600 dark:text-blue-400', Icon: Shield };
   }
   return { label: 'Open access', color: 'text-amber-600 dark:text-amber-400', Icon: ShieldAlert };
-}
-
-type HttpBindingRow = {
-  key: string;
-  name: string;
-  url: string;
-  agentId: string;
-  agentName: string;
-  allowedTools?: string[];
-  hasSecretHeaders: boolean;
-};
-
-function collectHttpBindings(agents: AgentDefinition[]): HttpBindingRow[] {
-  const rows: HttpBindingRow[] = [];
-  for (const agent of agents) {
-    const bindings = agent.mcpServers ?? {};
-    for (const [name, binding] of Object.entries(bindings)) {
-      if (binding.type !== 'http') continue;
-      rows.push({
-        key: `${agent.id}::${name}`,
-        name,
-        url: binding.url,
-        agentId: agent.id,
-        agentName: agent.name,
-        allowedTools: binding.allowedTools,
-        hasSecretHeaders: hasSecretTemplate(binding.auth?.headers),
-      });
-    }
-  }
-  return rows;
-}
-
-function countStdioUsage(agents: AgentDefinition[], catalogId: string): { total: number; withAllowlist: boolean } {
-  let total = 0;
-  let withAllowlist = false;
-  for (const agent of agents) {
-    const bindings = agent.mcpServers ?? {};
-    for (const binding of Object.values(bindings)) {
-      if (binding.type === 'stdio' && binding.catalogId === catalogId) {
-        total += 1;
-        if (binding.allowedTools && binding.allowedTools.length > 0) withAllowlist = true;
-      }
-    }
-  }
-  return { total, withAllowlist };
 }
 
 function matchesQuery(haystack: string | undefined, needle: string): boolean {

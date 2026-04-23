@@ -36,15 +36,15 @@ function valuesFromEntry(entry: ToolCatalogEntry | null): CatalogFormValues {
 }
 
 function valuesToEntry(values: CatalogFormValues, existingId?: string): ToolCatalogEntry {
-  const args = values.args.map((a) => a.value).filter((value) => value !== '');
-  const envEntries = values.env.filter((e) => e.key !== '');
+  const args = values.args.map((arg) => arg.value).filter((value) => value !== '');
+  const envEntries = values.env.filter((envVar) => envVar.key !== '');
   const description = values.description.trim();
   return {
     id: existingId ?? values.id.trim(),
     command: values.command.trim(),
     ...(args.length > 0 ? { args } : {}),
     ...(envEntries.length > 0
-      ? { env: Object.fromEntries(envEntries.map((e) => [e.key, e.value])) }
+      ? { env: Object.fromEntries(envEntries.map((envVar) => [envVar.key, envVar.value])) }
       : {}),
     ...(description !== '' ? { description } : {}),
   };

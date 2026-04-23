@@ -1,7 +1,7 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertTriangle, Loader2, Pencil, Plus, Server, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Pencil, Plus, Server, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AgentMcpBinding, AgentMcpBindingMap, ToolCatalogEntry } from '@mediforce/platform-core';
 import {
@@ -55,6 +55,7 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
 
   const handleSubmit = useCallback(
     async (name: string, binding: AgentMcpBinding) => {
+      setError(null);
       const updated = await putAgentBinding(agentId, name, binding);
       setBindings(updated);
       setDialog({ kind: 'closed' });
@@ -65,6 +66,7 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
   const handleDeleteConfirm = useCallback(async () => {
     if (deleteTarget === null) return;
     const target = deleteTarget;
+    setError(null);
     // Close the dialog BEFORE the async work so React 18 can unmount it
     // while the HTTP call is in flight (see Journey 1 learning).
     setDeleteTarget(null);
@@ -216,7 +218,6 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
                 onClick={handleDeleteConfirm}
                 className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
               >
-                <Loader2 className="hidden h-3.5 w-3.5 animate-spin" />
                 Delete
               </button>
             </div>

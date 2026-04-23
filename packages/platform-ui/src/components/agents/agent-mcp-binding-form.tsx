@@ -272,7 +272,7 @@ function HttpFields({
       url: values.url,
       ...(allowed.length > 0 ? { allowedTools: allowed } : {}),
       ...(headers.length > 0
-        ? { auth: { headers: Object.fromEntries(headers.map((h) => [h.key, h.value])) } }
+        ? { auth: { headers: Object.fromEntries(headers.map((header) => [header.key, header.value])) } }
         : {}),
     };
     await onSubmit(binding);

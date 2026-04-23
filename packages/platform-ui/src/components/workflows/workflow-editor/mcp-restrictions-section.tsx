@@ -7,6 +7,7 @@ import { listAgentBindings } from '@/lib/agent-mcp-client';
 import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 import { Section } from './step-editor-fields';
+import { applyRestrictionUpdate } from './mcp-restrictions-helpers';
 
 interface McpRestrictionsSectionProps {
   agentId: string;
@@ -44,15 +45,7 @@ export function McpRestrictionsSection({ agentId, restrictions, onChange }: McpR
 
   const updateEntry = useCallback(
     (serverName: string, patch: Partial<{ disable: boolean; denyTools: string[] }>) => {
-      const current = restrictions?.[serverName] ?? {};
-      const merged = { ...current, ...patch };
-      // Normalise: drop empty fields, and drop the whole entry if nothing narrows.
-      const disable = merged.disable === true ? true : undefined;
-      const denyTools = merged.denyTools && merged.denyTools.length > 0 ? merged.denyTools : undefined;
-      const { [serverName]: _drop, ...rest } = restrictions ?? {};
-      const entry = disable === undefined && denyTools === undefined ? null : { ...(disable === true ? { disable } : {}), ...(denyTools ? { denyTools } : {}) };
-      const next: StepMcpRestriction = entry === null ? rest : { ...rest, [serverName]: entry };
-      onChange(Object.keys(next).length > 0 ? next : undefined);
+      onChange(applyRestrictionUpdate(restrictions, serverName, patch));
     },
     [restrictions, onChange],
   );
@@ -88,9 +81,9 @@ export function McpRestrictionsSection({ agentId, restrictions, onChange }: McpR
                 denyTools={denyTools}
                 onToggleDisable={(next) => updateEntry(name, { disable: next })}
                 onAddDenyTool={(tool) =>
-                  updateEntry(name, { denyTools: [...denyTools.filter((t) => t !== tool), tool] })
+                  updateEntry(name, { denyTools: [...denyTools.filter((existing) => existing !== tool), tool] })
                 }
-                onRemoveDenyTool={(tool) => updateEntry(name, { denyTools: denyTools.filter((t) => t !== tool) })}
+                onRemoveDenyTool={(tool) => updateEntry(name, { denyTools: denyTools.filter((existing) => existing !== tool) })}
               />
             );
           })}
