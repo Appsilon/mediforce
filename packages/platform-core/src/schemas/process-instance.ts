@@ -26,7 +26,15 @@ export const ProcessInstanceSchema = z.object({
   pauseReason: z.string().nullable(),
   error: z.string().nullable(),
   assignedRoles: z.array(z.string()).default([]),
-  deleted: z.boolean().optional(),
+  /**
+   * Soft-delete marker. New runs are written with `false`; a tombstone-sweep
+   * (see `ProcessInstanceRepository.setDeletedByDefinitionName`) flips it to
+   * `true`. The `default(false)` means pre-migration docs with the field
+   * missing parse as `deleted: false` on read, so downstream code reading
+   * `instance.deleted` never sees `undefined` — and no one-time backfill of
+   * Firestore is required for queries that filter on this field.
+   */
+  deleted: z.boolean().default(false),
   /**
    * Snapshot of outputs carried over from the last successfully completed
    * run of the same workflow name, per the WD's `inputForNextRun` declarations.

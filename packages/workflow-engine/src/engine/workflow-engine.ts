@@ -103,6 +103,10 @@ export class WorkflowEngine {
       pauseReason: null,
       error: null,
       assignedRoles: definition.roles ?? [],
+      // Explicit write so Firestore docs carry the field — lets
+      // getLastCompletedByDefinitionName filter on `deleted == false` server-side
+      // without needing a one-time backfill of pre-feature instances.
+      deleted: false,
       ...(carryOver !== null ? { previousRun: carryOver.values } : {}),
       ...(carryOver?.sourceId !== undefined
         ? { previousRunSourceId: carryOver.sourceId }

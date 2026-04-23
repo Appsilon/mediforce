@@ -88,6 +88,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "definitionName", "order": "ASCENDING" },
+        { "fieldPath": "deleted", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]

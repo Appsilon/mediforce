@@ -70,6 +70,7 @@ function makeRunningInstance(
     pauseReason: null,
     error: null,
     assignedRoles: [],
+    deleted: false,
     ...overrides,
   };
 }

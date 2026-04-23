@@ -161,6 +161,7 @@ async function createTestInstance(instanceRepository: InMemoryProcessInstanceRep
     pauseReason: null,
     error: null,
     assignedRoles: [],
+    deleted: false,
   });
 }
 
