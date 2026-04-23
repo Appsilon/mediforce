@@ -26,6 +26,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import getpass
 import json
 import os
@@ -36,6 +37,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
 from dataclasses import dataclass, field, fields
 from pathlib import Path
@@ -246,13 +248,22 @@ def _ssh_base_opts(ctx: "Context") -> list[str]:
     about to configure — trust-on-first-use, prints the host key once, then
     pins it in ~/.ssh/known_hosts for later runs.
     """
+    # ControlPath must stay under the UNIX-domain-socket limit (~104 chars on
+    # macOS). `%C` hashes user+host+port to a 16-char digest, keeping the path
+    # well below the limit regardless of tempdir. `~/.ssh/cm-%C` resolves to a
+    # short, stable location that works on both macOS and Linux.
+    #
+    # `-i` is treated as a hint (preferred key) but we do NOT set
+    # IdentitiesOnly=yes — on operator machines the private key often lives in
+    # an ssh-agent (e.g. 1Password) while the `--ssh-key` path is just the
+    # public-key placeholder. Restricting to the file alone drops to password
+    # auth, which fails against servers that disable root password login.
     return [
         "-i", str(ctx.ssh_key_path),
-        "-o", "IdentitiesOnly=yes",
         "-o", "StrictHostKeyChecking=accept-new",
         "-o", "ConnectTimeout=10",
         "-o", "ControlMaster=auto",
-        "-o", f"ControlPath={tempfile.gettempdir()}/mediforce-ssh-%r@%h:%p",
+        "-o", "ControlPath=~/.ssh/cm-%C",
         "-o", "ControlPersist=60",
     ]
 
@@ -594,6 +605,67 @@ systemctl enable --now docker
     verify = ssh(ctx, "docker --version && docker compose version", check=True)
     for line in verify.stdout.strip().splitlines():
         ok(line)
+
+
+def step_docker_gc(ctx: Context) -> None:
+    """Cap BuildKit cache so it cannot fill the Docker data volume.
+
+    Without this cap, the builder keeps cache indefinitely (we've seen 85GB+
+    build cache pile up in under a week, filling the 98GB Hetzner volume and
+    breaking deploys with ENOSPC). A 20GB cap is plenty for one working set
+    and leaves headroom for images + containers on typical volumes.
+    """
+    if ctx.dry_run:
+        info("[dry-run] would write /etc/docker/daemon.json and restart docker")
+        return
+    info("Configuring Docker builder GC (cap cache at 20GB)")
+
+    # Remote python script — checks for existing config, writes + restarts
+    # docker only if needed. Base64-encoded so we pass it as a single argv
+    # token with no escaping landmines (heredoc, quotes, backslashes).
+    remote_py = textwrap.dedent('''
+        import json, os, sys
+        path = "/etc/docker/daemon.json"
+        try:
+            with open(path) as f:
+                cfg = json.load(f)
+        except (FileNotFoundError, ValueError):
+            cfg = {}
+        if cfg.get("builder", {}).get("gc", {}).get("defaultKeepStorage"):
+            print("ALREADY_CONFIGURED")
+            sys.exit(0)
+        cfg.setdefault("builder", {}).setdefault("gc", {}).update({
+            "enabled": True,
+            "defaultKeepStorage": "20GB",
+            "policy": [{"keepStorage": "20GB", "all": True}],
+        })
+        os.makedirs("/etc/docker", exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(cfg, f, indent=2)
+        print("WROTE")
+    ''').strip()
+    b64 = base64.b64encode(remote_py.encode()).decode()
+
+    sudo = "" if ctx.user == "root" else "sudo "
+    # Single ssh call — one password prompt instead of N. bash -lc runs remote
+    # commands; the result of the python invocation drives whether we bounce
+    # the docker daemon (only when config actually changed).
+    remote_cmd = (
+        f"set -eu; "
+        f"result=$(echo {b64} | base64 -d | {sudo}python3 -); "
+        f'echo "$result"; '
+        f'if [ "$result" = "WROTE" ]; then {sudo}systemctl restart docker; echo RESTARTED; fi'
+    )
+    result = ssh(ctx, remote_cmd, capture=True)
+    if result.rc != 0:
+        raise RuntimeError(f"docker GC config failed (rc={result.rc}): {result.stderr}")
+    out = result.stdout.strip()
+    if "ALREADY_CONFIGURED" in out:
+        ok("docker builder GC already configured")
+    elif "RESTARTED" in out:
+        ok("docker builder GC: 20GB cap set, daemon restarted")
+    else:
+        raise RuntimeError(f"unexpected output from docker GC step: {out!r}")
 
 
 def step_deploy_user(ctx: Context) -> None:
@@ -1504,6 +1576,7 @@ STEPS: list[tuple[str, str, Callable[[Context], None]]] = [
     ("target_server",    "Target server + SSH access",           step_target_server),
     ("system_packages",  "System packages (apt)",                step_system_packages),
     ("docker",           "Docker CE + compose plugin",           step_docker),
+    ("docker_gc",        "Docker builder GC cap (20GB)",         step_docker_gc),
     ("deploy_user",      "deploy user",                          step_deploy_user),
     ("github_access",    "GitHub deploy key",                    step_github_access),
     ("clone_repo",       "Clone repo to /opt/mediforce",         step_clone_repo),
@@ -1530,6 +1603,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--repo", help=f"GitHub repo to deploy, e.g. Org/Name (default: {DEFAULT_REPO}).")
     p.add_argument("--branch", help=f"Branch to deploy (default: {DEFAULT_BRANCH}).")
     p.add_argument("--from-step", type=int, help="Skip to step number N (1-based).")
+    p.add_argument("--only-step", help="Run a single step by name (e.g. docker_gc) and exit.")
     p.add_argument("--resume", action="store_true", help="Force resume prompt even if state looks fresh.")
     p.add_argument("--dry-run", action="store_true", help="Describe actions without making changes.")
     return p.parse_args()
@@ -1623,6 +1697,17 @@ def main() -> int:
         state=state,
         dry_run=args.dry_run,
     )
+
+    if args.only_step:
+        matches = [(i, n, t, f) for i, (n, t, f) in enumerate(STEPS, 1) if n == args.only_step]
+        if not matches:
+            available = ", ".join(n for n, _, _ in STEPS)
+            raise SystemExit(f"--only-step {args.only_step!r} not found. Available: {available}")
+        idx, name, title, fn = matches[0]
+        section(f"{idx}. {title} (only-step)")
+        fn(ctx)
+        state.mark(name)
+        return 0
 
     start = resolve_start_index(args, state)
     try:
