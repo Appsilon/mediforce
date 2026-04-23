@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Loader2 } from 'lucide-react';
 import { claimTask } from '@/app/actions/tasks';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 
 /**
@@ -11,17 +12,16 @@ import { cn } from '@/lib/utils';
  */
 export function ClaimButton({
   taskId,
-  currentUserId,
   fullWidth = false,
   variant = 'default',
   onClaimed,
 }: {
   taskId: string;
-  currentUserId: string;
   fullWidth?: boolean;
   variant?: 'default' | 'inline';
   onClaimed?: () => void;
 }) {
+  const { firebaseUser } = useAuth();
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -29,7 +29,8 @@ export function ClaimButton({
     setPending(true);
     setError(null);
     try {
-      const result = await claimTask(taskId, currentUserId);
+      const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+      const result = await claimTask(taskId, idToken);
       if (result.success) {
         onClaimed?.();
       } else {
@@ -82,13 +83,12 @@ export function ClaimButton({
  */
 export function UnclaimButton({
   taskId,
-  currentUserId,
   onUnclaimed,
 }: {
   taskId: string;
-  currentUserId: string;
   onUnclaimed?: () => void;
 }) {
+  const { firebaseUser } = useAuth();
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -97,7 +97,8 @@ export function UnclaimButton({
     setError(null);
     try {
       const { unclaimTask } = await import('@/app/actions/tasks');
-      const result = await unclaimTask(taskId, currentUserId);
+      const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+      const result = await unclaimTask(taskId, idToken);
       if (result.success) {
         onUnclaimed?.();
       } else {

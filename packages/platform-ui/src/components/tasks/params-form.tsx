@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle, Loader2, Send } from 'lucide-react';
 import { completeParamsTask } from '@/app/actions/tasks';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { StepParam } from '@mediforce/platform-core';
@@ -14,7 +15,6 @@ interface ParamsFormProps {
   params: StepParam[];
   remainingTaskCount?: number;
   onCompleted?: () => void;
-  userId?: string;
 }
 
 interface SubmittedValues {
@@ -27,9 +27,9 @@ export function ParamsForm({
   params,
   remainingTaskCount,
   onCompleted,
-  userId,
 }: ParamsFormProps) {
   const handle = useHandleFromPath();
+  const { firebaseUser } = useAuth();
   const [values, setValues] = React.useState<Record<string, unknown>>(() => {
     const initial: Record<string, unknown> = {};
     for (const param of params) {
@@ -73,7 +73,8 @@ export function ParamsForm({
       }
     }
 
-    const result = await completeParamsTask(taskId, coerced, userId);
+    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+    const result = await completeParamsTask(taskId, coerced, idToken);
 
     if (result.success) {
       setSubmitted({ values: coerced, timestamp: new Date().toISOString() });

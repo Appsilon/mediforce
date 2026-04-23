@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle, MessageSquare, X, Loader2 } from 'lucide-react';
 import { completeTask } from '@/app/actions/tasks';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
@@ -13,7 +14,6 @@ interface VerdictFormProps {
   disabled: boolean; // True when no content to review
   remainingTaskCount?: number;
   onCompleted?: () => void;
-  userId?: string;
 }
 
 interface SubmittedData {
@@ -33,9 +33,9 @@ export function VerdictForm({
   disabled,
   remainingTaskCount,
   onCompleted,
-  userId,
 }: VerdictFormProps) {
   const handle = useHandleFromPath();
+  const { firebaseUser } = useAuth();
   const [verdict, setVerdict] = React.useState<'approve' | 'revise' | null>(null);
   const [comment, setComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
@@ -50,7 +50,8 @@ export function VerdictForm({
     setSubmitting(true);
     setError(null);
 
-    const result = await completeTask(taskId, verdict, comment.trim(), undefined, userId);
+    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+    const result = await completeTask(taskId, verdict, comment.trim(), undefined, idToken);
 
     if (result.success) {
       const data: SubmittedData = {

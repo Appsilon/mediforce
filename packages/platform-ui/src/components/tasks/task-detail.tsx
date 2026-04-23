@@ -21,6 +21,7 @@ import { useCollection } from '@/hooks/use-collection';
 import { useInstanceTasks } from '@/hooks/use-instance-tasks';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { storage } from '@/lib/firebase';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useBackNavigation } from '@/hooks/use-back-navigation';
@@ -41,12 +42,11 @@ function formatUploadSize(bytes: number): string {
 
 export function TaskDetail({
   task,
-  currentUserId,
 }: {
   task: HumanTask;
-  currentUserId: string;
 }) {
   const handle = useHandleFromPath();
+  const { firebaseUser } = useAuth();
   const { goBack } = useBackNavigation(`/${handle}/tasks`);
   const { data: processInstance } = useProcessInstance(task.processInstanceId);
   const [hasStepContent, setHasStepContent] = React.useState(false);
@@ -114,7 +114,8 @@ export function TaskDetail({
       }
 
       // Complete the task with file metadata
-      const result = await completeUploadTask(task.id, uploadedFiles, currentUserId);
+      const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+      const result = await completeUploadTask(task.id, uploadedFiles, idToken);
       if (result.success) {
         setUploadComplete(true);
       } else {
@@ -128,7 +129,7 @@ export function TaskDetail({
     } finally {
       setUploading(false);
     }
-  }, [task.id]);
+  }, [task.id, firebaseUser]);
 
   // Count remaining tasks for the same role (pending or claimed, excluding this task)
   const remainingConstraints = useMemo(
@@ -362,7 +363,6 @@ export function TaskDetail({
             taskId={task.id}
             options={task.options!}
             remainingTaskCount={remainingTaskCount}
-            userId={currentUserId}
           />
         )}
 
@@ -371,7 +371,6 @@ export function TaskDetail({
             taskId={task.id}
             params={task.params!}
             remainingTaskCount={remainingTaskCount}
-            userId={currentUserId}
           />
         )}
 
@@ -380,7 +379,6 @@ export function TaskDetail({
             taskId={task.id}
             disabled={false}
             remainingTaskCount={remainingTaskCount}
-            userId={currentUserId}
           />
         )}
 

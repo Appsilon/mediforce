@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle, MessageSquare, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { completeTask } from '@/app/actions/tasks';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
@@ -13,7 +14,6 @@ interface SelectionFormProps {
   options: Record<string, unknown>[];
   remainingTaskCount?: number;
   onCompleted?: () => void;
-  userId?: string;
 }
 
 interface SubmittedData {
@@ -29,9 +29,9 @@ export function SelectionForm({
   options,
   remainingTaskCount,
   onCompleted,
-  userId,
 }: SelectionFormProps) {
   const handle = useHandleFromPath();
+  const { firebaseUser } = useAuth();
   const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
   const [mode, setMode] = React.useState<'select' | 'revise' | null>(null);
   const [comment, setComment] = React.useState('');
@@ -44,7 +44,8 @@ export function SelectionForm({
     setSubmitting(true);
     setError(null);
 
-    const result = await completeTask(taskId, 'approve', '', selectedIndex, userId);
+    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+    const result = await completeTask(taskId, 'approve', '', selectedIndex, idToken);
 
     if (result.success) {
       const selected = options[selectedIndex];
@@ -67,7 +68,8 @@ export function SelectionForm({
     setSubmitting(true);
     setError(null);
 
-    const result = await completeTask(taskId, 'revise', comment.trim(), undefined, userId);
+    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+    const result = await completeTask(taskId, 'revise', comment.trim(), undefined, idToken);
 
     if (result.success) {
       setSubmitted({
