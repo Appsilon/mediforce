@@ -5,23 +5,26 @@ import {
 } from '@mediforce/platform-core';
 import { ConfigVersionAlreadyExistsError } from '@mediforce/platform-infra';
 import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { listProcessConfigs } from '@mediforce/platform-api/handlers';
+import { ListProcessConfigsInputSchema } from '@mediforce/platform-api/contract';
 
-export async function GET(request: Request): Promise<NextResponse> {
-  const { searchParams } = new URL(request.url);
-  const processName = searchParams.get('processName');
-
-  if (!processName) {
-    return NextResponse.json(
-      { error: 'processName query parameter is required' },
-      { status: 400 },
-    );
-  }
-
-  const { processRepo } = getPlatformServices();
-  const configs = await processRepo.listProcessConfigs(processName);
-
-  return NextResponse.json({ configs });
-}
+/**
+ * GET /api/configs?processName=X
+ *
+ * Required `processName` query param (400 when missing). Returns
+ * `{ configs: ProcessConfig[] }` — empty array when the process has none.
+ */
+export const GET = createRouteAdapter(
+  ListProcessConfigsInputSchema,
+  (req) => ({
+    processName: new URL(req.url).searchParams.get('processName') ?? undefined,
+  }),
+  (input) =>
+    listProcessConfigs(input, {
+      processRepo: getPlatformServices().processRepo,
+    }),
+);
 
 export async function POST(request: Request): Promise<NextResponse> {
   let body: unknown;
