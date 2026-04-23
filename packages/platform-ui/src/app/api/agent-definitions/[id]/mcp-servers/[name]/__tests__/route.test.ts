@@ -219,14 +219,22 @@ describe('DELETE /api/agent-definitions/:id/mcp-servers/:name', () => {
     expect(res.status).toBe(400);
   });
 
-  it('[ERROR] 404 when binding does not exist', async () => {
+  it('[DATA] idempotent — 200 with unchanged bindings when name does not exist', async () => {
     mockAgentGetById.mockResolvedValue(coworkAgent);
+    mockAgentUpdate.mockImplementation((_id: string, patch: { mcpServers?: unknown }) =>
+      Promise.resolve({ ...coworkAgent, mcpServers: patch.mcpServers }),
+    );
 
     const res = await DELETE(
       makeDeleteRequest('tealflow-cowork-chat', 'missing'),
       { params: makeParams('tealflow-cowork-chat', 'missing') },
     );
-    expect(res.status).toBe(404);
-    expect(mockAgentUpdate).not.toHaveBeenCalled();
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.mcpServers).toEqual(coworkAgent.mcpServers);
+    expect(mockAgentUpdate).toHaveBeenCalledWith('tealflow-cowork-chat', {
+      mcpServers: coworkAgent.mcpServers,
+    });
   });
 });

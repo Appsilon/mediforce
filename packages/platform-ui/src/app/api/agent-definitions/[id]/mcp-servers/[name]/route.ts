@@ -55,11 +55,8 @@ export async function DELETE(
     );
   }
 
-  if (!(agent.mcpServers && name in agent.mcpServers)) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const { [name]: _removed, ...rest } = agent.mcpServers;
+  const rest = { ...(agent.mcpServers ?? {}) };
+  delete rest[name];
   const updated = await agentDefinitionRepo.update(id, { mcpServers: rest });
   return NextResponse.json({ mcpServers: updated.mcpServers ?? {} });
 }

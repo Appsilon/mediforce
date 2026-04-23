@@ -62,11 +62,6 @@ export async function DELETE(
   const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
   if (namespace instanceof NextResponse) return namespace;
 
-  const existing = await services.toolCatalogRepo.getById(namespace, id);
-  if (existing === null) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
   await services.toolCatalogRepo.delete(namespace, id);
   return NextResponse.json({ success: true });
 }

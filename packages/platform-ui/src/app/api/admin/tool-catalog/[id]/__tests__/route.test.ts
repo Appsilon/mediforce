@@ -189,7 +189,6 @@ describe('DELETE /api/admin/tool-catalog/:id', () => {
 
   it('[DATA] deletes an existing entry', async () => {
     mockNamespaceGet.mockResolvedValue(existingNamespace);
-    mockCatalogGetById.mockResolvedValue(catalogEntry);
     mockCatalogDelete.mockResolvedValue(undefined);
 
     const res = await DELETE(
@@ -203,16 +202,16 @@ describe('DELETE /api/admin/tool-catalog/:id', () => {
     expect(mockCatalogDelete).toHaveBeenCalledWith('appsilon', 'tealflow-mcp');
   });
 
-  it('[ERROR] 404 when entry does not exist', async () => {
+  it('[DATA] idempotent — 200 even when entry does not exist', async () => {
     mockNamespaceGet.mockResolvedValue(existingNamespace);
-    mockCatalogGetById.mockResolvedValue(null);
+    mockCatalogDelete.mockResolvedValue(undefined);
 
     const res = await DELETE(
       makeDeleteRequest('unknown', 'appsilon'),
       { params: makeParams('unknown') },
     );
-    expect(res.status).toBe(404);
-    expect(mockCatalogDelete).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(mockCatalogDelete).toHaveBeenCalledWith('appsilon', 'unknown');
   });
 
   it('[ERROR] 404 when namespace missing', async () => {
