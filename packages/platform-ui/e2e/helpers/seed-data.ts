@@ -774,6 +774,11 @@ export function buildSeedData(testUserId: string) {
   // agent MCP journey is deterministic. Without this, the page relies on the
   // fire-and-forget `seedBuiltinAgentDefinitions` in platform-services, which
   // races with the first GET `/api/agent-definitions/:id` request.
+  //
+  // `mcp-test-agent` is a fixture consumed by step-mcp-restrictions.journey.ts —
+  // it ships with one pre-bound stdio server so the Restrictions section has
+  // something to narrow. Journey 2 uses `claude-code-agent`, which must start
+  // binding-free for its "empty state" assertion; hence the split.
   const agentDefinitions: Record<string, Record<string, unknown>> = {
     'claude-code-agent': {
       kind: 'plugin',
@@ -790,6 +795,47 @@ export function buildSeedData(testUserId: string) {
       createdAt: twoDaysAgo,
       updatedAt: twoDaysAgo,
     },
+    'mcp-test-agent': {
+      kind: 'plugin',
+      runtimeId: 'script-container',
+      name: 'MCP Test Agent',
+      iconName: 'Terminal',
+      description: 'Fixture agent for step-level MCP restrictions journey.',
+      inputDescription: 'test input',
+      outputDescription: 'test output',
+      foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: '',
+      skillFileNames: [],
+      mcpServers: {
+        filesystem: { type: 'stdio', catalogId: 'filesystem' },
+      },
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+    },
+  };
+
+  // Minimal workflow with one agent step referencing `mcp-test-agent`, used
+  // only by step-mcp-restrictions.journey.ts.
+  workflowDefinitions['MCP Restrictions Test:1'] = {
+    name: 'MCP Restrictions Test',
+    namespace: 'test',
+    version: 1,
+    description: 'Fixture workflow for step-level MCP restrictions journey',
+    steps: [
+      {
+        id: 'process',
+        name: 'Process',
+        type: 'creation',
+        executor: 'agent',
+        autonomyLevel: 'L2',
+        plugin: 'script-container',
+        agentId: 'mcp-test-agent',
+      },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'process', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start' }],
+    createdAt: twoDaysAgo,
   };
 
   // -------------------------------------------------------------------------
