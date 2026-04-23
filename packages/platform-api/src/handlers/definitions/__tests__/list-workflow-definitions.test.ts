@@ -36,10 +36,21 @@ describe('listWorkflowDefinitions handler', () => {
     expect(flowA?.definition?.version).toBe(2);
   });
 
-  it('sets definition to null when no version matches latestVersion (defensive)', async () => {
-    // Valid input never produces this shape, but the route projected the
-    // latest with `?? null` for safety — contract keeps the same guarantee.
+  it('resolves the latest definition for each name (newest version wins)', async () => {
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'flow-a', version: 1 }),
+    );
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'flow-a', version: 2 }),
+    );
+    await processRepo.saveWorkflowDefinition(
+      buildWorkflowDefinition({ name: 'flow-a', version: 3 }),
+    );
+
     const result = await listWorkflowDefinitions({}, { processRepo });
-    expect(result.definitions.every((d) => d.definition === null || d.definition !== undefined)).toBe(true);
+
+    expect(result.definitions).toHaveLength(1);
+    expect(result.definitions[0]?.latestVersion).toBe(3);
+    expect(result.definitions[0]?.definition?.version).toBe(3);
   });
 });
