@@ -3,54 +3,53 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Tool Catalog Journey', () => {
-  test('browse tool catalog, search, and view tool detail', async ({ page }, testInfo) => {
+  test('browse live tool catalog, search, and view entry detail', async ({ page }, testInfo) => {
     await setupRecording(page, 'tool-catalog', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/tools`);
     await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible({ timeout: 10_000 });
 
-    // Category sections visible
-    await expect(page.getByText('Data Access').first()).toBeVisible();
-    await expect(page.getByText('Clinical Data').first()).toBeVisible();
-
-    // Tool cards visible
-    await expect(page.getByText('Filesystem').first()).toBeVisible();
-    await expect(page.getByText('PostgreSQL').first()).toBeVisible();
-    await expect(page.getByText('CDISC Library').first()).toBeVisible();
+    // Section heading + seeded stdio catalog entries (ids are shown verbatim).
+    await expect(page.getByRole('heading', { level: 2, name: /stdio servers/i })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 3, name: 'filesystem' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 3, name: 'postgres' })).toBeVisible();
     await showStep(page);
 
-    // Security level badges visible
-    await expect(page.getByText('Allowlist + secrets').first()).toBeVisible(); // PostgreSQL
-    await expect(page.getByText('Open access').first()).toBeVisible(); // Filesystem
+    // Security badges: postgres has {{SECRET:DATABASE_URL}}, filesystem is open.
+    await expect(page.getByText(/secrets required/i).first()).toBeVisible();
+    await expect(page.getByText(/open access/i).first()).toBeVisible();
     await showStep(page);
 
-    // Search filters tools
+    // Admins see the "Manage catalog" shortcut.
+    await expect(page.getByRole('link', { name: /manage catalog/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /add http binding/i })).toBeVisible();
+
+    // Search filters entries by id.
     await click(page, page.getByPlaceholder('Search tools...'));
     await page.getByPlaceholder('Search tools...').fill('postgres');
-    await expect(page.getByText('PostgreSQL').first()).toBeVisible();
-    await expect(page.getByText('Filesystem')).not.toBeVisible();
+    await expect(page.getByRole('heading', { level: 3, name: 'postgres' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 3, name: 'filesystem' })).not.toBeVisible();
     await showStep(page);
 
-    // Clear search
     await page.getByPlaceholder('Search tools...').fill('');
-    await expect(page.getByText('Filesystem').first()).toBeVisible();
+    await expect(page.getByRole('heading', { level: 3, name: 'filesystem' })).toBeVisible();
 
-    // Navigate to tool detail (whole card is a link)
-    await click(page, page.getByText('PostgreSQL').first());
+    // Navigate into detail.
+    await click(page, page.getByRole('heading', { level: 3, name: 'postgres' }));
     await expect(page.getByText('Connection')).toBeVisible({ timeout: 10_000 });
     await showStep(page);
 
-    // Tool detail shows secrets and allowlist
+    // Detail shows the env variable and the usage section (empty, no agents bound yet).
     await expect(page.getByText('DATABASE_URL').first()).toBeVisible();
-    await expect(page.getByText('Tool Allowlist')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: /used by agents/i })).toBeVisible();
+    await expect(page.getByText(/no agent bindings reference this entry yet/i)).toBeVisible();
     await showStep(page);
 
-    // Usage snippet visible
-    await expect(page.getByText('Usage in Workflow Definition')).toBeVisible();
+    // Usage snippet visible.
+    await expect(page.getByText(/usage in agent definition/i)).toBeVisible();
     await expect(page.getByText('mcpServers').first()).toBeVisible();
     await showResult(page);
 
-    // Navigate back
-    await click(page, page.getByRole('link', { name: 'Back to Tools' }));
+    await click(page, page.getByRole('link', { name: /back to tools/i }));
     await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible({ timeout: 10_000 });
     await endRecording(page);
   });

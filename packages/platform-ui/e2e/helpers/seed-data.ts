@@ -752,6 +752,24 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
+  // Namespace-scoped tool catalog — seed entries under
+  // `namespaces/{TEST_ORG_HANDLE}/toolCatalog/{entryId}`. Doc id IS the entry id,
+  // so we strip `id` from the payload to match FirestoreToolCatalogRepository
+  // (see packages/platform-infra/src/firestore/tool-catalog-repository.ts).
+  const toolCatalog: Record<string, Record<string, unknown>> = {
+    filesystem: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'],
+      description: 'Read and write files in a scoped directory.',
+    },
+    postgres: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-postgres'],
+      env: { DATABASE_URL: '{{SECRET:DATABASE_URL}}' },
+      description: 'Execute read-only SQL queries against a PostgreSQL database.',
+    },
+  };
+
   // -------------------------------------------------------------------------
   // Cowork sessions — collaborative human+AI artifact building
   // -------------------------------------------------------------------------
@@ -870,5 +888,5 @@ export function buildSeedData(testUserId: string) {
     createdAt: twoDaysAgo,
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog };
 }
