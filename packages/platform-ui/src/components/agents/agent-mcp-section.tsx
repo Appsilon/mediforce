@@ -167,6 +167,8 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
                   existing={dialog.kind === 'edit' ? { name: dialog.name, binding: dialog.binding } : null}
                   existingNames={existingNames}
                   catalogEntries={catalog}
+                  agentId={agentId}
+                  namespace={handle}
                   onSubmit={handleSubmit}
                   onCancel={() => setDialog({ kind: 'closed' })}
                 />
