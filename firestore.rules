@@ -34,16 +34,46 @@ service cloud.firestore {
     // Namespaces: read by authenticated; create/update by authenticated; delete by owner only
     match /namespaces/{handle} {
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      // Create: if the namespace is personal (has linkedUserId), the user can
+      // only create it for themselves — prevents creating a personal namespace
+      // on behalf of another uid and then bootstrap-joining it as owner.
+      allow create: if request.auth != null
+        && (!('linkedUserId' in request.resource.data)
+            || request.resource.data.linkedUserId == request.auth.uid);
+      // Update: linkedUserId is immutable once set — changing it would let an
+      // attacker rebind any namespace to their uid and then self-seed via the
+      // personal-bootstrap path in /members.
+      allow update: if request.auth != null
+        && (!('linkedUserId' in resource.data)
+            || resource.data.linkedUserId == request.resource.data.linkedUserId);
       // Only an owner of the namespace may delete it
       allow delete: if request.auth != null
         && get(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid)).data.role == 'owner';
 
       match /members/{memberId} {
         allow read: if request.auth != null;
-        // Owner/admin can add or update members; role cannot be elevated to 'owner'
-        // except by an existing owner.
-        allow create, update: if request.auth != null
+        // Two create paths:
+        //
+        //   1. Personal-namespace bootstrap: a user seeds themselves as owner
+        //      of their own personal namespace (namespace.linkedUserId ==
+        //      auth.uid, memberId == auth.uid, role == 'owner'). This breaks
+        //      the circular dep where the "must already be owner/admin" check
+        //      below would otherwise block every first-ever write. Cannot be
+        //      used to take over anyone else's namespace — linkedUserId pins
+        //      the namespace to a single uid, and a namespace with an existing
+        //      linkedUserId is immutable (see namespaces create/update above).
+        //
+        //   2. Existing owner/admin adds another member. Role cannot be
+        //      elevated to 'owner' except by an existing owner.
+        allow create: if request.auth != null && (
+          (memberId == request.auth.uid
+            && request.resource.data.role == 'owner'
+            && get(/databases/$(database)/documents/namespaces/$(handle)).data.linkedUserId == request.auth.uid)
+          || (get(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid)).data.role in ['owner', 'admin']
+              && (request.resource.data.role != 'owner'
+                  || get(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid)).data.role == 'owner'))
+        );
+        allow update: if request.auth != null
           && get(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid)).data.role in ['owner', 'admin']
           && (request.resource.data.role != 'owner'
               || get(/databases/$(database)/documents/namespaces/$(handle)/members/$(request.auth.uid)).data.role == 'owner');
