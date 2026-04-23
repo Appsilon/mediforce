@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   AgentDefinitionSchema,
+  CreateAgentDefinitionInputSchema,
   WorkflowDefinitionSchema,
 } from '@mediforce/platform-core';
 
@@ -59,3 +60,58 @@ export const GetAgentDefinitionOutputSchema = z.object({
 
 export type GetAgentDefinitionInput = z.infer<typeof GetAgentDefinitionInputSchema>;
 export type GetAgentDefinitionOutput = z.infer<typeof GetAgentDefinitionOutputSchema>;
+
+// ---- PUT /api/definitions (legacy YAML process definition) ------------------
+//
+// Receives a YAML body. Handler parses + validates via `parseProcessDefinition`
+// before persistence. Non-parseable YAML becomes `ValidationError` (400);
+// the version-already-exists case becomes `ConflictError` (409).
+// Also auto-seeds an "all-human" config if one doesn't exist for this version.
+
+export const UpsertLegacyDefinitionInputSchema = z.object({
+  yaml: z.string().min(1, 'YAML body is required'),
+});
+
+export const UpsertLegacyDefinitionOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  version: z.string(),
+});
+
+export type UpsertLegacyDefinitionInput = z.infer<typeof UpsertLegacyDefinitionInputSchema>;
+export type UpsertLegacyDefinitionOutput = z.infer<typeof UpsertLegacyDefinitionOutputSchema>;
+
+// ---- POST /api/workflow-definitions ----------------------------------------
+//
+// Registers a new version of a WorkflowDefinition. `version` + `createdAt`
+// are assigned server-side. `namespace` is required and comes from a query
+// param on the route (the handler treats it as part of the input).
+
+const WorkflowDefinitionDraftSchema = WorkflowDefinitionSchema.omit({
+  version: true,
+  createdAt: true,
+});
+
+export const CreateWorkflowDefinitionInputSchema = z.object({
+  namespace: z.string().min(1),
+  draft: WorkflowDefinitionDraftSchema,
+});
+
+export const CreateWorkflowDefinitionOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  version: z.number(),
+});
+
+export type CreateWorkflowDefinitionInput = z.infer<typeof CreateWorkflowDefinitionInputSchema>;
+export type CreateWorkflowDefinitionOutput = z.infer<typeof CreateWorkflowDefinitionOutputSchema>;
+
+// ---- POST /api/agent-definitions -------------------------------------------
+
+export const CreateAgentDefinitionInputContractSchema = CreateAgentDefinitionInputSchema;
+
+export const CreateAgentDefinitionOutputSchema = z.object({
+  agent: AgentDefinitionSchema,
+});
+
+export type CreateAgentDefinitionOutput = z.infer<typeof CreateAgentDefinitionOutputSchema>;

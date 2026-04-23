@@ -42,6 +42,18 @@ export {
   type GetAgentDefinitionDeps,
 } from './definitions/get-agent-definition.js';
 export {
+  upsertLegacyDefinition,
+  type UpsertLegacyDefinitionDeps,
+} from './definitions/upsert-legacy-definition.js';
+export {
+  createWorkflowDefinition,
+  type CreateWorkflowDefinitionDeps,
+} from './definitions/create-workflow-definition.js';
+export {
+  createAgentDefinition,
+  type CreateAgentDefinitionDeps,
+} from './definitions/create-agent-definition.js';
+export {
   getCoworkSession,
   type GetCoworkSessionDeps,
 } from './cowork/get-cowork-session.js';

@@ -29,6 +29,12 @@ export {
   ListAgentDefinitionsOutputSchema,
   GetAgentDefinitionInputSchema,
   GetAgentDefinitionOutputSchema,
+  UpsertLegacyDefinitionInputSchema,
+  UpsertLegacyDefinitionOutputSchema,
+  CreateWorkflowDefinitionInputSchema,
+  CreateWorkflowDefinitionOutputSchema,
+  CreateAgentDefinitionInputContractSchema,
+  CreateAgentDefinitionOutputSchema,
   type ListWorkflowDefinitionsInput,
   type ListWorkflowDefinitionsOutput,
   type WorkflowDefinitionSummary,
@@ -36,6 +42,11 @@ export {
   type ListAgentDefinitionsOutput,
   type GetAgentDefinitionInput,
   type GetAgentDefinitionOutput,
+  type UpsertLegacyDefinitionInput,
+  type UpsertLegacyDefinitionOutput,
+  type CreateWorkflowDefinitionInput,
+  type CreateWorkflowDefinitionOutput,
+  type CreateAgentDefinitionOutput,
 } from './definitions.js';
 
 export {
