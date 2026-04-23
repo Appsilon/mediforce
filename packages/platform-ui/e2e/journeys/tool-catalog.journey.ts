@@ -34,9 +34,11 @@ test.describe('Tool Catalog Journey', () => {
     await page.getByPlaceholder('Search tools...').fill('');
     await expect(page.getByRole('heading', { level: 3, name: 'filesystem' })).toBeVisible();
 
-    // Navigate into detail.
+    // Navigate into detail. First-time compile of /tools/[toolId] on a cold
+    // dev server can exceed 10s, so use a longer timeout for the first
+    // visible element on the detail page.
     await click(page, page.getByRole('heading', { level: 3, name: 'postgres' }));
-    await expect(page.getByText('Connection')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Connection')).toBeVisible({ timeout: 30_000 });
     await showStep(page);
 
     // Detail shows the env variable and the usage section (empty, no agents bound yet).
