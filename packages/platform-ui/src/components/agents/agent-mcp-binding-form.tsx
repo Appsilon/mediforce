@@ -242,14 +242,14 @@ function HttpFields({
   submitError,
   submitLabel,
 }: {
-  initial: { type: 'http'; url: string; allowedTools?: string[]; auth?: { headers?: Record<string, string> } } | null;
+  initial: Extract<AgentMcpBinding, { type: 'http' }> | null;
   onSubmit: (binding: AgentMcpBinding) => Promise<void>;
   onCancel: () => void;
   submitError: string | null;
   submitLabel: string;
 }) {
   const initialHeaders = useMemo(() => {
-    if (!initial?.auth?.headers) return [];
+    if (initial?.auth?.type !== 'headers') return [];
     return Object.entries(initial.auth.headers).map(([key, value]) => ({ key, value }));
   }, [initial]);
 
@@ -272,7 +272,12 @@ function HttpFields({
       url: values.url,
       ...(allowed.length > 0 ? { allowedTools: allowed } : {}),
       ...(headers.length > 0
-        ? { auth: { headers: Object.fromEntries(headers.map((header) => [header.key, header.value])) } }
+        ? {
+            auth: {
+              type: 'headers' as const,
+              headers: Object.fromEntries(headers.map((header) => [header.key, header.value])),
+            },
+          }
         : {}),
     };
     await onSubmit(binding);

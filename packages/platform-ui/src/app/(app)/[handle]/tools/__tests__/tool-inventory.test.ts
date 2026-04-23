@@ -75,6 +75,8 @@ describe('collectHttpBindings', () => {
       agentName: 'Reviewer',
       allowedTools: undefined,
       hasSecretHeaders: false,
+      authKind: 'none',
+      oauthProvider: undefined,
     });
     expect(result[1]).toMatchObject({
       key: 'a2::github',
@@ -92,12 +94,33 @@ describe('collectHttpBindings', () => {
           github: {
             type: 'http',
             url: 'https://api.github.com/mcp',
-            auth: { headers: { Authorization: 'Bearer {{SECRET:GH_TOKEN}}' } },
+            auth: { type: 'headers', headers: { Authorization: 'Bearer {{SECRET:GH_TOKEN}}' } },
           },
         },
       }),
     ]);
     expect(result[0]!.hasSecretHeaders).toBe(true);
+    expect(result[0]!.authKind).toBe('headers');
+  });
+
+  it('surfaces oauth bindings with provider reference', () => {
+    const result = collectHttpBindings([
+      agent({
+        id: 'a1',
+        name: 'Reviewer',
+        mcpServers: {
+          github: {
+            type: 'http',
+            url: 'https://api.github.com/mcp',
+            auth: { type: 'oauth', provider: 'github' },
+          },
+        },
+      }),
+    ]);
+    expect(result[0]!.authKind).toBe('oauth');
+    expect(result[0]!.oauthProvider).toBe('github');
+    // OAuth bindings never flag as having raw secret templates
+    expect(result[0]!.hasSecretHeaders).toBe(false);
   });
 
   it('skips agents with no mcpServers map at all', () => {
