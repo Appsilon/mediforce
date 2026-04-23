@@ -251,6 +251,68 @@ describe('Mediforce', () => {
       expect((error as ApiError).status).toBe(500);
     });
   });
+
+  describe('tasks.get', () => {
+    it('calls GET /api/tasks/:taskId and returns the parsed task', async () => {
+      const task = buildHumanTask({ id: 'task-42' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(task));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.tasks.get({ taskId: 'task-42' });
+
+      expect(result.id).toBe('task-42');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/tasks/task-42`,
+      );
+    });
+
+    it('URL-encodes the taskId path segment', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(buildHumanTask({ id: 'a/b c' })));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.tasks.get({ taskId: 'a/b c' });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/tasks/a%2Fb%20c`,
+      );
+    });
+
+    it('throws ApiError on 404 with the server message', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ error: 'Task missing-1 not found' }, 404),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const err = await mediforce.tasks
+        .get({ taskId: 'missing-1' })
+        .catch((e) => e);
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).status).toBe(404);
+      expect((err as ApiError).message).toMatch(/missing-1/);
+    });
+
+    it('rejects an empty taskId before firing any request', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await expect(mediforce.tasks.get({ taskId: '' })).rejects.toThrow();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('rejects responses that do not match the output schema', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ id: 'task-42' }),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await expect(mediforce.tasks.get({ taskId: 'task-42' })).rejects.toThrow();
+    });
+  });
 });
 
 // Type-level assertion — ClientConfig accepts only the documented options.

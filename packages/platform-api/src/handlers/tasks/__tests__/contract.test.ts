@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACTIONABLE_STATUSES,
+  GetTaskInputSchema,
+  GetTaskOutputSchema,
   ListTasksInputSchema,
   ListTasksOutputSchema,
 } from '../../../contract/tasks.js';
+import { buildHumanTask } from '@mediforce/platform-core/testing';
 
 /**
  * Contract-only tests: exercise the Zod schemas directly. No handler, no repo.
@@ -149,6 +152,35 @@ describe('ListTasksOutputSchema', () => {
     const result = ListTasksOutputSchema.safeParse({
       tasks: [{ id: 'task-1' }],
     });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('GetTaskInputSchema', () => {
+  it('accepts a non-empty taskId', () => {
+    const result = GetTaskInputSchema.safeParse({ taskId: 'task-1' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty-string taskId', () => {
+    const result = GetTaskInputSchema.safeParse({ taskId: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects payloads missing taskId', () => {
+    const result = GetTaskInputSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('GetTaskOutputSchema', () => {
+  it('accepts a well-formed task', () => {
+    const result = GetTaskOutputSchema.safeParse(buildHumanTask({ id: 't-1' }));
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a task that misses required fields', () => {
+    const result = GetTaskOutputSchema.safeParse({ id: 'only-id' });
     expect(result.success).toBe(false);
   });
 });

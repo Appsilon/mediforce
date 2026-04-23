@@ -1,6 +1,10 @@
 import {
+  GetTaskInputSchema,
+  GetTaskOutputSchema,
   ListTasksInputSchema,
   ListTasksOutputSchema,
+  type GetTaskInput,
+  type GetTaskOutput,
   type ListTasksInput,
   type ListTasksOutput,
 } from '../contract/index.js';
@@ -62,6 +66,7 @@ export class ApiError extends Error {
 export class Mediforce {
   readonly tasks: {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
+    get: (input: GetTaskInput) => Promise<GetTaskOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -111,6 +116,14 @@ export class Mediforce {
         const res = await this.request(`/api/tasks${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.list');
         return ListTasksOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetTaskInputSchema.parse(input);
+        const res = await this.request(
+          `/api/tasks/${encodeURIComponent(validated.taskId)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.tasks.get');
+        return GetTaskOutputSchema.parse(body);
       },
     };
   }

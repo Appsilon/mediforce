@@ -50,3 +50,21 @@ export type ListTasksInput =
   | (ListTasksFilters & { role: string; instanceId?: undefined });
 
 export type ListTasksOutput = z.infer<typeof ListTasksOutputSchema>;
+
+/**
+ * Contract for `GET /api/tasks/:taskId`.
+ *
+ * The output is the raw `HumanTaskSchema` — single resource, no wrapper
+ * object. Missing tasks return HTTP 404 (the handler throws `NotFoundError`,
+ * the route adapter maps it to an error body). Keeps the response shape
+ * identical to `tasks[i]` from `GET /api/tasks`, so clients can reuse the
+ * same type and fixtures.
+ */
+export const GetTaskInputSchema = z.object({
+  taskId: z.string().min(1),
+});
+
+export const GetTaskOutputSchema = HumanTaskSchema;
+
+export type GetTaskInput = z.infer<typeof GetTaskInputSchema>;
+export type GetTaskOutput = z.infer<typeof GetTaskOutputSchema>;
