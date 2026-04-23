@@ -263,7 +263,7 @@ export function ProcessDetail({
               workflowName={instance.definitionName}
             />
           )}
-          {wfStatus.displayStatus === 'waiting_for_human' && !needsHumanTaskAction && !needsCowork && wfStatus.rawReason !== 'missing_env' && (
+          {wfStatus.displayStatus === 'waiting_for_human' && !needsHumanTaskAction && !needsCowork && (
             <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
               {wfStatus.reason}
             </div>

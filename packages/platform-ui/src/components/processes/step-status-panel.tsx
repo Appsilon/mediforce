@@ -72,8 +72,7 @@ function getEffectiveStatus(
       // (e.g. L3 agent step paused for human review — execution record stays 'running')
       if (
         instance.currentStepId === step.id
-        && instance.status === 'paused'
-        && (instance.pauseReason === 'waiting_for_human' || instance.pauseReason === 'awaiting_agent_approval')
+        && getWorkflowStatus(instance).displayStatus === 'waiting_for_human'
       ) {
         return 'waiting';
       }
@@ -86,10 +85,7 @@ function getEffectiveStatus(
 
   // No execution record yet — derive from instance state
   if (instance.currentStepId === step.id) {
-    if (instance.status === 'paused' && (
-      instance.pauseReason === 'waiting_for_human'
-      || instance.pauseReason === 'awaiting_agent_approval'
-    )) {
+    if (getWorkflowStatus(instance).displayStatus === 'waiting_for_human') {
       return 'waiting';
     }
     if (instance.status === 'running') {

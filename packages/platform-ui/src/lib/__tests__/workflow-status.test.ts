@@ -103,6 +103,7 @@ describe('getWorkflowStatus', () => {
       const result = getWorkflowStatus({ status: 'failed', error: 'Cancelled by user' });
       expect(result.displayStatus).toBe('error');
       expect(result.reason).toBe('Cancelled by user');
+      expect(result.rawReason).toBeNull();
       expect(result.isRetryable).toBe(false);
     });
 
@@ -124,6 +125,12 @@ describe('getWorkflowStatus', () => {
       const result = getWorkflowStatus({ status: 'paused', pauseReason: 'something_new' });
       expect(result.displayStatus).toBe('error');
       expect(result.rawReason).toBe('something_new');
+      expect(result.isRetryable).toBe(false);
+    });
+
+    it('unknown status falls back to error', () => {
+      const result = getWorkflowStatus({ status: 'archived' });
+      expect(result.displayStatus).toBe('error');
       expect(result.isRetryable).toBe(false);
     });
   });

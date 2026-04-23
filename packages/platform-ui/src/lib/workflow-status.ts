@@ -69,5 +69,5 @@ export function getWorkflowStatus(instance: {
     return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: !isCancelled };
   }
 
-  return { displayStatus: 'in_progress', reason: null, rawReason: null, isRetryable: false };
+  return { displayStatus: 'error', reason: `Unknown status: ${instance.status}`, rawReason: null, isRetryable: false };
 }
