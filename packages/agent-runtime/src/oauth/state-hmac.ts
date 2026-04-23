@@ -59,6 +59,13 @@ export interface OAuthStatePayload {
   ts: number;
   /** 16 random bytes, base64url — prevents replay of identical payloads. */
   nonce: string;
+  /** PKCE code_verifier (RFC 7636). Present when the authorize URL was
+   *  built with a code_challenge; callback must echo it back at token
+   *  exchange. Carried inside the state HMAC — signed but not encrypted,
+   *  so treat the verifier as a single-use secret and keep state TTL
+   *  short (10 min). Absent for legacy pre-Step-5 flows that never used
+   *  PKCE against GitHub/Google OAuth Apps. */
+  codeVerifier?: string;
 }
 
 /** Sign a state payload. Caller supplies timestamp + nonce so tests can be
@@ -128,6 +135,7 @@ export async function verifyState(
       connectedBy: asRecord.connectedBy,
       ts: asRecord.ts,
       nonce: asRecord.nonce,
+      ...(typeof asRecord.codeVerifier === 'string' ? { codeVerifier: asRecord.codeVerifier } : {}),
     };
   } catch {
     return null;
@@ -143,4 +151,29 @@ export function generateNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return base64urlEncode(bytes);
+}
+
+export interface PkcePair {
+  /** Random 32-byte value, base64url-encoded. Sent to the token endpoint
+   *  as `code_verifier`. Must match the challenge the AS received at
+   *  authorize time. */
+  codeVerifier: string;
+  /** `base64url(SHA-256(codeVerifier))` — sent to the authorize endpoint
+   *  as `code_challenge` with `code_challenge_method=S256`. */
+  codeChallenge: string;
+}
+
+/** Generate a fresh PKCE verifier/challenge pair per RFC 7636. S256 is
+ *  the only method we produce; plain is obsolete and several AS reject
+ *  it outright (Readwise: `Code challenge required`). */
+export async function generatePkcePair(): Promise<PkcePair> {
+  const verifierBytes = new Uint8Array(32);
+  crypto.getRandomValues(verifierBytes);
+  const codeVerifier = base64urlEncode(verifierBytes);
+  const digestBuffer = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(codeVerifier),
+  );
+  const codeChallenge = base64urlEncode(new Uint8Array(digestBuffer));
+  return { codeVerifier, codeChallenge };
 }

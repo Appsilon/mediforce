@@ -54,13 +54,17 @@ async function exchangeCode(params: {
   provider: OAuthProviderConfig;
   code: string;
   redirectUri: string;
+  codeVerifier?: string;
 }): Promise<TokenExchangeResponse | null> {
-  const { provider, code, redirectUri } = params;
+  const { provider, code, redirectUri, codeVerifier } = params;
   const bodyFields: Record<string, string> = {
     grant_type: 'authorization_code',
     code,
     redirect_uri: redirectUri,
   };
+  if (codeVerifier !== undefined) {
+    bodyFields.code_verifier = codeVerifier;
+  }
   const authMethod = provider.tokenEndpointAuthMethod ?? 'client_secret_basic';
   const headers: Record<string, string> = {
     'Content-Type': 'application/x-www-form-urlencoded',
@@ -181,6 +185,7 @@ export async function GET(
     provider,
     code,
     redirectUri: buildSelfCallbackUrl(request, providerSlug),
+    codeVerifier: state.codeVerifier,
   });
   if (exchange === null) {
     return redirectError(request, 'code-exchange-failed', state);

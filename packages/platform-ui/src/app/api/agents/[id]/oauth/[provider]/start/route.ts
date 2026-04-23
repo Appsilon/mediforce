@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { signState, generateNonce } from '@mediforce/agent-runtime';
+import { signState, generateNonce, generatePkcePair } from '@mediforce/agent-runtime';
 import { getPlatformServices } from '@/lib/platform-services';
 import { requireFirebaseUid, requireNamespaceFromQuery } from '../../_shared/auth';
 
@@ -22,6 +22,7 @@ function buildAuthorizeUrl(params: {
   scopes: string[];
   redirectUri: string;
   state: string;
+  codeChallenge?: string;
 }): string {
   const url = new URL(params.base);
   url.searchParams.set('client_id', params.clientId);
@@ -32,6 +33,10 @@ function buildAuthorizeUrl(params: {
   // `access_type=offline` requests a refresh token from Google; GitHub
   // ignores the parameter. Harmless cross-provider default.
   url.searchParams.set('access_type', 'offline');
+  if (params.codeChallenge !== undefined) {
+    url.searchParams.set('code_challenge', params.codeChallenge);
+    url.searchParams.set('code_challenge_method', 'S256');
+  }
   return url.toString();
 }
 
@@ -106,6 +111,8 @@ export async function POST(
     );
   }
 
+  const pkce = await generatePkcePair();
+
   const state = await signState(
     {
       namespace,
@@ -115,6 +122,7 @@ export async function POST(
       connectedBy: uid,
       ts: Date.now(),
       nonce: generateNonce(),
+      codeVerifier: pkce.codeVerifier,
     },
     platformSecret,
   );
@@ -125,6 +133,7 @@ export async function POST(
     scopes: provider.scopes,
     redirectUri: buildCallbackUrl(request, providerSlug),
     state,
+    codeChallenge: pkce.codeChallenge,
   });
 
   return NextResponse.json({ authorizeUrl, state });

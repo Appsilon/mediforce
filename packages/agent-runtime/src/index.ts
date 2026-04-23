@@ -48,7 +48,9 @@ export {
   signState,
   verifyState,
   generateNonce,
+  generatePkcePair,
   type OAuthStatePayload,
+  type PkcePair,
 } from './oauth/state-hmac.js';
 export {
   REFRESH_MARGIN_MS,

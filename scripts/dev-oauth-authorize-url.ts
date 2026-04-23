@@ -16,6 +16,7 @@ interface OAuthStatePayload {
   connectedBy: string;
   ts: number;
   nonce: string;
+  codeVerifier?: string;
 }
 
 function base64urlEncode(bytes: Uint8Array): string {
@@ -47,6 +48,20 @@ function generateNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return base64urlEncode(bytes);
+}
+
+interface PkcePair {
+  codeVerifier: string;
+  codeChallenge: string;
+}
+
+async function generatePkcePair(): Promise<PkcePair> {
+  const verifierBytes = new Uint8Array(32);
+  crypto.getRandomValues(verifierBytes);
+  const codeVerifier = base64urlEncode(verifierBytes);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
+  const codeChallenge = base64urlEncode(new Uint8Array(digest));
+  return { codeVerifier, codeChallenge };
 }
 
 interface Args {
@@ -111,6 +126,8 @@ async function main(): Promise<void> {
     process.exit(4);
   }
 
+  const pkce = await generatePkcePair();
+
   const state = await signState(
     {
       namespace: args.namespace,
@@ -120,6 +137,7 @@ async function main(): Promise<void> {
       connectedBy: args.uid,
       ts: Date.now(),
       nonce: generateNonce(),
+      codeVerifier: pkce.codeVerifier,
     },
     platformSecret,
   );
@@ -134,6 +152,8 @@ async function main(): Promise<void> {
   url.searchParams.set('scope', provider.scopes.join(' '));
   url.searchParams.set('state', state);
   url.searchParams.set('access_type', 'offline');
+  url.searchParams.set('code_challenge', pkce.codeChallenge);
+  url.searchParams.set('code_challenge_method', 'S256');
 
   console.log(url.toString());
 }
