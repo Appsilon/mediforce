@@ -13,6 +13,7 @@ interface AgentOutputReviewPanelProps {
   agentOutput: AgentOutputData;
   stepId?: string;
   onContentLoaded?: (hasContent: boolean) => void;
+  instanceId: string;
 }
 
 /** Build a self-contained HTML document for the sandboxed iframe. */
@@ -82,6 +83,7 @@ export function AgentOutputReviewPanel({
   agentOutput,
   stepId,
   onContentLoaded,
+  instanceId,
 }: AgentOutputReviewPanelProps) {
   const hasPresentation = typeof agentOutput.presentation === 'string' && agentOutput.presentation.length > 0;
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
@@ -127,7 +129,7 @@ export function AgentOutputReviewPanel({
   React.useEffect(() => {
     if (!outputFilePath) return;
     setFileLoading(true);
-    apiFetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}`)
+    apiFetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}&instanceId=${encodeURIComponent(instanceId)}`)
       .then((res) => res.json() as Promise<{ content?: string; error?: string }>)
       .then((data) => {
         if (data.error && !data.content) {

@@ -3,11 +3,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 import { Save } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
-import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { StartRunButton } from '@/components/processes/start-run-button';
+import { saveWorkflowDefinition, setDefaultWorkflowVersion } from '@/app/actions/definitions';
 import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -22,6 +24,7 @@ type SaveState =
 export default function WorkflowDefinitionVersionPage() {
   const { name, version, handle } = useParams<{ name: string; version: string; handle: string }>();
   const router = useRouter();
+  const { firebaseUser } = useAuth();
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
@@ -61,7 +64,7 @@ export default function WorkflowDefinitionVersionPage() {
     [],
   );
 
-  const handleSave = useCallback(async (title: string) => {
+  const handleSave = useCallback(async (title: string, setAsDefault: boolean) => {
     if (!definition) return;
     const steps = currentStepsRef.current;
     const transitions = currentTransitionsRef.current;
@@ -96,6 +99,9 @@ export default function WorkflowDefinitionVersionPage() {
     });
 
     if (result.success) {
+      if (setAsDefault) {
+        await setDefaultWorkflowVersion(definition.name, result.version);
+      }
       setSaveState({ status: 'saved', version: result.version });
       redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${name}/definitions/${result.version}`);
@@ -170,7 +176,8 @@ export default function WorkflowDefinitionVersionPage() {
           </div>
 
           {/* Right: save controls */}
-          <div className="flex items-center gap-2 shrink-0 pt-0.5">
+          <div className="flex items-center gap-3 shrink-0 pt-0.5">
+            <StartRunButton workflowName={decodedName} version={definition.version} />
             {saveState.status === 'saved' && (
               <span className="text-sm text-green-600 dark:text-green-400 font-medium">
                 Saved as v{saveState.version}
@@ -202,6 +209,8 @@ export default function WorkflowDefinitionVersionPage() {
         initialSteps={definition.steps}
         initialTransitions={definition.transitions}
         workflowName={decodedName}
+        namespace={handle}
+        userId={firebaseUser?.uid}
         yamlFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
         onChange={handleCanvasChange}
         stepErrors={stepErrors}

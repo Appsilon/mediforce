@@ -5,12 +5,10 @@ import { useParams } from 'next/navigation';
 import { doc, onSnapshot } from 'firebase/firestore';
 import type { HumanTask } from '@mediforce/platform-core';
 import { db } from '@/lib/firebase';
-import { useAuth } from '@/contexts/auth-context';
 import { TaskDetail } from '@/components/tasks/task-detail';
 
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
-  const { firebaseUser } = useAuth();
   const [task, setTask] = React.useState<HumanTask | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -45,5 +43,5 @@ export default function TaskDetailPage() {
     );
   }
 
-  return <TaskDetail task={task} currentUserId={firebaseUser?.uid ?? ''} />;
+  return <TaskDetail task={task} />;
 }

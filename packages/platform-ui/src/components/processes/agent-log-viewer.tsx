@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2 } from 'lucide-react';
+import { FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2, Clock } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 
@@ -390,7 +390,7 @@ function AgentTabContent({ section }: { section: AgentLogSection }) {
 
       {isEmpty && !section.error && (
         <p className="text-xs text-muted-foreground py-2">
-          Waiting for agent activity...
+          Initializing agent log...
         </p>
       )}
 
@@ -408,6 +408,39 @@ function allSectionsFinished(sections: AgentLogSection[]): boolean {
   return sections.every((s) => s.entries.some((e) => classifyEntry(e) === 'result'));
 }
 
+/** True when no more output is expected from this section. */
+function isSectionTerminal(section: AgentLogSection): boolean {
+  if (section.entries.some((e) => classifyEntry(e) === 'result')) return true;
+  if (section.error !== null) return true;
+  return false;
+}
+
+const THINKING_TEXT = 'Thinking...';
+
+function ThinkingIndicator() {
+  const [charCount, setCharCount] = React.useState(0);
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setCharCount((prev) => (prev >= THINKING_TEXT.length ? 0 : prev + 1));
+    }, 120);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 py-2 mt-1">
+      <Clock className="h-3.5 w-3.5 text-primary animate-spin shrink-0" />
+      {/* Use visibility:hidden (not display:none) at char 0 so layout height stays constant — prevents scrollbar jump. */}
+      <span
+        className={cn('text-xs font-bold text-primary', charCount === 0 && 'invisible')}
+        style={{ minWidth: '5.5rem' }}
+      >
+        {THINKING_TEXT.slice(0, Math.max(charCount, 1))}
+      </span>
+    </div>
+  );
+}
+
 export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps) {
   const [sections, setSections] = React.useState<AgentLogSection[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -415,6 +448,7 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
   const [activeTab, setActiveTab] = React.useState(0);
   const [copied, setCopied] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const prevSectionsLengthRef = React.useRef(0);
 
   // When initialStepId changes, select the matching tab
   React.useEffect(() => {
@@ -424,6 +458,17 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
       setActiveTab(index);
     }
   }, [initialStepId, sections]);
+
+  // Auto-switch to newest agent tab when a new section is loaded.
+  // Intentionally based on sections (post-fetch) not logFiles (pre-fetch) so
+  // the clamp effect can't immediately override the new index before data arrives.
+  React.useEffect(() => {
+    const prev = prevSectionsLengthRef.current;
+    prevSectionsLengthRef.current = sections.length;
+    if (sections.length > prev) {
+      setActiveTab(sections.length - 1);
+    }
+  }, [sections.length]);
 
   const fetchLogs = React.useCallback(async () => {
     if (logFiles.length === 0) return;
@@ -468,16 +513,6 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
     }
   }, [sections, activeTab]);
 
-  if (logFiles.length === 0) {
-    return (
-      <div className="text-sm text-muted-foreground py-8 text-center">
-        No agent log available for this run.
-      </div>
-    );
-  }
-
-  const totalEvents = sections.reduce((sum, section) => sum + section.entries.length, 0);
-  const hasTabs = sections.length > 1;
   const activeSection = sections[activeTab] ?? null;
 
   const handleCopy = React.useCallback(async () => {
@@ -488,10 +523,21 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
     setTimeout(() => setCopied(false), 2000);
   }, [activeSection]);
 
+  if (logFiles.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground py-8 text-center">
+        No agent log available for this run.
+      </div>
+    );
+  }
+
+  const totalEvents = sections.reduce((sum, section) => sum + section.entries.length, 0);
+  const hasTabs = sections.length > 1;
+
   return (
-    <div className="space-y-0">
+    <div className="flex flex-col h-full">
       {/* Controls bar */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 shrink-0">
         <div className="text-xs text-muted-foreground">
           {totalEvents > 0 && <span>{totalEvents} events across {sections.length} agent{sections.length > 1 ? 's' : ''}</span>}
         </div>
@@ -508,10 +554,10 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
       </div>
 
       {/* Terminal-style container */}
-      <div className="border rounded-md overflow-hidden bg-background">
+      <div className="flex flex-col flex-1 min-h-0 border rounded-md overflow-hidden bg-background">
         {/* Tab bar — only shown when multiple agents */}
         {hasTabs && (
-          <div className="flex items-stretch bg-muted/60 border-b overflow-x-auto">
+          <div className="flex items-stretch bg-muted/60 border-b overflow-x-auto shrink-0">
             {sections.map((section, index) => {
               const isActive = index === activeTab;
               return (
@@ -543,10 +589,10 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
           </div>
         )}
 
-        {/* Log content area */}
+        {/* Log content area — fills remaining height, scrolls, auto-scrolled to bottom */}
         <div
           ref={scrollRef}
-          className="p-3 overflow-auto max-h-[500px] space-y-0.5"
+          className="p-3 overflow-auto flex-1 min-h-0 space-y-0.5"
         >
           {sections.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-4">
@@ -562,6 +608,11 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
           {/* Multiple agents — show active tab */}
           {hasTabs && activeSection && (
             <AgentTabContent section={activeSection} />
+          )}
+
+          {/* Thinking indicator — only when agent is genuinely still running */}
+          {pollingActive && activeSection && !isSectionTerminal(activeSection) && (
+            <ThinkingIndicator />
           )}
         </div>
       </div>

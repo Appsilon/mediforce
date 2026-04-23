@@ -35,6 +35,7 @@ export const AgentOutputSnapshotSchema = z.object({
     repoUrl: z.string(),
   }).nullable(),
   presentation: z.string().nullable().optional(),
+  deliverableFile: z.string().nullable().optional(),
 });
 
 export const StepExecutionSchema = z.object({
