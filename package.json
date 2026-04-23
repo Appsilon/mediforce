@@ -12,8 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "dev:ui": "pnpm --filter @mediforce/platform-ui dev",
     "dev:ui:local": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
-    "dev": "pnpm --filter @mediforce/platform-ui --filter supply-intelligence dev",
-    "dev:local": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui --filter supply-intelligence dev",
+    "dev": "pnpm --filter @mediforce/platform-ui dev",
+    "dev:local": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
     "dev:ui:test": "pnpm --filter @mediforce/platform-ui dev:test",
     "dev:redis": "docker run --rm -p 6379:6379 redis:7-alpine",
     "dev:worker": "REDIS_URL=redis://localhost:6379 tsx packages/agent-queue/src/worker-entry.ts",
@@ -35,13 +35,13 @@
       "protobufjs": "7.5.5",
       "hono": "4.12.14",
       "@hono/node-server": "1.19.14",
-      "fast-xml-parser": "5.5.12",
+      "fast-xml-parser": "5.6.0",
       "node-forge": "1.4.0",
       "follow-redirects": "1.16.0",
       "brace-expansion": "2.1.0",
       "@tootallnate/once": "3.0.1",
-      "next": "16.2.3",
-      "vite": "8.0.5"
+      "next": "16.2.4",
+      "vite": "8.0.8"
     },
     "minimumReleaseAgeExclude": [
       "axios",
@@ -51,11 +51,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
-    "@types/node": "^25.6.0",
+    "@types/node": "^24.12.2",
     "@vitest/coverage-v8": "^4.1.4",
     "tsx": "latest",
     "typescript": "~6.0.0",
-    "vite": "8.0.5",
+    "vite": "8.0.8",
     "vitest": "^4.1.4"
   }
 }

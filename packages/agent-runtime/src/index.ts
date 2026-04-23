@@ -37,6 +37,11 @@ export { FallbackHandler } from './runner/fallback-handler.js';
 export { validateWorkflowEnv } from './plugins/resolve-env.js';
 export type { MissingEnvVar } from './plugins/resolve-env.js';
 
+// MCP resolution helpers
+export { resolveMcpForStep, AgentDefinitionNotFoundError } from './mcp/resolve-mcp-for-step.js';
+export type { ResolveMcpForStepDeps } from './mcp/resolve-mcp-for-step.js';
+export { flattenResolvedMcpToLegacy } from './mcp/flatten-resolved-mcp.js';
+
 // Testing utilities
 export {
   InMemoryAgentEventLog,

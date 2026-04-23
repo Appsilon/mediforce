@@ -77,6 +77,13 @@ vi.mock('@/lib/platform-services', () => ({
   }),
 }));
 
+// executeAgentStep pre-fetches workflow secrets from Firestore. In unit tests
+// there's no emulator and no project id, so stub the call to return an empty
+// map — template resolution covers secret presence separately.
+vi.mock('@/app/actions/workflow-secrets', () => ({
+  getWorkflowSecretsForRuntime: vi.fn().mockResolvedValue({}),
+}));
+
 // Import after mock setup
 import { executeAgentStep } from '../execute-agent-step';
 

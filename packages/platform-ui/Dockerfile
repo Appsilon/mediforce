@@ -1,5 +1,8 @@
+# syntax=docker/dockerfile:1.6
 FROM node:24-slim AS base
 RUN corepack enable && corepack prepare pnpm@latest --activate
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
 
 # --- Dependencies ---
 FROM base AS deps
@@ -19,7 +22,10 @@ COPY apps/community-digest/package.json apps/community-digest/
 COPY apps/protocol-to-tfl/package.json apps/protocol-to-tfl/
 COPY apps/supply-intelligence/package.json apps/supply-intelligence/
 
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm config set package-import-method copy && \
+    (pnpm install --frozen-lockfile || pnpm install)
 
 # --- Builder ---
 FROM base AS builder

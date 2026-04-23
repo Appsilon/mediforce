@@ -48,9 +48,16 @@ function mergeDefinitionAndConfig(
     };
   });
 
+  // Legacy ProcessDefinitions predate namespacing. The schema may carry
+  // a namespace at the document level in Firestore (seed-data uses
+  // 'test'); prefer that if present, otherwise default to 'appsilon'.
+  const maybeNamespace = (legacyDef as { namespace?: unknown }).namespace;
+  const legacyNamespace = typeof maybeNamespace === 'string' ? maybeNamespace : 'appsilon';
+
   return {
     name: legacyDef.name,
     version,
+    namespace: legacyNamespace,
     description: legacyDef.description,
     repo: legacyDef.repo,
     url: legacyDef.url,

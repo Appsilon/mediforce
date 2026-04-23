@@ -21,6 +21,7 @@ import type { StepActor } from '../index.js';
 const linearDef: WorkflowDefinition = {
   name: 'linear-process',
   version: 1,
+  namespace: 'test',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'process', name: 'Process', type: 'creation', executor: 'human' },
@@ -36,6 +37,7 @@ const linearDef: WorkflowDefinition = {
 const branchingDef: WorkflowDefinition = {
   name: 'branching-process',
   version: 1,
+  namespace: 'test',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'path-a', name: 'Path A', type: 'creation', executor: 'agent' },
@@ -54,6 +56,7 @@ const branchingDef: WorkflowDefinition = {
 const reviewDef: WorkflowDefinition = {
   name: 'review-process',
   version: 1,
+  namespace: 'test',
   steps: [
     { id: 'draft', name: 'Draft', type: 'creation', executor: 'agent' },
     {
@@ -574,6 +577,7 @@ describe('WorkflowEngine', () => {
       const defWithRoles = {
         name: 'linear-process-with-roles',
         version: 1,
+        namespace: 'test',
         steps: [
           { id: 'start', name: 'Start', type: 'creation' as const, executor: 'agent' as const },
           { id: 'process', name: 'Process', type: 'creation' as const, executor: 'human' as const, allowedRoles: ['reviewer'] },
@@ -620,6 +624,7 @@ describe('WorkflowEngine', () => {
       const defWithRoles = {
         name: 'linear-process-analyst',
         version: 1,
+        namespace: 'test',
         steps: [
           { id: 'start', name: 'Start', type: 'creation' as const, executor: 'agent' as const },
           { id: 'process', name: 'Process', type: 'creation' as const, executor: 'human' as const, allowedRoles: ['supply-analyst'] },
@@ -652,6 +657,7 @@ describe('WorkflowEngine', () => {
     const selectionDef: WorkflowDefinition = {
       name: 'selection-process',
       version: 1,
+      namespace: 'test',
       steps: [
         { id: 'generate', name: 'Generate Options', type: 'creation', executor: 'agent' },
         {
@@ -759,6 +765,7 @@ describe('WorkflowEngine', () => {
 const linearWorkflowDef: WorkflowDefinition = {
   name: 'linear-workflow',
   version: 1,
+  namespace: 'test',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'process', name: 'Process', type: 'creation', executor: 'human', allowedRoles: ['operator'] },
@@ -775,6 +782,7 @@ const linearWorkflowDef: WorkflowDefinition = {
 const reviewWorkflowDef: WorkflowDefinition = {
   name: 'review-workflow',
   version: 1,
+  namespace: 'test',
   steps: [
     { id: 'draft', name: 'Draft', type: 'creation', executor: 'agent' },
     {
@@ -1039,6 +1047,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
   const autonomyTestDef: WorkflowDefinition = {
     name: 'autonomy-test',
     version: 1,
+    namespace: 'test',
     steps: [
       { id: 'agent-step', name: 'Agent Step', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
       { id: 'human-step', name: 'Human Review', type: 'creation', executor: 'human', allowedRoles: ['reviewer'] },
@@ -1079,6 +1088,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
     const directTerminalDef: WorkflowDefinition = {
       name: 'direct-terminal',
       version: 1,
+      namespace: 'test',
       steps: [
         { id: 'agent-step', name: 'Agent Step', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -1103,6 +1113,7 @@ describe('WorkflowEngine — WorkflowDefinition (unified schema)', () => {
     const chainedAgentDef: WorkflowDefinition = {
       name: 'chained-agents',
       version: 1,
+      namespace: 'test',
       steps: [
         { id: 'step-1', name: 'Step 1', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'step-2', name: 'Step 2', type: 'creation', executor: 'agent', autonomyLevel: 'L4' },

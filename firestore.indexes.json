@@ -18,6 +18,14 @@
       ]
     },
     {
+      "collectionGroup": "humanTasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedRole", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "auditEvents",
       "queryScope": "COLLECTION",
       "fields": [
