@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   ProcessConfigSchema,
   validateProcessConfig,
@@ -17,8 +17,8 @@ import { ListProcessConfigsInputSchema } from '@mediforce/platform-api/contract'
  */
 export const GET = createRouteAdapter(
   ListProcessConfigsInputSchema,
-  (req) => ({
-    processName: new URL(req.url).searchParams.get('processName') ?? undefined,
+  (req: NextRequest) => ({
+    processName: req.nextUrl.searchParams.get('processName') ?? undefined,
   }),
   (input) =>
     listProcessConfigs(input, {

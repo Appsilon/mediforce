@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import type { ProcessConfig } from '@mediforce/platform-core';
 
 // ---- Mocks ----
@@ -35,12 +36,12 @@ import { GET, POST } from '../route';
 
 // ---- Helpers ----
 
-function makeGetRequest(params?: Record<string, string>): Request {
+function makeGetRequest(params?: Record<string, string>): NextRequest {
   const url = new URL('http://localhost/api/configs');
   if (params) {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   }
-  return new Request(url.toString());
+  return new NextRequest(url.toString());
 }
 
 function makePostRequest(body: unknown): Request {
@@ -89,12 +90,20 @@ describe('GET /api/configs', () => {
     expect(json.configs).toEqual([]);
   });
 
-  it('[ERROR] returns 400 when processName is missing', async () => {
+  it('[ERROR] returns 400 with explicit message when processName is missing', async () => {
     const res = await GET(makeGetRequest());
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBeDefined();
+    expect(json.error).toBe('processName query parameter is required');
+  });
+
+  it('[ERROR] returns 400 with explicit message when processName is empty', async () => {
+    const res = await GET(makeGetRequest({ processName: '' }));
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe('processName query parameter is required');
   });
 });
 

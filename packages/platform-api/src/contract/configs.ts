@@ -12,8 +12,12 @@ import { ProcessConfigSchema } from '@mediforce/platform-core';
 
 // ---- GET /api/configs?processName=X -----------------------------------------
 
+const PROCESS_NAME_REQUIRED = 'processName query parameter is required';
+
 export const ListProcessConfigsInputSchema = z.object({
-  processName: z.string().min(1),
+  processName: z
+    .string({ message: PROCESS_NAME_REQUIRED })
+    .min(1, PROCESS_NAME_REQUIRED),
 });
 
 export const ListProcessConfigsOutputSchema = z.object({
