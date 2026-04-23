@@ -6,19 +6,17 @@ sources: 2
 tags: [plugin, script-container, agent-runtime, deterministic]
 ---
 
-**Built-in container plugin for deterministic scripts — runs a scripted container without calling an LLM. Registered as `script-container`.**
+**Deterministic script container. No LLM. Registered as `script-container`. Used by [community-digest](../apps/community-digest.md).**
 
-## Purpose
+## Why
 
-Use when a workflow step needs to execute reproducible, LLM-free code (data transformations, file packaging, API calls). The container still goes through the same spawn + output-envelope machinery as LLM plugins, which keeps workflow steps homogeneous and audit events consistent.
-
-Used by the [`community-digest` app](../apps/community-digest.md) for GitHub data gathering and Discord posting.
+Some steps need reproducible LLM-free code (data transforms, packaging, API calls). Script container reuses the same spawn + envelope machinery as LLM plugins → homogeneous workflow steps + consistent audit events.
 
 ## How it fits
 
-- Concrete subclass of `BaseContainerAgentPlugin` in [`agent-runtime`](../packages/agent-runtime.md).
+- Subclass of `BaseContainerAgentPlugin` in [`agent-runtime`](../packages/agent-runtime.md). See [plugin-dispatch](../../concepts/plugin-dispatch.md).
 - Registered by `getPlatformServices()` in [`platform-ui`](../packages/platform-ui.md).
-- Output still conforms to `AgentOutputEnvelopeSchema`, but `confidence` is typically pinned to `1.0` (deterministic).
+- Output conforms to `AgentOutputEnvelopeSchema`; `confidence` typically pinned to `1.0` (deterministic).
 
 ## Relationships
 

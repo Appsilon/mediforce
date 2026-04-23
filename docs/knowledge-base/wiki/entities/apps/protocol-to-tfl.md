@@ -6,13 +6,9 @@ sources: 3
 tags: [app, protocol-to-tfl, clinical, cdisc, workflow]
 ---
 
-**Meta-workflow app that transforms a clinical trial protocol (PDF) plus SAP into production Tables, Figures, Listings (TFLs). Six automated/human steps plus terminal.**
+**Protocol PDF + SAP → TFLs. 6 steps + terminal. L3 autonomy, two `git-mode` steps commit to `Appsilon/mediforce-clinical-workspace`.**
 
-## Purpose
-
-Pipeline for clinical submissions. Starts from raw PDFs (protocol + statistical analysis plan), extracts metadata, generates TLG shells, ingests SDTM data, derives ADaM datasets with R code, and produces final TFLs. Agent-heavy (L3 autonomy — periodic human review) with two `git-mode` steps that commit output to the `Appsilon/mediforce-clinical-workspace` repo.
-
-## Workflow definition
+## Steps
 
 File: `apps/protocol-to-tfl/src/protocol-to-tfl.wd.json`.
 
@@ -26,22 +22,23 @@ File: `apps/protocol-to-tfl/src/protocol-to-tfl.wd.json`.
 | 6 | generate-tlg | agent | claude-code-agent (git-mode) | L3 |
 | 7 | done | terminal | — | — |
 
-## Skills (runtime)
+See [autonomy-levels](../../concepts/autonomy-levels.md), [cdisc-sdtm](../../concepts/cdisc-sdtm.md).
+
+## Runtime skills
 
 Registered in `apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml`:
 
-- `trial-metadata-extractor` — extracts trial metadata from protocol PDF.
-- `mock-tlg-generator` — generates mock TLG specs from metadata.
-- `sdtm-to-adam` — derives ADaM datasets from SDTM (see [cdisc-sdtm concept](../../concepts/cdisc-sdtm.md)).
-- `adam-to-tlg` — produces final TFLs from ADaM.
-- `adam-to-teal` — R-based Teal app generator.
+- `trial-metadata-extractor` — protocol PDF → metadata.
+- `mock-tlg-generator` — metadata → mock TLG specs.
+- `sdtm-to-adam` — SDTM → ADaM.
+- `adam-to-tlg` — ADaM → final TFLs.
+- `adam-to-teal` — R-based Teal app.
 
-These are runtime skills, resolved by [`agent-runtime`](../packages/agent-runtime.md) via the workflow definition's `skillsDir` field — paths are hardcoded in the `.wd.json`. Do not move them.
+**Paths hardcoded in `.wd.json` via `skillsDir`. Don't move them.** See [runtime-skill-path-coupling](../../gotchas/runtime-skill-path-coupling.md).
 
 ## Process configs
 
-Multiple variants under `apps/protocol-to-tfl/`:
-- `process-config-claude.json`, `process-config-opencode.json`, `process-config-local.json`
+Variants: `process-config-claude.json`, `process-config-opencode.json`, `process-config-local.json`.
 
 ## Relationships
 

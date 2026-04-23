@@ -6,11 +6,11 @@ sources: 3
 tags: [app, supply-intelligence, nextjs]
 ---
 
-**Standalone Next.js dashboard for supply-chain risk analysis, visualization, and issue management.**
+**Standalone Next.js dashboard. Supply-chain risk visualization + issue management. Port 9004.**
 
 ## Purpose
 
-User-facing UI on top of the [`supply-intelligence`](../packages/supply-intelligence.md) domain. Distinct from the main [`platform-ui`](../packages/platform-ui.md) — lives in `apps/supply-intelligence/` and ships independently. Visualises risk rollups (therapeutic category, SKU detail, operational view) and surfaces draft issues produced by the [`supply-intelligence/risk-detection` plugin](../plugins/supply-intelligence-risk-detection.md).
+UI over [`supply-intelligence`](../packages/supply-intelligence.md). Ships separate from [platform-ui](../packages/platform-ui.md). Visualises risk rollups (category, SKU, operational). Surfaces draft issues from [risk-detection plugin](../plugins/supply-intelligence-risk-detection.md).
 
 ## Stack
 
@@ -21,21 +21,21 @@ User-facing UI on top of the [`supply-intelligence`](../packages/supply-intellig
 
 ## Routes
 
-- `/` → redirects to `/overview`
+- `/` → `/overview`
 - `/overview` — portfolio dashboard
 - `/operational` — operational view
 - `/sku/[id]` — SKU detail
 
 ## Dev / test
 
-- Dev: `npm run dev` on port **9004** (distinct from `platform-ui` on 9003).
-- E2E: Playwright; `NEXT_PUBLIC_USE_EMULATORS=true` for emulator-backed tests.
+- Dev: `npm run dev` → port **9004** (not 9003 — that's platform-ui).
+- E2E: Playwright; `NEXT_PUBLIC_USE_EMULATORS=true` for emulator tests.
 
 ## Relationships
 
 - Depends on: [`supply-intelligence`](../packages/supply-intelligence.md).
-- Consumes Firestore writes from: [`supply-intelligence/risk-detection`](../plugins/supply-intelligence-risk-detection.md).
-- Does **not** import `platform-ui` or `platform-infra`.
+- Reads Firestore writes from: [`supply-intelligence/risk-detection`](../plugins/supply-intelligence-risk-detection.md).
+- **Does not** import: `platform-ui`, `platform-infra`.
 
 ## Sources
 

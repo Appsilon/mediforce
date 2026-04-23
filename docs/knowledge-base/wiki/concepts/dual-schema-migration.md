@@ -6,29 +6,29 @@ sources: 2
 tags: [concept, migration, workflow-definitions, dual-schema]
 ---
 
-**Legacy `processDefinitions` + `processConfigs` coexist with the unified `workflowDefinitions`. Resolution logic routes reads to whichever schema has the data. Live migration in progress.**
+**Legacy `processDefinitions` + `processConfigs` coexist with unified `workflowDefinitions`. Read-time resolution. Live migration in progress.**
 
-## Why it exists
+## Why
 
-The platform originally stored process logic in two Firestore collections: `processDefinitions` (structure) and `processConfigs` (per-step config). The unified `workflowDefinitions` collection merges both. Rather than a big-bang migration, the system resolves at read time.
+Originally: two Firestore collections — `processDefinitions` (structure) + `processConfigs` (per-step config). New: unified `workflowDefinitions`. No big-bang migration → system resolves at read time.
 
-## Where resolution happens
+## Where resolution lives
 
-`packages/platform-ui/src/lib/resolve-definition-steps.ts` — the single resolver. It consults both schemas and returns a normalised `WorkflowDefinition`-shaped object. Every feature that reads steps goes through this function.
+`packages/platform-ui/src/lib/resolve-definition-steps.ts`. Single resolver. Consults both schemas → returns normalised `WorkflowDefinition`-shaped object. Every feature that reads steps goes through this.
 
-## Before writing new code
+## Before writing code
 
-- Reading step definitions? **Use `resolveDefinitionSteps()`.** Do not hit `processDefinitions` or `workflowDefinitions` directly.
-- Writing new workflow logic? **Write against `WorkflowDefinition` only** (Zod schema in [`platform-core`](../entities/packages/platform-core.md)). The legacy path is read-only.
-- Migrating? Use the migration endpoints under `packages/platform-ui/src/app/api/migrations/`.
+- Reading step definitions? **Use `resolveDefinitionSteps()`.** Never hit `processDefinitions` / `workflowDefinitions` Firestore directly. See [dual-schema-routing gotcha](../gotchas/dual-schema-routing.md).
+- New workflow logic? **Write against `WorkflowDefinition` only.** Legacy = read-only.
+- Migrating? `packages/platform-ui/src/app/api/migrations/`.
 
 ## Schema authority
 
-`WorkflowDefinition` lives in `packages/platform-core/src/schemas/workflow-definition.ts`. Union type covering agent / review / cowork / handoff step variants.
+`WorkflowDefinition` in `packages/platform-core/src/schemas/workflow-definition.ts`. Union over agent / review / cowork / handoff step variants.
 
 ## Immutability
 
-All definition versions (both legacy and unified) are **write-once** in Firestore. Re-publishing increments the version. Enforced by [repository-pattern](./repository-pattern.md) errors: `DefinitionVersionAlreadyExistsError`.
+All definition versions write-once in Firestore. Republish → version bump. Enforced via [repository-pattern](./repository-pattern.md): `DefinitionVersionAlreadyExistsError`.
 
 ## Sources
 

@@ -6,26 +6,26 @@ sources: 2
 tags: [concept, expression, dsl, transitions, workflow-engine]
 ---
 
-**Custom DSL for transition when-expressions — e.g. `${variables.field} == "value"`. Evaluated by `evaluateExpression()` in `workflow-engine`. Not JavaScript eval, not JSONata — a small in-house DSL.**
+**Custom DSL for transition `when` clauses. E.g. `${variables.field} == "value"`. Evaluated by `evaluateExpression()` in `workflow-engine`. Not JS eval. Not JSONata. Small in-house DSL.**
 
 ## Purpose
 
-Transitions in a `WorkflowDefinition` carry an optional `when` expression that decides whether the transition fires. The DSL is deliberately narrow — variable reads, comparisons, boolean combinators — to keep audit/review simple and sidestep eval-style injection risks.
+Transitions in a `WorkflowDefinition` carry optional `when` expression. Narrow DSL on purpose — variable reads, comparisons, boolean combinators — keeps audit/review simple. Sidesteps eval-style injection risks.
 
-## Where it lives
+## Where
 
-- `packages/workflow-engine/src/expressions/expression-evaluator.ts` — the evaluator.
-- `packages/workflow-engine/src/engine/transition-resolver.ts` — the caller; uses it in `resolveTransitions()`.
+- Evaluator: `packages/workflow-engine/src/expressions/expression-evaluator.ts`.
+- Caller: `packages/workflow-engine/src/engine/transition-resolver.ts` — uses it in `resolveTransitions()`.
 - Tests: `packages/workflow-engine/src/expressions/__tests__/`.
 
-## Before adding a DSL feature
+## Before adding DSL features
 
-- Check the existing evaluator — new constructs should go there, not parallel implementations in UI or plugin code.
-- Transition logic should never bypass `resolveTransitions()`. If an expression can't express what you need, extend the DSL rather than routing around it.
+- Check the existing evaluator. New constructs go there. Don't write parallel evaluators in UI / plugin code.
+- Transition logic never bypasses `resolveTransitions()`. If an expression can't express what you need, extend the DSL instead of routing around it.
 
 ## Context
 
-The evaluator reads from the step's `variables` object (the accumulated workflow context). Mutation happens in `StepExecutor`, not in expressions — expressions are pure.
+Reads from step's `variables` (accumulated workflow context). Mutation happens in `StepExecutor`, not in expressions. Expressions are pure.
 
 ## Used by
 

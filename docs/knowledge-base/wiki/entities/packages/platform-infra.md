@@ -6,39 +6,39 @@ sources: 4
 tags: [package, platform-infra, firestore, firebase]
 ---
 
-**Firebase/Firestore infrastructure layer — concrete repository implementations, auth services, notification senders, and secrets cipher.**
+**Firebase/Firestore infra layer. Concrete repos, auth services, notifications, secrets cipher.**
 
 ## Purpose
 
-Implements the repository interfaces from `platform-core` against Firestore and wraps Firebase Auth. Encapsulates collection/document shape, immutable version constraints, dual client-vs-admin SDK initialisation, and notification delivery (SendGrid + webhooks). Constructor-injected into services — no global singletons.
+Implements repo interfaces from `platform-core` against Firestore. Wraps Firebase Auth. Owns collection/doc shape, immutable version constraints, dual client-vs-admin SDK init, notification delivery (SendGrid + webhooks). Constructor-injected. No global singletons inside repos.
 
 ## Dependencies
 
-- Internal: [`platform-core`](./platform-core.md)
-- External: `firebase`, `firebase-admin`, `@sendgrid/mail`
+- Internal: [`platform-core`](./platform-core.md).
+- External: `firebase`, `firebase-admin`, `@sendgrid/mail`.
 
 ## Key exports
 
 - **Repositories**: `FirestoreProcessRepository`, `FirestoreProcessInstanceRepository`, `FirestoreAuditRepository`, `FirestoreAgentRunRepository`, `FirestoreHumanTaskRepository`, `FirestoreAgentDefinitionRepository`, `FirestoreNamespaceRepository`, `FirestoreCoworkSessionRepository`, `FirestoreCronTriggerStateRepository`, `FirestoreToolCatalogRepository`.
 - **Auth**: `FirebaseAuthService`, `FirebaseUserDirectoryService`, `FirebaseInviteService`.
-- **Configuration**: `initializeFirebase`, `getFirestoreDb`, `getFirebaseAuth`, `getAdminFirestore`, `getAdminAuth`.
-- **Crypto**: `validateSecretsKey` (HMAC validation for encrypted workflow secrets).
-- **Errors**: `DefinitionVersionAlreadyExistsError`, `ConfigVersionAlreadyExistsError` — enforce write-once semantics (see [repository-pattern concept](../../concepts/repository-pattern.md)).
+- **Config**: `initializeFirebase`, `getFirestoreDb`, `getFirebaseAuth`, `getAdminFirestore`, `getAdminAuth`.
+- **Crypto**: `validateSecretsKey` (HMAC for workflow secrets).
+- **Errors**: `DefinitionVersionAlreadyExistsError`, `ConfigVersionAlreadyExistsError` — write-once enforcement → see [repository-pattern](../../concepts/repository-pattern.md).
 
 ## Key internal modules
 
-- `src/firestore/` — one repository per domain entity.
-- `src/auth/` — Firebase Auth wrappers, user directory, invite service.
-- `src/config/firebase-init.ts` — dual mode (client SDK vs admin SDK) init.
+- `src/firestore/` — one repo per domain entity.
+- `src/auth/` — Firebase Auth wrappers, user directory, invites.
+- `src/config/firebase-init.ts` — client vs admin SDK init.
 - `src/crypto/secrets-cipher.ts` — HMAC validation.
-- `src/notifications/` — SendGrid + webhook delivery.
-- `src/__tests__/` — repository CRUD, versioning, auth claims, cipher.
+- `src/notifications/` — SendGrid + webhooks.
+- `src/__tests__/` — repo CRUD, versioning, auth, cipher.
 
 ## Relationships
 
 - Consumed by: [`platform-ui`](./platform-ui.md).
 - Depends on: [`platform-core`](./platform-core.md).
-- Does **not** depend on: workflow-engine, agent-runtime, supply-intelligence.
+- **Does not** depend on: workflow-engine, agent-runtime, supply-intelligence.
 
 ## Sources
 

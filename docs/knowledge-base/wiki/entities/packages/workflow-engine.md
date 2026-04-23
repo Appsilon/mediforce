@@ -6,33 +6,33 @@ sources: 3
 tags: [package, workflow-engine, orchestration]
 ---
 
-**Process instance orchestrator — step execution, transition routing, review tracking, trigger handling, and expression evaluation.**
+**Process instance orchestrator. Step execution, transition routing, review tracking, triggers, when-expression DSL.**
 
 ## Purpose
 
-Runs the workflow loop. Given a `ProcessInstance`, it advances steps, routes transitions via a when-expression DSL, tracks review verdicts, validates step graphs, and dispatches manual / webhook / cron triggers. Stateless by design — state lives in repositories injected from `platform-core`.
+Runs the workflow loop. Given `ProcessInstance`: advance steps, route transitions, track review verdicts, validate step graphs, dispatch triggers. Stateless — state lives in repos from `platform-core`.
 
 ## Dependencies
 
-- Internal: [`platform-core`](./platform-core.md)
-- External: `zod`
+- Internal: [`platform-core`](./platform-core.md).
+- External: `zod`.
 
 ## Key exports
 
-- **Engine**: `WorkflowEngine` (main orchestrator — advance / pause / resume / abort), `StepExecutor`, `ReviewTracker`.
+- **Engine**: `WorkflowEngine` (main — advance/pause/resume/abort), `StepExecutor`, `ReviewTracker`.
 - **Routing**: `resolveTransitions`, `TransitionValidationError`, `NoMatchingTransitionError`.
-- **Expressions**: `evaluateExpression` (see [expression-evaluator concept](../../concepts/expression-evaluator.md)).
+- **Expressions**: `evaluateExpression` → see [expression-evaluator](../../concepts/expression-evaluator.md).
 - **Triggers**: `ManualTrigger`, `WebhookTrigger`, `CronTrigger`, `TriggerHandler`, `validateCronSchedule`, `isDue`.
-- **Graph validation**: `validateStepGraph` (DAG + cycle checks).
+- **Graph**: `validateStepGraph` (DAG + cycle check).
 - **Errors**: `StepFailureError`, `RoutingError`, `InvalidTransitionError`, `MaxIterationsExceededError`.
 
 ## Key internal modules
 
-- `src/engine/` — `workflow-engine.ts` (main loop, 600+ lines), `step-executor.ts`, `transition-resolver.ts`, `errors.ts`.
-- `src/expressions/` — custom when-expression evaluator (`${variables.field} == "value"` DSL).
-- `src/graph/` — step graph validator.
-- `src/review/` — `ReviewTracker` (verdict accumulation, decision finalisation).
-- `src/triggers/` — manual / webhook / cron handlers.
+- `src/engine/` — `workflow-engine.ts` (600+ lines), `step-executor.ts`, `transition-resolver.ts`, `errors.ts`.
+- `src/expressions/` — when-DSL evaluator (`${variables.field} == "value"`).
+- `src/graph/` — graph validator.
+- `src/review/` — `ReviewTracker`.
+- `src/triggers/` — manual / webhook / cron.
 - `src/__tests__/` — engine integration tests (see `docs/ENGINE-TESTING.md`).
 
 ## Relationships

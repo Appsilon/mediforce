@@ -6,20 +6,20 @@ sources: 3
 tags: [plugin, supply-intelligence, issues, firestore]
 ---
 
-**Scans red-flagged SKU+warehouse pairs, computes priority scores, and writes draft issues to Firestore. Registered as `supply-intelligence/risk-detection`.**
+**Red-flag scanner → priority score → writes draft issues to Firestore `draftIssues`. Registered as `supply-intelligence/risk-detection`.**
 
-## Purpose
+## What it does
 
-Surfaces actionable supply-chain risks. Pulls supply data, runs `classifyRisk()` from [`supply-intelligence`](../packages/supply-intelligence.md), filters to red rows, ranks them with `lib/priority-score.ts`, and produces draft issues — each with an LLM-generated title, summary, and proposed action — written to Firestore collection `draftIssues`.
+Pull supply data → `classifyRisk()` from [`supply-intelligence`](../packages/supply-intelligence.md) → filter red rows → rank via `lib/priority-score.ts` → emit draft issues. Each issue: LLM-generated title + summary + proposed action; priority + thresholds are deterministic. See [llm-no-computation-rule](../../concepts/llm-no-computation-rule.md).
 
 ## Output
 
-Firestore writes in collection `draftIssues`. The LLM contributes text only; priority score and thresholds are deterministic.
+Firestore collection `draftIssues`. LLM contributes text only.
 
 ## How it fits
 
-- Registered via `registerSupplyIntelligencePlugins(registry)` from [`platform-ui`](../packages/platform-ui.md).
-- Shares data-fetching and risk-computation libs with the [driver-agent plugin](./supply-intelligence-driver-agent.md).
+- Registered via `registerSupplyIntelligencePlugins(registry)` from [platform-ui](../packages/platform-ui.md).
+- Shares data-fetcher + risk-computations with [driver-agent](./supply-intelligence-driver-agent.md).
 
 ## Relationships
 

@@ -6,32 +6,32 @@ sources: 2
 tags: [concept, autonomy, agent-runtime, workflow]
 ---
 
-**Five-level scale (L0–L4) controlling how much agent action is allowed before a human must intervene. Enforced by `AgentRunner`, not by individual plugins.**
+**5-level scale (L0–L4). How much agent can do before human must intervene. Enforced by `AgentRunner`, not plugins.**
 
 ## Levels
 
 | Level | Name | Behavior |
 |-------|------|----------|
-| L0 | Human-only | No agent involvement — step runs as pure human task. |
-| L1 | Agent-assisted | Agent produces output, human decides what to do with it. |
-| L2 | Human-in-the-loop | Agent acts, human approves each change before it takes effect. |
-| L3 | Periodic review | Agent is autonomous; humans review in batches (e.g. daily). Used by `protocol-to-tfl`. |
-| L4 | Fully autonomous | Agent applies changes directly, no review. |
+| L0 | Human-only | No agent. Pure human task. |
+| L1 | Agent-assisted | Agent outputs. Human decides. |
+| L2 | Human-in-the-loop | Agent acts. Human approves each change. |
+| L3 | Periodic review | Agent autonomous. Human reviews in batches. Used by `protocol-to-tfl`. |
+| L4 | Fully autonomous | Agent applies changes. No review. |
 
-## How it shows up in code
+## In code
 
-- Type: `AutonomyLevel` exported from [`agent-runtime`](../entities/packages/agent-runtime.md) `src/interfaces/`.
-- Field: each `WorkflowDefinition` agent step carries an `autonomy` field (Zod schema in [`platform-core`](../entities/packages/platform-core.md) `src/schemas/workflow-definition.ts`).
-- Enforcement: [`AgentRunner`](./plugin-dispatch.md) — applies autonomy handling **after** the plugin emits its `result` event. Plugins themselves do not implement autonomy; the runner consults `step.autonomy` + `step.confidenceThreshold` and triggers the [`FallbackHandler`](../entities/packages/agent-runtime.md) when thresholds aren't met.
+- Type: `AutonomyLevel` from [`agent-runtime`](../entities/packages/agent-runtime.md) `src/interfaces/`.
+- Field: each `WorkflowDefinition` agent step has `autonomy`. Zod schema in [`platform-core`](../entities/packages/platform-core.md) `src/schemas/workflow-definition.ts`.
+- Enforcement: `AgentRunner` (see [plugin-dispatch](./plugin-dispatch.md)) — applies autonomy **after** plugin `result` event. Consults `step.autonomy` + `step.confidenceThreshold` → fires `FallbackHandler` if thresholds miss. Plugins themselves do not implement autonomy.
 
-## Confidence threshold coupling
+## Confidence coupling
 
-L3 and L4 typically pair with a `confidenceThreshold` (0.0–1.0). The plugin must emit `confidence` + `confidence_rationale` in its `AgentOutputEnvelope`; if `confidence < threshold`, `AgentRunner` escalates via fallback (human task, retry, or cancel) regardless of autonomy level.
+L3 + L4 pair with `confidenceThreshold` (0.0–1.0). Plugin emits `confidence` + `confidence_rationale` in `AgentOutputEnvelope`. If `confidence < threshold` → `AgentRunner` escalates (human task / retry / cancel) regardless of autonomy.
 
 ## Used by
 
-- [`protocol-to-tfl`](../entities/apps/protocol-to-tfl.md) — all agent steps at L3.
-- Any workflow step in [`platform-ui`](../entities/packages/platform-ui.md) catalog.
+- [`protocol-to-tfl`](../entities/apps/protocol-to-tfl.md) — all agent steps L3.
+- Any step in [`platform-ui`](../entities/packages/platform-ui.md) catalog.
 
 ## Sources
 

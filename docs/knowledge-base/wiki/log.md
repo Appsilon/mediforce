@@ -135,3 +135,21 @@ Ran relative-`.md`-link + orphan check on all 38 wiki pages.
 
 touched: 3 pages above, `index.md` unchanged.
 summary: 38 pages, 0 broken links, 0 orphans. Ready to push.
+
+## [2026-04-23] rewrite | Caveman pass on commits 1–4 (26 pages)
+
+Rewrote every page from commits 1–4 in caveman style per `SCHEMA.md` → "Writing style: caveman". Kept untouched: frontmatter, section headers, code blocks, file paths, URLs, Zod/symbol/variable names, numbers, dates, markdown links. Compressed only prose — dropped articles, filler ("it's worth noting", "in practice"), pleasantries; used fragments; pushed facts into tables + bullets where possible.
+
+Pages rewritten:
+
+- Packages (7): platform-core, workflow-engine, agent-runtime, platform-infra, platform-ui, supply-intelligence, supply-intelligence-plugins.
+- Plugins (6): claude-code-agent, opencode-agent, script-container, example-agent, supply-intelligence-driver-agent, supply-intelligence-risk-detection.
+- Apps (4): supply-intelligence, protocol-to-tfl, community-digest, workflow-designer.
+- Concepts (9): autonomy-levels, plugin-dispatch, repository-pattern, docker-spawn-strategies, dual-schema-migration, expression-evaluator, service-singleton, mcp-resolution, llm-no-computation-rule.
+
+Also added forward cross-references from entity pages to the relevant gotchas (e.g. platform-ui → mediforce-source-custom-condition, remote-e2e-setup, dual-schema-routing; protocol-to-tfl → runtime-skill-path-coupling; repository-pattern → in-memory-repos-not-mocks; dual-schema-migration → dual-schema-routing). These were missing before because gotchas landed in a later commit.
+
+Lint after rewrite: 38 files, 0 broken links, 0 orphans.
+
+touched: 26 existing pages rewritten + `log.md`.
+summary: wiki now fully in caveman, consistent across all 38 pages. Context-frugal for in-session agent reads.

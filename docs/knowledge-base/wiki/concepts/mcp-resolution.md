@@ -6,39 +6,39 @@ sources: 3
 tags: [concept, mcp, agent-runtime, tool-catalog]
 ---
 
-**Per-step resolution of MCP (Model Context Protocol) servers and tool filters. Inputs: agent-definition bindings + step-level restrictions + tool catalog. Output: a concrete `mcp-config.json` written into the container.**
+**Per-step MCP resolution. Inputs: agent-def bindings + step-level restrictions + tool catalog. Output: concrete `mcp-config.json` written into container.**
 
 ## Two paths
 
 ### Workflow-mode (recommended)
 
-- `context.resolvedMcpConfig` is pre-resolved by [`agent-runtime`](../entities/packages/agent-runtime.md) `resolveMcpForStep()`.
-- Inputs: `AgentDefinition` bindings (which MCP servers the agent may use), step-level `allowedTools` restrictions, tool catalog entries from Firestore.
+- `context.resolvedMcpConfig` — pre-resolved by [`agent-runtime`](../entities/packages/agent-runtime.md) `resolveMcpForStep()`.
+- Inputs: `AgentDefinition` bindings (which MCP servers agent may use), step-level `allowedTools`, tool catalog entries from Firestore.
 - Used by: workflow steps running through `BaseContainerAgentPlugin`.
 
 ### Legacy path
 
-- `agentConfig.mcpServers` array supplied inline in the process config.
+- `agentConfig.mcpServers` array inline in process config.
 - Flattened via `flattenResolvedMcpToLegacy()`.
-- Used by: the legacy `processConfigs` schema (see [dual-schema-migration](./dual-schema-migration.md)).
+- Used by: legacy `processConfigs` (see [dual-schema-migration](./dual-schema-migration.md)).
 
 ## What gets written
 
-`/output/mcp-config.json` inside the container, with:
+`/output/mcp-config.json` inside container:
 
-- `mcpServers` map — each entry is either `stdio` (command + args) or `http` (URL).
-- `allowedTools` filter per server — subset declared by the step.
+- `mcpServers` map — `stdio` (command + args) or `http` (URL).
+- `allowedTools` filter per server — subset declared by step.
 
 ## Env var templating
 
-`{{SECRET}}` placeholders in the server config are resolved at write time from `workflowSecrets` (encrypted at rest, decrypted via `secrets-cipher` in [`platform-infra`](../entities/packages/platform-infra.md)).
+`{{SECRET}}` placeholders in server config resolved at write time from `workflowSecrets`. Encrypted at rest, decrypted via `secrets-cipher` in [`platform-infra`](../entities/packages/platform-infra.md).
 
 ## Before adding a new MCP integration
 
-- Register the server in the tool catalog (`packages/platform-core/src/schemas/` → tool catalog entries).
-- Bind it on an `AgentDefinition` (Firestore).
-- Restrict it per-step with `allowedTools` in the `WorkflowDefinition`.
-- Do **not** hardcode server URLs in plugin code — go through `resolveMcpForStep()`.
+- Register the server in tool catalog (`packages/platform-core/src/schemas/` → tool catalog entries).
+- Bind on `AgentDefinition` (Firestore).
+- Restrict per-step with `allowedTools` in `WorkflowDefinition`.
+- **Do not** hardcode server URLs in plugin code. Go through `resolveMcpForStep()`.
 
 ## Sources
 

@@ -6,25 +6,26 @@ sources: 3
 tags: [plugin, supply-intelligence, narrative, llm]
 ---
 
-**Narrative risk summarizer — generates prose for SKU+warehouse pairs, therapeutic categories, and portfolio overview. Registered as `supply-intelligence/driver-agent`.**
+**Narrative risk summarizer. Prose for SKU+warehouse, category, portfolio overview. Registered as `supply-intelligence/driver-agent`.**
 
-## Purpose
+## What it does
 
-Given pre-computed risk numbers (from [`supply-intelligence`](../packages/supply-intelligence.md) + `lib/risk-computations.ts`), produces a narrative summary via LLM. Numbers are templated into the prompt; the LLM is never asked to compute them. Keeps outputs auditable — you can trace any claim in the narrative back to a number.
+Takes pre-computed risk numbers (from [`supply-intelligence`](../packages/supply-intelligence.md) + `lib/risk-computations.ts`) → templates into prompt → LLM writes prose. LLM never computes numbers → [llm-no-computation-rule](../../concepts/llm-no-computation-rule.md). Every narrative claim traces to a number.
 
-## Inputs
+## Targets
 
-Decided by prompt target:
+Per prompt target:
+
 - SKU-level (specific SKU × warehouse)
-- Category-level (therapeutic category rollup)
+- Category-level (therapeutic rollup)
 - Overview (portfolio-wide)
 
-Prompt builders live in `packages/supply-intelligence-plugins/src/prompts/`.
+Prompt builders: `packages/supply-intelligence-plugins/src/prompts/`.
 
 ## How it fits
 
-- Registered via `registerSupplyIntelligencePlugins(registry)` called from [`platform-ui`](../packages/platform-ui.md) `getPlatformServices()`.
-- Data fetched through `lib/supply-data-fetcher.ts` (Firestore).
+- Registered via `registerSupplyIntelligencePlugins(registry)` from [platform-ui](../packages/platform-ui.md) `getPlatformServices()`.
+- Data: `lib/supply-data-fetcher.ts` (Firestore).
 
 ## Relationships
 

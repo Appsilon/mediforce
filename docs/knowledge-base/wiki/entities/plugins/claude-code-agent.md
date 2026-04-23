@@ -6,29 +6,25 @@ sources: 3
 tags: [plugin, claude-code, agent-runtime, container]
 ---
 
-**Built-in container plugin that runs Claude Code inside a Docker image to execute an agent step. Registered in `PluginRegistry` under `claude-code-agent`.**
-
-## Purpose
-
-Default container-backed agent. Assembles a prompt from the step's skill file + custom prompt + previous outputs + confidence instructions, spawns Claude Code in a Docker container (local or queued), extracts the emitted output envelope. `MOCK_AGENT=true` swaps it for `MockClaudeCodeAgentPlugin` which returns fixtures without running the CLI.
+**Default container plugin. Runs Claude Code in Docker for agent steps. Registered as `claude-code-agent`. `MOCK_AGENT=true` → `MockClaudeCodeAgentPlugin`.**
 
 ## How it fits
 
-- Concrete subclass of [`BaseContainerAgentPlugin`](../../concepts/plugin-dispatch.md) in [`agent-runtime`](../packages/agent-runtime.md).
+- Subclass of `BaseContainerAgentPlugin` in [`agent-runtime`](../packages/agent-runtime.md). See [plugin-dispatch](../../concepts/plugin-dispatch.md).
 - Registered by `getPlatformServices()` in [`platform-ui`](../packages/platform-ui.md).
-- Subclass responsibilities: `getAgentCommand()`, `getMockDockerArgs()`, `parseAgentOutput()`.
-- Spawning: delegates to [`LocalDockerSpawnStrategy`](../../concepts/docker-spawn-strategies.md) by default, or `QueuedDockerSpawnStrategy` when `REDIS_URL` is set.
+- Subclass must implement: `getAgentCommand()`, `getMockDockerArgs()`, `parseAgentOutput()`.
+- Spawning: [`LocalDockerSpawnStrategy`](../../concepts/docker-spawn-strategies.md) by default. `REDIS_URL` set → `QueuedDockerSpawnStrategy`.
 
-## Input / output contract
+## I/O contract
 
-- Input: `AgentContext` with step input, config, resolved MCP, workflow secrets.
-- Output: must emit a `result` event conforming to `AgentOutputEnvelopeSchema`, including `confidence` (0.0–1.0) and `confidence_rationale`. `AgentRunner` validates `confidence` against the step's `confidenceThreshold` and fires a fallback if the threshold isn't met.
+- Input: `AgentContext` — step input, config, resolved MCP (see [mcp-resolution](../../concepts/mcp-resolution.md)), workflow secrets.
+- Output: emit exactly one `result` event conforming to `AgentOutputEnvelopeSchema`. Must include `confidence` (0.0–1.0) + `confidence_rationale`. `AgentRunner` validates vs `step.confidenceThreshold` → fires fallback if below.
 
 ## Relationships
 
 - Registered in: [`platform-ui`](../packages/platform-ui.md).
 - Inherits from: [`agent-runtime`](../packages/agent-runtime.md) `BaseContainerAgentPlugin`.
-- Used by: any workflow step with `type: agent` and `agent: claude-code-agent`.
+- Used by: any step with `type: agent` + `agent: claude-code-agent`.
 
 ## Sources
 

@@ -6,11 +6,7 @@ sources: 2
 tags: [app, workflow-designer, meta-workflow]
 ---
 
-**Meta-workflow app that designs new Mediforce `WorkflowDefinition`s via AI + human review. Three workflow variants shipped (base, cowork, voice).**
-
-## Purpose
-
-Bootstraps new workflows. User describes an idea in natural language; an agent generates a candidate `WorkflowDefinition` JSON; human reviews and approves; the system registers it. Role-gated: `workflow-designer` role required.
+**Meta-workflow. Designs new `WorkflowDefinition`s via AI + human review. Three variants (base, cowork, voice). Role-gated: `workflow-designer`.**
 
 ## Workflow definitions
 
@@ -18,18 +14,19 @@ Bootstraps new workflows. User describes an idea in natural language; an agent g
 - `apps/workflow-designer/src/cowork-workflow-designer.wd.json` — co-authoring variant
 - `apps/workflow-designer/src/voice-workflow-designer.wd.json` — voice input variant
 
-Partial step list (base):
+## Steps (base)
+
 1. `choose-mode` (human) — create-new vs edit-existing
-2. `describe-idea` (human) — natural language + workflow name
-3. `fetch-workflows` (agent) — list available workflows
-4. `design-steps` (agent) — generate WorkflowDefinition JSON
+2. `describe-idea` (human) — natural language + name
+3. `fetch-workflows` (agent) — list available
+4. `design-steps` (agent) — generate `WorkflowDefinition` JSON
 5. `human-review` (human) — approve / reject
 6. `register` (agent) — validate + register
 
 ## Relationships
 
-- Produces: `WorkflowDefinition` entries consumed by [`workflow-engine`](../packages/workflow-engine.md) and [`platform-ui`](../packages/platform-ui.md).
-- Schema authority: `WorkflowDefinition` lives in [`platform-core`](../packages/platform-core.md) `src/schemas/workflow-definition.ts`.
+- Produces: `WorkflowDefinition` entries consumed by [workflow-engine](../packages/workflow-engine.md) + [platform-ui](../packages/platform-ui.md).
+- Schema authority: `WorkflowDefinition` in [platform-core](../packages/platform-core.md) `src/schemas/workflow-definition.ts`.
 
 ## Sources
 

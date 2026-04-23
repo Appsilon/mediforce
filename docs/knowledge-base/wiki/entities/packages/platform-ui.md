@@ -6,11 +6,11 @@ sources: 5
 tags: [package, platform-ui, nextjs, app-router]
 ---
 
-**Main web application — Next.js 15 App Router, hosts all workspace routes, API routes, and the `getPlatformServices()` singleton that wires every other package together.**
+**Main web app. Next.js 15 App Router. Hosts every route + API + `getPlatformServices()` composition root.**
 
 ## Purpose
 
-User-facing entry point. Serves workspace-scoped pages (agents, tasks, processes, workflows, catalog, monitoring, cowork, runs, tickets, configs, settings), exposes the REST API consumed by agents and external clients, and composes the platform-services singleton that instantiates repositories, the workflow engine, agent runners, and the plugin registry. All other packages are orchestrated from here.
+User-facing entry. Workspace-scoped pages (agents, tasks, processes, workflows, catalog, monitoring, cowork, runs, tickets, configs, settings). REST API for agents + external clients. `getPlatformServices()` wires every other package: repos, workflow engine, agent runners, plugin registry. Top of dependency graph.
 
 ## Dependencies
 
@@ -19,45 +19,45 @@ User-facing entry point. Serves workspace-scoped pages (agents, tasks, processes
 
 ## Key entry points
 
-- **Route groups**: `src/app/(app)/[handle]/{agents,catalog,configs,cowork,monitoring,processes,runs,settings,tasks,tools,workflows}`.
+- **Routes**: `src/app/(app)/[handle]/{agents,catalog,configs,cowork,monitoring,processes,runs,settings,tasks,tools,workflows}`.
 - **Auth pages**: `/login`, `/change-password`, `/test-login`, `/workspace-selection`.
-- **API routes**: `src/app/api/{processes,definitions,tasks,users,configs,cowork,workflow-definitions,agents,tickets,cron,migrations}`.
-- **Service singleton**: `src/lib/platform-services.ts` — `getPlatformServices()` lazy-creates everything, shared across API routes. Registers the three built-in plugins (`claude-code-agent`, `opencode-agent`, `script-container`) plus supply-intelligence plugins.
-- **Middleware**: `src/middleware.ts` — JWT/API key auth, CORS, Firebase token validation (emulator-aware via `NEXT_PUBLIC_USE_EMULATORS`).
+- **API**: `src/app/api/{processes,definitions,tasks,users,configs,cowork,workflow-definitions,agents,tickets,cron,migrations}`.
+- **Service singleton**: `src/lib/platform-services.ts` — `getPlatformServices()` lazy-wires everything. Registers built-in plugins (`claude-code-agent`, `opencode-agent`, `script-container`) + supply-intelligence plugins. See [service-singleton](../../concepts/service-singleton.md).
+- **Middleware**: `src/middleware.ts` — JWT/API-key auth, CORS, Firebase token verify (emulator-aware via `NEXT_PUBLIC_USE_EMULATORS`).
 
 ## Key internal modules
 
-- `src/lib/platform-services.ts` — service composition root.
-- `src/lib/execute-agent-step.ts`, `src/lib/resolve-task.ts` — workflow/task resolution.
-- `src/lib/resolve-definition-steps.ts` — bridges legacy `processDefinitions` + `processConfigs` to unified `workflowDefinitions` (see [dual-schema-migration concept](../../concepts/dual-schema-migration.md)).
+- `src/lib/platform-services.ts` — composition root.
+- `src/lib/execute-agent-step.ts`, `src/lib/resolve-task.ts` — workflow + task resolution.
+- `src/lib/resolve-definition-steps.ts` — bridges legacy `processDefinitions`+`processConfigs` to unified `workflowDefinitions`. **Always go through this.** See [dual-schema-migration](../../concepts/dual-schema-migration.md) + [dual-schema-routing gotcha](../../gotchas/dual-schema-routing.md).
 - `src/components/{agents,tasks,processes,workflows}` — feature UI.
 - `src/contexts/auth-context.tsx` — Firebase Auth React context.
 
 ## Notable patterns
 
-- **Service singleton** (see [service-singleton concept](../../concepts/service-singleton.md)): `getPlatformServices()` with fail-fast encryption-key validation.
-- **Custom `@mediforce/source` TS condition** — imports resolve to source `.ts` during dev, compiled `dist/` in prod (see [gotchas/mediforce-source-custom-condition](../../gotchas/mediforce-source-custom-condition.md)).
-- **Firebase emulator toggle** — `NEXT_PUBLIC_USE_EMULATORS=true` switches JWT verification from `jwtVerify` (production, JWKS) to `decodeJwt` (emulator, unsigned).
-- **App Router server components** — async RSC throughout route groups.
+- **Service singleton** → [service-singleton](../../concepts/service-singleton.md).
+- **`@mediforce/source` TS condition** — dev = source `.ts`, prod = `dist/`. See [mediforce-source-custom-condition gotcha](../../gotchas/mediforce-source-custom-condition.md).
+- **Firebase emulator toggle** — `NEXT_PUBLIC_USE_EMULATORS=true` → JWT verify switches `jwtVerify` (prod JWKS) to `decodeJwt` (emulator unsigned).
+- **App Router RSC** — async server components throughout.
 
 ## Testing surface
 
-- Unit: `src/test/*.test.ts` (Vitest, jsdom).
+- Unit: `src/test/*.test.ts` (Vitest jsdom).
 - Journey: `src/test/*-journey.test.ts` — handler-level, in-memory repos.
-- E2E: `e2e/journeys/` (Playwright, port 9007 emulator mode), `e2e/smoke.spec.ts`.
+- E2E: `e2e/journeys/` (Playwright, port 9007 emulator), `e2e/smoke.spec.ts`. Remote env? → [remote-e2e-setup gotcha](../../gotchas/remote-e2e-setup.md).
 - Real-LLM E2E: `e2e/api/*.test.ts` via `pnpm test:mcp-real`.
 
 ## Ports / infra
 
-- Dev: port `9003` (`pnpm dev`).
-- Emulator E2E: port `9007`.
+- Dev: `9003` (`pnpm dev`).
+- Emulator E2E: `9007`.
 - Firebase emulators: Auth `9099`, Firestore `8080`.
-- Production: Firebase App Hosting (`apphosting.yaml`).
+- Prod: Firebase App Hosting (`apphosting.yaml`).
 
 ## Relationships
 
-- Consumes all other Mediforce packages.
-- Consumed by: nothing (top of the dependency graph).
+- Consumes: every other Mediforce package.
+- Consumed by: nothing (top of graph).
 
 ## Sources
 

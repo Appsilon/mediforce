@@ -6,28 +6,21 @@ sources: 2
 tags: [app, community-digest, discord, github, cron]
 ---
 
-**Scheduled workflow app that gathers GitHub activity, ranks changes, and drafts Discord posts. Runs daily Mon–Fri at 08:00 or on-demand.**
+**Scheduled workflow. Gathers GitHub activity → ranks changes → drafts Discord posts. Daily Mon–Fri 08:00 or manual.**
 
-## Purpose
+## Steps
 
-Automates the "what happened this week" update. Triggered by cron or manual dispatch. Uses the [`script-container`](../plugins/script-container.md) plugin (not an LLM plugin) for GitHub data gathering, then DeepSeek for ranking, then drafts Discord posts for human review before posting.
+File: `apps/community-digest/src/community-digest.wd.json`. Trigger: cron or manual.
 
-## Workflow definition
-
-File: `apps/community-digest/src/community-digest.wd.json`.
-
-Trigger: `cron` — daily 08:00 Mon–Fri — or manual.
-
-Partial step list:
 1. `select-period` (human)
-2. `gather-changes` (script, `script-container`)
-3. `rank-changes` (agent)
+2. `gather-changes` (script, [`script-container`](../plugins/script-container.md))
+3. `rank-changes` (agent — DeepSeek)
 4. `draft-posts` (agent)
 5. `post-to-discord` (agent)
 
 ## Container
 
-Custom Docker image `mediforce-agent:community-digest`, built from `apps/community-digest/container/Dockerfile`.
+Custom Docker image `mediforce-agent:community-digest` built from `apps/community-digest/container/Dockerfile`.
 
 ## Relationships
 
