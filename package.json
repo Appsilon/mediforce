@@ -41,8 +41,7 @@
       "brace-expansion": "2.0.3",
       "@tootallnate/once": "3.0.1",
       "next": "16.2.3",
-      "vite": "8.0.5",
-      "@lezer/common": "1.5.2"
+      "vite": "8.0.5"
     },
     "minimumReleaseAgeExclude": ["axios", "protobufjs", "hono"]
   },
