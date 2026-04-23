@@ -919,13 +919,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // 5. Input context
     const previousOutputs = await this.context.getPreviousStepOutputs();
     const hasPreviousOutputs = Object.keys(previousOutputs).length > 0;
+    const INLINE_THRESHOLD = 5_000; // characters — shared by both previous-run and previous-step spill logic
 
     parts.push('## Input Data');
     parts.push(JSON.stringify(input, null, 2));
 
     // 5b. Previous run outputs — carry-over snapshot from the last successful
     // run of this workflow (see WD.inputForNextRun). Distinct from "previous
-    // step outputs" (same run). Inline always — bounded by design.
+    // step outputs" (same run). Reuse the same inline-or-spill pattern as
+    // below so a workflow that inadvertently carries a large payload doesn't
+    // balloon the prompt and token cost silently.
     if (isWorkflowAgentContext(this.context) && this.context.previousRun !== undefined) {
       parts.push(
         '## Previous Run Outputs\n' +
@@ -935,12 +938,46 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         'or chain reset). Use this to resume where the previous run left off ' +
         '(e.g. a cursor, last-seen hash, etc.).',
       );
-      parts.push(JSON.stringify(this.context.previousRun, null, 2));
+
+      const previousRun = this.context.previousRun;
+      if (outputDir) {
+        const inlinePreviousRun: Record<string, unknown> = {};
+        const previousRunFileRefs: { field: string; containerPath: string }[] = [];
+
+        for (const [key, value] of Object.entries(previousRun)) {
+          const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+          if (serialized.length > INLINE_THRESHOLD) {
+            const writeDir = hostOutputDir ?? outputDir;
+            const ext = typeof value === 'string' && !value.trimStart().startsWith('{') ? '.md' : '.json';
+            const filename = `prevrun-${key}${ext}`;
+            const hostPath = join(writeDir, filename);
+            await writeFile(hostPath, typeof value === 'string' ? value : JSON.stringify(value, null, 2), 'utf-8');
+            const agentFilePath = `${outputDir}/${filename}`;
+            previousRunFileRefs.push({ field: key, containerPath: agentFilePath });
+            inlinePreviousRun[key] = `[FILE: ${agentFilePath}]`;
+          } else {
+            inlinePreviousRun[key] = value;
+          }
+        }
+
+        parts.push(JSON.stringify(inlinePreviousRun, null, 2));
+
+        if (previousRunFileRefs.length > 0) {
+          parts.push(
+            '## Large Previous Run Files\n' +
+            'Some previous run values were too large to include inline. ' +
+            `They have been written to files in ${outputDir}/. Read them with \`cat\` or your preferred tool:\n` +
+            previousRunFileRefs.map((r) => `- **${r.field}**: \`${r.containerPath}\``).join('\n'),
+          );
+        }
+      } else {
+        // No outputDir available (e.g. local-mode without disk) — inline verbatim.
+        parts.push(JSON.stringify(previousRun, null, 2));
+      }
     }
 
     // 6. Previous step outputs — write large values to files instead of inlining
     if (hasPreviousOutputs && outputDir) {
-      const INLINE_THRESHOLD = 5_000; // characters
       const inlineOutputs: Record<string, unknown> = {};
       const fileRefs: { stepId: string; field: string; containerPath: string }[] = [];
 
