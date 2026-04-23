@@ -5,6 +5,7 @@ export type {
   LlmClient,
   AgentContext,
   WorkflowAgentContext,
+  ResolvedOAuthBinding,
   EmitPayload,
   EmitFn,
   AgentPlugin,

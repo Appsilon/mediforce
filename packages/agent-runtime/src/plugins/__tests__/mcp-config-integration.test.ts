@@ -514,6 +514,207 @@ describe('writeMcpConfig integration', () => {
 
       await cleanup();
     });
+
+    // ---- HTTP auth: headers variant (Step-4 silent bug fix) ----
+    //
+    // Pre-Step 5, `auth.type === 'headers'` existed in the schema + UI but
+    // `writeResolvedMcpConfig` dropped it on the floor — the HTTP entry
+    // landed in mcp-config.json with `{url, allowedTools?}` only. These
+    // tests lock the fix in: headers must reach the output file.
+    it('[DATA] emits headers for http auth.type=headers (Step-4 silent bug fix)', async () => {
+      const context = buildMockWorkflowAgentContext({
+        resolvedMcpConfig: {
+          servers: {
+            linear: {
+              type: 'http',
+              url: 'https://linear.app/mcp',
+              auth: {
+                type: 'headers',
+                headers: { 'X-Linear-Token': 'static-token' },
+              },
+            },
+          },
+        },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        mcpServers: Record<string, { url: string; headers?: Record<string, string> }>;
+      };
+      expect(parsed.mcpServers.linear).toMatchObject({
+        url: 'https://linear.app/mcp',
+        headers: { 'X-Linear-Token': 'static-token' },
+      });
+
+      await cleanup();
+    });
+
+    it('[DATA] resolves {{SECRET:...}} templates inside http auth.type=headers values', async () => {
+      const context = buildMockWorkflowAgentContext({
+        workflowSecrets: { LINEAR_TOKEN: 'resolved-linear-token' },
+        resolvedMcpConfig: {
+          servers: {
+            linear: {
+              type: 'http',
+              url: 'https://linear.app/mcp',
+              auth: {
+                type: 'headers',
+                headers: { 'X-Linear-Token': '{{SECRET:LINEAR_TOKEN}}' },
+              },
+            },
+          },
+        },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        mcpServers: Record<string, { headers?: Record<string, string> }>;
+      };
+      expect(parsed.mcpServers.linear?.headers?.['X-Linear-Token']).toBe('resolved-linear-token');
+
+      await cleanup();
+    });
+
+    // ---- HTTP auth: oauth variant (Step 5) ----
+    //
+    // The resolved HTTP entry carries `auth.type === 'oauth'`; the runtime
+    // gets the token via `context.oauthTokens[serverName]` (pre-loaded by
+    // executeAgentStep). writeMcpConfig synthesizes `{[headerName]: rendered}`.
+    it('[DATA] emits oauth-rendered Authorization header from context.oauthTokens', async () => {
+      const context = buildMockWorkflowAgentContext({
+        oauthTokens: {
+          github: {
+            accessToken: 'gha_abc123',
+            headerName: 'Authorization',
+            headerValueTemplate: 'Bearer {token}',
+          },
+        },
+        resolvedMcpConfig: {
+          servers: {
+            github: {
+              type: 'http',
+              url: 'https://api.github.com/mcp',
+              auth: {
+                type: 'oauth',
+                provider: 'github',
+                headerName: 'Authorization',
+                headerValueTemplate: 'Bearer {token}',
+              },
+            },
+          },
+        },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        mcpServers: Record<string, { url: string; headers?: Record<string, string> }>;
+      };
+      expect(parsed.mcpServers.github).toMatchObject({
+        url: 'https://api.github.com/mcp',
+        headers: { Authorization: 'Bearer gha_abc123' },
+      });
+
+      await cleanup();
+    });
+
+    it('[DATA] oauth: custom header name + template from context takes precedence', async () => {
+      // Binding declared `Authorization: Bearer {token}`, but the connected
+      // token carries a custom header override (e.g. different header rotated
+      // after connect). writeMcpConfig must trust the pre-loaded bundle so
+      // the header shape stays consistent with what was connected.
+      const context = buildMockWorkflowAgentContext({
+        oauthTokens: {
+          notion: {
+            accessToken: 'ntn_xyz',
+            headerName: 'X-Notion-Token',
+            headerValueTemplate: 'Token {token}',
+          },
+        },
+        resolvedMcpConfig: {
+          servers: {
+            notion: {
+              type: 'http',
+              url: 'https://api.notion.com/mcp',
+              auth: {
+                type: 'oauth',
+                provider: 'notion',
+                headerName: 'Authorization',
+                headerValueTemplate: 'Bearer {token}',
+              },
+            },
+          },
+        },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        mcpServers: Record<string, { headers?: Record<string, string> }>;
+      };
+      expect(parsed.mcpServers.notion?.headers).toEqual({ 'X-Notion-Token': 'Token ntn_xyz' });
+
+      await cleanup();
+    });
+
+    it('[ERROR] oauth with no token in context throws OAuthTokenUnavailableError', async () => {
+      const context = buildMockWorkflowAgentContext({
+        // oauthTokens intentionally undefined — simulates "binding saved, not connected yet".
+        resolvedMcpConfig: {
+          servers: {
+            github: {
+              type: 'http',
+              url: 'https://api.github.com/mcp',
+              auth: {
+                type: 'oauth',
+                provider: 'github',
+                headerName: 'Authorization',
+                headerValueTemplate: 'Bearer {token}',
+              },
+            },
+          },
+        },
+      });
+      await plugin.initialize(context);
+
+      await expect(
+        (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir),
+      ).rejects.toThrow(/not connected.*Connect the account via the agent editor/);
+
+      await cleanup();
+    });
+
+    it('[DATA] http entry without auth omits headers field entirely', async () => {
+      const context = buildMockWorkflowAgentContext({
+        resolvedMcpConfig: {
+          servers: {
+            public: { type: 'http', url: 'https://open.example.com/mcp' },
+          },
+        },
+      });
+      await plugin.initialize(context);
+
+      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
+
+      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        mcpServers: Record<string, Record<string, unknown>>;
+      };
+      expect(parsed.mcpServers.public).toEqual({ url: 'https://open.example.com/mcp' });
+      expect(parsed.mcpServers.public).not.toHaveProperty('headers');
+
+      await cleanup();
+    });
   });
 
   describe('legacy path regression (no resolvedMcpConfig)', () => {

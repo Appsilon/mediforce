@@ -6,8 +6,19 @@
 // Called by the auto-runner loop when the instance was created via fireWorkflow (no configName).
 
 import { getPlatformServices } from './platform-services';
-import { resolveMcpForStep, type WorkflowAgentContext } from '@mediforce/agent-runtime';
-import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import {
+  resolveMcpForStep,
+  resolveOAuthToken,
+  type ResolvedOAuthBinding,
+  type WorkflowAgentContext,
+} from '@mediforce/agent-runtime';
+import type {
+  AgentOAuthTokenRepository,
+  OAuthProviderRepository,
+  ResolvedMcpConfig,
+  WorkflowDefinition,
+  WorkflowStep,
+} from '@mediforce/platform-core';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 
 export interface WorkflowAgentStepResult {
@@ -31,8 +42,20 @@ export async function executeAgentStep(
   triggeredBy: string,
   stepExecutionId?: string,
 ): Promise<WorkflowAgentStepResult> {
-  const { engine, agentRunner, pluginRegistry, instanceRepo, processRepo, auditRepo, humanTaskRepo, llmClient, agentDefinitionRepo, toolCatalogRepo } =
-    getPlatformServices();
+  const {
+    engine,
+    agentRunner,
+    pluginRegistry,
+    instanceRepo,
+    processRepo,
+    auditRepo,
+    humanTaskRepo,
+    llmClient,
+    agentDefinitionRepo,
+    toolCatalogRepo,
+    oauthProviderRepo,
+    agentOAuthTokenRepo,
+  } = getPlatformServices();
 
   const instance = await instanceRepo.getById(instanceId);
   if (!instance) {
@@ -99,6 +122,21 @@ export async function executeAgentStep(
     namespace: workflowDefinition.namespace,
   })) ?? undefined;
 
+  // Load and (lazily) refresh OAuth tokens for every HTTP binding that
+  // requested OAuth auth. Done here, not in the runtime, so the runtime
+  // stays decoupled from Firestore — queued-docker-spawn can serialize
+  // the context over BullMQ once this is populated. Refresh failures
+  // bubble up with actionable errors ("Reconnect via UI").
+  const oauthTokens = workflowStep.agentId !== undefined && resolvedMcpConfig !== undefined
+    ? await loadOAuthTokens({
+        namespace: workflowDefinition.namespace,
+        agentId: workflowStep.agentId,
+        resolvedMcpConfig,
+        oauthProviderRepo,
+        agentOAuthTokenRepo,
+      })
+    : undefined;
+
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
     processInstanceId: instanceId,
@@ -113,6 +151,7 @@ export async function executeAgentStep(
     ...(instance.previousRun !== undefined
       ? { previousRun: instance.previousRun }
       : {}),
+    oauthTokens,
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
       const result: Record<string, unknown> = {};
@@ -404,4 +443,67 @@ export async function executeAgentStep(
     currentStepId: currentInstance?.currentStepId ?? instance.currentStepId,
     agentRunStatus: runResult.status,
   };
+}
+
+interface LoadOAuthTokensDeps {
+  namespace: string;
+  agentId: string;
+  resolvedMcpConfig: ResolvedMcpConfig;
+  oauthProviderRepo: OAuthProviderRepository;
+  agentOAuthTokenRepo: AgentOAuthTokenRepository;
+}
+
+/** Load and lazy-refresh OAuth tokens for every HTTP binding in the
+ *  resolved MCP config whose auth is `type: 'oauth'`. Each token is
+ *  refreshed in place (Firestore write) when near expiry before its
+ *  accessToken flows into the runtime context. Callers forward refresh
+ *  errors up — the workflow then fails with an actionable "Reconnect"
+ *  message surfaced in the UI. Returns undefined when no OAuth bindings
+ *  are present (so the context field stays absent, not an empty object). */
+async function loadOAuthTokens(
+  deps: LoadOAuthTokensDeps,
+): Promise<Record<string, ResolvedOAuthBinding> | undefined> {
+  const { namespace, agentId, resolvedMcpConfig, oauthProviderRepo, agentOAuthTokenRepo } = deps;
+  const result: Record<string, ResolvedOAuthBinding> = {};
+
+  for (const [serverName, server] of Object.entries(resolvedMcpConfig.servers)) {
+    if (server.type !== 'http' || server.auth?.type !== 'oauth') continue;
+    const auth = server.auth;
+
+    const providerId = auth.provider;
+    const [token, provider] = await Promise.all([
+      agentOAuthTokenRepo.get(namespace, agentId, serverName),
+      oauthProviderRepo.get(namespace, providerId),
+    ]);
+
+    if (token === null) {
+      // Surface the same error shape the runtime would raise so UI messaging
+      // stays consistent whether the token is missing at load time or the
+      // runtime lookup layer.
+      throw new Error(
+        `OAuth token for MCP server "${serverName}" (provider "${providerId}") is not connected. ` +
+        `Connect the account via the agent editor in the UI, then retry the step.`,
+      );
+    }
+    if (provider === null) {
+      throw new Error(
+        `OAuth provider "${providerId}" (referenced by MCP server "${serverName}") not found in ` +
+        `namespace "${namespace}". Recreate the provider in the admin OAuth Providers page, ` +
+        `or switch the binding to a different provider.`,
+      );
+    }
+
+    const { token: fresh, wasRefreshed } = await resolveOAuthToken({ token, provider });
+    if (wasRefreshed) {
+      await agentOAuthTokenRepo.put(namespace, agentId, serverName, fresh);
+    }
+
+    result[serverName] = {
+      accessToken: fresh.accessToken,
+      headerName: auth.headerName,
+      headerValueTemplate: auth.headerValueTemplate,
+    };
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
 }

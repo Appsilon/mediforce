@@ -52,6 +52,9 @@ export interface OAuthStatePayload {
   agentId: string;
   serverName: string;
   providerId: string;
+  /** Firebase uid of the user who initiated the flow. Callback has no
+   *  session, so we carry this through the state to attribute audit fields. */
+  connectedBy: string;
   /** Unix ms at which this state was minted. Used for TTL enforcement. */
   ts: number;
   /** 16 random bytes, base64url — prevents replay of identical payloads. */
@@ -111,6 +114,7 @@ export async function verifyState(
       typeof asRecord.agentId !== 'string' ||
       typeof asRecord.serverName !== 'string' ||
       typeof asRecord.providerId !== 'string' ||
+      typeof asRecord.connectedBy !== 'string' ||
       typeof asRecord.ts !== 'number' ||
       typeof asRecord.nonce !== 'string'
     ) {
@@ -121,6 +125,7 @@ export async function verifyState(
       agentId: asRecord.agentId,
       serverName: asRecord.serverName,
       providerId: asRecord.providerId,
+      connectedBy: asRecord.connectedBy,
       ts: asRecord.ts,
       nonce: asRecord.nonce,
     };

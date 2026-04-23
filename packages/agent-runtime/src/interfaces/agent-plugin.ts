@@ -39,6 +39,25 @@ export interface AgentContext {
   getPreviousStepOutputs: () => Promise<Record<string, unknown>>;
 }
 
+/** OAuth token context passed into a workflow agent run, keyed by the MCP
+ *  server name on the agent's binding map. Carries the already-loaded
+ *  access token plus the binding's header injection settings so the
+ *  runtime writer can synthesize a single header without reaching back
+ *  into Firestore. Producing this map is the caller's job (platform-ui's
+ *  `execute-agent-step`): load the token, refresh if close to expiry,
+ *  persist the refresh, then hand the resolved bundle to the context.
+ *  Keeping the runtime decoupled from repos is what lets queued-docker
+ *  spawn serialize the context through BullMQ without a Firestore trip. */
+export interface ResolvedOAuthBinding {
+  /** Fresh OAuth access token, ready to render into the header value. */
+  accessToken: string;
+  /** Name of the HTTP header to emit (e.g. "Authorization"). */
+  headerName: string;
+  /** Template for the header value; `{token}` is replaced with
+   *  `accessToken` via `renderOAuthHeader`. (e.g. "Bearer {token}"). */
+  headerValueTemplate: string;
+}
+
 /**
  * Agent execution context built from the unified WorkflowDefinition model.
  * Replaces AgentContext — plugins read agent config from step.agent,
@@ -68,6 +87,11 @@ export interface WorkflowAgentContext {
    * or all previous failed). Undefined when the WD declares no carry-over.
    */
   previousRun?: Record<string, unknown>;
+  /** Pre-loaded OAuth tokens keyed by MCP server name. Populated by
+   *  platform-ui's executeAgentStep for every HTTP binding whose auth
+   *  config is `{ type: 'oauth', ... }`. Consumed by writeMcpConfig to
+   *  synthesize the Authorization header at spawn time. */
+  oauthTokens?: Record<string, ResolvedOAuthBinding>;
 }
 
 // EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp

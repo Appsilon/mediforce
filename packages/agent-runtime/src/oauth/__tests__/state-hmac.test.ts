@@ -9,6 +9,7 @@ function fixture(overrides: Partial<OAuthStatePayload> = {}): OAuthStatePayload 
     agentId: 'claude-code-agent',
     serverName: 'github',
     providerId: 'github',
+    connectedBy: 'firebase-uid-abc',
     ts: 1_700_000_000_000,
     nonce: 'test-nonce-abc',
     ...overrides,
