@@ -56,7 +56,11 @@ _Pending — ingest `**/*.wd.json` files._
 
 ### Pharma domain
 
-_Pending commit 5 — cdisc-sdtm, ctcae-grading, recist-v1-1, pharma-domain-context._
+- [pharma-domain-context](./concepts/pharma-domain-context.md) — clinical terms = identifiers; no wellbeing framing; preamble carries framing to runtime.
+- [cdisc-sdtm](./concepts/cdisc-sdtm.md) — SDTM → ADaM → TFL pipeline; variable-name standard; ties into protocol-to-tfl.
+- [ctcae-grading](./concepts/ctcae-grading.md) — 1–5 AE severity; Grade 5 = death; companion signals (irAE, Hy's Law).
+- [recist-v1-1](./concepts/recist-v1-1.md) — CR/PR/SD/PD tumour-response; ORR/DCR/PFS/DoR endpoints; iRECIST variant.
+- [ich-gcp](./concepts/ich-gcp.md) — regulatory framework; ALCOA+ data integrity; audit events = regulatory requirement.
 
 ## Decisions
 

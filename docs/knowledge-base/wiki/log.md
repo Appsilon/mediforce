@@ -82,3 +82,19 @@ Every concept page names the before-you-write-new-code check — e.g. "use `reso
 
 touched: `index.md`, 9 new concept pages.
 summary: covered the nine architectural concepts referenced most often in AGENTS.md + entity pages. Pharma-domain concepts queued for commit 5.
+
+## [2026-04-23] ingest | Pharma domain concepts (5)
+
+Written in caveman style (user directive mid-commit — see note below). Filed:
+- `concepts/pharma-domain-context.md`
+- `concepts/cdisc-sdtm.md`
+- `concepts/ctcae-grading.md`
+- `concepts/recist-v1-1.md`
+- `concepts/ich-gcp.md`
+
+Each page: what the standard is, where it shows up in our code (vars, schemas, skills, prompts), canonical external source, related pages.
+
+**Style change from this commit onward**: wiki pages written in caveman style (terse, dropped articles, fragments, tables, imperatives) for context-frugal reads by agents. SCHEMA.md to be updated with the full caveman prompt in a follow-up commit. Earlier pages (commits 1–4) written in fuller prose — lint should eventually rewrite for consistency.
+
+touched: `index.md`, 5 new pharma-concept pages.
+summary: covered pharma framing + 4 clinical standards that tie into `protocol-to-tfl` and clinical-workflow schemas.
