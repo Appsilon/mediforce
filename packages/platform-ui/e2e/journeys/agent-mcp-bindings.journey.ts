@@ -51,6 +51,10 @@ test.describe('Agent MCP Bindings Journey', () => {
     await click(page, page.getByRole('radio', { name: /^http$/i }));
     await page.getByLabel(/^url$/i).fill('https://api.example.com/mcp');
 
+    // Step 5 added a three-way Authentication radio (None / Static headers /
+    // OAuth). Default is None, so pick Static headers before adding rows.
+    await click(page, page.getByRole('radio', { name: /^static headers$/i }));
+
     // One header row
     await click(page, page.getByRole('button', { name: /add header/i }));
     await page.getByLabel(/header key 1|header name 1/i).fill('Authorization');

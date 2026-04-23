@@ -306,6 +306,12 @@ The agent detail page exposes an MCP Bindings section where authors attach tools
 
 ![agent-mcp-bindings](agent-mcp-bindings.gif)
 
+### Agent OAuth Connection
+
+HTTP MCP bindings can authenticate against a namespace-scoped OAuth provider instead of static headers. The binding row exposes inline Connect / Disconnect / Revoke actions: Connect performs a full-page redirect through the provider's `authorize` → `/api/oauth/<provider>/callback` chain (state verified via stateless HMAC, no session storage), Disconnect removes the local token only, and Revoke additionally POSTs the provider's revoke endpoint. Tokens are auto-refreshed at spawn time when within 5 minutes of expiry. Providers (GitHub, Google, or custom OAuth2) are provisioned by admins under `/<handle>/admin/oauth-providers`.
+
+![agent-mcp-oauth](agent-mcp-oauth.gif)
+
 ## Platform shortcuts
 
 ### Command Palette — New Ticket

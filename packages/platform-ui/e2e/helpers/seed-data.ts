@@ -821,7 +821,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       updatedAt: twoDaysAgo,
     },
     // Fixture agent for the OAuth journey (Step 5). Ships with a pre-bound
-    // HTTP binding named `github-tools` configured for OAuth via the
+    // HTTP binding named `github-mcp` configured for OAuth via the
     // `github-mock` provider, so the journey opens the editor and jumps
     // straight to "Connect" without first editing the agent.
     'oauth-test-agent': {
@@ -836,7 +836,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       systemPrompt: '',
       skillFileNames: [],
       mcpServers: {
-        'github-tools': {
+        'github-mcp': {
           type: 'http',
           url: 'https://api.example.com/mcp',
           auth: {

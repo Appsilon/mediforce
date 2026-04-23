@@ -16,7 +16,7 @@ import { setupRecording, click, showStep, showResult, endRecording } from '../he
  *     MCP section with a Connect button.
  *  3. Clicking Connect navigates to the provider `/authorize`, which 302s
  *     back to `/api/oauth/github-mock/callback?code=…&state=…`, which 302s
- *     to the agent page with `?connected=github-tools`. The binding row
+ *     to the agent page with `?connected=github-mcp`. The binding row
  *     now shows "Connected as @mock-user".
  *  4. Disconnect (local-only) flips back to "Not connected".
  *  5. Reconnect — same redirect chain, same final state.
@@ -51,17 +51,17 @@ test.describe('Agent MCP OAuth Journey', () => {
 
     const mcpHeading = page.getByRole('heading', { name: /mcp servers/i });
     await expect(mcpHeading).toBeVisible();
-    // The seeded binding name is `github-tools`.
-    await expect(page.getByText('github-tools').first()).toBeVisible();
+    // The seeded binding name is `github-mcp`.
+    await expect(page.getByText('github-mcp').first()).toBeVisible();
     await showStep(page);
 
     // ── Connect ───────────────────────────────────────────────────────────
     // `window.location = authorizeUrl` inside the Connect handler triggers
     // a full-page redirect to the mock `/authorize` endpoint, which
     // immediately 302s back to `/api/oauth/github-mock/callback?...`,
-    // which 302s to the agent page with `?connected=github-tools`.
+    // which 302s to the agent page with `?connected=github-mcp`.
     await click(page, page.getByRole('button', { name: /^connect$/i }).first());
-    await page.waitForURL(/\?connected=github-tools/, { timeout: 20_000 });
+    await page.waitForURL(/\?connected=github-mcp/, { timeout: 20_000 });
     await expect(page.getByText(/connected as @mock-user|connected: @mock-user|@mock-user/i).first()).toBeVisible({
       timeout: 10_000,
     });
@@ -78,7 +78,7 @@ test.describe('Agent MCP OAuth Journey', () => {
 
     // ── Reconnect ────────────────────────────────────────────────────────
     await click(page, page.getByRole('button', { name: /^connect$/i }).first());
-    await page.waitForURL(/\?connected=github-tools/, { timeout: 20_000 });
+    await page.waitForURL(/\?connected=github-mcp/, { timeout: 20_000 });
     await expect(page.getByText(/@mock-user/i).first()).toBeVisible({ timeout: 10_000 });
     await showStep(page);
 
