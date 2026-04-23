@@ -19,6 +19,6 @@
     "firebase-admin": "^13.6.1"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0"
+    "@types/node": "^24.12.2"
   }
 }
