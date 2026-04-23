@@ -92,10 +92,15 @@ export function ProcessDetail({
   );
 
   // When a new agent log file appears (new step started), switch to Agent Log.
-  // This fires even if the user manually switched to Audit Log mid-run — intentional:
-  // the active agent is the most relevant view while the workflow is running.
+  // Only switch when the count increases so the user's manual tab choice is
+  // respected mid-run.
+  const prevLogFilesLengthRef = React.useRef(agentLogFiles.length);
   React.useEffect(() => {
-    if (agentLogFiles.length > 0) setRightTab('agent-log');
+    const prev = prevLogFilesLengthRef.current;
+    prevLogFilesLengthRef.current = agentLogFiles.length;
+    if (agentLogFiles.length > prev) {
+      setRightTab('agent-log');
+    }
   }, [agentLogFiles.length]);
 
   const [agentLogStepId, setAgentLogStepId] = React.useState<string | null>(null);
