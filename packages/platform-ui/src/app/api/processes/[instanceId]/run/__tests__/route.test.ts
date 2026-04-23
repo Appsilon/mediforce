@@ -4,6 +4,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
+// Mock next/server `after()` to capture the callback so tests can await it
+let afterCallback: (() => Promise<void>) | null = null;
+vi.mock('next/server', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('next/server')>();
+  return {
+    ...mod,
+    after: (fn: () => Promise<void>) => { afterCallback = fn; },
+  };
+});
+
 // ---- Mocks ----
 
 const mockInstanceGetById = vi.fn();
@@ -102,6 +112,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    afterCallback = null;
     mockHumanTaskGetByInstanceId.mockResolvedValue([]);
   });
 
@@ -149,13 +160,14 @@ describe('POST /api/processes/[instanceId]/run', () => {
       });
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
-      const json = await res.json();
+      expect(res.status).toBe(202);
+
+      // Execute the after() callback (long-running work)
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
 
       // Agent step should have been executed exactly once
       expect(mockExecuteAgentStep).toHaveBeenCalledTimes(1);
-      // Instance should end paused (waiting for human)
-      expect(json.status).toBe('paused');
-      expect(json.stepsExecuted).toBe(1);
     });
 
     it('[ERROR] stuck loop safety guard triggers after MAX_SAME_STEP_ITERATIONS', async () => {
@@ -181,7 +193,9 @@ describe('POST /api/processes/[instanceId]/run', () => {
       });
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
-      const json = await res.json();
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
 
       // Should fail the instance after detecting stuck loop
       expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
@@ -221,7 +235,9 @@ describe('POST /api/processes/[instanceId]/run', () => {
       mockGetWorkflowDefinition.mockResolvedValue(humanFirstWorkflow);
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
-      const json = await res.json();
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
 
       // No agent step should have been called
       expect(mockExecuteAgentStep).not.toHaveBeenCalled();
@@ -291,12 +307,12 @@ describe('POST /api/processes/[instanceId]/run', () => {
       });
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
-      const json = await res.json();
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
 
       // Both agent steps should have been executed
       expect(mockExecuteAgentStep).toHaveBeenCalledTimes(2);
-      expect(json.stepsExecuted).toBe(2);
-      expect(json.status).toBe('paused');
     });
 
     it('[DATA] terminal step as first step — loop exits immediately', async () => {
@@ -315,10 +331,11 @@ describe('POST /api/processes/[instanceId]/run', () => {
       mockGetWorkflowDefinition.mockResolvedValue(terminalFirstWorkflow);
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
-      const json = await res.json();
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
 
       expect(mockExecuteAgentStep).not.toHaveBeenCalled();
-      expect(json.stepsExecuted).toBe(0);
     });
 
     it('[ERROR] unknown step ID fails the instance', async () => {
@@ -329,6 +346,9 @@ describe('POST /api/processes/[instanceId]/run', () => {
       mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
 
       expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
         status: 'failed',
@@ -352,6 +372,9 @@ describe('POST /api/processes/[instanceId]/run', () => {
       mockGetWorkflowDefinition.mockResolvedValue(badWorkflow);
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
 
       expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
         status: 'failed',
@@ -370,6 +393,9 @@ describe('POST /api/processes/[instanceId]/run', () => {
       ]);
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
 
       // Should not execute the agent step
       expect(mockExecuteAgentStep).not.toHaveBeenCalled();
