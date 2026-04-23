@@ -349,8 +349,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       ? this.context.oauthTokens
       : undefined;
 
-    type StdioEntry = { command: string; args?: string[]; env?: Record<string, string>; allowedTools?: string[] };
-    type HttpEntry = { url: string; headers?: Record<string, string>; allowedTools?: string[] };
+    type StdioEntry = { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; allowedTools?: string[] };
+    type HttpEntry = { type: 'http'; url: string; headers?: Record<string, string>; allowedTools?: string[] };
     const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
 
     for (const [name, server] of entries) {
@@ -366,6 +366,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           }
         }
         mcpConfig[name] = {
+          type: 'stdio',
           command: server.command,
           ...(server.args !== undefined && server.args.length > 0 ? { args: server.args } : {}),
           ...(Object.keys(resolvedEnv).length > 0 ? { env: resolvedEnv } : {}),
@@ -374,6 +375,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       } else {
         const headers = buildHttpHeaders(name, server.auth, oauthTokens, workflowSecrets);
         mcpConfig[name] = {
+          type: 'http',
           url: server.url,
           ...(headers !== undefined ? { headers } : {}),
           ...allowedToolsPart,
@@ -404,8 +406,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       ? this.context.workflowSecrets
       : undefined;
 
-    type StdioEntry = { command: string; args: string[]; env?: Record<string, string>; allowedTools?: string[] };
-    type HttpEntry = { url: string; allowedTools?: string[] };
+    type StdioEntry = { type: 'stdio'; command: string; args: string[]; env?: Record<string, string>; allowedTools?: string[] };
+    type HttpEntry = { type: 'http'; url: string; allowedTools?: string[] };
     const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
 
     for (const server of servers) {
@@ -422,6 +424,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
       if (server.command) {
         mcpConfig[server.name] = {
+          type: 'stdio',
           command: server.command,
           args: server.args ?? [],
           ...(Object.keys(resolvedEnv).length > 0 ? { env: resolvedEnv } : {}),
@@ -429,6 +432,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         };
       } else if (server.url) {
         mcpConfig[server.name] = {
+          type: 'http',
           url: server.url,
           ...allowedToolsPart,
         };

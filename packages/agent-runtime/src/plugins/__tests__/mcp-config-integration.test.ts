@@ -329,7 +329,7 @@ describe('writeMcpConfig integration', () => {
       mcpServers: Record<string, Record<string, unknown>>;
     };
 
-    expect(parsed.mcpServers['remote']).toEqual({ url: 'https://mcp.example.com/v1' });
+    expect(parsed.mcpServers['remote']).toEqual({ type: 'http', url: 'https://mcp.example.com/v1' });
     expect(parsed.mcpServers['remote']).not.toHaveProperty('command');
     expect(parsed.mcpServers['remote']).not.toHaveProperty('args');
 
@@ -545,6 +545,7 @@ describe('writeMcpConfig integration', () => {
         mcpServers: Record<string, { url: string; headers?: Record<string, string> }>;
       };
       expect(parsed.mcpServers.linear).toMatchObject({
+        type: 'http',
         url: 'https://linear.app/mcp',
         headers: { 'X-Linear-Token': 'static-token' },
       });
@@ -619,6 +620,7 @@ describe('writeMcpConfig integration', () => {
         mcpServers: Record<string, { url: string; headers?: Record<string, string> }>;
       };
       expect(parsed.mcpServers.github).toMatchObject({
+        type: 'http',
         url: 'https://api.github.com/mcp',
         headers: { Authorization: 'Bearer gha_abc123' },
       });
@@ -710,7 +712,7 @@ describe('writeMcpConfig integration', () => {
       const parsed = JSON.parse(raw) as {
         mcpServers: Record<string, Record<string, unknown>>;
       };
-      expect(parsed.mcpServers.public).toEqual({ url: 'https://open.example.com/mcp' });
+      expect(parsed.mcpServers.public).toEqual({ type: 'http', url: 'https://open.example.com/mcp' });
       expect(parsed.mcpServers.public).not.toHaveProperty('headers');
 
       await cleanup();
