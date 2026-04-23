@@ -42,9 +42,21 @@ _Pending — ingest `**/*.wd.json` files._
 
 ## Concepts
 
-_Pending commit 4 — autonomy-levels, plugin-dispatch, repository-pattern, docker-spawn-strategies, dual-schema-migration, expression-evaluator, service-singleton._
+### Architectural
 
-_Pending commit 5 (pharma domain) — cdisc-sdtm, ctcae-grading, recist-v1-1, pharma-domain-context._
+- [autonomy-levels](./concepts/autonomy-levels.md) — L0–L4 scale enforced by `AgentRunner`, coupled with confidence thresholds.
+- [plugin-dispatch](./concepts/plugin-dispatch.md) — `AgentRunner` + `PluginRegistry` + `AgentOutputEnvelope`; how steps route to plugins.
+- [repository-pattern](./concepts/repository-pattern.md) — interfaces in platform-core, Firestore in platform-infra, in-memory doubles for tests.
+- [docker-spawn-strategies](./concepts/docker-spawn-strategies.md) — local child-process vs BullMQ-queued; toggled by REDIS_URL.
+- [dual-schema-migration](./concepts/dual-schema-migration.md) — legacy `processDefinitions`+`processConfigs` coexist with unified `workflowDefinitions`; go through `resolveDefinitionSteps()`.
+- [expression-evaluator](./concepts/expression-evaluator.md) — custom DSL for transition `when` clauses.
+- [service-singleton](./concepts/service-singleton.md) — `getPlatformServices()` composition root in platform-ui.
+- [mcp-resolution](./concepts/mcp-resolution.md) — per-step MCP config; workflow-mode (recommended) vs legacy flattened path.
+- [llm-no-computation-rule](./concepts/llm-no-computation-rule.md) — LLMs generate prose, numbers come from pure functions.
+
+### Pharma domain
+
+_Pending commit 5 — cdisc-sdtm, ctcae-grading, recist-v1-1, pharma-domain-context._
 
 ## Decisions
 

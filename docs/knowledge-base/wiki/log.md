@@ -64,3 +64,21 @@ Key facts noted for downstream concepts:
 
 touched: `index.md`, 4 new app pages.
 summary: covered every `apps/*` directory.
+
+## [2026-04-23] ingest | Architectural concepts (9)
+
+Synthesised from AGENTS.md + the entity pages filed in earlier commits. Filed:
+- `concepts/autonomy-levels.md`
+- `concepts/plugin-dispatch.md`
+- `concepts/repository-pattern.md`
+- `concepts/docker-spawn-strategies.md`
+- `concepts/dual-schema-migration.md`
+- `concepts/expression-evaluator.md`
+- `concepts/service-singleton.md`
+- `concepts/mcp-resolution.md`
+- `concepts/llm-no-computation-rule.md`
+
+Every concept page names the before-you-write-new-code check — e.g. "use `resolveDefinitionSteps()` before hitting Firestore directly", "check `entities/plugins/` before writing a plugin", "numbers come from pure functions, not LLMs". These pages are the primary anti-duplicate-work surface for agents.
+
+touched: `index.md`, 9 new concept pages.
+summary: covered the nine architectural concepts referenced most often in AGENTS.md + entity pages. Pharma-domain concepts queued for commit 5.
