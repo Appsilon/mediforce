@@ -50,6 +50,11 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [['html'], ['json', { outputFile: 'test-results/results.json' }]],
+  // The mock OAuth server (Step 5) starts in globalSetup and stops in
+  // globalTeardown. Its URL is written to e2e/.mock-oauth-url so both
+  // auth-setup (fixture seeding) and journey code can read it.
+  globalSetup: useEmulators ? './e2e/global-setup.ts' : undefined,
+  globalTeardown: useEmulators ? './e2e/global-teardown.ts' : undefined,
   use: {
     baseURL: `http://localhost:${testPort}`,
     headless: true,

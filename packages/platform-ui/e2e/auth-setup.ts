@@ -1,7 +1,19 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { test as setup } from '@playwright/test';
 import { TEST_ORG_HANDLE } from './helpers/constants';
 import { clearEmulators, createTestUser, seedCollection, seedSubcollection } from './helpers/emulator';
 import { buildSeedData } from './helpers/seed-data';
+
+/** Read the mock OAuth server's base URL that globalSetup wrote. Falls back
+ *  to a placeholder when running without globalSetup (e.g. CI lanes that
+ *  skip it). Journey tests that rely on the mock will fail loudly in that
+ *  case — the URL is written only when NEXT_PUBLIC_USE_EMULATORS=true. */
+function readMockOAuthBaseUrl(): string {
+  const file = path.join(__dirname, '.mock-oauth-url');
+  if (!fs.existsSync(file)) return 'http://127.0.0.1:0';
+  return fs.readFileSync(file, 'utf8').trim();
+}
 
 const TEST_EMAIL = 'test@mediforce.dev';
 const TEST_PASSWORD = 'test123456';
@@ -21,7 +33,8 @@ setup('authenticate and seed data', async ({ page }) => {
   const testUserId = await createTestUser(TEST_EMAIL, TEST_PASSWORD, TEST_DISPLAY_NAME);
 
   // 3. Seed Firestore with test data
-  const data = buildSeedData(testUserId);
+  const mockOAuthBaseUrl = readMockOAuthBaseUrl();
+  const data = buildSeedData(testUserId, { mockOAuthBaseUrl });
   await seedCollection('users', data.users);
   await seedCollection('humanTasks', data.humanTasks);
   await seedCollection('processInstances', data.processInstances);
@@ -35,6 +48,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedCollection('namespaces', data.namespaces);
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'toolCatalog', data.toolCatalog);
+  await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'oauthProviders', data.oauthProviders);
   await seedCollection('agentDefinitions', data.agentDefinitions);
   await seedSubcollection('processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions);
   await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);

@@ -54,6 +54,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
 - [New Agent Form](#new-agent-form) — creating a new agent definition
 - [Agent MCP Bindings](#agent-mcp-bindings) — per-agent stdio (catalog) and HTTP (inline URL) tool bindings with allowlists
+- [Agent OAuth Connection](#agent-oauth-connection) — per-agent OAuth flow against custom providers with Connect / Disconnect / Revoke
 
 **Platform shortcuts** — keyboard-first utilities available everywhere
 - [Command Palette — New Ticket](#command-palette--new-ticket) — file a bug/idea/question from the command palette
