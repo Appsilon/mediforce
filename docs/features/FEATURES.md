@@ -29,6 +29,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Workflow Editor — Executor Switch](#workflow-editor--executor-switch) — changing executor type clears stale fields from the workflow definition
 - [Workflow Editor — Cowork Step](#workflow-editor--cowork-step) — adding a cowork step with human+agent collaboration config
 - [Workflow Editor — Cowork MCP Servers](#workflow-editor--cowork-mcp-servers) — configuring MCP server tools on a cowork step
+- [Workflow Editor — Step MCP Restrictions](#workflow-editor--step-mcp-restrictions) — per-step disable/denyTools overrides on top of the agent's MCP bindings
 
 **Process Runs** — monitoring and controlling workflow executions
 - [Run Detail — Step Graph](#run-detail--step-graph) — tracking progress through workflow steps
@@ -45,12 +46,14 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 
 **Tools** — MCP server catalog with per-step access control
 - [Tool Catalog](#tool-catalog) — browsing, searching, and inspecting MCP tools
+- [Admin Tool Catalog](#admin-tool-catalog) — admins manage namespace-scoped stdio catalog entries (create, edit, delete)
 
 
 **Agents** — AI agent catalog and execution oversight
 - [Agent Catalog & History](#agent-catalog--history) — discovering agents and reviewing their past runs
 - [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
 - [New Agent Form](#new-agent-form) — creating a new agent definition
+- [Agent MCP Bindings](#agent-mcp-bindings) — per-agent stdio (catalog) and HTTP (inline URL) tool bindings with allowlists
 
 **Platform shortcuts** — keyboard-first utilities available everywhere
 - [Command Palette — New Ticket](#command-palette--new-ticket) — file a bug/idea/question from the command palette
@@ -188,6 +191,12 @@ The cowork step editor includes an MCP Servers section where the agent's externa
 
 ![workflow-editor-cowork-mcp](workflow-editor-cowork-mcp.gif)
 
+### Workflow Editor — Step MCP Restrictions
+
+Agent steps show an MCP Restrictions panel listing every binding inherited from the step's agent definition (loaded live from `/api/agent-definitions/:id/mcp-servers`). For each binding the workflow author can toggle it off for this step or narrow its `allowedTools` via a deny list, and both overrides surface in the YAML under the step's `mcpRestrictions` block. This keeps agent-level bindings reusable while letting individual steps run with a tighter tool surface.
+
+![step-mcp-restrictions](step-mcp-restrictions.gif)
+
 ---
 
 ## Process Runs
@@ -261,6 +270,12 @@ Organization-level MCP server catalog with three-layer access control. Browse to
 
 ![tool-catalog](tool-catalog.gif)
 
+### Admin Tool Catalog
+
+Admins manage the namespace-scoped MCP catalog from `/[handle]/admin/tool-catalog`. The split-pane layout lists all stdio entries on the left and edits the selected one on the right. A new-entry form collects `id`, `command`, variadic `args`, optional environment variables (with `{{SECRET:…}}` placeholders), and description. Editing updates the entry in place with an auto-save indicator; deleting pops a confirmation dialog and removes the entry from the namespace's `toolCatalog` subcollection.
+
+![admin-tool-catalog](admin-tool-catalog.gif)
+
 ---
 
 
@@ -283,6 +298,12 @@ When an agent reports low confidence (here 0.45), the run is escalated for human
 Registration form for new agent definitions. Fill in name, select foundation model. This is the entry point for adding custom agents to the platform.
 
 ![agent-new-form](agent-new-form.gif)
+
+### Agent MCP Bindings
+
+The agent detail page exposes an MCP Bindings section where authors attach tools to an agent. Stdio bindings pick a catalog entry and add an optional `allowedTools` allowlist; HTTP bindings take an inline URL plus optional allowlist — both are saved to the agent's `mcpBindings` array via `/api/agent-definitions/:id/mcp-servers/:name`. Deleting removes an individual binding, and a reload confirms HTTP bindings persist across sessions. Workflow steps consume these bindings as their baseline surface, which Step MCP Restrictions can further narrow.
+
+![agent-mcp-bindings](agent-mcp-bindings.gif)
 
 ## Platform shortcuts
 
