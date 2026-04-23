@@ -3,14 +3,14 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Run Detail Journey', () => {
-  test('running process shows step graph, step history, and tabs', async ({ page }, testInfo) => {
+  test('running process shows step status panel and audit log tab', async ({ page }, testInfo) => {
     await setupRecording(page, 'run-detail-step-graph', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/running/i).first()).toBeVisible();
     await showStep(page);
 
-    // All 7 non-terminal steps visible
+    // All 7 non-terminal steps visible in the step status panel
     const expectedSteps = [
       'Vendor Assessment',
       'Narrative Summary',
@@ -28,26 +28,19 @@ test.describe('Run Detail Journey', () => {
     const stepStatusPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Step Status' }) });
     await expect(stepStatusPanel.locator('ol > li')).toHaveCount(7);
 
-    // Verdict labels visible
+    // Verdict labels visible in step status panel
     await expect(page.getByText('approve').first()).toBeVisible();
     await expect(page.getByText('request-actions')).toBeVisible();
     await expect(page.getByText('Archived').first()).toBeVisible();
     await showStep(page);
 
-    // Click Step History tab
-    await click(page, page.getByRole('tab', { name: /step history/i }));
-    const historyEntries = page.locator('[data-step-id]');
-    await expect(historyEntries).toHaveCount(2, { timeout: 10_000 });
-    await expect(page.locator('[data-step-id="vendor-assessment"]')).toBeVisible();
-    await expect(page.locator('[data-step-id="narrative-summary"]')).toBeVisible();
-    await showStep(page);
-
-    // Audit Log tab visible
-    await expect(page.getByRole('tab', { name: /audit log/i })).toBeVisible();
+    // Right panel: Audit Log tab visible; no Step History tab (removed in two-panel redesign)
+    await expect(page.getByRole('button', { name: /audit log/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /step history/i })).not.toBeVisible();
     await showResult(page);
   });
 
-  test('completed run shows all steps completed and step history', async ({ page }, testInfo) => {
+  test('completed run shows results panel, duration, and completed steps', async ({ page }, testInfo) => {
     await setupRecording(page, 'run-detail-completed', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`);
 
@@ -62,36 +55,57 @@ test.describe('Run Detail Journey', () => {
     const completedSteps = stepStatusPanel.locator('li').filter({ hasText: 'Completed' });
     await expect(completedSteps).toHaveCount(2);
 
-    // Step History tab
-    await click(page, page.getByRole('tab', { name: /step history/i }));
-    await expect(page.locator('[data-step-id="verify-data-quality"]')).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('[data-step-id="review-results"]')).toBeVisible();
+    // Duration is visible for a completed run
+    await expect(page.getByText(/duration/i)).toBeVisible();
+
+    // Right panel: Audit Log tab in the two-panel layout
+    await expect(page.getByRole('button', { name: /audit log/i })).toBeVisible();
     await showResult(page);
   });
 
-  test('autonomy badges and new-style workflow run', async ({ page }, testInfo) => {
+  test('autonomy badges and executor identity labels', async ({ page }, testInfo) => {
     await setupRecording(page, 'run-detail-autonomy-badges', testInfo);
-    // proc-completed-2 has processConfig with L4, L2
+    // proc-completed-2 has processConfig with L4, L2 autonomy levels
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-completed-2`);
 
     const stepStatusPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Step Status' }) });
     await expect(stepStatusPanel.locator('ol > li')).toHaveCount(7, { timeout: 10_000 });
 
-    // Autonomy badges
+    // Autonomy badges from processConfig
     await expect(stepStatusPanel.getByText('L4').first()).toBeVisible();
     await expect(stepStatusPanel.getByText('L2').first()).toBeVisible();
     await showStep(page);
 
-    // Navigate to new-style workflow run (no configName)
+    // Executor identity labels: plugin name from legacy processConfig
+    await expect(stepStatusPanel.getByText('agent:supply-chain/vendor-assessment')).toBeVisible();
+    await showStep(page);
+
+    // Navigate to new-style workflow run (proc-workflow-run-1 uses WorkflowDefinition, no configName)
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-workflow-run-1`);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
 
-    // Step status panel renders
-    const stepPanel = page
-      .locator('[data-testid="step-status-panel"]')
-      .or(page.locator('text=/Vendor Assessment|Narrative Summary|Risk Scoring/i'));
-    await expect(stepPanel.first()).toBeVisible({ timeout: 10_000 });
+    const wfStepPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Step Status' }) });
+    await expect(wfStepPanel.locator('ol > li').first()).toBeVisible({ timeout: 10_000 });
+
+    // Executor label uses plugin from the WorkflowDefinition step ('supply-data-collector')
+    await expect(wfStepPanel.getByText('agent:supply-data-collector')).toBeVisible();
     await showResult(page);
     await endRecording(page);
+  });
+
+  test('duration hidden while running, visible when completed', async ({ page }, testInfo) => {
+    await setupRecording(page, 'run-detail-duration-visibility', testInfo);
+
+    // Running process: Duration metadata field must NOT appear
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
+    await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/^Duration:/i)).not.toBeVisible();
+    await showStep(page);
+
+    // Completed process: Duration metadata field IS visible
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`);
+    await expect(page.getByRole('heading', { name: 'Data Quality Review' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/^Duration:/i)).toBeVisible();
+    await showResult(page);
   });
 });

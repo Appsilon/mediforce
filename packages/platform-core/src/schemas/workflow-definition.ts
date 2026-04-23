@@ -36,6 +36,10 @@ export const WorkflowAgentConfigSchema = z.object({
    *  Step 2 of the MCP permissions refactor will migrate existing
    *  workflows and drop this field. Still parsed for backward-compat. */
   mcpServers: z.array(McpServerConfigSchema).optional(),
+  /** Additional Claude Code tools to allow beyond the default set
+   *  (Bash, Read, Write, Edit, Glob, Grep). Use this to grant internet
+   *  access (WebSearch, WebFetch) or any other built-in tool. */
+  allowedTools: z.array(z.string()).optional(),
 });
 
 export const CoworkChatConfigSchema = z.object({

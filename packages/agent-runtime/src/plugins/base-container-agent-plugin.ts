@@ -161,6 +161,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     return {};
   }
 
+  /** Return plugin-internal env vars for local (non-Docker) execution.
+   *  Override when container paths differ from host paths (e.g. /output/ vs actual outputDir).
+   *  Default: delegates to getInternalEnvVars(). */
+  protected getLocalInternalEnvVars(_outputDir: string): Record<string, string> {
+    return this.getInternalEnvVars();
+  }
+
   /** Return the CLI command spec to run the agent inside the container.
    *  @param promptFilePath — container path to the prompt file (/output/prompt.txt) */
   abstract getAgentCommand(promptFilePath: string, options?: SpawnCliOptions): AgentCommandSpec;
@@ -375,6 +382,68 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     });
   }
 
+  /**
+   * Scan outputDir for deliverable files (HTML, PDF, CSV, etc.) — excluding
+   * internal agent files. Copy the first match to a stable temp location so
+   * it survives output-dir cleanup, and return the absolute copied path.
+   * Returns null if nothing found.
+   *
+   * Two-phase logic:
+   * 1. Loop over known deliverable extensions, skipping INTERNAL_NAMES.
+   *    `presentation.html` is in INTERNAL_NAMES so it's skipped here.
+   * 2. Fallback: try `presentation.html` separately. It's excluded from the
+   *    loop because it's already read into spawnResult.presentation, but we
+   *    still need a persisted path so the Download Report button can serve it.
+   */
+  protected async persistDeliverableFile(
+    outputDir: string,
+    instanceId: string,
+    stepId: string,
+  ): Promise<string | null> {
+    const INTERNAL_NAMES = new Set([
+      'opencode.json', 'auth.json', 'prompt.txt', 'result.json',
+      'git-result.json', 'mock-result.json', 'presentation.html',
+    ]);
+    const DELIVERABLE_EXTS = new Set(['.html', '.htm', '.pdf', '.csv', '.xlsx', '.md']);
+
+    let entries: string[];
+    try {
+      entries = await readdir(outputDir);
+    } catch {
+      return null;
+    }
+
+    for (const name of entries) {
+      if (INTERNAL_NAMES.has(name)) continue;
+      if (name.startsWith('.')) continue;
+      const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+      if (!DELIVERABLE_EXTS.has(ext)) continue;
+
+      const srcPath = join(outputDir, name);
+      const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
+      await mkdir(destDir, { recursive: true });
+      const destPath = join(destDir, name);
+      try {
+        await cp(srcPath, destPath);
+        return destPath;
+      } catch {
+        continue;
+      }
+    }
+
+    // Also handle presentation.html (already read as spawnResult.presentation but path needed)
+    const presentationPath = join(outputDir, 'presentation.html');
+    try {
+      const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
+      await mkdir(destDir, { recursive: true });
+      const destPath = join(destDir, `${stepId}-presentation.html`);
+      await cp(presentationPath, destPath);
+      return destPath;
+    } catch {
+      return null;
+    }
+  }
+
   /** Resolve the host path to the mock-fixtures directory for this step's plugin.
    *  Returns null if skillsDir is not set. */
   protected getMockFixturesDir(): string | null {
@@ -443,6 +512,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         commit: stepAgent.commit,
         dockerfile: stepAgent.dockerfile,
         mcpServers: stepAgent.mcpServers,
+        allowedTools: stepAgent.allowedTools,
       };
     } else {
       const stepConfig = context.config.stepConfigs.find(
@@ -695,6 +765,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // Strip envelope-level fields from result to avoid duplication in UI
       const { confidence: _c, confidence_rationale: _cr, ...cleanResult } = parsedResult;
 
+      // Persist any deliverable file from the output dir before it gets cleaned up
+      const deliverableFile = await this.persistDeliverableFile(
+        dockerOutputDir ?? spawnResult.outputDir ?? '',
+        instanceId,
+        this.context.stepId,
+      );
+
       await emit({
         type: 'result',
         payload: {
@@ -718,6 +795,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           result: cleanResult,
           ...(spawnResult.gitMetadata ? { gitMetadata: spawnResult.gitMetadata } : {}),
           ...(spawnResult.presentation ? { presentation: spawnResult.presentation } : {}),
+          ...(deliverableFile ? { deliverableFile } : {}),
         },
         timestamp: new Date().toISOString(),
       });
@@ -1117,14 +1195,17 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     }
 
     // --- Spawn the agent CLI ---
-    // Local mode: inherit host env (agent CLI uses host auth)
     const commandSpec = this.getAgentCommand(promptFilePath, options);
 
     const cliOutput = await new Promise<string>((resolve, reject) => {
       const child = spawn(commandSpec.args[0], commandSpec.args.slice(1), {
         cwd: workingDir,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env },
+        env: {
+          ...process.env,
+          ...this.resolvedEnv.vars,
+          ...this.getLocalInternalEnvVars(outputDir),
+        },
       });
 
       let settled = false;

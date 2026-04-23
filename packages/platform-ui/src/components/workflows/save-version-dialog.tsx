@@ -9,7 +9,7 @@ interface SaveVersionDialogProps {
   nextVersion: number;
   confirmLabel?: string;
   onClose: () => void;
-  onConfirm: (title: string) => void;
+  onConfirm: (title: string, setAsDefault: boolean) => void;
 }
 
 export function SaveVersionDialog({
@@ -20,11 +20,13 @@ export function SaveVersionDialog({
   onConfirm,
 }: SaveVersionDialogProps) {
   const [title, setTitle] = useState('');
+  const [setAsDefault, setSetAsDefault] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setTitle('');
+      setSetAsDefault(false);
       // Defer focus so the dialog is mounted before we focus
       setTimeout(() => inputRef.current?.focus(), 30);
     }
@@ -36,7 +38,7 @@ export function SaveVersionDialog({
 
   const handleConfirm = () => {
     if (!trimmed) return;
-    onConfirm(trimmed);
+    onConfirm(trimmed, setAsDefault);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -97,6 +99,16 @@ export function SaveVersionDialog({
             )
           }
         </p>
+
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={setAsDefault}
+            onChange={(e) => setSetAsDefault(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-border accent-primary"
+          />
+          <span className="text-xs text-muted-foreground">Set as default version</span>
+        </label>
 
         <div className="flex justify-end gap-2 pt-1">
           <button
