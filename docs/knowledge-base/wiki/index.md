@@ -68,7 +68,11 @@ _Pending._
 
 ## Gotchas
 
-_Pending commit 6 — mediforce-source-custom-condition, remote-e2e-setup, dual-schema-routing._
+- [mediforce-source-custom-condition](./gotchas/mediforce-source-custom-condition.md) — TS condition resolves `@mediforce/*` to source `.ts` in dev, `dist/` in prod; don't rebuild in dev.
+- [remote-e2e-setup](./gotchas/remote-e2e-setup.md) — run `bootstrap_e2e.py` before E2E in remote envs; idempotent.
+- [dual-schema-routing](./gotchas/dual-schema-routing.md) — always read via `resolveDefinitionSteps()`; never hit `processDefinitions` / `workflowDefinitions` directly.
+- [runtime-skill-path-coupling](./gotchas/runtime-skill-path-coupling.md) — runtime skill paths hardcoded in `.wd.json`; runtime vs dev skills are two tiers.
+- [in-memory-repos-not-mocks](./gotchas/in-memory-repos-not-mocks.md) — use `InMemory*Repository` from `@mediforce/platform-core/testing`; don't mock firebase-admin.
 
 ## Syntheses
 

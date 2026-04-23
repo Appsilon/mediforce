@@ -98,3 +98,26 @@ Each page: what the standard is, where it shows up in our code (vars, schemas, s
 
 touched: `index.md`, 5 new pharma-concept pages.
 summary: covered pharma framing + 4 clinical standards that tie into `protocol-to-tfl` and clinical-workflow schemas.
+
+## [2026-04-23] decision | Adopt caveman style for wiki prose
+
+Embedded JuliusBrussee/caveman canonical always-on prompt in `SCHEMA.md` → "Writing style: caveman". Rationale: 60–75% fewer tokens vs full prose, same substance. Wiki read in-session by agents → context budget dominates.
+
+Intensity levels added: lite (decisions/syntheses), full (entities/concepts/gotchas — default), ultra (index/table rows). Passthrough list: frontmatter, code, URLs, symbols, numbers — never compress.
+
+Pharma commit already caveman. Earlier commits (1–4) in fuller prose — follow-up rewrite pass TBD.
+
+touched: `SCHEMA.md`.
+
+## [2026-04-23] ingest | Gotchas (5)
+
+High-value anti-duplicate-work surface. Each gotcha = "agent burned >15 min on this" or "agent likely to reimplement the wrong way". Filed in caveman:
+
+- `gotchas/mediforce-source-custom-condition.md` — TS condition trap.
+- `gotchas/remote-e2e-setup.md` — bootstrap_e2e.py before E2E in remote envs.
+- `gotchas/dual-schema-routing.md` — go through resolveDefinitionSteps; pairs with dual-schema-migration concept.
+- `gotchas/runtime-skill-path-coupling.md` — runtime vs dev skills, skillsDir hardcoded.
+- `gotchas/in-memory-repos-not-mocks.md` — test doubles > firebase-admin mocks.
+
+touched: `index.md`, 5 new gotcha pages.
+summary: covered the most common reimplement-what-already-exists traps called out by AGENTS.md.
