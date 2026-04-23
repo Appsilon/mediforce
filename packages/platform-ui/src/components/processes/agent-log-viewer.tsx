@@ -4,7 +4,6 @@ import * as React from 'react';
 import { FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2, Clock } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/auth-context';
 
 interface LogEntry {
   ts: string;
@@ -307,7 +306,7 @@ function LogGroupList({ groups }: { groups: LogGroup[] }) {
   );
 }
 
-async function fetchSingleLog(file: string, authToken: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
+async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
   try {
     const response = await apiFetch(`/api/agent-logs?file=${encodeURIComponent(file)}`);
     const data = await response.json() as { content: string; error?: string };
@@ -443,7 +442,6 @@ function ThinkingIndicator() {
 }
 
 export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps) {
-  const { firebaseUser } = useAuth();
   const [sections, setSections] = React.useState<AgentLogSection[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [pollingActive, setPollingActive] = React.useState(logFiles.length > 0);
@@ -475,11 +473,10 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
   const fetchLogs = React.useCallback(async () => {
     if (logFiles.length === 0) return;
     setLoading(true);
-    const authToken = firebaseUser ? await firebaseUser.getIdToken() : '';
     try {
       const results = await Promise.all(
         logFiles.map(async (logFile) => {
-          const result = await fetchSingleLog(logFile.file, authToken);
+          const result = await fetchSingleLog(logFile.file);
           return { stepId: logFile.stepId, ...result };
         }),
       );
