@@ -302,6 +302,7 @@ export function TaskDetail({
         processInstance={processInstance}
         siblingTasks={siblingTasks}
         onContentLoaded={onContentLoaded}
+        instanceId={task.processInstanceId}
       />
 
       {/* Previous step output — context for all non-file-upload tasks */}
@@ -423,11 +424,13 @@ function AgentOutputSection({
   processInstance,
   siblingTasks,
   onContentLoaded,
+  instanceId,
 }: {
   task: HumanTask;
   processInstance: ProcessInstance | null;
   siblingTasks: HumanTask[];
   onContentLoaded: (has: boolean) => void;
+  instanceId: string;
 }) {
   const isAgentReview = isAgentReviewTask(task, processInstance);
   if (!isAgentReview) return null;
@@ -450,6 +453,7 @@ function AgentOutputSection({
       agentOutput={agentOutput}
       stepId={task.stepId}
       onContentLoaded={onContentLoaded}
+      instanceId={instanceId}
     />
   );
 }

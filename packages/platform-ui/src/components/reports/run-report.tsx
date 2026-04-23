@@ -187,7 +187,7 @@ export function RunReport({
       </section>
 
       {/* Deliverables */}
-      <DeliverablesSection finalOutput={finalOutput} />
+      <DeliverablesSection finalOutput={finalOutput} instanceId={instance.id} />
 
       {/* Footer */}
       <ReportFooter />
@@ -423,8 +423,10 @@ function JsonPreview({ label, value }: { label: string; value: unknown }) {
 
 function DeliverablesSection({
   finalOutput,
+  instanceId,
 }: {
   finalOutput: ReturnType<typeof findFinalAgentOutput>;
+  instanceId: string;
 }) {
   const { firebaseUser } = useAuth();
 
@@ -440,7 +442,7 @@ function DeliverablesSection({
     if (!effectiveDeliverableFile) return;
     const authToken = firebaseUser ? await firebaseUser.getIdToken() : '';
     const response = await fetch(
-      `/api/agent-output-file?path=${encodeURIComponent(effectiveDeliverableFile)}`,
+      `/api/agent-output-file?path=${encodeURIComponent(effectiveDeliverableFile)}&instanceId=${encodeURIComponent(instanceId)}`,
       { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} },
     );
     if (!response.ok) return;

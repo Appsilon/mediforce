@@ -6,20 +6,11 @@ import { getAdminAuth } from '@mediforce/platform-infra';
 
 /**
  * Serves agent output files from allowed directories.
- * Accepts an absolute `path` query parameter and validates it against known safe prefixes.
+ * Requires both `path` and `instanceId` query parameters.
+ * The path is validated against instance-specific prefixes to prevent
+ * cross-tenant access — only files belonging to the given instance can
+ * be served.
  */
-
-const ALLOWED_PREFIXES = [
-  // Agent working directories (macOS resolves /var → /private/var)
-  `${tmpdir()}/mediforce-agent-`,
-  `/private/var/folders/`,
-  `/var/folders/`,
-  // System temp (macOS: /tmp → /private/tmp)
-  `/tmp/`,
-  `/private/tmp/`,
-  // Platform-UI tmp directory for generated outputs
-  resolve(process.cwd(), 'tmp') + '/',
-];
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const authHeader = request.headers.get('Authorization') ?? '';
@@ -35,13 +26,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Missing path parameter' }, { status: 400 });
   }
 
-  // Security: block path traversal
-  if (filePath.includes('..')) {
-    return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+  const instanceId = request.nextUrl.searchParams.get('instanceId');
+  if (!instanceId) {
+    return NextResponse.json({ error: 'Missing instanceId parameter' }, { status: 400 });
   }
 
   const resolved = resolve(filePath);
-  const isAllowed = ALLOWED_PREFIXES.some((prefix) => resolved.startsWith(prefix));
+
+  const instanceAllowedPrefixes = [
+    `${tmpdir()}/mediforce-deliverables/${instanceId}/`,
+    `${tmpdir()}/mediforce-agent-${instanceId}-`,
+    resolve(process.cwd(), 'tmp') + '/',
+  ];
+
+  const isAllowed = instanceAllowedPrefixes.some((prefix) => resolved.startsWith(prefix));
   if (!isAllowed) {
     return NextResponse.json({ error: 'Path not in allowed directory' }, { status: 403 });
   }
