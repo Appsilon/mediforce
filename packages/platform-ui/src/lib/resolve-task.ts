@@ -39,6 +39,7 @@ export function isResolveError(result: ResolveResult): result is ResolveError {
 export async function resolveTask(
   taskId: string,
   body: Record<string, unknown>,
+  userId?: string,
 ): Promise<ResolveResult> {
   const { humanTaskRepo, instanceRepo, auditRepo, engine } =
     getPlatformServices();
@@ -56,10 +57,10 @@ export async function resolveTask(
   // ── 2. Auto-claim if pending ────────────────────────────────────────────
   let resolvedTask: HumanTask = task;
   if (task.status === 'pending') {
-    resolvedTask = await humanTaskRepo.claim(taskId, 'api-user');
+    resolvedTask = await humanTaskRepo.claim(taskId, userId ?? 'api-user');
   }
 
-  const actorId = resolvedTask.assignedUserId ?? 'api-user';
+  const actorId = resolvedTask.assignedUserId ?? userId ?? 'api-user';
   const isFileUpload = resolvedTask.ui?.component === 'file-upload';
   const isParamsTask =
     Array.isArray(resolvedTask.params) && resolvedTask.params.length > 0;

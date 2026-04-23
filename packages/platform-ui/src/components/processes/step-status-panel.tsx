@@ -2,11 +2,16 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { format } from 'date-fns';
+import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-core';
 import { AutonomyBadge } from '../agents/autonomy-badge';
 import { RetryStepButton } from './retry-step-button';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/lib/format';
+import { useUserDisplayNames } from '@/hooks/use-users';
+
+const SYSTEM_ACTOR_IDS = new Set(['auto-runner', 'api-user', 'system']);
 
 interface AgentEventItem {
   id: string;
@@ -32,7 +37,7 @@ interface StepConfigInfo {
   fallbackBehavior?: string;
   timeoutMinutes?: number;
   reviewerType?: string;
-  agentConfig?: { skill?: string; prompt?: string; model?: string; skillsDir?: string; mcpServers?: Array<{ name: string }> };
+  agentConfig?: { skill?: string; prompt?: string; model?: string; skillsDir?: string; runtime?: string; mcpServers?: Array<{ name: string }> };
 }
 
 interface StepStatusPanelProps {
@@ -40,7 +45,6 @@ interface StepStatusPanelProps {
   definitionSteps: Step[];
   stepExecutions: StepExecution[];
   agentEvents?: AgentEventItem[];
-  onStepClick?: (stepId: string) => void;
   stepConfigMap?: Map<string, StepConfigInfo>;
   onAgentLogClick?: (stepId: string) => void;
   /** Base href for step detail links, e.g. "/workflows/foo/runs/abc". Steps link to `{base}/steps/{stepId}`. */
@@ -164,6 +168,48 @@ function TypeBadge({ type, executorType }: { type: Step['type']; executorType?: 
     <span className="inline-flex items-center gap-0.5 text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5">
       <Cog className="h-3 w-3" />
       {type}
+    </span>
+  );
+}
+
+function ExecutedBy({ executedBy, executorType, plugin, autonomyLevel, runtime }: {
+  executedBy: string;
+  executorType?: string;
+  plugin?: string;
+  autonomyLevel?: string;
+  runtime?: string;
+}) {
+  const userNames = useUserDisplayNames();
+
+  if (executorType === 'agent') {
+    const agentLabel = plugin ? `agent:${plugin}` : 'Agent unknown';
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <Bot className="h-3 w-3 shrink-0" />
+        <span>{agentLabel}</span>
+        {autonomyLevel && <AutonomyBadge level={autonomyLevel} />}
+      </span>
+    );
+  }
+  if (executorType === 'script') {
+    const scriptLabel = runtime
+      ? `${runtime.charAt(0).toUpperCase()}${runtime.slice(1)} script`
+      : 'Script';
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <FileCode className="h-3 w-3 shrink-0" />
+        {scriptLabel}
+      </span>
+    );
+  }
+  const resolvedName = SYSTEM_ACTOR_IDS.has(executedBy)
+    ? null
+    : (userNames.get(executedBy) ?? executedBy);
+  const displayName = resolvedName ?? 'User unknown';
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <User className="h-3 w-3 shrink-0" />
+      {displayName}
     </span>
   );
 }
@@ -313,7 +359,6 @@ export function StepStatusPanel({
   definitionSteps,
   stepExecutions,
   agentEvents = [],
-  onStepClick,
   stepConfigMap,
   onAgentLogClick,
   stepDetailBaseHref,
@@ -350,6 +395,9 @@ export function StepStatusPanel({
           const stepConfig = stepConfigMap?.get(step.id);
           const isExpanded = expandedStepId === step.id;
           const hasConfig = stepConfig && stepConfig.executorType === 'agent';
+          const latestExec = stepExecutions
+            .filter((e) => e.stepId === step.id)
+            .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
           const hasAgentLog = agentEvents.some(
             (e) => e.stepId === step.id && e.type === 'status' && String(e.payload).startsWith('agent activity log:'),
           );
@@ -371,8 +419,6 @@ export function StepStatusPanel({
               onClick={() => {
                 if (hasConfig) {
                   setExpandedStepId(isExpanded ? null : step.id);
-                } else if (onStepClick) {
-                  onStepClick(step.id);
                 }
               }}
             >
@@ -424,6 +470,35 @@ export function StepStatusPanel({
                   )}
                 </div>
                 <div className="text-xs font-mono text-muted-foreground mt-0.5">{step.id}</div>
+                {latestExec && (
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-xs text-muted-foreground">
+                      <span className="text-muted-foreground/60 mr-1">Started</span>
+                      {format(new Date(latestExec.startedAt), 'MMM d, HH:mm')}
+                    </span>
+                    {latestExec.completedAt && (
+                      <>
+                        <span className="text-muted-foreground/40">·</span>
+                        <span className="text-xs text-muted-foreground">
+                          <span className="text-muted-foreground/60 mr-1">Completed</span>
+                          {format(new Date(latestExec.completedAt), 'MMM d, HH:mm')}
+                        </span>
+                        <span className="text-muted-foreground/40">·</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDuration(new Date(latestExec.completedAt).getTime() - new Date(latestExec.startedAt).getTime())}
+                        </span>
+                      </>
+                    )}
+                    <span className="text-muted-foreground/40">·</span>
+                    <ExecutedBy
+                      executedBy={latestExec.executedBy}
+                      executorType={stepConfig?.executorType}
+                      plugin={stepConfig?.plugin}
+                      autonomyLevel={stepConfig?.autonomyLevel}
+                      runtime={stepConfig?.agentConfig?.runtime}
+                    />
+                  </div>
+                )}
                 {status === 'running' && stepConfigMap?.get(step.id)?.executorType === 'agent' && (
                   <StepProgress stepId={step.id} agentEvents={agentEvents} />
                 )}

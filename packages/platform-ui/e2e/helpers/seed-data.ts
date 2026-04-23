@@ -956,5 +956,41 @@ export function buildSeedData(testUserId: string) {
     createdAt: twoDaysAgo,
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, agentDefinitions };
+  // Step executions for the new-style workflow run (proc-workflow-run-1)
+  // Used by executor identity label tests — vendor-assessment has plugin 'supply-data-collector'
+  // in the WorkflowDefinition, so its label should render as 'agent:supply-data-collector'.
+  const workflowRunStepExecutions: Record<string, Record<string, unknown>> = {
+    'exec-wf-vendor': {
+      id: 'exec-wf-vendor',
+      instanceId: 'proc-workflow-run-1',
+      stepId: 'vendor-assessment',
+      status: 'completed',
+      input: { studyId: 'study-wf-001' },
+      output: { assessed: true },
+      verdict: null,
+      executedBy: 'agent:vendor-assessment',
+      startedAt: oneHourAgo,
+      completedAt: oneHourAgo,
+      iterationNumber: 0,
+      gateResult: { next: 'narrative-summary', reason: 'assessment complete' },
+      error: null,
+    },
+    'exec-wf-narrative': {
+      id: 'exec-wf-narrative',
+      instanceId: 'proc-workflow-run-1',
+      stepId: 'narrative-summary',
+      status: 'running',
+      input: { assessed: true },
+      output: null,
+      verdict: null,
+      executedBy: 'agent:narrative-summary',
+      startedAt: now,
+      completedAt: null,
+      iterationNumber: 0,
+      gateResult: null,
+      error: null,
+    },
+  };
+
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, agentDefinitions, workflowRunStepExecutions };
 }

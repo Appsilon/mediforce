@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -186,7 +187,7 @@ export function RunReport({
       </section>
 
       {/* Deliverables */}
-      <DeliverablesSection finalOutput={finalOutput} />
+      <DeliverablesSection finalOutput={finalOutput} instanceId={instance.id} />
 
       {/* Footer */}
       <ReportFooter />
@@ -422,21 +423,56 @@ function JsonPreview({ label, value }: { label: string; value: unknown }) {
 
 function DeliverablesSection({
   finalOutput,
+  instanceId,
 }: {
   finalOutput: ReturnType<typeof findFinalAgentOutput>;
+  instanceId: string;
 }) {
+  const { firebaseUser } = useAuth();
+
   if (!finalOutput) return null;
 
   const { stepId, output, result } = finalOutput;
   const git = output.gitMetadata;
+  const deliverableFile = output.deliverableFile ?? null;
+  const resultOutputFile = typeof result?.output_file === 'string' ? result.output_file : null;
+  const effectiveDeliverableFile = deliverableFile ?? resultOutputFile;
+
+  async function handleDownload() {
+    if (!effectiveDeliverableFile) return;
+    const authToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+    const response = await fetch(
+      `/api/agent-output-file?path=${encodeURIComponent(effectiveDeliverableFile)}&instanceId=${encodeURIComponent(instanceId)}`,
+      { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} },
+    );
+    if (!response.ok) return;
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = effectiveDeliverableFile.split('/').pop() ?? 'download';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <section>
       <h2 className="text-lg font-headline font-semibold mb-4">Deliverables</h2>
       <div className="rounded-lg border bg-card p-4 space-y-4">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-          <span>From {formatStepName(stepId)}</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <span>From {formatStepName(stepId)}</span>
+          </div>
+          {effectiveDeliverableFile && (
+            <button
+              onClick={handleDownload}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <FileText className="h-4 w-4" />
+              Download Report
+            </button>
+          )}
         </div>
 
         {git && (

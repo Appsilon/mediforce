@@ -47,6 +47,10 @@ vi.mock('@/hooks/use-collection', () => ({
   useCollection: () => ({ data: [], loading: false }),
 }));
 
+vi.mock('@/contexts/auth-context', () => ({
+  useAuth: () => ({ firebaseUser: { getIdToken: vi.fn().mockResolvedValue('mock-id-token') } }),
+}));
+
 // Mock server actions (all consolidated in tasks.ts)
 const mockCompleteUploadTask = vi.fn().mockResolvedValue({ success: true });
 vi.mock('@/app/actions/tasks', () => ({
@@ -97,7 +101,7 @@ describe('TaskDetail — selection task rendering', () => {
 
   it('[RENDER] shows option cards when task has options', () => {
     const task = createSelectionTask();
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     expect(screen.getByText('All-human')).toBeInTheDocument();
     expect(screen.getByText('Hybrid')).toBeInTheDocument();
@@ -106,7 +110,7 @@ describe('TaskDetail — selection task rendering', () => {
 
   it('[RENDER] shows approve and revise buttons for selection tasks', () => {
     const task = createSelectionTask();
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     expect(screen.getByRole('button', { name: /approve selected/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /request revisions/i })).toBeInTheDocument();
@@ -114,7 +118,7 @@ describe('TaskDetail — selection task rendering', () => {
 
   it('[RENDER] does not show verdict form when selection task is active', () => {
     const task = createSelectionTask();
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     // Should show selection form, not the regular verdict form
     expect(screen.getByText('All-human')).toBeInTheDocument();
@@ -127,7 +131,7 @@ describe('TaskDetail — selection task rendering', () => {
 
   it('[RENDER] shows selection form even when task is pending (auto-assign)', () => {
     const task = createSelectionTask({ status: 'pending', assignedUserId: null });
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     expect(screen.getByText('All-human')).toBeInTheDocument();
   });
@@ -144,7 +148,7 @@ describe('TaskDetail — selection task rendering', () => {
         completedAt: '2026-03-14T12:00:00.000Z',
       },
     });
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     expect(screen.getByText(/you approved: all-human/i)).toBeInTheDocument();
   });
@@ -160,7 +164,7 @@ describe('TaskDetail — file upload integration', () => {
   it('[RENDER] shows FileUploadZone when task has ui.component file-upload', () => {
     const task = createUploadTask();
 
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     expect(screen.getByText(/drop files here/i)).toBeInTheDocument();
     expect(screen.getByText(/pdf/i)).toBeInTheDocument();
@@ -172,7 +176,7 @@ describe('TaskDetail — file upload integration', () => {
       assignedUserId: 'user-1',
     });
 
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     expect(screen.queryByText(/drop files here/i)).not.toBeInTheDocument();
     // Should show verdict form instead
@@ -182,7 +186,7 @@ describe('TaskDetail — file upload integration', () => {
   it('[RENDER] shows FileUploadZone even when task is pending (auto-assign)', () => {
     const task = createUploadTask({ status: 'pending', assignedUserId: null });
 
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     // Forms are shown for pending tasks (claiming removed, auto-assign enabled)
     expect(screen.getByText(/drop files here/i)).toBeInTheDocument();
@@ -191,7 +195,7 @@ describe('TaskDetail — file upload integration', () => {
   it('[RENDER] does not show verdict form when upload UI is active', () => {
     const task = createUploadTask();
 
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     // Should show upload zone, not verdict buttons
     expect(screen.getByText(/drop files here/i)).toBeInTheDocument();
@@ -202,7 +206,7 @@ describe('TaskDetail — file upload integration', () => {
     const user = userEvent.setup();
     const task = createUploadTask();
 
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     // Add a file
     const input = screen.getByTestId('file-input');
@@ -217,6 +221,7 @@ describe('TaskDetail — file upload integration', () => {
     expect(mockCompleteUploadTask).toHaveBeenCalledWith(
       task.id,
       [expect.objectContaining({ name: 'protocol.pdf', downloadUrl: 'https://storage.example.com/file.pdf' })],
+      expect.any(String),
     );
   });
 
@@ -224,7 +229,7 @@ describe('TaskDetail — file upload integration', () => {
     const user = userEvent.setup();
     const task = createUploadTask();
 
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     const input = screen.getByTestId('file-input');
     const file = new File(['content'], 'protocol.pdf', { type: 'application/pdf' });
@@ -249,7 +254,7 @@ describe('TaskDetail — file upload integration', () => {
       },
     });
 
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     expect(screen.getByText(/2 files uploaded/i)).toBeInTheDocument();
     expect(screen.getByText('protocol.pdf')).toBeInTheDocument();
@@ -267,7 +272,7 @@ describe('TaskDetail — file upload integration', () => {
     const user = userEvent.setup();
     const task = createUploadTask();
 
-    render(<TaskDetail task={task} currentUserId="user-1" />);
+    render(<TaskDetail task={task} />);
 
     const input = screen.getByTestId('file-input');
     const file = new File(['content'], 'protocol.pdf', { type: 'application/pdf' });
