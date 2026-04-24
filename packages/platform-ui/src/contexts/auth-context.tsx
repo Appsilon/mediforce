@@ -36,6 +36,22 @@ async function ensurePersonalNamespace(user: { uid: string; email: string | null
     const userSnap = await getDoc(userRef);
     const userData = userSnap.exists() ? userSnap.data() : {};
 
+    // Self-heal helper: the hardened rules from PR #250 silently rejected
+    // this uid's owner-member write on any prior login (circular-dep bug
+    // fixed in the Step-5 rules patch). A namespace doc may therefore exist
+    // without a member doc for the owner. Re-seed when missing.
+    async function ensureOwnerMember(handle: string): Promise<void> {
+      const memberRef = doc(db, 'namespaces', handle, 'members', user.uid);
+      const memberSnap = await getDoc(memberRef);
+      if (memberSnap.exists()) return;
+      await setDoc(memberRef, {
+        uid: user.uid,
+        role: 'owner',
+        ...(user.displayName !== null ? { displayName: user.displayName } : {}),
+        joinedAt: new Date().toISOString(),
+      });
+    }
+
     if (typeof userData.handle === 'string' && userData.handle !== '') {
       // Already has handle — check namespace exists
       const nsRef = doc(db, 'namespaces', userData.handle);
@@ -48,13 +64,8 @@ async function ensurePersonalNamespace(user: { uid: string; email: string | null
           linkedUserId: user.uid,
           createdAt: new Date().toISOString(),
         });
-        await setDoc(doc(db, 'namespaces', userData.handle, 'members', user.uid), {
-          uid: user.uid,
-          role: 'owner',
-          ...(user.displayName !== null ? { displayName: user.displayName } : {}),
-          joinedAt: new Date().toISOString(),
-        });
       }
+      await ensureOwnerMember(userData.handle);
       return;
     }
 
@@ -69,6 +80,7 @@ async function ensurePersonalNamespace(user: { uid: string; email: string | null
     if (!existingSnap.empty) {
       const existingHandle = existingSnap.docs[0]!.id;
       await setDoc(userRef, { handle: existingHandle }, { merge: true });
+      await ensureOwnerMember(existingHandle);
       return;
     }
 

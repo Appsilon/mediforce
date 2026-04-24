@@ -94,8 +94,8 @@ describe('middleware public routes', () => {
     expect(res.status).not.toBe(401);
   });
 
-  it('allows GET /api/oauth/callback without any key', async () => {
-    const res = await middleware(makeRequest('/api/oauth/callback'));
+  it('allows GET /api/oauth/:provider/callback without any key', async () => {
+    const res = await middleware(makeRequest('/api/oauth/github-mock/callback'));
     expect(res.status).not.toBe(401);
   });
 });

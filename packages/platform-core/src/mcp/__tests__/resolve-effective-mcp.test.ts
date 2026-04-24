@@ -92,18 +92,44 @@ describe('resolveEffectiveMcp', () => {
       expect(cdisc.env).toEqual({ API_KEY: '{{SECRET:cdisc_key}}' });
     });
 
-    it('resolves http bindings without catalog lookup', () => {
+    it('resolves http bindings without catalog lookup (headers auth)', () => {
       const agent = makeAgent({
         remote: {
           type: 'http',
           url: 'https://mcp.example.com/v1',
-          auth: { headers: { Authorization: 'Bearer {{SECRET:tok}}' } },
+          auth: { type: 'headers', headers: { Authorization: 'Bearer {{SECRET:tok}}' } },
         },
       });
       const result = resolveEffectiveMcp(agent, makeStep(), new Map());
       const remote = asHttp(result.servers.remote);
       expect(remote.url).toBe('https://mcp.example.com/v1');
-      expect(remote.auth?.headers?.Authorization).toBe('Bearer {{SECRET:tok}}');
+      expect(remote.auth?.type).toBe('headers');
+      if (remote.auth?.type === 'headers') {
+        expect(remote.auth.headers.Authorization).toBe('Bearer {{SECRET:tok}}');
+      }
+    });
+
+    it('resolves http bindings with oauth auth variant', () => {
+      const agent = makeAgent({
+        gh: {
+          type: 'http',
+          url: 'https://api.github.com/mcp',
+          auth: {
+            type: 'oauth',
+            provider: 'github',
+            headerName: 'Authorization',
+            headerValueTemplate: 'Bearer {token}',
+          },
+        },
+      });
+      const result = resolveEffectiveMcp(agent, makeStep(), new Map());
+      const gh = asHttp(result.servers.gh);
+      expect(gh.auth?.type).toBe('oauth');
+      if (gh.auth?.type === 'oauth') {
+        expect(gh.auth.provider).toBe('github');
+        expect(gh.auth.headerName).toBe('Authorization');
+        expect(gh.auth.headerValueTemplate).toBe('Bearer {token}');
+      }
     });
 
     it('resolves a mix of 2 stdio + 1 http servers', () => {

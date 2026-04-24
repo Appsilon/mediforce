@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   AgentMcpBindingSchema,
+  HttpAgentMcpBindingSchema,
   HttpAuthConfigSchema,
+  HttpHeadersAuthSchema,
+  HttpOAuthAuthSchema,
   StepMcpRestrictionSchema,
   ToolCatalogEntrySchema,
 } from '../agent-mcp-binding.js';
@@ -86,11 +89,12 @@ describe('AgentMcpBindingSchema', () => {
       }
     });
 
-    it('parses http binding with auth headers', () => {
+    it('parses http binding with discriminated headers auth', () => {
       const result = AgentMcpBindingSchema.safeParse({
         type: 'http',
         url: 'https://mcp.example.com/v1',
         auth: {
+          type: 'headers',
           headers: {
             Authorization: 'Bearer {{SECRET:mcp_token}}',
             'X-Workspace': 'acme',
@@ -99,9 +103,81 @@ describe('AgentMcpBindingSchema', () => {
       });
       expect(result.success).toBe(true);
       if (result.success && result.data.type === 'http') {
-        expect(result.data.auth?.headers?.Authorization).toBe(
-          'Bearer {{SECRET:mcp_token}}',
-        );
+        expect(result.data.auth?.type).toBe('headers');
+        if (result.data.auth?.type === 'headers') {
+          expect(result.data.auth.headers.Authorization).toBe(
+            'Bearer {{SECRET:mcp_token}}',
+          );
+        }
+      }
+    });
+
+    it('parses http binding with discriminated oauth auth', () => {
+      const result = AgentMcpBindingSchema.safeParse({
+        type: 'http',
+        url: 'https://mcp.example.com/v1',
+        auth: {
+          type: 'oauth',
+          provider: 'github',
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.type === 'http' && result.data.auth?.type === 'oauth') {
+        expect(result.data.auth.provider).toBe('github');
+        expect(result.data.auth.headerName).toBe('Authorization');
+        expect(result.data.auth.headerValueTemplate).toBe('Bearer {token}');
+      }
+    });
+
+    it('parses http binding with oauth auth and custom header override', () => {
+      const result = AgentMcpBindingSchema.safeParse({
+        type: 'http',
+        url: 'https://mcp.example.com/v1',
+        auth: {
+          type: 'oauth',
+          provider: 'github',
+          headerName: 'X-API-Token',
+          headerValueTemplate: '{token}',
+          scopes: ['repo', 'read:user'],
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.type === 'http' && result.data.auth?.type === 'oauth') {
+        expect(result.data.auth.headerName).toBe('X-API-Token');
+        expect(result.data.auth.headerValueTemplate).toBe('{token}');
+        expect(result.data.auth.scopes).toEqual(['repo', 'read:user']);
+      }
+    });
+
+    it('normalizes legacy { headers } auth shape into discriminated form', () => {
+      // Pre-Step-5 bindings stored auth as `{ headers: {...} }` without
+      // a type discriminator. Lazy read-time migration converts them.
+      const result = HttpAgentMcpBindingSchema.safeParse({
+        type: 'http',
+        url: 'https://mcp.example.com/v1',
+        auth: {
+          headers: { Authorization: 'Bearer {{SECRET:legacy_tok}}' },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.auth?.type).toBe('headers');
+        if (result.data.auth?.type === 'headers') {
+          expect(result.data.auth.headers.Authorization).toBe('Bearer {{SECRET:legacy_tok}}');
+        }
+      }
+    });
+
+    it('drops legacy empty auth object ({}) during normalization', () => {
+      // `auth: {}` carried no meaningful state; preprocess drops it.
+      const result = HttpAgentMcpBindingSchema.safeParse({
+        type: 'http',
+        url: 'https://mcp.example.com/v1',
+        auth: {},
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.auth).toBeUndefined();
       }
     });
 
@@ -167,26 +243,87 @@ describe('AgentMcpBindingSchema', () => {
 });
 
 describe('HttpAuthConfigSchema', () => {
-  it('parses empty auth config', () => {
-    const result = HttpAuthConfigSchema.safeParse({});
-    expect(result.success).toBe(true);
-  });
-
-  it('parses auth with headers map', () => {
+  it('parses headers variant', () => {
     const result = HttpAuthConfigSchema.safeParse({
+      type: 'headers',
       headers: { 'X-Api-Key': '{{SECRET:foo}}' },
     });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.headers?.['X-Api-Key']).toBe('{{SECRET:foo}}');
+    if (result.success && result.data.type === 'headers') {
+      expect(result.data.headers['X-Api-Key']).toBe('{{SECRET:foo}}');
     }
+  });
+
+  it('parses oauth variant with defaults', () => {
+    const result = HttpAuthConfigSchema.safeParse({
+      type: 'oauth',
+      provider: 'google',
+    });
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'oauth') {
+      expect(result.data.headerName).toBe('Authorization');
+      expect(result.data.headerValueTemplate).toBe('Bearer {token}');
+    }
+  });
+
+  it('rejects auth without type discriminator', () => {
+    const result = HttpAuthConfigSchema.safeParse({
+      headers: { 'X-Api-Key': 'v' },
+    });
+    expect(result.success).toBe(false);
   });
 
   it('rejects headers with non-string values', () => {
     const result = HttpAuthConfigSchema.safeParse({
+      type: 'headers',
       headers: { 'X-Count': 42 },
     });
     expect(result.success).toBe(false);
+  });
+
+  it('rejects oauth without provider', () => {
+    const result = HttpAuthConfigSchema.safeParse({ type: 'oauth' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects oauth with empty provider', () => {
+    const result = HttpAuthConfigSchema.safeParse({ type: 'oauth', provider: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects oauth with empty headerName override', () => {
+    const result = HttpAuthConfigSchema.safeParse({
+      type: 'oauth',
+      provider: 'github',
+      headerName: '',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects oauth with rogue fields', () => {
+    const result = HttpAuthConfigSchema.safeParse({
+      type: 'oauth',
+      provider: 'github',
+      headers: { Authorization: 'Bearer x' },
+    });
+    // Strict: `headers` is valid only on the headers variant.
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('HttpHeadersAuthSchema + HttpOAuthAuthSchema (sub-schema exports)', () => {
+  it('HttpHeadersAuthSchema requires type=headers', () => {
+    expect(HttpHeadersAuthSchema.safeParse({ type: 'headers', headers: {} }).success).toBe(true);
+    expect(HttpHeadersAuthSchema.safeParse({ type: 'oauth', provider: 'github' }).success).toBe(false);
+  });
+
+  it('HttpOAuthAuthSchema applies default headerName + headerValueTemplate', () => {
+    const result = HttpOAuthAuthSchema.safeParse({ type: 'oauth', provider: 'github' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.headerName).toBe('Authorization');
+      expect(result.data.headerValueTemplate).toBe('Bearer {token}');
+    }
   });
 });
 
@@ -296,7 +433,7 @@ describe('AgentDefinitionSchema with mcpServers', () => {
     }
   });
 
-  it('parses agent definition with mixed stdio + http mcpServers', () => {
+  it('parses agent definition with mixed stdio + http mcpServers (discriminated auth)', () => {
     const result = AgentDefinitionSchema.safeParse({
       ...base,
       mcpServers: {
@@ -305,15 +442,47 @@ describe('AgentDefinitionSchema with mcpServers', () => {
         remote: {
           type: 'http',
           url: 'https://mcp.example.com/v1',
-          auth: { headers: { Authorization: 'Bearer {{SECRET:token}}' } },
+          auth: { type: 'headers', headers: { Authorization: 'Bearer {{SECRET:token}}' } },
+        },
+        remote_oauth: {
+          type: 'http',
+          url: 'https://api.github.com/mcp',
+          auth: { type: 'oauth', provider: 'github' },
         },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(Object.keys(result.data.mcpServers ?? {})).toHaveLength(3);
+      expect(Object.keys(result.data.mcpServers ?? {})).toHaveLength(4);
       expect(result.data.mcpServers?.github?.type).toBe('stdio');
       expect(result.data.mcpServers?.remote?.type).toBe('http');
+      const remoteOauth = result.data.mcpServers?.remote_oauth;
+      if (remoteOauth?.type === 'http' && remoteOauth.auth?.type === 'oauth') {
+        expect(remoteOauth.auth.provider).toBe('github');
+      }
+    }
+  });
+
+  it('normalizes legacy auth shapes when parsing AgentDefinition with mcpServers', () => {
+    const result = AgentDefinitionSchema.safeParse({
+      ...base,
+      mcpServers: {
+        legacy: {
+          type: 'http',
+          url: 'https://mcp.example.com/v1',
+          auth: { headers: { Authorization: 'Bearer {{SECRET:tok}}' } },
+        },
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const legacy = result.data.mcpServers?.legacy;
+      if (legacy?.type === 'http') {
+        expect(legacy.auth?.type).toBe('headers');
+        if (legacy.auth?.type === 'headers') {
+          expect(legacy.auth.headers.Authorization).toBe('Bearer {{SECRET:tok}}');
+        }
+      }
     }
   });
 

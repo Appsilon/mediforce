@@ -8,6 +8,8 @@ export { NoopNotificationService } from './noop-notification-service.js';
 export { InMemoryCoworkSessionRepository } from './in-memory-cowork-session-repository.js';
 export { InMemoryCronTriggerStateRepository } from './in-memory-cron-trigger-state-repository.js';
 export { InMemoryToolCatalogRepository } from './in-memory-tool-catalog-repository.js';
+export { InMemoryOAuthProviderRepository } from './in-memory-oauth-provider-repository.js';
+export { InMemoryAgentOAuthTokenRepository } from './in-memory-agent-oauth-token-repository.js';
 
 // Test factories
 export {

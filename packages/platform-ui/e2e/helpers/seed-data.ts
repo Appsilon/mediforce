@@ -4,7 +4,15 @@ const twoDaysAgo = new Date(Date.now() - 2 * 86400_000).toISOString();
 const threeDaysAgo = new Date(Date.now() - 3 * 86400_000).toISOString();
 const nextWeek = new Date(Date.now() + 7 * 86400_000).toISOString();
 
-export function buildSeedData(testUserId: string) {
+export interface SeedOptions {
+  /** Base URL of the mock OAuth server (from globalSetup). Used to build the
+   *  `github-mock` provider fixture so the journey can Connect through it
+   *  without touching real GitHub/Google. */
+  mockOAuthBaseUrl?: string;
+}
+
+export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
+  const mockOAuthBaseUrl = options.mockOAuthBaseUrl ?? 'http://127.0.0.1:0';
   const humanTasks: Record<string, Record<string, unknown>> = {
     'task-pending-1': {
       id: 'task-pending-1',
@@ -812,6 +820,56 @@ export function buildSeedData(testUserId: string) {
       createdAt: twoDaysAgo,
       updatedAt: twoDaysAgo,
     },
+    // Fixture agent for the OAuth journey (Step 5). Ships with a pre-bound
+    // HTTP binding named `github-mcp` configured for OAuth via the
+    // `github-mock` provider, so the journey opens the editor and jumps
+    // straight to "Connect" without first editing the agent.
+    'oauth-test-agent': {
+      kind: 'plugin',
+      runtimeId: 'claude-code-agent',
+      name: 'OAuth Test Agent',
+      iconName: 'Bot',
+      description: 'Fixture agent for the per-agent OAuth journey.',
+      inputDescription: 'task input',
+      outputDescription: 'task output',
+      foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: '',
+      skillFileNames: [],
+      mcpServers: {
+        'github-mcp': {
+          type: 'http',
+          url: 'https://api.example.com/mcp',
+          auth: {
+            type: 'oauth',
+            provider: 'github-mock',
+            headerName: 'Authorization',
+            headerValueTemplate: 'Bearer {token}',
+          },
+        },
+      },
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+    },
+  };
+
+  // ── OAuth providers (Step 5) ───────────────────────────────────────────────
+  // Seeded into `namespaces/{TEST_ORG_HANDLE}/oauthProviders/{providerId}`.
+  // The mock OAuth server started in globalSetup exposes /authorize, /token,
+  // /userinfo, /revoke — we point the provider at it so Connect / Disconnect /
+  // Revoke flow end-to-end without any real external dependency.
+  const oauthProviders: Record<string, Record<string, unknown>> = {
+    'github-mock': {
+      name: 'GitHub (mock)',
+      clientId: 'mock-client-id',
+      clientSecret: 'mock-client-secret',
+      authorizeUrl: `${mockOAuthBaseUrl}/authorize`,
+      tokenUrl: `${mockOAuthBaseUrl}/token`,
+      userInfoUrl: `${mockOAuthBaseUrl}/userinfo`,
+      revokeUrl: `${mockOAuthBaseUrl}/revoke`,
+      scopes: ['repo', 'read:user'],
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+    },
   };
 
   // Minimal workflow with one agent step referencing `mcp-test-agent`, used
@@ -992,5 +1050,5 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, agentDefinitions, workflowRunStepExecutions };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions };
 }

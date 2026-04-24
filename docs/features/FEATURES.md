@@ -54,6 +54,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Agent Escalated Run](#agent-escalated-run) — understanding why an agent flagged low confidence
 - [New Agent Form](#new-agent-form) — creating a new agent definition
 - [Agent MCP Bindings](#agent-mcp-bindings) — per-agent stdio (catalog) and HTTP (inline URL) tool bindings with allowlists
+- [Agent OAuth Connection](#agent-oauth-connection) — per-agent OAuth flow against custom providers with Connect / Disconnect / Revoke
 
 **Platform shortcuts** — keyboard-first utilities available everywhere
 - [Command Palette — New Ticket](#command-palette--new-ticket) — file a bug/idea/question from the command palette
@@ -304,6 +305,12 @@ Registration form for new agent definitions. Fill in name, select foundation mod
 The agent detail page exposes an MCP Bindings section where authors attach tools to an agent. Stdio bindings pick a catalog entry and add an optional `allowedTools` allowlist; HTTP bindings take an inline URL plus optional allowlist — both are saved to the agent's `mcpBindings` array via `/api/agent-definitions/:id/mcp-servers/:name`. Deleting removes an individual binding, and a reload confirms HTTP bindings persist across sessions. Workflow steps consume these bindings as their baseline surface, which Step MCP Restrictions can further narrow.
 
 ![agent-mcp-bindings](agent-mcp-bindings.gif)
+
+### Agent OAuth Connection
+
+HTTP MCP bindings can authenticate against a namespace-scoped OAuth provider instead of static headers. The binding row exposes inline Connect / Disconnect / Revoke actions: Connect performs a full-page redirect through the provider's `authorize` → `/api/oauth/<provider>/callback` chain (state verified via stateless HMAC, no session storage), Disconnect removes the local token only, and Revoke additionally POSTs the provider's revoke endpoint. Tokens are auto-refreshed at spawn time when within 5 minutes of expiry. Providers (GitHub, Google, or custom OAuth2) are provisioned by admins under `/<handle>/admin/oauth-providers`.
+
+![agent-mcp-oauth](agent-mcp-oauth.gif)
 
 ## Platform shortcuts
 

@@ -9,13 +9,17 @@ if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
 
 function ensureAdminApp() {
   if (!getApps().length) {
-    if (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
-      initializeApp({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'demo-mediforce',
-      });
-    } else {
-      initializeApp();
-    }
+    // Always pin projectId explicitly. Without this, Admin SDK falls back to
+    // Application Default Credentials' default project, which on a dev
+    // machine often points at a personal GCP project (e.g. whatever
+    // `gcloud config get-value project` returns) — leading to silent 404s
+    // against the expected Firebase project. In emulator mode the env var
+    // might not be set, so keep the demo-mediforce fallback there.
+    const projectId =
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+      ?? process.env.GOOGLE_CLOUD_PROJECT
+      ?? (process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' ? 'demo-mediforce' : undefined);
+    initializeApp(projectId !== undefined ? { projectId } : {});
   }
   return getApp();
 }

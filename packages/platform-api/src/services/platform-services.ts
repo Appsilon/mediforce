@@ -9,6 +9,8 @@ import {
   FirestoreCronTriggerStateRepository,
   FirestoreToolCatalogRepository,
   FirestoreNamespaceRepository,
+  FirestoreOAuthProviderRepository,
+  FirestoreAgentOAuthTokenRepository,
   getAdminFirestore,
   validateSecretsKey,
 } from '@mediforce/platform-infra';
@@ -50,6 +52,8 @@ export interface PlatformServices {
   cronTriggerStateRepo: CronTriggerStateRepository;
   toolCatalogRepo: FirestoreToolCatalogRepository;
   namespaceRepo: FirestoreNamespaceRepository;
+  oauthProviderRepo: FirestoreOAuthProviderRepository;
+  agentOAuthTokenRepo: FirestoreAgentOAuthTokenRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -71,6 +75,8 @@ export function getPlatformServices(): PlatformServices {
   const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
   const toolCatalogRepo = new FirestoreToolCatalogRepository(db);
   const namespaceRepo = new FirestoreNamespaceRepository(db);
+  const oauthProviderRepo = new FirestoreOAuthProviderRepository(db);
+  const agentOAuthTokenRepo = new FirestoreAgentOAuthTokenRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -126,6 +132,8 @@ export function getPlatformServices(): PlatformServices {
     cronTriggerStateRepo,
     toolCatalogRepo,
     namespaceRepo,
+    oauthProviderRepo,
+    agentOAuthTokenRepo,
   };
 
   if (!seedingStarted) {

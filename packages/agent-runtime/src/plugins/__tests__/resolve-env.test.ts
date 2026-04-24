@@ -373,4 +373,45 @@ describe('resolveValue', () => {
       }
     });
   });
+
+  describe('namespaced SECRET: form', () => {
+    it('[DATA] resolves {{SECRET:api_key}} from workflowSecrets[api_key]', () => {
+      const secrets = { api_key: 'resolved' };
+      expect(resolveValue('{{SECRET:api_key}}', secrets)).toBe('resolved');
+    });
+
+    it('[DATA] resolves {{SECRET:with-dashes}} (hyphen-tolerant key)', () => {
+      const secrets = { 'with-dashes': 'ok' };
+      expect(resolveValue('{{SECRET:with-dashes}}', secrets)).toBe('ok');
+    });
+
+    it('[DATA] falls through to process.env for SECRET: form', () => {
+      const original = process.env.SECRET_FALLBACK_KEY;
+      process.env.SECRET_FALLBACK_KEY = 'from-env';
+      try {
+        expect(resolveValue('{{SECRET:SECRET_FALLBACK_KEY}}')).toBe('from-env');
+      } finally {
+        if (original === undefined) delete process.env.SECRET_FALLBACK_KEY;
+        else process.env.SECRET_FALLBACK_KEY = original;
+      }
+    });
+
+    it('[ERROR] throws with the literal template + key when SECRET: lookup fails', () => {
+      const key = 'NEVER_EXISTS_KEY';
+      delete process.env[key];
+      delete process.env[`DOCKER_${key}`];
+      expect(() => resolveValue(`{{SECRET:${key}}}`)).toThrow(
+        new RegExp(`\\{\\{SECRET:${key}\\}\\}`),
+      );
+    });
+  });
+
+  describe('OAUTH: namespace is rejected', () => {
+    it('[ERROR] throws when {{OAUTH:github}} is used as an env/header value', () => {
+      // OAuth tokens flow through HttpAuthConfig { type: 'oauth' }, not env
+      // templates. Silent pass-through would produce invalid header values.
+      expect(() => resolveValue('{{OAUTH:github}}', {})).toThrow(/OAUTH/);
+      expect(() => resolveValue('{{OAUTH:github}}', {})).toThrow(/auth.*oauth/i);
+    });
+  });
 });

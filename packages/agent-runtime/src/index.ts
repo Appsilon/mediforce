@@ -6,6 +6,7 @@ export type {
   LlmClient,
   AgentContext,
   WorkflowAgentContext,
+  ResolvedOAuthBinding,
   EmitPayload,
   EmitFn,
   AgentPlugin,
@@ -16,7 +17,7 @@ export type {
 } from './interfaces/index.js';
 
 // Plugins
-export { BaseContainerAgentPlugin, isLocalExecutionAllowed } from './plugins/base-container-agent-plugin.js';
+export { BaseContainerAgentPlugin, isLocalExecutionAllowed, OAuthTokenUnavailableError } from './plugins/base-container-agent-plugin.js';
 export type { AgentCommandSpec, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin.js';
 export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin.js';
 export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin.js';
@@ -41,6 +42,41 @@ export type { MissingEnvVar } from './plugins/resolve-env.js';
 export { resolveMcpForStep, AgentDefinitionNotFoundError } from './mcp/resolve-mcp-for-step.js';
 export type { ResolveMcpForStepDeps } from './mcp/resolve-mcp-for-step.js';
 export { flattenResolvedMcpToLegacy } from './mcp/flatten-resolved-mcp.js';
+
+// OAuth (Step 5)
+export {
+  signState,
+  verifyState,
+  generateNonce,
+  generatePkcePair,
+  type OAuthStatePayload,
+  type PkcePair,
+} from './oauth/state-hmac.js';
+export {
+  REFRESH_MARGIN_MS,
+  RefreshTokenRejectedError,
+  RefreshTokenUnavailableError,
+  renderOAuthHeader,
+  resolveOAuthToken,
+  type ResolvedToken,
+  type ResolveTokenOptions,
+} from './oauth/resolve-oauth-token.js';
+export {
+  discoverMcpAuthServer,
+  deriveProviderSlug,
+  extractResourceMetadataUrl,
+  McpDiscoveryError,
+  type DiscoveredAuthServer,
+  type ProtectedResourceMetadata,
+  type AuthServerMetadata,
+} from './oauth/mcp-oauth-discovery.js';
+export {
+  registerOAuthClient,
+  pickAuthMethod,
+  DcrError,
+  type DcrRequest,
+  type DcrResponse,
+} from './oauth/dcr-client.js';
 
 // Testing utilities
 export {

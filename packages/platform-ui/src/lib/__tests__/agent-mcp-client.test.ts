@@ -27,7 +27,7 @@ const stdioBinding: AgentMcpBinding = {
 const httpBinding: AgentMcpBinding = {
   type: 'http',
   url: 'https://mcp.example.com/sse',
-  auth: { headers: { Authorization: 'Bearer {{SECRET:token}}' } },
+  auth: { type: 'headers', headers: { Authorization: 'Bearer {{SECRET:token}}' } },
 };
 
 describe('agent-mcp-client', () => {

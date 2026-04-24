@@ -1,13 +1,61 @@
 import { z } from 'zod';
 
-/** Auth config for HTTP MCP transports. Header values support
- *  {{SECRET:name}} (resolved at writeMcpConfig time) and, once Step 4
- *  lands, {{OAUTH:provider}} template injection. */
-export const HttpAuthConfigSchema = z.object({
-  headers: z.record(z.string(), z.string()).optional(),
+/** Headers-based auth for HTTP MCP transports. Header values support
+ *  {{SECRET:name}} template syntax — resolved from workflowSecrets at
+ *  writeMcpConfig time. Literal values pass through untouched. */
+export const HttpHeadersAuthSchema = z.object({
+  type: z.literal('headers'),
+  headers: z.record(z.string(), z.string()),
 }).strict();
 
+export type HttpHeadersAuth = z.infer<typeof HttpHeadersAuthSchema>;
+
+/** OAuth 2.0 auth for HTTP MCP transports. Token is obtained via OAuth
+ *  flow (see Step 5 API) and stored per-agent per-server. Injected at
+ *  writeMcpConfig time: `headerValueTemplate.replace('{token}', accessToken)`
+ *  is emitted as a single header named `headerName`. Defaults produce the
+ *  standard `Authorization: Bearer <token>` form. */
+export const HttpOAuthAuthSchema = z.object({
+  type: z.literal('oauth'),
+  /** References an entry in `namespaces/{h}/oauthProviders/{provider}`. */
+  provider: z.string().min(1),
+  /** Header name to inject. Default: 'Authorization'. */
+  headerName: z.string().min(1).default('Authorization'),
+  /** Header value template. `{token}` is replaced with the access token
+   *  at spawn time. Default: 'Bearer {token}'. */
+  headerValueTemplate: z.string().min(1).default('Bearer {token}'),
+  /** Optional scope display override (purely informational; authoritative
+   *  scopes live on the provider config). */
+  scopes: z.array(z.string()).optional(),
+}).strict();
+
+export type HttpOAuthAuth = z.infer<typeof HttpOAuthAuthSchema>;
+
+/** Discriminated union of supported HTTP auth strategies. */
+export const HttpAuthConfigSchema = z.discriminatedUnion('type', [
+  HttpHeadersAuthSchema,
+  HttpOAuthAuthSchema,
+]);
+
 export type HttpAuthConfig = z.infer<typeof HttpAuthConfigSchema>;
+
+/** Normalizes legacy HTTP auth shapes into the discriminated form.
+ *  Pre-Step 5, bindings stored `{ headers: {...} }` without a `type`
+ *  discriminator. After this step, all authed HTTP bindings must carry
+ *  `type: 'headers' | 'oauth'`. Lazy read-time migration: legacy shapes
+ *  are normalized here, writes always emit the new form. */
+function normalizeLegacyAuth(val: unknown): unknown {
+  if (val === null || val === undefined) return val;
+  if (typeof val !== 'object') return val;
+  const record = val as Record<string, unknown>;
+  if ('type' in record) return val;
+  if ('headers' in record && record.headers !== null && record.headers !== undefined) {
+    return { type: 'headers', headers: record.headers };
+  }
+  // Empty legacy object (`{}` or `{ headers: undefined }`) carried no auth
+  // intent — drop it so the field becomes undefined.
+  return undefined;
+}
 
 /** Stdio binding — must reference a curated ToolCatalogEntry by id.
  *  Inline command/args are NOT accepted on bindings: that would re-open
@@ -26,7 +74,7 @@ export const HttpAgentMcpBindingSchema = z.object({
   type: z.literal('http'),
   url: z.string().url(),
   allowedTools: z.array(z.string()).min(1).optional(),
-  auth: HttpAuthConfigSchema.optional(),
+  auth: z.preprocess(normalizeLegacyAuth, HttpAuthConfigSchema.optional()),
 }).strict();
 
 export type HttpAgentMcpBinding = z.infer<typeof HttpAgentMcpBindingSchema>;

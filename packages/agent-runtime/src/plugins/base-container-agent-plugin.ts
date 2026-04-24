@@ -8,6 +8,26 @@ import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, Mc
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls } from './container-plugin.js';
+import { renderOAuthHeader } from '../oauth/resolve-oauth-token.js';
+
+/** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
+ *  but the agent context carries no OAuth token entry for that server. The
+ *  message points the user at the UI to connect the account — that's the
+ *  only place the token can be provisioned. */
+export class OAuthTokenUnavailableError extends Error {
+  public readonly serverName: string;
+  public readonly provider: string;
+
+  constructor(serverName: string, provider: string) {
+    super(
+      `OAuth token for MCP server "${serverName}" (provider "${provider}") is not connected. ` +
+      `Connect the account via the agent editor in the UI, then retry the step.`,
+    );
+    this.name = 'OAuthTokenUnavailableError';
+    this.serverName = serverName;
+    this.provider = provider;
+  }
+}
 
 const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
@@ -141,6 +161,45 @@ export async function cleanupTempDir(tempDir: string | null): Promise<void> {
   }
 }
 
+/** Build the `headers` map for an HTTP MCP entry based on the resolved
+ *  binding's auth discriminator. Returns undefined when there's no auth
+ *  to emit — the caller omits the `headers` key entirely in that case.
+ *
+ *  - `type: 'headers'` — resolves `{{SECRET:...}}` / `{{NAME}}` templates in
+ *    each value via `resolveValue` so `mcp-config.json` ships final strings.
+ *  - `type: 'oauth'` — looks up the pre-loaded access token in
+ *    `context.oauthTokens[serverName]`. When the binding requests OAuth
+ *    but no token has been connected yet, throws an `OAuthTokenUnavailableError`
+ *    rather than silently dropping the header — a half-authed agent would
+ *    generate confusing 401s from the downstream MCP server. */
+function buildHttpHeaders(
+  serverName: string,
+  auth: { type: 'headers'; headers: Record<string, string> } | { type: 'oauth'; provider: string; headerName: string; headerValueTemplate: string; scopes?: string[] } | undefined,
+  oauthTokens: Record<string, { accessToken: string; headerName: string; headerValueTemplate: string }> | undefined,
+  workflowSecrets: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (auth === undefined) return undefined;
+
+  if (auth.type === 'headers') {
+    const resolved: Record<string, string> = {};
+    for (const [name, value] of Object.entries(auth.headers)) {
+      resolved[name] = resolveValue(value, workflowSecrets);
+    }
+    return Object.keys(resolved).length > 0 ? resolved : undefined;
+  }
+
+  // auth.type === 'oauth' — the token must be pre-loaded in context.
+  // Resolve via the binding-supplied header settings instead of the auth
+  // config so future per-token overrides (e.g. rotated header name) stay
+  // consistent with what was actually connected.
+  const bundle = oauthTokens?.[serverName];
+  if (bundle === undefined) {
+    throw new OAuthTokenUnavailableError(serverName, auth.provider);
+  }
+  const headerValue = renderOAuthHeader(bundle.headerValueTemplate, bundle.accessToken);
+  return { [bundle.headerName]: headerValue };
+}
+
 /**
  * Abstract base class for container-based agent plugins.
  *
@@ -272,7 +331,10 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
   /** Serialize a resolved MCP config into the flat mcp-config.json shape
    *  Claude CLI expects. Applies {{SECRET}} template resolution to env
-   *  values on stdio entries at write time. */
+   *  values on stdio entries and to any HTTP `auth.type === 'headers'`
+   *  values at write time. For `auth.type === 'oauth'`, the access token
+   *  comes from `context.oauthTokens[name]` (pre-loaded + pre-refreshed
+   *  by the caller) and is stamped into `headerValueTemplate`. */
   private async writeResolvedMcpConfig(
     outputDir: string,
     resolved: ResolvedMcpConfig,
@@ -283,9 +345,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const workflowSecrets = isWorkflowAgentContext(this.context)
       ? this.context.workflowSecrets
       : undefined;
+    const oauthTokens = isWorkflowAgentContext(this.context)
+      ? this.context.oauthTokens
+      : undefined;
 
-    type StdioEntry = { command: string; args?: string[]; env?: Record<string, string>; allowedTools?: string[] };
-    type HttpEntry = { url: string; allowedTools?: string[] };
+    type StdioEntry = { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; allowedTools?: string[] };
+    type HttpEntry = { type: 'http'; url: string; headers?: Record<string, string>; allowedTools?: string[] };
     const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
 
     for (const [name, server] of entries) {
@@ -301,14 +366,18 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           }
         }
         mcpConfig[name] = {
+          type: 'stdio',
           command: server.command,
           ...(server.args !== undefined && server.args.length > 0 ? { args: server.args } : {}),
           ...(Object.keys(resolvedEnv).length > 0 ? { env: resolvedEnv } : {}),
           ...allowedToolsPart,
         };
       } else {
+        const headers = buildHttpHeaders(name, server.auth, oauthTokens, workflowSecrets);
         mcpConfig[name] = {
+          type: 'http',
           url: server.url,
+          ...(headers !== undefined ? { headers } : {}),
           ...allowedToolsPart,
         };
       }
@@ -337,8 +406,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       ? this.context.workflowSecrets
       : undefined;
 
-    type StdioEntry = { command: string; args: string[]; env?: Record<string, string>; allowedTools?: string[] };
-    type HttpEntry = { url: string; allowedTools?: string[] };
+    type StdioEntry = { type: 'stdio'; command: string; args: string[]; env?: Record<string, string>; allowedTools?: string[] };
+    type HttpEntry = { type: 'http'; url: string; allowedTools?: string[] };
     const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
 
     for (const server of servers) {
@@ -355,6 +424,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
       if (server.command) {
         mcpConfig[server.name] = {
+          type: 'stdio',
           command: server.command,
           args: server.args ?? [],
           ...(Object.keys(resolvedEnv).length > 0 ? { env: resolvedEnv } : {}),
@@ -362,6 +432,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         };
       } else if (server.url) {
         mcpConfig[server.name] = {
+          type: 'http',
           url: server.url,
           ...allowedToolsPart,
         };

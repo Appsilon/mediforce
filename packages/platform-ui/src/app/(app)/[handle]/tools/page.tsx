@@ -9,6 +9,7 @@ import {
   FlaskConical,
   Globe,
   HardDrive,
+  KeyRound,
   Plug,
   Search,
   Settings,
@@ -233,13 +234,22 @@ export default function ToolsPage() {
         </div>
         <div className="flex items-center gap-2">
           {canAdmin && (
-            <Link
-              href={`/${handle}/admin/tool-catalog`}
-              className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-            >
-              <Settings className="h-3.5 w-3.5" />
-              Manage catalog
-            </Link>
+            <>
+              <Link
+                href={`/${handle}/admin/tool-catalog`}
+                className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                Manage catalog
+              </Link>
+              <Link
+                href={`/${handle}/admin/oauth-providers`}
+                className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                OAuth providers
+              </Link>
+            </>
           )}
           <Link
             href={`/${handle}/agents`}

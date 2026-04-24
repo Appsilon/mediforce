@@ -1,5 +1,7 @@
 import type { AgentDefinition } from '@mediforce/platform-core';
 
+export type HttpBindingAuthKind = 'none' | 'headers' | 'oauth';
+
 export type HttpBindingRow = {
   key: string;
   name: string;
@@ -8,6 +10,8 @@ export type HttpBindingRow = {
   agentName: string;
   allowedTools?: string[];
   hasSecretHeaders: boolean;
+  authKind: HttpBindingAuthKind;
+  oauthProvider?: string;
 };
 
 export function hasSecretTemplate(values: Record<string, string> | undefined): boolean {
@@ -26,6 +30,10 @@ export function collectHttpBindings(agents: AgentDefinition[]): HttpBindingRow[]
     const bindings = agent.mcpServers ?? {};
     for (const [name, binding] of Object.entries(bindings)) {
       if (binding.type !== 'http') continue;
+      const auth = binding.auth;
+      const authKind: HttpBindingAuthKind = auth?.type ?? 'none';
+      const hasSecretHeaders = auth?.type === 'headers' ? hasSecretTemplate(auth.headers) : false;
+      const oauthProvider = auth?.type === 'oauth' ? auth.provider : undefined;
       rows.push({
         key: `${agent.id}::${name}`,
         name,
@@ -33,7 +41,9 @@ export function collectHttpBindings(agents: AgentDefinition[]): HttpBindingRow[]
         agentId: agent.id,
         agentName: agent.name,
         allowedTools: binding.allowedTools,
-        hasSecretHeaders: hasSecretTemplate(binding.auth?.headers),
+        hasSecretHeaders,
+        authKind,
+        oauthProvider,
       });
     }
   }
