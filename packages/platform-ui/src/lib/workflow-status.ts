@@ -78,9 +78,12 @@ export function getWorkflowStatus(instance: {
     }
   }
 
-  // instance.status === 'failed'
-  // cancelProcessRun sets error='Cancelled by user' — string match is the cheapest gate here;
-  // this value is written by cancelProcessRun and must not change without updating this check.
-  const isCancelled = error === 'Cancelled by user';
-  return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: !isCancelled, hasDedicatedBanner: false };
+  if (instance.status === 'failed') {
+    // cancelProcessRun sets error='Cancelled by user' — string match is the cheapest gate here;
+    // this value is written by cancelProcessRun and must not change without updating this check.
+    const isCancelled = error === 'Cancelled by user';
+    return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: !isCancelled, hasDedicatedBanner: false };
+  }
+
+  return { displayStatus: 'error', reason: 'Unknown status', rawReason: null, isRetryable: false, hasDedicatedBanner: false };
 }
