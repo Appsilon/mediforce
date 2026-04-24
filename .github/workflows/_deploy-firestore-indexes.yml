@@ -56,6 +56,14 @@ jobs:
             echo "::error::FIREBASE_CI_TOKEN secret is empty"
             exit 1
           fi
+          # Diagnostic: verify token integrity without leaking value.
+          token_len=${#FIREBASE_TOKEN}
+          token_sha=$(printf '%s' "$FIREBASE_TOKEN" | sha256sum | cut -c1-12)
+          echo "FIREBASE_TOKEN length=${token_len} sha256(prefix)=${token_sha}"
+          case "$FIREBASE_TOKEN" in
+            *[$' \t\r\n']*) echo "::warning::FIREBASE_TOKEN contains whitespace or newline" ;;
+            *) echo "FIREBASE_TOKEN contains no whitespace" ;;
+          esac
           echo "Current indexes in project '$FIREBASE_PROJECT' before deploy:"
           if current_json=$(firebase firestore:indexes --project "$FIREBASE_PROJECT" --json 2>&1); then
             if echo "$current_json" | jq -e '.result.indexes' >/dev/null 2>&1; then
