@@ -31,7 +31,7 @@ test.describe('Task Review Journey', () => {
 
   test('reviewer approves a task and sees confirmation', async ({ page }, testInfo) => {
     await setupRecording(page, 'task-approve-flow', testInfo);
-    await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-human-review`);
+    await page.goto(`/${TEST_ORG_HANDLE}/tasks/task-review-target`);
     await expect(page.getByText(/Human Review/)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/pending/i)).toBeVisible();
     await showCaption(page, 'Human review task — status: pending');

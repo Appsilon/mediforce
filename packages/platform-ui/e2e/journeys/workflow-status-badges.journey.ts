@@ -6,8 +6,9 @@ test.describe('Workflow Status Badges Journey', () => {
   test('process list shows all four semantic status badges', async ({ page }, testInfo) => {
     await setupRecording(page, 'workflow-status-badges-list', testInfo);
 
-    await page.goto(`/${TEST_ORG_HANDLE}/workflows`);
-    await expect(page.getByRole('heading', { name: /workflows/i })).toBeVisible({ timeout: 10_000 });
+    // The RunsTable (with status badges) lives at /runs, not /workflows
+    await page.goto(`/${TEST_ORG_HANDLE}/runs`);
+    await expect(page.getByText('All workflow runs across the platform.')).toBeVisible({ timeout: 10_000 });
     await showStep(page);
 
     // Four display statuses visible in the list

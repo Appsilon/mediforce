@@ -79,6 +79,22 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       completedAt: null,
       completionData: null,
     },
+    // Dedicated task for task-review.journey.ts — approving this advances
+    // proc-review-target, not proc-human-waiting, so the status-badges test
+    // is not polluted by the approval flow.
+    'task-review-target': {
+      id: 'task-review-target',
+      processInstanceId: 'proc-review-target',
+      stepId: 'human-review',
+      assignedRole: 'reviewer',
+      assignedUserId: null,
+      status: 'pending',
+      deadline: nextWeek,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      completionData: null,
+    },
     'task-upload-docs': {
       id: 'task-upload-docs',
       processInstanceId: 'proc-upload-waiting',
@@ -223,6 +239,26 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       variables: { studyId: 'study-003' },
       triggerType: 'manual',
       triggerPayload: { studyId: 'study-003' },
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: 'auto-runner',
+      pauseReason: 'waiting_for_human',
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
+    // Dedicated instance for task-review.journey.ts — isolated so approving its
+    // task does not pollute the proc-human-waiting used by workflow-status-badges.
+    'proc-review-target': {
+      id: 'proc-review-target',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1.0.0',
+      configName: 'all-human',
+      configVersion: '1',
+      status: 'paused',
+      currentStepId: 'human-review',
+      variables: { studyId: 'study-review-target' },
+      triggerType: 'manual',
+      triggerPayload: {},
       createdAt: oneHourAgo,
       updatedAt: now,
       createdBy: 'auto-runner',
@@ -524,6 +560,34 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         queriesCritical: 2,
         sites: ['Site A', 'Site B', 'Site C'],
         recommendation: 'Review overdue queries — 2 critical queries require immediate attention',
+      },
+      verdict: null,
+      executedBy: 'agent:query-status',
+      startedAt: oneHourAgo,
+      completedAt: now,
+      iterationNumber: 0,
+      gateResult: { next: 'human-review', reason: 'agent step complete' },
+      error: null,
+    },
+  };
+
+  // Step executions for the dedicated task-review journey instance.
+  // Mirrors humanWaitingStepExecutions so the "previous step output" tab
+  // shows content, but is isolated under proc-review-target.
+  const reviewTargetStepExecutions: Record<string, Record<string, unknown>> = {
+    'exec-review-target-1': {
+      id: 'exec-review-target-1',
+      instanceId: 'proc-review-target',
+      stepId: 'query-status',
+      status: 'completed',
+      input: { studyId: 'study-review-target' },
+      output: {
+        reasoning_summary: 'Analyzed 10 open queries across 2 sites. 2 queries are overdue.',
+        queriesTotal: 10,
+        queriesOverdue: 2,
+        queriesCritical: 1,
+        sites: ['Site A', 'Site B'],
+        recommendation: 'Review overdue queries — 1 critical query requires attention',
       },
       verdict: null,
       executedBy: 'agent:query-status',
@@ -1087,5 +1151,5 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions };
 }
