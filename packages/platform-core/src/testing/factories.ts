@@ -102,6 +102,7 @@ export function buildProcessInstance(
     error: null,
     assignedRoles: [],
     deleted: false,
+    archived: false,
     ...overrides,
   };
 }

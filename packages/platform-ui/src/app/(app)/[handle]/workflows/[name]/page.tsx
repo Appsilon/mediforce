@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2, ArrowRightLeft, KeyRound } from 'lucide-react';
+import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, Eye, EyeOff } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
@@ -26,8 +26,10 @@ export default function ProcessDefinitionPage() {
   const router = useRouter();
   const decodedName = decodeURIComponent(name);
 
+  const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
+
   const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName);
-  const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName);
+  const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns);
   const { data: activeTasks } = useMyTasks(null);
 
   const activeTaskByInstance = React.useMemo(() => {
@@ -241,7 +243,19 @@ export default function ProcessDefinitionPage() {
         {/* Runs tab */}
         <Tabs.Content value="runs" className="flex-1 p-6">
           <div className="flex items-center justify-between mb-4">
-            <div />
+            <button
+              onClick={() => setShowArchivedRuns((v) => !v)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
+                showArchivedRuns
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+              )}
+            >
+              {showArchivedRuns
+                ? <><EyeOff className="h-3.5 w-3.5" />Hide archived</>
+                : <><Eye className="h-3.5 w-3.5" />Show archived</>}
+            </button>
             {hasManualTrigger ? (
               <StartRunButton workflowName={decodedName} showVersionPicker />
             ) : (

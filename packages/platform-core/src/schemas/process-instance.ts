@@ -36,6 +36,13 @@ export const ProcessInstanceSchema = z.object({
    */
   deleted: z.boolean().default(false),
   /**
+   * User-initiated archive flag. Archived runs are hidden from the default
+   * run list views but preserved in Firestore for audit trail purposes.
+   * Toggle "Show archived" in the UI to include them. Only terminal/error
+   * runs can be archived — active runs must be cancelled first.
+   */
+  archived: z.boolean().default(false),
+  /**
    * Snapshot of outputs carried over from the last successfully completed
    * run of the same workflow name, per the WD's `inputForNextRun` declarations.
    * Empty object when the WD declares carry-over but no predecessor qualifies.

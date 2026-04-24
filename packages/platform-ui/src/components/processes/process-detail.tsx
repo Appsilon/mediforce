@@ -3,14 +3,14 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowLeft, FileBarChart } from 'lucide-react';
+import { ArrowLeft, FileBarChart, Archive, ArchiveRestore } from 'lucide-react';
 import type { ProcessInstance, StepExecution, AuditEvent, Step } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
-import { cancelProcessRun } from '@/app/actions/processes';
+import { cancelProcessRun, archiveProcessRun } from '@/app/actions/processes';
 import { useActiveCoworkSession } from '@/hooks/use-tasks';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
@@ -125,6 +125,14 @@ export function ProcessDetail({
   const [cancelError, setCancelError] = React.useState<string | null>(null);
 
   const canCancel = wfStatus.displayStatus === 'in_progress' || wfStatus.displayStatus === 'waiting_for_human';
+  const canArchive = wfStatus.displayStatus === 'completed' || wfStatus.displayStatus === 'error';
+  const [archiving, setArchiving] = React.useState(false);
+
+  async function handleArchiveToggle() {
+    setArchiving(true);
+    await archiveProcessRun(instance.id, instance.archived !== true);
+    setArchiving(false);
+  }
 
   async function handleConfirmCancel() {
     setCancelStep(2);
@@ -168,6 +176,18 @@ export function ProcessDetail({
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-headline font-semibold flex-1">{formatStepName(instance.definitionName)}</h1>
+            {canArchive && (
+              <button
+                onClick={handleArchiveToggle}
+                disabled={archiving}
+                title={instance.archived === true ? 'Unarchive run' : 'Archive run'}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0 disabled:opacity-50"
+              >
+                {instance.archived === true
+                  ? <><ArchiveRestore className="h-3.5 w-3.5" />Unarchive</>
+                  : <><Archive className="h-3.5 w-3.5" />Archive</>}
+              </button>
+            )}
             {canCancel && cancelStep === 0 && (
               <button
                 onClick={() => setCancelStep(1)}
@@ -204,6 +224,12 @@ export function ProcessDetail({
           {/* Metadata row — status badge, definition, ID, created, duration, report link */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground items-center">
             <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
+            {instance.archived === true && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                <Archive className="h-3 w-3" />
+                Archived
+              </span>
+            )}
             <span>Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span></span>
             {instance.configName && (
               <span>Config: <span className="font-mono text-foreground">{instance.configName} v{instance.configVersion}</span></span>
