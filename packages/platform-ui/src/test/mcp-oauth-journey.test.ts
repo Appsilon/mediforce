@@ -18,12 +18,16 @@ import {
 const fake = vi.hoisted(() => {
   const agents = new Map<string, unknown>();
   const namespaces = new Map<string, unknown>();
+  // members[namespaceHandle][uid] = { uid, role, joinedAt }
+  const members = new Map<string, Map<string, unknown>>();
   const oauthProviderRepo = {} as unknown;
   const agentOAuthTokenRepo = {} as unknown;
 
   const services = {
     namespaceRepo: {
       getNamespace: async (handle: string) => namespaces.get(handle) ?? null,
+      getMember: async (handle: string, uid: string) =>
+        members.get(handle)?.get(uid) ?? null,
     },
     agentDefinitionRepo: {
       getById: async (id: string) => agents.get(id) ?? null,
@@ -33,7 +37,7 @@ const fake = vi.hoisted(() => {
   };
 
   return {
-    state: { agents, namespaces },
+    state: { agents, namespaces, members },
     services,
     // Replaced per-test by `beforeEach` so each test has fresh repos.
     setRepos(options: {
@@ -42,6 +46,15 @@ const fake = vi.hoisted(() => {
     }): void {
       (services as { oauthProviderRepo: unknown }).oauthProviderRepo = options.oauthProviderRepo;
       (services as { agentOAuthTokenRepo: unknown }).agentOAuthTokenRepo = options.agentOAuthTokenRepo;
+    },
+    addMember(handle: string, uid: string, role: 'owner' | 'admin' | 'member'): void {
+      const forNs = members.get(handle) ?? new Map<string, unknown>();
+      forNs.set(uid, {
+        uid,
+        role,
+        joinedAt: '2026-01-01T00:00:00.000Z',
+      });
+      members.set(handle, forNs);
     },
   };
 });
@@ -144,14 +157,20 @@ function userInfoResponse(overrides: Record<string, unknown> = {}): Response {
 
 function adminListProviders(ns: string): Promise<Response> {
   const url = new URL(`http://localhost/api/admin/oauth-providers?namespace=${ns}`);
-  return Promise.resolve(adminProvidersRoute.GET(new NextRequest(url.toString())));
+  const req = new NextRequest(url.toString(), {
+    headers: { Authorization: 'Bearer valid-token' },
+  });
+  return Promise.resolve(adminProvidersRoute.GET(req));
 }
 
 function adminCreateProvider(ns: string, body: unknown): Promise<Response> {
   const url = new URL(`http://localhost/api/admin/oauth-providers?namespace=${ns}`);
   const req = new NextRequest(url.toString(), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer valid-token',
+    },
     body: JSON.stringify(body),
   });
   return Promise.resolve(adminProvidersRoute.POST(req));
@@ -256,8 +275,12 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     // Seed baseline namespace + agent.
     fake.state.namespaces.clear();
     fake.state.agents.clear();
+    fake.state.members.clear();
     fake.state.namespaces.set(APPSILON.handle, APPSILON);
     fake.state.agents.set('agent-1', buildAgentWithOAuthBinding());
+    // The seeded UID is an admin of `appsilon` — covers both admin-only
+    // routes and namespace-membership gates.
+    fake.addMember(APPSILON.handle, UID, 'admin');
 
     originalFetch = globalThis.fetch;
     fetchMock = vi.fn();
@@ -431,5 +454,90 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     expect(serialized).not.toContain('should-not-leak');
     expect(body.tokens[0]).not.toHaveProperty('accessToken');
     expect(body.tokens[0]).not.toHaveProperty('refreshToken');
+  });
+
+  // Regression tests for PR #263 review findings #1, #2 and #3. Each uses
+  // the same repo-mocked scaffolding as the journey above; only the seed
+  // and assertions change.
+
+  it('[AUTHZ] admin GET hides clientSecret end-to-end', async () => {
+    await adminCreateProvider('appsilon', providerCreateInput);
+
+    const listRes = await adminListProviders('appsilon');
+    const body = (await listRes.json()) as { providers: Array<Record<string, unknown>> };
+    expect(body.providers).toHaveLength(1);
+    expect(JSON.stringify(body)).not.toContain('client-secret-xyz');
+    expect(body.providers[0]).not.toHaveProperty('clientSecret');
+  });
+
+  it('[AUTHZ] admin routes reject plain (non-admin) member with 403', async () => {
+    const plainUid = 'plain-member-uid';
+    fake.addMember('appsilon', plainUid, 'member');
+    mockVerifyIdToken.mockResolvedValue({ uid: plainUid });
+
+    const createRes = await adminCreateProvider('appsilon', providerCreateInput);
+    expect(createRes.status).toBe(403);
+
+    const listRes = await adminListProviders('appsilon');
+    expect(listRes.status).toBe(403);
+  });
+
+  it('[AUTHZ] start rejects cross-namespace caller with 404', async () => {
+    // Second namespace exists but the journey UID is not a member there.
+    const OTHER = { ...APPSILON, handle: 'other-ns', displayName: 'Other' };
+    fake.state.namespaces.set(OTHER.handle, OTHER);
+    await adminCreateProvider('appsilon', providerCreateInput);
+
+    const startRes = await userStartOAuth('agent-1', 'github', 'other-ns', 'gh');
+    expect(startRes.status).toBe(404);
+    // Token was NOT persisted to `other-ns`.
+    expect(await tokenRepo.get('other-ns', 'agent-1', 'gh')).toBeNull();
+  });
+
+  it('[AUTHZ] delete rejects cross-namespace caller with 404 and leaves token intact', async () => {
+    const OTHER = { ...APPSILON, handle: 'other-ns', displayName: 'Other' };
+    fake.state.namespaces.set(OTHER.handle, OTHER);
+
+    // Seed a token owned by `other-ns`.
+    const token: AgentOAuthToken = {
+      provider: 'github',
+      accessToken: 'survives-attack',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 3600_000,
+      scope: 'repo',
+      providerUserId: '1',
+      accountLogin: 'victim',
+      connectedAt: Date.now(),
+      connectedBy: 'other-user',
+    };
+    await tokenRepo.put('other-ns', 'agent-1', 'gh', token);
+
+    const deleteRes = await userDeleteToken('agent-1', 'github', 'other-ns', 'gh', false);
+    expect(deleteRes.status).toBe(404);
+    // The other-ns token must still be there — cross-tenant delete denied.
+    const surviving = await tokenRepo.get('other-ns', 'agent-1', 'gh');
+    expect(surviving?.accessToken).toBe('survives-attack');
+  });
+
+  it('[AUTHZ] list tokens filters by caller namespace — other namespace leaks nothing', async () => {
+    const OTHER = { ...APPSILON, handle: 'other-ns', displayName: 'Other' };
+    fake.state.namespaces.set(OTHER.handle, OTHER);
+
+    // Seed a token in `other-ns` that the caller should NOT see.
+    const secretToken: AgentOAuthToken = {
+      provider: 'github',
+      accessToken: 'other-ns-secret',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 3600_000,
+      scope: 'repo',
+      providerUserId: '1',
+      accountLogin: 'victim',
+      connectedAt: Date.now(),
+      connectedBy: 'other-user',
+    };
+    await tokenRepo.put('other-ns', 'agent-1', 'gh', secretToken);
+
+    const listRes = await userListOAuthTokens('agent-1', 'other-ns');
+    expect(listRes.status).toBe(404);
   });
 });

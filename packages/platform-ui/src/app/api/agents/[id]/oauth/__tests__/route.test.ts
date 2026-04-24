@@ -6,6 +6,7 @@ import type { AgentOAuthToken } from '@mediforce/platform-core';
 
 const mockVerifyIdToken = vi.fn();
 const mockTokenListByAgent = vi.fn();
+const mockGetMember = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
@@ -14,8 +15,15 @@ vi.mock('@mediforce/platform-infra', () => ({
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     agentOAuthTokenRepo: { listByAgent: mockTokenListByAgent },
+    namespaceRepo: { getMember: mockGetMember },
   }),
 }));
+
+const memberAppsilon = {
+  uid: 'uid-1',
+  role: 'member' as const,
+  joinedAt: '2026-01-01T00:00:00.000Z',
+};
 
 import { GET } from '../route';
 
@@ -59,6 +67,7 @@ describe('GET /api/agents/:id/oauth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockVerifyIdToken.mockResolvedValue({ uid: 'uid-1' });
+    mockGetMember.mockResolvedValue(memberAppsilon);
   });
 
   it('[DATA] returns tokens with public fields only (no access/refresh tokens)', async () => {
@@ -152,5 +161,28 @@ describe('GET /api/agents/:id/oauth', () => {
     );
 
     expect(mockTokenListByAgent).toHaveBeenCalledWith('other-ns', 'other-agent');
+  });
+
+  it('[AUTHZ] caller who is not a member of the namespace gets 404', async () => {
+    mockGetMember.mockResolvedValue(null);
+    mockTokenListByAgent.mockResolvedValue([]);
+
+    const res = await GET(
+      makeGetRequest('agent-1', 'other-ns'),
+      { params: makeParams('agent-1') },
+    );
+    expect(res.status).toBe(404);
+    expect(mockTokenListByAgent).not.toHaveBeenCalled();
+  });
+
+  it('[AUTHZ] membership lookup uses the query-param namespace, not a hardcoded one', async () => {
+    mockGetMember.mockResolvedValue(memberAppsilon);
+    mockTokenListByAgent.mockResolvedValue([]);
+
+    await GET(
+      makeGetRequest('agent-1', 'other-ns'),
+      { params: makeParams('agent-1') },
+    );
+    expect(mockGetMember).toHaveBeenCalledWith('other-ns', 'uid-1');
   });
 });

@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { OAuthProviderConfig } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
-import { requireFirebaseUid, requireNamespaceFromQuery } from '../_shared/auth';
+import {
+  requireFirebaseUid,
+  requireNamespaceFromQuery,
+  requireNamespaceMembership,
+} from '../_shared/auth';
 
 /** DELETE /api/agents/:id/oauth/:provider?namespace=X&serverName=Y&revokeAtProvider=Z
  *
@@ -44,10 +48,19 @@ export async function DELETE(
 
   const uidOrResponse = await requireFirebaseUid(request);
   if (uidOrResponse instanceof NextResponse) return uidOrResponse;
+  const uid = uidOrResponse;
 
   const namespaceOrResponse = await requireNamespaceFromQuery(request);
   if (namespaceOrResponse instanceof NextResponse) return namespaceOrResponse;
   const namespace = namespaceOrResponse;
+
+  const services = getPlatformServices();
+  const membershipFailure = await requireNamespaceMembership({
+    namespaceRepo: services.namespaceRepo,
+    namespace,
+    uid,
+  });
+  if (membershipFailure !== undefined) return membershipFailure;
 
   const url = new URL(request.url);
   const serverName = url.searchParams.get('serverName') ?? '';
@@ -59,8 +72,6 @@ export async function DELETE(
       { status: 400 },
     );
   }
-
-  const services = getPlatformServices();
 
   if (revokeFlag) {
     const [token, provider] = await Promise.all([

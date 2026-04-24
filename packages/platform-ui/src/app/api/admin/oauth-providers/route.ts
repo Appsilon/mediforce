@@ -4,20 +4,20 @@ import {
   ProviderAlreadyExistsError,
 } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveNamespaceFromQuery } from './helpers';
+import { requireAdminForNamespace, toPublicProvider } from './helpers';
 
 export async function GET(request: Request): Promise<NextResponse> {
   const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
+  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
   if (namespace instanceof NextResponse) return namespace;
 
   const providers = await services.oauthProviderRepo.list(namespace);
-  return NextResponse.json({ providers });
+  return NextResponse.json({ providers: providers.map(toPublicProvider) });
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
   const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
+  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
   if (namespace instanceof NextResponse) return namespace;
 
   const body = await request.json().catch(() => null);
@@ -35,7 +35,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   try {
     const provider = await services.oauthProviderRepo.create(namespace, parsed.data);
-    return NextResponse.json({ provider }, { status: 201 });
+    return NextResponse.json({ provider: toPublicProvider(provider) }, { status: 201 });
   } catch (err) {
     if (err instanceof ProviderAlreadyExistsError) {
       return NextResponse.json(

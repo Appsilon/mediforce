@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { UpdateOAuthProviderInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveNamespaceFromQuery } from '../helpers';
+import { requireAdminForNamespace, toPublicProvider } from '../helpers';
 
 export async function GET(
   request: Request,
@@ -9,14 +9,14 @@ export async function GET(
 ): Promise<NextResponse> {
   const { id } = await params;
   const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
+  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
   if (namespace instanceof NextResponse) return namespace;
 
   const provider = await services.oauthProviderRepo.get(namespace, id);
   if (provider === null) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  return NextResponse.json({ provider });
+  return NextResponse.json({ provider: toPublicProvider(provider) });
 }
 
 export async function PATCH(
@@ -25,7 +25,7 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const { id } = await params;
   const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
+  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
   if (namespace instanceof NextResponse) return namespace;
 
   const body = await request.json().catch(() => null);
@@ -45,7 +45,7 @@ export async function PATCH(
   if (updated === null) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  return NextResponse.json({ provider: updated });
+  return NextResponse.json({ provider: toPublicProvider(updated) });
 }
 
 export async function DELETE(
@@ -54,7 +54,7 @@ export async function DELETE(
 ): Promise<NextResponse> {
   const { id } = await params;
   const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
+  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
   if (namespace instanceof NextResponse) return namespace;
 
   await services.oauthProviderRepo.delete(namespace, id);

@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { PublicAgentOAuthTokenSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
-import { requireFirebaseUid, requireNamespaceFromQuery } from './_shared/auth';
+import {
+  requireFirebaseUid,
+  requireNamespaceFromQuery,
+  requireNamespaceMembership,
+} from './_shared/auth';
 
 /** GET /api/agents/:id/oauth?namespace=X
  *
@@ -17,12 +21,20 @@ export async function GET(
 
   const uidOrResponse = await requireFirebaseUid(request);
   if (uidOrResponse instanceof NextResponse) return uidOrResponse;
+  const uid = uidOrResponse;
 
   const namespaceOrResponse = await requireNamespaceFromQuery(request);
   if (namespaceOrResponse instanceof NextResponse) return namespaceOrResponse;
   const namespace = namespaceOrResponse;
 
   const services = getPlatformServices();
+  const membershipFailure = await requireNamespaceMembership({
+    namespaceRepo: services.namespaceRepo,
+    namespace,
+    uid,
+  });
+  if (membershipFailure !== undefined) return membershipFailure;
+
   const entries = await services.agentOAuthTokenRepo.listByAgent(namespace, agentId);
 
   const tokens = entries.map((entry) => {

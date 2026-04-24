@@ -4,13 +4,22 @@ import { ProviderAlreadyExistsError } from '@mediforce/platform-core';
 
 // ---- Mocks ----
 
+const mockVerifyIdToken = vi.fn();
 const mockNamespaceGet = vi.fn();
+const mockGetMember = vi.fn();
 const mockProviderList = vi.fn();
 const mockProviderCreate = vi.fn();
 
+vi.mock('@mediforce/platform-infra', () => ({
+  getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
+}));
+
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
-    namespaceRepo: { getNamespace: mockNamespaceGet },
+    namespaceRepo: {
+      getNamespace: mockNamespaceGet,
+      getMember: mockGetMember,
+    },
     oauthProviderRepo: {
       list: mockProviderList,
       create: mockProviderCreate,
@@ -22,18 +31,31 @@ import { GET, POST } from '../route';
 
 // ---- Helpers ----
 
-function makeGetRequest(namespace?: string): NextRequest {
+function makeGetRequest(
+  namespace?: string,
+  { authHeader = 'Bearer valid-token', apiKey }: { authHeader?: string | null; apiKey?: string } = {},
+): NextRequest {
   const url = new URL('http://localhost/api/admin/oauth-providers');
   if (namespace !== undefined) url.searchParams.set('namespace', namespace);
-  return new NextRequest(url.toString());
+  const headers: Record<string, string> = {};
+  if (authHeader !== null) headers.Authorization = authHeader;
+  if (apiKey !== undefined) headers['X-Api-Key'] = apiKey;
+  return new NextRequest(url.toString(), { headers });
 }
 
-function makePostRequest(namespace: string | null, body: unknown): NextRequest {
+function makePostRequest(
+  namespace: string | null,
+  body: unknown,
+  { authHeader = 'Bearer valid-token', apiKey }: { authHeader?: string | null; apiKey?: string } = {},
+): NextRequest {
   const url = new URL('http://localhost/api/admin/oauth-providers');
   if (namespace !== null) url.searchParams.set('namespace', namespace);
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (authHeader !== null) headers.Authorization = authHeader;
+  if (apiKey !== undefined) headers['X-Api-Key'] = apiKey;
   return new NextRequest(url.toString(), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
 }
@@ -44,6 +66,15 @@ const existingNamespace = {
   displayName: 'Appsilon',
   createdAt: '2026-01-01T00:00:00.000Z',
 };
+
+const adminMember = {
+  uid: 'uid-admin',
+  role: 'admin' as const,
+  joinedAt: '2026-01-01T00:00:00.000Z',
+};
+
+const ownerMember = { ...adminMember, role: 'owner' as const };
+const plainMember = { ...adminMember, role: 'member' as const };
 
 const providerConfig = {
   id: 'github',
@@ -72,22 +103,37 @@ const providerInput = {
 // ---- Tests ----
 
 describe('GET /api/admin/oauth-providers', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockVerifyIdToken.mockResolvedValue({ uid: 'uid-admin' });
+    mockNamespaceGet.mockResolvedValue(existingNamespace);
+    mockGetMember.mockResolvedValue(adminMember);
+  });
 
   it('[DATA] lists providers in a namespace', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
     mockProviderList.mockResolvedValue([providerConfig]);
 
     const res = await GET(makeGetRequest('appsilon'));
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.providers).toEqual([providerConfig]);
+    expect(json.providers).toHaveLength(1);
+    expect(json.providers[0].id).toBe('github');
     expect(mockProviderList).toHaveBeenCalledWith('appsilon');
   });
 
+  it('[SECURITY] list response strips clientSecret', async () => {
+    mockProviderList.mockResolvedValue([providerConfig]);
+
+    const res = await GET(makeGetRequest('appsilon'));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.providers[0]).not.toHaveProperty('clientSecret');
+    expect(JSON.stringify(json)).not.toContain('client-secret-xyz');
+  });
+
   it('[DATA] returns empty list when no providers exist', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
     mockProviderList.mockResolvedValue([]);
 
     const res = await GET(makeGetRequest('appsilon'));
@@ -119,32 +165,119 @@ describe('GET /api/admin/oauth-providers', () => {
   });
 
   it('[ISOLATION] list is scoped to the requested namespace', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
     mockProviderList.mockResolvedValue([providerConfig]);
 
     await GET(makeGetRequest('other-ns'));
     expect(mockProviderList).toHaveBeenCalledWith('other-ns');
     expect(mockProviderList).not.toHaveBeenCalledWith('appsilon');
   });
+
+  it('[AUTHZ] owner role passes', async () => {
+    mockGetMember.mockResolvedValue(ownerMember);
+    mockProviderList.mockResolvedValue([]);
+
+    const res = await GET(makeGetRequest('appsilon'));
+    expect(res.status).toBe(200);
+  });
+
+  it('[AUTHZ] plain member gets 403', async () => {
+    mockGetMember.mockResolvedValue(plainMember);
+
+    const res = await GET(makeGetRequest('appsilon'));
+    const json = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(json.error).toContain('admin');
+    expect(mockProviderList).not.toHaveBeenCalled();
+  });
+
+  it('[AUTHZ] non-member gets 403', async () => {
+    mockGetMember.mockResolvedValue(null);
+
+    const res = await GET(makeGetRequest('appsilon'));
+    expect(res.status).toBe(403);
+    expect(mockProviderList).not.toHaveBeenCalled();
+  });
+
+  it('[AUTHZ] missing Bearer token gets 401', async () => {
+    const res = await GET(makeGetRequest('appsilon', { authHeader: null }));
+    expect(res.status).toBe(401);
+    expect(mockProviderList).not.toHaveBeenCalled();
+  });
+
+  it('[AUTHZ] invalid token gets 401', async () => {
+    mockVerifyIdToken.mockRejectedValue(new Error('bad token'));
+    const res = await GET(makeGetRequest('appsilon'));
+    expect(res.status).toBe(401);
+  });
+
+  it('[AUTHZ] PLATFORM_ADMIN_API_KEY allows server-to-server admin', async () => {
+    const previous = process.env.PLATFORM_ADMIN_API_KEY;
+    process.env.PLATFORM_ADMIN_API_KEY = 'admin-key-xyz';
+    try {
+      mockProviderList.mockResolvedValue([]);
+
+      const res = await GET(
+        makeGetRequest('appsilon', { authHeader: null, apiKey: 'admin-key-xyz' }),
+      );
+      expect(res.status).toBe(200);
+      expect(mockVerifyIdToken).not.toHaveBeenCalled();
+      expect(mockGetMember).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env.PLATFORM_ADMIN_API_KEY;
+      else process.env.PLATFORM_ADMIN_API_KEY = previous;
+    }
+  });
+
+  it('[AUTHZ] wrong X-Api-Key falls through to Firebase check', async () => {
+    const previous = process.env.PLATFORM_ADMIN_API_KEY;
+    process.env.PLATFORM_ADMIN_API_KEY = 'admin-key-xyz';
+    try {
+      mockProviderList.mockResolvedValue([]);
+
+      const res = await GET(
+        makeGetRequest('appsilon', { apiKey: 'wrong-key' }),
+      );
+      expect(res.status).toBe(200);
+      expect(mockGetMember).toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env.PLATFORM_ADMIN_API_KEY;
+      else process.env.PLATFORM_ADMIN_API_KEY = previous;
+    }
+  });
 });
 
 describe('POST /api/admin/oauth-providers', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockVerifyIdToken.mockResolvedValue({ uid: 'uid-admin' });
+    mockNamespaceGet.mockResolvedValue(existingNamespace);
+    mockGetMember.mockResolvedValue(adminMember);
+  });
 
   it('[DATA] creates a provider with valid payload', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
     mockProviderCreate.mockResolvedValue(providerConfig);
 
     const res = await POST(makePostRequest('appsilon', providerInput));
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.provider).toEqual(providerConfig);
+    expect(json.provider.id).toBe('github');
     expect(mockProviderCreate).toHaveBeenCalledWith('appsilon', providerInput);
   });
 
+  it('[SECURITY] POST response strips clientSecret', async () => {
+    mockProviderCreate.mockResolvedValue(providerConfig);
+
+    const res = await POST(makePostRequest('appsilon', providerInput));
+    const json = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(json.provider).not.toHaveProperty('clientSecret');
+    expect(JSON.stringify(json)).not.toContain('client-secret-xyz');
+  });
+
   it('[DATA] accepts optional revokeUrl and iconUrl', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
     const fullInput = {
       ...providerInput,
       revokeUrl: 'https://oauth2.googleapis.com/revoke',
@@ -180,12 +313,13 @@ describe('POST /api/admin/oauth-providers', () => {
   });
 
   it('[ERROR] 400 when body is not JSON', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
-
     const url = new URL('http://localhost/api/admin/oauth-providers?namespace=appsilon');
     const req = new NextRequest(url.toString(), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer valid-token',
+      },
       body: 'not-json',
     });
 
@@ -197,8 +331,6 @@ describe('POST /api/admin/oauth-providers', () => {
   });
 
   it('[ERROR] 400 on schema validation failure (missing clientId)', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
-
     const invalid = { ...providerInput };
     delete (invalid as Record<string, unknown>).clientId;
 
@@ -211,8 +343,6 @@ describe('POST /api/admin/oauth-providers', () => {
   });
 
   it('[ERROR] 400 on invalid URL (authorizeUrl)', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
-
     const res = await POST(
       makePostRequest('appsilon', { ...providerInput, authorizeUrl: 'not a url' }),
     );
@@ -224,8 +354,6 @@ describe('POST /api/admin/oauth-providers', () => {
   });
 
   it('[ERROR] 400 on invalid id pattern (uppercase)', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
-
     const res = await POST(
       makePostRequest('appsilon', { ...providerInput, id: 'GitHub' }),
     );
@@ -234,8 +362,6 @@ describe('POST /api/admin/oauth-providers', () => {
   });
 
   it('[ERROR] 400 when scopes is empty array', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
-
     const res = await POST(
       makePostRequest('appsilon', { ...providerInput, scopes: [] }),
     );
@@ -244,8 +370,6 @@ describe('POST /api/admin/oauth-providers', () => {
   });
 
   it('[ERROR] 400 on unknown field (strict schema)', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
-
     const res = await POST(
       makePostRequest('appsilon', { ...providerInput, rogueField: 'nope' }),
     );
@@ -254,7 +378,6 @@ describe('POST /api/admin/oauth-providers', () => {
   });
 
   it('[ERROR] 409 when a provider with the same id already exists', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
     mockProviderCreate.mockRejectedValue(
       new ProviderAlreadyExistsError('appsilon', 'github'),
     );
@@ -268,10 +391,25 @@ describe('POST /api/admin/oauth-providers', () => {
   });
 
   it('[ISOLATION] create is scoped to requested namespace', async () => {
-    mockNamespaceGet.mockResolvedValue(existingNamespace);
     mockProviderCreate.mockResolvedValue(providerConfig);
 
     await POST(makePostRequest('other-ns', providerInput));
     expect(mockProviderCreate).toHaveBeenCalledWith('other-ns', providerInput);
+  });
+
+  it('[AUTHZ] plain member gets 403 on POST', async () => {
+    mockGetMember.mockResolvedValue(plainMember);
+
+    const res = await POST(makePostRequest('appsilon', providerInput));
+    expect(res.status).toBe(403);
+    expect(mockProviderCreate).not.toHaveBeenCalled();
+  });
+
+  it('[AUTHZ] non-member gets 403 on POST', async () => {
+    mockGetMember.mockResolvedValue(null);
+
+    const res = await POST(makePostRequest('appsilon', providerInput));
+    expect(res.status).toBe(403);
+    expect(mockProviderCreate).not.toHaveBeenCalled();
   });
 });

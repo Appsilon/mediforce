@@ -8,6 +8,7 @@ import type { AgentDefinition, OAuthProviderConfig } from '@mediforce/platform-c
 const mockVerifyIdToken = vi.fn();
 const mockAgentGetById = vi.fn();
 const mockProviderGet = vi.fn();
+const mockGetMember = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
@@ -17,8 +18,15 @@ vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     agentDefinitionRepo: { getById: mockAgentGetById },
     oauthProviderRepo: { get: mockProviderGet },
+    namespaceRepo: { getMember: mockGetMember },
   }),
 }));
+
+const memberAppsilon = {
+  uid: 'user-firebase-uid',
+  role: 'member' as const,
+  joinedAt: '2026-01-01T00:00:00.000Z',
+};
 
 import { POST } from '../route';
 
@@ -101,6 +109,7 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockVerifyIdToken.mockResolvedValue({ uid: 'user-firebase-uid' });
+    mockGetMember.mockResolvedValue(memberAppsilon);
     process.env.PLATFORM_API_KEY = 'test-platform-secret';
   });
 
@@ -282,5 +291,28 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
       { params: makeParams('agent-1', 'github') },
     );
     expect(res.status).toBe(500);
+  });
+
+  it('[AUTHZ] caller who is not a member of the namespace gets 404', async () => {
+    mockGetMember.mockResolvedValue(null);
+
+    const res = await POST(
+      makePostRequest('agent-1', 'github', 'other-ns', { serverName: 'gh' }),
+      { params: makeParams('agent-1', 'github') },
+    );
+    expect(res.status).toBe(404);
+    expect(mockAgentGetById).not.toHaveBeenCalled();
+    expect(mockProviderGet).not.toHaveBeenCalled();
+  });
+
+  it('[AUTHZ] membership check uses the query-param namespace', async () => {
+    mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
+    mockProviderGet.mockResolvedValue(providerConfig);
+
+    await POST(
+      makePostRequest('agent-1', 'github', 'other-ns', { serverName: 'gh' }),
+      { params: makeParams('agent-1', 'github') },
+    );
+    expect(mockGetMember).toHaveBeenCalledWith('other-ns', 'user-firebase-uid');
   });
 });

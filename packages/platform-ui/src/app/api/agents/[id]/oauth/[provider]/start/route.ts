@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { signState, generateNonce, generatePkcePair } from '@mediforce/agent-runtime';
 import { getPlatformServices } from '@/lib/platform-services';
-import { requireFirebaseUid, requireNamespaceFromQuery } from '../../_shared/auth';
+import {
+  requireFirebaseUid,
+  requireNamespaceFromQuery,
+  requireNamespaceMembership,
+} from '../../_shared/auth';
 
 const StartBodySchema = z.object({
   serverName: z.string().min(1),
@@ -54,6 +58,14 @@ export async function POST(
   if (namespaceOrResponse instanceof NextResponse) return namespaceOrResponse;
   const namespace = namespaceOrResponse;
 
+  const services = getPlatformServices();
+  const membershipFailure = await requireNamespaceMembership({
+    namespaceRepo: services.namespaceRepo,
+    namespace,
+    uid,
+  });
+  if (membershipFailure !== undefined) return membershipFailure;
+
   const body = await request.json().catch(() => null);
   const parsed = StartBodySchema.safeParse(body);
   if (!parsed.success) {
@@ -63,8 +75,6 @@ export async function POST(
     );
   }
   const { serverName } = parsed.data;
-
-  const services = getPlatformServices();
 
   const agent = await services.agentDefinitionRepo.getById(agentId);
   if (agent === null) {

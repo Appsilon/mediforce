@@ -8,6 +8,7 @@ const mockVerifyIdToken = vi.fn();
 const mockTokenGet = vi.fn();
 const mockTokenDelete = vi.fn();
 const mockProviderGet = vi.fn();
+const mockGetMember = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
@@ -20,8 +21,15 @@ vi.mock('@/lib/platform-services', () => ({
       delete: mockTokenDelete,
     },
     oauthProviderRepo: { get: mockProviderGet },
+    namespaceRepo: { getMember: mockGetMember },
   }),
 }));
+
+const memberAppsilon = {
+  uid: 'uid-1',
+  role: 'member' as const,
+  joinedAt: '2026-01-01T00:00:00.000Z',
+};
 
 import { DELETE } from '../route';
 
@@ -92,6 +100,7 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockVerifyIdToken.mockResolvedValue({ uid: 'uid-1' });
+    mockGetMember.mockResolvedValue(memberAppsilon);
     originalFetch = globalThis.fetch;
     fetchMock = vi.fn();
     globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
@@ -289,5 +298,37 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
     expect(res.status).toBe(400);
     expect(json.error).toContain('serverName');
     expect(mockTokenDelete).not.toHaveBeenCalled();
+  });
+
+  it('[AUTHZ] caller who is not a member of the namespace gets 404 and does not delete', async () => {
+    mockGetMember.mockResolvedValue(null);
+
+    const res = await DELETE(
+      makeDeleteRequest({
+        agentId: 'agent-1',
+        providerSlug: 'github',
+        namespace: 'other-ns',
+        serverName: 'gh',
+      }),
+      { params: makeParams('agent-1', 'github') },
+    );
+    expect(res.status).toBe(404);
+    expect(mockTokenDelete).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('[AUTHZ] membership check uses the query-param namespace', async () => {
+    mockTokenDelete.mockResolvedValue(true);
+
+    await DELETE(
+      makeDeleteRequest({
+        agentId: 'agent-1',
+        providerSlug: 'github',
+        namespace: 'other-ns',
+        serverName: 'gh',
+      }),
+      { params: makeParams('agent-1', 'github') },
+    );
+    expect(mockGetMember).toHaveBeenCalledWith('other-ns', 'uid-1');
   });
 });
