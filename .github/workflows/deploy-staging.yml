@@ -16,7 +16,7 @@ jobs:
     with:
       environment-name: staging
     secrets:
-      FIREBASE_CI_TOKEN: ${{ secrets.FIREBASE_CI_TOKEN }}
+      FIREBASE_SA_KEY: ${{ secrets.FIREBASE_SA_KEY_STAGING }}
       FIREBASE_PROJECT: ${{ secrets.FIREBASE_STAGING_PROJECT }}
 
   deploy:

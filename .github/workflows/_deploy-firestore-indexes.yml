@@ -5,8 +5,11 @@ name: Deploy Firestore indexes (reusable)
 # the first job in deploy-staging / deploy-production, so the SSH app deploy
 # never lands code that queries an index Firestore is still building.
 #
-# Caller passes the per-environment Firebase project as a secret; the same
-# CI token works against any project the token's owner has access to.
+# Auth: prefers a service account JSON key passed as FIREBASE_SA_KEY (written
+# to disk, exposed via GOOGLE_APPLICATION_CREDENTIALS). Falls back to the
+# legacy FIREBASE_CI_TOKEN when the SA key is missing — firebase-tools has
+# deprecated that path and Google rejects those tokens from some runner
+# network ranges, so new environments should onboard the SA key.
 
 on:
   workflow_call:
@@ -17,16 +20,17 @@ on:
         type: string
     secrets:
       FIREBASE_CI_TOKEN:
-        required: true
+        required: false
       FIREBASE_PROJECT:
         required: true
+      FIREBASE_SA_KEY:
+        required: false
 
 jobs:
   deploy-firestore-indexes:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      FIREBASE_TOKEN: ${{ secrets.FIREBASE_CI_TOKEN }}
       FIREBASE_PROJECT: ${{ secrets.FIREBASE_PROJECT }}
     steps:
       - uses: actions/checkout@v6
@@ -46,24 +50,31 @@ jobs:
             sudo apt-get install -y -qq jq
           fi
 
-      - name: Log current Firestore index state (${{ inputs.environment-name }})
+      - name: Configure Firebase auth (${{ inputs.environment-name }})
+        env:
+          FIREBASE_SA_KEY: ${{ secrets.FIREBASE_SA_KEY }}
+          FIREBASE_CI_TOKEN: ${{ secrets.FIREBASE_CI_TOKEN }}
         run: |
           if [ -z "$FIREBASE_PROJECT" ]; then
             echo "::error::FIREBASE project secret for ${{ inputs.environment-name }} is empty"
             exit 1
           fi
-          if [ -z "$FIREBASE_TOKEN" ]; then
-            echo "::error::FIREBASE_CI_TOKEN secret is empty"
+          if [ -n "$FIREBASE_SA_KEY" ]; then
+            keyfile="$RUNNER_TEMP/firebase-sa.json"
+            printf '%s' "$FIREBASE_SA_KEY" > "$keyfile"
+            chmod 600 "$keyfile"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$keyfile" >> "$GITHUB_ENV"
+            echo "Auth: service account key ($(jq -r .client_email "$keyfile"))"
+          elif [ -n "$FIREBASE_CI_TOKEN" ]; then
+            echo "FIREBASE_TOKEN=$FIREBASE_CI_TOKEN" >> "$GITHUB_ENV"
+            echo "Auth: FIREBASE_CI_TOKEN (deprecated, migrate to FIREBASE_SA_KEY)"
+          else
+            echo "::error::No auth configured — set FIREBASE_SA_KEY (preferred) or FIREBASE_CI_TOKEN"
             exit 1
           fi
-          # Diagnostic: verify token integrity without leaking value.
-          token_len=${#FIREBASE_TOKEN}
-          token_sha=$(printf '%s' "$FIREBASE_TOKEN" | sha256sum | cut -c1-12)
-          echo "FIREBASE_TOKEN length=${token_len} sha256(prefix)=${token_sha}"
-          case "$FIREBASE_TOKEN" in
-            *[$' \t\r\n']*) echo "::warning::FIREBASE_TOKEN contains whitespace or newline" ;;
-            *) echo "FIREBASE_TOKEN contains no whitespace" ;;
-          esac
+
+      - name: Log current Firestore index state (${{ inputs.environment-name }})
+        run: |
           echo "Current indexes in project '$FIREBASE_PROJECT' before deploy:"
           if current_json=$(firebase firestore:indexes --project "$FIREBASE_PROJECT" --json 2>&1); then
             if echo "$current_json" | jq -e '.result.indexes' >/dev/null 2>&1; then
