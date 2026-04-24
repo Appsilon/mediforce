@@ -9,6 +9,7 @@ import { getPlatformServices } from './platform-services';
 import {
   resolveMcpForStep,
   resolveOAuthToken,
+  OAuthTokenUnavailableError,
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
 } from '@mediforce/agent-runtime';
@@ -477,13 +478,7 @@ async function loadOAuthTokens(
     ]);
 
     if (token === null) {
-      // Surface the same error shape the runtime would raise so UI messaging
-      // stays consistent whether the token is missing at load time or the
-      // runtime lookup layer.
-      throw new Error(
-        `OAuth token for MCP server "${serverName}" (provider "${providerId}") is not connected. ` +
-        `Connect the account via the agent editor in the UI, then retry the step.`,
-      );
+      throw new OAuthTokenUnavailableError(serverName, providerId);
     }
     if (provider === null) {
       throw new Error(
