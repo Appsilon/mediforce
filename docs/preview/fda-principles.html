@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FDA/EMA AI Principles — Mediforce</title>
+  <title>FDA/EMA AI Principles - Mediforce</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
@@ -37,7 +37,7 @@
     /* Content */
     .w { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; }
 
-    /* Hero — two-column with doc preview */
+    /* Hero - two-column with doc preview */
     .hero { padding: 64px 0 40px; }
     .hero-grid {
       display: grid; grid-template-columns: 1fr 320px; gap: 48px; align-items: start;
@@ -72,7 +72,7 @@
     .hero-doc-overlay a { font-size: 12px; font-weight: 600; color: white; opacity: 0.9; transition: opacity 0.2s; }
     .hero-doc-overlay a:hover { opacity: 1; }
 
-/* Principle colors — 5 cycling */
+/* Principle colors - 5 cycling */
     .color-teal    { --pc: #0D9488; --pc-bg: rgba(13,148,136,0.05); }
     .color-blue    { --pc: #2563EB; --pc-bg: rgba(37,99,235,0.05); }
     .color-purple  { --pc: #7C3AED; --pc-bg: rgba(124,58,237,0.05); }
@@ -117,7 +117,7 @@
     }
     .principle-desc b { color: var(--text-2); font-weight: 600; }
 
-    /* Feature list — right column */
+    /* Feature list - right column */
     .feature-list {
       display: flex; flex-direction: column; gap: 4px;
       padding-top: 2px;
@@ -131,7 +131,7 @@
     .feature-item:hover { color: var(--text); }
     .feature-item:hover .feature-link { opacity: 1; }
 
-    /* Status icons — simple inline SVG-like indicators */
+    /* Status icons - simple inline SVG-like indicators */
     .fi-icon {
       width: 18px; height: 18px;
       flex-shrink: 0;
@@ -214,7 +214,7 @@
 <header class="header">
   <div class="header-inner">
     <a href="index.html" class="logo-group">
-      <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="2.0" fill="none" opacity="0.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
+      <div class="logo-mark"><img src="logo.png" alt="Mediforce logo" style="width:100%;height:100%;object-fit:contain;" /></div>
       <span class="logo-text">Mediforce</span>
     </a>
     <div class="header-links">
@@ -236,12 +236,12 @@
           In January 2026, FDA and EMA jointly published
           <a href="https://www.fda.gov/media/189581/download" target="_blank">10 guiding principles</a>
           for AI in drug development. Below is our plan for how Mediforce
-          addresses each principle — what we've built so far, and where we're heading.
+          addresses each principle - what we've built so far, and where we're heading.
           We welcome your feedback as we work toward this together.
         </p>
       </div>
       <div class="hero-doc-card">
-        <img src="fda-principles-cover.png" alt="FDA/EMA Guiding Principles of Good AI Practice in Drug Development — cover page" />
+        <img src="fda-principles-cover.png" alt="FDA/EMA Guiding Principles of Good AI Practice in Drug Development - cover page" />
         <div class="hero-doc-overlay">
           <a href="https://www.fda.gov/media/189581/download" target="_blank">View PDF &rarr;</a>
         </div>
@@ -270,8 +270,8 @@
       </div>
       <div class="feature-list">
         <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Autonomy levels L0&ndash;L4 per workflow step</span><span class="feature-link">Validated AI &rarr; Control</span></a>
-        <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--live"></span><span class="feature-text">HITL enforcement &mdash; workflow pauses until human approves</span><span class="feature-link">Validated AI &rarr; Control</span></a>
-        <a class="feature-item" href="validated-ai.html#watch"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Anti-rubber-stamping &mdash; review quality monitoring</span><span class="feature-link">Validated AI &rarr; Watch</span></a>
+        <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--live"></span><span class="feature-text">HITL enforcement - workflow pauses until human approves</span><span class="feature-link">Validated AI &rarr; Control</span></a>
+        <a class="feature-item" href="validated-ai.html#watch"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Anti-rubber-stamping - review quality monitoring</span><span class="feature-link">Validated AI &rarr; Watch</span></a>
       </div>
     </div>
 
@@ -301,7 +301,7 @@
         <div class="principle-desc">AI technologies adhere to relevant legal, ethical, technical, scientific, <b>cybersecurity, and regulatory standards</b>, including Good Practices (GxP).</div>
       </div>
       <div class="feature-list">
-        <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Audit trail &mdash; 21 CFR Part 11 aligned</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
+        <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Audit trail - 21 CFR Part 11 aligned</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
         <a class="feature-item" href="security.html#access"><span class="fi-icon fi-icon--live"></span><span class="feature-text">RBAC, access control, e-signatures</span><span class="feature-link">Security &rarr; Access</span></a>
         <a class="feature-item" href="security.html#encrypt"><span class="fi-icon fi-icon--live"></span><span class="feature-text">AES-256-GCM encryption, namespace isolation</span><span class="feature-link">Security &rarr; Encrypt</span></a>
       </div>
@@ -318,7 +318,7 @@
       </div>
       <div class="feature-list">
         <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Workflow definitions with explicit step purpose</span><span class="feature-link">Validated AI &rarr; Control</span></a>
-        <a class="feature-item" href="security.html#isolate"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Per-step agent config &mdash; model, prompt, tools scoped</span><span class="feature-link">Security &rarr; Isolate</span></a>
+        <a class="feature-item" href="security.html#isolate"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Per-step agent config - model, prompt, tools scoped</span><span class="feature-link">Security &rarr; Isolate</span></a>
       </div>
     </div>
 
@@ -332,9 +332,9 @@
         <div class="principle-desc"><b>Multidisciplinary expertise</b> covering both the AI technology and its context of use are integrated throughout the technology's life cycle.</div>
       </div>
       <div class="feature-list">
-        <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Role-based step assignment &mdash; different experts per step</span><span class="feature-link">Validated AI &rarr; Control</span></a>
-        <a class="feature-item" href="security.html#access"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Per-step RBAC &mdash; right expert reviews right step</span><span class="feature-link">Security &rarr; Access</span></a>
-        <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Producer &ne; reviewer &mdash; enforced separation of duties</span><span class="feature-link">Validated AI &rarr; Control</span></a>
+        <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Role-based step assignment - different experts per step</span><span class="feature-link">Validated AI &rarr; Control</span></a>
+        <a class="feature-item" href="security.html#access"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Per-step RBAC - right expert reviews right step</span><span class="feature-link">Security &rarr; Access</span></a>
+        <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Producer &ne; reviewer - enforced separation of duties</span><span class="feature-link">Validated AI &rarr; Control</span></a>
       </div>
     </div>
 
@@ -349,8 +349,8 @@
       </div>
       <div class="feature-list">
         <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Audit trail with input/output snapshots</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
-        <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Decision reconstruction &mdash; full chain from input to approval</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
-        <a class="feature-item" href="security.html#isolate"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Per-step data scoping &mdash; agents see only authorized data</span><span class="feature-link">Security &rarr; Isolate</span></a>
+        <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Decision reconstruction - full chain from input to approval</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
+        <a class="feature-item" href="security.html#isolate"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Per-step data scoping - agents see only authorized data</span><span class="feature-link">Security &rarr; Isolate</span></a>
       </div>
     </div>
 
@@ -364,9 +364,9 @@
         <div class="principle-desc">The development of AI technologies follows best practices in model and system design, considering <b>interpretability, explainability</b>, and predictive performance. Good development promotes <b>transparency, reliability</b>, and robustness.</div>
       </div>
       <div class="feature-list">
-        <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Agent output envelope &mdash; confidence, reasoning chain, annotations</span><span class="feature-link">Validated AI &rarr; Control</span></a>
-        <a class="feature-item" href="security.html#deploy"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Model-agnostic &mdash; any model, self-hosted or cloud</span><span class="feature-link">Security &rarr; Deploy</span></a>
-        <a class="feature-item" href="https://github.com/Appsilon/mediforce" target="_blank"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Open source &mdash; inspect every line</span><span class="feature-link">GitHub</span></a>
+        <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Agent output envelope - confidence, reasoning chain, annotations</span><span class="feature-link">Validated AI &rarr; Control</span></a>
+        <a class="feature-item" href="security.html#deploy"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Model-agnostic - any model, self-hosted or cloud</span><span class="feature-link">Security &rarr; Deploy</span></a>
+        <a class="feature-item" href="https://github.com/Appsilon/mediforce" target="_blank"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Open source - inspect every line</span><span class="feature-link">GitHub</span></a>
       </div>
     </div>
 
@@ -380,9 +380,9 @@
         <div class="principle-desc">Risk-based performance assessments <b>evaluate the complete system including human-AI interactions</b>, using fit-for-use data and metrics appropriate for the intended context of use.</div>
       </div>
       <div class="feature-list">
-        <a class="feature-item" href="validated-ai.html#test"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Agent benchmark suites &mdash; run N times, measure quality</span><span class="feature-link">Validated AI &rarr; Test</span></a>
+        <a class="feature-item" href="validated-ai.html#test"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Agent benchmark suites - run N times, measure quality</span><span class="feature-link">Validated AI &rarr; Test</span></a>
         <a class="feature-item" href="validated-ai.html#test"><span class="fi-icon fi-icon--building"></span><span class="feature-text">End-to-end workflow evals</span><span class="feature-link">Validated AI &rarr; Test</span></a>
-        <a class="feature-item" href="validated-ai.html#watch"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Judge agents &mdash; AI reviewing AI outputs</span><span class="feature-link">Validated AI &rarr; Watch</span></a>
+        <a class="feature-item" href="validated-ai.html#watch"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Judge agents - AI reviewing AI outputs</span><span class="feature-link">Validated AI &rarr; Watch</span></a>
       </div>
     </div>
 
@@ -396,9 +396,9 @@
         <div class="principle-desc">Risk-based quality management systems are implemented throughout the AI technologies' life cycles. The AI technologies undergo <b>scheduled monitoring and periodic re-evaluation</b> to ensure adequate performance (e.g., to address data drift).</div>
       </div>
       <div class="feature-list">
-        <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Agent version tracking &mdash; model, prompt, config per execution</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
-        <a class="feature-item" href="validated-ai.html#test"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Drift monitoring &mdash; periodic benchmark re-runs</span><span class="feature-link">Validated AI &rarr; Test</span></a>
-        <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--planned"></span><span class="feature-text">Qualification reports &mdash; auditor-ready documentation</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
+        <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Agent version tracking - model, prompt, config per execution</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
+        <a class="feature-item" href="validated-ai.html#test"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Drift monitoring - periodic benchmark re-runs</span><span class="feature-link">Validated AI &rarr; Test</span></a>
+        <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--planned"></span><span class="feature-text">Qualification reports - auditor-ready documentation</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
       </div>
     </div>
 
@@ -413,7 +413,7 @@
       </div>
       <div class="feature-list">
         <a class="feature-item" href="validated-ai.html#control"><span class="fi-icon fi-icon--live"></span><span class="feature-text">Reasoning chain &amp; confidence rationale in every output</span><span class="feature-link">Validated AI &rarr; Control</span></a>
-        <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Workflow risk report &mdash; one view of how risk is managed</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
+        <a class="feature-item" href="validated-ai.html#prove"><span class="fi-icon fi-icon--building"></span><span class="feature-text">Workflow risk report - one view of how risk is managed</span><span class="feature-link">Validated AI &rarr; Prove</span></a>
       </div>
     </div>
 
@@ -428,12 +428,12 @@
       was published jointly by the U.S. FDA and the European Medicines Agency in January 2026.
     </p>
     <p>
-      This page is a <strong>request for comment</strong> &mdash; our evolving design blueprint for how Mediforce
+      This page is a <strong>request for comment</strong> - our evolving design blueprint for how Mediforce
       intends to address each principle. Status reflects where we are today in that process,
       not a finished compliance claim. We welcome feedback as we iterate.
     </p>
     <p>
-      Mediforce is open source &mdash; every feature listed here can be
+      Mediforce is open source - every feature listed here can be
       <a href="https://github.com/Appsilon/mediforce" target="_blank">inspected in the codebase</a>.
       If you have thoughts on how we're approaching these principles,
       <a href="https://discord.gg/TVx4VkG3C2" target="_blank">join us on Discord</a>.

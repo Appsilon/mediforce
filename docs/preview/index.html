@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mediforce — AI agents and humans, working together in pharma</title>
-  <meta name="description" content="Open-source platform for deploying AI agents into regulated clinical processes — with compliance, audit trails, and human oversight built in." />
+  <title>Mediforce - Governed AI for Regulated Clinical Workflows</title>
+  <meta name="description" content="Open-source platform for orchestrating AI agents with built-in validation, traceability, and human oversight." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
@@ -73,7 +73,7 @@
       width: 1.75rem; height: 1.75rem;
       display: flex; align-items: center; justify-content: center;
     }
-    .logo-mark svg { width: 100%; height: 100%; }
+    .logo-mark img { width: 100%; height: 100%; object-fit: contain; }
     .logo-text {
       font-family: 'Manrope', sans-serif;
       font-size: 1.125rem; font-weight: 700; letter-spacing: -0.025em;
@@ -132,7 +132,7 @@
       font-weight: 800;
       letter-spacing: -0.035em;
       line-height: 1.15;
-      max-width: 48rem;
+      max-width: 54rem;
       margin: 0 auto;
     }
     .hero h1 .gradient {
@@ -173,10 +173,10 @@
 
     @media (min-width: 640px) {
       .hero { padding: 8rem 0 6rem; }
-      .hero h1 { font-size: 3.75rem; }
+      .hero h1 { font-size: 3.25rem; }
     }
     @media (min-width: 1024px) {
-      .hero h1 { font-size: 4.25rem; }
+      .hero h1 { font-size: 3.75rem; }
     }
 
     /* ── Buttons ── */
@@ -281,7 +281,7 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: var(--text-40);
+      color: var(--text-70);
       padding: 0 1rem 0.75rem;
       border-bottom: 1px solid var(--border-light);
     }
@@ -298,6 +298,43 @@
     }
     .autonomy-table .level-desc { color: var(--text-80); }
     .autonomy-table .level-human { color: var(--text-50); }
+
+    .how-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 3rem;
+      align-items: start;
+    }
+    @media (min-width: 768px) {
+      .how-layout {
+        grid-template-columns: 13rem 1fr;
+      }
+    }
+    .how-image {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .how-image-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-50);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
+    .how-image img {
+      width: 100%;
+      max-width: 13rem;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    }
+    @media (max-width: 767px) {
+      .how-image { order: 2; }
+      .how-content { order: 1; }
+    }
 
     @media (max-width: 639px) {
       .autonomy-table thead { display: none; }
@@ -454,7 +491,7 @@
   <header class="header">
     <div class="header-inner">
       <a href="index.html" class="logo-group">
-        <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="2.0" fill="none" opacity="0.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
+        <div class="logo-mark"><img src="logo.png" alt="Mediforce logo" style="width:100%;height:100%;object-fit:contain;" /></div>
         <span class="logo-text">Mediforce</span>
       </a>
       <div class="header-links">
@@ -473,11 +510,11 @@
         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         Open Source
       </div>
-      <h1>AI agents and humans, <span class="gradient">working together</span> in the pharmaceutical industry</h1>
+      <h1><span class="gradient">Governed AI</span> for<br>Regulated Clinical Workflows</h1>
       <p class="hero-subtitle">
-        Open-source platform for deploying AI agents into regulated clinical
-        processes — with <a href="validated-ai.html">compliance</a>, <a href="security.html">audit trails</a>,
-        and human oversight built in.
+        Open-source platform for orchestrating AI agents with built-in
+        <a href="validated-ai.html">validation</a>, audit trail, <a href="security.html">data security</a>,
+        and human oversight.
       </p>
       <div class="hero-ctas">
         <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="btn btn--outline">
@@ -498,7 +535,7 @@
   <section class="section section--alt">
     <div class="container">
       <div class="section-label">Why now</div>
-      <h2 class="section-title">The infrastructure for AI in pharma doesn't exist yet</h2>
+      <h2 class="section-title">Pharma has AI tools - but lacks validated AI infrastructure.</h2>
       <div class="why-grid">
         <div class="why-item">
           <h3>AI agents are ready</h3>
@@ -530,44 +567,52 @@
   <!-- How It Works -->
   <section class="section">
     <div class="container">
-      <div class="section-label">How it works</div>
-      <h2 class="section-title">You define the process. The platform handles compliance.</h2>
-      <p class="how-intro">
-        For each step in a workflow, you decide who does the work — human, AI
-        agent, or both. Agents operate at one of four autonomy levels, and the
-        platform enforces the rules.
-      </p>
-      <table class="autonomy-table">
-        <thead>
-          <tr>
-            <th>Level</th>
-            <th>What the agent does</th>
-            <th>Human involvement</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="level-name">Observer</td>
-            <td class="level-desc">Watches and reports</td>
-            <td class="level-human">None — informational only</td>
-          </tr>
-          <tr>
-            <td class="level-name">Advisor</td>
-            <td class="level-desc">Suggests actions</td>
-            <td class="level-human">Human decides and acts</td>
-          </tr>
-          <tr>
-            <td class="level-name">Drafter</td>
-            <td class="level-desc">Does work, submits for approval</td>
-            <td class="level-human">Human approves or sends back</td>
-          </tr>
-          <tr>
-            <td class="level-name">Executor</td>
-            <td class="level-desc">Acts autonomously</td>
-            <td class="level-human">Human reviews after the fact</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="how-layout">
+        <div class="how-image">
+          <span class="how-image-label">Example workflow</span>
+          <img src="workflow.png" alt="Example Mediforce workflow showing human input, script, AI task with review loop, and report generation steps" />
+        </div>
+        <div class="how-content">
+          <div class="section-label">How it works</div>
+          <h2 class="section-title">You define the process. The platform handles compliance.</h2>
+          <p class="how-intro">
+            For each step in a workflow, you decide who does the work - human, AI
+            agent, or both. Agents operate at one of four autonomy levels, and the
+            platform enforces the rules.
+          </p>
+          <table class="autonomy-table">
+            <thead>
+              <tr>
+                <th>Autonomy Level</th>
+                <th>What the agent does</th>
+                <th>Human involvement</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="level-name">Observer</td>
+                <td class="level-desc">Watches and reports</td>
+                <td class="level-human">None - informational only</td>
+              </tr>
+              <tr>
+                <td class="level-name">Advisor</td>
+                <td class="level-desc">Suggests actions</td>
+                <td class="level-human">Human decides and acts</td>
+              </tr>
+              <tr>
+                <td class="level-name">Drafter</td>
+                <td class="level-desc">Does work, submits for approval</td>
+                <td class="level-human">Human approves or sends back</td>
+              </tr>
+              <tr>
+                <td class="level-name">Executor</td>
+                <td class="level-desc">Acts autonomously</td>
+                <td class="level-human">Human reviews after the fact</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -583,10 +628,10 @@
           </svg>
           <h3>Audit trail</h3>
           <p>
-            Every action is recorded — who did what, when, and why. Full
+            Every action is recorded - who did what, when, and why. Full
             traceability from agent decision to human approval.
           </p>
-          <a href="validated-ai.html" class="learn-more">How we validate AI &rarr;</a>
+          <a href="validated-ai.html" class="learn-more">How we validate AI ➜</a>
         </div>
         <div class="regulated-item">
           <svg class="regulated-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -595,9 +640,9 @@
           <h3>Accountability</h3>
           <p>
             Clear record of who is responsible for each step. Humans and
-            agents have defined roles — no ambiguity about who made a decision.
+            agents have defined roles - no ambiguity about who made a decision.
           </p>
-          <a href="security.html" class="learn-more">Security architecture &rarr;</a>
+          <a href="security.html" class="learn-more">Security architecture ➜</a>
         </div>
         <div class="regulated-item">
           <svg class="regulated-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -608,7 +653,7 @@
             Inspect every line of code. No vendor lock-in, no black boxes.
             Deploy on your infrastructure, audit the logic, contribute back.
           </p>
-          <a href="fda-principles.html" class="learn-more">FDA/EMA AI principles alignment &rarr;</a>
+          <a href="fda-principles.html" class="learn-more">FDA/EMA AI principles alignment ➜</a>
         </div>
       </div>
     </div>
@@ -659,7 +704,7 @@
         </div>
       </div>
       <p class="community-byline">
-        Built by <a href="https://appsilon.com" target="_blank" rel="noopener noreferrer">Appsilon</a> — building open-source tools for life sciences since 2013.
+        Built by <a href="https://appsilon.com" target="_blank" rel="noopener noreferrer">Appsilon</a> - building open-source tools for life sciences since 2013.
       </p>
     </div>
   </section>
