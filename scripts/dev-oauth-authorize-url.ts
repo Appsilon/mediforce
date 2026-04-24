@@ -107,11 +107,14 @@ async function main(): Promise<void> {
     console.error('PLATFORM_API_KEY must be exported in the environment');
     process.exit(2);
   }
-  const mediforceApiKey = process.env.MEDIFORCE_API_KEY ?? platformSecret;
+  // Admin routes (/api/admin/oauth-providers/**) require the dedicated
+  // PLATFORM_ADMIN_API_KEY when hit via X-Api-Key. Falls back to
+  // PLATFORM_API_KEY only if you've consciously aliased them in dev.
+  const adminApiKey = process.env.PLATFORM_ADMIN_API_KEY ?? process.env.MEDIFORCE_API_KEY ?? platformSecret;
 
   const listResp = await fetch(
     `${args.origin}/api/admin/oauth-providers?namespace=${args.namespace}`,
-    { headers: { 'X-Api-Key': mediforceApiKey } },
+    { headers: { 'X-Api-Key': adminApiKey } },
   );
   if (!listResp.ok) {
     console.error(`Failed to list providers (${listResp.status})`);
