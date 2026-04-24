@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Security — Mediforce</title>
+  <title>Security - Mediforce</title>
   <meta name="description" content="How Mediforce keeps your data, agents, and workflows secure." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -64,7 +64,7 @@
       letter-spacing: 0.02em;
     }
 
-    /* Pillar TOC — sticky full-width strip */
+    /* Pillar TOC - sticky full-width strip */
     .pillar-toc {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr 1fr;
@@ -195,7 +195,7 @@
 <header class="header">
   <div class="header-inner">
     <a href="index.html" class="logo-group">
-      <div class="logo-mark"><svg viewBox="0 0 36 36" fill="none"><defs><linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0D9488"/><stop offset="100%" stop-color="#0891B2"/></linearGradient></defs><rect x="1" y="1" width="34" height="34" rx="8" fill="url(#logo)"/><path d="M8 27V9L18 18 28 9V27" stroke="white" stroke-width="2.0" fill="none" opacity="0.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="27" r="3.2" fill="white"/><circle cx="8" cy="9" r="3" fill="white"/><circle cx="18" cy="18" r="3.4" fill="white"/><circle cx="28" cy="9" r="3" fill="white"/><circle cx="28" cy="27" r="3.2" fill="white"/></svg></div>
+      <div class="logo-mark"><img src="logo.png" alt="Mediforce logo" style="width:100%;height:100%;object-fit:contain;" /></div>
       <span class="logo-text">Mediforce</span>
     </a>
     <div class="header-links">
@@ -246,7 +246,7 @@
     <div class="pillar-head"><span class="pillar-badge pb--isolate">Isolate</span></div>
     <h2>Every agent runs in a sandbox. Every step has a scope.</h2>
     <p class="psub">
-      We hear from pharma teams that they only give AI access to metadata — never real patient data.
+      We hear from pharma teams that they only give AI access to metadata - never real patient data.
       Mediforce is built for that reality. You control exactly what each agent sees,
       down to the table level.
     </p>
@@ -263,7 +263,7 @@
           <div class="mockup">
             <div class="mockup-bar">
               <span class="dot dot--r"></span><span class="dot dot--y"></span><span class="dot dot--g"></span>
-              Step Scope &mdash; "Draft Safety Narrative" (Step 3)
+              Step Scope - "Draft Safety Narrative" (Step 3)
             </div>
             <div class="mockup-body">
               <div class="mock-scope-row">
@@ -284,12 +284,12 @@
               <div class="mock-scope-row">
                 <div style="color:#E2E8F0">Study DEF-456</div>
                 <div><span class="mock-tag mock-tag--deny">Blocked</span></div>
-                <div>&mdash;</div>
+                <div>-</div>
               </div>
               <div class="mock-scope-row">
                 <div style="color:#E2E8F0">Internal APIs</div>
                 <div><span class="mock-tag mock-tag--deny">Blocked</span></div>
-                <div>&mdash;</div>
+                <div>-</div>
               </div>
               <div class="mock-scope-row">
                 <div style="color:#E2E8F0">Internet</div>
@@ -348,7 +348,7 @@
         </div>
         <div class="fc-body">
           <h3>Step-level RBAC</h3>
-          <p>Each step specifies allowed roles. The platform checks before the step can advance. Wrong role? <strong>Blocked, logged, audited.</strong> Not a warning — a hard stop.</p>
+          <p>Each step specifies allowed roles. The platform checks before the step can advance. Wrong role? <strong>Blocked, logged, audited.</strong> Not a warning - a hard stop.</p>
           <div class="fc-detail">
             <strong>Clinical Data Manager</strong> can approve Step 2 (data review). Cannot approve Step 5 (medical review). <strong>Medical Monitor</strong> can approve Step 5. Cannot modify Step 2. Enforced in workflow engine before any state change.
           </div>
@@ -393,7 +393,7 @@
         </div>
         <div class="fc-body">
           <h3>Workflow secrets</h3>
-          <p>API keys, tokens, credentials — encrypted at rest with <strong>AES-256-GCM</strong>. Injected into agent containers at runtime, never stored in workflow definitions or logs.</p>
+          <p>API keys, tokens, credentials - encrypted at rest with <strong>AES-256-GCM</strong>. Injected into agent containers at runtime, never stored in workflow definitions or logs.</p>
           <div class="fc-detail">
             Secrets stored as <strong>iv:ciphertext:authTag</strong> in Firestore. Template syntax <code style="color:#60A5FA;background:rgba(96,165,250,0.1);padding:1px 5px;border-radius:3px;">{{SECRET_NAME}}</code> resolved at execution time. Pre-flight validation catches missing secrets before workflow starts.
           </div>
@@ -405,7 +405,7 @@
         </div>
         <div class="fc-body">
           <h3>Tamper-evident audit trail</h3>
-          <p><strong>Server-written timestamps</strong> — not client clock. Append-only — no updates, no deletes. If someone tampers with an entry, the chain breaks.</p>
+          <p><strong>Server-written timestamps</strong> - not client clock. Append-only - no updates, no deletes. If someone tampers with an entry, the chain breaks.</p>
         </div>
       </div>
     </div>
@@ -426,9 +426,9 @@
         </div>
         <div class="fc-body">
           <h3>Self-hosted models</h3>
-          <p>Run LLMs on your own infrastructure — isolated from the internet, inside your network perimeter. No data leaves your environment. Configure any model that speaks the OpenAI-compatible API as a provider.</p>
+          <p>Run LLMs on your own infrastructure - isolated from the internet, inside your network perimeter. No data leaves your environment. Configure any model that speaks the OpenAI-compatible API as a provider.</p>
           <div class="fc-detail">
-            Deploy open models (Llama, Mistral, Qwen, GLM) on your GPU cluster or private cloud. Point Mediforce at your endpoint. The platform doesn't care which model — it cares about the process around it.
+            Deploy open models (Llama, Mistral, Qwen, GLM) on your GPU cluster or private cloud. Point Mediforce at your endpoint. The platform doesn't care which model - it cares about the process around it.
           </div>
         </div>
       </div>
@@ -537,7 +537,7 @@
     <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 10px;">We published this to start a conversation.</h2>
     <p style="font-size: 15px; color: var(--text-3); max-width: 460px; margin: 0 auto 28px; line-height: 1.7;">
       Security in pharma AI is uncharted territory.
-      We have a point of view and we're building towards it &mdash;
+      We have a point of view and we're building towards it -
       tell us what we're missing.
     </p>
     <div class="cta-btns">
@@ -555,7 +555,7 @@
 
 <footer>
   <div class="w f">
-    <span>Mediforce &middot; Draft &mdash; April 2026</span>
+    <span>Mediforce &middot; Draft - April 2026</span>
     <div class="f-links">
       <a href="/">Home</a>
       <a href="/validated-ai.html">Validation</a>
