@@ -37,6 +37,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Run Detail — Autonomy Badges](#run-detail--autonomy-badges) — seeing which steps are agent-driven vs human
 - [Cancel Run](#cancel-run) — safely stopping a running process with confirmation
 - [Retry Failed Step](#retry-failed-step) — re-running a failed step in place without restarting the workflow
+- [Workflow Status Badges](#workflow-status-badges) — semantic status display (In Progress, Waiting for human, Error, Completed)
 - [Run Report](#run-report) — post-completion summary with timing and step outputs
 - [Report Unavailable](#report-unavailable) — guard preventing report access on in-progress runs
 
@@ -231,6 +232,20 @@ Stopping a running process requires double confirmation to prevent accidental ca
 When a step fails (docker daemon down, flaky network, etc.), clicking Retry on the failed step flips the instance back to running and the auto-runner re-dispatches that step — without restarting from the beginning. Variables from earlier steps are preserved.
 
 ![retry-step](retry-step.gif)
+
+### Workflow Status Badges
+
+Runs list and run detail show semantic status badges instead of raw `paused` state. Paused instances render as either "Waiting for human" (amber) or "Error" (red) depending on `pauseReason`, while active runs show "In Progress" (green) and finished runs show "Completed" (blue).
+
+![workflow-status-badges-list](workflow-status-badges-list.gif)
+
+Error state with banner and "Run again this step" retry button:
+
+![workflow-status-badges-error](workflow-status-badges-error.gif)
+
+Waiting for human state with amber banner:
+
+![workflow-status-badges-waiting](workflow-status-badges-waiting.gif)
 
 ### Run Report
 
