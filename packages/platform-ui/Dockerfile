@@ -11,6 +11,7 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages/platform-core/package.json packages/platform-core/
 COPY packages/platform-infra/package.json packages/platform-infra/
+COPY packages/platform-api/package.json packages/platform-api/
 COPY packages/workflow-engine/package.json packages/workflow-engine/
 COPY packages/agent-runtime/package.json packages/agent-runtime/
 COPY packages/agent-queue/package.json packages/agent-queue/
