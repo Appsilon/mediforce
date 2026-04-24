@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Deploy Firestore composite indexes BEFORE the application so production
-  # queries never land before their backing index exists. Index builds run
+  # Deploy Firestore composite indexes BEFORE the application so the deployed
+  # app never queries an index Firestore is still building. Index builds run
   # asynchronously inside Firestore (minutes on cold collections, longer on
   # populated ones) — the reusable workflow polls until every index is READY
   # before unblocking the SSH deploy gate below.
