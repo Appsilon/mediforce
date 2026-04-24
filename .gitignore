@@ -19,6 +19,9 @@ dist/
 *.pem
 minutes/*.html
 
+# service-account keys / runtime-mounted secrets
+secrets/
+
 # claude
 .claude/settings.local.json
 memory/
