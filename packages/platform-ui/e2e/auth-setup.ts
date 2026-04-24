@@ -42,6 +42,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedCollection('auditEvents', data.auditEvents);
   await seedSubcollection('processInstances', 'proc-running-1', 'stepExecutions', data.stepExecutions);
   await seedSubcollection('processInstances', 'proc-human-waiting', 'stepExecutions', data.humanWaitingStepExecutions);
+  await seedSubcollection('processInstances', 'proc-review-target', 'stepExecutions', data.reviewTargetStepExecutions);
   await seedCollection('processDefinitions', data.processDefinitions);
   await seedCollection('processConfigs', data.processConfigs);
   await seedCollection('workflowDefinitions', data.workflowDefinitions);
@@ -52,6 +53,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedCollection('agentDefinitions', data.agentDefinitions);
   await seedSubcollection('processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions);
   await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);
+  await seedSubcollection('processInstances', 'proc-step-failure', 'stepExecutions', data.stepFailureStepExecutions);
   await seedSubcollection('processInstances', 'proc-retry-test', 'stepExecutions', data.retryTestStepExecutions);
   await seedSubcollection('processInstances', 'proc-workflow-run-1', 'stepExecutions', data.workflowRunStepExecutions);
   await seedCollection('coworkSessions', data.coworkSessions);

@@ -107,6 +107,7 @@ export class WorkflowEngine {
       // getLastCompletedByDefinitionName filter on `deleted == false` server-side
       // without needing a one-time backfill of pre-feature instances.
       deleted: false,
+      archived: false,
       ...(carryOver !== null ? { previousRun: carryOver.values } : {}),
       ...(carryOver?.sourceId !== undefined
         ? { previousRunSourceId: carryOver.sourceId }

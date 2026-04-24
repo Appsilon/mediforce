@@ -2,6 +2,7 @@
 
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 import type { WorkflowTriggerContext } from '@mediforce/workflow-engine';
+import { getWorkflowStatus } from '@/lib/workflow-status';
 
 interface StartWorkflowRunInput {
   definitionName: string;
@@ -171,6 +172,46 @@ export async function retryFailedStep(
       body: JSON.stringify({ triggeredBy: 'user' }),
     }).catch(() => {});
 
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
+}
+
+export async function archiveProcessRun(
+  instanceId: string,
+  archived: boolean,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { instanceRepo, auditRepo } = getPlatformServices();
+    const instance = await instanceRepo.getById(instanceId);
+    if (!instance) {
+      return { success: false, error: 'Run not found' };
+    }
+    const { displayStatus } = getWorkflowStatus(instance);
+    if (displayStatus === 'in_progress' || displayStatus === 'waiting_for_human') {
+      return { success: false, error: 'Cannot archive an active run' };
+    }
+    const now = new Date().toISOString();
+    await instanceRepo.update(instanceId, { archived, updatedAt: now });
+    await auditRepo.append({
+      actorId: 'user',
+      actorType: 'user',
+      actorRole: 'operator',
+      action: archived ? 'instance.archived' : 'instance.unarchived',
+      description: `Run ${archived ? 'archived' : 'unarchived'} by operator`,
+      timestamp: now,
+      inputSnapshot: { previousArchived: instance.archived ?? false },
+      outputSnapshot: { archived },
+      basis: 'User-initiated archive via UI',
+      entityType: 'processInstance',
+      entityId: instanceId,
+      processInstanceId: instanceId,
+      processDefinitionVersion: instance.definitionVersion,
+    });
     return { success: true };
   } catch (err) {
     return {

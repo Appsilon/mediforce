@@ -26,6 +26,7 @@ function createTestInstance(
     error: null,
     assignedRoles: [],
     deleted: false,
+    archived: false,
     ...overrides,
   };
 }

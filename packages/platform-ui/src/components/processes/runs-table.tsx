@@ -1,13 +1,16 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
-import { ChevronRight, ExternalLink } from 'lucide-react';
+import { ChevronRight, ExternalLink, Archive, ArchiveRestore } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
+import { archiveProcessRun } from '@/app/actions/processes';
+import { getWorkflowStatus } from '@/lib/workflow-status';
 
 interface RunsTableProps {
   runs: ProcessInstance[];
@@ -31,6 +34,18 @@ export function RunsTable({
 }: RunsTableProps) {
   const handle = useHandleFromPath();
   const userNames = useUserDisplayNames();
+  const [archivingIds, setArchivingIds] = React.useState<Set<string>>(new Set());
+
+  async function handleArchive(run: ProcessInstance) {
+    const newArchived = run.archived !== true;
+    setArchivingIds((prev) => new Set(prev).add(run.id));
+    await archiveProcessRun(run.id, newArchived);
+    setArchivingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(run.id);
+      return next;
+    });
+  }
   const effectiveRunHref = runHref ?? ((run: ProcessInstance) =>
     `/${handle}/workflows/${encodeURIComponent(run.definitionName)}/runs/${run.id}`
   );
@@ -42,6 +57,7 @@ export function RunsTable({
     'Started by',
     'Current Step',
     'Started',
+    '', // Archive action
     '', // View link
   ];
 
@@ -104,7 +120,7 @@ export function RunsTable({
                 )}
               </td>
               <td className="px-4 py-3">
-                <ProcessStatusBadge status={run.status} />
+                <ProcessStatusBadge status={run.status} pauseReason={run.pauseReason} />
               </td>
               <td className="px-4 py-3 text-xs text-muted-foreground">
                 {run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy.slice(0, 8)) : '—'}
@@ -130,6 +146,27 @@ export function RunsTable({
                 {formatDistanceToNow(new Date(run.createdAt), {
                   addSuffix: true,
                 })}
+              </td>
+              <td className="px-4 py-3">
+                {(() => {
+                  const { displayStatus } = getWorkflowStatus(run);
+                  const isActive = displayStatus === 'in_progress' || displayStatus === 'waiting_for_human';
+                  if (isActive) return null;
+                  const isArchiving = archivingIds.has(run.id);
+                  const isArchived = run.archived === true;
+                  return (
+                    <button
+                      onClick={() => handleArchive(run)}
+                      disabled={isArchiving}
+                      title={isArchived ? 'Unarchive run' : 'Archive run'}
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                    >
+                      {isArchived
+                        ? <ArchiveRestore className="h-3.5 w-3.5" />
+                        : <Archive className="h-3.5 w-3.5" />}
+                    </button>
+                  );
+                })()}
               </td>
               <td className="px-4 py-3">
                 <Link

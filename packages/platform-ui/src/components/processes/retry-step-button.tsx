@@ -45,9 +45,9 @@ export function RetryStepButton({ instanceId, stepId }: RetryStepButtonProps) {
 
   const busy = status === 'submitting' || status === 'success';
   const label =
-    status === 'submitting' ? 'Queuing retry\u2026'
-    : status === 'success' ? 'Retry queued'
-    : 'Retry';
+    status === 'submitting' ? 'Starting…'
+    : status === 'success' ? 'Started'
+    : 'Run again this step';
 
   return (
     <div className="inline-flex items-center gap-2">

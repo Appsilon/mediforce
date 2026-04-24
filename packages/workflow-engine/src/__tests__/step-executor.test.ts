@@ -71,6 +71,7 @@ function makeRunningInstance(
     error: null,
     assignedRoles: [],
     deleted: false,
+    archived: false,
     ...overrides,
   };
 }

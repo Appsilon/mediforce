@@ -3,14 +3,14 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowLeft, FileBarChart } from 'lucide-react';
+import { ArrowLeft, FileBarChart, Archive, ArchiveRestore } from 'lucide-react';
 import type { ProcessInstance, StepExecution, AuditEvent, Step } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
-import { cancelProcessRun } from '@/app/actions/processes';
+import { cancelProcessRun, archiveProcessRun } from '@/app/actions/processes';
 import { useActiveCoworkSession } from '@/hooks/use-tasks';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
@@ -21,6 +21,7 @@ import { formatStepName } from '@/components/tasks/task-utils';
 import { MissingEnvBanner } from './missing-env-banner';
 import { PreviousRunBanner } from './previous-run-banner';
 import { formatDuration } from '@/lib/format';
+import { getWorkflowStatus } from '@/lib/workflow-status';
 
 type AuditEventWithId = AuditEvent & { id: string };
 
@@ -63,12 +64,12 @@ export function ProcessDetail({
 }) {
   const handle = useHandleFromPath();
   const { goBack } = useBackNavigation(backHref);
-  const needsHumanAction = instance.pauseReason === 'waiting_for_human'
-    || instance.pauseReason === 'awaiting_agent_approval';
+  const wfStatus = getWorkflowStatus(instance);
+  const needsHumanTaskAction = wfStatus.rawReason === 'waiting_for_human' || wfStatus.rawReason === 'awaiting_agent_approval';
   const { task: blockingTask } = useActiveTaskForInstance(
-    needsHumanAction ? instance.id : null,
+    needsHumanTaskAction ? instance.id : null,
   );
-  const needsCowork = instance.pauseReason === 'cowork_in_progress';
+  const needsCowork = wfStatus.rawReason === 'cowork_in_progress';
   const { session: coworkSession } = useActiveCoworkSession(
     needsCowork ? instance.id : null,
   );
@@ -123,7 +124,15 @@ export function ProcessDetail({
   const [cancelStep, setCancelStep] = React.useState<0 | 1 | 2>(0);
   const [cancelError, setCancelError] = React.useState<string | null>(null);
 
-  const canCancel = instance.status === 'running' || instance.status === 'paused';
+  const canCancel = wfStatus.displayStatus === 'in_progress' || wfStatus.displayStatus === 'waiting_for_human';
+  const canArchive = wfStatus.displayStatus === 'completed' || wfStatus.displayStatus === 'error';
+  const [archiving, setArchiving] = React.useState(false);
+
+  async function handleArchiveToggle() {
+    setArchiving(true);
+    await archiveProcessRun(instance.id, instance.archived !== true);
+    setArchiving(false);
+  }
 
   async function handleConfirmCancel() {
     setCancelStep(2);
@@ -167,6 +176,18 @@ export function ProcessDetail({
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-headline font-semibold flex-1">{formatStepName(instance.definitionName)}</h1>
+            {canArchive && (
+              <button
+                onClick={handleArchiveToggle}
+                disabled={archiving}
+                title={instance.archived === true ? 'Unarchive run' : 'Archive run'}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shrink-0 disabled:opacity-50"
+              >
+                {instance.archived === true
+                  ? <><ArchiveRestore className="h-3.5 w-3.5" />Unarchive</>
+                  : <><Archive className="h-3.5 w-3.5" />Archive</>}
+              </button>
+            )}
             {canCancel && cancelStep === 0 && (
               <button
                 onClick={() => setCancelStep(1)}
@@ -203,13 +224,19 @@ export function ProcessDetail({
           {/* Metadata row — status badge, definition, ID, created, duration, report link */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground items-center">
             <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
+            {instance.archived === true && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                <Archive className="h-3 w-3" />
+                Archived
+              </span>
+            )}
             <span>Definition: <span className="font-mono text-foreground">v{instance.definitionVersion}</span></span>
             {instance.configName && (
               <span>Config: <span className="font-mono text-foreground">{instance.configName} v{instance.configVersion}</span></span>
             )}
             <span title={instance.id}>ID: <span className="font-mono text-foreground text-xs">{instance.id.slice(0, 8)}</span></span>
             <span>Created: <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span></span>
-            {instance.status !== 'running' && instance.status !== 'paused' && (
+            {wfStatus.displayStatus !== 'in_progress' && (
               <span>Duration: <span className="text-foreground">{formatDuration(runDurationMs)}</span></span>
             )}
             {instance.status === 'completed' && (
@@ -223,7 +250,7 @@ export function ProcessDetail({
             )}
           </div>
 
-          {needsHumanAction && blockingTask && (
+          {needsHumanTaskAction && blockingTask && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
               <div className="text-sm">
                 <span className="font-medium">Waiting for your input</span>
@@ -255,21 +282,21 @@ export function ProcessDetail({
               </Link>
             </div>
           )}
-          {instance.pauseReason === 'missing_env' && instance.error && (
+          {wfStatus.hasDedicatedBanner && instance.error && (
             <MissingEnvBanner
               instanceId={instance.id}
               errorJson={instance.error}
               workflowName={instance.definitionName}
             />
           )}
-          {instance.pauseReason && !needsHumanAction && !needsCowork && instance.pauseReason !== 'missing_env' && (
+          {wfStatus.displayStatus === 'waiting_for_human' && !needsHumanTaskAction && !needsCowork && (
             <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-              Paused
+              {wfStatus.reason}
             </div>
           )}
-          {instance.error && instance.pauseReason !== 'missing_env' && (
+          {wfStatus.displayStatus === 'error' && !wfStatus.hasDedicatedBanner && (
             <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-800 dark:text-red-300">
-              Error: {instance.error}
+              {wfStatus.reason}
             </div>
           )}
           {instance.previousRun !== undefined && (

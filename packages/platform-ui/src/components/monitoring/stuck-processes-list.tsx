@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { getWorkflowStatus } from '@/lib/workflow-status';
 
 export function StuckProcessesList({
   processes,
@@ -35,7 +36,15 @@ export function StuckProcessesList({
   return (
     <div className="space-y-2">
       {processes.map((inst) => {
-        const pausedSince = inst.createdAt;
+        const wfStatus = getWorkflowStatus(inst);
+        // updatedAt is the last state transition — a better proxy for "when it got stuck"
+        // than createdAt, which just reflects when the run was created.
+        const stuckSince = inst.updatedAt;
+        // In a summary list, truncate long error strings (e.g. Docker stack traces from
+        // step_failure) so rows don't blow up in height.
+        const displayReason = wfStatus.reason !== null && wfStatus.reason.length > 120
+          ? wfStatus.reason.slice(0, 120) + '…'
+          : wfStatus.reason;
         return (
           <div
             key={inst.id}
@@ -51,12 +60,12 @@ export function StuckProcessesList({
                   {inst.definitionName}
                 </Link>
                 <span className="text-xs text-muted-foreground shrink-0">
-                  paused {formatDistanceToNow(new Date(pausedSince), { addSuffix: true })}
+                  stuck {formatDistanceToNow(new Date(stuckSince), { addSuffix: true })}
                 </span>
               </div>
-              {inst.pauseReason && (
+              {displayReason && (
                 <div className="text-xs text-amber-700 dark:text-amber-300">
-                  Reason: {inst.pauseReason.replace(/_/g, ' ')}
+                  {displayReason}
                 </div>
               )}
               {inst.currentStepId && (
