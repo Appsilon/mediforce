@@ -1,0 +1,119 @@
+name: Deploy Firestore indexes (reusable)
+
+# Deploy Firestore composite indexes from firestore.indexes.json and wait
+# until every index reports state "READY" before returning. Designed to be
+# the first job in deploy-staging / deploy-production, so the SSH app deploy
+# never lands code that queries an index Firestore is still building.
+#
+# Caller passes the per-environment Firebase project as a secret; the same
+# CI token works against any project the token's owner has access to.
+
+on:
+  workflow_call:
+    inputs:
+      environment-name:
+        description: Human-readable label used in log lines and error messages (e.g. "staging", "production").
+        required: true
+        type: string
+    secrets:
+      FIREBASE_CI_TOKEN:
+        required: true
+      FIREBASE_PROJECT:
+        required: true
+
+jobs:
+  deploy-firestore-indexes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_CI_TOKEN }}
+      FIREBASE_PROJECT: ${{ secrets.FIREBASE_PROJECT }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install firebase-tools (and jq if missing)
+        run: |
+          npm install -g firebase-tools@15.15.0
+          if command -v jq >/dev/null 2>&1; then
+            echo "jq already installed: $(jq --version)"
+          else
+            echo "jq not found, installing..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq jq
+          fi
+
+      - name: Log current Firestore index state (${{ inputs.environment-name }})
+        run: |
+          if [ -z "$FIREBASE_PROJECT" ]; then
+            echo "::error::FIREBASE project secret for ${{ inputs.environment-name }} is empty"
+            exit 1
+          fi
+          if [ -z "$FIREBASE_TOKEN" ]; then
+            echo "::error::FIREBASE_CI_TOKEN secret is empty"
+            exit 1
+          fi
+          echo "Current indexes in project '$FIREBASE_PROJECT' before deploy:"
+          if current_json=$(firebase firestore:indexes --project "$FIREBASE_PROJECT" --json 2>&1); then
+            if echo "$current_json" | jq -e '.result.indexes' >/dev/null 2>&1; then
+              echo "$current_json" | jq '.result.indexes | length as $n | "Total: \($n)"'
+              echo "$current_json" | jq -r '.result.indexes[] | "  - \(.collectionGroup // "?") [\(.state // "?")] \((.fields // []) | map(.fieldPath) | join(", "))"'
+            else
+              echo "::warning::Unexpected JSON shape from firebase firestore:indexes — logging raw output"
+              echo "$current_json"
+            fi
+          else
+            echo "::warning::Could not fetch current index state (continuing with deploy): $current_json"
+          fi
+
+      - name: Deploy Firestore indexes (${{ inputs.environment-name }})
+        run: |
+          firebase deploy --only firestore:indexes \
+            --project "$FIREBASE_PROJECT" \
+            --non-interactive
+
+      - name: Wait for all indexes to report READY (${{ inputs.environment-name }})
+        run: |
+          deadline=$(( $(date +%s) + 30 * 60 ))
+          consecutive_failures=0
+          max_failures=3
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            if ! indexes_json=$(firebase firestore:indexes \
+              --project "$FIREBASE_PROJECT" \
+              --json 2>&1); then
+              consecutive_failures=$((consecutive_failures + 1))
+              echo "::warning::firebase firestore:indexes failed (attempt $consecutive_failures/$max_failures): $indexes_json"
+              if [ "$consecutive_failures" -ge "$max_failures" ]; then
+                echo "::error::firebase firestore:indexes failed $max_failures times in a row — aborting"
+                exit 1
+              fi
+              sleep 20
+              continue
+            fi
+
+            if ! echo "$indexes_json" | jq -e '.result.indexes' >/dev/null 2>&1; then
+              echo "::error::Unexpected JSON shape from firebase firestore:indexes — .result.indexes missing. Raw output:"
+              echo "$indexes_json"
+              exit 1
+            fi
+
+            consecutive_failures=0
+            pending=$(echo "$indexes_json" \
+              | jq '[.result.indexes[] | select(.state != "READY")] | length')
+
+            if [ "$pending" = "0" ]; then
+              echo "All Firestore indexes are READY"
+              exit 0
+            fi
+
+            echo "Waiting for $pending index(es) to reach READY:"
+            echo "$indexes_json" \
+              | jq -r '.result.indexes[] | select(.state != "READY") | "  - \(.collectionGroup // "?") [\(.state // "?")] \((.fields // []) | map(.fieldPath) | join(", "))"'
+            sleep 20
+          done
+          echo "::error::Timed out after 30 minutes waiting for indexes to become READY"
+          firebase firestore:indexes --project "$FIREBASE_PROJECT" --json || true
+          exit 1

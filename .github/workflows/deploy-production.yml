@@ -6,9 +6,23 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Deploy Firestore composite indexes BEFORE the application so production
+  # queries never land before their backing index exists. Index builds run
+  # asynchronously inside Firestore (minutes on cold collections, longer on
+  # populated ones) — the reusable workflow polls until every index is READY
+  # before unblocking the SSH deploy gate below.
+  deploy-firestore-indexes:
+    uses: ./.github/workflows/_deploy-firestore-indexes.yml
+    with:
+      environment-name: production
+    secrets:
+      FIREBASE_CI_TOKEN: ${{ secrets.FIREBASE_CI_TOKEN }}
+      FIREBASE_PROJECT: ${{ secrets.FIREBASE_PROD_PROJECT }}
+
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: deploy-firestore-indexes
 
     steps:
       - name: Deploy via SSH
