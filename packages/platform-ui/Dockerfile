@@ -61,6 +61,9 @@ COPY --from=builder /app/packages/platform-ui/.next/standalone ./
 COPY --from=builder /app/packages/platform-ui/.next/static ./packages/platform-ui/.next/static
 # Copy public assets (PWA icons, manifest, service worker)
 COPY --from=builder /app/packages/platform-ui/public ./packages/platform-ui/public
+# Seed JSONs (agent-definitions, tool-catalog) read at platform-services init.
+# Not reliably picked up by Next.js output file tracing in this build, so copy explicitly.
+COPY --from=builder /app/data ./data
 
 EXPOSE 3000
 
