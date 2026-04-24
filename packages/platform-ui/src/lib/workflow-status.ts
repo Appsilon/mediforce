@@ -1,3 +1,5 @@
+import type { InstanceStatus } from '@mediforce/platform-core';
+
 export type WorkflowDisplayStatus = 'in_progress' | 'waiting_for_human' | 'error' | 'completed';
 
 export interface WorkflowStatus {
@@ -19,10 +21,16 @@ export interface WorkflowStatus {
   rawReason: string | null;
   /** True when the user can trigger "Run again this step" to restart from this error state. */
   isRetryable: boolean;
+  /**
+   * True when the reason warrants a dedicated UI banner (e.g. MissingEnvBanner).
+   * Components that render a generic error banner should gate on `!hasDedicatedBanner`
+   * to avoid showing two banners for the same state.
+   */
+  hasDedicatedBanner: boolean;
 }
 
 export function getWorkflowStatus(instance: {
-  status: string;
+  status: InstanceStatus;
   pauseReason?: string | null;
   error?: string | null;
 }): WorkflowStatus {
@@ -30,44 +38,49 @@ export function getWorkflowStatus(instance: {
   const error = instance.error ?? null;
 
   if (instance.status === 'completed') {
-    return { displayStatus: 'completed', reason: null, rawReason: null, isRetryable: false };
+    return { displayStatus: 'completed', reason: null, rawReason: null, isRetryable: false, hasDedicatedBanner: false };
   }
 
   if (instance.status === 'running' || instance.status === 'created') {
-    return { displayStatus: 'in_progress', reason: null, rawReason: null, isRetryable: false };
+    return { displayStatus: 'in_progress', reason: null, rawReason: null, isRetryable: false, hasDedicatedBanner: false };
   }
 
   if (instance.status === 'paused') {
     switch (pauseReason) {
       case 'waiting_for_human':
-        return { displayStatus: 'waiting_for_human', reason: 'Waiting for human task', rawReason: pauseReason, isRetryable: false };
+        return { displayStatus: 'waiting_for_human', reason: 'Waiting for human task', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'awaiting_agent_approval':
-        return { displayStatus: 'waiting_for_human', reason: 'Waiting for agent approval review', rawReason: pauseReason, isRetryable: false };
+        return { displayStatus: 'waiting_for_human', reason: 'Waiting for agent approval review', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'cowork_in_progress':
-        return { displayStatus: 'waiting_for_human', reason: 'Cowork session in progress', rawReason: pauseReason, isRetryable: false };
+        return { displayStatus: 'waiting_for_human', reason: 'Cowork session in progress', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'agent_escalated':
-        return { displayStatus: 'waiting_for_human', reason: 'Agent escalated to human review', rawReason: pauseReason, isRetryable: true };
+        return { displayStatus: 'waiting_for_human', reason: 'Agent escalated to human review', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
       case 'agent_paused':
-        return { displayStatus: 'waiting_for_human', reason: 'Agent requested human review', rawReason: pauseReason, isRetryable: true };
+        return { displayStatus: 'waiting_for_human', reason: 'Agent requested human review', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
       case 'missing_env':
-        return { displayStatus: 'error', reason: 'Missing environment configuration', rawReason: pauseReason, isRetryable: false };
+        return { displayStatus: 'error', reason: 'Missing environment configuration', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: true };
       case 'step_failure':
-        return { displayStatus: 'error', reason: error ?? 'Step execution failed', rawReason: pauseReason, isRetryable: true };
+        return { displayStatus: 'error', reason: error ?? 'Step execution failed', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
       case 'routing_error':
-        return { displayStatus: 'error', reason: 'Workflow routing error', rawReason: pauseReason, isRetryable: true };
+        return { displayStatus: 'error', reason: 'Workflow routing error', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
       case 'max_iterations_exceeded':
-        return { displayStatus: 'error', reason: 'Maximum review iterations exceeded', rawReason: pauseReason, isRetryable: false };
+        return { displayStatus: 'error', reason: 'Maximum review iterations exceeded', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       default:
-        return { displayStatus: 'error', reason: pauseReason ?? 'Workflow stopped unexpectedly', rawReason: pauseReason, isRetryable: false };
+        return {
+          displayStatus: 'error',
+          reason: pauseReason !== null
+            ? pauseReason.replace(/_/g, ' ')
+            : 'Workflow stopped unexpectedly',
+          rawReason: pauseReason,
+          isRetryable: false,
+          hasDedicatedBanner: false,
+        };
     }
   }
 
-  if (instance.status === 'failed') {
-    // cancelProcessRun sets error='Cancelled by user' — the user intentionally stopped the run,
-    // so retry should not be offered. All other failed states are retryable.
-    const isCancelled = error === 'Cancelled by user';
-    return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: !isCancelled };
-  }
-
-  return { displayStatus: 'error', reason: `Unknown status: ${instance.status}`, rawReason: null, isRetryable: false };
+  // instance.status === 'failed'
+  // cancelProcessRun sets error='Cancelled by user' — string match is the cheapest gate here;
+  // this value is written by cancelProcessRun and must not change without updating this check.
+  const isCancelled = error === 'Cancelled by user';
+  return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: !isCancelled, hasDedicatedBanner: false };
 }

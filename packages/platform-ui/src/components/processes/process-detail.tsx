@@ -282,7 +282,7 @@ export function ProcessDetail({
               </Link>
             </div>
           )}
-          {wfStatus.rawReason === 'missing_env' && instance.error && (
+          {wfStatus.hasDedicatedBanner && instance.error && (
             <MissingEnvBanner
               instanceId={instance.id}
               errorJson={instance.error}
@@ -294,7 +294,7 @@ export function ProcessDetail({
               {wfStatus.reason}
             </div>
           )}
-          {wfStatus.displayStatus === 'error' && wfStatus.rawReason !== 'missing_env' && (
+          {wfStatus.displayStatus === 'error' && !wfStatus.hasDedicatedBanner && (
             <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-800 dark:text-red-300">
               {wfStatus.reason}
             </div>

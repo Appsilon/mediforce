@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import type { InstanceStatus } from '@mediforce/platform-core';
 import { getWorkflowStatus, type WorkflowDisplayStatus } from '@/lib/workflow-status';
 
 const STATUS_STYLES: Record<WorkflowDisplayStatus, string> = {
@@ -19,7 +20,7 @@ export function ProcessStatusBadge({
   status,
   pauseReason,
 }: {
-  status: string;
+  status: InstanceStatus;
   pauseReason?: string | null;
 }) {
   const { displayStatus } = getWorkflowStatus({ status, pauseReason });
