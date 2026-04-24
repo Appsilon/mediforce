@@ -76,6 +76,13 @@ const pausedInstance = {
 };
 
 // ---- GET /api/tasks/:taskId ----
+//
+// Route-level smoke only. Handler behaviour is covered by
+// `packages/platform-api/src/handlers/tasks/__tests__/get-task.test.ts`
+// (against `InMemoryHumanTaskRepository`). Schema shapes by the contract
+// test. What matters here is that the Next.js route wires the schema,
+// services factory, and handler together — including the 404 mapping the
+// adapter does when the handler throws `NotFoundError`.
 
 describe('GET /api/tasks/:taskId', () => {
   beforeEach(() => {
@@ -99,8 +106,10 @@ describe('GET /api/tasks/:taskId', () => {
 
     const req = new NextRequest('http://localhost/api/tasks/unknown');
     const res = await GET(req, { params: makeParams('unknown') });
+    const json = await res.json();
 
     expect(res.status).toBe(404);
+    expect(json.error).toContain('unknown');
   });
 });
 

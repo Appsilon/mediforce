@@ -2,30 +2,24 @@ import { NextResponse } from 'next/server';
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
 import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { listWorkflowDefinitions } from '@mediforce/platform-api/handlers';
+import { ListWorkflowDefinitionsInputSchema } from '@mediforce/platform-api/contract';
 
 /**
  * GET /api/workflow-definitions
  *
- * List all registered workflow definitions. Returns each workflow's latest
- * version as a full WorkflowDefinition object, suitable for loading into
- * the Workflow Designer edit flow.
+ * List all registered workflow definitions. Each entry is a group (by
+ * workflow name) with `latestVersion`, `defaultVersion`, and the latest
+ * `definition` pre-resolved. Shape is identical to the pre-migration
+ * route — the UI loads this directly into the Workflow Designer.
  */
-export async function GET(): Promise<NextResponse> {
-  const { processRepo } = getPlatformServices();
-  const { definitions } = await processRepo.listWorkflowDefinitions();
-
-  const result = definitions.map((group) => {
-    const latest = group.versions.find((v) => v.version === group.latestVersion);
-    return {
-      name: group.name,
-      latestVersion: group.latestVersion,
-      defaultVersion: group.defaultVersion,
-      definition: latest ?? null,
-    };
-  });
-
-  return NextResponse.json({ definitions: result });
-}
+export const GET = createRouteAdapter(
+  ListWorkflowDefinitionsInputSchema,
+  () => ({}),
+  (input) =>
+    listWorkflowDefinitions(input, { processRepo: getPlatformServices().processRepo }),
+);
 
 /**
  * POST /api/workflow-definitions?namespace=handle
@@ -36,6 +30,8 @@ export async function GET(): Promise<NextResponse> {
  *
  * The `namespace` query parameter is required and sets the owning namespace.
  * It overrides any `namespace` field in the request body.
+ *
+ * Still inline because mutations are Phase 2 — see `docs/headless-migration.md`.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);

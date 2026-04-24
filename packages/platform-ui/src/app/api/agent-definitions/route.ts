@@ -1,13 +1,26 @@
 import { NextResponse } from 'next/server';
 import { CreateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { listAgentDefinitions } from '@mediforce/platform-api/handlers';
+import { ListAgentDefinitionsInputSchema } from '@mediforce/platform-api/contract';
 
-export async function GET(): Promise<NextResponse> {
-  const { agentDefinitionRepo } = getPlatformServices();
-  const agents = await agentDefinitionRepo.list();
-  return NextResponse.json({ agents });
-}
+/**
+ * GET /api/agent-definitions — list every registered agent definition.
+ */
+export const GET = createRouteAdapter(
+  ListAgentDefinitionsInputSchema,
+  () => ({}),
+  (input) =>
+    listAgentDefinitions(input, {
+      agentDefinitionRepo: getPlatformServices().agentDefinitionRepo,
+    }),
+);
 
+/**
+ * POST /api/agent-definitions — create a new agent definition.
+ * Mutation, still inline until Phase 2.
+ */
 export async function POST(request: Request): Promise<NextResponse> {
   const body = await request.json();
   const input = CreateAgentDefinitionInputSchema.parse(body);

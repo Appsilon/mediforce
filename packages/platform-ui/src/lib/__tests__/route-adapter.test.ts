@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createRouteAdapter } from '../route-adapter';
+import { HandlerError, NotFoundError } from '@mediforce/platform-api/handlers';
 
 const InputSchema = z.object({ name: z.string().min(1) });
 
@@ -67,6 +68,93 @@ describe('createRouteAdapter', () => {
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: 'Internal error' });
     expect(consoleError).toHaveBeenCalled();
+  });
+
+  describe('HandlerError mapping', () => {
+    it('maps NotFoundError to 404 with the original message', async () => {
+      const handler = vi.fn().mockRejectedValue(new NotFoundError('Task abc not found'));
+      const GET = createRouteAdapter(
+        InputSchema,
+        (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+        handler,
+      );
+
+      const res = await GET(makeRequest({ name: 'alice' }));
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: 'Task abc not found' });
+    });
+
+    it('maps an arbitrary HandlerError to its declared statusCode', async () => {
+      const handler = vi.fn().mockRejectedValue(new HandlerError(409, 'Precondition failed'));
+      const GET = createRouteAdapter(
+        InputSchema,
+        (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+        handler,
+      );
+
+      const res = await GET(makeRequest({ name: 'alice' }));
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: 'Precondition failed' });
+    });
+
+    it('does not log HandlerError to console (it is not an unexpected failure)', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const handler = vi.fn().mockRejectedValue(new NotFoundError('Task missing'));
+      const GET = createRouteAdapter(
+        InputSchema,
+        (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+        handler,
+      );
+
+      await GET(makeRequest({ name: 'alice' }));
+
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('dynamic route context (path params)', () => {
+    // Next.js passes dynamic-route params as the second arg to a route
+    // handler — `{ params: Promise<{ taskId: string }> }` in App Router.
+    // The adapter must thread that context through to `inputFromRequest`
+    // and await any async result.
+
+    interface RouteContext {
+      params: Promise<{ taskId: string }>;
+    }
+
+    const TaskInputSchema = z.object({ taskId: z.string().min(1) });
+
+    it('awaits an async inputFromRequest that reads params', async () => {
+      const handler = vi.fn().mockResolvedValue({ ok: true });
+      const GET = createRouteAdapter<typeof TaskInputSchema, z.infer<typeof TaskInputSchema>, RouteContext>(
+        TaskInputSchema,
+        async (_req, ctx) => ({ taskId: (await ctx.params).taskId }),
+        handler,
+      );
+
+      const req = new NextRequest('http://localhost/api/tasks/task-xyz');
+      const res = await GET(req, { params: Promise.resolve({ taskId: 'task-xyz' }) });
+
+      expect(res.status).toBe(200);
+      expect(handler).toHaveBeenCalledWith({ taskId: 'task-xyz' });
+    });
+
+    it('still returns 400 when the resolved input fails Zod validation', async () => {
+      const handler = vi.fn();
+      const GET = createRouteAdapter<typeof TaskInputSchema, z.infer<typeof TaskInputSchema>, RouteContext>(
+        TaskInputSchema,
+        async (_req, ctx) => ({ taskId: (await ctx.params).taskId }),
+        handler,
+      );
+
+      const req = new NextRequest('http://localhost/api/tasks/');
+      const res = await GET(req, { params: Promise.resolve({ taskId: '' }) });
+
+      expect(res.status).toBe(400);
+      expect(handler).not.toHaveBeenCalled();
+    });
   });
 
   describe('NarrowInput generic', () => {

@@ -1,8 +1,46 @@
 import {
+  GetAgentDefinitionInputSchema,
+  GetAgentDefinitionOutputSchema,
+  GetCoworkSessionByInstanceInputSchema,
+  GetCoworkSessionByInstanceOutputSchema,
+  GetCoworkSessionInputSchema,
+  GetCoworkSessionOutputSchema,
+  GetProcessInputSchema,
+  GetProcessOutputSchema,
+  GetProcessStepsInputSchema,
+  GetProcessStepsOutputSchema,
+  GetTaskInputSchema,
+  GetTaskOutputSchema,
+  ListAgentDefinitionsOutputSchema,
+  ListAuditEventsInputSchema,
+  ListAuditEventsOutputSchema,
+  ListPluginsOutputSchema,
+  ListProcessConfigsInputSchema,
+  ListProcessConfigsOutputSchema,
   ListTasksInputSchema,
   ListTasksOutputSchema,
+  ListWorkflowDefinitionsOutputSchema,
+  type GetAgentDefinitionInput,
+  type GetAgentDefinitionOutput,
+  type GetCoworkSessionByInstanceInput,
+  type GetCoworkSessionByInstanceOutput,
+  type GetCoworkSessionInput,
+  type GetCoworkSessionOutput,
+  type GetProcessInput,
+  type GetProcessOutput,
+  type GetProcessStepsInput,
+  type GetProcessStepsOutput,
+  type GetTaskInput,
+  type GetTaskOutput,
+  type ListAgentDefinitionsOutput,
+  type ListAuditEventsInput,
+  type ListAuditEventsOutput,
+  type ListPluginsOutput,
+  type ListProcessConfigsInput,
+  type ListProcessConfigsOutput,
   type ListTasksInput,
   type ListTasksOutput,
+  type ListWorkflowDefinitionsOutput,
 } from '../contract/index.js';
 
 /**
@@ -62,6 +100,37 @@ export class ApiError extends Error {
 export class Mediforce {
   readonly tasks: {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
+    get: (input: GetTaskInput) => Promise<GetTaskOutput>;
+  };
+
+  readonly processes: {
+    get: (input: GetProcessInput) => Promise<GetProcessOutput>;
+    getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
+    listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
+  };
+
+  readonly workflowDefinitions: {
+    list: () => Promise<ListWorkflowDefinitionsOutput>;
+  };
+
+  readonly agentDefinitions: {
+    list: () => Promise<ListAgentDefinitionsOutput>;
+    get: (input: GetAgentDefinitionInput) => Promise<GetAgentDefinitionOutput>;
+  };
+
+  readonly cowork: {
+    get: (input: GetCoworkSessionInput) => Promise<GetCoworkSessionOutput>;
+    getByInstance: (
+      input: GetCoworkSessionByInstanceInput,
+    ) => Promise<GetCoworkSessionByInstanceOutput>;
+  };
+
+  readonly configs: {
+    list: (input: ListProcessConfigsInput) => Promise<ListProcessConfigsOutput>;
+  };
+
+  readonly plugins: {
+    list: () => Promise<ListPluginsOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -111,6 +180,105 @@ export class Mediforce {
         const res = await this.request(`/api/tasks${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.list');
         return ListTasksOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetTaskInputSchema.parse(input);
+        const res = await this.request(
+          `/api/tasks/${encodeURIComponent(validated.taskId)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.tasks.get');
+        return GetTaskOutputSchema.parse(body);
+      },
+    };
+
+    this.processes = {
+      get: async (input) => {
+        const validated = GetProcessInputSchema.parse(input);
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.get');
+        return GetProcessOutputSchema.parse(body);
+      },
+      getSteps: async (input) => {
+        const validated = GetProcessStepsInputSchema.parse(input);
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}/steps`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.getSteps');
+        return GetProcessStepsOutputSchema.parse(body);
+      },
+      listAuditEvents: async (input) => {
+        const validated = ListAuditEventsInputSchema.parse(input);
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}/audit`,
+        );
+        const body = await parseJsonOrThrow(
+          res,
+          'mediforce.processes.listAuditEvents',
+        );
+        return ListAuditEventsOutputSchema.parse(body);
+      },
+    };
+
+    this.workflowDefinitions = {
+      list: async () => {
+        const res = await this.request('/api/workflow-definitions');
+        const body = await parseJsonOrThrow(res, 'mediforce.workflowDefinitions.list');
+        return ListWorkflowDefinitionsOutputSchema.parse(body);
+      },
+    };
+
+    this.agentDefinitions = {
+      list: async () => {
+        const res = await this.request('/api/agent-definitions');
+        const body = await parseJsonOrThrow(res, 'mediforce.agentDefinitions.list');
+        return ListAgentDefinitionsOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetAgentDefinitionInputSchema.parse(input);
+        const res = await this.request(
+          `/api/agent-definitions/${encodeURIComponent(validated.id)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agentDefinitions.get');
+        return GetAgentDefinitionOutputSchema.parse(body);
+      },
+    };
+
+    this.cowork = {
+      get: async (input) => {
+        const validated = GetCoworkSessionInputSchema.parse(input);
+        const res = await this.request(
+          `/api/cowork/${encodeURIComponent(validated.sessionId)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.cowork.get');
+        return GetCoworkSessionOutputSchema.parse(body);
+      },
+      getByInstance: async (input) => {
+        const validated = GetCoworkSessionByInstanceInputSchema.parse(input);
+        const res = await this.request(
+          `/api/cowork/by-instance/${encodeURIComponent(validated.instanceId)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.cowork.getByInstance');
+        return GetCoworkSessionByInstanceOutputSchema.parse(body);
+      },
+    };
+
+    this.configs = {
+      list: async (input) => {
+        const validated = ListProcessConfigsInputSchema.parse(input);
+        const qs = toSearchParams({ processName: validated.processName });
+        const res = await this.request(`/api/configs${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.configs.list');
+        return ListProcessConfigsOutputSchema.parse(body);
+      },
+    };
+
+    this.plugins = {
+      list: async () => {
+        const res = await this.request('/api/plugins');
+        const body = await parseJsonOrThrow(res, 'mediforce.plugins.list');
+        return ListPluginsOutputSchema.parse(body);
       },
     };
   }
