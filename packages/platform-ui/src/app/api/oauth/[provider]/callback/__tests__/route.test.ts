@@ -277,16 +277,25 @@ describe('GET /api/oauth/:provider/callback', () => {
     expect(mockTokenPut).not.toHaveBeenCalled();
   });
 
-  it('[ERROR] redirect to error page when PLATFORM_API_KEY is not set', async () => {
+  it('[ERROR] redirect to error page when state-signing secret is not set', async () => {
     process.env.PLATFORM_API_KEY = '';
-    const state = await mintState();
-    const res = await GET(
-      makeCallbackRequest('github', { code: 'c', state }),
-      { params: makeParams('github') },
-    );
-    expect(res.status).toBe(302);
-    const location = res.headers.get('Location') ?? '';
-    expect(location).toContain('server-misconfigured');
+    // The helper prefers OAUTH_STATE_SECRET with PLATFORM_API_KEY as
+    // fallback — clear both so the server is genuinely misconfigured.
+    const previousOAuthSecret = process.env.OAUTH_STATE_SECRET;
+    delete process.env.OAUTH_STATE_SECRET;
+    try {
+      const state = await mintState();
+      const res = await GET(
+        makeCallbackRequest('github', { code: 'c', state }),
+        { params: makeParams('github') },
+      );
+      expect(res.status).toBe(302);
+      const location = res.headers.get('Location') ?? '';
+      expect(location).toContain('server-misconfigured');
+    } finally {
+      if (previousOAuthSecret === undefined) delete process.env.OAUTH_STATE_SECRET;
+      else process.env.OAUTH_STATE_SECRET = previousOAuthSecret;
+    }
   });
 
   it('[ERROR] tampered state returns invalid-state redirect', async () => {

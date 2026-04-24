@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { signState, generateNonce, generatePkcePair } from '@mediforce/agent-runtime';
 import { getPlatformServices } from '@/lib/platform-services';
+import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
 import {
   requireFirebaseUid,
   requireNamespaceFromQuery,
@@ -113,10 +114,10 @@ export async function POST(
     );
   }
 
-  const platformSecret = process.env.PLATFORM_API_KEY ?? '';
-  if (platformSecret === '') {
+  const platformSecret = getOAuthStateSecret();
+  if (platformSecret === null) {
     return NextResponse.json(
-      { error: 'PLATFORM_API_KEY is not configured' },
+      { error: 'OAUTH_STATE_SECRET (or PLATFORM_API_KEY fallback) is not configured' },
       { status: 500 },
     );
   }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyState, type OAuthStatePayload } from '@mediforce/agent-runtime';
 import type { AgentOAuthToken, OAuthProviderConfig } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
+import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
 
 /** Platform-owned callback for the OAuth authorization-code flow. Provider
  *  redirects here after consent. No user session (external origin), so the
@@ -161,8 +162,8 @@ export async function GET(
     return redirectError(request, 'missing-code-or-state', null);
   }
 
-  const platformSecret = process.env.PLATFORM_API_KEY ?? '';
-  if (platformSecret === '') {
+  const platformSecret = getOAuthStateSecret();
+  if (platformSecret === null) {
     return redirectError(request, 'server-misconfigured', null);
   }
 

@@ -281,16 +281,23 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
     expect(json.error).toContain('appsilon');
   });
 
-  it('[ERROR] 500 when PLATFORM_API_KEY is not configured', async () => {
+  it('[ERROR] 500 when neither OAUTH_STATE_SECRET nor PLATFORM_API_KEY is configured', async () => {
     process.env.PLATFORM_API_KEY = '';
-    mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
-    mockProviderGet.mockResolvedValue(providerConfig);
+    const previousOAuthSecret = process.env.OAUTH_STATE_SECRET;
+    delete process.env.OAUTH_STATE_SECRET;
+    try {
+      mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
+      mockProviderGet.mockResolvedValue(providerConfig);
 
-    const res = await POST(
-      makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
-      { params: makeParams('agent-1', 'github') },
-    );
-    expect(res.status).toBe(500);
+      const res = await POST(
+        makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
+        { params: makeParams('agent-1', 'github') },
+      );
+      expect(res.status).toBe(500);
+    } finally {
+      if (previousOAuthSecret === undefined) delete process.env.OAUTH_STATE_SECRET;
+      else process.env.OAUTH_STATE_SECRET = previousOAuthSecret;
+    }
   });
 
   it('[AUTHZ] caller who is not a member of the namespace gets 404', async () => {
@@ -314,5 +321,47 @@ describe('POST /api/agents/:id/oauth/:provider/start', () => {
       { params: makeParams('agent-1', 'github') },
     );
     expect(mockGetMember).toHaveBeenCalledWith('other-ns', 'user-firebase-uid');
+  });
+
+  it('[SECRETS] prefers OAUTH_STATE_SECRET over PLATFORM_API_KEY', async () => {
+    process.env.OAUTH_STATE_SECRET = 'dedicated-state-secret';
+    try {
+      mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
+      mockProviderGet.mockResolvedValue(providerConfig);
+
+      const res = await POST(
+        makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
+        { params: makeParams('agent-1', 'github') },
+      );
+      const json = (await res.json()) as { state: string };
+      expect(res.status).toBe(200);
+
+      // State signed with the dedicated secret — verifies with that key,
+      // not with PLATFORM_API_KEY.
+      const payload = await verifyState(json.state, 'dedicated-state-secret', 60_000);
+      expect(payload).not.toBeNull();
+      expect(payload?.namespace).toBe('appsilon');
+
+      const withWrongKey = await verifyState(json.state, 'test-platform-secret', 60_000);
+      expect(withWrongKey).toBeNull();
+    } finally {
+      delete process.env.OAUTH_STATE_SECRET;
+    }
+  });
+
+  it('[SECRETS] falls back to PLATFORM_API_KEY when OAUTH_STATE_SECRET unset', async () => {
+    delete process.env.OAUTH_STATE_SECRET;
+    mockAgentGetById.mockResolvedValue(makeAgentWithOAuthBinding());
+    mockProviderGet.mockResolvedValue(providerConfig);
+
+    const res = await POST(
+      makePostRequest('agent-1', 'github', 'appsilon', { serverName: 'gh' }),
+      { params: makeParams('agent-1', 'github') },
+    );
+    const json = (await res.json()) as { state: string };
+    expect(res.status).toBe(200);
+
+    const payload = await verifyState(json.state, 'test-platform-secret', 60_000);
+    expect(payload).not.toBeNull();
   });
 });
