@@ -61,9 +61,13 @@ services:
       - DOCKER_OPENROUTER_API_KEY=${DOCKER_OPENROUTER_API_KEY}
       - DOCKER_APP_BASE_URL=http://platform-ui:3000
       - MEDIFORCE_ROOT=/repo
+      # Firebase Admin SDK credentials for server-side Firestore/Auth access.
+      # Mounted read-only from host ./secrets/firebase-admin-sa.json.
+      - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-sa.json
     volumes:
       - /tmp:/tmp
       - .:/repo:ro
+      - ./secrets/firebase-admin-sa.json:/run/secrets/firebase-sa.json:ro
     depends_on:
       redis:
         condition: service_healthy
