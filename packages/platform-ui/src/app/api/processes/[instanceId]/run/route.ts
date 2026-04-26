@@ -302,6 +302,86 @@ export async function POST(
           break;
         }
 
+        if (currentStep.executor === 'action') {
+          if (!currentStep.action) {
+            await instanceRepo.update(instanceId, {
+              status: 'failed',
+              error: `Step '${currentStep.id}' has executor='action' but no action config`,
+              updatedAt: new Date().toISOString(),
+            });
+            break;
+          }
+
+          const { actionRegistry, engine } = getPlatformServices();
+          console.log(`[auto-runner] Executing action step '${instance.currentStepId}' (kind: ${currentStep.action.kind}) on instance '${instanceId}'`);
+
+          const previousStepId = workflowDefinition.transitions.find(
+            (t) => t.to === instance.currentStepId,
+          )?.from ?? null;
+          const stepInput = previousStepId
+            ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
+            : {};
+
+          const executionId = crypto.randomUUID();
+          const startedAt = new Date().toISOString();
+          await instanceRepo.addStepExecution(instanceId, {
+            id: executionId,
+            instanceId,
+            stepId: instance.currentStepId,
+            status: 'running',
+            input: stepInput,
+            output: null,
+            verdict: null,
+            executedBy: 'auto-runner',
+            startedAt,
+            completedAt: null,
+            iterationNumber: 0,
+            gateResult: null,
+            error: null,
+          });
+
+          try {
+            const output = await actionRegistry.dispatch(currentStep.action, {
+              stepId: instance.currentStepId,
+              processInstanceId: instanceId,
+              sources: {
+                triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
+                steps: instance.variables,
+                variables: instance.variables,
+              },
+            });
+
+            await instanceRepo.updateStepExecution(instanceId, executionId, {
+              status: 'completed',
+              output,
+              completedAt: new Date().toISOString(),
+            });
+
+            await engine.advanceStep(
+              instanceId,
+              output,
+              { id: 'auto-runner', role: 'system' },
+            );
+
+            stepsExecuted++;
+            continue;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`[auto-runner] Action step '${currentStep.id}' failed: ${message}`);
+            await instanceRepo.updateStepExecution(instanceId, executionId, {
+              status: 'failed',
+              completedAt: new Date().toISOString(),
+              error: message,
+            });
+            await instanceRepo.update(instanceId, {
+              status: 'failed',
+              error: message,
+              updatedAt: new Date().toISOString(),
+            });
+            break;
+          }
+        }
+
         if (currentStep.executor === 'agent' || currentStep.executor === 'script') {
           console.log(`[auto-runner] Executing workflow agent step '${instance.currentStepId}' on instance '${instanceId}' (iteration ${stepsExecuted})`);
 

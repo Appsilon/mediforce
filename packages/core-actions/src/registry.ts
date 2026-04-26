@@ -1,6 +1,7 @@
 import type { ActionConfig } from '@mediforce/platform-core';
 import type {
   ActionContext,
+  ActionHandler,
   ActionOutput,
   AnyActionHandler,
 } from './types.js';
@@ -24,8 +25,8 @@ export class UnknownActionKindError extends Error {
 export class ActionRegistry {
   private readonly handlers = new Map<string, AnyActionHandler>();
 
-  register(kind: string, handler: AnyActionHandler): void {
-    this.handlers.set(kind, handler);
+  register<T>(kind: string, handler: ActionHandler<T>): void {
+    this.handlers.set(kind, handler as AnyActionHandler);
   }
 
   has(kind: string): boolean {
