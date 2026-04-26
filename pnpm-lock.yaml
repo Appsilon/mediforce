@@ -281,6 +281,9 @@ importers:
       '@mediforce/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@mediforce/core-actions':
+        specifier: workspace:*
+        version: link:../core-actions
       '@mediforce/mcp-client':
         specifier: workspace:*
         version: link:../mcp-client

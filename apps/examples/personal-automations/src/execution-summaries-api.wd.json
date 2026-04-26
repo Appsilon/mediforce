@@ -16,8 +16,8 @@
   "steps": [
     {
       "id": "echo",
-      "name": "echo",
-      "type": "terminal",
+      "name": "Echo",
+      "type": "creation",
       "executor": "action",
       "action": {
         "kind": "http",
@@ -27,7 +27,13 @@
           "body": "${triggerPayload.body}"
         }
       }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
     }
   ],
-  "transitions": []
+  "transitions": [{ "from": "echo", "to": "done" }]
 }
