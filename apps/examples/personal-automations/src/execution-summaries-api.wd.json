@@ -1,0 +1,33 @@
+{
+  "name": "execution-summaries-api",
+  "title": "Execution Summaries API",
+  "description": "Echo webhook payload through HTTP to validate the spike #9 model",
+  "preamble": "## Domain Context\nSpike #9 reference workflow. Validates webhook trigger -> http action -> polling round-trip against a local echo server.",
+  "triggers": [
+    {
+      "type": "webhook",
+      "name": "main",
+      "config": {
+        "method": "POST",
+        "path": "/execution-summaries"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "echo",
+      "name": "echo",
+      "type": "terminal",
+      "executor": "action",
+      "action": {
+        "kind": "http",
+        "config": {
+          "method": "POST",
+          "url": "http://localhost:9099/anything",
+          "body": "${triggerPayload.body}"
+        }
+      }
+    }
+  ],
+  "transitions": []
+}

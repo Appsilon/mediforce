@@ -1,0 +1,17 @@
+{
+  "name": "@mediforce/personal-automations",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Reference templates for Filip's personal automations migrated from n8n",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mediforce/platform-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.2",
+    "vitest": "^4.0.0"
+  }
+}
