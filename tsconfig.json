@@ -25,6 +25,7 @@
     { "path": "packages/platform-api" },
     { "path": "packages/platform-ui" },
     { "path": "packages/mcp-client" },
-    { "path": "packages/cli" }
+    { "path": "packages/cli" },
+    { "path": "packages/core-actions" }
   ]
 }
