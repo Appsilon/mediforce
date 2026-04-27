@@ -22,7 +22,7 @@
   "dependencies": {
     "@mediforce/platform-api": "workspace:*",
     "@mediforce/platform-core": "workspace:*",
-    "tsx": "latest",
+    "tsx": "^4.21.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
