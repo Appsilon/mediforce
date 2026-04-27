@@ -20,6 +20,7 @@
  */
 
 import { workflowRegisterCommand } from './commands/workflow-register.js';
+import { workflowListCommand } from './commands/workflow-list.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -58,6 +59,9 @@ export async function runCli(input: RunCliInput): Promise<number> {
 
   if (command === 'workflow' && subcommand === 'register') {
     return workflowRegisterCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'workflow' && subcommand === 'list') {
+    return workflowListCommand({ argv: rest, env: input.env, output });
   }
 
   output.stderr(`Unknown command: ${[command, subcommand].filter(Boolean).join(' ')}`);
