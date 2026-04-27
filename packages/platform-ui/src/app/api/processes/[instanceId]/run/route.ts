@@ -56,13 +56,15 @@ export async function POST(
       );
     }
 
-    // Pre-flight: validate all env templates are resolvable before executing anything
+    // Pre-flight: validate all env templates are resolvable before executing anything.
+    // The decrypted bag is also reused below as the `secrets` source for action
+    // interpolation (`${secrets.NAME}` in http urls/headers/body).
+    const workflowSecrets = await getWorkflowSecretsForRuntime(
+      workflowDefinition.namespace,
+      workflowDefinition.name,
+    );
     {
-      const secrets = await getWorkflowSecretsForRuntime(
-        workflowDefinition.namespace,
-        workflowDefinition.name,
-      );
-      const missingEnv = validateWorkflowEnv(workflowDefinition, secrets);
+      const missingEnv = validateWorkflowEnv(workflowDefinition, workflowSecrets);
       if (missingEnv.length > 0) {
         const names = missingEnv.map((m) => m.secretName);
         console.log(`[auto-runner] Missing env vars for '${initialInstance.definitionName}': ${names.join(', ')}`);
@@ -348,6 +350,7 @@ export async function POST(
                 triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
                 steps: instance.variables,
                 variables: instance.variables,
+                secrets: workflowSecrets,
               },
             });
 

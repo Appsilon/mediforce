@@ -25,15 +25,18 @@ export async function GET(
 
   let finalOutput: unknown = null;
   if (instance.status === 'completed' || instance.status === 'failed') {
+    // Walk executions in reverse insertion order — repository preserves
+    // execution order, and timestamp-based sort is unreliable when chained
+    // actions complete inside the same millisecond (which the in-memory
+    // repo can produce, and Firestore can produce on hot paths too).
     const executions = await instanceRepo.getStepExecutions(runId);
-    const completed = executions
-      .filter((e) => e.status === 'completed' && e.output !== null)
-      .sort(
-        (a, b) =>
-          new Date(b.completedAt ?? b.startedAt).getTime()
-          - new Date(a.completedAt ?? a.startedAt).getTime(),
-      );
-    finalOutput = completed[0]?.output ?? null;
+    for (let i = executions.length - 1; i >= 0; i--) {
+      const exec = executions[i];
+      if (exec.status === 'completed' && exec.output !== null && exec.output !== undefined) {
+        finalOutput = exec.output;
+        break;
+      }
+    }
   }
 
   return NextResponse.json({
