@@ -45,6 +45,28 @@ Common flags:
 
 Authentication:
   Set MEDIFORCE_API_KEY (or PLATFORM_API_KEY) in the environment.
+
+Output streams:
+  Success output and --json error payloads are written to stdout.
+  Human-mode error messages are written to stderr so success output
+  on stdout stays machine-parseable when piped.
+`;
+
+const WORKFLOW_HELP = `Usage: mediforce workflow <subcommand> [options]
+
+Subcommands:
+  register --file <path> --namespace <ns>   Register a workflow definition
+  list                                      List registered workflow definitions
+
+Run \`mediforce workflow <subcommand> --help\` for subcommand-specific flags.
+`;
+
+const RUN_HELP = `Usage: mediforce run <subcommand> [options]
+
+Subcommands:
+  get <runId>   Fetch a single run's status
+
+Run \`mediforce run <subcommand> --help\` for subcommand-specific flags.
 `;
 
 export async function runCli(input: RunCliInput): Promise<number> {
@@ -57,6 +79,21 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
 
   const [command, subcommand, ...rest] = args;
+
+  // Namespace-only invocation (no subcommand): print the namespaced HELP and
+  // exit 2 instead of the generic `Unknown command: workflow undefined`.
+  if (command === 'workflow' && subcommand === undefined) {
+    output.stderr('mediforce workflow: missing subcommand');
+    output.stderr('');
+    output.stderr(WORKFLOW_HELP);
+    return 2;
+  }
+  if (command === 'run' && subcommand === undefined) {
+    output.stderr('mediforce run: missing subcommand');
+    output.stderr('');
+    output.stderr(RUN_HELP);
+    return 2;
+  }
 
   if (command === 'workflow' && subcommand === 'register') {
     return workflowRegisterCommand({ argv: rest, env: input.env, output });

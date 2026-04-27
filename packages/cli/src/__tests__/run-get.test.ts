@@ -94,4 +94,16 @@ describe('run get command', () => {
     });
     expect(code).toBe(2);
   });
+
+  it('prints HELP on too many positionals (matches missing-positional UX)', async () => {
+    const output = captureOutput();
+    const code = await runGetCommand({
+      argv: ['id1', 'id2', '--json'],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+    expect(code).toBe(2);
+    const allOutput = output.stderrLines.join('\n') + output.stdoutLines.join('\n');
+    expect(allOutput).toMatch(/Usage: mediforce run get/);
+  });
 });

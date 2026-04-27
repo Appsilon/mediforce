@@ -66,6 +66,8 @@ export async function runGetCommand(input: CommandInput): Promise<number> {
       { error: `Expected exactly one runId, got ${String(positionals.length)}` },
       jsonMode,
     );
+    input.output.stderr('');
+    input.output.stderr(HELP);
     return 2;
   }
 
