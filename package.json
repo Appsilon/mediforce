@@ -50,6 +50,7 @@
     ]
   },
   "devDependencies": {
+    "@mediforce/cli": "workspace:*",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^24.12.2",
     "@vitest/coverage-v8": "^4.1.4",
