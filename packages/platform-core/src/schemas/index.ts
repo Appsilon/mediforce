@@ -146,6 +146,7 @@ export {
   HttpMethodSchema,
   WebhookTriggerConfigSchema,
   HttpActionConfigSchema,
+  ReshapeActionConfigSchema,
   ActionConfigSchema,
   validateInputForNextRun,
   validateExecutorAndTriggers,
@@ -161,6 +162,7 @@ export {
   type HttpMethod,
   type WebhookTriggerConfig,
   type HttpActionConfig,
+  type ReshapeActionConfig,
   type ActionConfig,
 } from './workflow-definition.js';
 

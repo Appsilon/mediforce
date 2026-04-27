@@ -148,4 +148,70 @@ describe('workflow-definition action executor', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it('parses a workflow with executor:action and reshape config', () => {
+    const result = parseWorkflowDefinitionForCreation({
+      ...baseTemplate,
+      namespace: 'filip',
+      steps: [
+        {
+          id: 'shape',
+          name: 'shape',
+          type: 'terminal',
+          executor: 'action',
+          action: {
+            kind: 'reshape',
+            config: {
+              values: {
+                id: '${triggerPayload.body.id}',
+                source: 'webhook',
+                count: 1,
+              },
+            },
+          },
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects reshape with non-record values', () => {
+    const result = parseWorkflowDefinitionForCreation({
+      ...baseTemplate,
+      namespace: 'filip',
+      steps: [
+        {
+          id: 'shape',
+          name: 'shape',
+          type: 'terminal',
+          executor: 'action',
+          action: {
+            kind: 'reshape',
+            config: { values: 'not-an-object' },
+          },
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects reshape without a values field', () => {
+    const result = parseWorkflowDefinitionForCreation({
+      ...baseTemplate,
+      namespace: 'filip',
+      steps: [
+        {
+          id: 'shape',
+          name: 'shape',
+          type: 'terminal',
+          executor: 'action',
+          action: {
+            kind: 'reshape',
+            config: {},
+          },
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
 });

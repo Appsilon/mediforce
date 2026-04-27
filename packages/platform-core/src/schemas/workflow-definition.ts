@@ -36,15 +36,25 @@ export const HttpActionConfigSchema = z.object({
   headers: z.record(z.string(), z.string()).optional(),
 });
 
+/** reshape action config: rebuild a new object by interpolating each leaf
+ *  against the same sources (triggerPayload, steps, variables). Pure
+ *  data transformation — no side effects. Output is the interpolated
+ *  values map. */
+export const ReshapeActionConfigSchema = z.object({
+  values: z.record(z.string(), z.unknown()),
+});
+
 /** Discriminated union of action configs. Spike ships only `http`; future
  *  kinds (wait, subworkflow, email, set) plug in here. */
 export const ActionConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('http'), config: HttpActionConfigSchema }),
+  z.object({ kind: z.literal('reshape'), config: ReshapeActionConfigSchema }),
 ]);
 
 export type HttpMethod = z.infer<typeof HttpMethodSchema>;
 export type WebhookTriggerConfig = z.infer<typeof WebhookTriggerConfigSchema>;
 export type HttpActionConfig = z.infer<typeof HttpActionConfigSchema>;
+export type ReshapeActionConfig = z.infer<typeof ReshapeActionConfigSchema>;
 export type ActionConfig = z.infer<typeof ActionConfigSchema>;
 
 export const WorkflowAgentConfigSchema = z.object({
