@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Mediforce, ApiError } from '../index.js';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
+import { omitServerFields } from '../../contract/__tests__/_helpers.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -23,10 +24,7 @@ describe('mediforce.workflows.register', () => {
 
     const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
     const wd = buildWorkflowDefinition({ name: 'wf' });
-    const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
-    void _v;
-    void _n;
-    void _c;
+    const body = omitServerFields(wd);
 
     const result = await mediforce.workflows.register(body, { namespace: 'Appsilon' });
 
@@ -44,10 +42,7 @@ describe('mediforce.workflows.register', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
     const wd = buildWorkflowDefinition();
-    const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
-    void _v;
-    void _n;
-    void _c;
+    const body = omitServerFields(wd);
 
     await expect(
       mediforce.workflows.register(body, { namespace: '' }),
@@ -76,10 +71,7 @@ describe('mediforce.workflows.register', () => {
 
     const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
     const wd = buildWorkflowDefinition();
-    const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
-    void _v;
-    void _n;
-    void _c;
+    const body = omitServerFields(wd);
 
     const error = await mediforce.workflows
       .register(body, { namespace: 'Appsilon' })

@@ -5,14 +5,12 @@ import {
   RegisterWorkflowOutputSchema,
   ListWorkflowsOutputSchema,
 } from '../workflows.js';
+import { omitServerFields } from './_helpers.js';
 
 describe('RegisterWorkflowInputSchema', () => {
   it('accepts a workflow definition body without version, createdAt, or namespace', () => {
     const wd = buildWorkflowDefinition();
-    const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
-    void _v;
-    void _n;
-    void _c;
+    const body = omitServerFields(wd);
     const result = RegisterWorkflowInputSchema.safeParse(body);
     expect(result.success).toBe(true);
   });
