@@ -5,6 +5,7 @@ import {
   RegisterWorkflowInputSchema,
   type RegisterWorkflowInput,
 } from '@mediforce/platform-api/contract';
+import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import { resolveConfig } from '../config.js';
 import { printJson, printError, type OutputSink } from '../output.js';
 
@@ -113,6 +114,23 @@ export async function workflowRegisterCommand(input: CommandInput): Promise<numb
   }
 
   if (flags['dry-run'] === true) {
+    // Mirror the server-side parse exactly so dry-run can never pass while a
+    // real POST would fail. The server applies `parseWorkflowDefinitionForCreation`
+    // (= WorkflowDefinitionBase.omit({version, createdAt}).superRefine(validateInputForNextRun))
+    // after injecting the namespace from the query string. We do the same here
+    // and emit the same `{ error: 'Validation failed', issues }` shape.
+    const serverParse = parseWorkflowDefinitionForCreation({
+      ...body,
+      namespace: flags.namespace,
+    });
+    if (!serverParse.success) {
+      printError(
+        input.output,
+        { error: 'Validation failed', body: serverParse.error.issues },
+        jsonMode,
+      );
+      return 1;
+    }
     const summary = {
       success: true,
       dryRun: true,

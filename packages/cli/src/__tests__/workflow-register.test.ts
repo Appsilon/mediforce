@@ -85,6 +85,48 @@ describe('workflow register command', () => {
     expect(output.stdoutLines.join('\n')).toMatch(/dry-run/i);
   });
 
+  it('--dry-run rejects inputForNextRun referencing an unknown stepId (server parity)', async () => {
+    // Without superRefine, `RegisterWorkflowInputSchema` accepts this body
+    // and dry-run would pass while a real POST would 400. Mirroring
+    // `parseWorkflowDefinitionForCreation` server-side keeps the two in
+    // lockstep — see workflow-register.ts dry-run path.
+    const wd = buildWorkflowDefinition({ name: 'sample-wf' });
+    const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
+    void _v;
+    void _n;
+    void _c;
+    const malformed = {
+      ...body,
+      inputForNextRun: [{ stepId: 'does-not-exist', output: 'x', as: 'y' }],
+    };
+    const malformedFile = path.join(tempDir, 'malformed.json');
+    await writeFile(malformedFile, JSON.stringify(malformed), 'utf-8');
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const output = captureOutput();
+    const code = await workflowRegisterCommand({
+      argv: ['--file', malformedFile, '--namespace', 'Appsilon', '--dry-run', '--json'],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+    expect(code).toBe(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const parsed: unknown = JSON.parse(output.stdoutLines.join('\n'));
+    expect(parsed).toMatchObject({ error: 'Validation failed' });
+    // Same issue shape the server emits — Zod issue array with a path
+    // pointing at the offending entry.
+    const issues = (parsed as { body: Array<{ path: Array<string | number> }> }).body;
+    expect(Array.isArray(issues)).toBe(true);
+    expect(
+      issues.some(
+        (issue) =>
+          Array.isArray(issue.path) &&
+          issue.path[0] === 'inputForNextRun' &&
+          issue.path[2] === 'stepId',
+      ),
+    ).toBe(true);
+  });
+
   it('POSTs to /api/workflow-definitions with namespace + apiKey', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
