@@ -19,6 +19,7 @@
  * commits as each command lands.
  */
 
+import { workflowRegisterCommand } from './commands/workflow-register.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -53,7 +54,11 @@ export async function runCli(input: RunCliInput): Promise<number> {
     return 0;
   }
 
-  const [command, subcommand] = args;
+  const [command, subcommand, ...rest] = args;
+
+  if (command === 'workflow' && subcommand === 'register') {
+    return workflowRegisterCommand({ argv: rest, env: input.env, output });
+  }
 
   output.stderr(`Unknown command: ${[command, subcommand].filter(Boolean).join(' ')}`);
   output.stderr('');
