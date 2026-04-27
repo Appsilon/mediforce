@@ -29,6 +29,29 @@ export function printJson(sink: OutputSink, payload: unknown): void {
   sink.stdout(JSON.stringify(payload, null, 2));
 }
 
+/**
+ * Stream contract — load-bearing, do not change without updating tests:
+ *
+ *   --json mode:  error payload is written to STDOUT (single channel for
+ *                 machine consumers; pipe `... | jq` works for both
+ *                 success and error responses without flag-juggling).
+ *   human mode:   error message is written to STDERR (success output stays
+ *                 on stdout uncluttered, so `cmd > out.txt` only captures
+ *                 success and `cmd 2> err.log` only captures errors).
+ *
+ * The regression tests in `__tests__/output.test.ts` and the per-command
+ * tests in `__tests__/run-get.test.ts` and
+ * `__tests__/workflow-register.test.ts` lock this behaviour in. The
+ * top-level `mediforce --help` text also documents this contract under
+ * the "Output streams" section so consumers don't have to read code.
+ *
+ * Rationale:
+ *   - JSON mode: a single output channel is what `jq`, log shippers, and
+ *     CI parsers expect. Splitting JSON across stdout/stderr breaks them.
+ *   - Human mode: separating diagnostics from data lets shell users
+ *     compose commands (`cmd | next-tool`) without errors corrupting
+ *     the pipe.
+ */
 export function printError(
   sink: OutputSink,
   payload: ErrorPayload,
