@@ -1,0 +1,32 @@
+{
+  "name": "@mediforce/cli",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "mediforce": "./bin/mediforce.cjs"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "@mediforce/source": "./src/index.ts",
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mediforce/platform-api": "workspace:*",
+    "@mediforce/platform-core": "workspace:*",
+    "tsx": "latest",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.2",
+    "vitest": "^4.0.0"
+  }
+}

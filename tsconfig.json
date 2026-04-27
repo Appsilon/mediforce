@@ -24,6 +24,7 @@
     { "path": "packages/agent-queue" },
     { "path": "packages/platform-api" },
     { "path": "packages/platform-ui" },
-    { "path": "packages/mcp-client" }
+    { "path": "packages/mcp-client" },
+    { "path": "packages/cli" }
   ]
 }
