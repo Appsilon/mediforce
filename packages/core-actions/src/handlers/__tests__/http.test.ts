@@ -9,6 +9,7 @@ const baseCtx: ActionContext = {
     triggerPayload: { body: { hello: 'filip' }, method: 'POST' },
     steps: {},
     variables: {},
+    secrets: {},
   },
 };
 
@@ -95,6 +96,7 @@ describe('httpActionHandler', () => {
         triggerPayload: { host: 'example.com', token: 'abc' },
         steps: {},
         variables: {},
+        secrets: {},
       },
     };
     await httpActionHandler(

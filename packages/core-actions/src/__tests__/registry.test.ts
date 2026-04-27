@@ -5,7 +5,7 @@ import type { ActionContext } from '../types.js';
 const ctx: ActionContext = {
   stepId: 'step-1',
   processInstanceId: 'instance-1',
-  sources: { triggerPayload: {}, steps: {}, variables: {} },
+  sources: { triggerPayload: {}, steps: {}, variables: {}, secrets: {} },
 };
 
 describe('ActionRegistry', () => {

@@ -10,11 +10,17 @@ import type {
  *    notation (e.g. `${steps.fetch.body.id}`).
  *  - `variables` is the merged workflow scratch space (alias of `steps` today;
  *    reserved for explicit set/let in future).
+ *  - `secrets` is the per-workflow encrypted secret bag, decrypted at action
+ *    dispatch time. Accessed via `${secrets.NAME}` in url/body/headers. The
+ *    runtime loads this from WorkflowSecretsRepository before invoking
+ *    handlers — values must NEVER be persisted to step output or audit logs
+ *    by handler code.
  */
 export interface InterpolationSources {
   triggerPayload: Record<string, unknown>;
   steps: Record<string, unknown>;
   variables: Record<string, unknown>;
+  secrets: Record<string, string>;
 }
 
 /** Per-step context passed to every action handler. The runtime fills this

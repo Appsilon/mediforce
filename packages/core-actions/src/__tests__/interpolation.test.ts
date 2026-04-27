@@ -11,6 +11,7 @@ const sources: InterpolationSources = {
     fetch: { body: { json: { token: 'abc' } } },
   },
   variables: { greeting: 'hi' },
+  secrets: { OWM_KEY: 'secret-key-123', PUSHOVER_TOKEN: 'push-token-456' },
 };
 
 describe('getPath', () => {
@@ -95,8 +96,34 @@ describe('interpolate', () => {
       triggerPayload: { x: 1 },
       steps: { y: 2 },
       variables: {},
+      secrets: {},
     };
     expect(interpolate('${x}', local)).toBe(1);
     expect(interpolate('${y}', local)).toBe(2);
+  });
+
+  it('resolves ${secrets.NAME} to the secret value', () => {
+    expect(interpolate('${secrets.OWM_KEY}', sources)).toBe('secret-key-123');
+  });
+
+  it('embeds secrets in multi-placeholder strings', () => {
+    expect(
+      interpolate('Bearer ${secrets.PUSHOVER_TOKEN}', sources),
+    ).toBe('Bearer push-token-456');
+  });
+
+  it('renders unknown secret as empty string in concat', () => {
+    expect(interpolate('key=${secrets.NOT_THERE}', sources)).toBe('key=');
+  });
+
+  it('does NOT resolve secrets via bare-identifier fallback', () => {
+    // `${OWM_KEY}` without the `secrets.` prefix must return undefined —
+    // explicit access prevents accidental secret leaks via copy-paste.
+    expect(interpolate('${OWM_KEY}', sources)).toBeUndefined();
+  });
+
+  it('resolves bare ${secrets} root to undefined', () => {
+    // No useful semantics for the whole bag; force callers to name a key.
+    expect(interpolate('${secrets}', sources)).toBeUndefined();
   });
 });

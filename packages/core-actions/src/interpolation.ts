@@ -143,8 +143,13 @@ function resolvePath(rawPath: string, sources: InterpolationSources): unknown {
     resolved = rest.length === 0 ? sources.steps : getPath(sources.steps, rest);
   } else if (root === 'variables') {
     resolved = rest.length === 0 ? sources.variables : getPath(sources.variables, rest);
+  } else if (root === 'secrets') {
+    // Secrets resolve only via the explicit `secrets.NAME` form — never via
+    // the bare-identifier fallback below — to make leaks visible in code review.
+    resolved = rest.length === 0 ? undefined : getPath(sources.secrets, rest);
   } else {
     // Bare identifiers fall through to triggerPayload for n8n-style ergonomics.
+    // Deliberately NOT searching `secrets` here — secret access must be explicit.
     resolved = getPath(sources.triggerPayload, path)
       ?? getPath(sources.steps, path)
       ?? getPath(sources.variables, path);

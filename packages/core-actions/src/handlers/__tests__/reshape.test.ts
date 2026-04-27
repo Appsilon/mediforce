@@ -14,6 +14,7 @@ const baseCtx: ActionContext = {
       fetch: { body: { json: { user: { name: 'Alice', age: 30 } } } },
     },
     variables: { workflowId: 'wf-1' },
+    secrets: {},
   },
 };
 
