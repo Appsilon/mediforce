@@ -1,4 +1,8 @@
-import type { ActionConfig, HttpActionConfig } from '@mediforce/platform-core';
+import type {
+  ActionConfig,
+  HttpActionConfig,
+  ReshapeActionConfig,
+} from '@mediforce/platform-core';
 
 /** Sources available to interpolation in action configs.
  *  - `triggerPayload` is the raw webhook body / cron tick / manual payload.
@@ -41,6 +45,7 @@ export type ActionHandler<TConfig> = (
 /** Narrowed handler types — used by the registry to dispatch by `kind`.
  *  Add new kinds here as more handlers are introduced. */
 export type HttpActionHandler = ActionHandler<HttpActionConfig>;
+export type ReshapeActionHandler = ActionHandler<ReshapeActionConfig>;
 
 export type AnyActionHandler = ActionHandler<unknown>;
 

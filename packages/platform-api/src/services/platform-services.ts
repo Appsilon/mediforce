@@ -30,7 +30,11 @@ import {
   OpenCodeAgentPlugin,
   ScriptContainerPlugin,
 } from '@mediforce/agent-runtime';
-import { ActionRegistry, httpActionHandler } from '@mediforce/core-actions';
+import {
+  ActionRegistry,
+  httpActionHandler,
+  reshapeActionHandler,
+} from '@mediforce/core-actions';
 import { WebhookRouter } from '@mediforce/workflow-engine';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
 import { seedBuiltinToolCatalog } from './seed-tool-catalog.js';
@@ -122,6 +126,7 @@ export function getPlatformServices(): PlatformServices {
 
   const actionRegistry = new ActionRegistry();
   actionRegistry.register('http', httpActionHandler);
+  actionRegistry.register('reshape', reshapeActionHandler);
 
   const webhookRouter = new WebhookRouter(engine, processRepo);
 
