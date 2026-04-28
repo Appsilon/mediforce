@@ -17,6 +17,7 @@ const nextConfig = {
     '@mediforce/agent-runtime',
     '@mediforce/agent-queue',
     '@mediforce/mcp-client',
+    '@mediforce/core-actions',
     // @hookform/resolvers/zod imports `zod/v4/core` without declaring zod
     // as a peer dep. In pnpm's isolated layout, webpack on Vercel can't
     // walk out of the resolver's .pnpm dir to find zod — transpiling it
@@ -43,6 +44,7 @@ const nextConfig = {
       '@mediforce/agent-runtime': path.join(packagesDir, 'agent-runtime/src/index.ts'),
       '@mediforce/agent-queue': path.join(packagesDir, 'agent-queue/src/index.ts'),
       '@mediforce/mcp-client': path.join(packagesDir, 'mcp-client/src/index.ts'),
+      '@mediforce/core-actions': path.join(packagesDir, 'core-actions/src/index.ts'),
       // Pin zod to platform-ui's own copy so `@hookform/resolvers/zod` (which
       // imports `zod/v4/core` without declaring zod as a peer dep) resolves
       // on Vercel. Without this, webpack walks up from the resolver's .pnpm
