@@ -1,8 +1,19 @@
 import {
   ListTasksInputSchema,
   ListTasksOutputSchema,
+  RegisterWorkflowInputSchema,
+  RegisterWorkflowOutputSchema,
+  ListWorkflowsOutputSchema,
+  GetRunInputSchema,
+  GetRunOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
+  type RegisterWorkflowInput,
+  type RegisterWorkflowOutput,
+  type RegisterWorkflowOptions,
+  type ListWorkflowsOutput,
+  type GetRunInput,
+  type GetRunOutput,
 } from '../contract/index.js';
 
 /**
@@ -64,6 +75,18 @@ export class Mediforce {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
   };
 
+  readonly workflows: {
+    register: (
+      input: RegisterWorkflowInput,
+      options: RegisterWorkflowOptions,
+    ) => Promise<RegisterWorkflowOutput>;
+    list: () => Promise<ListWorkflowsOutput>;
+  };
+
+  readonly runs: {
+    get: (input: GetRunInput) => Promise<GetRunOutput>;
+  };
+
   constructor(private readonly config: ClientConfig) {
     // Defense-in-depth against JS callers / bad casts that bypass the
     // discriminated union (e.g. `new Mediforce()` with no argument, which the
@@ -111,6 +134,42 @@ export class Mediforce {
         const res = await this.request(`/api/tasks${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.list');
         return ListTasksOutputSchema.parse(body);
+      },
+    };
+
+    this.workflows = {
+      register: async (input, options) => {
+        const validatedInput = RegisterWorkflowInputSchema.parse(input);
+        const namespace = options.namespace;
+        if (typeof namespace !== 'string' || namespace.length === 0) {
+          throw new Error(
+            'mediforce.workflows.register: `namespace` is required (passed as an HTTP query parameter).',
+          );
+        }
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/workflow-definitions${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validatedInput),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.register');
+        return RegisterWorkflowOutputSchema.parse(body);
+      },
+      list: async () => {
+        const res = await this.request('/api/workflow-definitions');
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.list');
+        return ListWorkflowsOutputSchema.parse(body);
+      },
+    };
+
+    this.runs = {
+      get: async (input) => {
+        const validated = GetRunInputSchema.parse(input);
+        const res = await this.request(
+          `/api/runs/${encodeURIComponent(validated.runId)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.get');
+        return GetRunOutputSchema.parse(body);
       },
     };
   }

@@ -96,7 +96,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     return model;
   }
 
-  getMockDockerArgs(stepId: string, isGitMode: boolean): string[] {
+  getMockDockerArgs(stepId: string): string[] {
     const copyOutputCmd =
       `cp -r /mock-data/* /output/ 2>/dev/null; ` +
       `if [ -f "/mock-fixtures/${stepId}.json" ]; then ` +
@@ -107,33 +107,22 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         `echo "[mock-opencode] step=${stepId}: no fixture, generic mock" >&2; ` +
       `fi`;
 
+    const copyWorkspaceCmd =
+      `WSDIR=$(grep -o '"_workspaceDir"[[:space:]]*:[[:space:]]*"[^"]*"' /mock-fixtures/${stepId}.json 2>/dev/null | sed 's/.*"\\([^"]*\\)"$/\\1/'); ` +
+      `if [ -n "$WSDIR" ] && [ -d "/mock-data/$WSDIR" ]; then ` +
+        `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
+        `echo "[mock-opencode] step=${stepId}: copied $WSDIR/ into /workspace/" >&2; ` +
+      `fi`;
+
     const mockAgentResponse = JSON.stringify({
       output_file: '/output/mock-result.json',
       summary: `Mock OpenCode output for step ${stepId}`,
     });
-    // Wrap in OpenCode's JSONL format: { "type": "text", "part": { "text": "..." } }
     const mockOpenCodeJson = JSON.stringify({ type: 'text', part: { type: 'text', text: mockAgentResponse } });
-
-    if (isGitMode) {
-      const copyWorkspaceCmd =
-        `WSDIR=$(grep -o '"_workspaceDir"[[:space:]]*:[[:space:]]*"[^"]*"' /mock-fixtures/${stepId}.json 2>/dev/null | sed 's/.*"\\([^"]*\\)"$/\\1/'); ` +
-        `if [ -n "$WSDIR" ] && [ -d "/mock-data/$WSDIR" ]; then ` +
-          `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
-          `echo "[mock-opencode] step=${stepId}: copied $WSDIR/ into /workspace/ for git commit" >&2; ` +
-        `else ` +
-          `echo "# Mock output from step ${stepId}" > /workspace/mock-${stepId}-output.md; ` +
-        `fi`;
-
-      return [
-        'bash', '-c',
-        `${copyOutputCmd} && ${copyWorkspaceCmd} && ` +
-        `echo '${mockOpenCodeJson.replace(/'/g, "'\\''")}'`,
-      ];
-    }
 
     return [
       'bash', '-c',
-      `${copyOutputCmd} && ` +
+      `${copyOutputCmd} && ${copyWorkspaceCmd}; ` +
       `echo '${mockOpenCodeJson.replace(/'/g, "'\\''")}'`,
     ];
   }

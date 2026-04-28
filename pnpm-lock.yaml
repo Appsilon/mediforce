@@ -21,6 +21,9 @@ importers:
 
   .:
     devDependencies:
+      '@mediforce/cli':
+        specifier: workspace:*
+        version: link:packages/cli
       '@tailwindcss/postcss':
         specifier: ^4.2.2
         version: 4.2.2
@@ -102,6 +105,28 @@ importers:
       '@mediforce/agent-queue':
         specifier: workspace:*
         version: link:../agent-queue
+
+  packages/cli:
+    dependencies:
+      '@mediforce/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../platform-core
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^24.12.2
+        version: 24.12.2
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/example-agent:
     dependencies:

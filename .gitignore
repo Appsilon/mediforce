@@ -43,3 +43,4 @@ blob-report/
 coverage/
 .vercel
 packages/platform-ui/.emulator-data
+.claude/scheduled_tasks.lock

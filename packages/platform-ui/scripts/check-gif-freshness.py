@@ -12,8 +12,11 @@ import subprocess
 import sys
 
 
-def last_commit_touching(base: str, pattern: str) -> int | None:
-    """Return the index (0 = oldest) of the last commit in base..HEAD that touches pattern."""
+def last_commit_touching(base: str, pattern: str, *, exclude: str | None = None) -> int | None:
+    """Return the index (0 = oldest) of the last commit in base..HEAD that touches pattern.
+
+    Files matching `exclude` (if set) are not counted.
+    """
     result = subprocess.run(
         ["git", "log", "--oneline", f"{base}..HEAD"],
         capture_output=True, text=True, check=True,
@@ -33,7 +36,10 @@ def last_commit_touching(base: str, pattern: str) -> int | None:
         )
         if diff.returncode != 0:
             continue
-        if any(re.search(pattern, f) for f in diff.stdout.strip().splitlines()):
+        matched = [f for f in diff.stdout.strip().splitlines() if re.search(pattern, f)]
+        if exclude is not None:
+            matched = [f for f in matched if not re.search(exclude, f)]
+        if matched:
             last = idx
     return last
 
@@ -41,10 +47,15 @@ def last_commit_touching(base: str, pattern: str) -> int | None:
 def main() -> None:
     base = sys.argv[1] if len(sys.argv) > 1 else "origin/main"
 
-    # Skip API-only journeys (*-api.journey.ts). By convention these drive
-    # HTTP endpoints via Playwright's `request` fixture without opening a
-    # browser, so a GIF demo is not meaningful.
-    last_journey = last_commit_touching(base, r"e2e/journeys/(?!.*-api\.journey\.ts$).*\.journey\.ts$")
+    # UI journey tests require GIF recordings. Browserless journeys (API-only,
+    # Docker-backed workflow execution, etc.) don't produce recordable artefacts,
+    # so exclude them. Convention: browserless tests use Playwright's `request`
+    # fixture, not `page`, and their filenames opt out via suffix.
+    last_journey = last_commit_touching(
+        base,
+        r"e2e/journeys/",
+        exclude=r"(?:-api|-docker)\.journey\.ts$",
+    )
     last_gif = last_commit_touching(base, r"docs/features/.*\.gif")
 
     if last_journey is None:

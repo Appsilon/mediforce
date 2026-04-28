@@ -10,11 +10,9 @@
     "test:affected": "vitest run --changed",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "dev:ui": "pnpm --filter @mediforce/platform-ui dev",
-    "dev:ui:local": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
     "dev": "pnpm --filter @mediforce/platform-ui dev",
     "dev:local": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
-    "dev:ui:test": "pnpm --filter @mediforce/platform-ui dev:test",
+    "dev:test": "pnpm --filter @mediforce/platform-ui dev:test",
     "dev:redis": "docker run --rm -p 6379:6379 redis:7-alpine",
     "dev:worker": "REDIS_URL=redis://localhost:6379 tsx packages/agent-queue/src/worker-entry.ts",
     "dev:ui:queue": "REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
@@ -50,6 +48,7 @@
     ]
   },
   "devDependencies": {
+    "@mediforce/cli": "workspace:*",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^24.12.2",
     "@vitest/coverage-v8": "^4.1.4",
