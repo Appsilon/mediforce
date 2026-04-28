@@ -16,9 +16,22 @@ interface StartRunButtonProps {
   version?: number;
   /** Show version dropdown (split button). */
   showVersionPicker?: boolean;
+  /** Whether the workflow declares a `manual` trigger. When false the button
+   * renders disabled with an explanatory tooltip. Defaults to true so callers
+   * that haven't been migrated keep working. */
+  hasManualTrigger?: boolean;
+  /** Whether the workflow is archived. When true the button renders disabled
+   * with an explanatory tooltip. */
+  archived?: boolean;
 }
 
-export function StartRunButton({ workflowName, version, showVersionPicker }: StartRunButtonProps) {
+export function StartRunButton({
+  workflowName,
+  version,
+  showVersionPicker,
+  hasManualTrigger = true,
+  archived = false,
+}: StartRunButtonProps) {
   const router = useRouter();
   const handle = useHandleFromPath();
   const { firebaseUser } = useAuth();
@@ -64,7 +77,16 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
     }
   }
 
-  if (effectiveVersion === 0) return null;
+  // Reasons the button cannot be used. Order matters — first match wins for tooltip text.
+  const disabledReason: string | null = archived
+    ? 'Workflow is archived'
+    : !hasManualTrigger
+      ? 'This workflow has no manual trigger'
+      : effectiveVersion === 0
+        ? 'No workflow version available'
+        : null;
+  const isDisabled = disabledReason !== null || starting;
+  const tooltip = disabledReason ?? undefined;
 
   const errorBanner = error ? (
     <p className="mt-1 text-xs text-destructive max-w-xs truncate" title={error}>{error}</p>
@@ -75,11 +97,13 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
     return (
       <div>
         <button
-          disabled={starting}
+          disabled={isDisabled}
           onClick={() => handleStart()}
+          title={tooltip}
+          aria-disabled={isDisabled}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-            starting && 'opacity-50 cursor-not-allowed',
+            isDisabled && 'opacity-50 cursor-not-allowed hover:bg-primary',
           )}
         >
           {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
@@ -95,19 +119,27 @@ export function StartRunButton({ workflowName, version, showVersionPicker }: Sta
     <div>
       <div className="relative inline-flex" ref={dropdownRef}>
         <button
-          disabled={starting}
+          disabled={isDisabled}
           onClick={() => handleStart()}
+          title={tooltip}
+          aria-disabled={isDisabled}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-            starting && 'opacity-50 cursor-not-allowed',
+            isDisabled && 'opacity-50 cursor-not-allowed hover:bg-primary',
           )}
         >
           {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
           {starting ? 'Starting...' : 'Start Run'}
         </button>
         <button
+          disabled={isDisabled}
           onClick={() => setDropdownOpen((prev) => !prev)}
-          className="inline-flex items-center rounded-r-md border-l border-primary-foreground/20 bg-primary px-1.5 py-1.5 text-primary-foreground hover:bg-primary/90 transition-colors"
+          title={tooltip}
+          aria-disabled={isDisabled}
+          className={cn(
+            'inline-flex items-center rounded-r-md border-l border-primary-foreground/20 bg-primary px-1.5 py-1.5 text-primary-foreground hover:bg-primary/90 transition-colors',
+            isDisabled && 'opacity-50 cursor-not-allowed hover:bg-primary',
+          )}
         >
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', dropdownOpen && 'rotate-180')} />
         </button>
