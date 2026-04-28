@@ -58,6 +58,45 @@ apps/landing-zone/
       draft-rejection-note/SKILL.md
 ```
 
+## Local development
+
+For v0.1 the workflow runs against a local mock SFTP server (`atmoz/sftp` in Docker), not a real CRO endpoint. Hetzner staging is v0.2+.
+
+### Start the mock SFTP
+
+From the repo root:
+
+```bash
+docker compose -f apps/landing-zone/docker-compose.sftp.yml up -d
+```
+
+This binds `127.0.0.1:2222` to the SFTP container and mounts `studies/CDISCPILOT01/data/sftp-staging/` as the `cro` user's `/upload` dir. Credentials are `cro` / `cro` — local dev only, not a real secret.
+
+### Drop demo files
+
+```bash
+python apps/landing-zone/scripts/seed_sftp.py --variant clean
+```
+
+Available variants: `clean`, `injection`, `mess-late`, `mess-encoding`, `mess-missing-domain`, `mess-inconsistent-values`. The `mess-late` variant additionally backdates file mtimes by 14 days to simulate an overdue delivery against `contract.expectedDeliveries[].cadence`. The script clears `sftp-staging/` first so each call models a fresh delivery.
+
+The variant directories under `studies/CDISCPILOT01/data/{variant}/` are populated by the demo data prep step (separate task); the seed script fails gracefully if they are missing.
+
+### Test the connection
+
+```bash
+sftp -P 2222 cro@localhost
+# password: cro
+```
+
+You should see the files dropped by `seed_sftp.py` under the user's home directory at `upload/`.
+
+### Stop the mock SFTP
+
+```bash
+docker compose -f apps/landing-zone/docker-compose.sftp.yml down
+```
+
 ## References
 
 - [`legacy/pawel.md`](legacy/pawel.md) — earlier 9-step plan; `validate.py` reuses the CDISC CORE wrapper concept and structured findings layout
