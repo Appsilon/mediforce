@@ -272,7 +272,9 @@ export class FirestoreProcessRepository implements ProcessRepository {
     await docRef.set(cleaned);
   }
 
-  async listWorkflowDefinitions(): Promise<WorkflowDefinitionListResult> {
+  async listWorkflowDefinitions(
+    includeArchived: boolean,
+  ): Promise<WorkflowDefinitionListResult> {
     const snapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
       .get();
@@ -281,6 +283,12 @@ export class FirestoreProcessRepository implements ProcessRepository {
 
     for (const docSnap of snapshot.docs) {
       const raw = docSnap.data();
+      // Filter archived BEFORE schema validation. Archived WDs are not
+      // runnable; running them through safeParse only produces noise from
+      // legacy data that no one intends to fix.
+      if (!includeArchived && (raw as { archived?: unknown })?.archived === true) {
+        continue;
+      }
       const parsed = WorkflowDefinitionSchema.safeParse(raw);
       if (!parsed.success) {
         console.warn(

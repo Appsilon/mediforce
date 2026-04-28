@@ -24,16 +24,15 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
   const skipped: SkippedEntry[] = [];
 
   try {
-    const { definitions: definitionGroups } = await processRepo.listWorkflowDefinitions();
+    const { definitions: definitionGroups } = await processRepo.listWorkflowDefinitions(false);
 
-    // Flatten to latest version of each definition that has at least one cron trigger
+    // Flatten to latest version of each definition that has at least one cron trigger.
+    // Archived WDs are already filtered at the repo layer (includeArchived=false).
     const cronDefinitions = definitionGroups
       .map((group) => group.versions.find((v) => v.version === group.latestVersion))
       .filter((def): def is WorkflowDefinition => def !== undefined)
-      .filter(
-        (def: WorkflowDefinition) =>
-          def.archived !== true &&
-          def.triggers.some((t: Trigger) => t.type === 'cron'),
+      .filter((def: WorkflowDefinition) =>
+        def.triggers.some((t: Trigger) => t.type === 'cron'),
       );
 
     for (const def of cronDefinitions) {
