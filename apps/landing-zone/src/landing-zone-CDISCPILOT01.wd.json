@@ -136,8 +136,8 @@
     }
   ],
   "transitions": [
-    { "from": "sftp-poll", "to": "no-deliveries", "when": "${result.newFiles.length} == 0" },
-    { "from": "sftp-poll", "to": "validate-script", "when": "${result.newFiles.length} > 0" },
+    { "from": "sftp-poll", "to": "no-deliveries", "when": "output.newFiles.length == 0" },
+    { "from": "sftp-poll", "to": "validate-script", "when": "output.newFiles.length > 0" },
     { "from": "validate-script", "to": "interpret-validation" },
     { "from": "interpret-validation", "to": "human-review" },
     { "from": "accept-delivery", "to": "accepted" },
