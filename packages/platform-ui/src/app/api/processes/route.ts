@@ -33,4 +33,5 @@ export const POST = createRouteAdapter(
       triggerRun: triggerAutoRunner,
     });
   },
+  { successStatus: 201 },
 );

@@ -1,4 +1,18 @@
 import {
+  CancelProcessInputSchema,
+  CancelProcessOutputSchema,
+  ClaimTaskInputSchema,
+  ClaimTaskOutputSchema,
+  CompleteTaskInputSchema,
+  CompleteTaskOutputSchema,
+  CreateAgentDefinitionInputContractSchema,
+  CreateAgentDefinitionOutputSchema,
+  CreateProcessConfigInputSchema,
+  CreateProcessConfigOutputSchema,
+  CreateProcessInputSchema,
+  CreateProcessOutputSchema,
+  CreateWorkflowDefinitionInputSchema,
+  CreateWorkflowDefinitionOutputSchema,
   GetAgentDefinitionInputSchema,
   GetAgentDefinitionOutputSchema,
   GetCoworkSessionByInstanceInputSchema,
@@ -11,6 +25,8 @@ import {
   GetProcessStepsOutputSchema,
   GetTaskInputSchema,
   GetTaskOutputSchema,
+  HeartbeatInputSchema,
+  HeartbeatOutputSchema,
   ListAgentDefinitionsOutputSchema,
   ListAuditEventsInputSchema,
   ListAuditEventsOutputSchema,
@@ -20,6 +36,25 @@ import {
   ListTasksInputSchema,
   ListTasksOutputSchema,
   ListWorkflowDefinitionsOutputSchema,
+  ResolveTaskInputSchema,
+  ResolveTaskOutputSchema,
+  ResumeProcessInputSchema,
+  ResumeProcessOutputSchema,
+  UpsertLegacyDefinitionInputSchema,
+  UpsertLegacyDefinitionOutputSchema,
+  type CancelProcessInput,
+  type CancelProcessOutput,
+  type ClaimTaskInput,
+  type ClaimTaskOutput,
+  type CompleteTaskInput,
+  type CompleteTaskOutput,
+  type CreateAgentDefinitionOutput,
+  type CreateProcessConfigInput,
+  type CreateProcessConfigOutput,
+  type CreateProcessInput,
+  type CreateProcessOutput,
+  type CreateWorkflowDefinitionInput,
+  type CreateWorkflowDefinitionOutput,
   type GetAgentDefinitionInput,
   type GetAgentDefinitionOutput,
   type GetCoworkSessionByInstanceInput,
@@ -32,6 +67,8 @@ import {
   type GetProcessStepsOutput,
   type GetTaskInput,
   type GetTaskOutput,
+  type HeartbeatInput,
+  type HeartbeatOutput,
   type ListAgentDefinitionsOutput,
   type ListAuditEventsInput,
   type ListAuditEventsOutput,
@@ -41,7 +78,14 @@ import {
   type ListTasksInput,
   type ListTasksOutput,
   type ListWorkflowDefinitionsOutput,
+  type ResolveTaskInput,
+  type ResolveTaskOutput,
+  type ResumeProcessInput,
+  type ResumeProcessOutput,
+  type UpsertLegacyDefinitionInput,
+  type UpsertLegacyDefinitionOutput,
 } from '../contract/index.js';
+import type { CreateAgentDefinitionInput } from '@mediforce/platform-core';
 
 /**
  * Typed client for the Mediforce API. Runtime-agnostic — works in the
@@ -101,21 +145,39 @@ export class Mediforce {
   readonly tasks: {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
+    claim: (input: ClaimTaskInput) => Promise<ClaimTaskOutput>;
+    complete: (input: CompleteTaskInput) => Promise<CompleteTaskOutput>;
+    resolve: (input: ResolveTaskInput) => Promise<ResolveTaskOutput>;
   };
 
   readonly processes: {
     get: (input: GetProcessInput) => Promise<GetProcessOutput>;
     getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
     listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
+    create: (input: CreateProcessInput) => Promise<CreateProcessOutput>;
+    cancel: (input: CancelProcessInput) => Promise<CancelProcessOutput>;
+    resume: (input: ResumeProcessInput) => Promise<ResumeProcessOutput>;
   };
 
   readonly workflowDefinitions: {
     list: () => Promise<ListWorkflowDefinitionsOutput>;
+    create: (
+      input: CreateWorkflowDefinitionInput,
+    ) => Promise<CreateWorkflowDefinitionOutput>;
+  };
+
+  readonly definitions: {
+    upsertLegacy: (
+      input: UpsertLegacyDefinitionInput,
+    ) => Promise<UpsertLegacyDefinitionOutput>;
   };
 
   readonly agentDefinitions: {
     list: () => Promise<ListAgentDefinitionsOutput>;
     get: (input: GetAgentDefinitionInput) => Promise<GetAgentDefinitionOutput>;
+    create: (
+      input: CreateAgentDefinitionInput,
+    ) => Promise<CreateAgentDefinitionOutput>;
   };
 
   readonly cowork: {
@@ -127,10 +189,17 @@ export class Mediforce {
 
   readonly configs: {
     list: (input: ListProcessConfigsInput) => Promise<ListProcessConfigsOutput>;
+    create: (
+      input: CreateProcessConfigInput,
+    ) => Promise<CreateProcessConfigOutput>;
   };
 
   readonly plugins: {
     list: () => Promise<ListPluginsOutput>;
+  };
+
+  readonly cron: {
+    heartbeat: (input?: HeartbeatInput) => Promise<HeartbeatOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -189,6 +258,41 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.get');
         return GetTaskOutputSchema.parse(body);
       },
+      claim: async (input) => {
+        const validated = ClaimTaskInputSchema.parse(input);
+        const res = await this.request(
+          `/api/tasks/${encodeURIComponent(validated.taskId)}/claim`,
+          { method: 'POST', body: JSON.stringify({ userId: validated.userId }) },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.tasks.claim');
+        return ClaimTaskOutputSchema.parse(body);
+      },
+      complete: async (input) => {
+        const validated = CompleteTaskInputSchema.parse(input);
+        const res = await this.request(
+          `/api/tasks/${encodeURIComponent(validated.taskId)}/complete`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              verdict: validated.verdict,
+              comment: validated.comment,
+            }),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.tasks.complete');
+        return CompleteTaskOutputSchema.parse(body);
+      },
+      resolve: async (input) => {
+        const validated = ResolveTaskInputSchema.parse(input);
+        // taskId travels in the path; everything else in the body
+        const { taskId, ...rest } = validated;
+        const res = await this.request(
+          `/api/tasks/${encodeURIComponent(taskId)}/resolve`,
+          { method: 'POST', body: JSON.stringify(rest) },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.tasks.resolve');
+        return ResolveTaskOutputSchema.parse(body);
+      },
     };
 
     this.processes = {
@@ -219,6 +323,33 @@ export class Mediforce {
         );
         return ListAuditEventsOutputSchema.parse(body);
       },
+      create: async (input) => {
+        const validated = CreateProcessInputSchema.parse(input);
+        const res = await this.request('/api/processes', {
+          method: 'POST',
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.create');
+        return CreateProcessOutputSchema.parse(body);
+      },
+      cancel: async (input) => {
+        const validated = CancelProcessInputSchema.parse(input);
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}/cancel`,
+          { method: 'POST' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.cancel');
+        return CancelProcessOutputSchema.parse(body);
+      },
+      resume: async (input) => {
+        const validated = ResumeProcessInputSchema.parse(input);
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}/resume`,
+          { method: 'POST' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.processes.resume');
+        return ResumeProcessOutputSchema.parse(body);
+      },
     };
 
     this.workflowDefinitions = {
@@ -226,6 +357,35 @@ export class Mediforce {
         const res = await this.request('/api/workflow-definitions');
         const body = await parseJsonOrThrow(res, 'mediforce.workflowDefinitions.list');
         return ListWorkflowDefinitionsOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateWorkflowDefinitionInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/workflow-definitions${qs}`, {
+          method: 'POST',
+          body: JSON.stringify(validated.draft),
+        });
+        const body = await parseJsonOrThrow(
+          res,
+          'mediforce.workflowDefinitions.create',
+        );
+        return CreateWorkflowDefinitionOutputSchema.parse(body);
+      },
+    };
+
+    this.definitions = {
+      upsertLegacy: async (input) => {
+        const validated = UpsertLegacyDefinitionInputSchema.parse(input);
+        const res = await this.request('/api/definitions', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'text/plain' },
+          body: validated.yaml,
+        });
+        const body = await parseJsonOrThrow(
+          res,
+          'mediforce.definitions.upsertLegacy',
+        );
+        return UpsertLegacyDefinitionOutputSchema.parse(body);
       },
     };
 
@@ -242,6 +402,18 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agentDefinitions.get');
         return GetAgentDefinitionOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateAgentDefinitionInputContractSchema.parse(input);
+        const res = await this.request('/api/agent-definitions', {
+          method: 'POST',
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(
+          res,
+          'mediforce.agentDefinitions.create',
+        );
+        return CreateAgentDefinitionOutputSchema.parse(body);
       },
     };
 
@@ -272,6 +444,15 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.configs.list');
         return ListProcessConfigsOutputSchema.parse(body);
       },
+      create: async (input) => {
+        const validated = CreateProcessConfigInputSchema.parse(input);
+        const res = await this.request('/api/configs', {
+          method: 'POST',
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.configs.create');
+        return CreateProcessConfigOutputSchema.parse(body);
+      },
     };
 
     this.plugins = {
@@ -281,6 +462,18 @@ export class Mediforce {
         return ListPluginsOutputSchema.parse(body);
       },
     };
+
+    this.cron = {
+      heartbeat: async (input) => {
+        const validated = HeartbeatInputSchema.parse(input ?? {});
+        const res = await this.request('/api/cron/heartbeat', {
+          method: 'POST',
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.cron.heartbeat');
+        return HeartbeatOutputSchema.parse(body);
+      },
+    };
   }
 
   private async request(path: string, init?: RequestInit): Promise<Response> {
@@ -288,6 +481,17 @@ export class Mediforce {
     const headers = new Headers(init?.headers);
     for (const [key, value] of Object.entries(authHeaders)) {
       if (!headers.has(key)) headers.set(key, value);
+    }
+    // Default Content-Type for mutations carrying a serialised body. Callers
+    // that want another type (e.g. YAML upload uses text/plain) set it
+    // explicitly in `init.headers` and we don't overwrite.
+    if (
+      init?.body !== undefined &&
+      init.body !== null &&
+      typeof init.body === 'string' &&
+      !headers.has('Content-Type')
+    ) {
+      headers.set('Content-Type', 'application/json');
     }
     const base = this.config.baseUrl ?? '';
     const fetchImpl = this.config.fetch ?? globalThis.fetch;

@@ -149,8 +149,10 @@ describe('POST /api/configs', () => {
     const res = await POST(makePostRequest(validConfig));
     const json = await res.json();
 
+    // Phase 2: validation errors now surface through the unified `{ error }`
+    // contract shape (a single string joined from the validator's `errors`).
     expect(res.status).toBe(400);
-    expect(json.errors).toBeDefined();
+    expect(json.error).toContain('Missing StepConfig');
   });
 
   it('[DATA] runs validateProcessConfig server-side before saving', async () => {

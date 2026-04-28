@@ -35,4 +35,5 @@ export const POST = createRouteAdapter(
   },
   (input) =>
     createWorkflowDefinition(input, { processRepo: getPlatformServices().processRepo }),
+  { successStatus: 201 },
 );

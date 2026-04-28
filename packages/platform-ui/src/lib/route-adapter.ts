@@ -76,6 +76,12 @@ export async function readJsonBody(req: NextRequest): Promise<unknown> {
  */
 type EmptyRouteContext = { params: Promise<Record<string, never>> };
 
+export interface RouteAdapterOptions {
+  /** HTTP status on successful handler resolution. Default: 200. Use 201 for
+   *  create endpoints that idiomatically return it. */
+  successStatus?: number;
+}
+
 export function createRouteAdapter<
   InputSchema extends z.ZodType,
   NarrowInput = z.infer<InputSchema>,
@@ -85,7 +91,9 @@ export function createRouteAdapter<
   inputSchema: InputSchema,
   inputFromRequest: (req: NextRequest, ctx: Context) => unknown | Promise<unknown>,
   handler: (input: NarrowInput) => Promise<Output>,
+  options?: RouteAdapterOptions,
 ): (req: NextRequest, ctx: Context) => Promise<NextResponse> {
+  const successStatus = options?.successStatus ?? 200;
   return async (req, ctx) => {
     const raw = await Promise.resolve(inputFromRequest(req, ctx));
     const parsed = inputSchema.safeParse(raw);
@@ -98,7 +106,7 @@ export function createRouteAdapter<
 
     try {
       const result = await handler(parsed.data as NarrowInput);
-      return NextResponse.json(result);
+      return NextResponse.json(result, { status: successStatus });
     } catch (err) {
       if (err instanceof HandlerError) {
         return NextResponse.json(

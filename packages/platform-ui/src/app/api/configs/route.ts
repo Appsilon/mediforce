@@ -32,4 +32,5 @@ export const POST = createRouteAdapter(
     const { processRepo, pluginRegistry } = getPlatformServices();
     return createProcessConfig(input, { processRepo, pluginRegistry });
   },
+  { successStatus: 201 },
 );

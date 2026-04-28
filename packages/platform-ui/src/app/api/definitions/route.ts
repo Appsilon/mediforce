@@ -15,4 +15,5 @@ export const PUT = createRouteAdapter(
   async (req: NextRequest) => ({ yaml: await req.text() }),
   (input) =>
     upsertLegacyDefinition(input, { processRepo: getPlatformServices().processRepo }),
+  { successStatus: 201 },
 );

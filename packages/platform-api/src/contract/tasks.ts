@@ -95,7 +95,9 @@ export type ClaimTaskOutput = z.infer<typeof ClaimTaskOutputSchema>;
  */
 export const CompleteTaskInputSchema = z.object({
   taskId: z.string().min(1),
-  verdict: z.enum(['approve', 'revise']),
+  verdict: z.enum(['approve', 'revise'], {
+    error: () => ({ message: 'verdict must be "approve" or "revise"' }),
+  }),
   comment: z.string().optional(),
 });
 
@@ -119,9 +121,9 @@ export type CompleteTaskOutput = z.infer<typeof CompleteTaskOutputSchema>;
  * loaded.
  */
 const AttachmentSchema = z.object({
-  name: z.string().min(1),
-  size: z.number().positive(),
-  type: z.string().min(1),
+  name: z.string({ error: 'attachment name is required' }).min(1, 'attachment name is required'),
+  size: z.number().positive('attachment size must be positive'),
+  type: z.string().min(1, 'attachment type is required'),
   storagePath: z.string().optional(),
   downloadUrl: z.string().optional(),
 });

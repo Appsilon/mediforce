@@ -32,4 +32,5 @@ export const POST = createRouteAdapter(
     createAgentDefinition(input, {
       agentDefinitionRepo: getPlatformServices().agentDefinitionRepo,
     }),
+  { successStatus: 201 },
 );
