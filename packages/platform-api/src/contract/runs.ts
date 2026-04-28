@@ -35,3 +35,24 @@ export const GetRunOutputSchema = z.object({
 
 export type GetRunInput = z.infer<typeof GetRunInputSchema>;
 export type GetRunOutput = z.infer<typeof GetRunOutputSchema>;
+
+/**
+ * Contract for `POST /api/processes` — fires a manual trigger and creates
+ * a new run for the named workflow definition. Server picks the latest
+ * version when `definitionVersion` is omitted.
+ */
+export const StartRunInputSchema = z.object({
+  definitionName: z.string().min(1),
+  definitionVersion: z.number().int().positive().optional(),
+  triggerName: z.string().min(1).default('manual'),
+  triggeredBy: z.string().min(1),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const StartRunOutputSchema = z.object({
+  instanceId: z.string().min(1),
+  status: z.string().min(1),
+});
+
+export type StartRunInput = z.infer<typeof StartRunInputSchema>;
+export type StartRunOutput = z.infer<typeof StartRunOutputSchema>;
