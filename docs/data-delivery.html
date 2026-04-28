@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Data Delivery — Mediforce</title>
+  <title>Automated Clinical Data Delivery</title>
   <meta name="description" content="Autonomous ingest workflow for clinical trial data deliveries. An AI agent watches the CRO SFTP, validates every delivery against CDISC standards, and escalates only when human judgment is needed." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -30,10 +30,12 @@
       --text-30: #E5E7EB;
       --border: #E5E7EB;
       --border-light: #D1D5DB;
-      --human: #4F46E5;
-      --human-dim: rgba(79,70,229,0.08);
-      --script: #6B7280;
-      --script-dim: rgba(107,114,128,0.1);
+      --human: #EA580C;
+      --human-dim: rgba(234,88,12,0.1);
+      --script: #B45309;
+      --script-dim: rgba(251,191,36,0.15);
+      --agent: #7C3AED;
+      --agent-dim: rgba(124,58,237,0.1);
     }
 
     html { scroll-behavior: smooth; }
@@ -308,17 +310,17 @@
     .step-icon svg { width: 1.5rem; height: 1.5rem; }
     .step-icon--script {
       background: var(--script-dim);
-      border: 1.5px solid rgba(107,114,128,0.2);
+      border: 1.5px solid rgba(251,191,36,0.3);
       color: var(--script);
     }
     .step-icon--agent {
-      background: var(--accent-dim);
-      border: 1.5px solid rgba(13,148,136,0.2);
-      color: var(--accent);
+      background: var(--agent-dim);
+      border: 1.5px solid rgba(124,58,237,0.2);
+      color: var(--agent);
     }
     .step-icon--human {
       background: var(--human-dim);
-      border: 1.5px solid rgba(79,70,229,0.2);
+      border: 1.5px solid rgba(234,88,12,0.2);
       color: var(--human);
     }
     .step-role {
@@ -329,7 +331,7 @@
       white-space: nowrap;
     }
     .step-role--script { color: var(--script); }
-    .step-role--agent  { color: var(--accent);  }
+    .step-role--agent  { color: var(--agent);  }
     .step-role--human  { color: var(--human);   }
     .step-body { padding-top: 0.75rem; }
     .step-body h3 {
@@ -529,6 +531,37 @@
       line-height: 1.5;
     }
 
+    /* ── Author avatars ── */
+    .demo-authors {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .demo-author-stack {
+      display: flex;
+    }
+    .demo-author-avatar {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      border: 2.5px solid var(--bg);
+      object-fit: cover;
+      margin-left: -0.75rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+    .demo-author-avatar:first-child { margin-left: 0; }
+    .demo-authors-label {
+      font-size: 0.875rem;
+      color: var(--text-60);
+      line-height: 1.4;
+    }
+    .demo-authors-label strong {
+      display: block;
+      color: var(--text-80);
+      font-weight: 600;
+    }
+
     /* ── CTA Strip ── */
     .cta-strip {
       background: var(--accent);
@@ -608,9 +641,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
         Clinical Data Management
       </div>
-      <h1>Automate your<br><span class="gradient">data manager's</span> delivery review</h1>
+      <h1>Automate <span class="gradient">Data Manager's</span><br>delivery review</h1>
       <p class="hero-subtitle">
-        Your CRO sends data. Our agent reads it, validates it against CDISC standards, and tells your data manager what to do — only when there's a real decision to make.
+        Your CRO sends data. Our agent reads it, validates it against CDISC standards, and tells your data manager what to do - only when there's a real decision to make.
       </p>
       <div class="hero-ctas">
         <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="btn btn--outline">
@@ -631,29 +664,29 @@
   <section class="section section--alt">
     <div class="container">
       <div class="section-label">The Challenge</div>
-      <h2 class="section-title">Clinical data arrives in every format. Fast, thorough validation is non-negotiable.</h2>
-      <p class="section-subtitle">Each CRO follows its own conventions — different file structures, controlled term variants, delivery schedules. Catching issues before they reach downstream pipelines requires coverage and speed that manual review can't sustain.</p>
+      <h2 class="section-title">Clinical data arrives in every format.<br>Fast, thorough validation is non-negotiable.</h2>
+      <p class="section-subtitle">Each CRO follows its own conventions - different file structures, controlled term variants, delivery schedules. Catching issues before they reach downstream pipelines requires coverage and speed that manual review can't sustain.</p>
       <div class="problem-grid">
         <div class="problem-item">
           <div class="problem-icon problem-icon--orange">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </div>
           <h3>Format inconsistencies pile up</h3>
-          <p>Site IDs, controlled term casing, date formats — every CRO does them differently. A data manager has to download the files, run CDISC validation, and manually sift through hundreds of findings to decide what's safe to pass downstream.</p>
+          <p>Site IDs, controlled term casing, date formats - every CRO does them differently. A data manager has to download the files, run CDISC validation, and manually sift through hundreds of findings to decide what's safe to pass downstream.</p>
         </div>
         <div class="problem-item">
           <div class="problem-icon problem-icon--yellow">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           </div>
           <h3>Rejection loops cost days</h3>
-          <p>When a package fails validation — wrong structure, missing domains, inconsistent values — the manager writes a back-and-forth email to the CRO, waits for a redelivery, and retries the whole validation cycle from scratch.</p>
+          <p>When a package fails validation - wrong structure, missing domains, inconsistent values - the manager writes a back-and-forth email to the CRO, waits for a redelivery, and retries the whole validation cycle from scratch.</p>
         </div>
         <div class="problem-item">
           <div class="problem-icon problem-icon--red">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
           <h3>Errors reach submissions</h3>
-          <p>Under deadline pressure, data gets waved through with unresolved findings. Analytics teams build dashboards on it; submissions are built on top of it. Errors surface at the worst possible moment — during regulatory review.</p>
+          <p>Under deadline pressure, data gets waved through with unresolved findings. Analytics teams build dashboards on it; submissions are built on top of it. Errors surface at the worst possible moment - during regulatory review.</p>
         </div>
         <div class="problem-item">
           <div class="problem-icon problem-icon--purple">
@@ -705,14 +738,14 @@
         <div class="step-item">
           <div class="step-icon-wrap">
             <div class="step-icon step-icon--agent">
-              <!-- Agent: sparkles/AI icon -->
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v1m0 16v1M4.22 4.22l.7.7m12.17 12.17.7.7M3 12h1m16 0h1M4.92 19.07l.7-.7M18.37 5.63l.7-.7"/><circle cx="12" cy="12" r="4"/></svg>
+              <!-- Agent: robot icon -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><circle cx="9" cy="14" r="1.25" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.25" fill="currentColor" stroke="none"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1.25"/></svg>
             </div>
             <span class="step-role step-role--agent">Agent</span>
           </div>
           <div class="step-body">
             <h3>Report</h3>
-            <p>An AI agent compiles the validation findings into a one-page HTML report — severity heatmap, top findings in priority order, and a clear classification. A notification is sent to the data manager with a direct link.</p>
+            <p>An AI agent compiles the validation findings into a one-page HTML report - severity heatmap, top findings in priority order, and a clear classification. A notification is sent to the data manager with a direct link.</p>
           </div>
         </div>
 
@@ -733,14 +766,14 @@
         <div class="step-item">
           <div class="step-icon-wrap">
             <div class="step-icon step-icon--agent">
-              <!-- Agent: message/send icon -->
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <!-- Agent: robot icon -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><circle cx="9" cy="14" r="1.25" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.25" fill="currentColor" stroke="none"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1.25"/></svg>
             </div>
             <span class="step-role step-role--agent">Agent</span>
           </div>
           <div class="step-body">
             <h3>Agent escalates</h3>
-            <p>On rejection, an AI agent drafts a factual, bounded rejection note to the CRO in the operator's tone — scoped to the actual findings, ready to be reviewed and forwarded. No copy-pasting finding lists from a validator output.</p>
+            <p>On rejection, an AI agent drafts a factual, bounded rejection note to the CRO in the operator's tone - scoped to the actual findings, ready to be reviewed and forwarded. No copy-pasting finding lists from a validator output.</p>
           </div>
         </div>
 
@@ -761,7 +794,7 @@
           </div>
           <div class="dm-item-body">
             <h3>Notification arrives</h3>
-            <p>An email or task notification: "Delivery from CRO X arrived — 5 findings, classification: needs review." No manual polling of the SFTP, no waiting for someone to ping you.</p>
+            <p>An email or task notification: "Delivery from CRO X arrived - 5 findings, classification: needs review." No manual polling of the SFTP, no waiting for someone to ping you.</p>
           </div>
         </div>
         <div class="dm-item">
@@ -770,7 +803,7 @@
           </div>
           <div class="dm-item-body">
             <h3>Review the report</h3>
-            <p>Follow the link to the HTML report — severity heatmap, top findings in priority order, and a status banner if validation itself hit an error. Everything in one page.</p>
+            <p>Follow the link to the HTML report - severity heatmap, top findings in priority order, and a status banner if validation itself hit an error. Everything in one page.</p>
           </div>
         </div>
         <div class="dm-item">
@@ -779,7 +812,7 @@
           </div>
           <div class="dm-item-body">
             <h3>Click Accept or Reject</h3>
-            <p>Two buttons. Accept passes the delivery downstream — with optional per-finding waivers on record. Reject queues the escalation step. The decision is logged with your identity and timestamp.</p>
+            <p>Two buttons. Accept passes the delivery downstream - with optional per-finding waivers on record. Reject queues the escalation step. The decision is logged with your identity and timestamp.</p>
           </div>
         </div>
         <div class="dm-item">
@@ -800,7 +833,7 @@
     <div class="container">
       <div class="section-label">What's Included</div>
       <h2 class="section-title">Enterprise-grade from day one.</h2>
-      <p class="section-subtitle">Built on Mediforce's governed AI platform — every capability ships with the audit trail and compliance controls already in place.</p>
+      <p class="section-subtitle">Built on Mediforce's governed AI platform - every capability ships with the audit trail and compliance controls already in place.</p>
       <div class="regulated-grid">
         <div class="regulated-item">
           <div class="regulated-icon">
@@ -821,14 +854,14 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
           </div>
           <h3>Audit by Design</h3>
-          <p>Every delivery gets its own git branch. Every step is a commit. <code style="font-size:0.8125rem;background:rgba(13,148,136,0.08);padding:0.1em 0.35em;border-radius:0.25rem;">git log</code> is the audit record — no separate logging system to keep in sync.</p>
+          <p>Every delivery gets its own git branch. Every step is a commit. <code style="font-size:0.8125rem;background:rgba(13,148,136,0.08);padding:0.1em 0.35em;border-radius:0.25rem;">git log</code> is the audit record - no separate logging system to keep in sync.</p>
         </div>
         <div class="regulated-item">
           <div class="regulated-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
           </div>
           <h3>Cleaning Rules as PRs</h3>
-          <p>Fixable mismatches — site ID formatting, controlled term variants — become pull requests against the study config repo. Reviewable, versioned, rolled back if wrong.</p>
+          <p>Fixable mismatches - site ID formatting, controlled term variants - become pull requests against the study config repo. Reviewable, versioned, rolled back if wrong.</p>
         </div>
         <div class="regulated-item">
           <div class="regulated-icon">
@@ -842,7 +875,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           </div>
           <h3>Regulatory Routing</h3>
-          <p>Findings are automatically mapped to the regulatory standard the study targets — FDA, PMDA, or EMA — so the report and escalation tone are always jurisdiction-appropriate.</p>
+          <p>Findings are automatically mapped to the regulatory standard the study targets - FDA, PMDA, or EMA - so the report and escalation tone are always jurisdiction-appropriate.</p>
         </div>
       </div>
     </div>
@@ -853,7 +886,7 @@
     <div class="container">
       <div class="section-label">See It Live</div>
       <h2 class="section-title">Book a live walkthrough</h2>
-      <p class="section-subtitle">We'll run the full workflow — SFTP delivery to validated report — and walk you through each step so you can see exactly how it fits your team's process.</p>
+      <p class="section-subtitle">We'll run the full workflow - SFTP delivery to validated report - and walk you through each step so you can see exactly how it fits your team's process.</p>
       <div class="demo-layout">
 
         <div class="demo-pitch">
@@ -861,7 +894,7 @@
             <div class="demo-pitch-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.72 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.63 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.61a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
             </div>
-            <p><strong>30-minute video call.</strong> We run a live demo against the CDISC Pilot 3 dataset — a real study, real CDISC validation findings, real Accept / Reject decision flow.</p>
+            <p><strong>30-minute video call.</strong> We run a live demo against the CDISC Pilot 3 dataset - a real study, real CDISC validation findings, real Accept / Reject decision flow.</p>
           </div>
           <div class="demo-pitch-item">
             <div class="demo-pitch-icon">
@@ -878,6 +911,17 @@
         </div>
 
         <div class="demo-form-card">
+          <div class="demo-authors">
+            <div class="demo-author-stack">
+              <img class="demo-author-avatar" src="images/author-1.jpg" alt="Author 1" />
+              <img class="demo-author-avatar" src="images/author-2.jpg" alt="Author 2" />
+              <img class="demo-author-avatar" src="images/author-3.jpg" alt="Author 3" />
+            </div>
+            <div class="demo-authors-label">
+              <strong>Meet the team</strong>
+              You'll speak directly with the people who built this.
+            </div>
+          </div>
           <h3>Request a demo call</h3>
           <p>Leave your email and a short note about your setup. We'll reply within one business day to schedule a time.</p>
           <!-- Wire this form to your preferred handler (Formspree, Netlify Forms, etc.) -->
@@ -892,7 +936,7 @@
             </div>
             <button type="submit" class="form-submit">Request a Demo Call</button>
           </form>
-          <p class="form-note">We don't share your contact details. No newsletter, no drip campaign — just a reply to book the call.</p>
+          <p class="form-note">We don't share your contact details. No newsletter, no drip campaign - just a reply to book the call.</p>
         </div>
 
       </div>
@@ -910,7 +954,7 @@
           View on GitHub
         </a>
         <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="btn btn--white-outline">
-          <svg viewBox="0 -28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/></svg>
+          <svg viewBox="0 - 28.5 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193a161.094 161.094 0 0 0 13.96-22.730 136.208 136.208 0 0 1-21.511-10.366c1.802-1.32 3.564-2.72 5.265-4.18 41.397 19.317 86.378 19.317 127.313 0 1.721 1.46 3.483 2.86 5.265 4.18a136.154 136.154 0 0 1-21.552 10.386 160.794 160.794 0 0 0 13.96 22.710c21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.824 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.015-11.805-23.015-26.18s10.148-26.2 23.015-26.2c12.866 0 23.236 11.824 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="currentColor"/></svg>
           Join Discord
         </a>
       </div>
