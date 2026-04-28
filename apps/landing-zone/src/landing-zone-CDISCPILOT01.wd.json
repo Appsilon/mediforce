@@ -7,10 +7,10 @@
   "workspace": {},
   "env": {
     "STUDY_ID": "CDISCPILOT01",
-    "SFTP_HOST": "host.docker.internal",
-    "SFTP_PORT": "2222",
-    "SFTP_USER": "cro",
-    "SFTP_REMOTE_PATH": "/upload",
+    "SFTP_HOST": "{{SFTP_HOST_CDISCPILOT01}}",
+    "SFTP_PORT": "22",
+    "SFTP_USER": "{{SFTP_USER_CDISCPILOT01}}",
+    "SFTP_REMOTE_PATH": "/uploads",
     "SFTP_PASS": "{{SFTP_PASS_CDISCPILOT01}}",
     "EXPECTED_DOMAINS": "DM,AE,LB,EX,VS,MH,CM",
     "VALIDATION_STANDARD": "sdtm",
@@ -21,7 +21,8 @@
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
   },
   "triggers": [
-    { "name": "poll-sftp", "type": "cron", "schedule": "*/15 * * * *" }
+    { "name": "poll-sftp", "type": "cron", "schedule": "*/15 * * * *" },
+    { "name": "manual", "type": "manual" }
   ],
   "inputForNextRun": [
     { "stepId": "sftp-poll", "output": "listing", "as": "previousListing" }
