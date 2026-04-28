@@ -69,12 +69,31 @@ export async function POST(
 
   // Fire-and-forget: kick the auto-runner so the workflow actually executes.
   // Same pattern as POST /api/processes for manual triggers.
+  //
+  // Without PLATFORM_API_KEY the kick would 401 silently (middleware drops it
+  // before any handler runs) and the run would stay queued forever. Surface
+  // misconfiguration immediately instead of returning 202 + dead instance.
+  const apiKey = process.env.PLATFORM_API_KEY;
+  if (!apiKey || apiKey.length === 0) {
+    console.error(
+      `[webhook] PLATFORM_API_KEY missing — cannot kick auto-runner for run ${result.runId}`,
+    );
+    return NextResponse.json(
+      {
+        error:
+          'Server is misconfigured: PLATFORM_API_KEY is not set. Webhook accepted but workflow cannot start.',
+        runId: result.runId,
+      },
+      { status: 500 },
+    );
+  }
+
   const baseUrl = getAppBaseUrl();
   fetch(`${baseUrl}/api/processes/${result.runId}/run`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
+      'X-Api-Key': apiKey,
     },
     body: JSON.stringify({ triggeredBy: 'webhook' }),
   }).catch((err) => {

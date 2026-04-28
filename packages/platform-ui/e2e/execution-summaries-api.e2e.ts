@@ -132,14 +132,25 @@ function restoreFetch(): void {
 // ---- Lifecycle -------------------------------------------------------------
 
 let echoServer: ReturnType<typeof createEchoServer>;
+let originalApiKey: string | undefined;
 
 beforeAll(async () => {
+  // Webhook handler short-circuits with 500 if PLATFORM_API_KEY is not set;
+  // the fetch shim swallows the kick anyway so any non-empty placeholder
+  // satisfies the guard.
+  originalApiKey = process.env.PLATFORM_API_KEY;
+  process.env.PLATFORM_API_KEY = 'test-api-key';
   echoServer = createEchoServer();
   await new Promise<void>((res) => echoServer.listen(ECHO_PORT, () => res()));
 });
 
 afterAll(async () => {
   await new Promise<void>((res) => echoServer.close(() => res()));
+  if (originalApiKey === undefined) {
+    delete process.env.PLATFORM_API_KEY;
+  } else {
+    process.env.PLATFORM_API_KEY = originalApiKey;
+  }
 });
 
 beforeEach(async () => {
@@ -251,5 +262,32 @@ describe('execution-summaries-api: webhook → http action → polling → echo 
     // action wraps that under body.json. So the original payload is at
     // finalOutput.body.json.json.
     expect(finalOutput.body.json.json).toEqual(payload);
+  });
+
+  it('returns 500 when PLATFORM_API_KEY is missing instead of silently dropping the run', async () => {
+    const savedApiKey = process.env.PLATFORM_API_KEY;
+    delete process.env.PLATFORM_API_KEY;
+    try {
+      const webhookReq = new NextRequest(
+        'http://localhost/api/triggers/webhook/examples/execution-summaries-api/execution-summaries',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hello: 'world' }),
+        },
+      );
+
+      const webhookRes = await webhookPost(webhookReq, {
+        params: Promise.resolve({
+          path: ['examples', 'execution-summaries-api', 'execution-summaries'],
+        }),
+      });
+      expect(webhookRes.status).toBe(500);
+      const webhookJson = (await webhookRes.json()) as { error: string; runId: string };
+      expect(webhookJson.error).toContain('PLATFORM_API_KEY');
+      expect(webhookJson.runId.length).toBeGreaterThan(0);
+    } finally {
+      process.env.PLATFORM_API_KEY = savedApiKey;
+    }
   });
 });

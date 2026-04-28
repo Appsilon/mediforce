@@ -114,14 +114,22 @@ function restoreFetch(): void {
 }
 
 let echoServer: ReturnType<typeof createEchoServer>;
+let originalApiKey: string | undefined;
 
 beforeAll(async () => {
+  originalApiKey = process.env.PLATFORM_API_KEY;
+  process.env.PLATFORM_API_KEY = 'test-api-key';
   echoServer = createEchoServer();
   await new Promise<void>((res) => echoServer.listen(ECHO_PORT, () => res()));
 });
 
 afterAll(async () => {
   await new Promise<void>((res) => echoServer.close(() => res()));
+  if (originalApiKey === undefined) {
+    delete process.env.PLATFORM_API_KEY;
+  } else {
+    process.env.PLATFORM_API_KEY = originalApiKey;
+  }
 });
 
 beforeEach(async () => {
