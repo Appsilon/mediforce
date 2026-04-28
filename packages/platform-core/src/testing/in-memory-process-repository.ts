@@ -74,6 +74,23 @@ export class InMemoryProcessRepository implements ProcessRepository {
     return latest;
   }
 
+  async getLatestWorkflowVersionInNamespace(
+    name: string,
+    namespace: string,
+  ): Promise<number> {
+    let latest = 0;
+    for (const definition of this.workflowDefinitions.values()) {
+      if (
+        definition.name === name &&
+        definition.namespace === namespace &&
+        definition.version > latest
+      ) {
+        latest = definition.version;
+      }
+    }
+    return latest;
+  }
+
   // ---------------------------------------------------------------------------
   // ProcessDefinition methods (legacy)
   // ---------------------------------------------------------------------------

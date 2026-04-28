@@ -56,13 +56,15 @@ export async function POST(
       );
     }
 
-    // Pre-flight: validate all env templates are resolvable before executing anything
+    // Pre-flight: validate all env templates are resolvable before executing anything.
+    // The decrypted bag is also reused below as the `secrets` source for action
+    // interpolation (`${secrets.NAME}` in http urls/headers/body).
+    const workflowSecrets = await getWorkflowSecretsForRuntime(
+      workflowDefinition.namespace,
+      workflowDefinition.name,
+    );
     {
-      const secrets = await getWorkflowSecretsForRuntime(
-        workflowDefinition.namespace,
-        workflowDefinition.name,
-      );
-      const missingEnv = validateWorkflowEnv(workflowDefinition, secrets);
+      const missingEnv = validateWorkflowEnv(workflowDefinition, workflowSecrets);
       if (missingEnv.length > 0) {
         const names = missingEnv.map((m) => m.secretName);
         console.log(`[auto-runner] Missing env vars for '${initialInstance.definitionName}': ${names.join(', ')}`);
@@ -300,6 +302,104 @@ export async function POST(
             updatedAt: new Date().toISOString(),
           });
           break;
+        }
+
+        if (currentStep.executor === 'action') {
+          if (!currentStep.action) {
+            await instanceRepo.update(instanceId, {
+              status: 'failed',
+              error: `Step '${currentStep.id}' has executor='action' but no action config`,
+              updatedAt: new Date().toISOString(),
+            });
+            break;
+          }
+
+          const { actionRegistry, engine } = getPlatformServices();
+          console.log(`[auto-runner] Executing action step '${instance.currentStepId}' (kind: ${currentStep.action.kind}) on instance '${instanceId}'`);
+
+          const previousStepId = workflowDefinition.transitions.find(
+            (t) => t.to === instance.currentStepId,
+          )?.from ?? null;
+          const previousStepOutput = previousStepId
+            ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
+            : {};
+          const stepInput = { ...previousStepOutput, steps: instance.variables };
+
+          const executionId = crypto.randomUUID();
+          const startedAt = new Date().toISOString();
+          await instanceRepo.addStepExecution(instanceId, {
+            id: executionId,
+            instanceId,
+            stepId: instance.currentStepId,
+            status: 'running',
+            input: stepInput,
+            output: null,
+            verdict: null,
+            executedBy: 'auto-runner',
+            startedAt,
+            completedAt: null,
+            iterationNumber: 0,
+            gateResult: null,
+            error: null,
+          });
+
+          await auditRepo.append({
+            actorId: 'auto-runner',
+            actorType: 'system',
+            actorRole: 'orchestrator',
+            action: 'process.run.step.started',
+            description: `Auto-runner dispatching action step '${instance.currentStepId}' (kind: ${currentStep.action.kind})`,
+            timestamp: startedAt,
+            inputSnapshot: { stepId: instance.currentStepId, actionKind: currentStep.action.kind },
+            outputSnapshot: {},
+            basis: 'Auto-run loop: action step dispatch',
+            entityType: 'processInstance',
+            entityId: instanceId,
+            processInstanceId: instanceId,
+            processDefinitionVersion: initialInstance.definitionVersion,
+          });
+
+          try {
+            const output = await actionRegistry.dispatch(currentStep.action, {
+              stepId: instance.currentStepId,
+              processInstanceId: instanceId,
+              sources: {
+                triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
+                steps: instance.variables,
+                variables: instance.variables,
+                secrets: workflowSecrets,
+              },
+            });
+
+            await instanceRepo.updateStepExecution(instanceId, executionId, {
+              status: 'completed',
+              output,
+              completedAt: new Date().toISOString(),
+            });
+
+            await engine.advanceStep(
+              instanceId,
+              output,
+              { id: 'auto-runner', role: 'system' },
+            );
+
+            stepsExecuted++;
+            continue;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`[auto-runner] Action step '${currentStep.id}' failed: ${message}`);
+            await instanceRepo.updateStepExecution(instanceId, executionId, {
+              status: 'failed',
+              completedAt: new Date().toISOString(),
+              error: message,
+            });
+            await instanceRepo.update(instanceId, {
+              status: 'failed',
+              error: message,
+              updatedAt: new Date().toISOString(),
+            });
+            break;
+          }
         }
 
         if (currentStep.executor === 'agent' || currentStep.executor === 'script') {
