@@ -31,19 +31,22 @@ export type WebhookRouteResult =
   | { status: 400; error: string };
 
 /**
- * WebhookRouter: path-based trigger dispatcher (decision A4).
+ * WebhookRouter: path-based trigger dispatcher.
  *
  * Resolution order for `/api/triggers/webhook/<namespace>/<workflowName>/<suffix>`:
- *   1. Look up the latest WorkflowDefinition by name.
- *   2. Confirm its `namespace` matches the URL namespace (404 otherwise).
- *   3. Find a webhook trigger whose typed config (method+path) matches the
+ *   1. Look up the latest WorkflowDefinition version belonging to the
+ *      requested namespace (returns 0 if no version exists for that tenant).
+ *   2. Find a webhook trigger whose typed config (method+path) matches the
  *      caller's method and suffix. Path comparison is exact (no globbing).
- *   4. Create the instance, start it, and return `{runId, statusUrl}`.
+ *   3. Create the instance, start it, and return `{runId, statusUrl}`.
+ *
+ * Namespace scoping at the version-lookup level prevents tenant A from
+ * accidentally surfacing tenant B's workflow when both registered the same
+ * `name` (the underlying storage is keyed by `name:version` globally).
  *
  * The router is framework-agnostic — Next.js, queue worker, websocket bridge
  * can all forward into it. Engine work (createInstance + startInstance) is
- * synchronous; the auto-runner is kicked separately by the route forwarder
- * (decision B5: full async, no held connections).
+ * synchronous; the auto-runner is kicked separately by the route forwarder.
  */
 export class WebhookRouter {
   constructor(
@@ -56,11 +59,14 @@ export class WebhookRouter {
       return { status: 400, error: 'namespace and workflowName are required' };
     }
 
-    const version = await this.processRepository.getLatestWorkflowVersion(input.workflowName);
+    const version = await this.processRepository.getLatestWorkflowVersionInNamespace(
+      input.workflowName,
+      input.namespace,
+    );
     if (version === 0) {
       return {
         status: 404,
-        error: `No workflow definition for '${input.workflowName}'`,
+        error: `No workflow definition for '${input.workflowName}' in namespace '${input.namespace}'`,
       };
     }
 
@@ -72,13 +78,6 @@ export class WebhookRouter {
       return {
         status: 404,
         error: `No workflow definition for '${input.workflowName}' v${version}`,
-      };
-    }
-
-    if (definition.namespace !== input.namespace) {
-      return {
-        status: 404,
-        error: `Workflow '${input.workflowName}' does not belong to namespace '${input.namespace}'`,
       };
     }
 

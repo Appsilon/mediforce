@@ -33,6 +33,13 @@ export interface ProcessRepository {
   saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void>;
   listWorkflowDefinitions(): Promise<WorkflowDefinitionListResult>;
   getLatestWorkflowVersion(name: string): Promise<number>;
+  /**
+   * Returns the highest version of `name` whose definition belongs to
+   * `namespace`, or 0 if none. The webhook router calls this to avoid
+   * picking up a version from another tenant when two namespaces share a
+   * workflow name.
+   */
+  getLatestWorkflowVersionInNamespace(name: string, namespace: string): Promise<number>;
   getDefaultWorkflowVersion(name: string): Promise<number | null>;
   setDefaultWorkflowVersion(name: string, version: number): Promise<void>;
 

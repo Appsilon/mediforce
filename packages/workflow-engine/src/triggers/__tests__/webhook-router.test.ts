@@ -184,4 +184,32 @@ describe('WebhookRouter', () => {
     });
     expect(result.status).toBe(400);
   });
+
+  it('resolves the namespace-local version when two tenants share a workflow name', async () => {
+    // Underlying storage is keyed by (name, version) globally — without
+    // namespace-scoped lookup the tenant with the highest version would
+    // shadow the other. Register a v5 owned by `tenant-b` and confirm a
+    // request to `tenant-a` still picks up tenant-a's v3 instead of 404'ing.
+    const tenantBV5: WorkflowDefinition = {
+      ...definition,
+      namespace: 'tenant-b',
+      version: 5,
+    };
+    const tenantAV3: WorkflowDefinition = {
+      ...definition,
+      namespace: 'tenant-a',
+      version: 3,
+    };
+    await processRepo.saveWorkflowDefinition(tenantBV5);
+    await processRepo.saveWorkflowDefinition(tenantAV3);
+
+    const result = await router.route({
+      namespace: 'tenant-a',
+      workflowName: 'execution-summaries-api',
+      suffix: '/execution-summaries',
+      method: 'POST',
+      body: { hello: 'world' },
+    });
+    expect(result.status).toBe(202);
+  });
 });
