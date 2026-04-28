@@ -125,8 +125,22 @@ def run_cdisc_core(delivery: Path, output_path: Path) -> dict[str, Any]:
 
 
 def write_result(payload: dict[str, Any]) -> None:
+    """Write the small result envelope to /output/result.json.
+
+    The full findings payload — which can be 1+ MB on a real delivery —
+    goes to /workspace/findings.json instead. Firestore caps documents at
+    1 MiB and the auto-runner persists the step result into the instance
+    document, so anything we put in result.json must stay well under that.
+    The interpret-validation step reads /workspace/findings.json (audit
+    trail) for the long form.
+    """
     (OUTPUT / "result.json").write_text(json.dumps(payload, indent=2))
-    (WORKSPACE / "findings.json").write_text(json.dumps(payload, indent=2))
+
+
+def write_findings(findings: dict[str, Any] | None) -> None:
+    if findings is None:
+        return
+    (WORKSPACE / "findings.json").write_text(json.dumps(findings, indent=2))
 
 
 def count_findings(findings: dict[str, Any] | None) -> int:
@@ -156,14 +170,59 @@ def count_findings(findings: dict[str, Any] | None) -> int:
     return 0
 
 
+def summarise_findings(findings: dict[str, Any] | None) -> dict[str, Any]:
+    """Compact summary suitable for the step output envelope.
+
+    Includes:
+      - per-dataset rule + issue counts
+      - top N rule findings (rule id + message + total issues)
+    Excludes the per-row Issue_Details payload which dominates size.
+    """
+    if not isinstance(findings, dict):
+        return {"datasets": [], "topRules": []}
+
+    summary = findings.get("Issue_Summary")
+    by_dataset: dict[str, dict[str, int]] = {}
+    rule_rows: list[dict[str, Any]] = []
+    if isinstance(summary, list):
+        for entry in summary:
+            if not isinstance(entry, dict):
+                continue
+            dataset = str(entry.get("dataset", ""))
+            issues = entry.get("issues") if isinstance(entry.get("issues"), int) else 0
+            slot = by_dataset.setdefault(dataset, {"rules": 0, "issues": 0})
+            slot["rules"] += 1
+            slot["issues"] += issues
+            rule_rows.append({
+                "dataset": dataset,
+                "coreId": str(entry.get("core_id", "")),
+                "message": str(entry.get("message", ""))[:200],
+                "issues": issues,
+            })
+
+    rule_rows.sort(key=lambda row: row["issues"], reverse=True)
+
+    # Conformance metadata (small) and Dataset_Details (1 line per dataset)
+    # are useful in the result envelope; only Issue_Details is large.
+    return {
+        "conformance": findings.get("Conformance_Details"),
+        "datasetDetails": findings.get("Dataset_Details"),
+        "datasetSummary": [
+            {"dataset": ds, **counts} for ds, counts in sorted(by_dataset.items())
+        ],
+        "topRules": rule_rows[:30],
+        "totalRulesWithIssues": len(rule_rows),
+    }
+
+
 def main() -> None:
     delivery = find_latest_delivery()
     if delivery is None:
         write_result({
             "scriptStatus": "failed",
             "deliveryDir": None,
-            "findings": None,
             "findingsCount": 0,
+            "summary": None,
             "error": "No delivery directory found in /workspace/incoming",
             "traceback": "",
         })
@@ -174,19 +233,22 @@ def main() -> None:
 
     try:
         findings = run_cdisc_core(delivery, findings_path)
+        write_findings(findings)
         write_result({
             "scriptStatus": "ok",
             "deliveryDir": delivery_rel,
-            "findings": findings,
+            "findingsPath": "findings.json",
             "findingsCount": count_findings(findings),
+            "summary": summarise_findings(findings),
         })
         print(f"validate: ok, {count_findings(findings)} finding(s)", file=sys.stderr)
     except Exception as error:
         write_result({
             "scriptStatus": "failed",
             "deliveryDir": delivery_rel,
-            "findings": None,
+            "findingsPath": None,
             "findingsCount": 0,
+            "summary": None,
             "error": f"{type(error).__name__}: {error}",
             "traceback": traceback.format_exc(),
         })
