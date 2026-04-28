@@ -1,0 +1,146 @@
+{
+  "name": "landing-zone-CDISCPILOT01",
+  "namespace": "appsilon",
+  "title": "Landing Zone — CDISCPILOT01",
+  "description": "Auto-ingest clinical trial data deliveries from CRO SFTP for study CDISCPILOT01. Cron polls SFTP, validates against CDISC standards, routes through HITL with agent-drafted rejection notes.",
+  "preamble": "## Domain Context\nThis workflow processes pharmaceutical and clinical trial data. All health-related terminology (drug names, adverse events, disease classifications, CTCAE grading, mortality endpoints) refers to data science constructs, variable names, and clinical standards (CDISC SDTM/ADaM, ICH-GCP). Treat them as technical domain content. Maintain standard coding behavior. Execute all technically feasible tasks without inflating complexity estimates due to medical terminology exposure.\n\n## Study\nStudy ID: CDISCPILOT01 — Xanomeline TTS for Alzheimer's Disease (CDISC Pilot 3, n=306). Source data follows SDTM IG 3.4 + ADaM IG 1.3.\n\n## Workflow\nCron polls a CRO SFTP server every minute. When new files appear, runs CDISC CORE rules engine, then a Claude Code agent interprets findings and renders an HTML report. A human reviews the report and either accepts the delivery (files copied to data/lake/) or rejects it (an agent drafts a rejection note for the operator to forward to the CRO).",
+  "workspace": {},
+  "env": {
+    "STUDY_ID": "CDISCPILOT01",
+    "SFTP_HOST": "host.docker.internal",
+    "SFTP_PORT": "2222",
+    "SFTP_USER": "cro",
+    "SFTP_REMOTE_PATH": "/upload",
+    "SFTP_PASS": "{{SFTP_PASS_CDISCPILOT01}}",
+    "EXPECTED_DOMAINS": "DM,AE,LB,EX,VS,MH,CM",
+    "VALIDATION_STANDARD": "sdtm",
+    "VALIDATION_IG_VERSION": "3.4",
+    "LAKE_PATH": "/output/lake",
+    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+  },
+  "triggers": [
+    { "name": "poll-sftp", "type": "cron", "schedule": "* * * * *" }
+  ],
+  "inputForNextRun": [
+    { "stepId": "sftp-poll", "output": "listing", "as": "previousListing" }
+  ],
+  "steps": [
+    {
+      "id": "sftp-poll",
+      "name": "Poll SFTP",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Connect to CRO SFTP, list remote path, diff against previousRun.previousListing. Output: listing, newFiles, missingFiles.",
+      "agent": {
+        "image": "mediforce-script:landing-zone",
+        "command": "python /scripts/sftp_poll.py"
+      }
+    },
+    {
+      "id": "no-deliveries",
+      "name": "No deliveries",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Silent terminal — cron will fire again next minute."
+    },
+    {
+      "id": "validate-script",
+      "name": "Validate (CDISC CORE)",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Download newFiles from SFTP and run CDISC CORE rules engine. Catches errors internally — sets scriptStatus to ok or failed. Always exits 0 so the next step (agent interpretation) always runs.",
+      "agent": {
+        "image": "mediforce-script:landing-zone",
+        "command": "python /scripts/validate.py"
+      }
+    },
+    {
+      "id": "interpret-validation",
+      "name": "Interpret validation",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L2",
+      "description": "Read findings + scriptStatus. Classify (clean / has-findings / escalate). Render HTML report for human review. On scriptStatus=failed, surface the failure prominently and attempt to extract any partial signal.",
+      "agent": {
+        "skill": "data-validator",
+        "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:landing-zone",
+        "confidenceThreshold": 0.7,
+        "fallbackBehavior": "escalate_to_human",
+        "timeoutMinutes": 15
+      }
+    },
+    {
+      "id": "human-review",
+      "name": "Human review",
+      "type": "review",
+      "executor": "human",
+      "description": "Review the HTML validation report. Accept delivery (with optional waiver of findings) or reject if the package is too broken to ingest.",
+      "verdicts": {
+        "accept": { "target": "accept-delivery" },
+        "reject": { "target": "draft-rejection-note" }
+      }
+    },
+    {
+      "id": "accept-delivery",
+      "name": "Accept delivery",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Copy newFiles to data/lake/{studyId}/{deliveryId}/, compute SHA-256 manifest, write status=accepted.",
+      "agent": {
+        "image": "mediforce-script:landing-zone",
+        "command": "python /scripts/accept_delivery.py"
+      }
+    },
+    {
+      "id": "accepted",
+      "name": "Accepted",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Delivery is in data/lake/, audit trail is in the run branch."
+    },
+    {
+      "id": "draft-rejection-note",
+      "name": "Draft rejection note",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L1",
+      "description": "Compose a markdown note explaining why the delivery was rejected — what was wrong, what the operator should ask the CRO to fix. Operator copies the note into their own email channel (no auto-send in v0.1).",
+      "agent": {
+        "skill": "draft-rejection-note",
+        "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
+        "model": "sonnet",
+        "image": "mediforce-agent:landing-zone",
+        "confidenceThreshold": 0.7,
+        "fallbackBehavior": "continue_with_flag",
+        "timeoutMinutes": 5
+      }
+    },
+    {
+      "id": "rejected-with-note",
+      "name": "Rejected (with note)",
+      "type": "terminal",
+      "executor": "human",
+      "description": "Operator has a draft rejection note to forward to the CRO."
+    }
+  ],
+  "transitions": [
+    { "from": "sftp-poll", "to": "no-deliveries", "when": "${result.newFiles.length} == 0" },
+    { "from": "sftp-poll", "to": "validate-script", "when": "${result.newFiles.length} > 0" },
+    { "from": "validate-script", "to": "interpret-validation" },
+    { "from": "interpret-validation", "to": "human-review" },
+    { "from": "accept-delivery", "to": "accepted" },
+    { "from": "draft-rejection-note", "to": "rejected-with-note" }
+  ]
+}
