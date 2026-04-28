@@ -317,6 +317,10 @@ export function parseWorkflowDefinitionForCreation(input: unknown) {
  * omit `namespace`; the loader injects it at registration so the same template
  * can serve multiple tenants. Validation reuses WorkflowDefinitionBaseSchema
  * minus the `namespace` field, then re-applies the same cross-field refinements.
+ *
+ * Templates that declare `namespace` are rejected — silently stripping the key
+ * would let the author believe their value was honored when the loader
+ * actually overwrites it.
  */
 export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit({
   namespace: true,
@@ -330,6 +334,25 @@ export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit({
 export type WorkflowTemplate = z.infer<typeof WorkflowTemplateSchema>;
 
 export function parseWorkflowTemplate(input: unknown) {
+  if (
+    typeof input === 'object' &&
+    input !== null &&
+    !Array.isArray(input) &&
+    'namespace' in input
+  ) {
+    return {
+      success: false as const,
+      error: new z.ZodError([
+        {
+          code: 'custom',
+          path: ['namespace'],
+          message:
+            'Workflow templates must not declare a namespace; it is injected at registration time',
+          input,
+        },
+      ]),
+    };
+  }
   return WorkflowTemplateSchema.safeParse(input);
 }
 

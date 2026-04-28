@@ -131,12 +131,11 @@ describe('workflow-definition action executor', () => {
       ...baseTemplate,
       namespace: 'examples',
     });
-    // Templates carry no namespace; loader injects it. With the omit() schema
-    // an extra key is silently stripped — so we still expect success but the
-    // injected namespace must come from the loader, not the template.
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect((result.data as { namespace?: string }).namespace).toBeUndefined();
+    // Silently stripping `namespace` would let the author believe their value
+    // is honored. Templates must omit `namespace` and let the loader inject it.
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['namespace']);
     }
   });
 
