@@ -269,12 +269,20 @@ function gitEnv(sshCmd: string): NodeJS.ProcessEnv {
   return { ...process.env, GIT_SSH_COMMAND: sshCmd };
 }
 
+// Node defaults `maxBuffer` to 1 MiB for spawnSync-family calls. Some git
+// outputs (e.g. `git diff --cached` against a step that wrote a large
+// findings.json) regularly cross that, raising ENOBUFS. Lift the cap to
+// 256 MiB — high enough for any realistic step delta, low enough that
+// runaway output still surfaces as a process failure rather than OOM.
+const GIT_MAX_BUFFER = 256 * 1024 * 1024;
+
 function runGit(args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv; capture?: boolean } = {}): string {
   const out = execFileSync('git', args, {
     cwd: opts.cwd,
     env: opts.env,
     stdio: opts.capture ? ['ignore', 'pipe', 'pipe'] : 'pipe',
     encoding: 'utf-8',
+    maxBuffer: GIT_MAX_BUFFER,
   });
   return typeof out === 'string' ? out : '';
 }
@@ -282,7 +290,7 @@ function runGit(args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv; c
 /** Try git; swallow stderr, return null on failure. Used for "does branch exist" checks. */
 function tryGit(args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): boolean {
   try {
-    execFileSync('git', args, { cwd: opts.cwd, env: opts.env, stdio: 'pipe' });
+    execFileSync('git', args, { cwd: opts.cwd, env: opts.env, stdio: 'pipe', maxBuffer: GIT_MAX_BUFFER });
     return true;
   } catch {
     return false;
