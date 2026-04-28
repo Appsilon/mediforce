@@ -533,6 +533,27 @@
       text-align: center;
       line-height: 1.5;
     }
+    .form-submit:disabled { opacity: 0.65; cursor: not-allowed; }
+    .form-success {
+      padding: 1.5rem;
+      border-radius: 0.75rem;
+      background: rgba(13,148,136,0.08);
+      border: 1px solid rgba(13,148,136,0.2);
+      text-align: center;
+    }
+    .form-success p { font-size: 0.9375rem; color: var(--text-80); line-height: 1.6; margin: 0; }
+    .form-success strong { color: var(--accent); }
+    .form-error-msg {
+      display: none;
+      margin-top: 0.75rem;
+      padding: 0.625rem 0.875rem;
+      border-radius: 0.5rem;
+      background: rgba(239,68,68,0.07);
+      border: 1px solid rgba(239,68,68,0.2);
+      font-size: 0.8125rem;
+      color: #DC2626;
+      text-align: center;
+    }
 
     /* ── Author avatars ── */
     .demo-authors {
@@ -899,18 +920,20 @@
           </div>
           <h3>Request a demo call</h3>
           <p>Leave your email and a short note about your setup. We'll reply within one business day to schedule a time.</p>
-          <!-- Wire this form to your preferred handler (Formspree, Netlify Forms, etc.) -->
-          <form method="POST" action="">
-            <div class="form-field">
-              <label for="demo-email">Work email <span style="color:#EF4444;">*</span></label>
-              <input type="email" id="demo-email" name="email" placeholder="you@sponsor.com" required />
-            </div>
-            <div class="form-field">
-              <label for="demo-message">Tell us about your setup</label>
-              <textarea id="demo-message" name="message" placeholder="e.g. We receive weekly SDTM deliveries from two CROs, targeting FDA submission. Looking to reduce the 2-day validation cycle."></textarea>
-            </div>
-            <button type="submit" class="form-submit">Request a Demo Call</button>
-          </form>
+          <div id="demo-form-wrap">
+            <form id="demo-form" novalidate>
+              <div class="form-field">
+                <label for="demo-email">Work email <span style="color:#EF4444;">*</span></label>
+                <input type="email" id="demo-email" name="from_email" placeholder="you@sponsor.com" required />
+              </div>
+              <div class="form-field">
+                <label for="demo-message">Tell us about your setup</label>
+                <textarea id="demo-message" name="message" placeholder="e.g. We receive weekly SDTM deliveries from two CROs, targeting FDA submission. Looking to reduce the 2-day validation cycle."></textarea>
+              </div>
+              <button type="submit" id="demo-submit" class="form-submit">Request a Demo Call</button>
+              <div id="demo-error" class="form-error-msg">Something went wrong - please try again or email us directly at mediforce@appsilon.com.</div>
+            </form>
+          </div>
           <p class="form-note">We don't share your contact details. No newsletter, no drip campaign - just a reply to book the call.</p>
         </div>
 
@@ -934,5 +957,53 @@
     </div>
   </footer>
 
+  <!-- EmailJS — https://emailjs.com
+       Setup (one time):
+         1. Create a free EmailJS account at https://emailjs.com
+         2. Add Service: connect your Mailgun account (Email Services → Add New Service → Mailgun)
+            Set "From Email" to a Mailgun-verified sender, e.g. noreply@mg.appsilon.com
+         3. Create Template (Email Templates → Create New Template):
+              To:      mediforce@appsilon.com
+              Subject: Demo request from {{from_email}}
+              Body:    From: {{from_email}}\n\n{{message}}
+         4. Fill in the three constants below (Account → API Keys)
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script>
+    const EMAILJS_PUBLIC_KEY  = 'YOUR_PUBLIC_KEY';   // Account → API Keys → Public Key
+    const EMAILJS_SERVICE_ID  = 'YOUR_SERVICE_ID';   // Email Services → your Mailgun service ID
+    const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';  // Email Templates → your template ID
+
+    emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+
+    document.getElementById('demo-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const emailInput = document.getElementById('demo-email');
+      if (!emailInput.checkValidity()) {
+        emailInput.reportValidity();
+        return;
+      }
+
+      const btn   = document.getElementById('demo-submit');
+      const error = document.getElementById('demo-error');
+      btn.textContent = 'Sending…';
+      btn.disabled    = true;
+      error.style.display = 'none';
+
+      emailjs.sendForm(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, this)
+        .then(function () {
+          document.getElementById('demo-form-wrap').innerHTML =
+            '<div class="form-success">' +
+              '<p>✓ <strong>Request received.</strong> We\'ll reply within one business day to schedule a time.</p>' +
+            '</div>';
+        })
+        .catch(function () {
+          btn.textContent    = 'Request a Demo Call';
+          btn.disabled       = false;
+          error.style.display = 'block';
+        });
+    });
+  </script>
 </body>
 </html>
