@@ -487,6 +487,76 @@
         text-align: center;
       }
     }
+
+    /* ── In Practice (case study) ── */
+    .practice-card {
+      margin-top: 3rem;
+      border-radius: 1rem;
+      border: 1px solid rgba(13,148,136,0.2);
+      background: var(--bg);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 768px) {
+      .practice-card { grid-template-columns: 1fr 1fr; }
+    }
+    .practice-card-narrative {
+      padding: 2.5rem;
+      background: rgba(13,148,136,0.04);
+      border-right: 1px solid rgba(13,148,136,0.12);
+    }
+    .practice-card-narrative p {
+      font-size: 0.9375rem;
+      color: var(--text-70);
+      line-height: 1.75;
+      margin-bottom: 1rem;
+    }
+    .practice-card-narrative p:last-of-type { margin-bottom: 0; }
+    .practice-card-flow {
+      padding: 2.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .flow-stages {
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+    }
+    .flow-stage {
+      padding: 0.875rem 1.125rem;
+      border-radius: 0.625rem;
+      border: 1px solid rgba(13,148,136,0.18);
+      background: rgba(13,148,136,0.04);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-80);
+      text-align: center;
+    }
+    .flow-arrow {
+      text-align: center;
+      color: var(--accent);
+      font-size: 1.125rem;
+      line-height: 1;
+    }
+    .practice-card-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 2rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .practice-card-link:hover { color: var(--accent-dark); }
+    .practice-card-link svg { width: 1rem; height: 1rem; }
+
+    @media (max-width: 767px) {
+      .practice-card-narrative { border-right: none; border-bottom: 1px solid rgba(13,148,136,0.12); }
+    }
   </style>
 </head>
 <body>
@@ -498,6 +568,7 @@
         <span class="logo-text">Mediforce</span>
       </a>
       <div class="header-links">
+        <a href="data-delivery.html" class="header-link">Data Delivery</a>
         <a href="validated-ai.html" class="header-link">Validation</a>
         <a href="security.html" class="header-link">Security</a>
         <a href="fda-principles.html" class="header-link">FDA Alignment</a>
@@ -659,6 +730,39 @@
   </section>
 
 
+  <!-- In Practice -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-label">In Practice</div>
+      <h2 class="section-title">See how Mediforce works in a real clinical workflow</h2>
+      <p class="section-subtitle">From CRO data delivery to reviewed validation report — without an afternoon of file triage.</p>
+      <div class="practice-card">
+        <div class="practice-card-narrative">
+          <p>Every CRO data delivery lands as a manual problem: download, validate, triage findings, write rejection emails, reconstruct the audit trail weeks later. The most expensive people in the organization spend their week on file wrangling — not on the science.</p>
+          <p>The AI Data Delivery workflow changes the unit of work. An agent watches the SFTP endpoint, runs every incoming package through CDISC CORE validation, and surfaces only the decisions that actually require human judgment — with the audit trail built in from the first poll.</p>
+          <p>A delivery that used to take an afternoon takes a click and a copy-paste. Clean deliveries go straight through; problem deliveries get a drafted rejection note ready to forward. The data manager stays in control without doing the groundwork.</p>
+        </div>
+        <div class="practice-card-flow">
+          <div class="flow-stages">
+            <div class="flow-stage">CRO sends SFTP delivery</div>
+            <div class="flow-arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.25rem;height:1.25rem;display:inline-block;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+            </div>
+            <div class="flow-stage">AI agent validates + reports</div>
+            <div class="flow-arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1.25rem;height:1.25rem;display:inline-block;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+            </div>
+            <div class="flow-stage">Data manager clicks Accept / Reject</div>
+          </div>
+          <a href="data-delivery.html" class="practice-card-link">
+            Explore the Data Delivery workflow
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Community -->
   <section class="section">
     <div class="container">
@@ -714,6 +818,7 @@
     <div class="footer-inner">
       <span>Mediforce</span>
       <nav class="footer-links">
+        <a href="data-delivery.html">Data Delivery</a>
         <a href="validated-ai.html">Validation</a>
         <a href="security.html">Security</a>
         <a href="fda-principles.html">FDA Alignment</a>
