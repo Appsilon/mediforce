@@ -38,10 +38,10 @@ docker build \
   "$REPO_ROOT"
 
 echo ""
-echo "=== Building landing-zone script-container image ==="
+echo "=== Building landing-zone image ==="
 docker build \
   -f "$REPO_ROOT/apps/landing-zone/container/Dockerfile" \
-  -t mediforce-script:landing-zone \
+  -t mediforce-landing-zone:latest \
   "$REPO_ROOT/apps/landing-zone"
 
 echo ""

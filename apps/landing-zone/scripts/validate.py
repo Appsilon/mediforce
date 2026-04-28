@@ -94,7 +94,7 @@ def run_cdisc_core(delivery: Path, output_path: Path) -> dict[str, Any]:
         )
 
     args = [
-        "python", "/opt/cdisc/core.py",
+        "python3", "/opt/cdisc/core.py",
         "validate",
         "--standard", standard,
         "--version", ig_version,

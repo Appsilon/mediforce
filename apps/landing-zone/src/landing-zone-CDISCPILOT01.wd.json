@@ -37,8 +37,8 @@
       "autonomyLevel": "L4",
       "description": "Connect to CRO SFTP, list remote path, diff against previousRun.previousListing. Output: listing, newFiles, missingFiles.",
       "agent": {
-        "image": "mediforce-script:landing-zone",
-        "command": "python /scripts/sftp_poll.py"
+        "image": "mediforce-landing-zone:latest",
+        "command": "python3 /scripts/sftp_poll.py"
       }
     },
     {
@@ -57,8 +57,8 @@
       "autonomyLevel": "L4",
       "description": "Download newFiles from SFTP and run CDISC CORE rules engine. Catches errors internally — sets scriptStatus to ok or failed. Always exits 0 so the next step (agent interpretation) always runs.",
       "agent": {
-        "image": "mediforce-script:landing-zone",
-        "command": "python /scripts/validate.py"
+        "image": "mediforce-landing-zone:latest",
+        "command": "python3 /scripts/validate.py"
       }
     },
     {
@@ -73,7 +73,7 @@
         "skill": "data-validator",
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
         "model": "sonnet",
-        "image": "mediforce-agent:landing-zone",
+        "image": "mediforce-landing-zone:latest",
         "confidenceThreshold": 0.7,
         "fallbackBehavior": "escalate_to_human",
         "timeoutMinutes": 15
@@ -99,8 +99,8 @@
       "autonomyLevel": "L4",
       "description": "Copy newFiles to data/lake/{studyId}/{deliveryId}/, compute SHA-256 manifest, write status=accepted.",
       "agent": {
-        "image": "mediforce-script:landing-zone",
-        "command": "python /scripts/accept_delivery.py"
+        "image": "mediforce-landing-zone:latest",
+        "command": "python3 /scripts/accept_delivery.py"
       }
     },
     {
@@ -122,7 +122,7 @@
         "skill": "draft-rejection-note",
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
         "model": "sonnet",
-        "image": "mediforce-agent:landing-zone",
+        "image": "mediforce-landing-zone:latest",
         "confidenceThreshold": 0.7,
         "fallbackBehavior": "continue_with_flag",
         "timeoutMinutes": 5

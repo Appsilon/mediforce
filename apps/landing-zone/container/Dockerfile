@@ -1,15 +1,22 @@
 # =============================================================================
-# Landing Zone Script Container Image
+# Landing Zone Container Image
 #
-# Used by `script-container` plugin steps in landing-zone-*.wd.json:
-#   sftp-poll, validate-script, accept-delivery
+# Single image used by both step types in landing-zone-*.wd.json:
+#   - script-container plugin (sftp-poll, validate-script, accept-delivery)
+#   - claude-code-agent plugin (interpret-validation, draft-rejection-note)
 #
-# Includes:
+# Extends mediforce-golden-image (R + tidyverse, Python 3, Node, Claude Code
+# CLI, OpenCode CLI, git, SSH) and adds the CDISC validation toolchain plus
+# the in-container step scripts. The agent steps don't use the CDISC libs
+# directly but they read findings.json the script step writes — keeping
+# both sides in one image avoids drift between script-time and agent-time
+# views of the same data.
+#
+# Includes (on top of golden):
 #   - cdisc-rules-engine: CDISC CORE rules engine (Python library)
-#   - core.py + resources: the CDISC CORE CLI entrypoint, cloned from upstream
-#     (the pip package does not ship a console script — upstream ships core.py
-#     at the repo root; we vendor it into /opt/cdisc together with the
-#     resources/ directory it needs at runtime, including pre-built rule caches)
+#   - core.py + resources: the CDISC CORE CLI entrypoint, vendored from
+#     upstream at a pinned commit (the pip package ships the library only;
+#     core.py + scripts/ + resources/ live at the repo root)
 #   - paramiko:           SFTP client
 #   - pyyaml:             study config parsing
 #
@@ -17,20 +24,16 @@
 #   python /opt/cdisc/core.py validate -s sdtmig -v 3-4 -dp <file.xpt> -o <out>
 #
 # Build:  docker build -f apps/landing-zone/container/Dockerfile \
-#                     -t mediforce-script:landing-zone \
+#                     -t mediforce-landing-zone:latest \
 #                     apps/landing-zone
 # =============================================================================
 
-FROM python:3.12-slim
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
-    && rm -rf /var/lib/apt/lists/*
+FROM mediforce-golden-image
 
 # Install the engine, paramiko (for SFTP), and pyyaml (for study config).
 # The cdisc-rules-engine pip package matches the upstream `main` branch
 # at the same version (0.15.0).
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir --break-system-packages \
     "cdisc-rules-engine==0.15.0" \
     "paramiko>=3" \
     "pyyaml>=6"
@@ -44,8 +47,7 @@ RUN pip install --no-cache-dir \
 # Layout:
 #   /opt/cdisc/core.py      — CLI entrypoint (`python /opt/cdisc/core.py`)
 #   /opt/cdisc/scripts/     — sibling python package core.py imports from
-#   <site-packages>/cdisc_rules_engine/resources/
-#                           — pre-built rule cache pickles read at startup
+#   /opt/cdisc/resources/   — pre-built rule cache pickles read at startup
 ARG CDISC_CORE_COMMIT=49f47862
 RUN git clone https://github.com/cdisc-org/cdisc-rules-engine.git /tmp/cdisc-core \
     && cd /tmp/cdisc-core \
