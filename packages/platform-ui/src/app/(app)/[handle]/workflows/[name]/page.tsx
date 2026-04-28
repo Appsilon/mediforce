@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-editor';
+import { WorkflowRepositoryEditor } from '@/components/workflows/workflow-repository-editor';
 
 
 export default function ProcessDefinitionPage() {
@@ -219,7 +220,7 @@ export default function ProcessDefinitionPage() {
       {/* Tabs */}
       <Tabs.Root defaultValue="runs" className="flex flex-1 flex-col">
         <Tabs.List className="flex border-b px-6 gap-0">
-          {['runs', 'definitions', 'secrets'].map((tab) => (
+          {['runs', 'definitions', 'repository', 'secrets'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -228,14 +229,16 @@ export default function ProcessDefinitionPage() {
                 'text-muted-foreground border-transparent',
                 'data-[state=active]:text-foreground data-[state=active]:border-primary',
                 'hover:text-foreground',
-                tab === 'secrets' && 'flex items-center gap-1.5',
+                (tab === 'secrets' || tab === 'repository') && 'flex items-center gap-1.5',
               )}
             >
               {tab === 'runs'
                 ? `Runs${runs.length > 0 ? ` (${runs.length})` : ''}`
                 : tab === 'secrets'
                   ? <><KeyRound className="h-3.5 w-3.5" />Secrets</>
-                  : 'Definitions'}
+                  : tab === 'repository'
+                    ? <><GitBranch className="h-3.5 w-3.5" />Repository</>
+                    : 'Definitions'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -278,6 +281,33 @@ export default function ProcessDefinitionPage() {
         <Tabs.Content value="definitions" className="flex-1 p-6">
           <div className="max-w-2xl">
             <DefinitionsList workflowName={decodedName} />
+          </div>
+        </Tabs.Content>
+
+        {/* Repository tab */}
+        <Tabs.Content value="repository" className="flex-1 p-6">
+          <div className="max-w-2xl">
+            {firebaseUser && latest && (() => {
+              const latestVersionNumber = Number(latest.version);
+              if (!Number.isFinite(latestVersionNumber)) {
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    Repository config is only available for unified workflow definitions. The latest version of this workflow uses the legacy schema.
+                  </p>
+                );
+              }
+              const ws = (latest as { workspace?: { remote?: string; remoteAuth?: string } }).workspace;
+              return (
+                <WorkflowRepositoryEditor
+                  namespace={handle}
+                  workflowName={decodedName}
+                  userId={firebaseUser.uid}
+                  initialRemote={ws?.remote}
+                  initialRemoteAuth={ws?.remoteAuth}
+                  latestVersion={latestVersionNumber}
+                />
+              );
+            })()}
           </div>
         </Tabs.Content>
 
