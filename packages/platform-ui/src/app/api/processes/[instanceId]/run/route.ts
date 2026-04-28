@@ -320,9 +320,10 @@ export async function POST(
           const previousStepId = workflowDefinition.transitions.find(
             (t) => t.to === instance.currentStepId,
           )?.from ?? null;
-          const stepInput = previousStepId
+          const previousStepOutput = previousStepId
             ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
             : {};
+          const stepInput = { ...previousStepOutput, steps: instance.variables };
 
           const executionId = crypto.randomUUID();
           const startedAt = new Date().toISOString();
@@ -340,6 +341,22 @@ export async function POST(
             iterationNumber: 0,
             gateResult: null,
             error: null,
+          });
+
+          await auditRepo.append({
+            actorId: 'auto-runner',
+            actorType: 'system',
+            actorRole: 'orchestrator',
+            action: 'process.run.step.started',
+            description: `Auto-runner dispatching action step '${instance.currentStepId}' (kind: ${currentStep.action.kind})`,
+            timestamp: startedAt,
+            inputSnapshot: { stepId: instance.currentStepId, actionKind: currentStep.action.kind },
+            outputSnapshot: {},
+            basis: 'Auto-run loop: action step dispatch',
+            entityType: 'processInstance',
+            entityId: instanceId,
+            processInstanceId: instanceId,
+            processDefinitionVersion: initialInstance.definitionVersion,
           });
 
           try {
