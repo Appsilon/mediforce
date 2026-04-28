@@ -77,6 +77,7 @@ export function useCollection<T extends { id: string }>(
         },
         (error: FirestoreError) => {
           if (cancelled) return;
+          console.error('[useCollection]', collectionPath, 'error:', error.code, error.message);
           // onSnapshot terminates the listener on error. For permission-denied
           // errors during app startup, Firestore's auth token may not have
           // propagated yet — retry a few times to let it settle.
