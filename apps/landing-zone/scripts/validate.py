@@ -50,25 +50,78 @@ def find_latest_delivery() -> Path | None:
     return max(deliveries, key=lambda path: path.stat().st_mtime)
 
 
+def normalise_standard(value: str) -> str:
+    # The CDISC CORE CLI accepts `sdtmig` / `adamig` etc. (no separator).
+    # WD env may carry `sdtm` / `SDTM` / `sdtm-ig` from study config —
+    # collapse to the shape the CLI expects.
+    cleaned = value.strip().lower().replace("-", "").replace("_", "")
+    if cleaned == "sdtm":
+        return "sdtmig"
+    if cleaned == "adam":
+        return "adamig"
+    return cleaned
+
+
+def normalise_version(value: str) -> str:
+    # CLI wants the version as a hyphen-separated string ("3-4"), not a dot
+    # ("3.4"). Both shapes appear in study configs depending on author.
+    return value.strip().replace(".", "-")
+
+
 def run_cdisc_core(delivery: Path, output_path: Path) -> dict[str, Any]:
-    standard = os.environ.get("VALIDATION_STANDARD", "sdtm")
-    ig_version = os.environ.get("VALIDATION_IG_VERSION", "3.4")
+    standard = normalise_standard(os.environ.get("VALIDATION_STANDARD", "sdtm"))
+    ig_version = normalise_version(os.environ.get("VALIDATION_IG_VERSION", "3-4"))
+
+    # Output flag wants a basename (no extension). The CLI appends the format
+    # extension itself (e.g. `--output reports/result --output-format json`
+    # produces `reports/result.json`). We strip any trailing `.json` so the
+    # downstream read still finds the file.
+    output_basename = str(output_path)
+    if output_basename.endswith(".json"):
+        output_basename = output_basename[:-5]
+    expected_output = Path(output_basename + ".json")
+
+    # core.py wants individual --dataset-path entries, one per file. Pass
+    # every regular file in the delivery dir; non-XPT files (e.g. define.xml)
+    # are filtered out so the engine doesn't choke on unsupported formats.
+    dataset_files = sorted(
+        path for path in delivery.iterdir()
+        if path.is_file() and path.suffix.lower() == ".xpt"
+    )
+    if not dataset_files:
+        raise RuntimeError(
+            f"No .xpt datasets found in {delivery} — nothing to validate"
+        )
+
     args = [
-        "core",
+        "python", "/opt/cdisc/core.py",
         "validate",
         "--standard", standard,
         "--version", ig_version,
-        "--dataset-path", str(delivery),
-        "--output", str(output_path),
-        "--output-format", "JSON",
+        "--output", output_basename,
+        "--output-format", "json",
     ]
-    proc = subprocess.run(args, capture_output=True, text=True, timeout=600)
+    for dataset in dataset_files:
+        args.extend(["--dataset-path", str(dataset)])
+
+    proc = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        timeout=600,
+        cwd="/opt/cdisc",
+    )
     if proc.returncode != 0:
         raise RuntimeError(
             f"core validate failed (exit {proc.returncode}): "
             f"{proc.stderr.strip() or proc.stdout.strip() or '(no output)'}"
         )
-    return json.loads(output_path.read_text())
+    if not expected_output.exists():
+        raise RuntimeError(
+            f"core validate produced no output at {expected_output}. "
+            f"stdout: {proc.stdout.strip() or '(empty)'}"
+        )
+    return json.loads(expected_output.read_text())
 
 
 def write_result(payload: dict[str, Any]) -> None:
@@ -77,8 +130,26 @@ def write_result(payload: dict[str, Any]) -> None:
 
 
 def count_findings(findings: dict[str, Any] | None) -> int:
+    """Total number of underlying issues across all rules.
+
+    The CDISC CORE 0.15 JSON shape is `{"Issue_Summary": [{"issues": int, ...}, ...]}`.
+    Each entry counts how many rows of a dataset matched a rule. We sum the
+    `issues` field per entry to get a total. Older shapes (`issues` /
+    `results` arrays at the top level) are kept as fallbacks.
+    """
     if not isinstance(findings, dict):
         return 0
+
+    summary = findings.get("Issue_Summary")
+    if isinstance(summary, list):
+        total = 0
+        for entry in summary:
+            if isinstance(entry, dict):
+                count = entry.get("issues")
+                if isinstance(count, int):
+                    total += count
+        return total
+
     issues = findings.get("issues") or findings.get("results") or []
     if isinstance(issues, list):
         return len(issues)
