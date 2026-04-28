@@ -9,6 +9,7 @@ const isVercel = process.env.VERCEL === '1';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   ...(isVercel ? {} : { output: 'standalone', outputFileTracingRoot: path.resolve(__dirname, '../..') }),
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   transpilePackages: [
     '@mediforce/platform-core',
     '@mediforce/platform-infra',
