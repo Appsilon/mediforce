@@ -21,7 +21,7 @@
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
   },
   "triggers": [
-    { "name": "poll-sftp", "type": "cron", "schedule": "* * * * *" }
+    { "name": "poll-sftp", "type": "cron", "schedule": "*/15 * * * *" }
   ],
   "inputForNextRun": [
     { "stepId": "sftp-poll", "output": "listing", "as": "previousListing" }
