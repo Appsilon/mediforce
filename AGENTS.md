@@ -139,17 +139,29 @@ Testing strategies:
 2. `pnpm test:affected` — tests for changed files only
 3. `pnpm test` — all unit tests
 
-**Before pushing (if UI or E2E tests changed):**
-4. Check if any `packages/platform-ui/src/` or `e2e/journeys/` files changed:
-   ```bash
-   git diff --name-only origin/main...HEAD | grep -qE 'platform-ui/src/|e2e/journeys/' && echo "E2E needed"
-   ```
-5. **Bootstrap the E2E environment** (idempotent — safe to run every time):
-   ```bash
-   python3 packages/platform-ui/scripts/bootstrap_e2e.py
-   ```
-   This creates `.env.local` with demo credentials, starts Firebase emulators, installs Playwright browsers, and installs ffmpeg. See [Remote E2E setup](#remote-e2e-setup) for details.
-6. `cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth` — all E2E journey + smoke tests (60s)
+**Before pushing — run E2E via a subagent (always spawn, never inline):**
+
+E2E runs take minutes and don't need main-thread context. Always delegate to a subagent with `run_in_background: true` so the main thread stays responsive. The subagent prompt is self-contained — it gets the bootstrap command, the test command, and what to report. Main thread gets a short pass/fail summary back.
+
+Run E2E when:
+- Any change to `packages/platform-ui/src/` or `e2e/journeys/` (litera reguły)
+- Any change to a package consumed by platform-ui at runtime (`agent-runtime`, `workflow-engine`, `platform-infra`, `platform-core`) whose behaviour could reach the UI (duch reguły)
+- Any refactor where you claim "no behaviour change" — confirm it
+
+Check what changed:
+```bash
+git diff --name-only origin/main...HEAD
+```
+
+Subagent runs:
+```bash
+python3 packages/platform-ui/scripts/bootstrap_e2e.py        # idempotent
+cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth
+```
+
+Bootstrap creates `.env.local` with demo credentials, starts Firebase emulators, installs Playwright browsers, installs ffmpeg. See [Remote E2E setup](#remote-e2e-setup) for details. Full run is ~60s. Subagent should report under 200 words: overall pass/fail + exact test + one-line error for each failure.
+
+Never declare work done before E2E comes back green. A refactor that "should" be behaviour-neutral still gets verified.
 
 **When adding/modifying UI features (TDD):**
 1. **RED** — Write the journey test first in `e2e/journeys/<feature>.journey.ts`. Use `showStep`/`showResult` from `helpers/recording.ts` at key moments for pacing during recordings.

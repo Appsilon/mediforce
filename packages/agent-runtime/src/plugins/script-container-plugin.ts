@@ -138,6 +138,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
     let outputDir: string | null = null;
 
     try {
+      // Every run gets a shared git worktree; mounted into the container at /workspace.
+      await this.resolveRunWorkspace();
+
       // Create temp directory for container /output mount
       const rawOutputDir = await mkdtemp(join(tmpdir(), 'mediforce-script-output-'));
       outputDir = await realpath(rawOutputDir);
@@ -179,6 +182,8 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         '--memory', '4g',
         '--cpus', '2',
         '-v', `${outputDir}:/output`,
+        '-v', `${this.runWorkspaceHandle!.path}:/workspace`,
+        '-w', '/workspace',
         ...envFlags,
         this.image,
         ...this.commandArgs,
@@ -226,6 +231,17 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
       const containerOutput = spawnResult.stdout.trim();
 
+      // Commit whatever the script wrote into /workspace (empty = --allow-empty).
+      // No reasoningSummary — the file delta is the more useful subject line
+      // for deterministic scripts; the command is available via Agent-Image
+      // + script.sh artefact for anyone digging deeper.
+      await this.commitRunWorkspace(outputDir, {
+        status: 'success',
+        durationMs: Date.now() - startTime,
+        agentPlugin: 'script-container',
+        agentImage: this.image,
+      });
+
       // Read result.json from the output directory
       const resultPath = join(outputDir, 'result.json');
       let result: Record<string, unknown>;
@@ -257,8 +273,23 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      // Clean up output dir before re-throwing
+      // Commit whatever landed in /workspace before the error — ✗ marker,
+      // full error excerpt in body. Best-effort: if the commit itself fails
+      // (e.g. worktree corrupt, detected secret), swallow that error and
+      // rethrow the original step error. We never mask the real failure.
+      const errMessage = error instanceof Error ? error.message : String(error);
       if (outputDir) {
+        try {
+          await this.commitRunWorkspace(outputDir, {
+            status: 'failed',
+            error: errMessage,
+            durationMs: Date.now() - startTime,
+            agentPlugin: 'script-container',
+            agentImage: this.image,
+          });
+        } catch (commitErr) {
+          console.warn('[ScriptContainer] Failed to commit failure artefacts:', commitErr);
+        }
         await rm(outputDir, { recursive: true, force: true }).catch(() => {});
         outputDir = null;
       }

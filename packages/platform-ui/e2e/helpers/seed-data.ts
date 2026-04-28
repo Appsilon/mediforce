@@ -818,6 +818,85 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   const workflowDefinitions: Record<string, Record<string, unknown>> = {
+    // Example workflow that exercises the run-scoped git workspace with a
+    // small real-shaped data pipeline: step 1 generates a CSV dataset, step 2
+    // reads it, computes summary stats, and writes a markdown report into a
+    // different subdirectory. A manual run leaves a run/<id> branch in the
+    // local bare repo with:
+    //
+    //   <seed>          "workspace initialized" (.gitignore seed)
+    //   generate-data   adds data/sales.csv
+    //   summarize       adds report/summary.md
+    //
+    // You can `git log`, `git diff`, and inspect the per-step artifacts.
+    'Sales CSV Report:1': {
+      name: 'Sales CSV Report',
+      namespace: 'test',
+      version: 1,
+      title: 'Sales CSV → summary report',
+      description: 'Two-step pipeline: generate a small sales CSV, then summarise it into a markdown report. Each step commits its artefacts to the run branch.',
+      workspace: {},
+      steps: [
+        {
+          id: 'generate-data',
+          name: 'Generate sales.csv',
+          type: 'creation',
+          executor: 'script',
+          plugin: 'script-container',
+          autonomyLevel: 'L4',
+          agent: {
+            runtime: 'bash',
+            inlineScript: [
+              '#!/bin/sh',
+              'set -eu',
+              'mkdir -p /workspace/data',
+              "printf 'region,units,revenue\\nnorth,12,2400\\nsouth,8,1600\\neast,17,3825\\nwest,5,900\\n' > /workspace/data/sales.csv",
+              'printf \'{"ok":true,"rows":4}\' > /output/result.json',
+              '',
+            ].join('\n'),
+          },
+        },
+        {
+          id: 'summarize',
+          name: 'Summarise → report/summary.md',
+          type: 'creation',
+          executor: 'script',
+          plugin: 'script-container',
+          autonomyLevel: 'L4',
+          agent: {
+            runtime: 'bash',
+            inlineScript: [
+              '#!/bin/sh',
+              'set -eu',
+              'test -f /workspace/data/sales.csv',
+              'mkdir -p /workspace/report',
+              'cd /workspace',
+              "ROWS=$(tail -n +2 data/sales.csv | wc -l | tr -d ' ')",
+              "TOTAL=$(tail -n +2 data/sales.csv | awk -F, '{s+=$3} END{print s}')",
+              "TOP=$(tail -n +2 data/sales.csv | sort -t, -k3 -nr | head -1 | cut -d, -f1)",
+              '{',
+              "  echo '# Sales summary'",
+              '  echo',
+              "  echo '| metric | value |'",
+              "  echo '|---|---|'",
+              '  echo "| rows | $ROWS |"',
+              '  echo "| total revenue | $TOTAL |"',
+              '  echo "| top region | $TOP |"',
+              '} > report/summary.md',
+              'printf \'{"ok":true}\' > /output/result.json',
+              '',
+            ].join('\n'),
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [
+        { from: 'generate-data', to: 'summarize' },
+        { from: 'summarize', to: 'done' },
+      ],
+      triggers: [{ type: 'manual', name: 'start' }],
+      createdAt: twoDaysAgo,
+    },
     'Supply Chain Review:1': {
       name: 'Supply Chain Review',
       namespace: 'test',

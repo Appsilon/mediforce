@@ -153,6 +153,11 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
         args.push('--add-dir', this.agentConfig.image ? '/data' : dir);
       }
     }
+    if (options?.pluginDir) {
+      // options.pluginDir is whatever the agent will actually see —
+      // the base plugin rewrites it to the container path in Docker mode.
+      args.push('--plugin-dir', options.pluginDir);
+    }
     // Headless pipeline: grant specific tool permissions so the agent never blocks on prompts.
     const allowedTools = ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep',
       ...(this.agentConfig.allowedTools ?? []),
@@ -210,13 +215,12 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
     return { args, promptDelivery: 'stdin' };
   }
 
-  getMockDockerArgs(stepId: string, isGitMode: boolean): string[] {
-    // /mock-data/ has the real output files (ro mount of data/outputs/cdiscpilot01-outputs/)
-    // /mock-fixtures/ has per-step result JSONs (ro mount of mock-fixtures/)
-    // 1. Copy all data files to /output/
-    // 2. Copy the step's fixture as /output/mock-result.json
-    // 3. In git mode: copy workspace files from fixture's _workspaceDir into /workspace/
-    // 4. Echo stream-json result to stdout
+  getMockDockerArgs(stepId: string): string[] {
+    // /mock-data/    — ro mount of real output files
+    // /mock-fixtures — ro mount of per-step result JSONs
+    // Every mock run: copy data to /output, copy fixture as /output/mock-result.json,
+    // optionally copy workspace files (from fixture's _workspaceDir) into /workspace/
+    // so the host commits them on step completion.
     const copyOutputCmd =
       `cp -r /mock-data/* /output/ 2>/dev/null; ` +
       `if [ -f "/mock-fixtures/${stepId}.json" ]; then ` +
@@ -225,6 +229,14 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
       `else ` +
         `echo '{"mock":true,"summary":"Mock output for step ${stepId}"}' > /output/mock-result.json && ` +
         `echo "[mock-agent] step=${stepId}: no fixture, generic mock" >&2; ` +
+      `fi`;
+
+    // If the fixture declares a `_workspaceDir`, copy it into /workspace so the host commits it.
+    const copyWorkspaceCmd =
+      `WSDIR=$(grep -o '"_workspaceDir"[[:space:]]*:[[:space:]]*"[^"]*"' /mock-fixtures/${stepId}.json 2>/dev/null | sed 's/.*"\\([^"]*\\)"$/\\1/'); ` +
+      `if [ -n "$WSDIR" ] && [ -d "/mock-data/$WSDIR" ]; then ` +
+        `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
+        `echo "[mock-agent] step=${stepId}: copied $WSDIR/ into /workspace/" >&2; ` +
       `fi`;
 
     const mockAgentResponse = JSON.stringify({
@@ -237,29 +249,9 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
       result: mockAgentResponse,
     });
 
-    if (isGitMode) {
-      // Read _workspaceDir from fixture JSON and copy real code/data into /workspace/
-      // so the entrypoint commits them to the git branch.
-      // Uses grep+sed to avoid needing jq in the container.
-      const copyWorkspaceCmd =
-        `WSDIR=$(grep -o '"_workspaceDir"[[:space:]]*:[[:space:]]*"[^"]*"' /mock-fixtures/${stepId}.json 2>/dev/null | sed 's/.*"\\([^"]*\\)"$/\\1/'); ` +
-        `if [ -n "$WSDIR" ] && [ -d "/mock-data/$WSDIR" ]; then ` +
-          `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
-          `echo "[mock-agent] step=${stepId}: copied $WSDIR/ into /workspace/ for git commit" >&2; ` +
-        `else ` +
-          `echo "# Mock output from step ${stepId}" > /workspace/mock-${stepId}-output.md; ` +
-        `fi`;
-
-      return [
-        'bash', '-c',
-        `${copyOutputCmd} && ${copyWorkspaceCmd} && ` +
-        `echo '${mockStreamJson.replace(/'/g, "'\\''")}'`,
-      ];
-    }
-
     return [
       'bash', '-c',
-      `${copyOutputCmd} && ` +
+      `${copyOutputCmd} && ${copyWorkspaceCmd}; ` +
       `echo '${mockStreamJson.replace(/'/g, "'\\''")}'`,
     ];
   }

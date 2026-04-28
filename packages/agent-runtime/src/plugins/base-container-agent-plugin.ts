@@ -1,4 +1,4 @@
-import { spawn, execSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath, cp } from 'node:fs/promises';
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
@@ -33,6 +33,9 @@ const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
 
 export const DEFAULT_TIMEOUT_MS = 20 * 60_000;
+
+/** Container-side path for bind-mounted Claude Code plugin roots. */
+export const CONTAINER_PLUGIN_MOUNT = '/plugin';
 
 // Monorepo root: this file lives at packages/agent-runtime/src/plugins/
 const MONOREPO_ROOT = process.env.MEDIFORCE_ROOT ?? resolve(__dirname_base, '../../../..');
@@ -82,15 +85,14 @@ export interface SpawnCliOptions {
   logFile?: string;
   timeoutMs?: number;
   outputDir?: string;
-  /** Host path to the skill directory — mounted at /workspace in standalone Docker mode. */
-  skillDir?: string;
-}
-
-export interface GitResultFile {
-  commitSha: string;
-  branch: string;
-  changedFiles: string[];
-  repoUrl: string;
+  /**
+   * Host path to the Claude Code plugin root — the directory containing
+   * `.claude-plugin/plugin.json` and `skills/`. When set, the runtime
+   * bind-mounts this at `/plugin` in Docker mode and agents can pass it
+   * via `--plugin-dir` so native skill resolution (including `references/`)
+   * works without polluting the workspace.
+   */
+  pluginDir?: string;
 }
 
 export interface SpawnDockerResult {
@@ -233,7 +235,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
   /** Return docker command args for mock mode (MOCK_AGENT=true).
    *  Must produce stdout that parseAgentOutput() can handle. */
-  abstract getMockDockerArgs(stepId: string, isGitMode: boolean): string[];
+  abstract getMockDockerArgs(stepId: string): string[];
 
   /** Extract the final result string from raw stdout (all lines joined).
    *  Must return a JSON string parseable by extractResult().
@@ -668,7 +670,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     let tempDir: string | null = null;
     let dockerOutputDir: string | null = null;
-    let localWorkspaceDir: string | null = null;
     let succeeded = false;
 
     try {
@@ -696,15 +697,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // In Docker mode, the agent sees /output; in local mode, the agent sees the real host path.
       const outputDirForPrompt = isLocalMode ? dockerOutputDir : '/output';
 
-      // In local standalone mode, create a workspace dir; in Docker, the agent sees /workspace.
-      let workingDirForPrompt: string | undefined;
-      if (isLocalMode) {
-        const rawWorkspaceDir = await mkdtemp(join(tmpdir(), 'mediforce-local-workspace-'));
-        localWorkspaceDir = await realpath(rawWorkspaceDir);
-        workingDirForPrompt = localWorkspaceDir;
-      } else {
-        workingDirForPrompt = '/workspace';
-      }
+      // Every run gets a shared git worktree via WorkspaceManager — one model, no branches.
+      await this.resolveRunWorkspace();
+      const workingDirForPrompt = isLocalMode ? this.runWorkspaceHandle!.path : '/workspace';
 
       // Fetch skills from workflow repo if configured
       if (this.agentConfig.skillsDir && isWorkflowAgentContext(this.context)) {
@@ -740,9 +735,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         options.addDirs = [tempDir];
       }
 
-      // Mount skill directory so reference files are available inside the container
-      if (this.agentConfig.skill && this.agentConfig.skillsDir) {
-        options.skillDir = join(this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath), this.agentConfig.skill);
+      // Plugin directory — host path to the Claude Code plugin that owns this skill.
+      // Convention: `skillsDir` points at `<plugin-root>/skills`; the plugin root
+      // (which holds `.claude-plugin/plugin.json`) is its parent directory.
+      // Agents that support `--plugin-dir` (Claude Code) pass this along so native
+      // skill resolution (SKILL.md + references/) works without workspace pollution.
+      if (this.agentConfig.skillsDir) {
+        const resolvedSkillsDir = this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath);
+        options.pluginDir = dirname(resolvedSkillsDir);
       }
 
       // Create activity log file for observability
@@ -892,6 +892,24 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         timestamp: new Date().toISOString(),
       });
 
+      // Commit whatever the agent wrote into /workspace before the error —
+      // ✗ marker on the run branch so failures are auditable. Best-effort:
+      // if this commit itself fails (e.g. worktree corrupt), we swallow that
+      // and rethrow the original error.
+      if (dockerOutputDir) {
+        try {
+          await this.commitRunWorkspace(dockerOutputDir, {
+            status: 'failed',
+            error: errorMessage,
+            durationMs: duration_ms,
+            agentPlugin: this.agentName,
+            agentImage: this.agentConfig.image,
+          });
+        } catch (commitErr) {
+          console.warn(`[${this.agentName}] Failed to commit failure artefacts:`, commitErr);
+        }
+      }
+
       // Re-throw so the agent runner's fallback handler deals with the error
       throw error;
     } finally {
@@ -901,9 +919,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       if (dockerOutputDir) {
         await rm(dockerOutputDir, { recursive: true, force: true }).catch(() => {});
       }
-      if (localWorkspaceDir) {
-        await rm(localWorkspaceDir, { recursive: true, force: true }).catch(() => {});
-      }
+      // Worktree is NOT disposed here — steps of the same run re-attach to it.
+      // A separate sweeper handles cleanup of worktrees from completed runs (out of v1 scope).
     }
   }
 
@@ -1025,44 +1042,23 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       `- "0.40 — Source document was a low-quality scan with multiple illegible sections. Significant guesswork on 3 out of 8 fields."`,
     );
 
-    // 4. Output directory & workspace — depends on whether this is a git-mode step
-    const isGitMode = Boolean(this.agentConfig.repo && this.agentConfig.commit);
-
-    if (isGitMode && workingDir && outputDir) {
-      // Git mode: deliverables go to /workspace/ (committed to git),
-      // only the result contract goes to /output/
+    // 4. Workspace + result contract directories (unified — every run has a git worktree).
+    if (workingDir && outputDir) {
       parts.push(
-        `## Workspace Directory (Git Repo)\n` +
-        `Your git workspace is at: ${workingDir}\n` +
+        `## Workspace Directory (Git Worktree)\n` +
+        `Your workspace is at: ${workingDir}\n` +
         `Write ALL deliverable files here — R scripts, data files, specs, reports, etc.\n` +
         `Use subdirectories like ${workingDir}/code/ and ${workingDir}/data/ as appropriate.\n` +
-        `Everything in this directory will be committed and pushed to the git repository.\n` +
+        `Everything in this directory will be committed on step completion.\n` +
         `Whenever the skill instructions reference {output_dir}, use ${workingDir} instead.\n` +
         `You MUST use full absolute paths when calling Write. Relative paths will be rejected.`,
       );
       parts.push(
         `## Result Contract Directory\n` +
         `Write ONLY the output result contract JSON to: ${outputDir}/result.json\n` +
-        `Do NOT write deliverable files to ${outputDir} — they will not be committed to git.\n` +
+        `Do NOT write deliverable files to ${outputDir} — they will not be committed.\n` +
         `The ${outputDir} directory is for the result contract and temporary/intermediate files only.`,
       );
-    } else {
-      // Non-git mode: everything goes to output dir
-      if (outputDir) {
-        parts.push(
-          `## Output Directory\n` +
-          `Write all output files to this absolute path: ${outputDir}\n` +
-          `You MUST use the full absolute path when calling Write. Relative paths will be rejected.`,
-        );
-      }
-
-      if (workingDir) {
-        parts.push(
-          `## Working Directory\n` +
-          `Your workspace is at: ${workingDir}\n` +
-          `Read source files and write code changes within this directory.`,
-        );
-      }
     }
 
     // 5. Input context
@@ -1202,68 +1198,16 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     options: SpawnCliOptions,
     workingDir: string,
   ): Promise<SpawnDockerResult> {
-    const repo = this.agentConfig.repo;
-    const commit = this.agentConfig.commit;
-    const isGitMode = Boolean(repo && commit);
     const outputDir = options.outputDir!;
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const logFile = options.logFile ?? null;
-    const processInstanceId = this.context.processInstanceId;
-    const stepId = this.context.stepId;
 
     // Write prompt to file for debugging and 'file' delivery mode
     const promptFilePath = join(outputDir, 'prompt.txt');
     await writeFile(promptFilePath, prompt, 'utf-8');
 
     await this.prepareOutputDir(outputDir);
-
-    // --- Git mode: clone, branch, set up workspace ---
-    if (isGitMode) {
-      const { gitUrl, httpsUrl } = normalizeRepoUrls(repo!);
-      const branch = `run/${processInstanceId}`;
-      const deployKeyPath = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-
-      // SSH command that uses the deploy key
-      const sshCmd = `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR`;
-
-      console.log(`[${this.agentName}] Local git mode: cloning ${gitUrl} into ${workingDir}`);
-      try {
-        execSync(`GIT_SSH_COMMAND="${sshCmd}" git clone "${gitUrl}" "${workingDir}"`, {
-          stdio: 'pipe',
-          env: { ...process.env, GIT_SSH_COMMAND: sshCmd },
-        });
-      } catch (cloneErr) {
-        const msg = cloneErr instanceof Error ? cloneErr.message : String(cloneErr);
-        throw new Error(
-          `Git clone failed for step '${stepId}': ${msg}. ` +
-          `Check DEPLOY_KEY_PATH env var (current: ${deployKeyPath}) and repo access (${repo}).`,
-        );
-      }
-
-      // Configure git identity
-      execSync('git config user.email "agent@mediforce.dev"', { cwd: workingDir, stdio: 'pipe' });
-      execSync(`git config user.name "Mediforce Agent (${stepId})"`, { cwd: workingDir, stdio: 'pipe' });
-
-      // Checkout starting commit
-      execSync(`git checkout "${commit}"`, { cwd: workingDir, stdio: 'pipe' });
-
-      // Create or checkout the working branch
-      try {
-        execSync(`GIT_SSH_COMMAND="${sshCmd}" git ls-remote --exit-code --heads origin "${branch}"`, {
-          cwd: workingDir,
-          stdio: 'pipe',
-          env: { ...process.env, GIT_SSH_COMMAND: sshCmd },
-        });
-        // Branch exists on remote
-        execSync(`git checkout -B "${branch}" "origin/${branch}"`, { cwd: workingDir, stdio: 'pipe' });
-      } catch {
-        // Branch doesn't exist — create new
-        execSync(`git checkout -b "${branch}"`, { cwd: workingDir, stdio: 'pipe' });
-      }
-    } else if (options.skillDir) {
-      // Standalone mode: copy skill files into workspace
-      await cp(options.skillDir, workingDir, { recursive: true });
-    }
+    // Workspace (git worktree) is already set up by run() → resolveRunWorkspace; nothing to do here.
 
     // --- Spawn the agent CLI ---
     const commandSpec = this.getAgentCommand(promptFilePath, options);
@@ -1367,53 +1311,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       child.stdin.end();
     });
 
-    // --- Git mode post-run: commit & push ---
-    let gitMetadata: GitMetadata | null = null;
-    if (isGitMode) {
-      const { httpsUrl } = normalizeRepoUrls(repo!);
-      const branch = `run/${processInstanceId}`;
-      const deployKeyPath = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-      const sshCmd = `ssh -i ${deployKeyPath} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR`;
-
-      try {
-        execSync('git add -A', { cwd: workingDir, stdio: 'pipe' });
-
-        // Check if there are changes
-        try {
-          execSync('git diff --cached --quiet', { cwd: workingDir, stdio: 'pipe' });
-          // No changes
-          console.log(`[${this.agentName}] No git changes to commit`);
-        } catch {
-          // There are staged changes — commit and push
-          const commitMessage = `agent(${stepId}): automated output\n\nStep: ${stepId}\nBranch: ${branch}\nStart commit: ${commit}`;
-          execSync(`git commit -m "${commitMessage}"`, { cwd: workingDir, stdio: 'pipe' });
-
-          const commitSha = execSync('git rev-parse HEAD', { cwd: workingDir, encoding: 'utf-8' }).trim();
-          const changedFiles = execSync('git diff --name-only HEAD~1', { cwd: workingDir, encoding: 'utf-8' })
-            .trim().split('\n').filter(Boolean);
-
-          execSync(`GIT_SSH_COMMAND="${sshCmd}" git push origin "${branch}"`, {
-            cwd: workingDir,
-            stdio: 'pipe',
-            env: { ...process.env, GIT_SSH_COMMAND: sshCmd },
-          });
-
-          gitMetadata = {
-            commitSha,
-            branch,
-            changedFiles,
-            repoUrl: httpsUrl || repo!,
-          };
-
-          // Also write git-result.json for consistency
-          const gitResult: GitResultFile = { commitSha, branch, changedFiles, repoUrl: httpsUrl || repo! };
-          await writeFile(join(outputDir, 'git-result.json'), JSON.stringify(gitResult, null, 2), 'utf-8');
-        }
-      } catch (gitErr) {
-        const msg = gitErr instanceof Error ? gitErr.message : String(gitErr);
-        throw new Error(`Git commit/push failed for step '${stepId}': ${msg}`);
-      }
-    }
+    const gitMetadata = await this.commitRunWorkspace(outputDir, {
+      status: 'success',
+      agentPlugin: this.agentName,
+      agentImage: this.agentConfig.image,
+    });
 
     // Read presentation.html from local output directory
     let localPresentation: string | null = null;
@@ -1430,12 +1332,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     prompt: string,
     options?: SpawnCliOptions,
   ): Promise<SpawnDockerResult> {
-    const repo = this.agentConfig.repo;
-    const commit = this.agentConfig.commit;
     const image = this.agentConfig.image;
 
     if (!image) {
       throw new Error(`agentConfig.image is required for Docker container execution`);
+    }
+    if (!this.runWorkspaceHandle) {
+      throw new Error('runWorkspaceHandle is not set — resolveRunWorkspace() must run before spawnDockerContainer()');
     }
 
     const imageBuild = resolveImageBuild(image, this.agentConfig, this.context, this.resolvedEnv.vars);
@@ -1444,16 +1347,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const internalVars = this.getInternalEnvVars();
     const envVars = { ...this.resolvedEnv.vars, ...internalVars };
     const injectedEnvVars = this.resolvedEnv.injectedKeys;
-
-    const isGitMode = Boolean(repo && commit);
-
-    let gitUrl = '';
-    let httpsUrl = '';
-    if (repo) {
-      const urls = normalizeRepoUrls(repo);
-      gitUrl = urls.gitUrl;
-      httpsUrl = urls.httpsUrl;
-    }
 
     // Use pre-created output dir from options, or create one
     let outputDir: string;
@@ -1493,28 +1386,20 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       dockerArgs.push('-e', `${key}=${value}`);
     }
 
-    if (isGitMode) {
-      // Git mode: mount entrypoint and deploy key, set git env vars
-      const deployKeyPath = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');
-      const entrypointPath = join(__dirname_base, '..', '..', 'container', 'entrypoint.sh');
+    // /workspace: bind-mount the host run worktree (read-write)
+    dockerArgs.push(
+      '-v', `${this.runWorkspaceHandle.path}:/workspace`,
+      '-w', '/workspace',
+    );
 
-      dockerArgs.push(
-        '-v', `${deployKeyPath}:/root/.ssh/deploy_key:ro`,
-        '-v', `${entrypointPath}:/entrypoint.sh:ro`,
-        '-e', `GIT_REPO=${gitUrl}`,
-        '-e', `GIT_BRANCH=run/${processInstanceId}`,
-        '-e', `START_COMMIT=${commit}`,
-        '-e', `STEP_ID=${stepId}`,
-        ...(httpsUrl ? ['-e', `REPO_URL=${httpsUrl}`] : []),
-      );
-    } else {
-      // Standalone mode: no git, just set working directory
-      dockerArgs.push('-w', '/workspace');
-
-      // Mount skill directory so reference files (e.g. references/*.md) are readable
-      if (options?.skillDir) {
-        dockerArgs.push('-v', `${options.skillDir}:/workspace:ro`);
-      }
+    // Bind-mount the Claude Code plugin root (read-only) when skillsDir is configured.
+    // The host `options.pluginDir` becomes `${CONTAINER_PLUGIN_MOUNT}` inside the container;
+    // we rewrite the options before getAgentCommand so the agent always receives the path
+    // it will actually see (no Docker-vs-local branching in subclass code).
+    const containerOptions: SpawnCliOptions = { ...options };
+    if (options?.pluginDir) {
+      dockerArgs.push('-v', `${options.pluginDir}:${CONTAINER_PLUGIN_MOUNT}:ro`);
+      containerOptions.pluginDir = CONTAINER_PLUGIN_MOUNT;
     }
 
     // Mount data directory if files were downloaded
@@ -1538,16 +1423,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     dockerArgs.push(image);
 
-    // Command to run inside container
-    if (isGitMode) {
-      dockerArgs.push('/entrypoint.sh');
-    }
-
     let promptViaStdin = false;
     if (isMockAgent) {
-      dockerArgs.push(...this.getMockDockerArgs(stepId, isGitMode));
+      dockerArgs.push(...this.getMockDockerArgs(stepId));
     } else {
-      const commandSpec = this.getAgentCommand('/output/prompt.txt', options);
+      const commandSpec = this.getAgentCommand('/output/prompt.txt', containerOptions);
       dockerArgs.push(...commandSpec.args);
       promptViaStdin = commandSpec.promptDelivery === 'stdin';
     }
@@ -1611,21 +1491,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       cliOutput = await this.recoverOutputFromDirectory(outputDir);
     }
 
-    // Read git-result.json from the output directory
-    let gitMetadata: GitMetadata | null = null;
-    try {
-      const gitResultPath = join(outputDir, 'git-result.json');
-      const gitResultRaw = await readFile(gitResultPath, 'utf-8');
-      const gitResult = JSON.parse(gitResultRaw) as GitResultFile;
-      gitMetadata = {
-        commitSha: gitResult.commitSha,
-        branch: gitResult.branch,
-        changedFiles: gitResult.changedFiles,
-        repoUrl: gitResult.repoUrl,
-      };
-    } catch {
-      // git-result.json may not exist if the agent made no changes
-    }
+    const gitMetadata = await this.commitRunWorkspace(outputDir, {
+      status: 'success',
+      agentPlugin: this.agentName,
+      agentImage: this.agentConfig.image,
+    });
 
     // Read presentation.html from the output directory (optional agent-provided HTML view)
     let presentation: string | null = null;

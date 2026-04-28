@@ -117,6 +117,10 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Worktrees are NOT swept. Full audit is the design goal: every run branch
+    // AND its worktree persist indefinitely so an operator can `cd` in at any
+    // later point and inspect what the agent produced. `disposeRunWorkspace`
+    // stays available as a manual admin API; the heartbeat never calls it.
     return NextResponse.json({ triggered, skipped });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
