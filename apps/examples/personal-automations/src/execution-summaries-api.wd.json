@@ -1,8 +1,8 @@
 {
   "name": "execution-summaries-api",
   "title": "Execution Summaries API",
-  "description": "Echo webhook payload through HTTP to validate the spike #9 model",
-  "preamble": "## Domain Context\nSpike #9 reference workflow. Validates webhook trigger -> http action -> polling round-trip against a local echo server.",
+  "description": "Echo webhook payload through HTTP. Reference template for webhook + single http action.",
+  "preamble": "## Domain Context\nReference workflow. Validates webhook trigger -> http action -> polling round-trip against a local echo server.",
   "triggers": [
     {
       "type": "webhook",

@@ -1,7 +1,7 @@
 /**
- * Spike #11 golden e2e: pogodynka — daily weather forecast workflow.
+ * Golden e2e: daily-weather — fetch → reshape → push×2 → terminal.
  *
- * What this validates beyond spike #9 / #10:
+ * What this validates beyond execution-summaries-api / food-log-proxy:
  *  - **Multi-action chain (4 actions)**: fetch-weather (http GET) → format
  *    (reshape) → push-pushover (http POST) → push-ntfy (http POST). Two
  *    parallel sinks downstream of one shape — variable propagation across
@@ -10,7 +10,7 @@
  *    real third-party API shapes (OpenWeatherMap, Pushover, ntfy.sh).
  *  - **Reshape with deep field access**: `steps.fetch-weather.body.json.list[0].weather[0].description`
  *    walks nested arrays + objects from a real-world response.
- *  - **Manual trigger path** (instead of webhook) — pogodynka's primary
+ *  - **Manual trigger path** (instead of webhook) — daily-weather's primary
  *    trigger is cron `0 6 * * *`; the e2e fires the parallel manual trigger
  *    through services.manualTrigger so the test stays deterministic without
  *    spinning the cron heartbeat.
@@ -47,7 +47,7 @@ import type { WorkflowDefinition } from '@mediforce/platform-core';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = resolve(
   __dirname,
-  '../../../apps/examples/personal-automations/src/pogodynka.wd.json',
+  '../../../apps/examples/personal-automations/src/daily-weather.wd.json',
 );
 
 // ---- Canned third-party responses ------------------------------------------
@@ -60,24 +60,24 @@ const FAKE_OWM_FORECAST = {
     {
       dt: 1745740800,
       main: { temp: 12.5, feels_like: 11.2, temp_min: 10, temp_max: 14, pressure: 1015, humidity: 65 },
-      weather: [{ id: 803, main: 'Clouds', description: 'zachmurzenie umiarkowane', icon: '04d' }],
+      weather: [{ id: 803, main: 'Clouds', description: 'broken clouds', icon: '04d' }],
       clouds: { all: 60 },
       wind: { speed: 3.5, deg: 270 },
     },
   ],
   city: {
-    id: 756135,
-    name: 'Warsaw',
-    coord: { lat: 52.2297, lon: 21.0122 },
-    country: 'PL',
-    population: 1702139,
-    timezone: 7200,
+    id: 2643743,
+    name: 'London',
+    coord: { lat: 51.5085, lon: -0.1257 },
+    country: 'GB',
+    population: 1000000,
+    timezone: 0,
   },
 };
 
 const FAKE_PUSHOVER_SUCCESS = { status: 1, request: 'pushover-req-123' };
 // ntfy returns a JSON receipt with the published message metadata.
-const FAKE_NTFY_RECEIPT = { id: 'ntfy-msg-456', time: 1745740800, expires: 1745912400, event: 'message', topic: 'filip' };
+const FAKE_NTFY_RECEIPT = { id: 'ntfy-msg-456', time: 1745740800, expires: 1745912400, event: 'message', topic: 'examples-test' };
 
 // ---- Wiring: in-memory services + handler glue -----------------------------
 
@@ -125,7 +125,7 @@ vi.mock('@/app/actions/workflow-secrets', () => ({
     OWM_KEY: 'test-owm-key-abc',
     PUSHOVER_TOKEN: 'test-pushover-token',
     PUSHOVER_USER: 'test-pushover-user',
-    NTFY_TOPIC: 'filip-test',
+    NTFY_TOPIC: 'examples-test',
   }),
 }));
 
@@ -133,9 +133,9 @@ const { POST: runPost } = await import('@/app/api/processes/[instanceId]/run/rou
 const { GET: runsGet } = await import('@/app/api/runs/[runId]/route');
 
 // ---- fetch shim: intercept the three third-party hostnames -----------------
-// Spike #9/#10 used a local echo server; pogodynka talks to three different
-// shapes (OWM forecast, Pushover messages, ntfy publish). Easier to canned-
-// response them here than to spin up shape-aware mock servers per host.
+// daily-weather talks to three different shapes (OWM forecast, Pushover
+// messages, ntfy publish). Easier to canned-response them here than to spin
+// up shape-aware mock servers per host.
 
 const realFetch = globalThis.fetch;
 let capturedRequests: Array<{ url: string; method: string; body: unknown; headers: Record<string, unknown> }> = [];
@@ -211,7 +211,7 @@ beforeEach(async () => {
   }
   const definition: WorkflowDefinition = {
     ...parsed.data,
-    namespace: 'filip',
+    namespace: 'examples',
     version: 1,
   };
   await services.processRepo.saveWorkflowDefinition(definition);
@@ -223,28 +223,29 @@ afterEach(() => {
 
 // ---- The golden test --------------------------------------------------------
 
-describe('spike #11: pogodynka — fetch → reshape → push×2 → terminal', () => {
+describe('daily-weather: fetch → reshape → push×2 → terminal', () => {
   it('runs end-to-end via manual trigger and pushes weather to Pushover + ntfy', async () => {
     // Fire via manual trigger (parallel to cron daily-6am). Manual trigger is
     // declared in the workflow alongside cron so e2e + ad-hoc human runs
     // share the same engine path.
     const triggerResult = await services.manualTrigger.fireWorkflow({
-      definitionName: 'pogodynka',
+      definitionName: 'daily-weather',
       definitionVersion: 1,
       triggerName: 'test',
-      triggeredBy: 'spike-11-test',
+      triggeredBy: 'daily-weather-test',
     });
     const runId = triggerResult.instanceId;
 
-    // Drive the auto-runner directly — same pattern as spike #9/#10. The
-    // route handler uses the mocked platform-services + workflow-secrets,
-    // so secrets interpolation runs against the test's canned bag.
+    // Drive the auto-runner directly — same pattern as the other action-flow
+    // e2e tests. The route handler uses the mocked platform-services +
+    // workflow-secrets, so secrets interpolation runs against the test's
+    // canned bag.
     const runReq = new NextRequest(
       `http://localhost/api/processes/${runId}/run`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ triggeredBy: 'spike-11-test' }),
+        body: JSON.stringify({ triggeredBy: 'daily-weather-test' }),
       },
     );
     await runPost(runReq, { params: Promise.resolve({ instanceId: runId }) });
@@ -280,7 +281,7 @@ describe('spike #11: pogodynka — fetch → reshape → push×2 → terminal', 
     };
     expect(finalOutput.status).toBe(200);
     expect(finalOutput.method).toBe('POST');
-    expect(finalOutput.url).toBe('https://ntfy.sh/filip-test');
+    expect(finalOutput.url).toBe('https://ntfy.sh/examples-test');
     expect(finalOutput.body.json).toEqual(FAKE_NTFY_RECEIPT);
 
     // Cross-check that all 3 third-party calls fired in order with the
@@ -288,7 +289,7 @@ describe('spike #11: pogodynka — fetch → reshape → push×2 → terminal', 
     const owmRequest = capturedRequests.find((r) => r.url.includes('openweathermap'));
     expect(owmRequest, 'OpenWeatherMap call missing').toBeDefined();
     expect(owmRequest!.url).toBe(
-      'https://api.openweathermap.org/data/2.5/forecast?q=Warsaw,PL&units=metric&lang=pl&appid=test-owm-key-abc',
+      'https://api.openweathermap.org/data/2.5/forecast?q=London,UK&units=metric&lang=en&appid=test-owm-key-abc',
     );
 
     const pushoverRequest = capturedRequests.find((r) => r.url.includes('pushover'));
@@ -297,15 +298,15 @@ describe('spike #11: pogodynka — fetch → reshape → push×2 → terminal', 
     expect(pushoverRequest!.body).toEqual({
       token: 'test-pushover-token',
       user: 'test-pushover-user',
-      title: 'Pogodynka Warsaw',
-      message: 'zachmurzenie umiarkowane, 12.5°C (feels 11.2°C)',
+      title: 'Weather London',
+      message: 'broken clouds, 12.5°C (feels 11.2°C)',
     });
 
     const ntfyRequest = capturedRequests.find((r) => r.url.includes('ntfy.sh'));
     expect(ntfyRequest, 'ntfy call missing').toBeDefined();
-    expect(ntfyRequest!.url).toBe('https://ntfy.sh/filip-test');
-    expect(ntfyRequest!.body).toBe('zachmurzenie umiarkowane, 12.5°C (feels 11.2°C)');
-    expect((ntfyRequest!.headers as Record<string, string>).Title).toBe('Pogodynka Warsaw');
+    expect(ntfyRequest!.url).toBe('https://ntfy.sh/examples-test');
+    expect(ntfyRequest!.body).toBe('broken clouds, 12.5°C (feels 11.2°C)');
+    expect((ntfyRequest!.headers as Record<string, string>).Title).toBe('Weather London');
     expect((ntfyRequest!.headers as Record<string, string>).Tags).toBe('sun_with_face');
   });
 });

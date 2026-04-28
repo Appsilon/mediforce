@@ -11,7 +11,7 @@
     "test:run": "vitest run",
     "test:watch": "vitest",
     "test:mcp-real": "vitest run --config vitest.config.e2e-api.ts",
-    "test:spike-9": "vitest run --config vitest.config.spike.ts",
+    "test:action-flows": "vitest run --config vitest.config.action-flows.ts",
     "test:e2e": "playwright test",
     "test:e2e:auth": "NEXT_PUBLIC_USE_EMULATORS=true playwright test",
     "test:e2e:auth:headed": "NEXT_PUBLIC_USE_EMULATORS=true playwright test --headed",

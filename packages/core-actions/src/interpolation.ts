@@ -62,7 +62,7 @@ export function getPath(source: unknown, dotPath: string): unknown {
 }
 
 /** Pattern matches `${path}` — captures the dot-notation path inside the braces.
- *  Backslash escape is intentionally NOT supported in spike (no callers need it
+ *  Backslash escape is intentionally NOT supported (no callers need it
  *  and it keeps the parser trivial). */
 const PLACEHOLDER_RE = /\$\{([^}]+)\}/g;
 

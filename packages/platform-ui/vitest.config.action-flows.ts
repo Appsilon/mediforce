@@ -3,10 +3,11 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
 /**
- * Vitest config for spike #9 e2e — drives webhook trigger → http action →
- * polling round-trip end-to-end through the real handlers + a local echo
- * server. Off the default `pnpm test` suite to keep its boot footprint
- * (no Firebase emulators required, but spawns a Node http server).
+ * Vitest config for action-flow e2e — drives webhook/cron triggers → http +
+ * reshape actions → polling round-trip end-to-end through the real handlers
+ * plus a local echo server. Off the default `pnpm test` suite to keep its
+ * boot footprint (no Firebase emulators required, but spawns a Node http
+ * server).
  */
 export default defineConfig({
   plugins: [react()],
@@ -31,7 +32,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    include: ['e2e/spike-*.e2e.ts'],
+    include: [
+      'e2e/execution-summaries-api.e2e.ts',
+      'e2e/food-log-proxy.e2e.ts',
+      'e2e/daily-weather.e2e.ts',
+    ],
     testTimeout: 30_000,
     hookTimeout: 15_000,
   },

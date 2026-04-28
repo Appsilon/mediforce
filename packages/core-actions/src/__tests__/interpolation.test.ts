@@ -4,7 +4,7 @@ import type { InterpolationSources } from '../types.js';
 
 const sources: InterpolationSources = {
   triggerPayload: {
-    body: { hello: 'filip', items: [{ id: 1 }, { id: 2 }] },
+    body: { hello: 'world', items: [{ id: 1 }, { id: 2 }] },
     method: 'POST',
   },
   steps: {
@@ -53,13 +53,13 @@ describe('interpolate', () => {
 
   it('resolves a sole placeholder to its raw value (preserves objects)', () => {
     const result = interpolate('${triggerPayload.body}', sources);
-    expect(result).toEqual({ hello: 'filip', items: [{ id: 1 }, { id: 2 }] });
+    expect(result).toEqual({ hello: 'world', items: [{ id: 1 }, { id: 2 }] });
   });
 
   it('concatenates multi-placeholder templates as strings', () => {
     expect(
       interpolate('${variables.greeting}, ${triggerPayload.body.hello}!', sources),
-    ).toBe('hi, filip!');
+    ).toBe('hi, world!');
   });
 
   it('walks array index inside multi-placeholder', () => {
@@ -71,7 +71,7 @@ describe('interpolate', () => {
   it('JSON-stringifies non-string values inside multi-placeholder', () => {
     expect(
       interpolate('payload=${triggerPayload.body}', sources),
-    ).toBe('payload={"hello":"filip","items":[{"id":1},{"id":2}]}');
+    ).toBe('payload={"hello":"world","items":[{"id":1},{"id":2}]}');
   });
 
   it('renders missing placeholders as empty string in concat', () => {
@@ -88,7 +88,7 @@ describe('interpolate', () => {
 
   it('walks into arrays', () => {
     const out = interpolate(['${triggerPayload.body.hello}', 'static'], sources);
-    expect(out).toEqual(['filip', 'static']);
+    expect(out).toEqual(['world', 'static']);
   });
 
   it('falls back across sources for bare identifiers', () => {

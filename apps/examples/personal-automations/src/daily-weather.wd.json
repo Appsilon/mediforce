@@ -1,8 +1,8 @@
 {
-  "name": "pogodynka",
-  "title": "Codzienna pogodynka",
-  "description": "Daily 6am weather forecast for Warsaw. Fetches OpenWeatherMap, formats summary, pushes via Pushover and ntfy.sh.",
-  "preamble": "Personal automation. Morning weather summary delivered to phone via push notifications. Migrated from n8n (workflow 2NGywSFmAgIz2tZG).",
+  "name": "daily-weather",
+  "title": "Daily weather",
+  "description": "Daily 6am weather forecast. Fetches OpenWeatherMap, formats summary, pushes via Pushover and ntfy.sh.",
+  "preamble": "Reference template. Morning weather summary delivered via push notifications.",
   "triggers": [
     {
       "type": "cron",
@@ -24,7 +24,7 @@
         "kind": "http",
         "config": {
           "method": "GET",
-          "url": "https://api.openweathermap.org/data/2.5/forecast?q=Warsaw,PL&units=metric&lang=pl&appid=${secrets.OWM_KEY}"
+          "url": "https://api.openweathermap.org/data/2.5/forecast?q=London,UK&units=metric&lang=en&appid=${secrets.OWM_KEY}"
         }
       }
     },
@@ -41,7 +41,7 @@
             "tempC": "${steps.fetch-weather.body.json.list[0].main.temp}",
             "feelsLikeC": "${steps.fetch-weather.body.json.list[0].main.feels_like}",
             "description": "${steps.fetch-weather.body.json.list[0].weather[0].description}",
-            "title": "Pogodynka ${steps.fetch-weather.body.json.city.name}",
+            "title": "Weather ${steps.fetch-weather.body.json.city.name}",
             "message": "${steps.fetch-weather.body.json.list[0].weather[0].description}, ${steps.fetch-weather.body.json.list[0].main.temp}°C (feels ${steps.fetch-weather.body.json.list[0].main.feels_like}°C)"
           }
         }

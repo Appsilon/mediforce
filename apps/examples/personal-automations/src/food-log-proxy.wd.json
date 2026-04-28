@@ -1,8 +1,8 @@
 {
   "name": "food-log-proxy",
   "title": "Food Log Proxy",
-  "description": "Webhook -> http proxy -> reshape. Mirrors n8n's food-log-proxy-getfoodlog (3 nodes) and validates chained actions + reshape kind.",
-  "preamble": "## Domain Context\nSpike #10 reference workflow. Validates that two chained `executor: 'action'` steps (http + reshape) propagate variables through the engine and that the reshape kind composes cleanly with http output.",
+  "description": "Webhook -> http proxy -> reshape. Reference template for chained actions + reshape kind.",
+  "preamble": "## Domain Context\nReference workflow. Validates that two chained `executor: 'action'` steps (http + reshape) propagate variables through the engine and that the reshape kind composes cleanly with http output.",
   "triggers": [
     {
       "type": "webhook",

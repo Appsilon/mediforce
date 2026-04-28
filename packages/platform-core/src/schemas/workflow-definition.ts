@@ -44,8 +44,8 @@ export const ReshapeActionConfigSchema = z.object({
   values: z.record(z.string(), z.unknown()),
 });
 
-/** Discriminated union of action configs. Spike ships only `http`; future
- *  kinds (wait, subworkflow, email, set) plug in here. */
+/** Discriminated union of action configs. Future kinds (wait, subworkflow,
+ *  email, set) plug in here. */
 export const ActionConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('http'), config: HttpActionConfigSchema }),
   z.object({ kind: z.literal('reshape'), config: ReshapeActionConfigSchema }),

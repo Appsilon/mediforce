@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Reference templates for Filip's personal automations migrated from n8n",
+  "description": "Reference workflow templates demonstrating webhook, cron, http and reshape actions",
   "scripts": {
     "test": "vitest run"
   },

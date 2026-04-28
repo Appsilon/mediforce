@@ -1,5 +1,5 @@
 /**
- * Spike #9 golden e2e: webhook → http action → polling → echo round-trip.
+ * Golden e2e: webhook → http action → polling → echo round-trip.
  *
  * What this test owns (decision boundaries):
  *  - Validates the full request lifecycle through the real Next.js handlers
@@ -89,7 +89,7 @@ vi.mock('@/lib/platform-services', () => ({
 }));
 
 // The auto-runner's env-validation pre-flight reaches into Firestore via
-// the workflow-secrets server action. Spike workflow declares no env, so
+// the workflow-secrets server action. This workflow declares no env, so
 // skipping the lookup is safe — return an empty record.
 vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretsForRuntime: async () => ({}),
@@ -156,7 +156,7 @@ beforeEach(async () => {
   }
   const definition: WorkflowDefinition = {
     ...parsed.data,
-    namespace: 'filip',
+    namespace: 'examples',
     version: 1,
     // Override the URL so the workflow targets the local echo server even
     // when other tests change ECHO_PORT.
@@ -181,11 +181,11 @@ afterEach(() => {
 
 // ---- The golden test --------------------------------------------------------
 
-describe('spike #9: webhook → http action → polling → echo round-trip', () => {
+describe('execution-summaries-api: webhook → http action → polling → echo round-trip', () => {
   it('completes a webhook-driven workflow end-to-end with echoed payload', async () => {
-    const payload = { hello: 'filip', greeting: 'caveman' };
+    const payload = { hello: 'world', greeting: 'caveman' };
     const webhookReq = new NextRequest(
-      'http://localhost/api/triggers/webhook/filip/execution-summaries-api/execution-summaries',
+      'http://localhost/api/triggers/webhook/examples/execution-summaries-api/execution-summaries',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -195,7 +195,7 @@ describe('spike #9: webhook → http action → polling → echo round-trip', ()
 
     const webhookRes = await webhookPost(webhookReq, {
       params: Promise.resolve({
-        path: ['filip', 'execution-summaries-api', 'execution-summaries'],
+        path: ['examples', 'execution-summaries-api', 'execution-summaries'],
       }),
     });
     expect(webhookRes.status).toBe(202);

@@ -6,7 +6,7 @@ const baseCtx: ActionContext = {
   stepId: 'echo',
   processInstanceId: 'inst-1',
   sources: {
-    triggerPayload: { body: { hello: 'filip' }, method: 'POST' },
+    triggerPayload: { body: { hello: 'world' }, method: 'POST' },
     steps: {},
     variables: {},
     secrets: {},
@@ -26,7 +26,7 @@ describe('httpActionHandler', () => {
 
   it('sends an interpolated POST body and returns parsed JSON', async () => {
     fetchSpy.mockResolvedValueOnce(
-      new Response(JSON.stringify({ ok: true, echo: { hello: 'filip' } }), {
+      new Response(JSON.stringify({ ok: true, echo: { hello: 'world' } }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       }),
@@ -45,15 +45,15 @@ describe('httpActionHandler', () => {
     const [calledUrl, init] = fetchSpy.mock.calls[0];
     expect(calledUrl).toBe('http://localhost:9099/anything');
     expect(init?.method).toBe('POST');
-    expect(init?.body).toBe(JSON.stringify({ hello: 'filip' }));
+    expect(init?.body).toBe(JSON.stringify({ hello: 'world' }));
     expect((init?.headers as Record<string, string>)['Content-Type']).toBe('application/json');
 
     expect(out.status).toBe(200);
     expect(out.method).toBe('POST');
     expect(out.url).toBe('http://localhost:9099/anything');
     expect(out.body).toEqual({
-      json: { ok: true, echo: { hello: 'filip' } },
-      text: JSON.stringify({ ok: true, echo: { hello: 'filip' } }),
+      json: { ok: true, echo: { hello: 'world' } },
+      text: JSON.stringify({ ok: true, echo: { hello: 'world' } }),
     });
   });
 

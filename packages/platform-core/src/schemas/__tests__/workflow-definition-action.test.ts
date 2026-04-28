@@ -39,7 +39,7 @@ describe('workflow-definition action executor', () => {
   it('parses a workflow with executor:action and http config', () => {
     const result = parseWorkflowDefinitionForCreation({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
     });
     expect(result.success).toBe(true);
   });
@@ -47,7 +47,7 @@ describe('workflow-definition action executor', () => {
   it('rejects executor:action without action config', () => {
     const result = parseWorkflowDefinitionForCreation({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
       steps: [
         {
           id: 'echo',
@@ -66,7 +66,7 @@ describe('workflow-definition action executor', () => {
   it('rejects action config on non-action executor', () => {
     const result = parseWorkflowDefinitionForCreation({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
       steps: [
         {
           id: 'echo',
@@ -83,7 +83,7 @@ describe('workflow-definition action executor', () => {
   it('rejects unknown action kind', () => {
     const result = parseWorkflowDefinitionForCreation({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
       steps: [
         {
           id: 'echo',
@@ -100,7 +100,7 @@ describe('workflow-definition action executor', () => {
   it('rejects webhook trigger without method+path config', () => {
     const result = parseWorkflowDefinitionForCreation({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
       triggers: [{ type: 'webhook', name: 'main', config: {} }],
     });
     expect(result.success).toBe(false);
@@ -109,7 +109,7 @@ describe('workflow-definition action executor', () => {
   it('rejects webhook trigger with bad path (missing leading /)', () => {
     const result = parseWorkflowDefinitionForCreation({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
       triggers: [
         {
           type: 'webhook',
@@ -129,7 +129,7 @@ describe('workflow-definition action executor', () => {
   it('rejects templates that include namespace', () => {
     const result = parseWorkflowTemplate({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
     });
     // Templates carry no namespace; loader injects it. With the omit() schema
     // an extra key is silently stripped — so we still expect success but the
@@ -143,7 +143,7 @@ describe('workflow-definition action executor', () => {
   it('full WorkflowDefinitionSchema with namespace + version parses', () => {
     const result = WorkflowDefinitionSchema.safeParse({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
       version: 1,
     });
     expect(result.success).toBe(true);
@@ -152,7 +152,7 @@ describe('workflow-definition action executor', () => {
   it('parses a workflow with executor:action and reshape config', () => {
     const result = parseWorkflowDefinitionForCreation({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
       steps: [
         {
           id: 'shape',
@@ -178,7 +178,7 @@ describe('workflow-definition action executor', () => {
   it('rejects reshape with non-record values', () => {
     const result = parseWorkflowDefinitionForCreation({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
       steps: [
         {
           id: 'shape',
@@ -198,7 +198,7 @@ describe('workflow-definition action executor', () => {
   it('rejects reshape without a values field', () => {
     const result = parseWorkflowDefinitionForCreation({
       ...baseTemplate,
-      namespace: 'filip',
+      namespace: 'examples',
       steps: [
         {
           id: 'shape',

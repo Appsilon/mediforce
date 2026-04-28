@@ -7,7 +7,7 @@ const baseCtx: ActionContext = {
   processInstanceId: 'inst-1',
   sources: {
     triggerPayload: {
-      body: { id: 42, hello: 'filip' },
+      body: { id: 42, hello: 'world' },
       method: 'POST',
     },
     steps: {
@@ -30,7 +30,7 @@ describe('reshapeActionHandler', () => {
       baseCtx,
     );
     expect(out).toEqual({
-      greeting: 'hello filip',
+      greeting: 'hello world',
       path: '/api/users/Alice',
     });
   });
@@ -45,7 +45,7 @@ describe('reshapeActionHandler', () => {
       },
       baseCtx,
     );
-    expect(out.payload).toEqual({ id: 42, hello: 'filip' });
+    expect(out.payload).toEqual({ id: 42, hello: 'world' });
     expect(out.age).toBe(30);
   });
 
@@ -105,7 +105,7 @@ describe('reshapeActionHandler', () => {
       },
       baseCtx,
     );
-    expect(out.combo).toBe('filip-Alice-wf-1');
+    expect(out.combo).toBe('world-Alice-wf-1');
   });
 
   it('renders missing placeholders as empty strings inside templates', async () => {

@@ -13,7 +13,7 @@ import { WebhookRouter } from '../webhook-router.js';
 const definition: WorkflowDefinition = {
   name: 'execution-summaries-api',
   version: 1,
-  namespace: 'filip',
+  namespace: 'examples',
   steps: [
     {
       id: 'echo',
@@ -67,11 +67,11 @@ beforeEach(async () => {
 describe('WebhookRouter', () => {
   it('routes a matching POST to a created+started instance and returns 202', async () => {
     const result = await router.route({
-      namespace: 'filip',
+      namespace: 'examples',
       workflowName: 'execution-summaries-api',
       suffix: '/execution-summaries',
       method: 'POST',
-      body: { hello: 'filip' },
+      body: { hello: 'world' },
     });
 
     expect(result.status).toBe(202);
@@ -95,11 +95,11 @@ describe('WebhookRouter', () => {
     router = new WebhookRouter(engine, processRepo);
 
     const result = await router.route({
-      namespace: 'filip',
+      namespace: 'examples',
       workflowName: 'execution-summaries-api',
       suffix: '/execution-summaries',
       method: 'POST',
-      body: { hello: 'filip' },
+      body: { hello: 'world' },
       headers: { 'x-trace': 'abc' },
     });
     expect(result.status).toBe(202);
@@ -109,7 +109,7 @@ describe('WebhookRouter', () => {
     expect(instance).not.toBeNull();
     expect(instance?.triggerType).toBe('webhook');
     expect(instance?.triggerPayload).toEqual({
-      body: { hello: 'filip' },
+      body: { hello: 'world' },
       headers: { 'x-trace': 'abc' },
       query: {},
       method: 'POST',
@@ -121,7 +121,7 @@ describe('WebhookRouter', () => {
 
   it('normalizes suffix without leading slash', async () => {
     const result = await router.route({
-      namespace: 'filip',
+      namespace: 'examples',
       workflowName: 'execution-summaries-api',
       suffix: 'execution-summaries',
       method: 'POST',
@@ -132,7 +132,7 @@ describe('WebhookRouter', () => {
 
   it('returns 404 when workflow does not exist', async () => {
     const result = await router.route({
-      namespace: 'filip',
+      namespace: 'examples',
       workflowName: 'unknown',
       suffix: '/execution-summaries',
       method: 'POST',
@@ -154,7 +154,7 @@ describe('WebhookRouter', () => {
 
   it('returns 404 when no webhook trigger matches the suffix', async () => {
     const result = await router.route({
-      namespace: 'filip',
+      namespace: 'examples',
       workflowName: 'execution-summaries-api',
       suffix: '/wrong-path',
       method: 'POST',
@@ -165,7 +165,7 @@ describe('WebhookRouter', () => {
 
   it('returns 405 when method does not match the trigger', async () => {
     const result = await router.route({
-      namespace: 'filip',
+      namespace: 'examples',
       workflowName: 'execution-summaries-api',
       suffix: '/execution-summaries',
       method: 'GET',

@@ -1,7 +1,8 @@
 /**
- * Spike #10 golden e2e: webhook → http action → reshape action → polling.
+ * Golden e2e: webhook → http action → reshape action → polling.
  *
- * Builds on spike #9 with a SECOND chained action step, validating:
+ * Adds a SECOND chained action step on top of execution-summaries-api,
+ * validating:
  *  - Multi-step workflow with action executors only (no agent/script).
  *  - Variables propagation: reshape reads `${steps.proxy.body.json.json}` from
  *    the upstream http step's output.
@@ -9,8 +10,8 @@
  *    handlers compose without engine changes.
  *  - WorkflowTemplate loader handles a different file from the same app.
  *
- * Mirrors the spike-9 wiring (in-memory repos via vi.mock, fetch shim that
- * swallows the auto-runner kick, local echo server on port 9098).
+ * Mirrors the execution-summaries-api wiring (in-memory repos via vi.mock,
+ * fetch shim that swallows the auto-runner kick, local echo server).
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fileURLToPath } from 'node:url';
@@ -37,9 +38,9 @@ import {
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { createEchoServer } from '../../../scripts/test-echo-server/server.js';
 
-// Distinct port from spike-9 so the two e2e files don't fight when run
-// in the same vitest process (vitest.config.spike.ts collapses both via
-// `e2e/spike-*.e2e.ts`).
+// Distinct port from execution-summaries-api so the two e2e files don't
+// fight when run in the same vitest process (vitest.config.action-flows.ts
+// runs all action-flow e2e files together).
 const ECHO_PORT = 9097;
 const ECHO_URL = `http://localhost:${ECHO_PORT}/anything`;
 
@@ -135,7 +136,7 @@ beforeEach(async () => {
   }
   const definition: WorkflowDefinition = {
     ...parsed.data,
-    namespace: 'filip',
+    namespace: 'examples',
     version: 1,
     // Override the http step's URL so the proxy targets the local echo server
     // even when other tests change ECHO_PORT.
@@ -158,11 +159,11 @@ afterEach(() => {
   restoreFetch();
 });
 
-describe('spike #10: webhook → http → reshape → polling', () => {
+describe('food-log-proxy: webhook → http → reshape → polling', () => {
   it('chains two action steps and reshapes the upstream response', async () => {
-    const payload = { meal: 'kasza ze szpinakiem', kcal: 420 };
+    const payload = { meal: 'oats with spinach', kcal: 420 };
     const webhookReq = new NextRequest(
-      'http://localhost/api/triggers/webhook/filip/food-log-proxy/food-log',
+      'http://localhost/api/triggers/webhook/examples/food-log-proxy/food-log',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,7 +173,7 @@ describe('spike #10: webhook → http → reshape → polling', () => {
 
     const webhookRes = await webhookPost(webhookReq, {
       params: Promise.resolve({
-        path: ['filip', 'food-log-proxy', 'food-log'],
+        path: ['examples', 'food-log-proxy', 'food-log'],
       }),
     });
     expect(webhookRes.status).toBe(202);
