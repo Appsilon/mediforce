@@ -12,6 +12,51 @@ import { ProcessNotificationConfigSchema } from './process-config.js';
 import { McpServerConfigSchema } from './mcp-server-config.js';
 import { StepMcpRestrictionSchema } from './agent-mcp-binding.js';
 
+/** HTTP method enum used by webhook triggers and the http action handler. */
+export const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
+
+/** Webhook trigger config: method + url path (relative to /api/triggers/webhook/<ns>/<wf>).
+ *  The path discriminates when a workflow has multiple webhook triggers and is
+ *  matched verbatim against the suffix segment(s) the caller used. */
+export const WebhookTriggerConfigSchema = z.object({
+  method: HttpMethodSchema,
+  path: z
+    .string()
+    .min(1)
+    .regex(/^\/[A-Za-z0-9_\-/]*$/, 'path must start with "/" and contain url-safe chars only'),
+});
+
+/** http action config: minimal request shape passed to fetch().
+ *  `body` accepts any JSON-serializable value or a string template — the action
+ *  handler interpolates `${...}` placeholders before sending. */
+export const HttpActionConfigSchema = z.object({
+  method: HttpMethodSchema,
+  url: z.string().min(1),
+  body: z.unknown().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+});
+
+/** reshape action config: rebuild a new object by interpolating each leaf
+ *  against the same sources (triggerPayload, steps, variables). Pure
+ *  data transformation — no side effects. Output is the interpolated
+ *  values map. */
+export const ReshapeActionConfigSchema = z.object({
+  values: z.record(z.string(), z.unknown()),
+});
+
+/** Discriminated union of action configs. Future kinds (wait, subworkflow,
+ *  email, set) plug in here. */
+export const ActionConfigSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('http'), config: HttpActionConfigSchema }),
+  z.object({ kind: z.literal('reshape'), config: ReshapeActionConfigSchema }),
+]);
+
+export type HttpMethod = z.infer<typeof HttpMethodSchema>;
+export type WebhookTriggerConfig = z.infer<typeof WebhookTriggerConfigSchema>;
+export type HttpActionConfig = z.infer<typeof HttpActionConfigSchema>;
+export type ReshapeActionConfig = z.infer<typeof ReshapeActionConfigSchema>;
+export type ActionConfig = z.infer<typeof ActionConfigSchema>;
+
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
   skill: z.string().optional(),
@@ -102,7 +147,9 @@ export const WorkflowStepSchema = z.object({
   selection: SelectionSchema.optional(),
   ui: StepUiSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  executor: z.enum(['human', 'agent', 'script', 'cowork']),
+  executor: z.enum(['human', 'agent', 'script', 'cowork', 'action']),
+  /** Required when executor='action'. Discriminated by `kind`. */
+  action: ActionConfigSchema.optional(),
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(),
   plugin: z.string().optional(),
   /** References an AgentDefinition by its deterministic slug (doc id).
@@ -141,6 +188,51 @@ export const InputForNextRunEntrySchema = z.object({
  * Applied via superRefine on the top-level schema (and also exported so that
  * callers using `.omit()` or `.partial()` on the base object can re-apply it).
  */
+/**
+ * executor='action' steps must carry an `action` config; conversely, `action`
+ * makes no sense on other executors. Webhook triggers must declare a typed
+ * config (method+path) — TriggerSchema accepts `config: z.record(...).optional()`
+ * for back-compat with cron/manual, so we narrow webhook here.
+ */
+function validateExecutorAndTriggers(
+  wd: {
+    steps: Array<{ id: string; executor: string; action?: unknown }>;
+    triggers: Array<{ type: string; config?: unknown }>;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  wd.steps.forEach((step, i) => {
+    if (step.executor === 'action' && step.action === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'action'],
+        message: `step '${step.id}' has executor='action' but no action config`,
+      });
+    }
+    if (step.executor !== 'action' && step.action !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'action'],
+        message: `step '${step.id}' has action config but executor is '${step.executor}' (must be 'action')`,
+      });
+    }
+  });
+
+  wd.triggers.forEach((trigger, i) => {
+    if (trigger.type !== 'webhook') return;
+    const parsed = WebhookTriggerConfigSchema.safeParse(trigger.config);
+    if (!parsed.success) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['triggers', i, 'config'],
+        message: `webhook trigger config invalid: ${parsed.error.issues
+          .map((iss) => `${iss.path.join('.')}: ${iss.message}`)
+          .join('; ')}`,
+      });
+    }
+  });
+}
+
 function validateInputForNextRun(
   wd: {
     steps: Array<{ id: string }>;
@@ -212,10 +304,14 @@ export const WorkflowDefinitionBaseSchema = z.object({
   inputForNextRun: z.array(InputForNextRunEntrySchema).optional(),
 });
 
-export const WorkflowDefinitionSchema =
-  WorkflowDefinitionBaseSchema.superRefine(validateInputForNextRun);
+export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine(
+  (wd, ctx) => {
+    validateInputForNextRun(wd, ctx);
+    validateExecutorAndTriggers(wd, ctx);
+  },
+);
 
-export { validateInputForNextRun };
+export { validateInputForNextRun, validateExecutorAndTriggers };
 
 /**
  * Default parse path for registering a new WorkflowDefinition (API routes,
@@ -228,8 +324,55 @@ export { validateInputForNextRun };
  */
 export function parseWorkflowDefinitionForCreation(input: unknown) {
   return WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true })
-    .superRefine(validateInputForNextRun)
+    .superRefine((wd, ctx) => {
+      validateInputForNextRun(wd, ctx);
+      validateExecutorAndTriggers(wd, ctx);
+    })
     .safeParse(input);
+}
+
+/**
+ * Namespace-agnostic workflow template. Files in apps/examples/<app>/src/*.wd.json
+ * omit `namespace`; the loader injects it at registration so the same template
+ * can serve multiple tenants. Validation reuses WorkflowDefinitionBaseSchema
+ * minus the `namespace` field, then re-applies the same cross-field refinements.
+ *
+ * Templates that declare `namespace` are rejected — silently stripping the key
+ * would let the author believe their value was honored when the loader
+ * actually overwrites it.
+ */
+export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit({
+  namespace: true,
+  version: true,
+  createdAt: true,
+}).superRefine((wd, ctx) => {
+  validateInputForNextRun(wd, ctx);
+  validateExecutorAndTriggers(wd, ctx);
+});
+
+export type WorkflowTemplate = z.infer<typeof WorkflowTemplateSchema>;
+
+export function parseWorkflowTemplate(input: unknown) {
+  if (
+    typeof input === 'object' &&
+    input !== null &&
+    !Array.isArray(input) &&
+    'namespace' in input
+  ) {
+    return {
+      success: false as const,
+      error: new z.ZodError([
+        {
+          code: 'custom',
+          path: ['namespace'],
+          message:
+            'Workflow templates must not declare a namespace; it is injected at registration time',
+          input,
+        },
+      ]),
+    };
+  }
+  return WorkflowTemplateSchema.safeParse(input);
 }
 
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;

@@ -353,6 +353,31 @@ export class FirestoreProcessRepository implements ProcessRepository {
     return latestVersion;
   }
 
+  async getLatestWorkflowVersionInNamespace(
+    name: string,
+    namespace: string,
+  ): Promise<number> {
+    const snapshot = await this.db
+      .collection(this.workflowDefinitionsCollection)
+      .where('name', '==', name)
+      .where('namespace', '==', namespace)
+      .get();
+
+    if (snapshot.empty) {
+      return 0;
+    }
+
+    let latestVersion = 0;
+    for (const docSnap of snapshot.docs) {
+      const raw = docSnap.data();
+      const parsed = WorkflowDefinitionSchema.safeParse(raw);
+      if (parsed.success && parsed.data.version > latestVersion) {
+        latestVersion = parsed.data.version;
+      }
+    }
+    return latestVersion;
+  }
+
   async setWorkflowDeleted(name: string, deleted: boolean): Promise<void> {
     const legacySnapshot = await this.db
       .collection(this.definitionsCollection)

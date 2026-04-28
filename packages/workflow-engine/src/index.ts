@@ -34,9 +34,15 @@ export { ManualTrigger } from './triggers/manual-trigger.js';
 export { WebhookTrigger } from './triggers/webhook-trigger.js';
 export { CronTrigger } from './triggers/cron-trigger.js';
 export { TriggerHandler } from './triggers/trigger-handler.js';
+export { WebhookRouter } from './triggers/webhook-router.js';
+export type {
+  WebhookRouteInput,
+  WebhookRouteResult,
+} from './triggers/webhook-router.js';
 export type { TriggerResult, WorkflowTriggerContext } from './triggers/trigger-types.js';
 export {
   WebhookPayloadValidationError,
   TriggerNotFoundError,
+  ManualTriggerNotDeclaredError,
 } from './triggers/trigger-errors.js';
 export { validateCronSchedule, isDue } from './triggers/cron-utils.js';

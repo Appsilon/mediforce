@@ -1,0 +1,10 @@
+{
+  "name": "@mediforce/test-echo-server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

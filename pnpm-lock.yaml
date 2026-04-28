@@ -52,6 +52,19 @@ importers:
         specifier: workspace:*
         version: link:../../packages/platform-core
 
+  apps/examples/personal-automations:
+    dependencies:
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../../../packages/platform-core
+    devDependencies:
+      '@types/node':
+        specifier: ^24.12.2
+        version: 24.12.2
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+
   apps/landing-zone:
     dependencies:
       '@mediforce/platform-core':
@@ -134,6 +147,19 @@ importers:
         specifier: ^4.0.0
         version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
 
+  packages/core-actions:
+    dependencies:
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../platform-core
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^24.12.2
+        version: 24.12.2
+
   packages/example-agent:
     dependencies:
       '@mediforce/agent-runtime':
@@ -174,6 +200,9 @@ importers:
       '@mediforce/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@mediforce/core-actions':
+        specifier: workspace:*
+        version: link:../core-actions
       '@mediforce/platform-core':
         specifier: workspace:*
         version: link:../platform-core
@@ -258,6 +287,9 @@ importers:
       '@mediforce/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@mediforce/core-actions':
+        specifier: workspace:*
+        version: link:../core-actions
       '@mediforce/mcp-client':
         specifier: workspace:*
         version: link:../mcp-client

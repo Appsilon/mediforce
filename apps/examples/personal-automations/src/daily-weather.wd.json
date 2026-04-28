@@ -1,0 +1,100 @@
+{
+  "name": "daily-weather",
+  "title": "Daily weather",
+  "description": "Daily 6am weather forecast. Fetches OpenWeatherMap, formats summary, pushes via Pushover and ntfy.sh.",
+  "preamble": "Reference template. Morning weather summary delivered via push notifications.",
+  "triggers": [
+    {
+      "type": "cron",
+      "name": "daily-6am",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "type": "manual",
+      "name": "test"
+    }
+  ],
+  "steps": [
+    {
+      "id": "fetch-weather",
+      "name": "Fetch weather forecast",
+      "type": "creation",
+      "executor": "action",
+      "action": {
+        "kind": "http",
+        "config": {
+          "method": "GET",
+          "url": "https://api.openweathermap.org/data/2.5/forecast?q=London,UK&units=metric&lang=en&appid=${secrets.OWM_KEY}"
+        }
+      }
+    },
+    {
+      "id": "format",
+      "name": "Format summary",
+      "type": "creation",
+      "executor": "action",
+      "action": {
+        "kind": "reshape",
+        "config": {
+          "values": {
+            "city": "${steps.fetch-weather.body.json.city.name}",
+            "tempC": "${steps.fetch-weather.body.json.list[0].main.temp}",
+            "feelsLikeC": "${steps.fetch-weather.body.json.list[0].main.feels_like}",
+            "description": "${steps.fetch-weather.body.json.list[0].weather[0].description}",
+            "title": "Weather ${steps.fetch-weather.body.json.city.name}",
+            "message": "${steps.fetch-weather.body.json.list[0].weather[0].description}, ${steps.fetch-weather.body.json.list[0].main.temp}°C (feels ${steps.fetch-weather.body.json.list[0].main.feels_like}°C)"
+          }
+        }
+      }
+    },
+    {
+      "id": "push-pushover",
+      "name": "Push via Pushover",
+      "type": "creation",
+      "executor": "action",
+      "action": {
+        "kind": "http",
+        "config": {
+          "method": "POST",
+          "url": "https://api.pushover.net/1/messages.json",
+          "body": {
+            "token": "${secrets.PUSHOVER_TOKEN}",
+            "user": "${secrets.PUSHOVER_USER}",
+            "title": "${steps.format.title}",
+            "message": "${steps.format.message}"
+          }
+        }
+      }
+    },
+    {
+      "id": "push-ntfy",
+      "name": "Push via ntfy",
+      "type": "creation",
+      "executor": "action",
+      "action": {
+        "kind": "http",
+        "config": {
+          "method": "POST",
+          "url": "https://ntfy.sh/${secrets.NTFY_TOPIC}",
+          "headers": {
+            "Title": "${steps.format.title}",
+            "Tags": "sun_with_face"
+          },
+          "body": "${steps.format.message}"
+        }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "fetch-weather", "to": "format" },
+    { "from": "format", "to": "push-pushover" },
+    { "from": "push-pushover", "to": "push-ntfy" },
+    { "from": "push-ntfy", "to": "done" }
+  ]
+}

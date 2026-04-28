@@ -8,6 +8,7 @@ import type { WorkflowDefinition } from '@mediforce/platform-core';
 import {
   WorkflowEngine,
   ManualTrigger,
+  ManualTriggerNotDeclaredError,
 } from '../index.js';
 import type { WorkflowTriggerContext } from '../index.js';
 
@@ -27,6 +28,18 @@ const linearDef: WorkflowDefinition = {
   triggers: [{ type: 'manual', name: 'Start Process' }],
 };
 
+const cronOnlyDef: WorkflowDefinition = {
+  name: 'cron-only-process',
+  version: 1,
+  namespace: 'test',
+  steps: [
+    { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
+    { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+  ],
+  transitions: [{ from: 'start', to: 'done' }],
+  triggers: [{ type: 'cron', name: 'Nightly', schedule: '0 0 * * *' }],
+};
+
 describe('ManualTrigger', () => {
   let processRepo: InMemoryProcessRepository;
   let instanceRepo: InMemoryProcessInstanceRepository;
@@ -43,9 +56,10 @@ describe('ManualTrigger', () => {
       instanceRepo,
       auditRepo,
     );
-    trigger = new ManualTrigger(engine);
+    trigger = new ManualTrigger(engine, processRepo);
 
     await processRepo.saveWorkflowDefinition(linearDef);
+    await processRepo.saveWorkflowDefinition(cronOnlyDef);
   });
 
   function makeContext(
@@ -90,5 +104,38 @@ describe('ManualTrigger', () => {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     expect(result.instanceId).toMatch(uuidRegex);
+  });
+
+  describe('manual trigger declaration enforcement', () => {
+    it('rejects workflows that do not declare a manual trigger', async () => {
+      await expect(
+        trigger.fireWorkflow(
+          makeContext({ definitionName: 'cron-only-process' }),
+        ),
+      ).rejects.toThrow(ManualTriggerNotDeclaredError);
+    });
+
+    it('does not create an instance when manual trigger is missing', async () => {
+      try {
+        await trigger.fireWorkflow(
+          makeContext({ definitionName: 'cron-only-process' }),
+        );
+      } catch {
+        // expected
+      }
+      const all = await instanceRepo.getByDefinition('cron-only-process', '1');
+      expect(all).toHaveLength(0);
+    });
+
+    it('error message identifies the workflow and version', async () => {
+      await expect(
+        trigger.fireWorkflow(
+          makeContext({
+            definitionName: 'cron-only-process',
+            definitionVersion: 1,
+          }),
+        ),
+      ).rejects.toThrow(/cron-only-process.*v1/);
+    });
   });
 });
