@@ -1,5 +1,9 @@
 import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
+// Load .env.local so PLATFORM_API_KEY is available inside test processes
+// (Next.js reads it for the server, but Playwright's Node runner doesn't).
+try { process.loadEnvFile('.env.local'); } catch { /* file may not exist in CI */ }
+
 const useEmulators = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
 const recording = process.env.E2E_RECORD === 'true';
 
@@ -63,7 +67,7 @@ export default defineConfig({
   projects,
   webServer: {
     command: useEmulators
-      ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce npx next dev --webpack -p ${testPort}`
+      ? `NEXT_DIST_DIR=.next-test NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce npx next dev --webpack -p ${testPort}`
       : 'pnpm dev',
     port: testPort,
     reuseExistingServer: true,
