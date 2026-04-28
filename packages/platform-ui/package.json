@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack -p 9003",
-    "dev:test": "NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce next dev --webpack -p 9003",
+    "dev:test": "NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:9007 NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 next dev --webpack -p 9007",
     "build": "rm -rf .next && next build --webpack",
     "start": "next start -p ${PORT:-3000}",
     "typecheck": "tsc --noEmit",

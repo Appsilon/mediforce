@@ -78,6 +78,17 @@ export {
   type DcrResponse,
 } from './oauth/dcr-client.js';
 
+// Workspace
+export { WorkspaceManager, SecretDetectedError } from './workspace/workspace-manager.js';
+export type {
+  WorkflowIdentity,
+  WorkspaceManagerInit,
+  BareRepoHandle,
+  RunWorkspaceHandle,
+  CommitStepOptions,
+  CommitStepResult,
+} from './workspace/workspace-manager.js';
+
 // Testing utilities
 export {
   InMemoryAgentEventLog,

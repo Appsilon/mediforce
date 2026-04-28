@@ -8,9 +8,12 @@ import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-p
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ScriptContainerPlugin } from '../script-container-plugin.js';
 
-vi.mock('node:child_process', () => ({
-  spawn: vi.fn(),
-}));
+// Only mock `spawn` (used for docker run). Leave the rest of child_process
+// real so WorkspaceManager's `execFileSync` calls to git actually work.
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, spawn: vi.fn() };
+});
 
 import { spawn } from 'node:child_process';
 const spawnMock = vi.mocked(spawn);
@@ -182,6 +185,82 @@ describe('ScriptContainerPlugin', () => {
       mockSpawnFailure(mockChild, 'Error: package not found');
 
       await expect(plugin.run(emit)).rejects.toThrow(/Script container failed/);
+    });
+
+    it('[DATA] inlineScript mode writes script file and invokes it via runtime cmd', async () => {
+      const context: AgentContext = {
+        ...buildMockContext(),
+        config: {
+          processName: 'test',
+          configName: 'default',
+          configVersion: 'v1',
+          stepConfigs: [
+            {
+              stepId: 'run-script',
+              executorType: 'script',
+              plugin: 'script-container',
+              agentConfig: {
+                runtime: 'bash',
+                inlineScript: '#!/bin/sh\necho hello > /workspace/out.txt\n',
+              },
+            },
+          ],
+        } satisfies ProcessConfig,
+      };
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockSpawnSuccess(createMockChild());
+
+      await plugin.run(emit);
+
+      const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+      const imageIdx = dockerArgs.indexOf('alpine:3.19');
+      expect(imageIdx, 'runtime=bash defaults to alpine:3.19').toBeGreaterThan(-1);
+      // The command after the image is exactly `sh /output/script.sh` — two tokens,
+      // no shell splitting of the user's multi-line bash body.
+      expect(dockerArgs.slice(imageIdx + 1)).toEqual(['sh', '/output/script.sh']);
+    });
+
+    it('[DATA] command field is whitespace-split argv — complex shell belongs in inlineScript', async () => {
+      // This documents the convention: `command` is token-split on whitespace,
+      // so it cannot carry shell operators like quotes, pipes, or `&&`.
+      // A command like `bash -c "echo hi && echo bye"` would be split into
+      // ['bash', '-c', '"echo', 'hi', '&&', 'echo', 'bye"'] — silently broken.
+      // Use `inlineScript + runtime` for anything with shell syntax.
+      const context: AgentContext = {
+        ...buildMockContext(),
+        config: {
+          processName: 'test',
+          configName: 'default',
+          configVersion: 'v1',
+          stepConfigs: [
+            {
+              stepId: 'run-script',
+              executorType: 'script',
+              plugin: 'script-container',
+              agentConfig: {
+                image: 'debian:bookworm-slim',
+                command: 'bash -c "echo hi && echo bye"',
+              },
+            },
+          ],
+        } satisfies ProcessConfig,
+      };
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockSpawnSuccess(createMockChild());
+
+      await plugin.run(emit);
+
+      const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+      const imageIdx = dockerArgs.indexOf('debian:bookworm-slim');
+      // These are the mangled tokens — the quotes are left in, shell operators
+      // are passed as argv. The bash process will see a nonsense command.
+      expect(dockerArgs.slice(imageIdx + 1)).toEqual([
+        'bash', '-c', '"echo', 'hi', '&&', 'echo', 'bye"',
+      ]);
     });
 
     it('[DATA] passes correct docker args including volume mount and command', async () => {

@@ -302,54 +302,7 @@ describe('OpenCodeAgentPlugin', () => {
       expect(prompt).toContain('/data/protocol.pdf');
     });
 
-    it('[DATA] git mode prompt has workspace/output split instructions', async () => {
-      const context = buildMockContext({
-        config: {
-          processName: 'protocol-to-tfl',
-          configName: 'default',
-          configVersion: 'v1',
-          stepConfigs: [
-            {
-              stepId: 'extract',
-              executorType: 'agent',
-              plugin: 'opencode-agent',
-              agentConfig: {
-                skill: 'trial-metadata-extractor',
-                skillsDir: '/plugins/protocol-to-tfl/skills',
-                image: 'mediforce-agent:opencode-protocol-to-tfl',
-                repo: 'Appsilon/mediforce-clinical-workspace',
-                commit: 'abc123',
-              },
-            },
-          ],
-        } satisfies ProcessConfig,
-      });
-      await plugin.initialize(context);
-
-      const { emit } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: 'ok' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output', injectedEnvVars: [],
-      });
-
-      await plugin.run(emit);
-
-      const [prompt] = spawnSpy.mock.calls[0];
-      // Git mode: deliverables go to /workspace/
-      expect(prompt).toContain('Workspace Directory (Git Repo)');
-      expect(prompt).toContain('/workspace/');
-      expect(prompt).toContain('committed and pushed to the git repository');
-      // Result contract still goes to /output/
-      expect(prompt).toContain('Result Contract Directory');
-      expect(prompt).toContain('/output/result.json');
-      // Should NOT have the generic "Write all output files" instruction
-      expect(prompt).not.toContain('Write all output files to this absolute path');
-    });
-
-    it('[DATA] non-git mode prompt has standard output directory', async () => {
+    it('[DATA] prompt has workspace + result-contract split instructions (every run has a workspace now)', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
@@ -365,11 +318,10 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.run(emit);
 
       const [prompt] = spawnSpy.mock.calls[0];
-      // Non-git mode: standard output directory instruction
-      expect(prompt).toContain('Write all output files to this absolute path');
-      // Should NOT have git workspace instructions
-      expect(prompt).not.toContain('Workspace Directory (Git Repo)');
-      expect(prompt).not.toContain('Result Contract Directory');
+      expect(prompt).toContain('Workspace Directory (Git Worktree)');
+      expect(prompt).toContain('/workspace');
+      expect(prompt).toContain('Result Contract Directory');
+      expect(prompt).toContain('/output/result.json');
     });
 
     it('[DATA] emits result with valid AgentOutputEnvelope', async () => {
@@ -715,22 +667,22 @@ describe('OpenCodeAgentPlugin', () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
-      const args = plugin.getMockDockerArgs('generate-tlg', false);
+      const args = plugin.getMockDockerArgs('generate-tlg');
 
-      // The last arg to bash -c should echo JSON with "response" key
       const bashCommand = args[2];
       expect(bashCommand).toContain('mock-opencode');
       expect(bashCommand).toContain('text');
       expect(bashCommand).toContain('mock-result.json');
     });
 
-    it('[DATA] includes git workspace write for git mode', async () => {
+    it('[DATA] copies fixture workspace files into /workspace/ when _workspaceDir is set', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
-      const args = plugin.getMockDockerArgs('generate-tlg', true);
+      const args = plugin.getMockDockerArgs('generate-tlg');
       const bashCommand = args[2];
-      expect(bashCommand).toContain('/workspace/mock-generate-tlg-output.md');
+      expect(bashCommand).toContain('_workspaceDir');
+      expect(bashCommand).toContain('/workspace/');
     });
   });
 });

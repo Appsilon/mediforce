@@ -74,6 +74,24 @@ export const WorkflowReviewConfigSchema = z.object({
   timeBoxDays: z.number().positive().optional(),
 });
 
+/**
+ * Run-scoped git workspace shared across all steps of a single workflow run.
+ *
+ * When set, the runtime creates one bare repo per workflow definition (host-cached)
+ * and a fresh `git worktree` per run on branch `run/<runId>`. Every step in the run
+ * mounts that worktree at `/workspace`. Commits are made per-step; pushes are
+ * controlled by `push` and default to `never`.
+ *
+ * Distinct from `agentConfig.repo + commit` which drive image build source and
+ * skills source (both still tied to immutable SHAs).
+ */
+export const WorkflowWorkspaceSchema = z.object({
+  /** Remote git URL — "org/repo", SSH URL, HTTPS URL. When unset the bare repo is local-only. */
+  remote: z.string().optional(),
+  /** Name of a workflow secret holding a token for HTTPS auth to the remote. */
+  remoteAuth: z.string().optional(),
+});
+
 export const WorkflowStepSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -183,6 +201,7 @@ export const WorkflowDefinitionBaseSchema = z.object({
   roles: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
   notifications: z.array(ProcessNotificationConfigSchema).optional(),
+  workspace: WorkflowWorkspaceSchema.optional(),
   steps: z.array(WorkflowStepSchema).min(1),
   transitions: z.array(TransitionSchema),
   triggers: z.array(TriggerSchema).min(1),
@@ -216,6 +235,7 @@ export function parseWorkflowDefinitionForCreation(input: unknown) {
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
 export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;
 export type WorkflowReviewConfig = z.infer<typeof WorkflowReviewConfigSchema>;
+export type WorkflowWorkspace = z.infer<typeof WorkflowWorkspaceSchema>;
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
 export type InputForNextRunEntry = z.infer<typeof InputForNextRunEntrySchema>;

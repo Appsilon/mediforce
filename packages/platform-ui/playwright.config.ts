@@ -66,8 +66,14 @@ export default defineConfig({
   },
   projects,
   webServer: {
+    // `MOCK_AGENT=true` wires the runtime through MockClaudeCodeAgentPlugin — real
+    // Docker still spawns, but the container runs a mock bash command instead of
+    // calling Claude. `MEDIFORCE_DATA_DIR` isolates workspace state to a test dir.
+    // `NEXT_PUBLIC_APP_URL` is explicit so `getAppBaseUrl` doesn't fall back to the
+    // :3000 default before Next sets PORT — the auto-runner fire-and-forget to
+    // `/api/processes/:id/run` needs the right host:port.
     command: useEmulators
-      ? `NEXT_DIST_DIR=.next-test NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce npx next dev --webpack -p ${testPort}`
+      ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev --webpack -p ${testPort}`
       : 'pnpm dev',
     port: testPort,
     reuseExistingServer: true,

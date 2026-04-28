@@ -34,10 +34,6 @@ RUN curl -fsSL https://opencode.ai/install | bash \
   && ln -s /root/.opencode/bin/opencode /usr/local/bin/opencode
 
 # Create standard directories
-RUN mkdir -p /workspace /output /data
-
-# Copy entrypoint (fallback — typically bind-mounted at runtime)
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN mkdir -p /workspace /output /data /plugin
 
 WORKDIR /workspace
