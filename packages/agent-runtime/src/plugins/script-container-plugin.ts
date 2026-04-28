@@ -1,14 +1,10 @@
 import { readFile, mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { AgentPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
+import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
-import { resolveStepEnv, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
-
-function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
-  return 'step' in ctx && 'workflowDefinition' in ctx;
-}
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild } from './container-plugin.js';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
@@ -37,22 +33,20 @@ const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: s
  *   3. Runs the script using the runtime's command in an auto-resolved Docker image
  *   4. Reads /output/result.json from the container
  */
-export class ScriptContainerPlugin implements AgentPlugin {
+export class ScriptContainerPlugin extends ContainerPlugin {
   readonly metadata: PluginCapabilityMetadata = {
     name: 'Script Container',
     description: 'Runs a deterministic script or inline code inside a Docker container — no LLM involved.',
-    inputDescription: 'Step input JSON mounted at /output/input.json inside the container.',
+    inputDescription: 'Step input JSON at /output/input.json; carry-over from WD inputForNextRun (when declared) at /output/previous_run.json.',
     outputDescription: 'Container writes result to /output/result.json; parsed and emitted as the step result.',
     roles: ['executor'],
   };
 
-  private context!: AgentContext | WorkflowAgentContext;
   private image!: string;
   private commandArgs!: string[];
   private commandDisplay!: string;
   private inlineScript: string | null = null;
   private runtime: string | null = null;
-  private resolvedEnv: ResolvedEnv = { vars: {}, injectedKeys: [] };
 
   async initialize(context: AgentContext | WorkflowAgentContext): Promise<void> {
     this.context = context;
@@ -126,8 +120,10 @@ export class ScriptContainerPlugin implements AgentPlugin {
       );
     }
 
-    // Resolve env vars from definition-level + step-level env
-    this.resolvedEnv = resolveStepEnv(definitionEnv, stepEnv);
+    // Resolve env vars from definition-level + step-level env + workflow secrets
+    const workflowSecrets = isWorkflowAgentContext(context) ? context.workflowSecrets : undefined;
+    this.resolveEnvironment(definitionEnv, stepEnv, workflowSecrets);
+    this.imageBuild = resolveImageBuild(this.image, agentConfig, context, this.resolvedEnv.vars);
   }
 
   async run(emit: EmitFn): Promise<void> {
@@ -142,6 +138,9 @@ export class ScriptContainerPlugin implements AgentPlugin {
     let outputDir: string | null = null;
 
     try {
+      // Every run gets a shared git worktree; mounted into the container at /workspace.
+      await this.resolveRunWorkspace();
+
       // Create temp directory for container /output mount
       const rawOutputDir = await mkdtemp(join(tmpdir(), 'mediforce-script-output-'));
       outputDir = await realpath(rawOutputDir);
@@ -149,6 +148,18 @@ export class ScriptContainerPlugin implements AgentPlugin {
       // Write step input as /output/input.json
       const inputPath = join(outputDir, 'input.json');
       await writeFile(inputPath, JSON.stringify(this.context.stepInput, null, 2), 'utf-8');
+
+      // Write carry-over snapshot as /output/previous_run.json when the
+      // workflow declares inputForNextRun. Always an object — `{}` on first
+      // run. Scripts that don't carry anything simply ignore the file.
+      if (isWorkflowAgentContext(this.context) && this.context.previousRun !== undefined) {
+        const previousRunPath = join(outputDir, 'previous_run.json');
+        await writeFile(
+          previousRunPath,
+          JSON.stringify(this.context.previousRun, null, 2),
+          'utf-8',
+        );
+      }
 
       // Write inline script to /output/script.{ext}
       if (this.inlineScript && this.runtime) {
@@ -171,6 +182,8 @@ export class ScriptContainerPlugin implements AgentPlugin {
         '--memory', '4g',
         '--cpus', '2',
         '-v', `${outputDir}:/output`,
+        '-v', `${this.runWorkspaceHandle!.path}:/workspace`,
+        '-w', '/workspace',
         ...envFlags,
         this.image,
         ...this.commandArgs,
@@ -189,6 +202,7 @@ export class ScriptContainerPlugin implements AgentPlugin {
         stepId: this.context.stepId,
         outputDir,
         logFile: null,
+        imageBuild: this.imageBuild,
       });
 
       // Emit stdout/stderr lines as activity events (batch mode after completion)
@@ -216,6 +230,17 @@ export class ScriptContainerPlugin implements AgentPlugin {
       }
 
       const containerOutput = spawnResult.stdout.trim();
+
+      // Commit whatever the script wrote into /workspace (empty = --allow-empty).
+      // No reasoningSummary — the file delta is the more useful subject line
+      // for deterministic scripts; the command is available via Agent-Image
+      // + script.sh artefact for anyone digging deeper.
+      await this.commitRunWorkspace(outputDir, {
+        status: 'success',
+        durationMs: Date.now() - startTime,
+        agentPlugin: 'script-container',
+        agentImage: this.image,
+      });
 
       // Read result.json from the output directory
       const resultPath = join(outputDir, 'result.json');
@@ -248,8 +273,23 @@ export class ScriptContainerPlugin implements AgentPlugin {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      // Clean up output dir before re-throwing
+      // Commit whatever landed in /workspace before the error — ✗ marker,
+      // full error excerpt in body. Best-effort: if the commit itself fails
+      // (e.g. worktree corrupt, detected secret), swallow that error and
+      // rethrow the original step error. We never mask the real failure.
+      const errMessage = error instanceof Error ? error.message : String(error);
       if (outputDir) {
+        try {
+          await this.commitRunWorkspace(outputDir, {
+            status: 'failed',
+            error: errMessage,
+            durationMs: Date.now() - startTime,
+            agentPlugin: 'script-container',
+            agentImage: this.image,
+          });
+        } catch (commitErr) {
+          console.warn('[ScriptContainer] Failed to commit failure artefacts:', commitErr);
+        }
         await rm(outputDir, { recursive: true, force: true }).catch(() => {});
         outputDir = null;
       }

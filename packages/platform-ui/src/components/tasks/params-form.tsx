@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle, Loader2, Send } from 'lucide-react';
 import { completeParamsTask } from '@/app/actions/tasks';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { StepParam } from '@mediforce/platform-core';
 
 interface ParamsFormProps {
@@ -26,6 +28,8 @@ export function ParamsForm({
   remainingTaskCount,
   onCompleted,
 }: ParamsFormProps) {
+  const handle = useHandleFromPath();
+  const { firebaseUser } = useAuth();
   const [values, setValues] = React.useState<Record<string, unknown>>(() => {
     const initial: Record<string, unknown> = {};
     for (const param of params) {
@@ -69,7 +73,8 @@ export function ParamsForm({
       }
     }
 
-    const result = await completeParamsTask(taskId, coerced);
+    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+    const result = await completeParamsTask(taskId, coerced, idToken);
 
     if (result.success) {
       setSubmitted({ values: coerced, timestamp: new Date().toISOString() });
@@ -147,7 +152,19 @@ function ParamField({
         <p className="text-xs text-muted-foreground">{param.description}</p>
       )}
 
-      {param.type === 'boolean' ? (
+      {param.options && param.options.length > 0 ? (
+        <select
+          value={String(value ?? '')}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
+          className={inputClasses}
+        >
+          <option value="">Select...</option>
+          {param.options.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      ) : param.type === 'boolean' ? (
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -200,6 +217,7 @@ function ParamsConfirmation({
   params: StepParam[];
   remainingTaskCount?: number;
 }) {
+  const handle = useHandleFromPath();
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:bg-green-900/20 dark:border-green-800">
@@ -236,12 +254,12 @@ function ParamsConfirmation({
         {remainingTaskCount !== undefined && remainingTaskCount > 0 ? (
           <span>
             You have {remainingTaskCount} more {remainingTaskCount === 1 ? 'task' : 'tasks'} &mdash;{' '}
-            <Link href="/tasks" className="text-primary hover:underline font-medium">
+            <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
               View next task
             </Link>
           </span>
         ) : (
-          <Link href="/tasks" className="text-primary hover:underline font-medium">
+          <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
             Back to tasks
           </Link>
         )}

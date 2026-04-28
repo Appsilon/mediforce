@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { Save, CheckCircle, XCircle, Pencil, Clock, Play, Webhook, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePlugins } from '@/hooks/use-plugins';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 import { StepConfigCard } from './step-config-card';
 import { ConfigValidationBanner } from './config-validation-banner';
 import { saveConfig } from '@/app/actions/configs';
@@ -62,6 +64,7 @@ export function ConfigEditor({
   onSaved,
 }: ConfigEditorProps) {
   const { plugins } = usePlugins();
+  const handle = useHandleFromPath();
 
   // Form state
   const [configName, setConfigName] = useState(
@@ -190,7 +193,7 @@ export function ConfigEditor({
   };
 
   const cloneUrl = initialConfig
-    ? `/configs/new?process=${encodeURIComponent(processName)}&cloneConfig=${encodeURIComponent(initialConfig.configName)}&cloneVersion=${encodeURIComponent(initialConfig.configVersion)}`
+    ? routes.configNew(handle, { process: processName, cloneConfig: initialConfig.configName, cloneVersion: String(initialConfig.configVersion) })
     : undefined;
 
   return (

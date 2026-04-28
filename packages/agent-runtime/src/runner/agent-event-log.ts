@@ -1,11 +1,6 @@
 import type { AgentEvent } from '@mediforce/platform-core';
 import type { EmitPayload } from '../interfaces/agent-plugin.js';
-import {
-  collection,
-  doc,
-  setDoc,
-  type Firestore,
-} from 'firebase/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 
 export interface AgentEventLog {
   write(instanceId: string, stepId: string, event: EmitPayload): Promise<void>;
@@ -32,14 +27,13 @@ export class FirestoreAgentEventLog implements AgentEventLog {
       ...event,
     };
 
-    // Write to Firestore immediately — no buffering (anti-pattern documented in RESEARCH.md)
-    const agentEventsRef = collection(
-      doc(this.db, 'processInstances', instanceId),
-      'agentEvents',
-    );
-    await setDoc(doc(agentEventsRef, agentEvent.id), agentEvent);
+    await this.db
+      .collection('processInstances')
+      .doc(instanceId)
+      .collection('agentEvents')
+      .doc(agentEvent.id)
+      .set(agentEvent);
 
-    // Update in-memory cache
     existing.push(agentEvent);
     this.cache.set(key, existing);
   }

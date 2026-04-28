@@ -3,9 +3,11 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, ExternalLink } from 'lucide-react';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { StatusDot } from '@/components/ui/status-dot';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 
 function toHumanLabel(identifier: string): string {
   return identifier
@@ -155,11 +157,12 @@ function shortTimeAgo(date: Date): string {
   return `${Math.floor(diffDays / 7)}w ago`;
 }
 
-export function ProcessInstanceRow({ instance, showProcess = false, steps, stepStyle = 'dots' }: { instance: ProcessInstance; showProcess?: boolean; steps?: string[]; stepStyle?: 'dots' | 'bar' }) {
+export function ProcessInstanceRow({ instance, showProcess = false, steps, stepStyle = 'dots', activeTaskId }: { instance: ProcessInstance; showProcess?: boolean; steps?: string[]; stepStyle?: 'dots' | 'bar'; activeTaskId?: string }) {
+  const handle = useHandleFromPath();
   const shortHash = `#${instance.id.slice(0, 6)}`;
   const timeAgo = shortTimeAgo(new Date(instance.createdAt));
   const fullTimeAgo = formatDistanceToNow(new Date(instance.createdAt), { addSuffix: true });
-  const detailHref = `/workflows/${encodeURIComponent(instance.definitionName)}/runs/${instance.id}`;
+  const detailHref = routes.workflowRun(handle, instance.definitionName, instance.id);
 
   return (
     <Link
@@ -195,9 +198,24 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
           ) : (
             <span className="text-xs truncate flex-1">
               {instance.currentStepId ? (
-                <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium">
-                  {toHumanLabel(instance.currentStepId)}
-                </span>
+                activeTaskId ? (
+                  <span
+                    role="link"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      window.location.href = routes.task(handle, activeTaskId);
+                    }}
+                    className="inline-flex items-center gap-1 bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
+                    {toHumanLabel(instance.currentStepId)}
+                    <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  </span>
+                ) : (
+                  <span className="inline-flex bg-muted/50 rounded px-1.5 py-0.5 text-xs font-medium">
+                    {toHumanLabel(instance.currentStepId)}
+                  </span>
+                )
               ) : 'Starting...'}
             </span>
           )}

@@ -5,13 +5,20 @@ import { CheckCircle, XCircle, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { saveDefinition } from '@/app/actions/definitions';
 import type { SaveDefinitionResult } from '@/app/actions/definitions';
+import { useAuth } from '@/contexts/auth-context';
+import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 
 interface YamlEditorProps {
   initialValue?: string;
+  namespace?: string;
+  onNamespaceChange?: (ns: string) => void;
   onSaved?: (name: string, version: string) => void;
 }
 
-export function YamlEditor({ initialValue = '', onSaved }: YamlEditorProps) {
+export function YamlEditor({ initialValue = '', namespace, onNamespaceChange, onSaved }: YamlEditorProps) {
+  const { firebaseUser } = useAuth();
+  const { namespaces, loading: namespacesLoading } = useAllUserNamespaces(firebaseUser?.uid);
+
   const [yaml, setYaml] = React.useState(initialValue);
   const [state, setState] = React.useState<
     | { status: 'idle' }
@@ -19,6 +26,13 @@ export function YamlEditor({ initialValue = '', onSaved }: YamlEditorProps) {
     | { status: 'saved'; name: string; version: string }
     | { status: 'error'; message: string }
   >({ status: 'idle' });
+
+  // Auto-select first namespace when loaded
+  React.useEffect(() => {
+    if (namespaces.length > 0 && (namespace === undefined || namespace === '')) {
+      onNamespaceChange?.(namespaces[0].handle);
+    }
+  }, [namespaces, namespace, onNamespaceChange]);
 
   // Reset when initialValue changes (e.g. version switched)
   React.useEffect(() => {
@@ -28,7 +42,7 @@ export function YamlEditor({ initialValue = '', onSaved }: YamlEditorProps) {
 
   const handleSave = async () => {
     setState({ status: 'saving' });
-    const result: SaveDefinitionResult = await saveDefinition(yaml);
+    const result: SaveDefinitionResult = await saveDefinition(yaml, namespace);
     if (result.success) {
       setState({ status: 'saved', name: result.name, version: result.version });
       onSaved?.(result.name, result.version);
@@ -39,6 +53,35 @@ export function YamlEditor({ initialValue = '', onSaved }: YamlEditorProps) {
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="namespace-select" className="text-sm font-medium text-muted-foreground">
+          Owner
+        </label>
+        <select
+          id="namespace-select"
+          value={namespace ?? ''}
+          onChange={(e) => onNamespaceChange?.(e.target.value)}
+          disabled={namespacesLoading || namespaces.length === 0}
+          className={cn(
+            'w-48 rounded-md border bg-background px-3 py-1.5 text-sm outline-none',
+            'focus:ring-1 focus:ring-ring focus:border-ring',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+          )}
+        >
+          {namespacesLoading ? (
+            <option value="">Loading...</option>
+          ) : namespaces.length === 0 ? (
+            <option value="">No namespaces</option>
+          ) : (
+            namespaces.map((ns) => (
+              <option key={ns.handle} value={ns.handle}>
+                {ns.displayName ?? ns.handle} (@{ns.handle})
+              </option>
+            ))
+          )}
+        </select>
+      </div>
+
       <textarea
         value={yaml}
         onChange={(e) => {

@@ -5,7 +5,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockSaveProcessDefinition = vi.fn();
 const mockGetProcessConfig = vi.fn();
 const mockSaveProcessConfig = vi.fn();
-const mockValidateApiKey = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -15,7 +14,6 @@ vi.mock('@/lib/platform-services', () => ({
       saveProcessConfig: mockSaveProcessConfig,
     },
   }),
-  validateApiKey: (...args: unknown[]) => mockValidateApiKey(...args),
 }));
 
 vi.mock('@mediforce/platform-infra', async () => {
@@ -77,20 +75,9 @@ function makePutRequest(body: string, apiKey?: string): Request {
 describe('PUT /api/definitions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockValidateApiKey.mockReturnValue(true);
     mockSaveProcessDefinition.mockResolvedValue(undefined);
     mockGetProcessConfig.mockResolvedValue(null);
     mockSaveProcessConfig.mockResolvedValue(undefined);
-  });
-
-  it('[AUTH] returns 401 when API key is invalid', async () => {
-    mockValidateApiKey.mockReturnValue(false);
-
-    const res = await PUT(makePutRequest(validYaml));
-    const json = await res.json();
-
-    expect(res.status).toBe(401);
-    expect(json.error).toBe('Unauthorized');
   });
 
   it('[DATA] saves valid YAML definition and returns 201', async () => {

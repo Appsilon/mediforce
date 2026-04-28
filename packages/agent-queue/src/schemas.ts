@@ -28,7 +28,15 @@ export const DockerJobDataSchema = z.object({
   logFile: z.string().nullable(),
   /** Files from outputDir, keyed by filename. Sent through Redis when caller
    *  and worker don't share a filesystem (e.g. Vercel → VPS). */
-  inputFiles: z.record(z.string()).optional(),
+  inputFiles: z.record(z.string(), z.string()).optional(),
+  /** Image build metadata — when present, worker ensures image exists before docker run. */
+  imageBuild: z.object({
+    image: z.string(),
+    repoUrl: z.string(),
+    commit: z.string(),
+    dockerfile: z.string().optional(),
+    repoToken: z.string().optional(),
+  }).optional(),
 });
 
 export type DockerJobData = z.infer<typeof DockerJobDataSchema>;
@@ -40,7 +48,7 @@ export const DockerJobResultSchema = z.object({
   signal: z.string().nullable(),
   /** Files from the worker's outputDir after docker run completes.
    *  Returned through Redis so the caller can recreate them locally. */
-  outputFiles: z.record(z.string()).optional(),
+  outputFiles: z.record(z.string(), z.string()).optional(),
 });
 
 export type DockerJobResult = z.infer<typeof DockerJobResultSchema>;

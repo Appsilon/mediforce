@@ -36,27 +36,39 @@ Fill in your Firebase project values. Get them from: Firebase Console > Project 
 ## Monorepo structure
 
 ```
-apps/
-  supply-intelligence/ # Standalone supply intelligence Next.js app
 packages/
   platform-core/       # Shared types, domain models, test factories
   platform-ui/         # Next.js UI — the main web application
   platform-infra/      # Firebase/Firestore infrastructure layer
+  platform-api/        # API contract schemas + pure handlers (framework-free)
   agent-runtime/       # Agent execution engine
   workflow-engine/     # Process orchestration engine
   example-agent/       # Reference agent implementation
-  supply-intelligence/ # Supply intelligence domain package
-  supply-intelligence-plugins/  # Agent plugins for supply intelligence
 ```
+
+## Local agent execution
+
+When running with `ALLOW_LOCAL_AGENTS=true` (via `pnpm dev:local`), the platform spawns agent CLIs directly as local processes instead of Docker containers. The following tools must be installed and on your `PATH`:
+
+| Tool | Used by | Install |
+|------|---------|---------|
+| `claude` | `ClaudeCodeAgent` workflow steps | [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code) — `npm install -g @anthropic-ai/claude-code` |
+| `opencode` | `OpenCodeAgent` workflow steps | `npm install -g opencode-ai` |
+
+Verify both are available after installing:
+
+```bash
+claude --version
+opencode --version
+```
+
+Without `ALLOW_LOCAL_AGENTS=true`, agents run inside Docker containers instead. In that case you need **Docker** installed and running, but not the CLIs above.
 
 ## Running the app
 
 ```bash
 # Platform UI (default, port 9003)
 cd packages/platform-ui && pnpm dev
-
-# Supply Intelligence app
-cd apps/supply-intelligence && pnpm dev
 ```
 
 ## Testing
@@ -79,6 +91,10 @@ pnpm test:coverage
 # Type checking
 pnpm typecheck
 ```
+
+### Contract tests
+
+Handlers in `platform-api` are tested against in-memory repositories from `@mediforce/platform-core/testing` — no mocks, no HTTP, no Firebase emulators, no dev server. The real win over E2E is not raw wall-clock time but zero ceremony: run the file, get the answer. Each handler is a pure function `(input, deps) => Promise<output>` with per-handler dependency injection, so tests read like the spec: set up repo state, call handler, assert on the return value. The canonical example is `packages/platform-api/src/handlers/tasks/__tests__/list-tasks.test.ts`, which exercises the `listTasks` handler backing `GET /api/tasks`.
 
 ### E2E tests (Playwright)
 

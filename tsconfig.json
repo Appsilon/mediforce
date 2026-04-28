@@ -12,7 +12,8 @@
     "incremental": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "customConditions": ["@mediforce/source"]
+    "customConditions": ["@mediforce/source"],
+    "types": ["node"]
   },
   "include": [],
   "references": [
@@ -21,7 +22,9 @@
     { "path": "packages/workflow-engine" },
     { "path": "packages/agent-runtime" },
     { "path": "packages/agent-queue" },
+    { "path": "packages/platform-api" },
     { "path": "packages/platform-ui" },
-    { "path": "packages/supply-intelligence" }
+    { "path": "packages/mcp-client" },
+    { "path": "packages/cli" }
   ]
 }

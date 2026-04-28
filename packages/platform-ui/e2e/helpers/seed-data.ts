@@ -4,7 +4,15 @@ const twoDaysAgo = new Date(Date.now() - 2 * 86400_000).toISOString();
 const threeDaysAgo = new Date(Date.now() - 3 * 86400_000).toISOString();
 const nextWeek = new Date(Date.now() + 7 * 86400_000).toISOString();
 
-export function buildSeedData(testUserId: string) {
+export interface SeedOptions {
+  /** Base URL of the mock OAuth server (from globalSetup). Used to build the
+   *  `github-mock` provider fixture so the journey can Connect through it
+   *  without touching real GitHub/Google. */
+  mockOAuthBaseUrl?: string;
+}
+
+export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
+  const mockOAuthBaseUrl = options.mockOAuthBaseUrl ?? 'http://127.0.0.1:0';
   const humanTasks: Record<string, Record<string, unknown>> = {
     'task-pending-1': {
       id: 'task-pending-1',
@@ -71,6 +79,22 @@ export function buildSeedData(testUserId: string) {
       completedAt: null,
       completionData: null,
     },
+    // Dedicated task for task-review.journey.ts — approving this advances
+    // proc-review-target, not proc-human-waiting, so the status-badges test
+    // is not polluted by the approval flow.
+    'task-review-target': {
+      id: 'task-review-target',
+      processInstanceId: 'proc-review-target',
+      stepId: 'human-review',
+      assignedRole: 'reviewer',
+      assignedUserId: null,
+      status: 'pending',
+      deadline: nextWeek,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      completionData: null,
+    },
     'task-upload-docs': {
       id: 'task-upload-docs',
       processInstanceId: 'proc-upload-waiting',
@@ -113,6 +137,25 @@ export function buildSeedData(testUserId: string) {
       error: null,
       assignedRoles: ['reviewer'],
     },
+    // Dedicated instance for cancel-run test — isolated so cancelling doesn't affect other tests
+    'proc-cancel-target': {
+      id: 'proc-cancel-target',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1.0.0',
+      configName: 'all-human',
+      configVersion: '1',
+      status: 'running',
+      currentStepId: 'narrative-summary',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: 'system',
+      pauseReason: null,
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
     'proc-paused-1': {
       id: 'proc-paused-1',
       definitionName: 'Supply Chain Review',
@@ -127,7 +170,7 @@ export function buildSeedData(testUserId: string) {
       createdAt: twoDaysAgo,
       updatedAt: oneHourAgo,
       createdBy: 'webhook',
-      pauseReason: 'agent_escalation',
+      pauseReason: 'agent_escalated',
       error: null,
       assignedRoles: ['analyst', 'reviewer'],
     },
@@ -203,6 +246,26 @@ export function buildSeedData(testUserId: string) {
       error: null,
       assignedRoles: ['reviewer'],
     },
+    // Dedicated instance for task-review.journey.ts — isolated so approving its
+    // task does not pollute the proc-human-waiting used by workflow-status-badges.
+    'proc-review-target': {
+      id: 'proc-review-target',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1.0.0',
+      configName: 'all-human',
+      configVersion: '1',
+      status: 'paused',
+      currentStepId: 'human-review',
+      variables: { studyId: 'study-review-target' },
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: 'auto-runner',
+      pauseReason: 'waiting_for_human',
+      error: null,
+      assignedRoles: ['reviewer'],
+    },
     // New-style run — uses WorkflowDefinition (no configName/configVersion)
     'proc-workflow-run-1': {
       id: 'proc-workflow-run-1',
@@ -237,6 +300,44 @@ export function buildSeedData(testUserId: string) {
       pauseReason: 'waiting_for_human',
       error: null,
       assignedRoles: ['operator'],
+    },
+    // Dedicated instance for workflow-status-badges test — paused with step_failure
+    // so the Error badge, error banner with reason text, and "Run again this step"
+    // button are all visible without triggering any actual retry.
+    'proc-step-failure': {
+      id: 'proc-step-failure',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1',
+      status: 'paused',
+      currentStepId: 'human-review',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: 'step_failure',
+      error: 'Docker container exited with code 1',
+      assignedRoles: ['reviewer'],
+    },
+    // Dedicated instance for retry-step test — seeded as failed on a human step
+    // so clicking Retry flips it to running; the auto-runner then creates a
+    // HumanTask and pauses the instance. No plugin or Docker involved.
+    'proc-retry-test': {
+      id: 'proc-retry-test',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1',
+      status: 'failed',
+      currentStepId: 'human-review',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: threeDaysAgo,
+      updatedAt: threeDaysAgo,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: 'Simulated step failure for retry journey',
+      assignedRoles: ['reviewer'],
     },
   };
 
@@ -408,6 +509,43 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
+  const stepFailureStepExecutions: Record<string, Record<string, unknown>> = {
+    'exec-step-failure-1': {
+      id: 'exec-step-failure-1',
+      instanceId: 'proc-step-failure',
+      stepId: 'human-review',
+      status: 'failed',
+      input: {},
+      output: null,
+      verdict: null,
+      executedBy: 'agent:script-container',
+      startedAt: oneHourAgo,
+      completedAt: now,
+      iterationNumber: 0,
+      gateResult: null,
+      error: 'Docker container exited with code 1',
+    },
+  };
+
+  const retryTestStepExecutions: Record<string, Record<string, unknown>> = {
+    // Seed a single failed execution so retryStep's latestExecution guard is satisfied
+    'exec-retry-fail-1': {
+      id: 'exec-retry-fail-1',
+      instanceId: 'proc-retry-test',
+      stepId: 'human-review',
+      status: 'failed',
+      input: {},
+      output: null,
+      verdict: null,
+      executedBy: 'auto-runner',
+      startedAt: threeDaysAgo,
+      completedAt: threeDaysAgo,
+      iterationNumber: 0,
+      gateResult: null,
+      error: 'Simulated step failure for retry journey',
+    },
+  };
+
   const humanWaitingStepExecutions: Record<string, Record<string, unknown>> = {
     'exec-hw-agent-1': {
       id: 'exec-hw-agent-1',
@@ -433,9 +571,38 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
+  // Step executions for the dedicated task-review journey instance.
+  // Mirrors humanWaitingStepExecutions so the "previous step output" tab
+  // shows content, but is isolated under proc-review-target.
+  const reviewTargetStepExecutions: Record<string, Record<string, unknown>> = {
+    'exec-review-target-1': {
+      id: 'exec-review-target-1',
+      instanceId: 'proc-review-target',
+      stepId: 'query-status',
+      status: 'completed',
+      input: { studyId: 'study-review-target' },
+      output: {
+        reasoning_summary: 'Analyzed 10 open queries across 2 sites. 2 queries are overdue.',
+        queriesTotal: 10,
+        queriesOverdue: 2,
+        queriesCritical: 1,
+        sites: ['Site A', 'Site B'],
+        recommendation: 'Review overdue queries — 1 critical query requires attention',
+      },
+      verdict: null,
+      executedBy: 'agent:query-status',
+      startedAt: oneHourAgo,
+      completedAt: now,
+      iterationNumber: 0,
+      gateResult: { next: 'human-review', reason: 'agent step complete' },
+      error: null,
+    },
+  };
+
   const processDefinitions: Record<string, Record<string, unknown>> = {
     'def-supply-chain-review': {
       name: 'Supply Chain Review',
+      namespace: 'test',
       version: '1.0.0',
       description: 'End-to-end supply chain review process',
       steps: [
@@ -461,6 +628,7 @@ export function buildSeedData(testUserId: string) {
     },
     'def-data-quality-review': {
       name: 'Data Quality Review',
+      namespace: 'test',
       version: '2.1.0',
       description: 'Data quality check workflow',
       steps: [
@@ -642,19 +810,101 @@ export function buildSeedData(testUserId: string) {
       uid: testUserId,
       email: 'test@mediforce.dev',
       displayName: 'Test User',
+      handle: 'test',
+      organizations: [],
       role: 'admin',
       roles: ['reviewer', 'analyst', 'operator'],
     },
   };
 
   const workflowDefinitions: Record<string, Record<string, unknown>> = {
+    // Example workflow that exercises the run-scoped git workspace with a
+    // small real-shaped data pipeline: step 1 generates a CSV dataset, step 2
+    // reads it, computes summary stats, and writes a markdown report into a
+    // different subdirectory. A manual run leaves a run/<id> branch in the
+    // local bare repo with:
+    //
+    //   <seed>          "workspace initialized" (.gitignore seed)
+    //   generate-data   adds data/sales.csv
+    //   summarize       adds report/summary.md
+    //
+    // You can `git log`, `git diff`, and inspect the per-step artifacts.
+    'Sales CSV Report:1': {
+      name: 'Sales CSV Report',
+      namespace: 'test',
+      version: 1,
+      title: 'Sales CSV → summary report',
+      description: 'Two-step pipeline: generate a small sales CSV, then summarise it into a markdown report. Each step commits its artefacts to the run branch.',
+      workspace: {},
+      steps: [
+        {
+          id: 'generate-data',
+          name: 'Generate sales.csv',
+          type: 'creation',
+          executor: 'script',
+          plugin: 'script-container',
+          autonomyLevel: 'L4',
+          agent: {
+            runtime: 'bash',
+            inlineScript: [
+              '#!/bin/sh',
+              'set -eu',
+              'mkdir -p /workspace/data',
+              "printf 'region,units,revenue\\nnorth,12,2400\\nsouth,8,1600\\neast,17,3825\\nwest,5,900\\n' > /workspace/data/sales.csv",
+              'printf \'{"ok":true,"rows":4}\' > /output/result.json',
+              '',
+            ].join('\n'),
+          },
+        },
+        {
+          id: 'summarize',
+          name: 'Summarise → report/summary.md',
+          type: 'creation',
+          executor: 'script',
+          plugin: 'script-container',
+          autonomyLevel: 'L4',
+          agent: {
+            runtime: 'bash',
+            inlineScript: [
+              '#!/bin/sh',
+              'set -eu',
+              'test -f /workspace/data/sales.csv',
+              'mkdir -p /workspace/report',
+              'cd /workspace',
+              "ROWS=$(tail -n +2 data/sales.csv | wc -l | tr -d ' ')",
+              "TOTAL=$(tail -n +2 data/sales.csv | awk -F, '{s+=$3} END{print s}')",
+              "TOP=$(tail -n +2 data/sales.csv | sort -t, -k3 -nr | head -1 | cut -d, -f1)",
+              '{',
+              "  echo '# Sales summary'",
+              '  echo',
+              "  echo '| metric | value |'",
+              "  echo '|---|---|'",
+              '  echo "| rows | $ROWS |"',
+              '  echo "| total revenue | $TOTAL |"',
+              '  echo "| top region | $TOP |"',
+              '} > report/summary.md',
+              'printf \'{"ok":true}\' > /output/result.json',
+              '',
+            ].join('\n'),
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [
+        { from: 'generate-data', to: 'summarize' },
+        { from: 'summarize', to: 'done' },
+      ],
+      triggers: [{ type: 'manual', name: 'start' }],
+      createdAt: twoDaysAgo,
+    },
     'Supply Chain Review:1': {
       name: 'Supply Chain Review',
+      namespace: 'test',
       version: 1,
       title: 'Initial vendor assessment workflow',
       description: 'End-to-end supply chain review process',
       steps: [
-        { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector' },
+        { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector', agent: { skill: 'vendor-assessment', mcpServers: [{ name: 'postgres-ro', command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres'], env: { DATABASE_URL: '{{DB_URL}}' }, allowedTools: ['query'] }, { name: 'filesystem', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'] }] } },
         { id: 'narrative-summary', name: 'Narrative Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3' },
         { id: 'risk-scoring', name: 'Risk Scoring', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'human-review', name: 'Human Review', type: 'review', executor: 'human', verdicts: { approve: { target: 'done' }, revise: { target: 'vendor-assessment' } } },
@@ -670,41 +920,61 @@ export function buildSeedData(testUserId: string) {
     },
   };
 
+  const namespaces: Record<string, Record<string, unknown>> = {
+    test: {
+      id: 'test',
+      handle: 'test',
+      type: 'personal',
+      displayName: 'Test User',
+      linkedUserId: testUserId,
+      createdAt: '2024-01-01T00:00:00.000Z',
+    },
+  };
+
+  const namespaceMembers: Record<string, Record<string, unknown>> = {
+    [testUserId]: {
+      id: testUserId,
+      uid: testUserId,
+      role: 'owner',
+      joinedAt: '2024-01-01T00:00:00.000Z',
+    },
+  };
+
+  // Namespace-scoped tool catalog — seed entries under
+  // `namespaces/{TEST_ORG_HANDLE}/toolCatalog/{entryId}`. Doc id IS the entry id,
+  // so we strip `id` from the payload to match FirestoreToolCatalogRepository
+  // (see packages/platform-infra/src/firestore/tool-catalog-repository.ts).
+  const toolCatalog: Record<string, Record<string, unknown>> = {
+    filesystem: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'],
+      description: 'Read and write files in a scoped directory.',
+    },
+    postgres: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-postgres'],
+      env: { DATABASE_URL: '{{SECRET:DATABASE_URL}}' },
+      description: 'Execute read-only SQL queries against a PostgreSQL database.',
+    },
+  };
+
+  // Top-level agentDefinitions collection — pre-seed `claude-code-agent` so the
+  // agent MCP journey is deterministic. Without this, the page relies on the
+  // fire-and-forget `seedBuiltinAgentDefinitions` in platform-services, which
+  // races with the first GET `/api/agent-definitions/:id` request.
+  //
+  // `mcp-test-agent` is a fixture consumed by step-mcp-restrictions.journey.ts —
+  // it ships with one pre-bound stdio server so the Restrictions section has
+  // something to narrow. Journey 2 uses `claude-code-agent`, which must start
+  // binding-free for its "empty state" assertion; hence the split.
   const agentDefinitions: Record<string, Record<string, unknown>> = {
-    'agent-def-driver': {
-      id: 'agent-def-driver',
-      pluginId: 'supply-intelligence/driver-agent',
-      name: 'Driver Agent',
-      iconName: 'Chart',
-      description: 'Orchestrates multi-step supply chain review workflows by coordinating data collection, analysis, and reporting agents.',
-      inputDescription: 'Workflow trigger payload with study identifiers',
-      outputDescription: 'Completed workflow result with step summaries',
-      foundationModel: 'anthropic/claude-sonnet-4',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-risk-detection': {
-      id: 'agent-def-risk-detection',
-      pluginId: 'supply-intelligence/risk-detection',
-      name: 'Risk Detection',
-      iconName: 'Chart',
-      description: 'Analyzes vendor submissions and supply chain data to identify potential risks, anomalies, and compliance issues.',
-      inputDescription: 'Vendor submission records and historical data',
-      outputDescription: 'Risk scores, flagged issues, and recommendations',
-      foundationModel: 'anthropic/claude-sonnet-4',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-claude-code': {
-      id: 'agent-def-claude-code',
-      pluginId: 'claude-code-agent',
+    'claude-code-agent': {
+      kind: 'plugin',
+      runtimeId: 'claude-code-agent',
       name: 'Claude Code Agent',
       iconName: 'Bot',
-      description: 'Executes code generation, analysis, and automated software tasks using Claude\'s advanced coding capabilities.',
+      description:
+        "Executes code generation, analysis, and automated software tasks using Claude's advanced coding capabilities.",
       inputDescription: 'Task description and relevant code context',
       outputDescription: 'Generated code, analysis results, or task completion report',
       foundationModel: 'anthropic/claude-sonnet-4',
@@ -713,35 +983,252 @@ export function buildSeedData(testUserId: string) {
       createdAt: twoDaysAgo,
       updatedAt: twoDaysAgo,
     },
-    'agent-def-opencode': {
-      id: 'agent-def-opencode',
-      pluginId: 'opencode-agent',
-      name: 'OpenCode Agent',
-      iconName: 'Cpu',
-      description: 'Open-source code execution agent powered by DeepSeek for cost-efficient automated development tasks.',
-      inputDescription: 'Code task description and project context',
-      outputDescription: 'Implemented code changes and execution results',
-      foundationModel: 'deepseek/deepseek-chat',
-      systemPrompt: '',
-      skillFileNames: [],
-      createdAt: twoDaysAgo,
-      updatedAt: twoDaysAgo,
-    },
-    'agent-def-script-container': {
-      id: 'agent-def-script-container',
-      pluginId: 'script-container',
-      name: 'Script Container',
+    'mcp-test-agent': {
+      kind: 'plugin',
+      runtimeId: 'script-container',
+      name: 'MCP Test Agent',
       iconName: 'Terminal',
-      description: 'Sandboxed execution environment for running custom scripts, data transformations, and automation tasks.',
-      inputDescription: 'Script definition and input parameters',
-      outputDescription: 'Script execution output and exit status',
+      description: 'Fixture agent for step-level MCP restrictions journey.',
+      inputDescription: 'test input',
+      outputDescription: 'test output',
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
       skillFileNames: [],
+      mcpServers: {
+        filesystem: { type: 'stdio', catalogId: 'filesystem' },
+      },
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+    },
+    // Fixture agent for the OAuth journey (Step 5). Ships with a pre-bound
+    // HTTP binding named `github-mcp` configured for OAuth via the
+    // `github-mock` provider, so the journey opens the editor and jumps
+    // straight to "Connect" without first editing the agent.
+    'oauth-test-agent': {
+      kind: 'plugin',
+      runtimeId: 'claude-code-agent',
+      name: 'OAuth Test Agent',
+      iconName: 'Bot',
+      description: 'Fixture agent for the per-agent OAuth journey.',
+      inputDescription: 'task input',
+      outputDescription: 'task output',
+      foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: '',
+      skillFileNames: [],
+      mcpServers: {
+        'github-mcp': {
+          type: 'http',
+          url: 'https://api.example.com/mcp',
+          auth: {
+            type: 'oauth',
+            provider: 'github-mock',
+            headerName: 'Authorization',
+            headerValueTemplate: 'Bearer {token}',
+          },
+        },
+      },
       createdAt: twoDaysAgo,
       updatedAt: twoDaysAgo,
     },
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, agentDefinitions };
+  // ── OAuth providers (Step 5) ───────────────────────────────────────────────
+  // Seeded into `namespaces/{TEST_ORG_HANDLE}/oauthProviders/{providerId}`.
+  // The mock OAuth server started in globalSetup exposes /authorize, /token,
+  // /userinfo, /revoke — we point the provider at it so Connect / Disconnect /
+  // Revoke flow end-to-end without any real external dependency.
+  const oauthProviders: Record<string, Record<string, unknown>> = {
+    'github-mock': {
+      name: 'GitHub (mock)',
+      clientId: 'mock-client-id',
+      clientSecret: 'mock-client-secret',
+      authorizeUrl: `${mockOAuthBaseUrl}/authorize`,
+      tokenUrl: `${mockOAuthBaseUrl}/token`,
+      userInfoUrl: `${mockOAuthBaseUrl}/userinfo`,
+      revokeUrl: `${mockOAuthBaseUrl}/revoke`,
+      scopes: ['repo', 'read:user'],
+      createdAt: twoDaysAgo,
+      updatedAt: twoDaysAgo,
+    },
+  };
+
+  // Minimal workflow with one agent step referencing `mcp-test-agent`, used
+  // only by step-mcp-restrictions.journey.ts.
+  workflowDefinitions['MCP Restrictions Test:1'] = {
+    name: 'MCP Restrictions Test',
+    namespace: 'test',
+    version: 1,
+    description: 'Fixture workflow for step-level MCP restrictions journey',
+    steps: [
+      {
+        id: 'process',
+        name: 'Process',
+        type: 'creation',
+        executor: 'agent',
+        autonomyLevel: 'L2',
+        plugin: 'script-container',
+        agentId: 'mcp-test-agent',
+      },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'process', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start' }],
+    createdAt: twoDaysAgo,
+  };
+
+  // -------------------------------------------------------------------------
+  // Cowork sessions — collaborative human+AI artifact building
+  // -------------------------------------------------------------------------
+
+  const coworkSessions: Record<string, Record<string, unknown>> = {
+    'cowork-active-1': {
+      id: 'cowork-active-1',
+      processInstanceId: 'proc-cowork-paused',
+      stepId: 'design',
+      assignedRole: 'analyst',
+      assignedUserId: testUserId,
+      status: 'active',
+      agent: 'chat',
+      model: 'anthropic/claude-sonnet-4',
+      systemPrompt: 'You are a workflow design assistant.',
+      outputSchema: {
+        type: 'object',
+        required: ['name', 'description', 'steps'],
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string' },
+          steps: { type: 'array' },
+        },
+      },
+      voiceConfig: null,
+      artifact: {
+        name: 'data-quality-review',
+        description: 'Automated data quality review workflow',
+        steps: [
+          { id: 'collect', name: 'Collect Data', executor: 'script' },
+          { id: 'analyze', name: 'Analyze Quality', executor: 'agent' },
+          { id: 'review', name: 'Human Review', executor: 'human' },
+        ],
+      },
+      turns: [
+        {
+          id: 'turn-1',
+          role: 'human',
+          content: 'I need a workflow for automated data quality review with 3 steps: collect data, analyze quality, and human review.',
+          timestamp: oneHourAgo,
+          artifactDelta: null,
+        },
+        {
+          id: 'turn-2',
+          role: 'agent',
+          content: 'I\'ve drafted a 3-step workflow: data collection via script, AI-powered quality analysis, and a final human review gate. The artifact has been updated with the full structure.',
+          timestamp: oneHourAgo,
+          artifactDelta: {
+            name: 'data-quality-review',
+            description: 'Automated data quality review workflow',
+            steps: [
+              { id: 'collect', name: 'Collect Data', executor: 'script' },
+              { id: 'analyze', name: 'Analyze Quality', executor: 'agent' },
+              { id: 'review', name: 'Human Review', executor: 'human' },
+            ],
+          },
+        },
+      ],
+      createdAt: oneHourAgo,
+      updatedAt: oneHourAgo,
+      finalizedAt: null,
+    },
+  };
+
+  // Process instance paused for cowork
+  processInstances['proc-cowork-paused'] = {
+    id: 'proc-cowork-paused',
+    definitionName: 'Workflow Designer',
+    definitionVersion: '1',
+    status: 'paused',
+    currentStepId: 'design',
+    variables: {},
+    triggerType: 'manual',
+    triggerPayload: {},
+    createdAt: oneHourAgo,
+    updatedAt: oneHourAgo,
+    createdBy: testUserId,
+    pauseReason: 'cowork_in_progress',
+    error: null,
+    assignedRoles: ['analyst'],
+  };
+
+  // Workflow definition with a cowork step
+  workflowDefinitions['Workflow Designer:1'] = {
+    name: 'Workflow Designer',
+    namespace: 'test',
+    version: 1,
+    description: 'Collaboratively design workflows with AI',
+    steps: [
+      {
+        id: 'design',
+        name: 'Design Workflow',
+        type: 'creation',
+        executor: 'cowork',
+        description: 'Collaboratively build a workflow definition with AI assistance. Describe your requirements and iterate on the design.',
+        allowedRoles: ['analyst'],
+        cowork: {
+          agent: 'chat',
+          systemPrompt: 'You are a workflow design assistant.',
+          outputSchema: {
+            type: 'object',
+            required: ['name', 'description', 'steps'],
+            properties: {
+              name: { type: 'string' },
+              description: { type: 'string' },
+              steps: { type: 'array' },
+            },
+          },
+          chat: { model: 'anthropic/claude-sonnet-4' },
+        },
+      },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'design', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start-design' }],
+    createdAt: twoDaysAgo,
+  };
+
+  // Step executions for the new-style workflow run (proc-workflow-run-1)
+  // Used by executor identity label tests — vendor-assessment has plugin 'supply-data-collector'
+  // in the WorkflowDefinition, so its label should render as 'agent:supply-data-collector'.
+  const workflowRunStepExecutions: Record<string, Record<string, unknown>> = {
+    'exec-wf-vendor': {
+      id: 'exec-wf-vendor',
+      instanceId: 'proc-workflow-run-1',
+      stepId: 'vendor-assessment',
+      status: 'completed',
+      input: { studyId: 'study-wf-001' },
+      output: { assessed: true },
+      verdict: null,
+      executedBy: 'agent:vendor-assessment',
+      startedAt: oneHourAgo,
+      completedAt: oneHourAgo,
+      iterationNumber: 0,
+      gateResult: { next: 'narrative-summary', reason: 'assessment complete' },
+      error: null,
+    },
+    'exec-wf-narrative': {
+      id: 'exec-wf-narrative',
+      instanceId: 'proc-workflow-run-1',
+      stepId: 'narrative-summary',
+      status: 'running',
+      input: { assessed: true },
+      output: null,
+      verdict: null,
+      executedBy: 'agent:narrative-summary',
+      startedAt: now,
+      completedAt: null,
+      iterationNumber: 0,
+      gateResult: null,
+      error: null,
+    },
+  };
+
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions };
 }

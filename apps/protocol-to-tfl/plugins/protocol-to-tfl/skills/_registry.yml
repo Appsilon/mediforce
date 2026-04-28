@@ -1,0 +1,34 @@
+version: "1.0"
+generated: "2026-03-26"
+standard: "agentskills.io/specification"
+total_skills: 5
+
+domains:
+  clinical-reporting:
+    description: Clinical trial reporting pipeline skills
+    skills:
+      - id: trial-metadata-extractor
+        path: trial-metadata-extractor/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Extract structured metadata from clinical trial Protocol and SAP
+      - id: mock-tlg-generator
+        path: mock-tlg-generator/SKILL.md
+        complexity: advanced
+        language: multi
+        description: Generate mock TLG shells from trial metadata
+      - id: sdtm-to-adam
+        path: sdtm-to-adam/SKILL.md
+        complexity: advanced
+        language: R
+        description: Derive ADaM datasets from SDTM data
+      - id: adam-to-tlg
+        path: adam-to-tlg/SKILL.md
+        complexity: advanced
+        language: R
+        description: Generate production TLGs from ADaM datasets
+      - id: adam-to-teal
+        path: adam-to-teal/SKILL.md
+        complexity: advanced
+        language: R
+        description: Generate TEAL modules from ADaM datasets

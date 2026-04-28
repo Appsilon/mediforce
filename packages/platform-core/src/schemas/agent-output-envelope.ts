@@ -23,6 +23,8 @@ export const AgentOutputEnvelopeSchema = z.object({
   duration_ms: z.number().int().nonnegative(),
   result: z.record(z.string(), z.unknown()).nullable(), // nullable for L0/L2 annotations-only
   gitMetadata: GitMetadataSchema.nullable().optional(), // container execution git output
+  presentation: z.string().nullable().optional(), // optional HTML view for human reviewers
+  deliverableFile: z.string().nullable().optional(), // persisted deliverable file path
 });
 
 export type Annotation = z.infer<typeof AnnotationSchema>;

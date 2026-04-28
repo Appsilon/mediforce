@@ -2,15 +2,68 @@
 
 import * as React from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Bot, Code, ExternalLink, FileText, Gauge, GitBranch, Loader2 } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { AlertTriangle, Bot, Code, ExternalLink, FileText, Gauge, GitBranch, Loader2, MonitorPlay } from 'lucide-react';
 import type { AgentOutputData } from './task-utils';
 import { formatStepName } from './task-utils';
+import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 
 interface AgentOutputReviewPanelProps {
   agentOutput: AgentOutputData;
   stepId?: string;
   onContentLoaded?: (hasContent: boolean) => void;
+  instanceId: string;
+}
+
+/** Build a self-contained HTML document for the sandboxed iframe. */
+function buildSrcdoc(presentation: string, result: Record<string, unknown> | null, isDark: boolean): string {
+  // Escape closing script tags in data to prevent XSS breakout
+  const safeData = JSON.stringify(result ?? {}).replace(/<\//g, '<\\/');
+  return `<!DOCTYPE html>
+<html class="${isDark ? 'dark' : ''}">
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+@theme {
+  --color-surface: #ffffff;
+  --color-surface-dark: #0f1117;
+  --color-text: #1a1a2e;
+  --color-text-dark: #e2e4e9;
+  --color-muted: #6b7280;
+  --color-muted-dark: #9ca3af;
+  --color-border: #e5e7eb;
+  --color-border-dark: #2d2f36;
+}
+body {
+  margin: 0;
+  padding: 1rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.dark body {
+  background: var(--color-surface-dark);
+  color: var(--color-text-dark);
+}
+</style>
+<script>window.__data__ = ${safeData};</script>
+</head>
+<body>
+${presentation}
+<script>
+const ro = new ResizeObserver(() => {
+  window.parent.postMessage({ type: 'resize', height: document.body.scrollHeight }, '*');
+});
+ro.observe(document.body);
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'theme') {
+    document.documentElement.classList.toggle('dark', e.data.dark);
+  }
+});
+</script>
+</body>
+</html>`;
 }
 
 /** Try to extract an output_file path from the result's `raw` field. */
@@ -30,7 +83,38 @@ export function AgentOutputReviewPanel({
   agentOutput,
   stepId,
   onContentLoaded,
+  instanceId,
 }: AgentOutputReviewPanelProps) {
+  const hasPresentation = typeof agentOutput.presentation === 'string' && agentOutput.presentation.length > 0;
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const [iframeHeight, setIframeHeight] = React.useState(300);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  React.useEffect(() => {
+    if (!hasPresentation) return;
+    const handler = (event: MessageEvent) => {
+      if (
+        event.data &&
+        typeof event.data === 'object' &&
+        event.data.type === 'resize' &&
+        typeof event.data.height === 'number' &&
+        iframeRef.current &&
+        event.source === iframeRef.current.contentWindow
+      ) {
+        setIframeHeight(event.data.height);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [hasPresentation]);
+
+  // Sync theme changes to iframe
+  React.useEffect(() => {
+    if (!hasPresentation) return;
+    iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
+  }, [isDark, hasPresentation]);
+
   const hasContent = agentOutput.result !== null && Object.keys(agentOutput.result).length > 0;
 
   const outputFilePath = React.useMemo(
@@ -45,7 +129,7 @@ export function AgentOutputReviewPanel({
   React.useEffect(() => {
     if (!outputFilePath) return;
     setFileLoading(true);
-    fetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}`)
+    apiFetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}&instanceId=${encodeURIComponent(instanceId)}`)
       .then((res) => res.json() as Promise<{ content?: string; error?: string }>)
       .then((data) => {
         if (data.error && !data.content) {
@@ -83,7 +167,7 @@ export function AgentOutputReviewPanel({
 
   const hasFileTab = fileContent !== null || fileLoading || outputFilePath !== null;
   const hasGitTab = agentOutput.gitMetadata !== null;
-  const defaultTab = hasGitTab ? 'git' : hasFileTab ? 'content' : 'summary';
+  const defaultTab = hasPresentation ? 'presentation' : hasGitTab ? 'git' : hasFileTab ? 'content' : 'summary';
 
   return (
     <div className="rounded-lg border">
@@ -97,6 +181,16 @@ export function AgentOutputReviewPanel({
           {stepId && (
             <span className="text-xs font-medium text-foreground">
               — {formatStepName(stepId)}
+            </span>
+          )}
+          {agentOutput.escalationReason !== null && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+              title={`Agent escalated to human because of ${agentOutput.escalationReason.replace(/_/g, ' ')}. Review the recommendation and approve or request revision.`}
+            >
+              <AlertTriangle className="h-3 w-3" />
+              Escalated: {formatEscalationReason(agentOutput.escalationReason)}
+              {agentOutput.escalationReason === 'low_confidence' && confidencePct !== null && ` (${confidencePct}%)`}
             </span>
           )}
         </div>
@@ -147,6 +241,7 @@ export function AgentOutputReviewPanel({
       <Tabs.Root defaultValue={defaultTab}>
         <Tabs.List className="flex gap-1 border-b px-4">
           {[
+            ...(hasPresentation ? [{ value: 'presentation', label: 'Presentation', icon: MonitorPlay }] : []),
             ...(hasFileTab ? [{ value: 'content', label: 'Content', icon: FileText }] : []),
             ...(hasGitTab ? [{ value: 'git', label: 'Git', icon: GitBranch }] : []),
             { value: 'summary', label: 'Extracted Data', icon: FileText },
@@ -167,6 +262,18 @@ export function AgentOutputReviewPanel({
             </Tabs.Trigger>
           ))}
         </Tabs.List>
+
+        {hasPresentation && (
+          <Tabs.Content value="presentation" className="p-4">
+            <iframe
+              ref={iframeRef}
+              srcDoc={buildSrcdoc(agentOutput.presentation!, agentOutput.result, isDark)}
+              sandbox="allow-scripts"
+              style={{ width: '100%', height: iframeHeight, border: 'none' }}
+              title="Agent presentation"
+            />
+          </Tabs.Content>
+        )}
 
         {hasFileTab && (
           <Tabs.Content value="content" className="p-4">
@@ -505,6 +612,15 @@ function formatKey(key: string): string {
     .replace(/_/g, ' ')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatEscalationReason(reason: 'low_confidence' | 'timeout' | 'error' | 'iterations_limit'): string {
+  switch (reason) {
+    case 'low_confidence': return 'low confidence';
+    case 'timeout': return 'timeout';
+    case 'error': return 'error';
+    case 'iterations_limit': return 'iterations limit reached';
+  }
 }
 
 function formatDuration(ms: number): string {

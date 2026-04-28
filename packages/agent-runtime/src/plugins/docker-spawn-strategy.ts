@@ -8,8 +8,18 @@
  * The queued strategy is activated when REDIS_URL is set.
  */
 import { spawn } from 'node:child_process';
-import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { appendFile, readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { ensureImage } from './docker-image-builder.js';
+
+export interface ImageBuildMeta {
+  image: string;
+  repoUrl: string;
+  commit: string;
+  dockerfile?: string;
+  /** Resolved token for authenticated HTTPS clone. When absent, falls back to SSH deploy key. */
+  repoToken?: string;
+}
 
 export interface DockerSpawnRequest {
   dockerArgs: string[];
@@ -20,6 +30,14 @@ export interface DockerSpawnRequest {
   stepId: string;
   outputDir: string;
   logFile: string | null;
+  /**
+   * When provided, each raw stdout line is passed through this function before being written
+   * to the log file. Returns an array of JSONL strings to write (empty = skip the line).
+   * Used by LocalDockerSpawnStrategy to write parsed log entries in real-time.
+   */
+  lineProcessor?: (rawLine: string) => string[];
+  /** When present, strategy ensures the image exists (lazy build) before docker run. */
+  imageBuild?: ImageBuildMeta;
 }
 
 export interface DockerSpawnResult {
@@ -38,7 +56,17 @@ export interface DockerSpawnStrategy {
  * This is the current behavior — extracted into a strategy for swapability.
  */
 export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
-  spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
+  async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
+    if (request.imageBuild) {
+      await ensureImage(request.imageBuild);
+    }
+
+    const { logFile } = request;
+    let logDirReady: Promise<void> | null = null;
+    if (logFile) {
+      logDirReady = mkdir(dirname(logFile), { recursive: true }).then(() => {});
+    }
+
     return new Promise<DockerSpawnResult>((resolve, reject) => {
       const child = spawn('docker', request.dockerArgs, {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -60,8 +88,26 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
 
+      let stdoutBuffer = '';
       child.stdout.on('data', (chunk: Buffer) => {
         stdoutChunks.push(chunk);
+        if (logFile && logDirReady) {
+          stdoutBuffer += chunk.toString('utf-8');
+          const lines = stdoutBuffer.split('\n');
+          stdoutBuffer = lines.pop() ?? '';
+          const trimmedLines = lines.map((l) => l.trim()).filter((l) => l.length > 0);
+          if (trimmedLines.length === 0) return;
+          if (request.lineProcessor) {
+            const entries = trimmedLines.flatMap((l) => request.lineProcessor!(l));
+            if (entries.length > 0) {
+              void logDirReady.then(() => appendFile(logFile, entries.join('\n') + '\n'));
+            }
+          } else {
+            void logDirReady.then(() =>
+              Promise.all(trimmedLines.map((l) => appendFile(logFile, l + '\n'))),
+            );
+          }
+        }
       });
 
       child.stderr.on('data', (chunk: Buffer) => {
@@ -83,11 +129,25 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
         settled = true;
         clearTimeout(timeoutHandle);
 
-        resolve({
-          stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
-          stderr: Buffer.concat(stderrChunks).toString('utf-8'),
-          exitCode: code,
-          signal: signal ?? null,
+        const remaining = stdoutBuffer.trim();
+        const flush =
+          logFile && logDirReady && remaining
+            ? logDirReady.then(() => {
+                if (request.lineProcessor) {
+                  const entries = request.lineProcessor(remaining);
+                  return entries.length > 0 ? appendFile(logFile, entries.join('\n') + '\n') : undefined;
+                }
+                return appendFile(logFile, remaining + '\n');
+              })
+            : Promise.resolve();
+
+        void flush.then(() => {
+          resolve({
+            stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
+            stderr: Buffer.concat(stderrChunks).toString('utf-8'),
+            exitCode: code,
+            signal: signal ?? null,
+          });
         });
       });
 
@@ -139,6 +199,7 @@ export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
       outputDir: request.outputDir,
       logFile: request.logFile,
       inputFiles,
+      imageBuild: request.imageBuild,
     });
 
     // Write output files from worker back to caller's outputDir

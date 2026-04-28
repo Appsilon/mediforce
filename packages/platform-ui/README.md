@@ -32,15 +32,23 @@ Copy `.env.local.example` to `.env.local` and fill in values.
 ## Dev Modes
 
 ```bash
-# Standard dev server
+# Standard dev server — port 9003, production/staging Firebase per .env.local
 pnpm dev
 
-# Dev with Firebase emulators (requires emulators running)
+# Full local emulator stack — port 9007, Firebase emulators, mock LLM agents,
+# real Docker for script-container steps, MEDIFORCE_DATA_DIR isolated to /tmp.
+# Use this to click through Docker-backed workflows without real credentials.
+# Bootstrap + seed first:
+#   python3 packages/platform-ui/scripts/bootstrap_e2e.py
+#   pnpm seed:dev
 pnpm dev:test
 
-# Dev with mock agents (no Claude CLI needed, instant fixture responses)
+# Dev with mock agents (no Claude CLI needed, instant fixture responses) but
+# against production/staging Firebase.
 MOCK_AGENT=true pnpm dev
 ```
+
+See `docs/running-workspace-locally.md` for the full step-by-step on exercising the workspace + Docker path locally.
 
 ## PR Preview Deployments
 

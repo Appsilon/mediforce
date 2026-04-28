@@ -1,0 +1,58 @@
+{
+  "name": "@mediforce/platform-api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "@mediforce/source": "./src/index.ts",
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./contract": {
+      "import": {
+        "@mediforce/source": "./src/contract/index.ts",
+        "types": "./dist/contract/index.d.ts",
+        "default": "./dist/contract/index.js"
+      }
+    },
+    "./handlers": {
+      "import": {
+        "@mediforce/source": "./src/handlers/index.ts",
+        "types": "./dist/handlers/index.d.ts",
+        "default": "./dist/handlers/index.js"
+      }
+    },
+    "./services": {
+      "import": {
+        "@mediforce/source": "./src/services/index.ts",
+        "types": "./dist/services/index.d.ts",
+        "default": "./dist/services/index.js"
+      }
+    },
+    "./client": {
+      "import": {
+        "@mediforce/source": "./src/client/index.ts",
+        "types": "./dist/client/index.d.ts",
+        "default": "./dist/client/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mediforce/agent-runtime": "workspace:*",
+    "@mediforce/platform-core": "workspace:*",
+    "@mediforce/platform-infra": "workspace:*",
+    "@mediforce/workflow-engine": "workspace:*",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.2",
+    "vitest": "^4.0.0"
+  }
+}

@@ -12,6 +12,7 @@ export type ProcessStatusFilter = 'all' | 'running' | 'paused' | 'completed' | '
 export function useProcessInstances(
   statusFilter: ProcessStatusFilter = 'all',
   definitionName?: string,
+  showArchived = false,
 ) {
   const constraints = useMemo(() => {
     const c = [];
@@ -30,13 +31,14 @@ export function useProcessInstances(
   const result = useCollection<ProcessInstance>('processInstances', constraints);
 
   const data = useMemo(() => {
-    // Filter out soft-deleted instances
-    const filtered = result.data.filter((instance) => !instance.deleted);
+    const filtered = result.data
+      .filter((instance) => !instance.deleted)
+      .filter((instance) => showArchived || instance.archived !== true);
     if (!definitionName) return filtered;
     return [...filtered].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
-  }, [result.data, definitionName]);
+  }, [result.data, definitionName, showArchived]);
 
   return { ...result, data };
 }

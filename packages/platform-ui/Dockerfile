@@ -1,5 +1,8 @@
-FROM node:22-slim AS base
+# syntax=docker/dockerfile:1.23
+FROM node:24-slim AS base
 RUN corepack enable && corepack prepare pnpm@latest --activate
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
 
 # --- Dependencies ---
 FROM base AS deps
@@ -8,17 +11,19 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages/platform-core/package.json packages/platform-core/
 COPY packages/platform-infra/package.json packages/platform-infra/
+COPY packages/platform-api/package.json packages/platform-api/
 COPY packages/workflow-engine/package.json packages/workflow-engine/
 COPY packages/agent-runtime/package.json packages/agent-runtime/
 COPY packages/agent-queue/package.json packages/agent-queue/
-COPY packages/supply-intelligence/package.json packages/supply-intelligence/
-COPY packages/supply-intelligence-plugins/package.json packages/supply-intelligence-plugins/
+COPY packages/mcp-client/package.json packages/mcp-client/
 COPY packages/platform-ui/package.json packages/platform-ui/
 COPY apps/community-digest/package.json apps/community-digest/
 COPY apps/protocol-to-tfl/package.json apps/protocol-to-tfl/
-COPY apps/supply-intelligence/package.json apps/supply-intelligence/
 
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm config set package-import-method copy && \
+    (pnpm install --frozen-lockfile || pnpm install)
 
 # --- Builder ---
 FROM base AS builder
@@ -40,7 +45,11 @@ ARG NEXT_PUBLIC_GIT_SHA
 RUN pnpm --filter @mediforce/platform-ui build
 
 # --- Runner ---
-FROM node:22-slim AS runner
+FROM node:24-slim AS runner
+
+# Git needed for cloning workflow repos (skill loading, lazy image build)
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -52,6 +61,9 @@ COPY --from=builder /app/packages/platform-ui/.next/standalone ./
 COPY --from=builder /app/packages/platform-ui/.next/static ./packages/platform-ui/.next/static
 # Copy public assets (PWA icons, manifest, service worker)
 COPY --from=builder /app/packages/platform-ui/public ./packages/platform-ui/public
+# Seed JSONs (agent-definitions, tool-catalog) read at platform-services init.
+# Not reliably picked up by Next.js output file tracing in this build, so copy explicitly.
+COPY --from=builder /app/data ./data
 
 EXPOSE 3000
 

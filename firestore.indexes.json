@@ -18,11 +18,79 @@
       ]
     },
     {
+      "collectionGroup": "humanTasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedRole", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "auditEvents",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "processInstanceId", "order": "ASCENDING" },
         { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "coworkSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "processInstanceId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "coworkSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "processInstanceId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "coworkSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedRole", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "coworkSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedRole", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "finalizedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "coworkSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "coworkSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "finalizedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "processInstances",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "definitionName", "order": "ASCENDING" },
+        { "fieldPath": "deleted", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
     }
   ],

@@ -1,20 +1,25 @@
 'use client';
 
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ReactFlow,
   ReactFlowProvider,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   type Node,
   type Edge,
+  type EdgeProps,
   type NodeProps,
   Handle,
   Position,
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal } from 'lucide-react';
+import { User, Bot, Terminal, Users, Trash2, Plus, PenLine, Search, GitBranch, Flag, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { WorkflowDefinition } from '@mediforce/platform-core';
+import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -26,33 +31,45 @@ const COLORS = {
   label: { forward: '#64748b', back: '#b45309' },
 } as const;
 
-const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: string }> = {
+const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: string; activeRing: string }> = {
   creation: {
     bg: 'bg-white dark:bg-slate-900',
     border: 'border-blue-200 dark:border-blue-800',
-    activeBorder: 'border-blue-500',
+    activeBorder: 'border-blue-600 dark:border-blue-400',
+    activeRing: 'ring-2 ring-blue-400 ring-offset-1 dark:ring-blue-500',
   },
   review: {
     bg: 'bg-amber-50/50 dark:bg-amber-950/20',
     border: 'border-amber-200 dark:border-amber-800',
-    activeBorder: 'border-amber-500',
+    activeBorder: 'border-amber-500 dark:border-amber-400',
+    activeRing: 'ring-2 ring-amber-400 ring-offset-1 dark:ring-amber-500',
   },
   decision: {
     bg: 'bg-purple-50/50 dark:bg-purple-950/20',
     border: 'border-purple-200 dark:border-purple-800',
-    activeBorder: 'border-purple-500',
+    activeBorder: 'border-purple-600 dark:border-purple-400',
+    activeRing: 'ring-2 ring-purple-400 ring-offset-1 dark:ring-purple-500',
   },
   terminal: {
     bg: 'bg-slate-50 dark:bg-slate-900',
     border: 'border-slate-200 dark:border-slate-700',
-    activeBorder: 'border-slate-500',
+    activeBorder: 'border-slate-600 dark:border-slate-400',
+    activeRing: 'ring-2 ring-slate-400 ring-offset-1 dark:ring-slate-500',
   },
+};
+
+const STEP_TYPE_CONFIG: Record<string, { icon: typeof PenLine; label: string; color: string }> = {
+  creation: { icon: PenLine,    label: 'Creation', color: 'text-blue-500 dark:text-blue-400' },
+  review:   { icon: Search,     label: 'Review',   color: 'text-amber-500 dark:text-amber-400' },
+  decision: { icon: GitBranch,  label: 'Decision', color: 'text-purple-500 dark:text-purple-400' },
+  terminal: { icon: Flag,       label: 'End',      color: 'text-emerald-500 dark:text-emerald-400' },
 };
 
 const EXECUTOR_STYLES: Record<string, { icon: typeof User; color: string; bg: string }> = {
   human: { icon: User, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
   agent: { icon: Bot, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30' },
   script: { icon: Terminal, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+  cowork: { icon: Users, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/30' },
 };
 
 // ---------------------------------------------------------------------------
@@ -65,13 +82,15 @@ type StepNodeData = {
   executor: string;
   autonomyLevel?: string;
   plugin?: string;
-  editing?: boolean;
-  onRemove?: () => void;
+  hasError?: boolean;
+  onDelete?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 };
 
 const NODE_WIDTH = 240;
-const NODE_INNER_HEIGHT = 72;
-const ROW_GAP = 48;
+const NODE_INNER_HEIGHT = 85;
+const ROW_GAP = 58;
 
 const HANDLE_CLASS = '!bg-transparent !border-0 !w-px !h-px';
 
@@ -100,6 +119,8 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   const style = STEP_STYLES[data.stepType] ?? STEP_STYLES.creation;
   const exec = EXECUTOR_STYLES[data.executor] ?? EXECUTOR_STYLES.human;
   const Icon = exec.icon;
+  const typeConfig = STEP_TYPE_CONFIG[data.stepType] ?? STEP_TYPE_CONFIG.creation;
+  const TypeIcon = typeConfig.icon;
 
   return (
     <>
@@ -111,20 +132,54 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
       <div
         style={{ width: NODE_WIDTH, minHeight: NODE_INNER_HEIGHT }}
         className={cn(
-          'rounded-xl border-[1.5px] px-4 py-3 transition-all cursor-pointer group/node relative',
+          'group rounded-xl border-[1.5px] px-4 py-3 transition-all cursor-pointer relative',
           'hover:shadow-md',
           style.bg,
-          selected ? `${style.activeBorder} shadow-md ring-1 ring-primary/10` : style.border,
+          selected
+            ? `${style.activeBorder} ${style.activeRing} shadow-lg`
+            : data.hasError
+              ? 'border-red-400 ring-2 ring-red-200 dark:ring-red-900/50'
+              : style.border,
         )}
       >
-        {/* Delete button — edit mode only */}
-        {data.editing && data.onRemove && (
-          <button
-            onClick={(e) => { e.stopPropagation(); data.onRemove?.(); }}
-            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-xs opacity-0 group-hover/node:opacity-100 transition-opacity shadow-sm hover:bg-red-600 z-10"
-          >
-            ×
-          </button>
+        {(data.onMoveUp || data.onMoveDown || data.onDelete) && (
+          <div className="absolute top-2.5 right-2.5 z-10 hidden group-hover:flex flex-col gap-0.5">
+            {data.onDelete && (
+              <button
+                onClick={(e) => { e.stopPropagation(); data.onDelete?.(); }}
+                className="h-5 w-5 flex items-center justify-center rounded text-red-400 hover:text-red-600 transition-colors bg-transparent"
+                aria-label="Delete step"
+              >
+                <Trash2 className="h-3 w-3" strokeWidth={1.5} />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); data.onMoveUp?.(); }}
+              disabled={!data.onMoveUp}
+              className={cn(
+                'h-5 w-5 flex items-center justify-center rounded transition-colors bg-transparent',
+                data.onMoveUp
+                  ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  : 'text-muted-foreground/20 cursor-not-allowed',
+              )}
+              aria-label="Move step up"
+            >
+              <ArrowUp className="h-3 w-3" strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); data.onMoveDown?.(); }}
+              disabled={!data.onMoveDown}
+              className={cn(
+                'h-5 w-5 flex items-center justify-center rounded transition-colors bg-transparent',
+                data.onMoveDown
+                  ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  : 'text-muted-foreground/20 cursor-not-allowed',
+              )}
+              aria-label="Move step down"
+            >
+              <ArrowDown className="h-3 w-3" strokeWidth={1.5} />
+            </button>
+          </div>
         )}
         <div className="flex items-start gap-2.5">
           <div className={cn('rounded-lg p-1.5 mt-0.5', exec.bg)}>
@@ -135,10 +190,13 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
               {data.label}
             </p>
             <div className="flex items-center gap-1.5 mt-1">
+              <TypeIcon className={cn('h-3 w-3 shrink-0', typeConfig.color)} strokeWidth={1.5} />
+              <span className={cn('text-[10px] font-semibold', typeConfig.color)}>{typeConfig.label}</span>
+              <span className="text-[10px] text-muted-foreground/30">·</span>
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                {data.executor === 'human' ? 'Human' : data.executor === 'agent' ? 'Agent' : 'Script'}
+                {{ human: 'Human', agent: 'Agent', script: 'Script', cowork: 'Cowork' }[data.executor] ?? data.executor}
               </span>
-              {data.autonomyLevel && (
+              {data.autonomyLevel && data.executor === 'agent' && (
                 <span className="text-[10px] font-mono text-muted-foreground/70">
                   {data.autonomyLevel}
                 </span>
@@ -151,71 +209,175 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   );
 }
 
-type AddNodeData = {
-  onAdd: (executor: 'human' | 'agent' | 'script') => void;
+const nodeTypes = { step: StepNode };
+
+// ---------------------------------------------------------------------------
+// Custom edge — forward edges with a mid-point "add step" button
+// ---------------------------------------------------------------------------
+
+type AddStepEdgeData = {
+  onAdd?: (type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void;
 };
 
-const ADD_OPTIONS: { executor: 'human' | 'agent' | 'script'; icon: typeof User; label: string; iconBg: string; iconColor: string; hoverBg: string }[] = [
-  { executor: 'human', icon: User, label: 'Human', iconBg: 'bg-blue-100 dark:bg-blue-900/40', iconColor: 'text-blue-600 dark:text-blue-400', hoverBg: 'hover:bg-blue-50 dark:hover:bg-blue-900/20' },
-  { executor: 'agent', icon: Bot, label: 'Agent', iconBg: 'bg-violet-100 dark:bg-violet-900/40', iconColor: 'text-violet-600 dark:text-violet-400', hoverBg: 'hover:bg-violet-50 dark:hover:bg-violet-900/20' },
-  { executor: 'script', icon: Terminal, label: 'Script', iconBg: 'bg-amber-100 dark:bg-amber-900/40', iconColor: 'text-amber-600 dark:text-amber-400', hoverBg: 'hover:bg-amber-50 dark:hover:bg-amber-900/20' },
-];
+const STEP_TYPE_OPTIONS = [
+  { type: 'creation' as const, icon: PenLine,  label: 'Creation', description: 'A step where content or data is produced — by a human, an AI agent, or a script.', color: 'text-blue-600 dark:text-blue-400',    activeBg: 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-400' },
+  { type: 'review'   as const, icon: Search,    label: 'Review',   description: 'A step where someone evaluates work and gives a verdict such as approve or reject.',  color: 'text-amber-600 dark:text-amber-400',  activeBg: 'bg-amber-50 dark:bg-amber-900/30 ring-1 ring-amber-400' },
+  { type: 'decision' as const, icon: GitBranch, label: 'Decision', description: 'A branching step that routes the workflow to different paths based on a condition.',   color: 'text-purple-600 dark:text-purple-400', activeBg: 'bg-purple-50 dark:bg-purple-900/30 ring-1 ring-purple-400' },
+] as const;
 
-function AddStepNode({ data }: NodeProps<Node<AddNodeData>>) {
-  const [open, setOpen] = useState(false);
-  const ref = React.useRef<HTMLDivElement>(null);
+function AddStepEdge({
+  id,
+  sourceX, sourceY, sourcePosition,
+  targetX, targetY, targetPosition,
+  style, markerEnd,
+  label, labelStyle, labelBgStyle, labelBgPadding, labelBgBorderRadius,
+  data,
+}: EdgeProps & { data?: AddStepEdgeData }) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [pendingType, setPendingType] = useState<WorkflowStep['type'] | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as HTMLElement)) setOpen(false);
+  useEffect(() => {
+    if (!popoverOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        popoverRef.current && !popoverRef.current.contains(e.target as HTMLElement) &&
+        buttonRef.current && !buttonRef.current.contains(e.target as HTMLElement)
+      ) {
+        setPopoverOpen(false);
+        setPendingType(null);
+      }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [popoverOpen]);
+
+  const [path, midX, midY] = getSmoothStepPath({
+    sourceX, sourceY, sourcePosition,
+    targetX, targetY, targetPosition,
+  });
+
+  // Position the button 40% along the source→target vector (10% closer to source than midpoint).
+  const buttonX = sourceX + 0.4 * (targetX - sourceX);
+  const buttonY = sourceY + 0.4 * (targetY - sourceY);
+
+  const handleButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (popoverOpen) {
+      setPopoverOpen(false);
+      setPendingType(null);
+      setPopoverPos(null);
+    } else {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (rect) {
+        setPopoverPos({
+          top: rect.bottom + window.scrollY + 8,
+          left: rect.left + window.scrollX + rect.width / 2,
+        });
+      }
+      setPopoverOpen(true);
+    }
+  };
 
   return (
     <>
-      <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
-      <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
-      <div ref={ref} style={{ width: NODE_WIDTH }} className="flex justify-center relative">
-        {!open ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-            className="w-7 h-7 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all"
+      <BaseEdge
+        id={id}
+        path={path}
+        style={style}
+        markerEnd={markerEnd}
+        label={label}
+        labelX={midX}
+        labelY={midY}
+        labelStyle={labelStyle}
+        labelBgStyle={labelBgStyle}
+        labelBgPadding={labelBgPadding}
+        labelBgBorderRadius={labelBgBorderRadius}
+        labelShowBg={true}
+      />
+      {data?.onAdd && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${buttonX}px, ${buttonY}px)`,
+              pointerEvents: 'all',
+            }}
+            className="nodrag nopan"
           >
-            <span className="text-sm font-bold">+</span>
-          </button>
-        ) : (
-          <div className="flex items-center gap-1 bg-background rounded-xl border shadow-xl px-1.5 py-1.5 animate-in fade-in zoom-in-95 duration-150">
-            {ADD_OPTIONS.map((opt, i) => {
-              const Icon = opt.icon;
-              return (
-                <React.Fragment key={opt.executor}>
-                  {i === 2 && <div className="w-px h-6 bg-border mx-0.5" />}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); data.onAdd(opt.executor); setOpen(false); }}
-                    className={cn(
-                      'flex items-center gap-2 rounded-lg px-3 py-2 transition-all active:scale-95',
-                      opt.hoverBg,
-                    )}
-                  >
-                    <div className={cn('w-6 h-6 rounded-md flex items-center justify-center', opt.iconBg)}>
-                      <Icon className={cn('h-3.5 w-3.5', opt.iconColor)} />
-                    </div>
-                    <span className="text-xs font-semibold text-foreground">{opt.label}</span>
-                  </button>
-                </React.Fragment>
-              );
-            })}
+            <button
+              ref={buttonRef}
+              onClick={handleButtonClick}
+              className="h-5 w-5 flex items-center justify-center rounded-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-400 hover:text-primary hover:border-primary transition-colors shadow-sm"
+              aria-label="Add step here"
+            >
+              <Plus className="h-3 w-3" />
+            </button>
           </div>
-        )}
-      </div>
+        </EdgeLabelRenderer>
+      )}
+      {popoverOpen && popoverPos && data?.onAdd && createPortal(
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'absolute',
+            top: popoverPos.top,
+            left: popoverPos.left,
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+          }}
+          className="bg-background border rounded-xl shadow-xl p-3 w-80 space-y-3"
+        >
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Step type</p>
+            <div className="flex flex-col gap-1">
+              {STEP_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.type}
+                  onClick={(e) => { e.stopPropagation(); setPendingType(opt.type); }}
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-left transition-all w-full',
+                    pendingType === opt.type ? opt.activeBg : 'hover:bg-muted',
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <opt.icon className={cn('h-3.5 w-3.5 shrink-0', opt.color)} strokeWidth={1.5} />
+                    <span className={cn('text-xs font-semibold', opt.color)}>{opt.label}</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{opt.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+          {pendingType && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Who handles this step?</p>
+              <div className="flex gap-1.5">
+                {(pendingType === 'creation'
+                  ? (['human', 'agent', 'script', 'cowork'] as const)
+                  : (['human', 'agent'] as const)
+                ).map((executor) => (
+                  <button
+                    key={executor}
+                    onClick={(e) => { e.stopPropagation(); data.onAdd?.(pendingType, executor); setPopoverOpen(false); setPendingType(null); setPopoverPos(null); }}
+                    className="flex-1 rounded-lg py-1.5 text-xs font-semibold hover:bg-muted transition-all capitalize border"
+                  >
+                    {executor}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>,
+        document.body,
+      )}
     </>
   );
 }
 
-const nodeTypes = { step: StepNode, addStep: AddStepNode };
+const edgeTypes = { addStep: AddStepEdge };
 
 // ---------------------------------------------------------------------------
 // Layout engine — top-down, even spacing
@@ -374,62 +536,48 @@ interface WorkflowDiagramProps {
   className?: string;
   style?: React.CSSProperties;
   onNodeClick?: (stepId: string) => void;
+  onNodeDelete?: (stepId: string) => void;
+  onNodeMoveUp?: (stepId: string) => void;
+  onNodeMoveDown?: (stepId: string) => void;
+  onEdgeAdd?: (fromStepId: string, type: WorkflowStep['type'], executor: WorkflowStep['executor']) => void;
+  onPaneClick?: () => void;
   selectedStepId?: string | null;
-  editing?: boolean;
-  onAddStep?: (afterStepId: string, beforeStepId: string, executor: 'human' | 'agent' | 'script') => void;
-  onRemoveStep?: (stepId: string) => void;
+  errorStepIds?: Set<string>;
+  canMoveUp?: Set<string>;
+  canMoveDown?: Set<string>;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, selectedStepId, editing, onAddStep, onRemoveStep }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, onPaneClick, selectedStepId, errorStepIds, canMoveUp, canMoveDown }: WorkflowDiagramProps) {
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition),
     [definition],
   );
 
-  // Inject editing callbacks into node data + add "+" nodes between steps in edit mode
   const { nodes, edges } = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const styledNodes: Node<any>[] = layoutNodes.map((n) => ({
+    const styledNodes: Node<StepNodeData>[] = layoutNodes.map((n) => ({
       ...n,
       selected: n.id === selectedStepId,
       data: {
         ...n.data,
-        editing,
-        onRemove: onRemoveStep ? () => onRemoveStep(n.id) : undefined,
+        hasError: errorStepIds?.has(n.id) ?? false,
+        onDelete: onNodeDelete && n.data.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
+        onMoveUp: onNodeMoveUp && canMoveUp?.has(n.id) ? () => onNodeMoveUp(n.id) : undefined,
+        onMoveDown: onNodeMoveDown && canMoveDown?.has(n.id) ? () => onNodeMoveDown(n.id) : undefined,
       },
     }));
-
-    let finalEdges = [...layoutEdges];
-
-    // In edit mode, insert "+" nodes between sequential forward edges
-    if (editing && onAddStep) {
-      const forwardEdges = layoutEdges.filter((e) => e.sourceHandle === 'bottom');
-      for (const edge of forwardEdges) {
-        const sourceNode = styledNodes.find((n) => n.id === edge.source);
-        const targetNode = styledNodes.find((n) => n.id === edge.target);
-        if (!sourceNode || !targetNode) continue;
-
-        const addId = `add-${edge.source}-${edge.target}`;
-        const midY = (sourceNode.position.y + targetNode.position.y) / 2;
-
-        styledNodes.push({
-          id: addId,
+    const styledEdges: Edge[] = layoutEdges.map((e) => {
+      const isForward = e.sourceHandle !== 'right-out';
+      if (isForward && onEdgeAdd) {
+        return {
+          ...e,
           type: 'addStep',
-          position: { x: sourceNode.position.x, y: midY - 14 },
-          data: { onAdd: (executor: 'human' | 'agent' | 'script') => onAddStep(edge.source, edge.target, executor) },
-        });
-
-        // Replace original edge with two edges through the add node
-        finalEdges = finalEdges.filter((e) => e.id !== edge.id);
-        finalEdges.push(
-          { ...edge, id: `${edge.source}->add`, target: addId, targetHandle: 'top', label: undefined, markerEnd: undefined },
-          { ...edge, id: `add->${edge.target}`, source: addId, sourceHandle: 'bottom', label: edge.label },
-        );
+          data: { onAdd: (type, executor) => onEdgeAdd(e.source, type, executor) } satisfies AddStepEdgeData,
+        };
       }
-    }
-
-    return { nodes: styledNodes, edges: finalEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, editing, onAddStep, onRemoveStep]);
+      return e;
+    });
+    return { nodes: styledNodes, edges: styledEdges };
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, canMoveUp, canMoveDown]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {
@@ -448,6 +596,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, sel
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={true}
@@ -457,6 +606,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, sel
           zoomOnDoubleClick={false}
           preventScrolling={false}
           onNodeClick={handleNodeClick}
+          onPaneClick={onPaneClick}
           defaultViewport={{ x: 16, y: 16, zoom: 1 }}
           proOptions={{ hideAttribution: true }}
         />

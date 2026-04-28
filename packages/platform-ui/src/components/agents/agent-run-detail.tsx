@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { format, differenceInMilliseconds } from 'date-fns';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { AgentRun, ProcessInstance } from '@mediforce/platform-core';
 import { ConfidenceBadge } from './confidence-badge';
 import { AutonomyBadge } from './autonomy-badge';
@@ -127,11 +128,12 @@ export function AgentRunDetail({
   inputData?: Record<string, unknown> | null;
 }) {
   const { envelope } = run;
+  const handle = useHandleFromPath();
 
   return (
     <div className="p-6 space-y-6 max-w-3xl">
       {/* Back */}
-      <Link href="/agents" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <Link href={`/${handle}/agents`} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="h-4 w-4" />
         Back to Agent Oversight
       </Link>
@@ -155,7 +157,7 @@ export function AgentRunDetail({
           <span className="inline-flex items-center gap-1">Autonomy: <AutonomyBadge level={run.autonomyLevel} showLabel /></span>
           {run.executorType && <span>Executor: <span className="text-foreground font-medium">{run.executorType}</span></span>}
           {run.reviewerType && <span>Reviewer: <span className="text-foreground font-medium">{run.reviewerType}</span></span>}
-          <span>Workflow: <Link href={`/workflows/${run.processInstanceId}`} className="text-primary hover:underline font-mono text-xs">{run.processInstanceId.slice(0, 12)}...</Link></span>
+          <span>Workflow: <Link href={`/${handle}/workflows/${run.processInstanceId}`} className="text-primary hover:underline font-mono text-xs">{run.processInstanceId.slice(0, 12)}...</Link></span>
           <span>Step: <span className="text-foreground font-medium">{formatStepName(run.stepId)}</span></span>
           <span>Duration: <span className="text-foreground">{formatDuration(run.startedAt, run.completedAt)}</span></span>
           <span>Started: <span className="text-foreground">{format(new Date(run.startedAt), 'MMM d, yyyy HH:mm:ss')}</span></span>

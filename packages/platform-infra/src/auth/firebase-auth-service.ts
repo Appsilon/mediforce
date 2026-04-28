@@ -88,6 +88,7 @@ export class FirebaseAuthService implements AuthService {
     const userDoc = await getDoc(userDocRef);
 
     let roles: string[] = [];
+    let handle: string | undefined;
     if (userDoc.exists()) {
       const data = userDoc.data();
       // Support both 'role' (single string) and 'roles' (array) for flexibility
@@ -96,6 +97,9 @@ export class FirebaseAuthService implements AuthService {
       } else if (typeof data.role === 'string') {
         roles = [data.role];
       }
+      if (typeof data.handle === 'string') {
+        handle = data.handle;
+      }
     }
 
     return {
@@ -103,6 +107,7 @@ export class FirebaseAuthService implements AuthService {
       email: firebaseUser.email ?? '',
       displayName: firebaseUser.displayName,
       roles,
+      handle,
     };
   }
 }

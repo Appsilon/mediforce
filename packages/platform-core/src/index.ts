@@ -39,9 +39,36 @@ export {
   PluginRoleSchema,
   PluginCapabilityMetadataSchema,
   WorkflowAgentConfigSchema,
+  WorkflowCoworkConfigSchema,
   WorkflowReviewConfigSchema,
+  WorkflowWorkspaceSchema,
   WorkflowStepSchema,
   WorkflowDefinitionSchema,
+  WorkflowDefinitionBaseSchema,
+  InputForNextRunEntrySchema,
+  validateInputForNextRun,
+  parseWorkflowDefinitionForCreation,
+  ConversationTurnSchema,
+  CoworkAgentSchema,
+  CoworkVoiceConfigSchema,
+  CoworkSessionStatusSchema,
+  CoworkSessionSchema,
+  NamespaceTypeSchema,
+  NamespaceSchema,
+  NamespaceMemberSchema,
+  WorkflowSecretsSchema,
+  CronTriggerStateSchema,
+  McpServerConfigSchema,
+  AgentMcpBindingSchema,
+  AgentMcpBindingMapSchema,
+  StdioAgentMcpBindingSchema,
+  HttpAgentMcpBindingSchema,
+  HttpAuthConfigSchema,
+  HttpHeadersAuthSchema,
+  HttpOAuthAuthSchema,
+  StepMcpRestrictionSchema,
+  StepMcpRestrictionEntrySchema,
+  ToolCatalogEntrySchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -86,9 +113,33 @@ export type {
   ProcessNotificationConfig,
   PluginCapabilityMetadata,
   WorkflowAgentConfig,
+  WorkflowCoworkConfig,
   WorkflowReviewConfig,
+  WorkflowWorkspace,
   WorkflowStep,
   WorkflowDefinition,
+  ConversationTurn,
+  HumanTurn,
+  AgentTurn,
+  ToolTurn,
+  CoworkSessionStatus,
+  CoworkSession,
+  NamespaceType,
+  Namespace,
+  NamespaceMember,
+  WorkflowSecrets,
+  CronTriggerState,
+  McpServerConfig,
+  AgentMcpBinding,
+  AgentMcpBindingMap,
+  StdioAgentMcpBinding,
+  HttpAgentMcpBinding,
+  HttpAuthConfig,
+  HttpHeadersAuth,
+  HttpOAuthAuth,
+  StepMcpRestriction,
+  StepMcpRestrictionEntry,
+  ToolCatalogEntry,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)
@@ -109,6 +160,9 @@ export type {
   UserDirectoryService,
   DirectoryUser,
   AgentRunRepository,
+  CoworkSessionRepository,
+  CronTriggerStateRepository,
+  ToolCatalogRepository,
 } from './interfaces/index.js';
 
 // Agent definition schema + repository interface
@@ -124,6 +178,34 @@ export type {
 } from './schemas/agent-definition.js';
 export type { AgentDefinitionRepository } from './repositories/agent-definition-repository.js';
 
+// OAuth — Step 5
+export {
+  OAuthProviderConfigSchema,
+  PublicOAuthProviderConfigSchema,
+  CreateOAuthProviderInputSchema,
+  UpdateOAuthProviderInputSchema,
+  OAUTH_PROVIDER_PRESETS,
+} from './schemas/oauth-provider.js';
+export type {
+  OAuthProviderConfig,
+  PublicOAuthProviderConfig,
+  CreateOAuthProviderInput,
+  UpdateOAuthProviderInput,
+} from './schemas/oauth-provider.js';
+export {
+  AgentOAuthTokenSchema,
+  PublicAgentOAuthTokenSchema,
+} from './schemas/agent-oauth-token.js';
+export type {
+  AgentOAuthToken,
+  PublicAgentOAuthToken,
+} from './schemas/agent-oauth-token.js';
+export {
+  ProviderAlreadyExistsError,
+  type OAuthProviderRepository,
+} from './repositories/oauth-provider-repository.js';
+export type { AgentOAuthTokenRepository } from './repositories/agent-oauth-token-repository.js';
+
 // Parser (YAML process definition parsing)
 export { parseProcessDefinition, type ParseResult } from './parser/index.js';
 export { formatZodErrors } from './parser/index.js';
@@ -137,6 +219,10 @@ export {
   InMemoryHumanTaskRepository,
   InMemoryHandoffRepository,
   NoopNotificationService,
+  InMemoryCoworkSessionRepository,
+  InMemoryCronTriggerStateRepository,
+  InMemoryOAuthProviderRepository,
+  InMemoryAgentOAuthTokenRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,
@@ -148,12 +234,25 @@ export {
   buildWorkflowDefinition,
   buildAgentOutputEnvelope,
   buildFileMetadata,
+  buildCoworkSession,
   resetFactorySequence,
 } from './testing/index.js';
 
 // Validation
 export { validateProcessConfig } from './validation/config-validator.js';
 export type { ConfigValidationResult } from './validation/config-validator.js';
+
+// MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
+export {
+  resolveEffectiveMcp,
+  CatalogEntryNotFoundError,
+  UnknownRestrictionTargetError,
+  DenyToolsWithoutAllowedToolsError,
+  type ResolvedMcpConfig,
+  type ResolvedMcpServer,
+  type ResolvedStdioMcpServer,
+  type ResolvedHttpMcpServer,
+} from './mcp/resolve-effective-mcp.js';
 
 // Collaboration (handoff registry, RBAC)
 export { handoffTypeRegistry, RbacService, RbacError } from './collaboration/index.js';

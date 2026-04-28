@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Convert E2E test recordings (webm) to GIFs in docs/features/.
+
+Reads gif-meta.json from each test result dir (written by setupRecording).
+Uses precise trimStart from metadata. Verifies each GIF has real content.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+FEATURES_DIR = Path("../../docs/features")
+RESULTS_DIR = Path("test-results")
+
+
+def verify_gif(gif_path: Path) -> bool:
+    """Check GIF has real content (not just login/loading screen).
+    Samples frames at 25%, 50%, and 75% — passes if any has real content."""
+    result = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", str(gif_path)],
+        capture_output=True, text=True,
+    )
+    duration = float(result.stdout.strip()) if result.stdout.strip() else 2.0
+
+    for pct in (0.25, 0.5, 0.75):
+        sample_at = str(max(0.5, duration * pct))
+        with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
+            subprocess.run(
+                ["ffmpeg", "-y", "-ss", sample_at, "-i", str(gif_path),
+                 "-vframes", "1", tmp.name],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
+            )
+            if Path(tmp.name).stat().st_size > 5000:
+                return True
+    return False
+
+
+def main() -> None:
+    if not shutil.which("ffmpeg"):
+        print("Error: ffmpeg not found. Install with: brew install ffmpeg")
+        sys.exit(1)
+
+    if not RESULTS_DIR.is_dir():
+        print("Error: No test-results/ directory. Run pnpm test:e2e:record first.")
+        sys.exit(1)
+
+    FEATURES_DIR.mkdir(parents=True, exist_ok=True)
+
+    filter_arg = sys.argv[1] if len(sys.argv) > 1 else ""
+    ok_count = 0
+    bad_count = 0
+
+    for video in sorted(RESULTS_DIR.glob("*/video.webm")):
+        result_dir = video.parent
+
+        if filter_arg and filter_arg not in result_dir.name:
+            continue
+
+        # Read metadata from gif-meta.json (written by setupRecording)
+        meta_file = result_dir / "gif-meta.json"
+        if not meta_file.exists():
+            print(f"⚠ Skipping {result_dir.name} — no gif-meta.json")
+            continue
+
+        meta = json.loads(meta_file.read_text())
+        name = meta["name"]
+        trim = meta.get("trimStart", 0)
+
+        output = FEATURES_DIR / f"{name}.gif"
+
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                *(["-ss", str(trim)] if trim > 0 else []),
+                "-i", str(video),
+                "-vf",
+                "fps=12,scale=960:-1:flags=lanczos,"
+                "split[s0][s1];"
+                "[s0]palettegen=max_colors=256:stats_mode=diff[p];"
+                "[s1][p]paletteuse=dither=sierra2_4a",
+                "-loop", "0",
+                str(output),
+            ],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
+        )
+
+        size = output.stat().st_size
+        human_size = f"{size / 1_048_576:.1f}M" if size >= 1_048_576 else f"{size / 1024:.0f}K"
+        trim_note = f", trimmed {trim:.1f}s" if trim > 0 else ""
+
+        if verify_gif(output):
+            print(f"\u2713 {name}.gif ({human_size}{trim_note})")
+            ok_count += 1
+        else:
+            print(f"\u2717 {name}.gif — FAILED VERIFICATION (login/loading?)")
+            output.unlink()
+            bad_count += 1
+
+    print(f"\nConverted: {ok_count} OK, {bad_count} failed")
+    if bad_count > 0:
+        print("Re-record failed GIFs with: pnpm test:e2e:record")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,43 @@
+{
+  "name": "Sales CSV Report",
+  "title": "Sales CSV \u2192 summary report",
+  "description": "Two-step pipeline: generate a small sales CSV, then summarise it into a markdown report. Each step commits its artefacts to the run branch.",
+  "workspace": {},
+  "steps": [
+    {
+      "id": "generate-data",
+      "name": "Generate sales.csv",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "agent": {
+        "runtime": "bash",
+        "inlineScript": "#!/bin/sh\nset -eu\nmkdir -p /workspace/data\nprintf 'region,units,revenue\\nnorth,12,2400\\nsouth,8,1600\\neast,17,3825\\nwest,5,900\\n' > /workspace/data/sales.csv\nprintf '{\"ok\":true,\"rows\":4}' > /output/result.json\n"
+      }
+    },
+    {
+      "id": "summarize",
+      "name": "Summarise \u2192 report/summary.md",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "agent": {
+        "runtime": "bash",
+        "inlineScript": "#!/bin/sh\nset -eu\ntest -f /workspace/data/sales.csv\nmkdir -p /workspace/report\ncd /workspace\nROWS=$(tail -n +2 data/sales.csv | wc -l | tr -d ' ')\nTOTAL=$(tail -n +2 data/sales.csv | awk -F, '{s+=$3} END{print s}')\nTOP=$(tail -n +2 data/sales.csv | sort -t, -k3 -nr | head -1 | cut -d, -f1)\n{\n  echo '# Sales summary'\n  echo\n  echo '| metric | value |'\n  echo '|---|---|'\n  echo \"| rows | $ROWS |\"\n  echo \"| total revenue | $TOTAL |\"\n  echo \"| top region | $TOP |\"\n} > report/summary.md\nprintf '{\"ok\":true}' > /output/result.json\n"
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "generate-data", "to": "summarize" },
+    { "from": "summarize", "to": "done" }
+  ],
+  "triggers": [{ "type": "manual", "name": "start" }]
+}

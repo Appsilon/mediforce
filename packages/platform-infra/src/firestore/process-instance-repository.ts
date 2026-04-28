@@ -6,26 +6,12 @@ import {
   type InstanceStatus,
   type StepExecution,
 } from '@mediforce/platform-core';
-import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit as firestoreLimit,
-  type Firestore,
-} from 'firebase/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 
 /**
  * Firestore implementation of the ProcessInstanceRepository interface.
  * Stores process instances in a `processInstances` collection and step executions
  * in a `stepExecutions` subcollection per instance document.
- *
- * Receives a Firestore instance via constructor injection.
  */
 export class FirestoreProcessInstanceRepository
   implements ProcessInstanceRepository
@@ -36,16 +22,17 @@ export class FirestoreProcessInstanceRepository
   constructor(private readonly db: Firestore) {}
 
   async create(instance: ProcessInstance): Promise<ProcessInstance> {
-    const docRef = doc(this.db, this.collectionName, instance.id);
-    await setDoc(docRef, instance);
+    await this.db.collection(this.collectionName).doc(instance.id).set(instance);
     return instance;
   }
 
   async getById(instanceId: string): Promise<ProcessInstance | null> {
-    const docRef = doc(this.db, this.collectionName, instanceId);
-    const snapshot = await getDoc(docRef);
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .doc(instanceId)
+      .get();
 
-    if (!snapshot.exists()) {
+    if (!snapshot.exists) {
       return null;
     }
 
@@ -56,21 +43,18 @@ export class FirestoreProcessInstanceRepository
     instanceId: string,
     updates: Partial<ProcessInstance>,
   ): Promise<void> {
-    const docRef = doc(this.db, this.collectionName, instanceId);
-    await updateDoc(docRef, {
+    await this.db.collection(this.collectionName).doc(instanceId).update({
       ...updates,
       updatedAt: new Date().toISOString(),
     });
   }
 
   async getByStatus(status: InstanceStatus): Promise<ProcessInstance[]> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(
-      colRef,
-      where('status', '==', status),
-      orderBy('createdAt', 'desc'),
-    );
-    const snapshot = await getDocs(q);
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .where('status', '==', status)
+      .orderBy('createdAt', 'desc')
+      .get();
     return snapshot.docs.map((d) => ProcessInstanceSchema.parse(d.data()));
   }
 
@@ -78,35 +62,62 @@ export class FirestoreProcessInstanceRepository
     name: string,
     version: string,
   ): Promise<ProcessInstance[]> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(
-      colRef,
-      where('definitionName', '==', name),
-      where('definitionVersion', '==', version),
-    );
-    const snapshot = await getDocs(q);
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .where('definitionName', '==', name)
+      .where('definitionVersion', '==', version)
+      .get();
     return snapshot.docs.map((d) => ProcessInstanceSchema.parse(d.data()));
+  }
+
+  async getLastCompletedByDefinitionName(
+    name: string,
+  ): Promise<ProcessInstance | null> {
+    // Server-side tombstone filter avoids the silent-failure mode where N
+    // consecutive soft-deletes at the top would shadow an older valid
+    // predecessor (the previous top-K client-side skip had that flaw).
+    //
+    // Requires composite index:
+    //   (definitionName ASC, deleted ASC, status ASC, updatedAt DESC)
+    // — see firestore.indexes.json.
+    //
+    // New instances always write `deleted: false` explicitly (see
+    // WorkflowEngine.createInstance), so pre-feature docs with the field
+    // missing are excluded from the result set. Those docs could never be
+    // valid carry-over predecessors anyway (pre-feature WDs couldn't
+    // declare inputForNextRun), so no backfill is required.
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .where('definitionName', '==', name)
+      .where('deleted', '==', false)
+      .where('status', '==', 'completed')
+      .orderBy('updatedAt', 'desc')
+      .limit(1)
+      .get();
+    if (snapshot.empty) return null;
+    return ProcessInstanceSchema.parse(snapshot.docs[0].data());
   }
 
   async addStepExecution(
     instanceId: string,
     execution: StepExecution,
   ): Promise<StepExecution> {
-    const subcollectionRef = collection(
-      doc(this.db, this.collectionName, instanceId),
-      this.stepExecutionsSubcollection,
-    );
-    await setDoc(doc(subcollectionRef, execution.id), execution);
+    await this.db
+      .collection(this.collectionName)
+      .doc(instanceId)
+      .collection(this.stepExecutionsSubcollection)
+      .doc(execution.id)
+      .set(execution);
     return execution;
   }
 
   async getStepExecutions(instanceId: string): Promise<StepExecution[]> {
-    const subcollectionRef = collection(
-      doc(this.db, this.collectionName, instanceId),
-      this.stepExecutionsSubcollection,
-    );
-    const q = query(subcollectionRef, orderBy('startedAt', 'asc'));
-    const snapshot = await getDocs(q);
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .doc(instanceId)
+      .collection(this.stepExecutionsSubcollection)
+      .orderBy('startedAt', 'asc')
+      .get();
     return snapshot.docs.map((d) => StepExecutionSchema.parse(d.data()));
   }
 
@@ -115,31 +126,26 @@ export class FirestoreProcessInstanceRepository
     executionId: string,
     updates: Partial<StepExecution>,
   ): Promise<void> {
-    const docRef = doc(
-      this.db,
-      this.collectionName,
-      instanceId,
-      this.stepExecutionsSubcollection,
-      executionId,
-    );
-    await updateDoc(docRef, { ...updates });
+    await this.db
+      .collection(this.collectionName)
+      .doc(instanceId)
+      .collection(this.stepExecutionsSubcollection)
+      .doc(executionId)
+      .update({ ...updates });
   }
 
   async getLatestStepExecution(
     instanceId: string,
     stepId: string,
   ): Promise<StepExecution | null> {
-    const subcollectionRef = collection(
-      doc(this.db, this.collectionName, instanceId),
-      this.stepExecutionsSubcollection,
-    );
-    const q = query(
-      subcollectionRef,
-      where('stepId', '==', stepId),
-      orderBy('startedAt', 'desc'),
-      firestoreLimit(1),
-    );
-    const snapshot = await getDocs(q);
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .doc(instanceId)
+      .collection(this.stepExecutionsSubcollection)
+      .where('stepId', '==', stepId)
+      .orderBy('startedAt', 'desc')
+      .limit(1)
+      .get();
 
     if (snapshot.empty) {
       return null;
@@ -149,18 +155,20 @@ export class FirestoreProcessInstanceRepository
   }
 
   async getIdsByDefinitionName(name: string): Promise<string[]> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(colRef, where('definitionName', '==', name));
-    const snapshot = await getDocs(q);
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .where('definitionName', '==', name)
+      .get();
     return snapshot.docs.map((d) => d.id);
   }
 
   async setDeletedByDefinitionName(name: string, deleted: boolean): Promise<void> {
-    const colRef = collection(this.db, this.collectionName);
-    const q = query(colRef, where('definitionName', '==', name));
-    const snapshot = await getDocs(q);
+    const snapshot = await this.db
+      .collection(this.collectionName)
+      .where('definitionName', '==', name)
+      .get();
     for (const d of snapshot.docs) {
-      await updateDoc(doc(this.db, this.collectionName, d.id), { deleted });
+      await this.db.collection(this.collectionName).doc(d.id).update({ deleted });
     }
   }
 }

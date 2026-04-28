@@ -107,15 +107,69 @@ export {
 export { NotificationTargetSchema, type NotificationTarget } from './process-config.js';
 
 export {
+  McpServerConfigSchema,
+  type McpServerConfig,
+} from './mcp-server-config.js';
+
+export {
+  AgentMcpBindingSchema,
+  AgentMcpBindingMapSchema,
+  StdioAgentMcpBindingSchema,
+  HttpAgentMcpBindingSchema,
+  HttpAuthConfigSchema,
+  HttpHeadersAuthSchema,
+  HttpOAuthAuthSchema,
+  StepMcpRestrictionSchema,
+  StepMcpRestrictionEntrySchema,
+  ToolCatalogEntrySchema,
+  type AgentMcpBinding,
+  type AgentMcpBindingMap,
+  type StdioAgentMcpBinding,
+  type HttpAgentMcpBinding,
+  type HttpAuthConfig,
+  type HttpHeadersAuth,
+  type HttpOAuthAuth,
+  type StepMcpRestriction,
+  type StepMcpRestrictionEntry,
+  type ToolCatalogEntry,
+} from './agent-mcp-binding.js';
+
+export {
   WorkflowAgentConfigSchema,
+  WorkflowCoworkConfigSchema,
   WorkflowReviewConfigSchema,
+  WorkflowWorkspaceSchema,
   WorkflowStepSchema,
   WorkflowDefinitionSchema,
+  WorkflowDefinitionBaseSchema,
+  InputForNextRunEntrySchema,
+  validateInputForNextRun,
+  parseWorkflowDefinitionForCreation,
   type WorkflowAgentConfig,
+  type WorkflowCoworkConfig,
   type WorkflowReviewConfig,
+  type WorkflowWorkspace,
   type WorkflowStep,
   type WorkflowDefinition,
+  type InputForNextRunEntry,
 } from './workflow-definition.js';
+
+export {
+  ConversationTurnSchema,
+  HumanTurnSchema,
+  AgentTurnSchema,
+  ToolTurnSchema,
+  CoworkAgentSchema,
+  CoworkVoiceConfigSchema,
+  CoworkSessionStatusSchema,
+  CoworkSessionSchema,
+  type ConversationTurn,
+  type HumanTurn,
+  type AgentTurn,
+  type ToolTurn,
+  type CoworkSessionStatus,
+  type CoworkSession,
+} from './cowork-session.js';
 
 export {
   PluginRoleSchema,
@@ -124,6 +178,25 @@ export {
 } from './plugin-capability-metadata.js';
 
 export {
+  NamespaceTypeSchema,
+  NamespaceSchema,
+  NamespaceMemberSchema,
+  type NamespaceType,
+  type Namespace,
+  type NamespaceMember,
+} from './namespace.js';
+
+export {
   AgentDefinitionSchema,
   type AgentDefinition,
 } from './agent-definition.js';
+
+export {
+  WorkflowSecretsSchema,
+  type WorkflowSecrets,
+} from './workflow-secret.js';
+
+export {
+  CronTriggerStateSchema,
+  type CronTriggerState,
+} from './cron-trigger-state.js';

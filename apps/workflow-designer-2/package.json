@@ -1,0 +1,12 @@
+{
+  "name": "@mediforce/workflow-designer-2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mediforce/platform-core": "workspace:*"
+  }
+}

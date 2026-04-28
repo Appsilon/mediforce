@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
+import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 
 interface StartWorkflowBody {
   definitionName: string;
@@ -11,10 +11,6 @@ interface StartWorkflowBody {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
     const body = (await req.json()) as StartWorkflowBody;
     const { manualTrigger, processRepo } = getPlatformServices();

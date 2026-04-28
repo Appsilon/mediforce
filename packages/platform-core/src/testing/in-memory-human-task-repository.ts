@@ -20,9 +20,7 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
   }
 
   async getByRole(role: string): Promise<HumanTask[]> {
-    return [...this.tasks.values()].filter(
-      (t) => t.assignedRole === role && (t.status === 'pending' || t.status === 'claimed'),
-    );
+    return [...this.tasks.values()].filter((t) => t.assignedRole === role);
   }
 
   async getByInstanceId(instanceId: string): Promise<HumanTask[]> {

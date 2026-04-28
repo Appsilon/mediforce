@@ -2,101 +2,122 @@
 
 # Mediforce
 
-**Open-source platform for human-agent collaboration in pharma**
+**The open-source platform for human-agent collaboration in pharma**
 
-Where pharma teams and AI agents work together — compliantly.
+Define processes. Assign humans and AI agents to each step. Ship compliant workflows — fast.
 
-[Vision](#vision) | [How It Works](#how-it-works) | [Current Status](#current-status) | [Get Involved](#get-involved)
+[Why Mediforce](#why-mediforce) | [How It Works](#how-it-works) | [See It in Action](#see-it-in-action) | [Get Involved](#get-involved)
 
 </div>
 
 ---
 
-## The Problem
+## Why Mediforce
 
-Pharma companies have AI budgets and mandates to use them. But turning AI into something that runs inside a real, regulated workflow? That's where most get stuck.
+Pharma is ready for AI. The models are capable, the budgets exist, and the pressure to modernize is real. What's missing is the **infrastructure** — a way to deploy AI agents into regulated workflows with the compliance, auditability, and human oversight that GxP demands.
 
-You can build custom — expensive, slow, rarely reusable. You can try general-purpose AI tools on the side — but without audit trails or compliance structure, that doesn't fly in GxP environments. Or you can wait.
+Mediforce is that infrastructure. Open-source, built for pharma, designed so your compliance team says yes on the first review.
 
-Most companies wait.
+**One platform, every process.** From clinical operations to pharmacovigilance to supply chain — define a process once, configure autonomy levels per step, and deploy. The first process is the hardest. Every one after that is incremental.
 
-## Vision
+**Your rules, your control.** You decide how much autonomy each agent gets. An agent can draft and a human approves. Or the agent acts and a human reviews after the fact. The process stays the same; the configuration adapts to your organization's risk tolerance.
 
-Mediforce is an open-source platform for defining how humans and AI agents collaborate on pharma processes. It's not a chatbot and not a plugin. It's the infrastructure layer that makes human-agent collaboration work in regulated environments.
+**Compliance is not a bolt-on.** Audit trails, accountability, data integrity, and scoped access are built into the platform from day one — not layered on top.
 
-The goal: you define a process as a series of steps. For each step, you decide who does the work — a human, an AI agent, or both. You set the rules: the agent drafts but a human approves, or the agent observes and flags but never acts alone. The platform handles compliance, audit trails, and accountability so you don't have to build that from scratch every time.
-
-The same process can run differently in different organizations — one company might want full human oversight, another might give agents more autonomy. The process stays the same; the configuration changes.
-
-> Read more: **[Vision — why this needs to exist and where we're headed](docs/vision.md)**
+> **[Read the full vision — why this needs to exist and where we're headed](docs/vision.md)**
 
 ## How It Works
 
-The core concept is simple: **processes are made of steps, and each step can be performed by a human, an AI agent, or both — with clear rules about who decides what.**
+Processes are made of steps. Each step can be performed by a human, an AI agent, or both — with clear rules about who decides what.
 
-### Agent Autonomy
+### Configurable Autonomy
 
-The key question isn't "should we use AI?" — it's "how much autonomy should the AI have?" Mediforce makes this configurable per step:
+| Level | Agent Role | Human Involvement |
+|-------|-----------|-------------------|
+| **L1 — Observer** | Watches and surfaces insights | Informational only |
+| **L2 — Advisor** | Suggests actions | Human decides and acts |
+| **L3 — Drafter** | Does the work, submits for review | Human approves or sends back |
+| **L4 — Executor** | Acts autonomously | Human reviews periodically |
 
-| Level | What the agent does | Human involvement |
-|-------|--------------------|--------------------|
-| **Observer** | Watches and reports insights | None — informational only |
-| **Advisor** | Suggests actions to a human | Human decides and acts |
-| **Drafter** | Does the work, submits for approval | Human approves or sends back |
-| **Executor** | Acts autonomously | Human reviews after the fact |
+At any level, an agent can signal uncertainty and escalate to a human. This isn't a failure mode — it's how the system maintains safety in production.
 
-At any level, an agent can signal uncertainty and escalate to a human. This isn't a failure — it's how the system maintains safety.
+### What Agents Actually Do
 
-### Compliance Built In
+These aren't chatbots. Mediforce agents perform real cognitive work inside structured processes:
 
-Regulated industries can't bolt compliance on after the fact. We're building it into the infrastructure:
+- **Document analysis** — review consent forms, flag missing fields, simplify language
+- **Anomaly detection** — monitor metrics, alert on unusual patterns across sites
+- **Report generation** — draft clinical summaries, compile safety narratives
+- **Supply intelligence** — forecast demand, detect risk signals, optimize inventory
+- **Quality checks** — validate data integrity, cross-reference against standards
 
-- **Audit trail** — every agent action, every human decision, every state transition is recorded
-- **Accountability** — clear record of who did what, what data was accessed, what was decided, and who approved
-- **Data integrity** — designed to meet the standards pharma requires
-- **Scoped access** — agents only see data relevant to their current task
+Every agent operates under human oversight, with every action recorded in a complete audit trail.
 
-> More details: [Architecture](docs/architecture.md)
+## See It in Action
 
-## Current Status
+### Workflow Dashboard
 
-This is early. We're building in public because we believe the standard for human-agent collaboration in pharma should be created in the open — not behind closed doors.
+All your workflows in one place — run counts, active status, and one-click access to any process execution.
 
-We have a working proof of concept that validates the core ideas against a real pharma process. Everything else — the platform abstractions, the developer experience, the process template ecosystem — is being actively figured out.
+<div align="center">
+<img src="docs/features/workflow-home.gif" alt="Workflow dashboard showing process overview" width="720" />
+</div>
 
-The codebase is a working proof of concept — experimental by design. We're using it to explore and validate architectural patterns for human-agent collaboration in regulated environments. The code prioritizes learning and iteration speed over production readiness. As the architecture stabilizes, we'll harden and evolve what works.
+### Human-in-the-Loop Review
 
-We're not pretending to have all the answers. We're experimenting, iterating, and building toward a vision. If you work in pharma and this resonates, we want to hear from you.
+The core decision point. Reviewers see full context from the agent's work and submit their verdict — approve, revise, or escalate.
+
+<div align="center">
+<img src="docs/features/task-approve-flow.gif" alt="Task approval flow with agent context" width="720" />
+</div>
+
+### Autonomy Levels on Every Step
+
+Each step displays its autonomy configuration (L1–L4) so operators always know what's agent-driven and what requires human action.
+
+<div align="center">
+<img src="docs/features/run-detail-autonomy-badges.gif" alt="Process run with autonomy level badges" width="720" />
+</div>
+
+> **[See all features with recordings](docs/features/FEATURES.md)** — task management, workflow editor, run reports, agent catalog, escalation handling, and more.
 
 ## Why Open Source
 
-In an industry where trust, transparency, and control are non-negotiable, open source is the right model:
+In regulated industries, trust and transparency are non-negotiable. Open source is the right model:
 
-- **Inspect every line** — critical when your compliance team validates the system
-- **No vendor lock-in** — you own your deployment, your data, your customizations
-- **Shared standard** — instead of every company building their own AI integration, we build one together
+- **Full transparency** — your compliance team can inspect every line of code
+- **Zero vendor lock-in** — you own your deployment, your data, your customizations
+- **Shared standard** — instead of every company building their own AI integration layer, we build one together
+- **Community-driven quality** — battle-tested by the people who use it
 
-We're [Appsilon](https://appsilon.com) — we've been building open-source tools for life sciences for over a decade. With Mediforce, we're applying the same philosophy to a bigger problem.
+We're [Appsilon](https://appsilon.com) — we've been building open-source tools for life sciences for over a decade. Mediforce applies that same philosophy to the biggest opportunity in pharma today.
 
 ## Get Involved
 
-We're looking for people who work in clinical operations, build for regulated industries, or think about how humans and AI should collaborate.
+We're building the standard for human-agent collaboration in pharma — and we're doing it in the open.
 
-- **[Join our Discord](https://discord.gg/Hkb2K7YE)** — follow progress, ask questions, share ideas
-- **Star this repo** — helps others find us
-- **Open an issue** — tell us what processes you'd want to see
+- **[Getting Started](GETTING-STARTED.md)** — set up your development environment
+- **[Join our Discord](https://discord.gg/Hkb2K7YE)** — follow progress, ask questions, shape the roadmap
+- **Star this repo** — helps others in pharma find us
+- **Open an issue** — tell us what processes matter most to you
 
 ## Development
 
-This is a pnpm monorepo. Quick start:
+**[Getting Started Guide](GETTING-STARTED.md)** — Quick start with emulators and demo data, no setup required.
+
+Quick start:
 
 ```bash
 pnpm install
-cp packages/platform-ui/.env.local.example packages/platform-ui/.env.local
-# fill in Firebase config values
-pnpm dev:ui        # platform UI only (port 9003)
-pnpm dev           # platform UI + supply intelligence (ports 9003 + 9004)
+cd packages/platform-ui
+python3 scripts/bootstrap-dev.py     # Create .env.local, start emulators
+pnpm seed:dev                        # Seed demo data
+NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:ui
 ```
+
+Demo credentials: `test@mediforce.dev` / `test123456`
+
+For production Firebase setup, see the [Getting Started Guide](GETTING-STARTED.md).
 
 Run tests:
 
@@ -137,10 +158,12 @@ pnpm dev:local     # platform UI + supply intelligence
 
 | | |
 |---|---|
+| **[Getting Started](GETTING-STARTED.md)** | Set up your development environment with Firebase |
 | **[Vision](docs/vision.md)** | Why this needs to exist, what agents actually do in pharma, and where we're headed |
-| **[Architecture](docs/architecture.md)** | How we're thinking about processes, steps, agents, and compliance |
-| **[How We Work](docs/how-we-work.md)** | Our approach — building bottom-up, in public, with real processes |
+| **[Architecture](docs/architecture.md)** | Processes, steps, agents, compliance — the technical foundation |
+| **[How We Work](docs/how-we-work.md)** | Building bottom-up, in public, with real processes |
 | **[Development](docs/development.md)** | Setup, monorepo structure, testing, deployment |
+| **[Features](docs/features/FEATURES.md)** | Full feature gallery with recorded walkthroughs |
 
 ## License
 
@@ -150,6 +173,6 @@ Apache License 2.0 — see [LICENSE](LICENSE).
 
 <div align="center">
 
-*Built by [Appsilon](https://appsilon.com) — building data solutions for life sciences since 2013.*
+*Built by [Appsilon](https://appsilon.com) — data solutions for life sciences since 2013.*
 
 </div>

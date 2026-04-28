@@ -10,6 +10,7 @@ import type {
   FileMetadata,
 } from '../index.js';
 import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
+import type { CoworkSession } from '../schemas/cowork-session.js';
 
 // ---------------------------------------------------------------------------
 // Internal counter for deterministic sequential IDs
@@ -100,6 +101,8 @@ export function buildProcessInstance(
     pauseReason: null,
     error: null,
     assignedRoles: [],
+    deleted: false,
+    archived: false,
     ...overrides,
   };
 }
@@ -292,6 +295,7 @@ export function buildWorkflowDefinition(
   return {
     name: 'test-workflow',
     version: 1,
+    namespace: 'test',
     steps: [
       {
         id: 'intake',
@@ -320,6 +324,36 @@ export function buildWorkflowDefinition(
     triggers: [
       { type: 'manual', name: 'Start' },
     ],
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildCoworkSession
+// ---------------------------------------------------------------------------
+
+export function buildCoworkSession(
+  overrides?: Partial<CoworkSession>,
+): CoworkSession {
+  const id = nextId('session');
+  return {
+    id,
+    processInstanceId: 'inst-0001',
+    stepId: 'step-cowork',
+    assignedRole: 'analyst',
+    assignedUserId: null,
+    status: 'active',
+    agent: 'chat',
+    model: null,
+    systemPrompt: null,
+    outputSchema: null,
+    voiceConfig: null,
+    artifact: null,
+    mcpServers: null,
+    turns: [],
+    createdAt: DEFAULT_TIMESTAMP,
+    updatedAt: DEFAULT_UPDATED_TIMESTAMP,
+    finalizedAt: null,
     ...overrides,
   };
 }

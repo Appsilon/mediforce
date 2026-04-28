@@ -6,10 +6,11 @@ const API_KEY = 'fake-api-key';
 export async function clearEmulators() {
   await fetch(`${AUTH_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/accounts`, {
     method: 'DELETE',
+    signal: AbortSignal.timeout(5000),
   });
   await fetch(
     `${FIRESTORE_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/databases/(default)/documents`,
-    { method: 'DELETE' },
+    { method: 'DELETE', signal: AbortSignal.timeout(5000) },
   );
 }
 
@@ -77,6 +78,14 @@ function toFirestoreFields(doc: Record<string, unknown>): Record<string, unknown
   return fields;
 }
 
+// Firestore emulator accepts `Authorization: Bearer owner` to bypass security rules.
+// Required for seed / fixture writes — without it, rules that require `request.auth != null`
+// reject unauthenticated REST calls with PERMISSION_DENIED.
+const EMULATOR_ADMIN_HEADERS = {
+  'Content-Type': 'application/json',
+  Authorization: 'Bearer owner',
+};
+
 export async function seedCollection(
   collection: string,
   documents: Record<string, Record<string, unknown>>,
@@ -86,12 +95,45 @@ export async function seedCollection(
     // Use PATCH to upsert — avoids errors if document already exists from a previous run
     const res = await fetch(`${basePath}/${collection}/${encodeURIComponent(docId)}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: EMULATOR_ADMIN_HEADERS,
       body: JSON.stringify({ fields: toFirestoreFields(docData) }),
     });
     if (!res.ok) {
       throw new Error(`Failed to seed ${collection}/${docId}: ${await res.text()}`);
     }
+  }
+}
+
+export async function getUserIdByEmail(email: string): Promise<string | null> {
+  const res = await fetch(
+    `${AUTH_EMULATOR}/emulator/v1/projects/${PROJECT_ID}/accounts`,
+    { signal: AbortSignal.timeout(5000) },
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as { userInfo?: Array<{ localId: string; email?: string }> };
+  const user = data.userInfo?.find((u) => u.email === email);
+  return user?.localId ?? null;
+}
+
+export async function patchDocumentFields(
+  collection: string,
+  docId: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  const basePath = `${FIRESTORE_EMULATOR}/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+  const updateMask = Object.keys(fields)
+    .map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`)
+    .join('&');
+  const res = await fetch(
+    `${basePath}/${collection}/${encodeURIComponent(docId)}?${updateMask}`,
+    {
+      method: 'PATCH',
+      headers: EMULATOR_ADMIN_HEADERS,
+      body: JSON.stringify({ fields: toFirestoreFields(fields) }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to patch ${collection}/${docId}: ${await res.text()}`);
   }
 }
 
@@ -108,7 +150,7 @@ export async function seedSubcollection(
       `${basePath}/${parentCollection}/${parentId}/${subcollection}/${docId}`,
       {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: EMULATOR_ADMIN_HEADERS,
         body: JSON.stringify({ fields: toFirestoreFields(docData) }),
       },
     );

@@ -1,0 +1,49 @@
+version: "1.0"
+generated: "2026-04-23"
+standard: "agentskills.io/specification"
+total_skills: 7
+
+# Runtime skills have their own per-app registries:
+#   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml
+#   apps/community-digest/plugins/community-digest/skills/_registry.yml
+#   apps/workflow-designer/plugins/workflow-designer/skills/_registry.yml
+
+domains:
+  development:
+    description: Development-time interactive skills
+    skills:
+      - id: agent-browser
+        path: skills/agent-browser/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Browser automation CLI for AI agents
+      - id: community
+        path: skills/community/SKILL.md
+        complexity: basic
+        language: multi
+        description: Write Discord updates for the MediForce community
+      - id: generate-pitch
+        path: skills/generate-pitch/SKILL.md
+        complexity: basic
+        language: multi
+        description: Generate Marp pitch deck from vision docs
+      - id: e2e-test
+        path: skills/e2e-test/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Write, run, and record E2E journey tests with TDD workflow
+      - id: code-review
+        path: skills/code-review/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Review PRs and code changes for architecture, security, and quality
+      - id: renovate-review
+        path: skills/renovate-review/SKILL.md
+        complexity: basic
+        language: multi
+        description: Review and validate Renovate dependency PRs
+      - id: knowledge-base
+        path: skills/knowledge-base/SKILL.md
+        complexity: basic
+        language: multi
+        description: Ingest, query, and lint the LLM-compiled wiki (Karpathy LLM Wiki pattern)

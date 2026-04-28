@@ -18,9 +18,14 @@ import { NextStepCard } from './next-step-card';
 import { getTaskDisplayTitle, isAgentReviewTask, getAgentOutput, getAgentOutputFromSiblings } from './task-utils';
 import { completeUploadTask } from '@/app/actions/tasks';
 import { useCollection } from '@/hooks/use-collection';
+import { useInstanceTasks } from '@/hooks/use-instance-tasks';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { storage } from '@/lib/firebase';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { useBackNavigation } from '@/hooks/use-back-navigation';
+import { routes } from '@/lib/routes';
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -37,11 +42,12 @@ function formatUploadSize(bytes: number): string {
 
 export function TaskDetail({
   task,
-  currentUserId,
 }: {
   task: HumanTask;
-  currentUserId: string;
 }) {
+  const handle = useHandleFromPath();
+  const { firebaseUser } = useAuth();
+  const { goBack } = useBackNavigation(`/${handle}/tasks`);
   const { data: processInstance } = useProcessInstance(task.processInstanceId);
   const [hasStepContent, setHasStepContent] = React.useState(false);
   const [uploadComplete, setUploadComplete] = React.useState(false);
@@ -101,14 +107,15 @@ export function TaskDetail({
         uploadedFiles.push({
           name: file.name,
           size: file.size,
-          type: file.type,
+          type: file.type || 'application/octet-stream',
           storagePath,
           downloadUrl,
         });
       }
 
       // Complete the task with file metadata
-      const result = await completeUploadTask(task.id, uploadedFiles);
+      const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+      const result = await completeUploadTask(task.id, uploadedFiles, idToken);
       if (result.success) {
         setUploadComplete(true);
       } else {
@@ -122,7 +129,7 @@ export function TaskDetail({
     } finally {
       setUploading(false);
     }
-  }, [task.id]);
+  }, [task.id, firebaseUser]);
 
   // Count remaining tasks for the same role (pending or claimed, excluding this task)
   const remainingConstraints = useMemo(
@@ -142,18 +149,9 @@ export function TaskDetail({
   );
   const remainingTaskCount = remainingTasks.filter((t) => t.id !== task.id).length;
 
-  // All tasks for the same process run
-  const siblingConstraints = useMemo(
-    () => [
-      where('processInstanceId', '==', task.processInstanceId),
-      orderBy('createdAt', 'asc'),
-    ],
-    [task.processInstanceId],
-  );
-  const { data: siblingTasks } = useCollection<HumanTask>(
-    'humanTasks',
-    siblingConstraints,
-  );
+  // All tasks for the same process run — contextual lookup, one-shot read is
+  // enough (`useInstanceTasks` consumes `apiClient.tasks.list`).
+  const { tasks: siblingTasks } = useInstanceTasks(task.processInstanceId);
 
   const isActionable = task.status === 'claimed' || task.status === 'pending';
   const isCompleted = task.status === 'completed';
@@ -161,13 +159,13 @@ export function TaskDetail({
   return (
     <div className="p-6 max-w-3xl space-y-6">
       {/* Back */}
-      <Link
-        href="/tasks"
+      <button
+        onClick={goBack}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to My Tasks
-      </Link>
+        Back
+      </button>
 
       {/* Title + status */}
       <div className="space-y-2">
@@ -194,7 +192,7 @@ export function TaskDetail({
           </div>
           {processInstance ? (
             <Link
-              href={`/workflows/${encodeURIComponent(processInstance.definitionName)}/runs/${task.processInstanceId}`}
+              href={`/${handle}/workflows/${encodeURIComponent(processInstance.definitionName)}/runs/${task.processInstanceId}`}
               className="text-primary hover:underline font-mono text-xs"
             >
               {task.processInstanceId.slice(0, 12)}&hellip;
@@ -205,6 +203,19 @@ export function TaskDetail({
             </span>
           )}
         </div>
+        {processInstance && (
+          <div>
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+              Workflow
+            </div>
+            <Link
+              href={`/${handle}/workflows/${encodeURIComponent(processInstance.definitionName)}`}
+              className="text-primary hover:underline text-xs"
+            >
+              {processInstance.definitionName}
+            </Link>
+          </div>
+        )}
         <div>
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Role
@@ -272,7 +283,7 @@ export function TaskDetail({
                     </span>
                   ) : (
                     <Link
-                      href={`/tasks/${sibling.id}`}
+                      href={routes.task(handle, sibling.id)}
                       className="text-primary hover:underline truncate"
                     >
                       {getTaskDisplayTitle(sibling, processInstance)}
@@ -291,6 +302,7 @@ export function TaskDetail({
         processInstance={processInstance}
         siblingTasks={siblingTasks}
         onContentLoaded={onContentLoaded}
+        instanceId={task.processInstanceId}
       />
 
       {/* Previous step output — context for all non-file-upload tasks */}
@@ -412,11 +424,13 @@ function AgentOutputSection({
   processInstance,
   siblingTasks,
   onContentLoaded,
+  instanceId,
 }: {
   task: HumanTask;
   processInstance: ProcessInstance | null;
   siblingTasks: HumanTask[];
   onContentLoaded: (has: boolean) => void;
+  instanceId: string;
 }) {
   const isAgentReview = isAgentReviewTask(task, processInstance);
   if (!isAgentReview) return null;
@@ -439,6 +453,7 @@ function AgentOutputSection({
       agentOutput={agentOutput}
       stepId={task.stepId}
       onContentLoaded={onContentLoaded}
+      instanceId={instanceId}
     />
   );
 }
@@ -456,6 +471,7 @@ function UploadConfirmationReadOnly({
 }: {
   completionData: Record<string, unknown>;
 }) {
+  const handle = useHandleFromPath();
   interface UploadedFile {
     name?: string;
     size?: number;
@@ -523,7 +539,7 @@ function UploadConfirmationReadOnly({
       </div>
 
       <div className="text-sm text-muted-foreground">
-        <Link href="/tasks" className="text-primary hover:underline font-medium">
+        <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
           Back to tasks
         </Link>
       </div>

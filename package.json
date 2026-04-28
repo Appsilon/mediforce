@@ -2,7 +2,7 @@
   "name": "mediforce",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.32.1",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "build": "pnpm -r run build",
     "test": "vitest run",
@@ -10,22 +10,51 @@
     "test:affected": "vitest run --changed",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "dev:ui": "pnpm --filter @mediforce/platform-ui dev",
-    "dev:ui:local": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
-    "dev": "pnpm --filter @mediforce/platform-ui --filter supply-intelligence dev",
-    "dev:local": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui --filter supply-intelligence dev",
-    "dev:ui:test": "pnpm --filter @mediforce/platform-ui dev:test",
+    "dev": "pnpm --filter @mediforce/platform-ui dev",
+    "dev:local": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
+    "dev:test": "pnpm --filter @mediforce/platform-ui dev:test",
     "dev:redis": "docker run --rm -p 6379:6379 redis:7-alpine",
     "dev:worker": "REDIS_URL=redis://localhost:6379 tsx packages/agent-queue/src/worker-entry.ts",
     "dev:ui:queue": "REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
     "typecheck": "tsc -b --noEmit",
-    "start": "if [ \"$APP_NAME\" = \"supply-intelligence\" ]; then pnpm --filter supply-intelligence start; else pnpm --filter @mediforce/platform-ui start; fi"
+    "start": "pnpm --filter @mediforce/platform-ui start",
+    "migrate:handles": "tsx scripts/migrate-user-handles.ts"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "protobufjs",
+      "msgpackr-extract",
+      "@firebase/util"
+    ],
+    "overrides": {
+      "axios": ">=1.15.0",
+      "protobufjs": "8.0.1",
+      "hono": "4.12.14",
+      "@hono/node-server": "1.19.14",
+      "fast-xml-parser": "5.6.0",
+      "node-forge": "1.4.0",
+      "follow-redirects": "1.16.0",
+      "brace-expansion": "5.0.5",
+      "@tootallnate/once": "3.0.1",
+      "next": "16.2.4",
+      "vite": "8.0.8"
+    },
+    "minimumReleaseAgeExclude": [
+      "axios",
+      "protobufjs",
+      "hono"
+    ]
   },
   "devDependencies": {
-    "@types/node": "^25.3.0",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@mediforce/cli": "workspace:*",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^24.12.2",
+    "@vitest/coverage-v8": "^4.1.4",
     "tsx": "latest",
-    "typescript": "~5.9.0",
-    "vitest": "^4.0.0"
+    "typescript": "~6.0.0",
+    "vite": "8.0.8",
+    "vitest": "^4.1.4"
   }
 }

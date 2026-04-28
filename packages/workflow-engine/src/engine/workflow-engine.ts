@@ -11,6 +11,7 @@ import type {
   NotificationTarget,
   HumanTaskRepository,
   HumanTask,
+  CoworkSessionRepository,
   UserDirectoryService,
   WorkflowDefinition,
   WorkflowStep,
@@ -59,6 +60,7 @@ export class WorkflowEngine {
     private readonly handoffRepository?: HandoffRepository, // optional: Phase 4 handoff creation on escalation
     private readonly notificationService?: NotificationService, // optional: escalation notifications
     private readonly humanTaskRepository?: HumanTaskRepository, // optional: Phase 4.1 HumanTask creation on human step advance
+    private readonly coworkSessionRepository?: CoworkSessionRepository, // optional: cowork session creation on cowork step advance
     private readonly userDirectoryService?: UserDirectoryService, // optional: resolves roles to email targets for notifications
   ) {
     this.stepExecutor = new StepExecutor(instanceRepository, auditRepository);
@@ -83,6 +85,9 @@ export class WorkflowEngine {
     }
 
     const now = new Date().toISOString();
+
+    const carryOver = await this.resolvePreviousRunOutputs(definition);
+
     const instance: ProcessInstance = {
       id: crypto.randomUUID(),
       definitionName,
@@ -98,6 +103,15 @@ export class WorkflowEngine {
       pauseReason: null,
       error: null,
       assignedRoles: definition.roles ?? [],
+      // Explicit write so Firestore docs carry the field — lets
+      // getLastCompletedByDefinitionName filter on `deleted == false` server-side
+      // without needing a one-time backfill of pre-feature instances.
+      deleted: false,
+      archived: false,
+      ...(carryOver !== null ? { previousRun: carryOver.values } : {}),
+      ...(carryOver?.sourceId !== undefined
+        ? { previousRunSourceId: carryOver.sourceId }
+        : {}),
     };
 
     await this.instanceRepository.create(instance);
@@ -304,6 +318,9 @@ export class WorkflowEngine {
             updatedAt: now,
           });
         }
+
+        // Note: CoworkSession creation is handled by the auto-runner (route.ts),
+        // not by advanceStep. This avoids duplicate sessions when both paths fire.
       }
     }
 
@@ -541,12 +558,149 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
+  /**
+   * Retry a failed step in-place: flip the instance back to 'running' so the
+   * auto-runner re-enters `currentStepId`. Variables from earlier steps are
+   * kept as-is; the retried step will create a fresh StepExecution when the
+   * runner dispatches it.
+   *
+   * Retry is allowed when the instance is 'failed', or 'paused' with a
+   * failure-like pauseReason:
+   *   - step_failure, routing_error — set by the legacy step-executor path
+   *   - agent_escalated, agent_paused — set by the fallback handler when an
+   *     agent plugin errors or escalates (this is the common real-world path:
+   *     docker daemon down, network flaky, LLM output invalid)
+   *
+   * Other pause reasons aren't failures and must be resolved through their
+   * own flows: waiting_for_human (user task), missing_env (configure secrets),
+   * cowork_in_progress (active session), awaiting_agent_approval (L3 review),
+   * max_iterations_exceeded (loop guard — retry wouldn't help).
+   *
+   * The requested step must match `currentStepId`, and the latest execution
+   * for that step must have failed.
+   */
+  async retryStep(
+    instanceId: string,
+    stepId: string,
+    actor: StepActor,
+  ): Promise<ProcessInstance> {
+    const instance = await this.loadInstance(instanceId);
+
+    const retryablePauseReasons = new Set([
+      'step_failure',
+      'routing_error',
+      'agent_escalated',
+      'agent_paused',
+    ]);
+    const isFailed = instance.status === 'failed';
+    const isRetryablePause =
+      instance.status === 'paused' &&
+      instance.pauseReason !== null &&
+      retryablePauseReasons.has(instance.pauseReason);
+    if (!isFailed && !isRetryablePause) {
+      throw new InvalidTransitionError(instance.status, 'retryStep');
+    }
+    if (instance.currentStepId !== stepId) {
+      throw new InvalidTransitionError(
+        instance.status,
+        `retryStep: '${stepId}' is not the current step (currentStepId='${instance.currentStepId}')`,
+      );
+    }
+
+    const executions = await this.instanceRepository.getStepExecutions(instanceId);
+    const latestExecution = executions
+      .filter((e) => e.stepId === stepId)
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+    if (!latestExecution || latestExecution.status !== 'failed') {
+      throw new InvalidTransitionError(
+        instance.status,
+        `retryStep: latest execution for '${stepId}' is not failed (status='${latestExecution?.status ?? 'none'}')`,
+      );
+    }
+
+    const now = new Date().toISOString();
+    await this.instanceRepository.update(instanceId, {
+      status: 'running',
+      pauseReason: null,
+      error: null,
+      updatedAt: now,
+    });
+
+    await this.auditRepository.append({
+      actorId: actor.id,
+      actorType: 'user',
+      actorRole: actor.role,
+      action: 'step.retried',
+      description: `Retried failed step '${stepId}' on instance '${instanceId}'`,
+      timestamp: now,
+      inputSnapshot: { instanceId, stepId, previousError: latestExecution.error },
+      outputSnapshot: {},
+      basis: 'Operator triggered retry after step failure',
+      entityType: 'stepExecution',
+      entityId: latestExecution.id,
+      processInstanceId: instanceId,
+      processDefinitionVersion: instance.definitionVersion,
+    });
+
+    return this.loadInstance(instanceId);
+  }
+
   private async loadInstance(instanceId: string): Promise<ProcessInstance> {
     const instance = await this.instanceRepository.getById(instanceId);
     if (!instance) {
       throw new Error(`Process instance '${instanceId}' not found`);
     }
     return instance;
+  }
+
+  /**
+   * Build the previous-run-outputs snapshot for a new instance.
+   *
+   * Returns `null` when the workflow does not declare `inputForNextRun` (the
+   * feature is off for this WD and `previousRun` should stay undefined).
+   *
+   * Returns `{ values, sourceId }` otherwise. `values` is `{}` when no
+   * predecessor run qualifies (first run ever, all previous runs failed).
+   * `sourceId` is only set when a predecessor was found.
+   *
+   * Two cases are deliberately distinguished:
+   * - **Semantic empty** (first run, all predecessors failed, predecessor's
+   *   step didn't produce the declared output): `values` is `{}` or partial
+   *   and the run proceeds. Steps that read `previousRun` must handle this.
+   * - **Infrastructure failure** (repository rejects, network error, etc.):
+   *   the error propagates out of `createInstance`. A WD that declares
+   *   `inputForNextRun` will not silently degrade to `{}` when resolution
+   *   cannot be performed — the run is not created.
+   */
+  private async resolvePreviousRunOutputs(
+    definition: WorkflowDefinition,
+  ): Promise<{ values: Record<string, unknown>; sourceId?: string } | null> {
+    if (!definition.inputForNextRun || definition.inputForNextRun.length === 0) {
+      return null;
+    }
+
+    const predecessor = await this.instanceRepository.getLastCompletedByDefinitionName(
+      definition.name,
+    );
+    if (!predecessor) {
+      return { values: {} };
+    }
+
+    const values: Record<string, unknown> = {};
+    for (const entry of definition.inputForNextRun) {
+      // Review loops can run the same step multiple times; we carry the final
+      // output from the latest execution.
+      const latest = await this.instanceRepository.getLatestStepExecution(
+        predecessor.id,
+        entry.stepId,
+      );
+      const output = latest?.output;
+      if (output !== null && typeof output === 'object' && entry.output in output) {
+        values[entry.as] = (output as Record<string, unknown>)[entry.output];
+      }
+    }
+
+    return { values, sourceId: predecessor.id };
   }
 
   /**

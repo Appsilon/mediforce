@@ -25,7 +25,6 @@ vi.mock('@/lib/platform-services', () => ({
     },
     engine: { advanceStep: mockAdvanceStep, advanceWorkflowStep: mockAdvanceStep },
   }),
-  validateApiKey: () => true,
   getAppBaseUrl: () => 'http://localhost:3000',
 }));
 

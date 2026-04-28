@@ -4,11 +4,19 @@
 // L4 autonomous execution, escalation/pause handling, and edge cases.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
+import type {
+  AgentDefinition,
+  AgentOAuthToken,
+  OAuthProviderConfig,
+  WorkflowStep,
+  WorkflowDefinition,
+} from '@mediforce/platform-core';
 import {
   buildProcessInstance,
   buildAgentOutputEnvelope,
   buildWorkflowDefinition,
+  InMemoryAgentOAuthTokenRepository,
+  InMemoryOAuthProviderRepository,
 } from '@mediforce/platform-core/testing';
 
 // Mock platform-services module
@@ -49,6 +57,7 @@ const mockAuditRepo = {
 };
 const mockEngine = {
   advanceStep: vi.fn(),
+  submitReviewVerdict: vi.fn(),
 };
 const mockHumanTaskRepo = {
   create: vi.fn(),
@@ -62,6 +71,26 @@ const mockHumanTaskRepo = {
 const mockLlmClient = {
   complete: vi.fn(),
 };
+const mockAgentDefinitionRepo = {
+  getById: vi.fn(),
+  list: vi.fn(),
+  create: vi.fn(),
+  update: vi.fn(),
+  delete: vi.fn(),
+};
+const mockToolCatalogRepo = {
+  getById: vi.fn(),
+  list: vi.fn(),
+  create: vi.fn(),
+  update: vi.fn(),
+  delete: vi.fn(),
+};
+// These two are swapped for fresh in-memory instances per test that needs
+// them (see the OAuth suite below). The module-scoped defaults only have
+// to exist — executeAgentStep never hits them unless step.agentId + oauth
+// binding are both present, which our non-OAuth tests don't exercise.
+const oauthProviderRepo = new InMemoryOAuthProviderRepository();
+const agentOAuthTokenRepo = new InMemoryAgentOAuthTokenRepository();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -73,7 +102,18 @@ vi.mock('@/lib/platform-services', () => ({
     llmClient: mockLlmClient,
     auditRepo: mockAuditRepo,
     humanTaskRepo: mockHumanTaskRepo,
+    agentDefinitionRepo: mockAgentDefinitionRepo,
+    toolCatalogRepo: mockToolCatalogRepo,
+    oauthProviderRepo,
+    agentOAuthTokenRepo,
   }),
+}));
+
+// executeAgentStep pre-fetches workflow secrets from Firestore. In unit tests
+// there's no emulator and no project id, so stub the call to return an empty
+// map — template resolution covers secret presence separately.
+vi.mock('@/app/actions/workflow-secrets', () => ({
+  getWorkflowSecretsForRuntime: vi.fn().mockResolvedValue({}),
 }));
 
 // Import after mock setup
@@ -391,6 +431,224 @@ describe('executeAgentStep', () => {
 
       expect(mockHumanTaskRepo.create).toHaveBeenCalled();
     });
+
+    it('[DATA] L3 with review.type=agent + escalated (low_confidence) still creates HumanTask with escalationReason', async () => {
+      const l3AgentReview: WorkflowStep = { ...l3Step, review: { type: 'agent' } };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: 'low_confidence',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3AgentReview, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creationReason: 'agent_review_l3',
+          completionData: expect.objectContaining({
+            agentOutput: expect.objectContaining({
+              escalationReason: 'low_confidence',
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('[DATA] L3 with review.type=agent + paused (no escalation) does NOT create HumanTask', async () => {
+      const l3AgentReview: WorkflowStep = { ...l3Step, review: { type: 'agent' } };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: null,
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3AgentReview, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] L3 escalated saves step execution as completed (not failed) when envelope is valid', async () => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'escalated',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: 'low_confidence',
+      });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-1');
+
+      expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'exec-1',
+        expect.objectContaining({ status: 'completed' }),
+      );
+    });
+
+    it('[DATA] L3 + review.type=agent + non-review step + completed + appliedToWorkflow=true calls advanceStep', async () => {
+      // Non-review step (type=creation) with review.type=agent falls through to
+      // advanceStep — there's no verdict to submit on a creation step.
+      const l3AgentReview: WorkflowStep = { ...l3Step, review: { type: 'agent' } };
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { verdict: 'approve', summary: 'LGTM' },
+      });
+      const runResult = {
+        status: 'completed' as const,
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      };
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue(runResult);
+
+      await executeAgentStep('inst-wf-001', 'gather-data', l3AgentReview, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+      expect(mockEngine.submitReviewVerdict).not.toHaveBeenCalled();
+      expect(mockEngine.advanceStep).toHaveBeenCalledWith(
+        'inst-wf-001',
+        { verdict: 'approve', summary: 'LGTM' },
+        { id: 'user-1', role: 'agent' },
+        undefined,
+        runResult,
+      );
+    });
+
+    // ---- L3 + review.type=agent on a REVIEW step: iteration loop via submitReviewVerdict ----
+
+    const l3ReviewAgentStep: WorkflowStep = {
+      id: 'review-pr',
+      name: 'Review PR',
+      type: 'review',
+      executor: 'agent',
+      autonomyLevel: 'L3',
+      allowedRoles: ['senior-reviewer'],
+      review: { type: 'agent', maxIterations: 3 },
+    };
+
+    it('[DATA] L3 + review.type=agent + review step + verdict=approve calls submitReviewVerdict', async () => {
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { verdict: 'approve', comment: 'LGTM' },
+      });
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'completed',
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      });
+      const updatedInstance = buildProcessInstance({
+        id: 'inst-wf-001',
+        status: 'running',
+        currentStepId: 'done',
+      });
+      mockEngine.submitReviewVerdict.mockResolvedValue(updatedInstance);
+
+      const result = await executeAgentStep('inst-wf-001', 'review-pr', l3ReviewAgentStep, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+      expect(mockEngine.advanceStep).not.toHaveBeenCalled();
+      expect(mockEngine.submitReviewVerdict).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'review-pr',
+        expect.objectContaining({
+          reviewerId: 'agent:review-pr',
+          reviewerRole: 'agent',
+          verdict: 'approve',
+          comment: 'LGTM',
+        }),
+        { id: 'agent:review-pr', role: 'agent' },
+      );
+      expect(result.currentStepId).toBe('done');
+      expect(result.agentRunStatus).toBe('completed');
+    });
+
+    it('[DATA] L3 + review.type=agent + review step + verdict=revise calls submitReviewVerdict (engine loops back)', async () => {
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { verdict: 'revise', comment: 'Please add tests' },
+      });
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'completed',
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      });
+      const loopedInstance = buildProcessInstance({
+        id: 'inst-wf-001',
+        status: 'running',
+        currentStepId: 'gather-data', // looped back to creation step
+      });
+      mockEngine.submitReviewVerdict.mockResolvedValue(loopedInstance);
+
+      const result = await executeAgentStep('inst-wf-001', 'review-pr', l3ReviewAgentStep, {}, 'user-1');
+
+      expect(mockHumanTaskRepo.create).not.toHaveBeenCalled();
+      expect(mockEngine.submitReviewVerdict).toHaveBeenCalledWith(
+        'inst-wf-001',
+        'review-pr',
+        expect.objectContaining({ verdict: 'revise', comment: 'Please add tests' }),
+        expect.any(Object),
+      );
+      expect(result.currentStepId).toBe('gather-data');
+    });
+
+    it('[DATA] L3 + review.type=agent + review step + missing verdict creates HumanTask with escalationReason=error', async () => {
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { summary: 'looks ok' }, // no verdict field
+      });
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'completed',
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      });
+
+      const result = await executeAgentStep('inst-wf-001', 'review-pr', l3ReviewAgentStep, {}, 'user-1');
+
+      expect(mockEngine.submitReviewVerdict).not.toHaveBeenCalled();
+      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creationReason: 'agent_review_l3',
+          completionData: expect.objectContaining({
+            agentOutput: expect.objectContaining({ escalationReason: 'error' }),
+          }),
+        }),
+      );
+      expect(result.status).toBe('paused');
+      expect(result.agentRunStatus).toBe('escalated');
+    });
+
+    it('[DATA] L3 + review.type=agent + review step + max_iterations_exceeded creates HumanTask with escalationReason=iterations_limit', async () => {
+      const reviewEnvelope = buildAgentOutputEnvelope({
+        result: { verdict: 'revise', comment: 'still missing tests' },
+      });
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'completed',
+        envelope: reviewEnvelope,
+        appliedToWorkflow: true,
+        fallbackReason: null,
+      });
+      const exhaustedInstance = buildProcessInstance({
+        id: 'inst-wf-001',
+        status: 'paused',
+        pauseReason: 'max_iterations_exceeded',
+        currentStepId: 'review-pr',
+      });
+      mockEngine.submitReviewVerdict.mockResolvedValue(exhaustedInstance);
+
+      const result = await executeAgentStep('inst-wf-001', 'review-pr', l3ReviewAgentStep, {}, 'user-1');
+
+      expect(mockEngine.submitReviewVerdict).toHaveBeenCalled();
+      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creationReason: 'agent_review_l3',
+          completionData: expect.objectContaining({
+            agentOutput: expect.objectContaining({ escalationReason: 'iterations_limit' }),
+          }),
+        }),
+      );
+      expect(result.status).toBe('paused');
+      expect(result.agentRunStatus).toBe('escalated');
+    });
   });
 
   // ---- Escalation/Pause (non-L3) ----
@@ -616,5 +874,191 @@ describe('executeAgentStep', () => {
         processInstanceId: 'inst-wf-001',
       }),
     );
+  });
+
+  // ---- OAuth token loading + refresh pass-through ----
+  //
+  // Verifies execute-agent-step wires the binding → token repo → refresh →
+  // context.oauthTokens chain end-to-end, and that near-expiry tokens get
+  // refreshed + persisted before the runtime sees them.
+
+  describe('OAuth token loading', () => {
+    const agentId = 'agent-with-github';
+    const namespace = 'acme';
+
+    const omitTimestamps = (cfg: OAuthProviderConfig) => {
+      const { createdAt: _c, updatedAt: _u, ...rest } = cfg;
+      return rest;
+    };
+
+    const githubAgentDefinition: AgentDefinition = {
+      id: agentId,
+      namespace,
+      name: 'GitHub agent',
+      image: 'mediforce-agent:test',
+      mcpServers: {
+        github: {
+          type: 'http',
+          url: 'https://api.github.com/mcp',
+          auth: {
+            type: 'oauth',
+            provider: 'github',
+            headerName: 'Authorization',
+            headerValueTemplate: 'Bearer {token}',
+          },
+        },
+      },
+    };
+
+    const githubProvider: OAuthProviderConfig = {
+      id: 'github',
+      name: 'GitHub',
+      clientId: 'client-abc',
+      clientSecret: 'secret-abc',
+      authorizeUrl: 'https://example.test/authorize',
+      tokenUrl: 'https://example.test/token',
+      userInfoUrl: 'https://example.test/userinfo',
+      scopes: ['repo'],
+      createdAt: '2026-04-23T00:00:00.000Z',
+      updatedAt: '2026-04-23T00:00:00.000Z',
+    };
+
+    const baseToken: AgentOAuthToken = {
+      provider: 'github',
+      accessToken: 'gh-fresh',
+      scope: 'repo',
+      providerUserId: '42',
+      accountLogin: '@mediforce-bot',
+      connectedAt: 1_700_000_000_000,
+      connectedBy: 'user-1',
+    };
+
+    const stepWithAgent: WorkflowStep = {
+      id: 'run-agent',
+      name: 'Run agent',
+      type: 'creation',
+      executor: 'agent',
+      autonomyLevel: 'L2',
+      agentId,
+    };
+
+    const githubWorkflow = buildWorkflowDefinition({
+      name: 'gh-flow',
+      version: 1,
+      namespace,
+      steps: [stepWithAgent, { id: 'done', name: 'Done', type: 'terminal', executor: 'human' }],
+      transitions: [{ from: 'run-agent', to: 'done' }],
+    });
+
+    beforeEach(() => {
+      // Reset in-memory OAuth stores between tests so fixture state from one
+      // test doesn't bleed into the next.
+      for (const ns of ['acme', 'other']) {
+        oauthProviderRepo
+          .delete(ns, 'github')
+          .catch(() => {});
+        agentOAuthTokenRepo
+          .delete(ns, agentId, 'github')
+          .catch(() => {});
+      }
+
+      mockInstanceRepo.getById.mockResolvedValue(
+        buildProcessInstance({
+          id: 'inst-gh',
+          definitionName: 'gh-flow',
+          definitionVersion: '1',
+          currentStepId: 'run-agent',
+          status: 'running',
+          configName: undefined,
+          configVersion: undefined,
+        }),
+      );
+      mockProcessRepo.getWorkflowDefinition.mockResolvedValue(githubWorkflow);
+      mockAgentDefinitionRepo.getById.mockResolvedValue(githubAgentDefinition);
+    });
+
+    it('[DATA] loads oauth token and threads into context.oauthTokens', async () => {
+      await oauthProviderRepo.create(namespace, omitTimestamps(githubProvider));
+      await agentOAuthTokenRepo.put(namespace, agentId, 'github', baseToken);
+
+      await executeAgentStep('inst-gh', 'run-agent', stepWithAgent, {}, 'user-1');
+
+      const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls.at(-1)?.[1];
+      expect(contextArg.oauthTokens).toEqual({
+        github: {
+          accessToken: 'gh-fresh',
+          headerName: 'Authorization',
+          headerValueTemplate: 'Bearer {token}',
+        },
+      });
+    });
+
+    it('[DATA] refreshes near-expiry token and persists updated token back to repo', async () => {
+      const fetchImpl = vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            access_token: 'gh-refreshed',
+            refresh_token: 'rt-new',
+            expires_in: 3_600,
+            scope: 'repo',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+      // Patch global fetch for the provider refresh exchange. resolveOAuthToken
+      // uses the injected fetchImpl when provided — but executeAgentStep calls
+      // it without injection, so we patch the global for the duration of this test.
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = fetchImpl as typeof fetch;
+
+      try {
+        await oauthProviderRepo.create(namespace, {
+          ...githubProvider,
+          createdAt: undefined as unknown as string,
+          updatedAt: undefined as unknown as string,
+        });
+        // Token expires within the 5min refresh margin → should refresh.
+        await agentOAuthTokenRepo.put(namespace, agentId, 'github', {
+          ...baseToken,
+          refreshToken: 'rt-old',
+          expiresAt: Date.now() + 60_000,
+        });
+
+        await executeAgentStep('inst-gh', 'run-agent', stepWithAgent, {}, 'user-1');
+
+        // Context carries the refreshed token, not the near-expiry one.
+        const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls.at(-1)?.[1];
+        expect(contextArg.oauthTokens?.github?.accessToken).toBe('gh-refreshed');
+
+        // Repo has the refreshed token persisted.
+        const persisted = await agentOAuthTokenRepo.get(namespace, agentId, 'github');
+        expect(persisted?.accessToken).toBe('gh-refreshed');
+        expect(persisted?.refreshToken).toBe('rt-new');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('[ERROR] throws actionable error when binding requests oauth but no token is connected', async () => {
+      await oauthProviderRepo.create(namespace, {
+        ...githubProvider,
+        createdAt: undefined as unknown as string,
+        updatedAt: undefined as unknown as string,
+      });
+      // NOTE: No token put — simulates "binding saved, Connect never clicked".
+
+      await expect(
+        executeAgentStep('inst-gh', 'run-agent', stepWithAgent, {}, 'user-1'),
+      ).rejects.toThrow(/not connected.*Connect the account via the agent editor/);
+    });
+
+    it('[ERROR] throws when provider config referenced by binding is missing', async () => {
+      // Token exists, but provider doc was deleted admin-side.
+      await agentOAuthTokenRepo.put(namespace, agentId, 'github', baseToken);
+
+      await expect(
+        executeAgentStep('inst-gh', 'run-agent', stepWithAgent, {}, 'user-1'),
+      ).rejects.toThrow(/provider "github" .* not found/);
+    });
   });
 });

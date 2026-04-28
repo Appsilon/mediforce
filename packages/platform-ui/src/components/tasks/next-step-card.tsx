@@ -9,6 +9,8 @@ import { useProcessConfig } from '@/hooks/use-process-config';
 import { useCollection } from '@/hooks/use-collection';
 import { where } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { routes } from '@/lib/routes';
 
 interface NextStepCardProps {
   processInstanceId: string;
@@ -25,6 +27,7 @@ function formatStepName(stepId: string): string {
 type DefinitionDoc = ProcessDefinition & { id: string };
 
 export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
+  const handle = useHandleFromPath();
   const { data: executions, loading: execLoading } = useSubcollection<StepExecution & { id: string }>(
     processInstanceId ? `processInstances/${processInstanceId}` : '',
     'stepExecutions',
@@ -106,7 +109,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
 
   // Build the run link
   const runHref = instance
-    ? `/workflows/${encodeURIComponent(instance.definitionName)}/runs/${processInstanceId}`
+    ? routes.workflowRun(handle, instance.definitionName, processInstanceId)
     : null;
 
   return (
@@ -151,6 +154,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
           executorType={executorType}
           nextHumanTask={nextHumanTask}
           runHref={runHref}
+          handle={handle}
         />
       </div>
     </div>
@@ -226,18 +230,20 @@ function StepLink({
   executorType,
   nextHumanTask,
   runHref,
+  handle,
 }: {
   isTerminal: boolean;
   processCompleted: boolean;
   executorType: string | null;
   nextHumanTask: { id: string } | null;
   runHref: string | null;
+  handle: string;
 }) {
   // Human step with a task → link to the task
   if (!isTerminal && !processCompleted && executorType === 'human' && nextHumanTask) {
     return (
       <Link
-        href={`/tasks/${nextHumanTask.id}`}
+        href={routes.task(handle, nextHumanTask.id)}
         className={cn(
           'shrink-0 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium',
           'bg-primary/10 text-primary hover:bg-primary/20 transition-colors',

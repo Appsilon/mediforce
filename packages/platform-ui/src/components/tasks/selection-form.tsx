@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle, MessageSquare, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { completeTask } from '@/app/actions/tasks';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
 interface SelectionFormProps {
   taskId: string;
@@ -28,6 +30,8 @@ export function SelectionForm({
   remainingTaskCount,
   onCompleted,
 }: SelectionFormProps) {
+  const handle = useHandleFromPath();
+  const { firebaseUser } = useAuth();
   const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
   const [mode, setMode] = React.useState<'select' | 'revise' | null>(null);
   const [comment, setComment] = React.useState('');
@@ -40,7 +44,8 @@ export function SelectionForm({
     setSubmitting(true);
     setError(null);
 
-    const result = await completeTask(taskId, 'approve', '', selectedIndex);
+    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+    const result = await completeTask(taskId, 'approve', '', selectedIndex, idToken);
 
     if (result.success) {
       const selected = options[selectedIndex];
@@ -63,7 +68,8 @@ export function SelectionForm({
     setSubmitting(true);
     setError(null);
 
-    const result = await completeTask(taskId, 'revise', comment.trim());
+    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
+    const result = await completeTask(taskId, 'revise', comment.trim(), undefined, idToken);
 
     if (result.success) {
       setSubmitted({
@@ -280,6 +286,7 @@ function SelectionConfirmation({
   data: SubmittedData;
   remainingTaskCount?: number;
 }) {
+  const handle = useHandleFromPath();
   const isApprove = data.verdict === 'approve';
 
   return (
@@ -341,12 +348,12 @@ function SelectionConfirmation({
         {remainingTaskCount !== undefined && remainingTaskCount > 0 ? (
           <span>
             You have {remainingTaskCount} more {remainingTaskCount === 1 ? 'task' : 'tasks'} &mdash;{' '}
-            <Link href="/tasks" className="text-primary hover:underline font-medium">
+            <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
               View next task
             </Link>
           </span>
         ) : (
-          <Link href="/tasks" className="text-primary hover:underline font-medium">
+          <Link href={`/${handle}/tasks`} className="text-primary hover:underline font-medium">
             Back to tasks
           </Link>
         )}

@@ -2,8 +2,24 @@ name: CI
 
 on:
   pull_request:
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - '.claude/**'
+      - 'agents/**'
+      - 'skills/**'
+      - '.planning/**'
+      - 'LICENSE'
   push:
     branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - '.claude/**'
+      - 'agents/**'
+      - 'skills/**'
+      - '.planning/**'
+      - 'LICENSE'
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -15,10 +31,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
@@ -28,10 +44,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build custom Docker images for E2E tests
@@ -43,10 +59,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
@@ -91,6 +107,15 @@ jobs:
           FIREBASE_PROJECT_ID: demo-mediforce
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
           NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
+          # Fake key for server-to-server auth between server actions and /api routes
+          # (e.g. retryFailedStep → /api/processes/:id/run). Same value on both sides
+          # of the self-fetch, so validateApiKey passes. Only used locally within
+          # the Next.js process — no real secret needed.
+          PLATFORM_API_KEY: ci-e2e-test-key
+          # Fake 64-hex-char key to satisfy validateSecretsKey() fail-fast check
+          # in getPlatformServices(). No real workflow secrets are encrypted/decrypted
+          # during E2E runs — this just has to be present and well-formed.
+          SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
 
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
@@ -98,3 +123,49 @@ jobs:
           name: playwright-report
           path: packages/platform-ui/playwright-report/
           retention-days: 14
+
+  supply-chain-deps-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check for compromised axios versions
+        run: |
+          if grep -qE 'axios@(1\.14\.1|0\.30\.4)' pnpm-lock.yaml; then
+            echo "::error::Compromised axios version detected!"
+            exit 1
+          fi
+      - name: Check for known malicious packages
+        run: |
+          for pkg in plain-crypto-js; do
+            if grep -q "${pkg}@" pnpm-lock.yaml; then
+              echo "::error::Malicious package '$pkg' detected!"
+              exit 1
+            fi
+          done
+      - name: Install osv-scanner
+        run: |
+          curl -fsSL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o /usr/local/bin/osv-scanner
+          chmod +x /usr/local/bin/osv-scanner
+      - name: Audit dependencies (critical = block)
+        run: |
+          output=$(osv-scanner scan --lockfile=pnpm-lock.yaml 2>&1) || true
+          echo "$output"
+          if echo "$output" | grep -qP '[1-9]\d* Critical'; then
+            echo "::error::Critical vulnerabilities found!"
+            exit 1
+          fi
+      - name: Audit dependencies (full report)
+        if: always()
+        run: osv-scanner scan --lockfile=pnpm-lock.yaml || true
+
+  gif-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check journey test changes have matching GIF updates
+        run: cd packages/platform-ui && python3 scripts/check-gif-freshness.py ${{ github.event.pull_request.base.sha }}

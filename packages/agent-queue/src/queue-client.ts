@@ -1,4 +1,4 @@
-import { Queue, QueueEvents } from 'bullmq';
+import type { Queue, QueueEvents } from 'bullmq';
 import { getRedisConnection } from './connection.js';
 import { QUEUE_NAME, DockerJobResultSchema } from './schemas.js';
 import type { DockerJobData, DockerJobResult } from './schemas.js';
@@ -6,8 +6,9 @@ import type { DockerJobData, DockerJobResult } from './schemas.js';
 let sharedQueue: Queue | null = null;
 let sharedQueueEvents: QueueEvents | null = null;
 
-function getQueue(): Queue {
+async function getQueue(): Promise<Queue> {
   if (!sharedQueue) {
+    const { Queue } = await import('bullmq');
     sharedQueue = new Queue(QUEUE_NAME, {
       connection: getRedisConnection(),
       defaultJobOptions: {
@@ -19,8 +20,9 @@ function getQueue(): Queue {
   return sharedQueue;
 }
 
-function getQueueEvents(): QueueEvents {
+async function getQueueEvents(): Promise<QueueEvents> {
   if (!sharedQueueEvents) {
+    const { QueueEvents } = await import('bullmq');
     sharedQueueEvents = new QueueEvents(QUEUE_NAME, {
       connection: getRedisConnection(),
     });
@@ -35,8 +37,8 @@ function getQueueEvents(): QueueEvents {
  * — the async queue is invisible to consuming code.
  */
 export async function enqueueDockerJob(data: DockerJobData): Promise<DockerJobResult> {
-  const queue = getQueue();
-  const queueEvents = getQueueEvents();
+  const queue = await getQueue();
+  const queueEvents = await getQueueEvents();
 
   const jobId = `${data.processInstanceId}:${data.stepId}:${Date.now()}`;
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { McpServerConfigSchema } from './mcp-server-config.js';
 
 export const ReviewConstraintsSchema = z.object({
   maxIterations: z.number().int().positive().optional(),
@@ -21,8 +22,12 @@ export const AgentConfigSchema = z.object({
   runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
   // Container image — when omitted, inline scripts auto-resolve the image from the runtime
   image: z.string().optional(),
+  dockerfile: z.string().optional(),
   repo: z.string().optional(),
-  commit: z.string().optional(),
+  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
+  repoAuth: z.string().optional(),
+  mcpServers: z.array(McpServerConfigSchema).optional(),
+  allowedTools: z.array(z.string()).optional(),
 });
 
 export const StepConfigSchema = z.object({

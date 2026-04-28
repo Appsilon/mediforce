@@ -1,11 +1,12 @@
 import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 import {
   BaseContainerAgentPlugin,
   type SpawnCliOptions,
   type AgentCommandSpec,
 } from './base-container-agent-plugin.js';
+import { isWorkflowAgentContext } from './container-plugin.js';
 
 /** Default model used when agentConfig.model is not set. */
 const DEFAULT_MODEL = 'deepseek/deepseek-chat';
@@ -47,21 +48,55 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     };
   }
 
+  protected override getLocalInternalEnvVars(outputDir: string): Record<string, string> {
+    const absOutputDir = resolve(outputDir);
+    return {
+      OPENCODE_CONFIG: join(absOutputDir, 'opencode.json'),
+      XDG_DATA_HOME: join(absOutputDir, '.local', 'share'),
+    };
+  }
+
   getAgentCommand(promptFilePath: string, _options?: SpawnCliOptions): AgentCommandSpec {
     // OpenCode CLI: `opencode run <message> --format json`
     // For long prompts, we read from the prompt file using $(cat ...) to avoid
     // shell argument length limits on the docker run command itself.
     // The expansion happens inside the container's bash, where ARG_MAX is ~2MB.
     const model = this.agentConfig.model ?? DEFAULT_MODEL;
+
+    // OpenCode's --model flag format is "providerID/modelID" — the first path
+    // segment is the provider, the rest is the model ID within that provider.
+    // "deepseek/deepseek-chat" means provider=deepseek, model=deepseek-chat.
+    // When routing through OpenRouter, we must prefix with "openrouter/" so
+    // OpenCode resolves provider=openrouter, model=deepseek/deepseek-chat.
+    const modelArg = this.resolveModelArg(model);
+
     const args = [
       'bash', '-c',
-      `opencode run "$(cat ${promptFilePath})" --format json --model ${model}`,
+      `opencode run "$(cat ${promptFilePath})" --format json --model ${modelArg}`,
     ];
 
     return { args, promptDelivery: 'file' };
   }
 
-  getMockDockerArgs(stepId: string, isGitMode: boolean): string[] {
+  /** Build the full provider/model string for the --model CLI flag. */
+  private resolveModelArg(model: string): string {
+    // Already has a recognised provider prefix — use as-is.
+    if (model.startsWith('openrouter/') || !model.includes('/')) {
+      return model;
+    }
+    const workflowSecrets = isWorkflowAgentContext(this.context)
+      ? this.context.workflowSecrets
+      : undefined;
+    const openrouterKey = this.resolvedEnv.vars.OPENROUTER_API_KEY ?? workflowSecrets?.OPENROUTER_API_KEY;
+    if (openrouterKey) {
+      // model is e.g. "deepseek/deepseek-chat" (an OpenRouter model path).
+      // Prefix with "openrouter/" so OpenCode routes to the openrouter provider.
+      return `openrouter/${model}`;
+    }
+    return model;
+  }
+
+  getMockDockerArgs(stepId: string): string[] {
     const copyOutputCmd =
       `cp -r /mock-data/* /output/ 2>/dev/null; ` +
       `if [ -f "/mock-fixtures/${stepId}.json" ]; then ` +
@@ -72,33 +107,22 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         `echo "[mock-opencode] step=${stepId}: no fixture, generic mock" >&2; ` +
       `fi`;
 
+    const copyWorkspaceCmd =
+      `WSDIR=$(grep -o '"_workspaceDir"[[:space:]]*:[[:space:]]*"[^"]*"' /mock-fixtures/${stepId}.json 2>/dev/null | sed 's/.*"\\([^"]*\\)"$/\\1/'); ` +
+      `if [ -n "$WSDIR" ] && [ -d "/mock-data/$WSDIR" ]; then ` +
+        `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
+        `echo "[mock-opencode] step=${stepId}: copied $WSDIR/ into /workspace/" >&2; ` +
+      `fi`;
+
     const mockAgentResponse = JSON.stringify({
       output_file: '/output/mock-result.json',
       summary: `Mock OpenCode output for step ${stepId}`,
     });
-    // Wrap in OpenCode's JSONL format: { "type": "text", "part": { "text": "..." } }
     const mockOpenCodeJson = JSON.stringify({ type: 'text', part: { type: 'text', text: mockAgentResponse } });
-
-    if (isGitMode) {
-      const copyWorkspaceCmd =
-        `WSDIR=$(grep -o '"_workspaceDir"[[:space:]]*:[[:space:]]*"[^"]*"' /mock-fixtures/${stepId}.json 2>/dev/null | sed 's/.*"\\([^"]*\\)"$/\\1/'); ` +
-        `if [ -n "$WSDIR" ] && [ -d "/mock-data/$WSDIR" ]; then ` +
-          `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
-          `echo "[mock-opencode] step=${stepId}: copied $WSDIR/ into /workspace/ for git commit" >&2; ` +
-        `else ` +
-          `echo "# Mock output from step ${stepId}" > /workspace/mock-${stepId}-output.md; ` +
-        `fi`;
-
-      return [
-        'bash', '-c',
-        `${copyOutputCmd} && ${copyWorkspaceCmd} && ` +
-        `echo '${mockOpenCodeJson.replace(/'/g, "'\\''")}'`,
-      ];
-    }
 
     return [
       'bash', '-c',
-      `${copyOutputCmd} && ` +
+      `${copyOutputCmd} && ${copyWorkspaceCmd}; ` +
       `echo '${mockOpenCodeJson.replace(/'/g, "'\\''")}'`,
     ];
   }
@@ -253,26 +277,42 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
 
   protected override async prepareOutputDir(outputDir: string): Promise<void> {
     // Write OpenCode config with provider configuration.
+    // Register the model in the appropriate provider so OpenCode can find it.
+    const model = this.agentConfig.model ?? DEFAULT_MODEL;
     const config: Record<string, unknown> = {
       $schema: 'https://opencode.ai/config.json',
       permission: 'allow',
     };
 
+    // Auth keys are resolved from two sources with the same priority:
+    // 1. Step/workflow env vars (explicit {{KEY}} references) — already in resolvedEnv.vars
+    // 2. Workflow secrets directly — users can store OPENROUTER_API_KEY / DEEPSEEK_API_KEY
+    //    in workflow secrets without needing to wire them through the env section.
+    const workflowSecrets = isWorkflowAgentContext(this.context)
+      ? this.context.workflowSecrets
+      : undefined;
+
+    const openrouterKey = this.resolvedEnv.vars.OPENROUTER_API_KEY ?? workflowSecrets?.OPENROUTER_API_KEY;
+    const deepseekKey = this.resolvedEnv.vars.DEEPSEEK_API_KEY ?? workflowSecrets?.DEEPSEEK_API_KEY;
+
+    // Auto-register model in the correct provider based on model ID and available keys.
+    if (openrouterKey && model.includes('/')) {
+      config.provider = { openrouter: { models: { [model]: {} } } };
+    } else if (deepseekKey && model.startsWith('deepseek/')) {
+      config.provider = { deepseek: { models: { [model]: {} } } };
+    }
+
     const configPath = join(outputDir, 'opencode.json');
     await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
 
-    // Write auth.json from resolved env vars.
-    // OpenCode stores credentials at $XDG_DATA_HOME/opencode/auth.json.
-    // The step config's env should provide DEEPSEEK_API_KEY / OPENROUTER_API_KEY.
+    // Write auth.json so OpenCode can authenticate with the provider.
     const auth: Record<string, { type: string; key: string }> = {};
-    const env = this.resolvedEnv.vars;
 
-    if (env.DEEPSEEK_API_KEY) {
-      auth.deepseek = { type: 'api', key: env.DEEPSEEK_API_KEY };
+    if (deepseekKey) {
+      auth.deepseek = { type: 'api', key: deepseekKey };
     }
-
-    if (env.OPENROUTER_API_KEY) {
-      auth.openrouter = { type: 'api', key: env.OPENROUTER_API_KEY };
+    if (openrouterKey) {
+      auth.openrouter = { type: 'api', key: openrouterKey };
     }
 
     if (Object.keys(auth).length > 0) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, validateApiKey, getAppBaseUrl } from '@/lib/platform-services';
+import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
 import type { WorkflowDefinition, Trigger } from '@mediforce/platform-core';
 
@@ -17,12 +17,8 @@ interface SkippedEntry {
   reason: string;
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (!validateApiKey(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { processRepo, cronTrigger } = getPlatformServices();
+export async function POST(_req: NextRequest): Promise<NextResponse> {
+  const { processRepo, cronTrigger, cronTriggerStateRepo } = getPlatformServices();
   const now = new Date();
   const triggered: TriggeredEntry[] = [];
   const skipped: SkippedEntry[] = [];
@@ -66,7 +62,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           continue;
         }
 
-        if (!isDue(schedule, now)) {
+        // Read last triggered time for this specific trigger.
+        // When no state exists (first run), use the definition's createdAt so
+        // gap-scanning catches any missed windows since the definition was created.
+        // TODO: race condition — overlapping heartbeats can read the same lastTriggeredAt
+        // and both fire the trigger. Not critical at current scale (single VPS cron),
+        // but needs a Firestore transaction or distributed lock if we scale out.
+        const state = await cronTriggerStateRepo.get(def.name, trigger.name);
+        const lastTriggeredAt = state
+          ? new Date(state.lastTriggeredAt)
+          : def.createdAt
+            ? new Date(def.createdAt)
+            : undefined;
+
+        if (!isDue(schedule, now, lastTriggeredAt)) {
           skipped.push({
             definitionName: def.name,
             definitionVersion: def.version,
@@ -85,6 +94,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           payload: { schedule, firedAt: now.toISOString() },
         });
 
+        // Persist trigger state AFTER successful fire (at-least-once semantics)
+        await cronTriggerStateRepo.set({
+          definitionName: def.name,
+          triggerName: trigger.name,
+          lastTriggeredAt: now.toISOString(),
+        });
+
         // Kick off the run loop by calling the run endpoint
         const baseUrl = getAppBaseUrl();
         await fetch(`${baseUrl}/api/processes/${result.instanceId}/run`, {
@@ -101,6 +117,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Worktrees are NOT swept. Full audit is the design goal: every run branch
+    // AND its worktree persist indefinitely so an operator can `cd` in at any
+    // later point and inspect what the agent produced. `disposeRunWorkspace`
+    // stays available as a manual admin API; the heartbeat never calls it.
     return NextResponse.json({ triggered, skipped });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

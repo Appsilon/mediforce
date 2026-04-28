@@ -10,11 +10,25 @@ docker build \
   "$REPO_ROOT/packages/agent-runtime/container"
 
 echo ""
+echo "=== Building script-container node runtime ==="
+docker build \
+  -f "$REPO_ROOT/packages/agent-runtime/container/Dockerfile.node" \
+  -t mediforce-node:latest \
+  "$REPO_ROOT/packages/agent-runtime/container"
+
+echo ""
 echo "=== Building protocol-to-tfl agent image ==="
 docker build \
   -f "$REPO_ROOT/apps/protocol-to-tfl/container/Dockerfile" \
   -t mediforce-agent:protocol-to-tfl \
   "$REPO_ROOT/apps/protocol-to-tfl/container"
+
+echo ""
+echo "=== Building tealflow agent image ==="
+docker build \
+  -f "$REPO_ROOT/apps/tealflow/container/Dockerfile" \
+  -t mediforce-agent:tealflow \
+  "$REPO_ROOT/apps/tealflow/container"
 
 echo ""
 echo "=== Building community-digest agent image ==="

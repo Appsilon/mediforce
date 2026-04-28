@@ -9,6 +9,8 @@ import {
   RepoSchema,
 } from './process-definition.js';
 import { ProcessNotificationConfigSchema } from './process-config.js';
+import { McpServerConfigSchema } from './mcp-server-config.js';
+import { StepMcpRestrictionSchema } from './agent-mcp-binding.js';
 
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
@@ -21,10 +23,48 @@ export const WorkflowAgentConfigSchema = z.object({
   inlineScript: z.string().optional(),
   runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
   image: z.string().optional(),
+  dockerfile: z.string().optional(),
   repo: z.string().optional(),
-  commit: z.string().optional(),
+  commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
+  /** Name of a workflow secret containing a token for repo access. */
+  repoAuth: z.string().optional(),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
+  /** @deprecated Step-level MCP configuration is being removed.
+   *  Move servers onto the agent via AgentDefinition.mcpServers and
+   *  narrow them at the step via WorkflowStep.mcpRestrictions.
+   *  Step 2 of the MCP permissions refactor will migrate existing
+   *  workflows and drop this field. Still parsed for backward-compat. */
+  mcpServers: z.array(McpServerConfigSchema).optional(),
+  /** Additional Claude Code tools to allow beyond the default set
+   *  (Bash, Read, Write, Edit, Glob, Grep). Use this to grant internet
+   *  access (WebSearch, WebFetch) or any other built-in tool. */
+  allowedTools: z.array(z.string()).optional(),
+});
+
+export const CoworkChatConfigSchema = z.object({
+  model: z.string().optional(),
+});
+
+export const CoworkVoiceRealtimeConfigSchema = z.object({
+  model: z.string().optional(),
+  voice: z.string().optional(),
+  synthesisModel: z.string().optional(),
+  maxDurationSeconds: z.number().positive().optional(),
+  idleTimeoutSeconds: z.number().positive().optional(),
+});
+
+export const WorkflowCoworkConfigSchema = z.object({
+  agent: z.enum(['chat', 'voice-realtime']),
+  systemPrompt: z.string().optional(),
+  outputSchema: z.record(z.string(), z.unknown()).optional(),
+  chat: CoworkChatConfigSchema.optional(),
+  voiceRealtime: CoworkVoiceRealtimeConfigSchema.optional(),
+  /** @deprecated Step-level MCP configuration is being removed.
+   *  Attach servers to the cowork agent definition and narrow per step
+   *  via WorkflowStep.mcpRestrictions. Retained for backward-compat
+   *  until the Step 2 migrator runs. */
+  mcpServers: z.array(McpServerConfigSchema).optional(),
 });
 
 export const WorkflowReviewConfigSchema = z.object({
@@ -32,6 +72,24 @@ export const WorkflowReviewConfigSchema = z.object({
   plugin: z.string().optional(),
   maxIterations: z.number().int().positive().optional(),
   timeBoxDays: z.number().positive().optional(),
+});
+
+/**
+ * Run-scoped git workspace shared across all steps of a single workflow run.
+ *
+ * When set, the runtime creates one bare repo per workflow definition (host-cached)
+ * and a fresh `git worktree` per run on branch `run/<runId>`. Every step in the run
+ * mounts that worktree at `/workspace`. Commits are made per-step; pushes are
+ * controlled by `push` and default to `never`.
+ *
+ * Distinct from `agentConfig.repo + commit` which drive image build source and
+ * skills source (both still tied to immutable SHAs).
+ */
+export const WorkflowWorkspaceSchema = z.object({
+  /** Remote git URL — "org/repo", SSH URL, HTTPS URL. When unset the bare repo is local-only. */
+  remote: z.string().optional(),
+  /** Name of a workflow secret holding a token for HTTPS auth to the remote. */
+  remoteAuth: z.string().optional(),
 });
 
 export const WorkflowStepSchema = z.object({
@@ -44,26 +102,106 @@ export const WorkflowStepSchema = z.object({
   selection: SelectionSchema.optional(),
   ui: StepUiSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  executor: z.enum(['human', 'agent', 'script']),
+  executor: z.enum(['human', 'agent', 'script', 'cowork']),
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(),
   plugin: z.string().optional(),
+  /** References an AgentDefinition by its deterministic slug (doc id).
+   *  The referenced definition carries canonical MCP server bindings
+   *  and runtime identity. Step-level mcpRestrictions narrow further.
+   *  When unset, no MCP resolution runs for this step. */
+  agentId: z.string().optional(),
   allowedRoles: z.array(z.string()).optional(),
   agent: WorkflowAgentConfigSchema.optional(),
   review: WorkflowReviewConfigSchema.optional(),
+  cowork: WorkflowCoworkConfigSchema.optional(),
   stepParams: z.record(z.string(), z.unknown()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+  /** Step-level subtractive MCP restrictions, keyed by server name
+   *  (matching AgentDefinition.mcpServers). Can only disable servers or
+   *  deny specific tools — the shape has no allow/broaden field. */
+  mcpRestrictions: StepMcpRestrictionSchema.optional(),
 });
 
-export const WorkflowDefinitionSchema = z.object({
+/**
+ * Declares which step outputs of the current run are exposed to the next run
+ * under ProcessInstance.previousRun. Each entry reads: from step `stepId`,
+ * take output key `output`, expose it as `as` on the next run.
+ */
+export const InputForNextRunEntrySchema = z.object({
+  stepId: z.string().min(1),
+  output: z.string().min(1),
+  as: z.string().min(1),
+});
+
+/**
+ * Cross-field validation for `inputForNextRun`:
+ *   - every stepId must match an existing step
+ *   - every `as` must be unique within the block
+ *
+ * Applied via superRefine on the top-level schema (and also exported so that
+ * callers using `.omit()` or `.partial()` on the base object can re-apply it).
+ */
+function validateInputForNextRun(
+  wd: {
+    steps: Array<{ id: string }>;
+    inputForNextRun?: Array<{ stepId: string; as: string }>;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (!wd.inputForNextRun) return;
+  const stepIds = new Set(wd.steps.map((s) => s.id));
+  const seenAs = new Set<string>();
+  wd.inputForNextRun.forEach((entry, i) => {
+    if (!stepIds.has(entry.stepId)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['inputForNextRun', i, 'stepId'],
+        message: `inputForNextRun[${i}].stepId '${entry.stepId}' does not match any step id`,
+      });
+    }
+    if (seenAs.has(entry.as)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['inputForNextRun', i, 'as'],
+        message: `inputForNextRun[${i}].as '${entry.as}' is duplicated (must be unique within inputForNextRun)`,
+      });
+    }
+    seenAs.add(entry.as);
+  });
+}
+
+/**
+ * Base WorkflowDefinition schema (no cross-field refinements). Exposed so
+ * callers can `.omit()` / `.partial()` and then re-apply validation via
+ * `.superRefine(validateInputForNextRun)`.
+ *
+ * WARNING: Using this schema directly bypasses the `inputForNextRun`
+ * cross-field validation (unknown stepId, duplicate `as`). If you reshape
+ * the schema (e.g. `.omit()`) you MUST re-apply `.superRefine(validateInputForNextRun)`
+ * or silently accept WDs with broken `inputForNextRun` references — the
+ * engine's resolver swallows unknown keys at runtime with no signal.
+ *
+ * For the common "register a new WD" path (API routes, server actions),
+ * prefer {@link parseWorkflowDefinitionForCreation} which applies the
+ * refinement for you.
+ */
+export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
+  /** Workspace namespace that owns this definition. Required because
+   *  MCP resolution, workflow secret lookups, and the namespace-scoped
+   *  tool catalog all key off this field — a workflow without one is
+   *  not a runnable workflow. */
+  namespace: z.string().min(1),
   title: z.string().min(1).optional(),
   description: z.string().optional(),
+  preamble: z.string().optional(),
   repo: RepoSchema.optional(),
   url: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
   notifications: z.array(ProcessNotificationConfigSchema).optional(),
+  workspace: WorkflowWorkspaceSchema.optional(),
   steps: z.array(WorkflowStepSchema).min(1),
   transitions: z.array(TransitionSchema),
   triggers: z.array(TriggerSchema).min(1),
@@ -71,9 +209,33 @@ export const WorkflowDefinitionSchema = z.object({
   archived: z.boolean().optional(),
   deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
+  inputForNextRun: z.array(InputForNextRunEntrySchema).optional(),
 });
 
+export const WorkflowDefinitionSchema =
+  WorkflowDefinitionBaseSchema.superRefine(validateInputForNextRun);
+
+export { validateInputForNextRun };
+
+/**
+ * Default parse path for registering a new WorkflowDefinition (API routes,
+ * server actions). Omits the server-managed `version` and `createdAt` fields
+ * and re-applies the cross-field `inputForNextRun` validation so callers
+ * cannot accidentally skip it.
+ *
+ * Returns a Zod `SafeParseReturnType` — check `.success` before using
+ * `.data` or `.error`.
+ */
+export function parseWorkflowDefinitionForCreation(input: unknown) {
+  return WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true })
+    .superRefine(validateInputForNextRun)
+    .safeParse(input);
+}
+
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
+export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;
 export type WorkflowReviewConfig = z.infer<typeof WorkflowReviewConfigSchema>;
+export type WorkflowWorkspace = z.infer<typeof WorkflowWorkspaceSchema>;
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
+export type InputForNextRunEntry = z.infer<typeof InputForNextRunEntrySchema>;

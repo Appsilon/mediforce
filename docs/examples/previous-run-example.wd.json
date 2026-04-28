@@ -1,0 +1,50 @@
+{
+  "_comment": "Reference WD demonstrating inputForNextRun end-to-end with a mixed script + human loop. Step 1 (`echo-previous`) is a Python script that reads /output/previous_run.json and summarizes what the prior run passed through. Step 2 (`set-next`) is a human params task — the operator types a message that becomes the next run's previousRun.message. Docker required for the script step. See docs/PREVIOUS_RUN.md.",
+  "name": "previous-run-example",
+  "title": "Previous Run Outputs Example",
+  "description": "Round-trips a message between runs: script reads `previousRun.message`, human sets next one.",
+  "steps": [
+    {
+      "id": "echo-previous",
+      "name": "Echo previous message",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "agent": {
+        "runtime": "python",
+        "inlineScript": "import json, os\ntry:\n    with open('/output/previous_run.json') as f:\n        prev = json.load(f)\nexcept FileNotFoundError:\n    prev = {}\nmsg = prev.get('message')\nif msg:\n    summary = f\"Previous run said: {msg!r}\"\nelse:\n    summary = 'Previous run said nothing (first run, predecessor failed, or no message was set).'\nwith open('/output/result.json', 'w') as f:\n    json.dump({'summary': summary, 'previousMessage': msg}, f)\nprint(summary)"
+      }
+    },
+    {
+      "id": "set-next",
+      "name": "Set message for next run",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["operator"],
+      "description": "Type a message in the form below. The next run of this workflow will see it as `previousRun.message`.",
+      "params": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true,
+          "description": "Message to pass to the next run."
+        }
+      ]
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "echo-previous", "to": "set-next" },
+    { "from": "set-next", "to": "done" }
+  ],
+  "triggers": [{ "type": "manual", "name": "Start" }],
+  "inputForNextRun": [
+    { "stepId": "set-next", "output": "message", "as": "message" }
+  ]
+}
