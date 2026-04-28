@@ -38,5 +38,6 @@ export type { TriggerResult, WorkflowTriggerContext } from './triggers/trigger-t
 export {
   WebhookPayloadValidationError,
   TriggerNotFoundError,
+  ManualTriggerNotDeclaredError,
 } from './triggers/trigger-errors.js';
 export { validateCronSchedule, isDue } from './triggers/cron-utils.js';

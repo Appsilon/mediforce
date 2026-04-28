@@ -177,7 +177,12 @@ export default function WorkflowDefinitionVersionPage() {
 
           {/* Right: save controls */}
           <div className="flex items-center gap-3 shrink-0 pt-0.5">
-            <StartRunButton workflowName={decodedName} version={definition.version} />
+            <StartRunButton
+              workflowName={decodedName}
+              version={definition.version}
+              hasManualTrigger={definition.triggers?.some((trigger) => trigger.type === 'manual') ?? false}
+              archived={definition.archived === true}
+            />
             {saveState.status === 'saved' && (
               <span className="text-sm text-green-600 dark:text-green-400 font-medium">
                 Saved as v{saveState.version}

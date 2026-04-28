@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Info, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, Eye, EyeOff } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
@@ -256,14 +256,12 @@ export default function ProcessDefinitionPage() {
                 ? <><EyeOff className="h-3.5 w-3.5" />Hide archived</>
                 : <><Eye className="h-3.5 w-3.5" />Show archived</>}
             </button>
-            {hasManualTrigger ? (
-              <StartRunButton workflowName={decodedName} showVersionPicker />
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Info className="h-3.5 w-3.5" />
-                This workflow does not support manual start
-              </span>
-            )}
+            <StartRunButton
+              workflowName={decodedName}
+              showVersionPicker
+              hasManualTrigger={hasManualTrigger}
+              archived={latest?.archived === true}
+            />
           </div>
 
           <RunsTable

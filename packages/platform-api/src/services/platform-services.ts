@@ -118,7 +118,7 @@ export function getPlatformServices(): PlatformServices {
 
   services = {
     engine,
-    manualTrigger: new ManualTrigger(engine),
+    manualTrigger: new ManualTrigger(engine, processRepo),
     cronTrigger: new CronTrigger(engine),
     agentRunner,
     pluginRegistry,
