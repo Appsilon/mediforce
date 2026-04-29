@@ -1,4 +1,6 @@
-function validateEnv(): void {
+// webpackIgnore: true on import() (not require()) is what webpack 5 actually
+// supports for skipping bundling. register() is async so we can await it.
+function validateEnv(existsSync: (path: string) => boolean): void {
   const errors: string[] = [];
   const isEmulatorMode = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
 
@@ -38,16 +40,10 @@ function validateEnv(): void {
         'GOOGLE_APPLICATION_CREDENTIALS is not set. '
         + 'Point it to your Firebase service account JSON file (e.g. /run/secrets/firebase-sa.json).',
       );
-    } else {
-      // webpackIgnore: true tells the bundler to leave this require untouched
-      // so Node resolves the built-in fs module natively at runtime.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { existsSync } = require(/* webpackIgnore: true */ 'fs') as typeof import('fs');
-      if (!existsSync(credPath)) {
-        errors.push(
-          `GOOGLE_APPLICATION_CREDENTIALS points to "${credPath}" but the file does not exist.`,
-        );
-      }
+    } else if (!existsSync(credPath)) {
+      errors.push(
+        `GOOGLE_APPLICATION_CREDENTIALS points to "${credPath}" but the file does not exist.`,
+      );
     }
   }
 
@@ -62,9 +58,12 @@ function validateEnv(): void {
   }
 }
 
-export function register(): void {
+export async function register(): Promise<void> {
   // Only validate on the server runtime (not edge, not build-time).
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    validateEnv();
+    // import() + webpackIgnore keeps node:fs out of webpack's dependency graph.
+    // webpackIgnore works on import() in webpack 5; it does NOT work on require().
+    const { existsSync } = await import(/* webpackIgnore: true */ 'node:fs');
+    validateEnv(existsSync);
   }
 }
