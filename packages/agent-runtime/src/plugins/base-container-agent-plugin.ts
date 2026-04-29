@@ -1376,7 +1376,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const dockerArgs: string[] = [
       'run', '--rm', '-i',
       '--name', containerName,
-      '--memory', '4g',
+      '--memory', '8g',
       '--cpus', '2',
       '-v', `${outputDir}:/output`,
     ];
