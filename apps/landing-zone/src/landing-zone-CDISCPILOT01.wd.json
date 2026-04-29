@@ -143,7 +143,11 @@
     { "from": "sftp-poll", "to": "no-deliveries", "when": "output.newFiles.length == 0" },
     { "from": "sftp-poll", "to": "validate-script", "when": "output.newFiles.length > 0" },
     { "from": "validate-script", "to": "interpret-validation" },
-    { "from": "interpret-validation", "to": "human-review" },
+    { "from": "interpret-validation", "to": "accept-delivery", "when": "output.classification == \"clean\"" },
+    { "from": "interpret-validation", "to": "human-review", "when": "output.classification == \"minor-fix\"" },
+    { "from": "interpret-validation", "to": "human-review", "when": "output.classification == \"recovery\"" },
+    { "from": "interpret-validation", "to": "draft-rejection-note", "when": "output.classification == \"escalate\"" },
+    { "from": "interpret-validation", "to": "draft-rejection-note", "when": "output.classification == \"chaos\"" },
     { "from": "accept-delivery", "to": "accepted" },
     { "from": "draft-rejection-note", "to": "rejected-with-note" }
   ]
