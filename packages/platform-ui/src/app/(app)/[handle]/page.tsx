@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc, where } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
-import { getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
+import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -163,48 +163,14 @@ function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member:
   );
 }
 
-const ALWAYS_KEY = WORKSPACE_DEFAULT_KEY;
-
-function DefaultWorkspaceToggle({ handle }: { handle: string }) {
-  const [isDefault, setIsDefault] = React.useState(false);
-
-  React.useEffect(() => {
-    setIsDefault(localStorage.getItem(ALWAYS_KEY) === handle);
-  }, [handle]);
-
-  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    if (event.target.checked) {
-      localStorage.setItem(ALWAYS_KEY, handle);
-      setIsDefault(true);
-    } else {
-      localStorage.removeItem(ALWAYS_KEY);
-      setIsDefault(false);
-    }
-  }
-
-  return (
-    <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
-      <input
-        type="checkbox"
-        checked={isDefault}
-        onChange={handleChange}
-        className="h-3.5 w-3.5 rounded border-input accent-primary cursor-pointer"
-      />
-      <span className="text-xs text-muted-foreground">Open this workspace by default</span>
-    </label>
-  );
-}
-
-function MemberAvatars({ namespace, trailing }: { namespace: Namespace; trailing?: React.ReactNode }) {
+function MemberAvatars({ namespace }: { namespace: Namespace }) {
   const { members, totalCount } = useWorkspaceMembers(
     namespace.handle,
     namespace.type === 'organization',
   );
   const userProfiles = useUserProfiles();
 
-  if (namespace.type !== 'organization') {
-    return trailing !== undefined ? <div className="mt-3">{trailing}</div> : null;
-  }
+  if (namespace.type !== 'organization') return null;
   if (totalCount === null) return null;
 
   function resolveName(member: MemberPreview): string {
@@ -236,7 +202,6 @@ function MemberAvatars({ namespace, trailing }: { namespace: Namespace; trailing
           {totalCount} {totalCount === 1 ? 'member' : 'members'}
         </span>
       </Link>
-      {trailing}
     </div>
   );
 }
@@ -635,24 +600,20 @@ export default function ProfilePage() {
             >
               {namespace.type === 'organization' ? 'Workspace' : 'Personal'}
             </span>
-            {currentRole === 'owner' && namespace.type === 'organization' && (
-              <Link
-                href={`/${namespace.handle}/settings`}
-                className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Settings className="h-3.5 w-3.5" />
-              </Link>
-            )}
+            <Link
+              href={`/${namespace.handle}/settings`}
+              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span>Settings</span>
+            </Link>
           </div>
 
           <p className="text-sm text-muted-foreground mt-0.5">@{namespace.handle}</p>
 
           <InlineEditableBio namespace={namespace} canEdit={canEdit} />
 
-          <MemberAvatars
-            namespace={namespace}
-            trailing={<DefaultWorkspaceToggle handle={namespace.handle} />}
-          />
+          <MemberAvatars namespace={namespace} />
         </div>
       </div>
 
