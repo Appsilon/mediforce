@@ -8,6 +8,8 @@ import {
   GetWorkflowOutputSchema,
   GetRunInputSchema,
   GetRunOutputSchema,
+  StartRunInputSchema,
+  StartRunOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type RegisterWorkflowInput,
@@ -18,6 +20,8 @@ import {
   type GetWorkflowOutput,
   type GetRunInput,
   type GetRunOutput,
+  type StartRunInput,
+  type StartRunOutput,
 } from '../contract/index.js';
 
 /**
@@ -90,6 +94,7 @@ export class Mediforce {
 
   readonly runs: {
     get: (input: GetRunInput) => Promise<GetRunOutput>;
+    start: (input: StartRunInput) => Promise<StartRunOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -186,6 +191,16 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.runs.get');
         return GetRunOutputSchema.parse(body);
+      },
+      start: async (input) => {
+        const validated = StartRunInputSchema.parse(input);
+        const res = await this.request('/api/processes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.start');
+        return StartRunOutputSchema.parse(body);
       },
     };
   }

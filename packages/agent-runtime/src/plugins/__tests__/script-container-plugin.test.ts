@@ -277,7 +277,7 @@ describe('ScriptContainerPlugin', () => {
         'docker',
         expect.arrayContaining([
           'run', '--rm',
-          '--memory', '4g',
+          '--memory', '8g',
           '--cpus', '2',
           'mediforce-r:latest',
           'Rscript',

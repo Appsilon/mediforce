@@ -16,7 +16,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const callerNs = await getCallerNamespaces(request, namespaceRepo);
   if (callerNs instanceof NextResponse) return callerNs;
 
-  const { definitions } = await processRepo.listWorkflowDefinitions();
+  const { definitions } = await processRepo.listWorkflowDefinitions(false);
 
   const result = definitions.map((group) => {
     const latest = group.versions.find((v) => v.version === group.latestVersion);

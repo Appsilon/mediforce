@@ -3,10 +3,13 @@
 import * as React from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import * as Tabs from '@radix-ui/react-tabs';
-import { FileText, Code, ChevronDown } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { ChevronDown, Code, FileText, MonitorPlay } from 'lucide-react';
 import type { StepExecution } from '@mediforce/platform-core';
 import { useSubcollection } from '@/hooks/use-process-instances';
+import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
+import { buildSrcdoc, isIframeResizeMessage } from './iframe-helpers';
 
 interface TaskContextPanelProps {
   processInstanceId: string;
@@ -15,7 +18,12 @@ interface TaskContextPanelProps {
 }
 
 /**
- * Displays the previous step's output in two tabs: Summary and Full Output.
+ * Displays the previous step's output. When that step produced an HTML
+ * report — either inline (`presentation` field) or as a written file
+ * (`htmlReportPath` field) — the panel renders it inside a sandboxed
+ * iframe under a "Report" tab and selects that tab by default. The
+ * Summary and Full Output tabs remain available for the structured JSON.
+ *
  * Reports content availability via onContentLoaded callback so the parent
  * can disable verdict buttons when no content exists to review.
  */
@@ -69,7 +77,8 @@ export function TaskContextPanel({
     );
   }
 
-  const output = previousStepOutput!.output!;
+  const previousStep = previousStepOutput!;
+  const output = previousStep.output!;
   const isObject = typeof output === 'object' && output !== null;
 
   return (
@@ -79,53 +88,215 @@ export function TaskContextPanel({
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Previous Step Output
             <span className="ml-2 font-normal normal-case text-muted-foreground/70">
-              ({previousStepOutput!.stepId})
+              ({previousStep.stepId})
             </span>
           </div>
           <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
         </Collapsible.Trigger>
         <Collapsible.Content>
-          <Tabs.Root defaultValue="summary">
-            <Tabs.List className="flex gap-1 border-b px-4">
-              {[
-                { value: 'summary', label: 'Summary', icon: FileText },
-                { value: 'full', label: 'Full Output', icon: Code },
-              ].map(({ value, label, icon: Icon }) => (
-                <Tabs.Trigger
-                  key={value}
-                  value={value}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium',
-                    'text-muted-foreground border-b-2 border-transparent -mb-px',
-                    'transition-colors',
-                    'data-[state=active]:border-primary data-[state=active]:text-primary',
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {label}
-                </Tabs.Trigger>
-              ))}
-            </Tabs.List>
-
-            <Tabs.Content value="summary" className="p-4">
-              {isObject ? (
-                <SummaryView output={output as Record<string, unknown>} />
-              ) : (
-                <pre className="text-sm whitespace-pre-wrap break-words">
-                  {String(output)}
-                </pre>
-              )}
-            </Tabs.Content>
-
-            <Tabs.Content value="full" className="p-4">
-              <pre className="rounded-md bg-muted p-4 text-xs overflow-auto max-h-96 whitespace-pre-wrap break-words">
-                {isObject ? JSON.stringify(output, null, 2) : String(output)}
-              </pre>
-            </Tabs.Content>
-          </Tabs.Root>
+          <PreviousStepOutputTabs
+            output={isObject ? (output as Record<string, unknown>) : null}
+            rawOutput={output}
+            instanceId={processInstanceId}
+            previousStepId={previousStep.stepId}
+          />
         </Collapsible.Content>
       </div>
     </Collapsible.Root>
+  );
+}
+
+interface PreviousStepOutputTabsProps {
+  output: Record<string, unknown> | null;
+  rawOutput: unknown;
+  instanceId: string;
+  previousStepId: string;
+}
+
+function PreviousStepOutputTabs({
+  output,
+  rawOutput,
+  instanceId,
+  previousStepId,
+}: PreviousStepOutputTabsProps) {
+  const inlinePresentation =
+    output !== null && typeof output.presentation === 'string' && output.presentation.length > 0
+      ? output.presentation
+      : null;
+
+  const htmlReportPath =
+    output !== null && typeof output.htmlReportPath === 'string' && output.htmlReportPath.length > 0
+      ? output.htmlReportPath
+      : null;
+
+  const reportMode: 'inline' | 'file' | null = inlinePresentation !== null
+    ? 'inline'
+    : htmlReportPath !== null
+      ? 'file'
+      : null;
+
+  const [fetchedReport, setFetchedReport] = React.useState<string | null>(null);
+  const [reportLoading, setReportLoading] = React.useState(false);
+  const [reportError, setReportError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (reportMode !== 'file') return;
+    let cancelled = false;
+    setReportLoading(true);
+    setReportError(null);
+    setFetchedReport(null);
+    apiFetch(
+      `/api/agent-output-file?instanceId=${encodeURIComponent(instanceId)}&stepId=${encodeURIComponent(previousStepId)}&kind=presentation`,
+    )
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return res.text();
+      })
+      .then((text) => {
+        if (cancelled) return;
+        setFetchedReport(text);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setReportError(err instanceof Error ? err.message : 'Failed to fetch report');
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setReportLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reportMode, instanceId, previousStepId]);
+
+  const presentationHtml = inlinePresentation ?? fetchedReport;
+  const showReportTab = reportMode !== null;
+  const defaultTab = showReportTab ? 'report' : 'summary';
+
+  return (
+    <Tabs.Root defaultValue={defaultTab}>
+      <Tabs.List className="flex gap-1 border-b px-4">
+        {[
+          ...(showReportTab ? [{ value: 'report', label: 'Report', icon: MonitorPlay }] : []),
+          { value: 'summary', label: 'Summary', icon: FileText },
+          { value: 'full', label: 'Full Output', icon: Code },
+        ].map(({ value, label, icon: Icon }) => (
+          <Tabs.Trigger
+            key={value}
+            value={value}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium',
+              'text-muted-foreground border-b-2 border-transparent -mb-px',
+              'transition-colors',
+              'data-[state=active]:border-primary data-[state=active]:text-primary',
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </Tabs.Trigger>
+        ))}
+      </Tabs.List>
+
+      {showReportTab && (
+        <Tabs.Content value="report" className="p-4">
+          <ReportPane
+            html={presentationHtml}
+            loading={reportLoading}
+            error={reportError}
+            result={output}
+          />
+        </Tabs.Content>
+      )}
+
+      <Tabs.Content value="summary" className="p-4">
+        {output !== null ? (
+          <SummaryView output={output} />
+        ) : (
+          <pre className="text-sm whitespace-pre-wrap break-words">
+            {String(rawOutput)}
+          </pre>
+        )}
+      </Tabs.Content>
+
+      <Tabs.Content value="full" className="p-4">
+        <pre className="rounded-md bg-muted p-4 text-xs overflow-auto max-h-96 whitespace-pre-wrap break-words">
+          {output !== null ? JSON.stringify(output, null, 2) : String(rawOutput)}
+        </pre>
+      </Tabs.Content>
+    </Tabs.Root>
+  );
+}
+
+interface ReportPaneProps {
+  html: string | null;
+  loading: boolean;
+  error: string | null;
+  result: Record<string, unknown> | null;
+}
+
+function ReportPane({ html, loading, error, result }: ReportPaneProps) {
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const [iframeHeight, setIframeHeight] = React.useState(300);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  // Listen for resize messages from the iframe
+  React.useEffect(() => {
+    if (html === null) return;
+    const handler = (event: MessageEvent) => {
+      if (
+        isIframeResizeMessage(event.data) &&
+        iframeRef.current &&
+        event.source === iframeRef.current.contentWindow
+      ) {
+        setIframeHeight(event.data.height);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [html]);
+
+  // Sync theme changes to iframe
+  React.useEffect(() => {
+    if (html === null) return;
+    iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
+  }, [isDark, html]);
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-4 w-32 rounded bg-muted animate-pulse" />
+        <div className="h-24 rounded bg-muted animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error !== null && html === null) {
+    return (
+      <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+        Report file not available — see Summary tab.
+      </div>
+    );
+  }
+
+  if (html === null) {
+    return (
+      <div className="text-sm text-muted-foreground">
+        No report content.
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={buildSrcdoc(html, result, isDark)}
+      sandbox="allow-scripts"
+      style={{ width: '100%', height: iframeHeight, border: 'none' }}
+      title="Previous step report"
+    />
   );
 }
 

@@ -23,6 +23,7 @@ import { workflowRegisterCommand } from './commands/workflow-register.js';
 import { workflowListCommand } from './commands/workflow-list.js';
 import { workflowGetCommand } from './commands/workflow-get.js';
 import { runGetCommand } from './commands/run-get.js';
+import { runStartCommand } from './commands/run-start.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -37,6 +38,7 @@ Commands:
   workflow register --file <path> --namespace <ns>   Register a workflow definition
   workflow list                                      List registered workflow definitions
   workflow get <name>                                Fetch a workflow definition
+  run start --workflow <name>                        Start a new run (manual trigger)
   run get <runId>                                    Fetch a single run's status
 
 Common flags:
@@ -67,7 +69,8 @@ Run \`mediforce workflow <subcommand> --help\` for subcommand-specific flags.
 const RUN_HELP = `Usage: mediforce run <subcommand> [options]
 
 Subcommands:
-  get <runId>   Fetch a single run's status
+  start --workflow <name>   Start a new run (manual trigger)
+  get <runId>               Fetch a single run's status
 
 Run \`mediforce run <subcommand> --help\` for subcommand-specific flags.
 `;
@@ -109,6 +112,9 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'run' && subcommand === 'get') {
     return runGetCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'run' && subcommand === 'start') {
+    return runStartCommand({ argv: rest, env: input.env, output });
   }
 
   output.stderr(`Unknown command: ${[command, subcommand].filter(Boolean).join(' ')}`);
