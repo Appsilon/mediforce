@@ -409,8 +409,19 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     const startRes = await userStartOAuth('agent-1', 'github', 'appsilon', 'gh');
     const startBody = (await startRes.json()) as { state: string };
 
-    // Corrupt the state signature and submit.
-    const tampered = `${startBody.state.slice(0, -1)}A`;
+    // Corrupt the state: flip the first character of the signature (after the
+    // dot). Position 1 of any base64url segment is never a boundary character
+    // with padding bits, so all 6 bits are meaningful and the change is always
+    // detectable by constantTimeEqual. Changing the last character is fragile
+    // because the 43rd char of a 32-byte HMAC encoding has only 4 meaningful
+    // bits — replacing it with 'A' (value 0) is a no-op when those 4 bits are
+    // already 0, causing the signature check to pass and the test to flake.
+    const dot = startBody.state.indexOf('.');
+    const firstSigChar = startBody.state[dot + 1] ?? 'A';
+    const tampered =
+      startBody.state.slice(0, dot + 1) +
+      (firstSigChar === 'A' ? 'B' : 'A') +
+      startBody.state.slice(dot + 2);
     const callbackRes = await userCallback('github', tampered, 'code-x');
     expect(callbackRes.status).toBe(302);
     expect(callbackRes.headers.get('Location') ?? '').toContain(

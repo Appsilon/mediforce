@@ -6,7 +6,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 
 **Authentication & Workspaces** — sign-in, workspace selection, and account setup
 - [Sign In](#sign-in) — email/password sign-in with redirect to workspace
-- [Workspace Selection](#workspace-selection) — choosing between personal and org workspaces
+- [Workspace Selection](#workspace-selection) — picker, default workspace via checkbox or settings toggle
 - [Forced Password Change](#forced-password-change) — invited user sets a permanent password on first sign-in
 
 **Tasks** — human review queue for workflow steps requiring human input
@@ -73,9 +73,19 @@ Users sign in with their email and password. After successful authentication, th
 
 ### Workspace Selection
 
-Users with multiple workspaces (personal + org memberships) see a picker on sign-in. Each workspace is shown as a card. Selecting one navigates directly into that workspace. A "Set as default" checkbox lets users skip the picker on future sign-ins.
+Users with multiple workspaces (personal + org memberships) see a picker on sign-in. Each workspace is shown as a card. Selecting one navigates directly into that workspace. A "Set as default" checkbox on the picker lets users skip it on future sign-ins. Alternatively, the "Default workspace" toggle in workspace settings (accessible via the Settings link visible to all users) sets the preference from within the workspace.
+
+**No default set — picker always appears:**
+
+![workspace-selection-no-default](workspace-selection-no-default.gif)
+
+**Basic picker flow — select a workspace:**
 
 ![workspace-selection](workspace-selection.gif)
+
+**Set default via workspace settings toggle — picker skipped on next visit:**
+
+![workspace-selection-default-via-settings](workspace-selection-default-via-settings.gif)
 
 ### Forced Password Change
 
