@@ -10,6 +10,11 @@ const isVercel = process.env.VERCEL === '1';
 const nextConfig = {
   ...(isVercel ? {} : { output: 'standalone', outputFileTracingRoot: path.resolve(__dirname, '../..') }),
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
+  // Trust loopback hostnames for HMR. Browsers that hit the dev server via
+  // `127.0.0.1` (e.g. after a CLI command prints that form) otherwise fail
+  // the cross-origin check on `/_next/webpack-hmr` and the page hangs in
+  // "loading" because HMR can't connect.
+  allowedDevOrigins: ['localhost', '127.0.0.1'],
   transpilePackages: [
     '@mediforce/platform-core',
     '@mediforce/platform-infra',
