@@ -77,14 +77,13 @@ def write_xport(df: pd.DataFrame, meta: pyreadstat.metadata_container, path: Pat
 
 
 # ---------------------------------------------------------------------------
-# Variant 1: injection — 5 deterministic CDISC SDTM rule violations.
-#
-# Errors per legacy/pawel.md (lines 64-68). The fifth error in pawel.md
-# (AD0196 — missing AVALU when AVAL is set) is an ADaM rule and cannot be
-# applied to an SDTM-only delivery, so it is replaced here with a fifth
-# SDTM-applicable violation: RFXSTDTC after RFXENDTC for one subject in DM
-# (a date-ordering inconsistency the rules engine flags under one of the
-# CG-series cross-variable consistency rules).
+# Variant 1: injection — 5 deterministic CDISC SDTM rule violations:
+#   - SD0003: malformed ISO date in LBDTC ('15MAR2020' instead of ISO8601)
+#   - SD0005: duplicate (USUBJID, --SEQ) pair in LB
+#   - SD0018: LBTESTCD value exceeding 8 characters
+#   - CT2xxx: SEX value 'X' outside the CDISC controlled terminology
+#   - CG-series: RFXSTDTC after RFXENDTC for one subject in DM (date
+#     ordering / cross-variable consistency)
 # ---------------------------------------------------------------------------
 def variant_injection(target: Path) -> None:
     reset_dir(target)

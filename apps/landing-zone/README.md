@@ -37,11 +37,9 @@ See [`FUTURE.md`](FUTURE.md) for deferred items and roadmap (v0.2–v0.6).
 apps/landing-zone/
   README.md                     This file
   FUTURE.md                     Deferred items + roadmap
-  Dockerfile.cdisc              python:3.12-slim + cdisc-rules-engine (TBD)
-  docker-compose.sftp.yml       Mock SFTP via atmoz/sftp (TBD)
-  legacy/
-    pawel.md                    Pre-workshop draft (CDISC CORE 9-step plan, partially reused)
-    scope.md
+  PITCH.md                      Landing-page-ready overview (non-technical)
+  container/Dockerfile          mediforce-golden-image + cdisc-rules-engine
+  docker-compose.sftp.yml       Mock SFTP via atmoz/sftp
   studies/
     CDISCPILOT01/
       config.yaml               Contract, schedule, expected files
@@ -99,7 +97,6 @@ docker compose -f apps/landing-zone/docker-compose.sftp.yml down
 
 ## References
 
-- [`legacy/pawel.md`](legacy/pawel.md) — earlier 9-step plan; `validate.py` reuses the CDISC CORE wrapper concept and structured findings layout
 - [PR #213](https://github.com/Appsilon/mediforce/pull/213) — per-run git worktree (workspace foundation)
 - [PR #217](https://github.com/Appsilon/mediforce/pull/217) — `inputForNextRun` (SFTP listing carry-over)
 - [`docs/PREVIOUS_RUN.md`](../../docs/PREVIOUS_RUN.md) — carry-over mechanism docs

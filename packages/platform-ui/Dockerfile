@@ -16,6 +16,7 @@ COPY packages/workflow-engine/package.json packages/workflow-engine/
 COPY packages/agent-runtime/package.json packages/agent-runtime/
 COPY packages/agent-queue/package.json packages/agent-queue/
 COPY packages/mcp-client/package.json packages/mcp-client/
+COPY packages/core-actions/package.json packages/core-actions/
 COPY packages/platform-ui/package.json packages/platform-ui/
 COPY apps/community-digest/package.json apps/community-digest/
 COPY apps/protocol-to-tfl/package.json apps/protocol-to-tfl/
