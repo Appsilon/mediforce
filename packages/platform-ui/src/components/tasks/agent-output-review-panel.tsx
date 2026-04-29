@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { AlertTriangle, Bot, Code, ExternalLink, FileText, Gauge, GitBranch, Loader2, MonitorPlay } from 'lucide-react';
 import type { AgentOutputData } from './task-utils';
 import { formatStepName } from './task-utils';
+import { buildSrcdoc, isIframeResizeMessage } from './iframe-helpers';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 
@@ -14,56 +15,6 @@ interface AgentOutputReviewPanelProps {
   stepId?: string;
   onContentLoaded?: (hasContent: boolean) => void;
   instanceId: string;
-}
-
-/** Build a self-contained HTML document for the sandboxed iframe. */
-function buildSrcdoc(presentation: string, result: Record<string, unknown> | null, isDark: boolean): string {
-  // Escape closing script tags in data to prevent XSS breakout
-  const safeData = JSON.stringify(result ?? {}).replace(/<\//g, '<\\/');
-  return `<!DOCTYPE html>
-<html class="${isDark ? 'dark' : ''}">
-<head>
-<meta charset="utf-8">
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-<style type="text/tailwindcss">
-@theme {
-  --color-surface: #ffffff;
-  --color-surface-dark: #0f1117;
-  --color-text: #1a1a2e;
-  --color-text-dark: #e2e4e9;
-  --color-muted: #6b7280;
-  --color-muted-dark: #9ca3af;
-  --color-border: #e5e7eb;
-  --color-border-dark: #2d2f36;
-}
-body {
-  margin: 0;
-  padding: 1rem;
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-.dark body {
-  background: var(--color-surface-dark);
-  color: var(--color-text-dark);
-}
-</style>
-<script>window.__data__ = ${safeData};</script>
-</head>
-<body>
-${presentation}
-<script>
-const ro = new ResizeObserver(() => {
-  window.parent.postMessage({ type: 'resize', height: document.body.scrollHeight }, '*');
-});
-ro.observe(document.body);
-window.addEventListener('message', (e) => {
-  if (e.data && e.data.type === 'theme') {
-    document.documentElement.classList.toggle('dark', e.data.dark);
-  }
-});
-</script>
-</body>
-</html>`;
 }
 
 /** Try to extract an output_file path from the result's `raw` field. */
@@ -95,10 +46,7 @@ export function AgentOutputReviewPanel({
     if (!hasPresentation) return;
     const handler = (event: MessageEvent) => {
       if (
-        event.data &&
-        typeof event.data === 'object' &&
-        event.data.type === 'resize' &&
-        typeof event.data.height === 'number' &&
+        isIframeResizeMessage(event.data) &&
         iframeRef.current &&
         event.source === iframeRef.current.contentWindow
       ) {

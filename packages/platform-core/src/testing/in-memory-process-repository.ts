@@ -33,9 +33,12 @@ export class InMemoryProcessRepository implements ProcessRepository {
     );
   }
 
-  async listWorkflowDefinitions(): Promise<WorkflowDefinitionListResult> {
+  async listWorkflowDefinitions(
+    includeArchived: boolean,
+  ): Promise<WorkflowDefinitionListResult> {
     const grouped = new Map<string, WorkflowDefinition[]>();
     for (const definition of this.workflowDefinitions.values()) {
+      if (!includeArchived && definition.archived === true) continue;
       const existing = grouped.get(definition.name) ?? [];
       existing.push(definition);
       grouped.set(definition.name, existing);

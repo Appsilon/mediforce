@@ -179,7 +179,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       const dockerArgs: string[] = [
         'run', '--rm',
         '--name', containerName,
-        '--memory', '4g',
+        '--memory', '8g',
         '--cpus', '2',
         '-v', `${outputDir}:/output`,
         '-v', `${this.runWorkspaceHandle!.path}:/workspace`,
