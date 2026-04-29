@@ -307,8 +307,27 @@ function LogGroupList({ groups }: { groups: LogGroup[] }) {
 }
 
 async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
+  let response: Response;
   try {
-    const response = await apiFetch(`/api/agent-logs?file=${encodeURIComponent(file)}`);
+    response = await apiFetch(`/api/agent-logs?file=${encodeURIComponent(file)}`);
+  } catch (fetchError) {
+    const msg = fetchError instanceof Error ? fetchError.message : String(fetchError);
+    return { entries: [], rawContent: null, error: `Network error (token/auth): ${msg}` };
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    let detail: string;
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      detail = parsed.error ?? text;
+    } catch {
+      detail = text || response.statusText;
+    }
+    return { entries: [], rawContent: null, error: `HTTP ${response.status} ${response.statusText}: ${detail}` };
+  }
+
+  try {
     const data = await response.json() as { content: string; error?: string };
     if (data.error && !data.content) {
       return { entries: [], rawContent: null, error: data.error };
@@ -320,8 +339,8 @@ async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawC
       return { entries: [], rawContent: data.content, error: null };
     }
     return { entries: [], rawContent: null, error: null };
-  } catch (fetchError) {
-    return { entries: [], rawContent: null, error: fetchError instanceof Error ? fetchError.message : 'Failed to fetch log' };
+  } catch (parseError) {
+    return { entries: [], rawContent: null, error: `Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}` };
   }
 }
 
@@ -385,7 +404,9 @@ function AgentTabContent({ section }: { section: AgentLogSection }) {
   return (
     <>
       {section.error && (
-        <div className="text-xs text-amber-600 dark:text-amber-400 py-1">{section.error}</div>
+        <pre className="text-xs font-mono bg-destructive/8 text-destructive border border-destructive/20 rounded p-2 whitespace-pre-wrap break-all select-text my-1 leading-relaxed">
+          {section.error}
+        </pre>
       )}
 
       {isEmpty && !section.error && (
@@ -610,8 +631,8 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
             <AgentTabContent section={activeSection} />
           )}
 
-          {/* Thinking indicator — only when agent is genuinely still running */}
-          {pollingActive && activeSection && !isSectionTerminal(activeSection) && (
+          {/* Thinking indicator — only when we have log lines and are waiting for more */}
+          {pollingActive && activeSection && activeSection.entries.length > 0 && !isSectionTerminal(activeSection) && (
             <ThinkingIndicator />
           )}
         </div>

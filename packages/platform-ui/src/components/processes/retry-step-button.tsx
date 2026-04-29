@@ -69,7 +69,11 @@ export function RetryStepButton({ instanceId, stepId }: RetryStepButtonProps) {
         }
         {label}
       </button>
-      {error !== null && <span className="text-xs text-destructive">{error}</span>}
+      {error !== null && (
+        <pre className="text-xs font-mono text-destructive whitespace-pre-wrap break-all select-text max-w-sm">
+          {error}
+        </pre>
+      )}
     </div>
   );
 }
