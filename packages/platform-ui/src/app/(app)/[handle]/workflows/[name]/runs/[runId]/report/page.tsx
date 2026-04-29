@@ -5,7 +5,6 @@ import { useMemo } from 'react';
 import type { StepExecution, AuditEvent } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useAuditEvents } from '@/hooks/use-audit-events';
-import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { resolveDefinitionSteps } from '@/lib/resolve-definition-steps';
 import { RunReport } from '@/components/reports/run-report';
@@ -24,12 +23,11 @@ export default function RunReportPage() {
   );
   const { data: auditEvents } = useAuditEvents(runId ?? null);
 
-  const { versions: legacyVersions } = useProcessDefinitionVersions(decodedName);
   const { definitions: workflowVersions } = useWorkflowDefinitions(decodedName);
 
   const definitionSteps = useMemo(
-    () => resolveDefinitionSteps(instance, legacyVersions, workflowVersions),
-    [instance, legacyVersions, workflowVersions],
+    () => resolveDefinitionSteps(instance, workflowVersions),
+    [instance, workflowVersions],
   );
 
   if (instanceLoading) {

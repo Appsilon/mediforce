@@ -8,7 +8,6 @@ import {
 } from '@mediforce/platform-core';
 import type {
   WorkflowDefinition,
-  ProcessConfig,
   StepConfig,
   UserDirectoryService,
   DirectoryUser,
@@ -238,16 +237,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
     userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
 
-    // Save process config with escalation notification config
-    const processConfig: ProcessConfig = {
-      processName: 'agent-process',
-      configName: 'default',
-      configVersion: '1.0',
-      stepConfigs: [],
-      notifications: [{ event: 'agent_escalation', roles: ['reviewer'] }],
-    };
-    await processRepo.saveProcessConfig(processConfig);
-
     const engine = new WorkflowEngine(
       processRepo,
       instanceRepo,
@@ -409,15 +398,6 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
   it('propagates notification failure as advanceStep failure (fatal — no catch)', async () => {
     const userDirectoryService = new InMemoryUserDirectoryService();
     userDirectoryService.addUser('reviewer', 'uid-r1', 'reviewer@example.com');
-
-    const processConfig: ProcessConfig = {
-      processName: 'agent-process',
-      configName: 'default',
-      configVersion: '1.0',
-      stepConfigs: [],
-      notifications: [{ event: 'agent_escalation', roles: ['reviewer'] }],
-    };
-    await processRepo.saveProcessConfig(processConfig);
 
     const failingNotificationService = {
       sent: [] as Array<{ event: unknown; targets: unknown[] }>,
