@@ -924,7 +924,7 @@
             <form id="demo-form" novalidate>
               <div class="form-field">
                 <label for="demo-email">Work email <span style="color:#EF4444;">*</span></label>
-                <input type="email" id="demo-email" name="from_email" placeholder="you@sponsor.com" required />
+                <input type="email" id="demo-email" name="sender" placeholder="you@sponsor.com" required />
               </div>
               <div class="form-field">
                 <label for="demo-message">Tell us about your setup</label>
@@ -962,17 +962,14 @@
          1. Create a free EmailJS account at https://emailjs.com
          2. Add Service: connect your Mailgun account (Email Services → Add New Service → Mailgun)
             Set "From Email" to a Mailgun-verified sender, e.g. noreply@mg.appsilon.com
-         3. Create Template (Email Templates → Create New Template):
-              To:      mediforce@appsilon.com
-              Subject: Demo request from {{from_email}}
-              Body:    From: {{from_email}}\n\n{{message}}
+         3. Template variables used: {{sender}} (email field), {{message}} (textarea)
          4. Fill in the three constants below (Account → API Keys)
   -->
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script>
-    const EMAILJS_PUBLIC_KEY  = 'YOUR_PUBLIC_KEY';   // Account → API Keys → Public Key
-    const EMAILJS_SERVICE_ID  = 'YOUR_SERVICE_ID';   // Email Services → your Mailgun service ID
-    const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';  // Email Templates → your template ID
+    const EMAILJS_PUBLIC_KEY  = 'zCRF_qcxPtPiyJCni';
+    const EMAILJS_SERVICE_ID  = 'service_2ai2vc8';
+    const EMAILJS_TEMPLATE_ID = 'template_mpo2zqf';
 
     emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
 
