@@ -10,11 +10,15 @@ export {
   RegisterWorkflowOutputSchema,
   WorkflowDefinitionGroupSchema,
   ListWorkflowsOutputSchema,
+  GetWorkflowInputSchema,
+  GetWorkflowOutputSchema,
   type RegisterWorkflowInput,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
   type WorkflowDefinitionGroupSummary,
   type ListWorkflowsOutput,
+  type GetWorkflowInput,
+  type GetWorkflowOutput,
 } from './workflows.js';
 
 export {
