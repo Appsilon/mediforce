@@ -61,7 +61,7 @@ describe('InMemoryProcessRepository', () => {
       await repo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'a', version: 2 }));
       await repo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'b', version: 1 }));
 
-      const result = await repo.listWorkflowDefinitions();
+      const result = await repo.listWorkflowDefinitions(false);
       expect(result.definitions).toHaveLength(2);
 
       const groupA = result.definitions.find((d) => d.name === 'a');

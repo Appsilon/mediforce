@@ -30,7 +30,7 @@ test.describe('Run Detail Journey', () => {
 
     // Verdict labels visible in step status panel
     await expect(page.getByText('approve').first()).toBeVisible();
-    await expect(page.getByText('request-actions')).toBeVisible();
+    await expect(page.getByText('revise')).toBeVisible();
     await expect(page.getByText('Archived').first()).toBeVisible();
     await showStep(page);
 

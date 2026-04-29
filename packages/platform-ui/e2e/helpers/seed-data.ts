@@ -612,7 +612,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { id: 'data-quality', name: 'Data Quality Analysis', type: 'creation' },
         { id: 'query-status', name: 'Query Status Analysis', type: 'creation' },
         { id: 'human-review', name: 'Human Review', type: 'creation' },
-        { id: 'manager-approval', name: 'Manager Approval', type: 'review', verdicts: { approve: { target: 'archived' }, 'request-actions': { target: 'archived' } } },
+        { id: 'manager-approval', name: 'Manager Approval', type: 'review', verdicts: { approve: { target: 'archived' }, revise: { target: 'archived' } } },
         { id: 'archived', name: 'Archived', type: 'terminal' },
       ],
       transitions: [
@@ -909,8 +909,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { id: 'risk-scoring', name: 'Risk Scoring', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'data-quality', name: 'Data Quality Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'query-status', name: 'Query Status Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L1' },
-        { id: 'human-review', name: 'Human Review', type: 'review', executor: 'human' },
-        { id: 'manager-approval', name: 'Manager Approval', type: 'review', executor: 'human', verdicts: { approve: { target: 'archived' }, 'request-actions': { target: 'archived' } } },
+        { id: 'human-review', name: 'Human Review', type: 'creation', executor: 'human' },
+        { id: 'manager-approval', name: 'Manager Approval', type: 'review', executor: 'human', verdicts: { approve: { target: 'archived' }, revise: { target: 'archived' } } },
         { id: 'archived', name: 'Archived', type: 'terminal', executor: 'human' },
       ],
       transitions: [
