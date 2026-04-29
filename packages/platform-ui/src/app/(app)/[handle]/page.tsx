@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
