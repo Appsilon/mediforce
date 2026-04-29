@@ -980,8 +980,8 @@
 
     emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
 
-    var lastSubmitAt = 0;
-    var COOLDOWN_MS  = 30000;
+    var COOLDOWN_MS = 300000;
+    var COOLDOWN_KEY = 'demo_last_submit';
 
     document.getElementById('demo-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -992,11 +992,10 @@
       const btn   = document.getElementById('demo-submit');
       const error = document.getElementById('demo-error');
 
-      // Cooldown: prevent rapid re-submission after errors
-      var now = Date.now();
-      if (now - lastSubmitAt < COOLDOWN_MS) {
-        var wait = Math.ceil((COOLDOWN_MS - (now - lastSubmitAt)) / 1000);
-        error.textContent = 'Please wait ' + wait + ' second' + (wait !== 1 ? 's' : '') + ' before trying again.';
+      // Cooldown: persisted in localStorage so page refresh doesn't reset it
+      var lastSubmitAt = parseInt(localStorage.getItem(COOLDOWN_KEY) || '0', 10);
+      if (Date.now() - lastSubmitAt < COOLDOWN_MS) {
+        error.textContent = 'Please wait 5 minutes before trying again or send us email to mediforce@appsilon.com';
         error.style.display = 'block';
         return;
       }
@@ -1007,7 +1006,7 @@
         return;
       }
 
-      lastSubmitAt = Date.now();
+      localStorage.setItem(COOLDOWN_KEY, Date.now().toString());
       btn.textContent = 'Sending…';
       btn.disabled    = true;
       error.style.display = 'none';
