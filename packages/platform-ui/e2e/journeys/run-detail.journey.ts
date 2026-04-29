@@ -65,19 +65,18 @@ test.describe('Run Detail Journey', () => {
 
   test('autonomy badges and executor identity labels', async ({ page }, testInfo) => {
     await setupRecording(page, 'run-detail-autonomy-badges', testInfo);
-    // proc-completed-2 has processConfig with L4, L2 autonomy levels
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-completed-2`);
 
     const stepStatusPanel = page.locator('.bg-card').filter({ has: page.locator('h3', { hasText: 'Step Status' }) });
     await expect(stepStatusPanel.locator('ol > li')).toHaveCount(7, { timeout: 10_000 });
 
-    // Autonomy badges from processConfig
-    await expect(stepStatusPanel.getByText('L4').first()).toBeVisible();
+    // Autonomy badges from WorkflowDefinition steps
     await expect(stepStatusPanel.getByText('L2').first()).toBeVisible();
+    await expect(stepStatusPanel.getByText('L3').first()).toBeVisible();
     await showStep(page);
 
-    // Executor identity labels: plugin name from legacy processConfig
-    await expect(stepStatusPanel.getByText('agent:supply-chain/vendor-assessment')).toBeVisible();
+    // Executor identity labels: plugin name from WorkflowDefinition step
+    await expect(stepStatusPanel.getByText('agent:supply-data-collector')).toBeVisible();
     await showStep(page);
 
     // Navigate to new-style workflow run (proc-workflow-run-1 uses WorkflowDefinition, no configName)
