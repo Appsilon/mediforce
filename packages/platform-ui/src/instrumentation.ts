@@ -39,10 +39,10 @@ function validateEnv(): void {
         + 'Point it to your Firebase service account JSON file (e.g. /run/secrets/firebase-sa.json).',
       );
     } else {
-      // Dynamic import hidden from webpack static analysis
-      const nodeFs = 'fs';
+      // webpackIgnore: true tells the bundler to leave this require untouched
+      // so Node resolves the built-in fs module natively at runtime.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { existsSync } = require(nodeFs) as typeof import('fs');
+      const { existsSync } = require(/* webpackIgnore: true */ 'fs') as typeof import('fs');
       if (!existsSync(credPath)) {
         errors.push(
           `GOOGLE_APPLICATION_CREDENTIALS points to "${credPath}" but the file does not exist.`,
