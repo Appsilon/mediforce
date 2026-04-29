@@ -76,6 +76,7 @@ export function decrypt(encoded: string): string {
       `Decryption auth-tag verification failed (${rootMessage}). ` +
         'Most likely cause: SECRETS_ENCRYPTION_KEY was rotated or differs between environments — ' +
         'secrets stored with the old key cannot be decrypted with the current key.',
+      { cause },
     );
   }
 }

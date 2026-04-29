@@ -29,7 +29,7 @@ export class FirestoreWorkflowSecretsRepository {
         result[key] = decrypt(value);
       } catch (cause) {
         const rootMessage = cause instanceof Error ? cause.message : String(cause);
-        throw new Error(`Failed to decrypt workflow secret '${key}': ${rootMessage}`);
+        throw new Error(`Failed to decrypt workflow secret '${key}': ${rootMessage}`, { cause });
       }
     }
     return result;
