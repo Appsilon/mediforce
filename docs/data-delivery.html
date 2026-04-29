@@ -543,6 +543,8 @@
     }
     .form-success p { font-size: 0.9375rem; color: var(--text-80); line-height: 1.6; margin: 0; }
     .form-success strong { color: var(--accent); }
+    /* Honeypot — moved off-screen so real users never see it; bots fill it */
+    .form-hp { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
     .form-error-msg {
       display: none;
       margin-top: 0.75rem;
@@ -922,6 +924,11 @@
           <p>Leave your email and a short note about your setup. We'll reply within one business day to schedule a time.</p>
           <div id="demo-form-wrap">
             <form id="demo-form" novalidate>
+              <!-- Honeypot: hidden from real users, bots fill it → submission silently dropped -->
+              <div class="form-hp" aria-hidden="true">
+                <label for="demo-hp">Leave this empty</label>
+                <input type="text" id="demo-hp" name="website" tabindex="-1" autocomplete="off" />
+              </div>
               <div class="form-field">
                 <label for="demo-email">Work email <span style="color:#EF4444;">*</span></label>
                 <input type="email" id="demo-email" name="sender" placeholder="name@company.com" required />
@@ -973,8 +980,26 @@
 
     emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
 
+    var lastSubmitAt = 0;
+    var COOLDOWN_MS  = 30000;
+
     document.getElementById('demo-form').addEventListener('submit', function (e) {
       e.preventDefault();
+
+      // Honeypot: real users leave this blank; bots fill it
+      if (document.getElementById('demo-hp').value) return;
+
+      const btn   = document.getElementById('demo-submit');
+      const error = document.getElementById('demo-error');
+
+      // Cooldown: prevent rapid re-submission after errors
+      var now = Date.now();
+      if (now - lastSubmitAt < COOLDOWN_MS) {
+        var wait = Math.ceil((COOLDOWN_MS - (now - lastSubmitAt)) / 1000);
+        error.textContent = 'Please wait ' + wait + ' second' + (wait !== 1 ? 's' : '') + ' before trying again.';
+        error.style.display = 'block';
+        return;
+      }
 
       const emailInput = document.getElementById('demo-email');
       if (!emailInput.checkValidity()) {
@@ -982,8 +1007,7 @@
         return;
       }
 
-      const btn   = document.getElementById('demo-submit');
-      const error = document.getElementById('demo-error');
+      lastSubmitAt = Date.now();
       btn.textContent = 'Sending…';
       btn.disabled    = true;
       error.style.display = 'none';
@@ -1002,6 +1026,7 @@
           console.error('EmailJS error status:', err.status, '— text:', err.text);
           btn.textContent    = 'Request a Demo Call';
           btn.disabled       = false;
+          error.textContent  = 'Something went wrong - please try again or email us directly at mediforce@appsilon.com.';
           error.style.display = 'block';
         });
     });
