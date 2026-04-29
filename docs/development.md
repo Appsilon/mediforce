@@ -147,3 +147,15 @@ pnpm build    # builds all packages
 ## Deployment
 
 The platform UI deploys via Firebase App Hosting. See `apphosting.yaml` for configuration.
+
+## Infrastructure
+
+Staging and production servers are hosted on **Hetzner**.
+
+| Environment | SSH access |
+|-------------|-----------|
+| Staging | `ssh deploy@204.168.165.57` |
+
+The staging machine also has an `sftpuser` account with SFTP enabled, used for the Data Landing Zone workflow demo.
+
+All credentials (SSH passwords, etc.) are stored in **1Password** under the **Mediforce** vault.
