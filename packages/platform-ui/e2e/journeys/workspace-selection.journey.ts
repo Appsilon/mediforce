@@ -86,13 +86,11 @@ test.describe('Workspace Selection Journey', () => {
   test('setting default workspace via settings toggle auto-redirects on next visit', async ({ page }, testInfo) => {
     await setupRecording(page, 'workspace-selection-default-via-settings', testInfo);
 
-    await page.addInitScript(() => {
-      localStorage.removeItem('alwaysNamespace');
-    });
-
-    // Navigate to the acme-labs workspace page
+    // Navigate first, then clear localStorage once via evaluate — addInitScript would
+    // re-run before every navigation and wipe the value the toggle saves.
     await page.goto('/acme-labs');
-    await expect(page.getByText('Acme Labs')).toBeVisible({ timeout: 15_000 });
+    await page.evaluate(() => localStorage.removeItem('alwaysNamespace'));
+    await expect(page.getByRole('heading', { name: 'Acme Labs' })).toBeVisible({ timeout: 15_000 });
     await showStep(page);
 
     // Click the Settings link (cog + "Settings" text, visible to all users)
