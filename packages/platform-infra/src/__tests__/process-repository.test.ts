@@ -211,7 +211,7 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
       ],
     });
 
-    const result = await repo.listWorkflowDefinitions();
+    const result = await repo.listWorkflowDefinitions(false);
 
     expect(result.definitions).toHaveLength(2);
 
@@ -230,8 +230,51 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
     const repo = createFirestoreRepo();
     mockGet.mockResolvedValue({ exists: false, docs: [] });
 
-    const result = await repo.listWorkflowDefinitions();
+    const result = await repo.listWorkflowDefinitions(false);
     expect(result.definitions).toHaveLength(0);
+  });
+
+  it('[DATA] listWorkflowDefinitions filters archived before parse when includeArchived=false', async () => {
+    const repo = createFirestoreRepo();
+    const active = buildWorkflowDefinition({ name: 'drug-approval', version: 1 });
+    const archived = buildWorkflowDefinition({ name: 'drug-approval', version: 2, archived: true });
+    // Legacy doc missing required `namespace` AND archived — must be skipped silently,
+    // not surface as a parse warning, since archived WDs are not runnable.
+    const archivedLegacy = { ...active, version: 3, archived: true };
+    delete (archivedLegacy as { namespace?: string }).namespace;
+
+    mockGet.mockResolvedValue({
+      exists: false,
+      docs: [
+        { id: 'drug-approval:1', data: () => active },
+        { id: 'drug-approval:2', data: () => archived },
+        { id: 'drug-approval:3', data: () => archivedLegacy },
+      ],
+    });
+
+    const result = await repo.listWorkflowDefinitions(false);
+
+    expect(result.definitions).toHaveLength(1);
+    expect(result.definitions[0].versions).toHaveLength(1);
+    expect(result.definitions[0].versions[0].version).toBe(1);
+  });
+
+  it('[DATA] listWorkflowDefinitions includes archived when includeArchived=true', async () => {
+    const repo = createFirestoreRepo();
+    const active = buildWorkflowDefinition({ name: 'drug-approval', version: 1 });
+    const archived = buildWorkflowDefinition({ name: 'drug-approval', version: 2, archived: true });
+
+    mockGet.mockResolvedValue({
+      exists: false,
+      docs: [
+        { id: 'drug-approval:1', data: () => active },
+        { id: 'drug-approval:2', data: () => archived },
+      ],
+    });
+
+    const result = await repo.listWorkflowDefinitions(true);
+
+    expect(result.definitions[0].versions).toHaveLength(2);
   });
 
   it('[DATA] getLatestWorkflowVersion returns max version for name', async () => {

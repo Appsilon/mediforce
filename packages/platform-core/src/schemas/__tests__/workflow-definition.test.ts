@@ -67,3 +67,101 @@ describe('WorkflowDefinitionSchema — inputForNextRun', () => {
     expect(WorkflowDefinitionSchema.safeParse(wd).success).toBe(false);
   });
 });
+
+describe('WorkflowDefinitionSchema — verdicts', () => {
+  const wdWithReview = {
+    ...baseWd,
+    steps: [
+      { id: 'scan', name: 'Scan', type: 'creation' as const, executor: 'script' as const },
+      {
+        id: 'review',
+        name: 'Review',
+        type: 'review' as const,
+        executor: 'human' as const,
+        verdicts: {
+          approve: { target: 'done' },
+          revise: { target: 'scan' },
+        },
+      },
+      { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+    ],
+    transitions: [
+      { from: 'scan', to: 'review' },
+    ],
+  };
+
+  it('accepts a review step with approve + revise verdicts', () => {
+    expect(() => WorkflowDefinitionSchema.parse(wdWithReview)).not.toThrow();
+  });
+
+  it('rejects a review step using a verdict key outside the allowlist', () => {
+    const wd = {
+      ...wdWithReview,
+      steps: wdWithReview.steps.map((step) =>
+        step.id === 'review'
+          ? {
+              ...step,
+              verdicts: {
+                accept: { target: 'done' },
+                reject: { target: 'scan' },
+              },
+            }
+          : step,
+      ),
+    };
+    const result = WorkflowDefinitionSchema.safeParse(wd);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const messages = result.error.issues.map((issue) => issue.message);
+      expect(messages.some((m) => /verdict key 'accept'.*not allowed/.test(m))).toBe(true);
+      expect(messages.some((m) => /verdict key 'reject'.*not allowed/.test(m))).toBe(true);
+    }
+  });
+
+  it('rejects when a verdict target points at a missing step', () => {
+    const wd = {
+      ...wdWithReview,
+      steps: wdWithReview.steps.map((step) =>
+        step.id === 'review'
+          ? {
+              ...step,
+              verdicts: {
+                approve: { target: 'nope' },
+                revise: { target: 'scan' },
+              },
+            }
+          : step,
+      ),
+    };
+    const result = WorkflowDefinitionSchema.safeParse(wd);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(
+        result.error.issues.some((issue) =>
+          /verdict 'approve'.*targets 'nope'.*does not match/.test(issue.message),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it('does not enforce the allowlist on non-review steps that carry verdicts', () => {
+    // A `decision` step type can keep custom verdict keys — only `review`
+    // is bound to the built-in form's hardcoded {approve, revise}.
+    const wd = {
+      ...wdWithReview,
+      steps: wdWithReview.steps.map((step) =>
+        step.id === 'review'
+          ? {
+              ...step,
+              type: 'decision' as const,
+              verdicts: {
+                'route-a': { target: 'done' },
+                'route-b': { target: 'scan' },
+              },
+            }
+          : step,
+      ),
+    };
+    expect(() => WorkflowDefinitionSchema.parse(wd)).not.toThrow();
+  });
+});

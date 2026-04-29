@@ -1,0 +1,19 @@
+version: "1.0"
+generated: "2026-04-28"
+standard: "agentskills.io/specification"
+total_skills: 2
+
+domains:
+  landing-zone:
+    description: Skills for the CDISC SFTP landing-zone HITL workflow
+    skills:
+      - id: data-validator
+        path: data-validator/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Interpret CDISC CORE validation output, classify a delivery, and render an HTML report for human review
+      - id: draft-rejection-note
+        path: draft-rejection-note/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Compose a markdown rejection note for the operator to forward to the CRO after a delivery is rejected

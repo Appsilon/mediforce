@@ -18,7 +18,13 @@ export interface ProcessRepository {
 
   getWorkflowDefinition(name: string, version: number): Promise<WorkflowDefinition | null>;
   saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void>;
-  listWorkflowDefinitions(): Promise<WorkflowDefinitionListResult>;
+  /** List all workflow definitions, grouped by name.
+   *  @param includeArchived When false, archived documents are filtered out
+   *  before schema validation runs. This is the right default for any
+   *  user-facing listing: archived WDs are not runnable, and skipping
+   *  them avoids spamming logs with safeParse failures on legacy data
+   *  that nobody intends to fix. */
+  listWorkflowDefinitions(includeArchived: boolean): Promise<WorkflowDefinitionListResult>;
   getLatestWorkflowVersion(name: string): Promise<number>;
   /**
    * Returns the highest version of `name` whose definition belongs to
