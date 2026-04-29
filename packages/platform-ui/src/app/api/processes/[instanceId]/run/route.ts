@@ -480,7 +480,7 @@ export async function POST(
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
 
-    console.error(`[auto-runner] Unhandled error for instance '${instanceId}': ${message}`);
+    console.error(`[auto-runner] Unhandled error for instance '${instanceId}':`, err);
 
     // Attempt to mark instance as failed and write audit event
     try {

@@ -25,7 +25,12 @@ export class FirestoreWorkflowSecretsRepository {
   private decryptSecrets(encrypted: Record<string, string>): Record<string, string> {
     const result: Record<string, string> = {};
     for (const [key, value] of Object.entries(encrypted)) {
-      result[key] = decrypt(value);
+      try {
+        result[key] = decrypt(value);
+      } catch (cause) {
+        const rootMessage = cause instanceof Error ? cause.message : String(cause);
+        throw new Error(`Failed to decrypt workflow secret '${key}': ${rootMessage}`);
+      }
     }
     return result;
   }

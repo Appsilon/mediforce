@@ -64,9 +64,18 @@ export function decrypt(encoded: string): string {
     authTagLength: AUTH_TAG_LENGTH,
   });
   decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(ciphertextHex, 'hex')),
-    decipher.final(),
-  ]);
-  return decrypted.toString('utf8');
+  try {
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(ciphertextHex, 'hex')),
+      decipher.final(),
+    ]);
+    return decrypted.toString('utf8');
+  } catch (cause) {
+    const rootMessage = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(
+      `Decryption auth-tag verification failed (${rootMessage}). ` +
+        'Most likely cause: SECRETS_ENCRYPTION_KEY was rotated or differs between environments — ' +
+        'secrets stored with the old key cannot be decrypted with the current key.',
+    );
+  }
 }
