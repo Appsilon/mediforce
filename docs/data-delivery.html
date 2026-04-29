@@ -288,7 +288,7 @@
       content: '';
       position: absolute;
       left: 1.875rem;
-      top: 3.5rem;
+      top: 5rem;
       bottom: 0;
       width: 2px;
       background: linear-gradient(to bottom, rgba(13,148,136,0.2), rgba(13,148,136,0.04));
@@ -699,7 +699,7 @@
   <section class="section" id="how-it-works">
     <div class="container">
       <div class="section-label">How It Works</div>
-      <h2 class="section-title">Five steps. One afternoon becomes a click.</h2>
+      <h2 class="section-title">Always watching, always validating. Your data manager reviews only what needs a decision.</h2>
       <p class="section-subtitle">An autonomous workflow takes ingest off the data manager's plate and surfaces only the decisions that actually require human judgment.</p>
       <div class="steps-list">
 
@@ -712,7 +712,7 @@
             <span class="step-role step-role--script">Script</span>
           </div>
           <div class="step-body">
-            <h3>Watch</h3>
+            <h3>Watch for new files in SFTP server</h3>
             <p>A cron-driven workflow polls the CRO SFTP, diffs against the previous run's file listing, and downloads new files only when something has changed. No manual checking, no missed deliveries.</p>
           </div>
         </div>
@@ -726,7 +726,7 @@
             <span class="step-role step-role--script">Script</span>
           </div>
           <div class="step-body">
-            <h3>Validate</h3>
+            <h3>Validate files</h3>
             <p>Every delivery runs through the CDISC CORE rules engine. Findings are categorised by severity (Critical / Major / Minor / Warning), mapped to the regulatory target (FDA, PMDA, EMA), and turned into a structured report.</p>
           </div>
         </div>
@@ -740,7 +740,7 @@
             <span class="step-role step-role--agent">Agent</span>
           </div>
           <div class="step-body">
-            <h3>Report</h3>
+            <h3>Validation Report</h3>
             <p>An AI agent compiles the validation findings into a one-page HTML report - severity heatmap, top findings in priority order, and a clear classification. A notification is sent to the data manager with a direct link.</p>
           </div>
         </div>
@@ -768,7 +768,7 @@
             <span class="step-role step-role--agent">Agent</span>
           </div>
           <div class="step-body">
-            <h3>Agent escalates</h3>
+            <h3>Agent drafts response to the CRO</h3>
             <p>On rejection, an AI agent drafts a factual, bounded rejection note to the CRO in the operator's tone - scoped to the actual findings, ready to be reviewed and forwarded. No copy-pasting finding lists from a validator output.</p>
           </div>
         </div>
@@ -924,7 +924,7 @@
             <form id="demo-form" novalidate>
               <div class="form-field">
                 <label for="demo-email">Work email <span style="color:#EF4444;">*</span></label>
-                <input type="email" id="demo-email" name="sender" placeholder="you@sponsor.com" required />
+                <input type="email" id="demo-email" name="sender" placeholder="name@company.com" required />
               </div>
               <div class="form-field">
                 <label for="demo-message">Tell us about your setup</label>
@@ -988,14 +988,18 @@
       btn.disabled    = true;
       error.style.display = 'none';
 
-      emailjs.sendForm(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, this)
+      emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+          sender:  document.getElementById('demo-email').value,
+          message: document.getElementById('demo-message').value,
+        })
         .then(function () {
           document.getElementById('demo-form-wrap').innerHTML =
             '<div class="form-success">' +
               '<p>✓ <strong>Request received.</strong> We\'ll reply within one business day to schedule a time.</p>' +
             '</div>';
         })
-        .catch(function () {
+        .catch(function (err) {
+          console.error('EmailJS error status:', err.status, '— text:', err.text);
           btn.textContent    = 'Request a Demo Call';
           btn.disabled       = false;
           error.style.display = 'block';
