@@ -1478,7 +1478,10 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         ? `killed by ${spawnResult.signal}${spawnResult.signal === 'SIGTERM' ? ` (likely timeout — ${timeoutMinutes} min limit)` : ''}`
         : `exit code ${spawnResult.exitCode}`;
       const detail = this.extractErrorFromResult(finalResult) || spawnResult.stderr.trim() || 'no stderr output';
-      throw new Error(`Docker container failed (${exitInfo}): ${detail}`);
+      const authHint = /not logged in|please run \/login/i.test(detail)
+        ? ' — Hint: set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY + ANTHROPIC_BASE_URL) in workflow env or secrets'
+        : '';
+      throw new Error(`Docker container failed (${exitInfo}): ${detail}${authHint}`);
     }
 
     let cliOutput: string;
