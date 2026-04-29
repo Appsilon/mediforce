@@ -193,6 +193,18 @@ export async function executeAgentStep(
     });
   }
 
+  // When the agent crashes (fallbackReason='error'), surface the error on the
+  // run overview by writing it to processInstance.error. Without this the error
+  // is only visible on the step detail page.
+  const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
+  if (isFailed && runResult.errorMessage) {
+    const failLabel = runResult.fallbackReason === 'timeout' ? 'timed out' : 'failed';
+    await instanceRepo.update(instanceId, {
+      error: `Agent step '${stepId}' ${failLabel}: ${runResult.errorMessage}`,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   // Persist output to instance.variables so subsequent steps can read it
   const agentOutput = envelope?.result ?? null;
   if (agentOutput !== null) {

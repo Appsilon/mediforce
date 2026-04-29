@@ -18,6 +18,7 @@ export async function POST(
   const { instanceRepo, processRepo, auditRepo } = getPlatformServices();
   let stepsExecuted = 0;
   let definitionVersion = 'unknown';
+  let lastActiveStepId: string | null = null;
 
   try {
     const body = (await req.json().catch(() => ({}))) as RunProcessBody;
@@ -115,6 +116,8 @@ export async function POST(
         if (!instance) break;
         if (instance.status !== 'running') break;
         if (instance.currentStepId === null) break;
+
+        lastActiveStepId = instance.currentStepId;
 
         if (isStuckLoop(instance.currentStepId, loopTracker)) {
           console.error(`[auto-runner] Safety guard: step '${instance.currentStepId}' looped ${MAX_SAME_STEP_ITERATIONS} times — aborting instance ${instanceId}`);
@@ -386,8 +389,9 @@ export async function POST(
             stepsExecuted++;
             continue;
           } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            console.error(`[auto-runner] Action step '${currentStep.id}' failed: ${message}`);
+            const rootMessage = err instanceof Error ? err.message : String(err);
+            const message = `Step '${currentStep.id}' (action: ${currentStep.action.kind}) failed: ${rootMessage}`;
+            console.error(`[auto-runner] Action step '${currentStep.id}' failed:`, err);
             await instanceRepo.updateStepExecution(instanceId, executionId, {
               status: 'failed',
               completedAt: new Date().toISOString(),
@@ -478,7 +482,9 @@ export async function POST(
       stepsExecuted,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
+    const rootMessage = err instanceof Error ? err.message : 'Unknown error';
+    const stepContext = lastActiveStepId !== null ? ` (crashed while processing step '${lastActiveStepId}')` : '';
+    const message = `${rootMessage}${stepContext}`;
 
     console.error(`[auto-runner] Unhandled error for instance '${instanceId}':`, err);
 

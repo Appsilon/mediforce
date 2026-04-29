@@ -50,7 +50,17 @@ export const httpActionHandler: HttpActionHandler = async (config, ctx) => {
     }
   }
 
-  const response = await fetch(resolvedConfig.url, init);
+  let response: Response;
+  try {
+    response = await fetch(resolvedConfig.url, init);
+  } catch (cause) {
+    const rootMessage = cause instanceof Error ? cause.message : String(cause);
+    const underlyingDetail =
+      cause instanceof Error && cause.cause instanceof Error ? ` (${cause.cause.message})` : '';
+    throw new Error(
+      `HTTP request failed: ${resolvedConfig.method} ${resolvedConfig.url} — ${rootMessage}${underlyingDetail}`,
+    );
+  }
   const text = await response.text();
   let json: unknown = null;
   if (text.length > 0) {
