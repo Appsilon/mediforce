@@ -71,7 +71,7 @@
       "executor": "agent",
       "plugin": "claude-code-agent",
       "autonomyLevel": "L2",
-      "description": "Read findings + scriptStatus. Classify (clean / has-findings / escalate). Render HTML report for human review. On scriptStatus=failed, surface the failure prominently and attempt to extract any partial signal.",
+      "description": "Read deterministic classification (clean / minor-fix / recovery / escalate / chaos) from validate-script output and render an HTML report. Does not classify — the rules engine + router_rules.py decide the class. Surfaces script-failure path (chaos) prominently with traceback when present.",
       "agent": {
         "skill": "data-validator",
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
