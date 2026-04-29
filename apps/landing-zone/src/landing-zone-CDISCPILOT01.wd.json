@@ -84,10 +84,10 @@
       "name": "Human review",
       "type": "review",
       "executor": "human",
-      "description": "Review the HTML validation report. Accept delivery (with optional waiver of findings) or reject if the package is too broken to ingest.",
+      "description": "Review the HTML validation report. Approve to accept the delivery (with optional waiver of findings) or Revise to reject the package as too broken to ingest — the reject path triggers the agent-drafted CRO note.",
       "verdicts": {
-        "accept": { "target": "accept-delivery" },
-        "reject": { "target": "draft-rejection-note" }
+        "approve": { "target": "accept-delivery" },
+        "revise": { "target": "draft-rejection-note" }
       }
     },
     {
