@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
+import { getCallerNamespaces } from '../auth.js';
 
 export async function GET(
   request: NextRequest,
@@ -8,7 +9,9 @@ export async function GET(
   const { name } = await params;
   const versionParam = request.nextUrl.searchParams.get('version');
 
-  const { processRepo } = getPlatformServices();
+  const { processRepo, namespaceRepo } = getPlatformServices();
+  const callerNs = await getCallerNamespaces(request, namespaceRepo);
+  if (callerNs instanceof NextResponse) return callerNs;
 
   let version: number;
   if (versionParam !== null) {
@@ -33,6 +36,13 @@ export async function GET(
   if (definition === null) {
     return NextResponse.json(
       { error: `Workflow '${name}' v${version} not found` },
+      { status: 404 },
+    );
+  }
+
+  if (callerNs !== null && !callerNs.has(definition.namespace)) {
+    return NextResponse.json(
+      { error: `Workflow '${name}' not found` },
       { status: 404 },
     );
   }

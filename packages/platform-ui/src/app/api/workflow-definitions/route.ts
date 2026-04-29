@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
 import { getPlatformServices } from '@/lib/platform-services';
+import { getCallerNamespaces } from './auth.js';
 
 /**
  * GET /api/workflow-definitions
@@ -10,8 +11,11 @@ import { getPlatformServices } from '@/lib/platform-services';
  * version as a full WorkflowDefinition object, suitable for loading into
  * the Workflow Designer edit flow.
  */
-export async function GET(): Promise<NextResponse> {
-  const { processRepo } = getPlatformServices();
+export async function GET(request: Request): Promise<NextResponse> {
+  const { processRepo, namespaceRepo } = getPlatformServices();
+  const callerNs = await getCallerNamespaces(request, namespaceRepo);
+  if (callerNs instanceof NextResponse) return callerNs;
+
   const { definitions } = await processRepo.listWorkflowDefinitions();
 
   const result = definitions.map((group) => {
@@ -24,7 +28,14 @@ export async function GET(): Promise<NextResponse> {
     };
   });
 
-  return NextResponse.json({ definitions: result });
+  const filtered = callerNs === null
+    ? result
+    : result.filter((item) => {
+        const ns = item.definition?.namespace;
+        return typeof ns === 'string' && callerNs.has(ns);
+      });
+
+  return NextResponse.json({ definitions: filtered });
 }
 
 /**
