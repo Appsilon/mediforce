@@ -94,6 +94,14 @@ export async function runGetCommand(input: CommandInput): Promise<number> {
       `  currentStep:   ${result.currentStepId ?? '(none)'}`,
     );
     input.output.stdout(`  error:         ${result.error ?? '(none)'}`);
+    if (
+      typeof result.definitionNamespace === 'string' &&
+      result.definitionNamespace.length > 0
+    ) {
+      input.output.stdout(
+        `  url:           ${config.baseUrl}/${result.definitionNamespace}/processes/${result.runId}`,
+      );
+    }
     if (result.finalOutput !== null && result.finalOutput !== undefined) {
       input.output.stdout(`  finalOutput:   ${JSON.stringify(result.finalOutput)}`);
     }

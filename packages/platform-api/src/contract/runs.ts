@@ -18,6 +18,14 @@ export const GetRunOutputSchema = z.object({
   currentStepId: z.string().nullable(),
   error: z.string().nullable(),
   finalOutput: z.unknown(),
+  /** Workflow definition name the run was started from. Optional for
+   *  backward compat with older servers — omit when absent. */
+  definitionName: z.string().min(1).optional(),
+  /** Namespace (= workspace handle) that owns the workflow definition.
+   *  Lets clients build the human-facing URL without a second request.
+   *  Nullable when the definition has been deleted; optional for older
+   *  servers that don't include the field. */
+  definitionNamespace: z.string().min(1).nullable().optional(),
 });
 
 export type GetRunInput = z.infer<typeof GetRunInputSchema>;
