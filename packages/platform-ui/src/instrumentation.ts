@@ -38,10 +38,16 @@ function validateEnv(): void {
         'GOOGLE_APPLICATION_CREDENTIALS is not set. '
         + 'Point it to your Firebase service account JSON file (e.g. /run/secrets/firebase-sa.json).',
       );
-    } else if (!require('fs').existsSync(credPath)) {
-      errors.push(
-        `GOOGLE_APPLICATION_CREDENTIALS points to "${credPath}" but the file does not exist.`,
-      );
+    } else {
+      // Dynamic import hidden from webpack static analysis
+      const nodeFs = 'fs';
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { existsSync } = require(nodeFs) as typeof import('fs');
+      if (!existsSync(credPath)) {
+        errors.push(
+          `GOOGLE_APPLICATION_CREDENTIALS points to "${credPath}" but the file does not exist.`,
+        );
+      }
     }
   }
 
