@@ -96,10 +96,12 @@ export async function runGetCommand(input: CommandInput): Promise<number> {
     input.output.stdout(`  error:         ${result.error ?? '(none)'}`);
     if (
       typeof result.definitionNamespace === 'string' &&
-      result.definitionNamespace.length > 0
+      result.definitionNamespace.length > 0 &&
+      typeof result.definitionName === 'string' &&
+      result.definitionName.length > 0
     ) {
       input.output.stdout(
-        `  url:           ${config.baseUrl}/${result.definitionNamespace}/processes/${result.runId}`,
+        `  url:           ${config.baseUrl}/${result.definitionNamespace}/workflows/${encodeURIComponent(result.definitionName)}/runs/${result.runId}`,
       );
     }
     if (result.finalOutput !== null && result.finalOutput !== undefined) {
