@@ -134,4 +134,13 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
       expect(hasOutgoing, `Step "${step.id}" should have an outgoing transition`).toBe(true);
     }
   });
+
+  it('declares workspace.remote pointing to dedicated study repo', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data.workspace?.remote).toBe('Appsilon/mediforce-landing-zone-study-demo');
+    expect(result.data.workspace?.remoteAuth).toBe('GITHUB_TOKEN');
+  });
 });

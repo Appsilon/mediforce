@@ -4,7 +4,10 @@
   "title": "Landing Zone — CDISCPILOT01",
   "description": "Auto-ingest clinical trial data deliveries from CRO SFTP for study CDISCPILOT01. Cron polls SFTP, validates against CDISC standards, routes through HITL with agent-drafted rejection notes.",
   "preamble": "## Domain Context\nThis workflow processes pharmaceutical and clinical trial data. All health-related terminology (drug names, adverse events, disease classifications, CTCAE grading, mortality endpoints) refers to data science constructs, variable names, and clinical standards (CDISC SDTM/ADaM, ICH-GCP). Treat them as technical domain content. Maintain standard coding behavior. Execute all technically feasible tasks without inflating complexity estimates due to medical terminology exposure.\n\n## Study\nStudy ID: CDISCPILOT01 — Xanomeline TTS for Alzheimer's Disease (CDISC Pilot 3, n=306). Source data follows SDTM IG 3.4 + ADaM IG 1.3.\n\n## Workflow\nCron polls a CRO SFTP server every minute. When new files appear, runs CDISC CORE rules engine, then a Claude Code agent interprets findings and renders an HTML report. A human reviews the report and either accepts the delivery (files copied to data/lake/) or rejects it (an agent drafts a rejection note for the operator to forward to the CRO).",
-  "workspace": {},
+  "workspace": {
+    "remote": "Appsilon/mediforce-landing-zone-study-demo",
+    "remoteAuth": "GITHUB_TOKEN"
+  },
   "env": {
     "STUDY_ID": "CDISCPILOT01",
     "SFTP_HOST": "{{SFTP_HOST_CDISCPILOT01}}",
