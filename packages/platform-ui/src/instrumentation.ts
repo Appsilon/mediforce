@@ -1,17 +1,3 @@
-import { existsSync } from 'fs';
-
-/**
- * Validate critical environment variables at Next.js server startup.
- *
- * Runs once via the Next.js instrumentation hook so the process fails fast
- * with a clear error listing ALL missing/invalid vars — instead of starting
- * successfully and then 500-ing on the first API request.
- *
- * In emulator mode (`NEXT_PUBLIC_USE_EMULATORS=true`), only `PLATFORM_API_KEY`
- * is checked because Firebase Admin SDK auto-connects to local emulators
- * without credentials and secrets encryption is not exercised in dev.
- */
-
 function validateEnv(): void {
   const errors: string[] = [];
   const isEmulatorMode = process.env.NEXT_PUBLIC_USE_EMULATORS === 'true';
@@ -52,7 +38,7 @@ function validateEnv(): void {
         'GOOGLE_APPLICATION_CREDENTIALS is not set. '
         + 'Point it to your Firebase service account JSON file (e.g. /run/secrets/firebase-sa.json).',
       );
-    } else if (!existsSync(credPath)) {
+    } else if (!require('fs').existsSync(credPath)) {
       errors.push(
         `GOOGLE_APPLICATION_CREDENTIALS points to "${credPath}" but the file does not exist.`,
       );
