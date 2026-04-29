@@ -4,6 +4,8 @@ import {
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
   ListWorkflowsOutputSchema,
+  GetWorkflowInputSchema,
+  GetWorkflowOutputSchema,
   GetRunInputSchema,
   GetRunOutputSchema,
   type ListTasksInput,
@@ -12,6 +14,8 @@ import {
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
   type ListWorkflowsOutput,
+  type GetWorkflowInput,
+  type GetWorkflowOutput,
   type GetRunInput,
   type GetRunOutput,
 } from '../contract/index.js';
@@ -81,6 +85,7 @@ export class Mediforce {
       options: RegisterWorkflowOptions,
     ) => Promise<RegisterWorkflowOutput>;
     list: () => Promise<ListWorkflowsOutput>;
+    get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
   };
 
   readonly runs: {
@@ -159,6 +164,17 @@ export class Mediforce {
         const res = await this.request('/api/workflow-definitions');
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.list');
         return ListWorkflowsOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetWorkflowInputSchema.parse(input);
+        const qs = toSearchParams({
+          version: validated.version !== undefined ? String(validated.version) : undefined,
+        });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.get');
+        return GetWorkflowOutputSchema.parse(body);
       },
     };
 
