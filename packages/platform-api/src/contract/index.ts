@@ -20,6 +20,10 @@ export {
 export {
   GetRunInputSchema,
   GetRunOutputSchema,
+  StartRunInputSchema,
+  StartRunOutputSchema,
   type GetRunInput,
   type GetRunOutput,
+  type StartRunInput,
+  type StartRunOutput,
 } from './runs.js';

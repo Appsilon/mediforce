@@ -24,6 +24,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, rm, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 import { normalizeRepoUrls, toHttpsWithToken } from '../plugins/container-plugin.js';
 
@@ -269,12 +270,20 @@ function gitEnv(sshCmd: string): NodeJS.ProcessEnv {
   return { ...process.env, GIT_SSH_COMMAND: sshCmd };
 }
 
+// Node defaults `maxBuffer` to 1 MiB for spawnSync-family calls. Some git
+// outputs (e.g. `git diff --cached` against a step that wrote a large
+// findings.json) regularly cross that, raising ENOBUFS. Lift the cap to
+// 256 MiB — high enough for any realistic step delta, low enough that
+// runaway output still surfaces as a process failure rather than OOM.
+const GIT_MAX_BUFFER = 256 * 1024 * 1024;
+
 function runGit(args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv; capture?: boolean } = {}): string {
   const out = execFileSync('git', args, {
     cwd: opts.cwd,
     env: opts.env,
     stdio: opts.capture ? ['ignore', 'pipe', 'pipe'] : 'pipe',
     encoding: 'utf-8',
+    maxBuffer: GIT_MAX_BUFFER,
   });
   return typeof out === 'string' ? out : '';
 }
@@ -282,7 +291,7 @@ function runGit(args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv; c
 /** Try git; swallow stderr, return null on failure. Used for "does branch exist" checks. */
 function tryGit(args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): boolean {
   try {
-    execFileSync('git', args, { cwd: opts.cwd, env: opts.env, stdio: 'pipe' });
+    execFileSync('git', args, { cwd: opts.cwd, env: opts.env, stdio: 'pipe', maxBuffer: GIT_MAX_BUFFER });
     return true;
   } catch {
     return false;
@@ -353,8 +362,86 @@ export class WorkspaceManager {
   }
 
   /**
+   * Compute the deterministic git remote name for a workspace URL.
+   *
+   * Format: `r-<sha8>` where sha8 is the first 8 hex chars of the SHA-256 of
+   * the canonical credential-free URL. Stripping userinfo before hashing
+   * ensures `https://x:token@github.com/foo/bar.git` and
+   * `https://github.com/foo/bar` map to the same remote name — tokens never
+   * leak into ref names.
+   */
+  private computeRemoteName(url: string): string {
+    // Strip userinfo (`user:pass@`) from any HTTP(S) URL before normalization.
+    const credFree = url.replace(/^(https?:\/\/)[^/@]+@/, '$1');
+    const canonical = normalizeRepoUrls(credFree).gitUrl;
+    const hash = createHash('sha256').update(canonical).digest('hex').slice(0, 8);
+    return `r-${hash}`;
+  }
+
+  /**
+   * Snapshot all `refs/remotes/<remoteName>/*` into
+   * `refs/heritage/<remoteName>/<ts>/<branch>` for audit. Captures the tip of
+   * every remote branch at the moment of fetch, so a later force-push on the
+   * remote cannot rewrite our recorded history. Timestamp segment is ISO 8601
+   * UTC with `:` and `.` substituted to make it a valid ref-name segment.
+   */
+  private snapshotHeritage(bareRepoPath: string, remoteName: string): void {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const out = runGit(
+      ['for-each-ref', '--format=%(refname) %(objectname)', `refs/remotes/${remoteName}/`],
+      { cwd: bareRepoPath, capture: true },
+    );
+    const lines = out.split('\n').map((line) => line.trim()).filter(Boolean);
+    for (const line of lines) {
+      const idx = line.lastIndexOf(' ');
+      if (idx < 0) continue;
+      const refname = line.slice(0, idx);
+      const sha = line.slice(idx + 1);
+      // Skip pseudo-refs like refs/remotes/<name>/HEAD (it's a symref, not a branch).
+      if (refname.endsWith('/HEAD')) continue;
+      const branch = refname.slice(`refs/remotes/${remoteName}/`.length);
+      const heritageRef = `refs/heritage/${remoteName}/${timestamp}/${branch}`;
+      runGit(['update-ref', heritageRef, sha], { cwd: bareRepoPath });
+    }
+  }
+
+  /**
+   * Whether a git remote with this name is already registered in the bare repo.
+   */
+  private hasRemote(bareRepoPath: string, remoteName: string): boolean {
+    const out = runGit(['remote'], { cwd: bareRepoPath, capture: true });
+    return out.split('\n').map((s) => s.trim()).includes(remoteName);
+  }
+
+  /**
+   * Add a remote (with tokenized URL when applicable) and fetch + snapshot
+   * heritage. Caller decides whether the remote is new or existing.
+   */
+  private addRemoteIfMissing(bareRepoPath: string, remoteName: string, remoteUrl: string): void {
+    if (!this.hasRemote(bareRepoPath, remoteName)) {
+      runGit(['remote', 'add', remoteName, remoteUrl], { cwd: bareRepoPath });
+    } else {
+      // Update the URL in case the token has been rotated since last fetch.
+      runGit(['remote', 'set-url', remoteName, remoteUrl], { cwd: bareRepoPath });
+    }
+  }
+
+  private fetchAndSnapshot(bareRepoPath: string, remoteName: string): void {
+    runGit(['fetch', '--prune', remoteName], {
+      cwd: bareRepoPath,
+      env: gitEnv(buildSshCmd(this.deployKeyPath)),
+    });
+    this.snapshotHeritage(bareRepoPath, remoteName);
+  }
+
+  /**
    * Ensure the bare repo exists and, if a remote is configured, is reasonably up to date.
    * Idempotent. Safe to call from concurrent runs — fetches are serialized by a file lock.
+   *
+   * Multi-remote model: one bare repo per (namespace, wd-name), with a git remote
+   * registered for every distinct `workspace.remote` URL ever used by any version
+   * of that WD. Older remotes are preserved (heritage refs guarantee audit) so the
+   * bare can serve runs of WD versions whose remote URL has since changed.
    */
   async ensureBareRepo(
     workflow: WorkflowIdentity & { workspace: WorkflowWorkspace },
@@ -365,19 +452,23 @@ export class WorkspaceManager {
     const lockPath = this.fetchLockPath(bareRepoPath);
 
     // One lock for both init and fetch — ensures two concurrent runs don't race
-    // on init/seed or both trying to update origin/fetch at the same time.
+    // on init/seed or both trying to update remotes at the same time.
     return withDirLock(lockPath, 60_000, async () => {
       const exists = await pathExists(join(bareRepoPath, 'HEAD'));
 
       if (!exists) {
         await mkdir(join(bareRepoPath, '..'), { recursive: true });
+        runGit(['init', '--bare', '--initial-branch=main', bareRepoPath]);
         if (remoteUrl) {
-          runGit(['clone', '--bare', remoteUrl, bareRepoPath], { env: gitEnv(buildSshCmd(this.deployKeyPath)) });
+          // Bootstrap from remote via init+fetch (not clone --bare). Same code
+          // path as add-remote-on-existing-bare — no branching.
+          const remoteName = this.computeRemoteName(workflow.workspace.remote!);
+          this.addRemoteIfMissing(bareRepoPath, remoteName, remoteUrl);
+          this.fetchAndSnapshot(bareRepoPath, remoteName);
         } else {
-          // Local-only bare repo: init and seed a single initial commit on `main`
-          // containing a baseline `.gitignore`. Every run branch then starts from
-          // a known state with secret-pattern ignores already in effect.
-          runGit(['init', '--bare', '--initial-branch=main', bareRepoPath]);
+          // Local-only bare repo: seed a single initial commit on `main`
+          // containing a baseline `.gitignore`. Every run branch then starts
+          // from a known state with secret-pattern ignores already in effect.
           this.seedMainWithGitignore(bareRepoPath);
         }
         // Also write .git/info/exclude as a per-repo safety net — this catches
@@ -387,9 +478,13 @@ export class WorkspaceManager {
       }
 
       if (remoteUrl) {
-        runGit(['remote', 'set-url', 'origin', remoteUrl], { cwd: bareRepoPath });
-        runGit(['fetch', '--prune', 'origin'], { cwd: bareRepoPath, env: gitEnv(buildSshCmd(this.deployKeyPath)) });
+        const remoteName = this.computeRemoteName(workflow.workspace.remote!);
+        this.addRemoteIfMissing(bareRepoPath, remoteName, remoteUrl);
+        this.fetchAndSnapshot(bareRepoPath, remoteName);
       }
+      // No-op when WD is local-only on an existing bare: prior remotes (if any)
+      // remain registered, but we don't fetch them. Heritage already records
+      // their last-known tips.
 
       return { path: bareRepoPath, freshlyInitialized: false, remoteUrl };
     });
@@ -462,13 +557,49 @@ export class WorkspaceManager {
   }
 
   /**
+   * Resolve the starting ref for a new run branch.
+   *
+   *   - Remote-backed WD: branch off `<remoteName>/<defaultBranch>`. Default
+   *     branch is read from `refs/remotes/<remoteName>/HEAD` (a symref written
+   *     by `git fetch` when the remote advertises one); falls back to `main`.
+   *   - Local-only WD: branch off the local `main` (seeded on init).
+   */
+  private resolveStartingPoint(bareRepoPath: string, workspace: WorkflowWorkspace): string {
+    if (!workspace.remote) return 'main';
+    const remoteName = this.computeRemoteName(workspace.remote);
+
+    // Try the remote's HEAD symref first (set by fetch when remote advertises one).
+    try {
+      const headOut = execFileSync(
+        'git',
+        ['symbolic-ref', '--short', `refs/remotes/${remoteName}/HEAD`],
+        { cwd: bareRepoPath, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf-8', maxBuffer: GIT_MAX_BUFFER },
+      ).toString().trim();
+      if (headOut) return headOut;
+    } catch {
+      // No symref — fall through to explicit lookups.
+    }
+
+    // Fall back to <remoteName>/main if it exists on the remote.
+    const mainRef = `refs/remotes/${remoteName}/main`;
+    if (tryGit(['show-ref', '--verify', '--quiet', mainRef], { cwd: bareRepoPath })) {
+      return `${remoteName}/main`;
+    }
+
+    // Last resort — local main (seeded). Should not happen for remote-backed
+    // bares created via the new lifecycle, since fetch always populates at
+    // least one remote-tracking branch.
+    return 'main';
+  }
+
+  /**
    * Create (or return existing) per-run worktree on branch `run/<runId>`.
    * Idempotent: if the worktree for this `(workflow, runId)` already exists, returns its handle.
    *
    * Starting ref resolution:
-   *   - branch already in bare repo (e.g. pre-existing on remote) → reuse it
-   *   - otherwise → branch from `main` (always present; local-only bare repos are
-   *     seeded with an initial `.gitignore` commit on init)
+   *   - branch already in bare repo (e.g. pre-existing on a previous run) → reuse it
+   *   - remote-backed WD → branch from `<remoteName>/<defaultBranch>`
+   *   - local-only WD → branch from local `main` (always present; seeded on init)
    */
   async createRunWorkspace(
     workflow: WorkflowIdentity & { workspace: WorkflowWorkspace },
@@ -491,7 +622,8 @@ export class WorkspaceManager {
     if (branchExists) {
       runGit(['worktree', 'add', wtPath, branch], { cwd: bare.path });
     } else {
-      runGit(['worktree', 'add', '-b', branch, wtPath, 'main'], { cwd: bare.path });
+      const startingPoint = this.resolveStartingPoint(bare.path, workflow.workspace);
+      runGit(['worktree', 'add', '-b', branch, wtPath, startingPoint], { cwd: bare.path });
     }
 
     runGit(['config', 'user.email', 'agent@mediforce.dev'], { cwd: wtPath });

@@ -38,5 +38,12 @@ docker build \
   "$REPO_ROOT"
 
 echo ""
+echo "=== Building landing-zone image ==="
+docker build \
+  -f "$REPO_ROOT/apps/landing-zone/container/Dockerfile" \
+  -t mediforce-landing-zone:latest \
+  "$REPO_ROOT/apps/landing-zone"
+
+echo ""
 echo "=== Done ==="
 docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}' | grep mediforce

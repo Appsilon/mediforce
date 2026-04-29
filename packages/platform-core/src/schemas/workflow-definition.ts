@@ -263,6 +263,53 @@ function validateInputForNextRun(
 }
 
 /**
+ * Verdict-key allowlist for review-type steps. Mirrors the hardcoded set
+ * accepted by the built-in human-task forms in
+ * `packages/platform-ui/src/components/tasks/{verdict,selection}-form.tsx`.
+ * Adding a third option here without expanding the form would let a WD
+ * register cleanly and then dead-end at run time with "Unknown verdict X
+ * on review step Y" — the exact failure mode this validation prevents.
+ */
+const ALLOWED_REVIEW_VERDICT_KEYS = ['approve', 'revise'] as const;
+
+function validateVerdicts(
+  wd: {
+    steps: Array<{
+      id: string;
+      type?: string;
+      verdicts?: Record<string, { target: string }> | undefined;
+    }>;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const stepIds = new Set(wd.steps.map((s) => s.id));
+  wd.steps.forEach((step, i) => {
+    if (!step.verdicts) return;
+    const keys = Object.keys(step.verdicts);
+    if (step.type === 'review') {
+      for (const key of keys) {
+        if (!ALLOWED_REVIEW_VERDICT_KEYS.includes(key as 'approve' | 'revise')) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['steps', i, 'verdicts', key],
+            message: `verdict key '${key}' on review step '${step.id}' is not allowed — must be one of: ${ALLOWED_REVIEW_VERDICT_KEYS.join(', ')}`,
+          });
+        }
+      }
+    }
+    for (const [key, verdict] of Object.entries(step.verdicts)) {
+      if (!stepIds.has(verdict.target)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, 'verdicts', key, 'target'],
+          message: `verdict '${key}' on step '${step.id}' targets '${verdict.target}' which does not match any step id`,
+        });
+      }
+    }
+  });
+}
+
+/**
  * Base WorkflowDefinition schema (no cross-field refinements). Exposed so
  * callers can `.omit()` / `.partial()` and then re-apply validation via
  * `.superRefine(validateInputForNextRun)`.
@@ -308,10 +355,11 @@ export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine
   (wd, ctx) => {
     validateInputForNextRun(wd, ctx);
     validateExecutorAndTriggers(wd, ctx);
+    validateVerdicts(wd, ctx);
   },
 );
 
-export { validateInputForNextRun, validateExecutorAndTriggers };
+export { validateInputForNextRun, validateExecutorAndTriggers, validateVerdicts };
 
 /**
  * Default parse path for registering a new WorkflowDefinition (API routes,

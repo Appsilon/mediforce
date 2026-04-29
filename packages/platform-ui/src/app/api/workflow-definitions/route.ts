@@ -12,7 +12,7 @@ import { getPlatformServices } from '@/lib/platform-services';
  */
 export async function GET(): Promise<NextResponse> {
   const { processRepo } = getPlatformServices();
-  const { definitions } = await processRepo.listWorkflowDefinitions();
+  const { definitions } = await processRepo.listWorkflowDefinitions(false);
 
   const result = definitions.map((group) => {
     const latest = group.versions.find((v) => v.version === group.latestVersion);

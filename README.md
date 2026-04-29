@@ -127,6 +127,41 @@ pnpm test           # unit + integration
 cd packages/platform-ui && pnpm test:e2e  # E2E (Playwright)
 ```
 
+### CLI
+
+`@mediforce/cli` is a thin wrapper around the platform API for registering
+workflows, starting runs, and inspecting state from a terminal. The bin
+entry runs `tsx` against `src/`, so changes show up without a build.
+
+Install once globally so `mediforce` is on your PATH:
+
+```bash
+pnpm setup                                 # one-time, creates PNPM_HOME
+                                           # (re-source ~/.zshrc afterwards)
+cd packages/cli && pnpm link --global
+which mediforce                            # confirm
+```
+
+Auth + base URL come from env. Add to `~/.zshrc` (or the per-shell
+session) so every invocation picks them up:
+
+```bash
+export MEDIFORCE_API_KEY="<value of PLATFORM_API_KEY in .env.local>"
+export MEDIFORCE_BASE_URL="http://127.0.0.1:9003"
+# Use 127.0.0.1 not localhost — Node prefers IPv6 and the dev server
+# binds IPv4, which surfaces as a misleading "fetch failed".
+```
+
+Common commands:
+
+```bash
+mediforce workflow list                                        # all registered workflows
+mediforce workflow register --file path/to.wd.json --namespace appsilon
+mediforce run start --workflow landing-zone-CDISCPILOT01       # fires manual trigger
+mediforce run get <runId>                                      # current status
+mediforce <command> --help                                     # per-command flags
+```
+
 ### Building Docker images for script steps
 
 Workflows with `script` executor steps need Docker images built locally:
