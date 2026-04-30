@@ -62,6 +62,8 @@ export async function workflowGetCommand(input: CommandInput): Promise<number> {
     return 2;
   }
 
+  const jsonMode = flags.json === true;
+
   if (flags.help === true) {
     input.output.stdout(HELP);
     return 0;
@@ -69,14 +71,14 @@ export async function workflowGetCommand(input: CommandInput): Promise<number> {
 
   const name = positionals[0];
   if (typeof name !== 'string' || name.length === 0) {
-    printError(input.output, { error: '<name> is required' }, false);
+    printError(input.output, { error: '<name> is required' }, jsonMode);
     return 2;
   }
 
   const version =
     flags.version !== undefined ? Number(flags.version) : undefined;
   if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
-    printError(input.output, { error: `Invalid --version: ${flags.version}` }, false);
+    printError(input.output, { error: `Invalid --version: ${flags.version}` }, jsonMode);
     return 2;
   }
 
@@ -84,7 +86,7 @@ export async function workflowGetCommand(input: CommandInput): Promise<number> {
   try {
     config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
   } catch (err) {
-    printError(input.output, { error: String(err) }, false);
+    printError(input.output, { error: String(err) }, jsonMode);
     return 2;
   }
 
@@ -104,6 +106,15 @@ export async function workflowGetCommand(input: CommandInput): Promise<number> {
       await writeFile(flags.output, json + '\n', 'utf-8');
       input.output.stdout(`Written to ${flags.output}`);
     } else {
+      if (!jsonMode) {
+        const def = result.definition;
+        const stepCount = Array.isArray(def.steps) ? def.steps.length : 0;
+        const transCount = Array.isArray(def.transitions) ? def.transitions.length : 0;
+        const triggerCount = Array.isArray(def.triggers) ? def.triggers.length : 0;
+        input.output.stdout(
+          `${def.name} v${String(def.version)} (namespace: ${def.namespace}, ${String(stepCount)} steps, ${String(transCount)} transitions, ${String(triggerCount)} triggers)`,
+        );
+      }
       input.output.stdout(json);
     }
     return 0;
@@ -112,10 +123,10 @@ export async function workflowGetCommand(input: CommandInput): Promise<number> {
       printError(
         input.output,
         { error: err.message, status: err.status, body: err.body },
-        true,
+        jsonMode,
       );
     } else {
-      printError(input.output, { error: String(err) }, true);
+      printError(input.output, { error: String(err) }, jsonMode);
     }
     return 1;
   }

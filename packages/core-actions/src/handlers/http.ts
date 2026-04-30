@@ -50,7 +50,26 @@ export const httpActionHandler: HttpActionHandler = async (config, ctx) => {
     }
   }
 
-  const response = await fetch(resolvedConfig.url, init);
+  let response: Response;
+  try {
+    response = await fetch(resolvedConfig.url, init);
+  } catch (cause) {
+    const rootMessage = cause instanceof Error ? cause.message : String(cause);
+    const underlyingDetail =
+      cause instanceof Error && cause.cause instanceof Error ? ` (${cause.cause.message})` : '';
+    // Strip query string — it may contain interpolated secret values (e.g. ?key=${secrets.API_KEY}).
+    const safeUrl = (() => {
+      try {
+        const u = new URL(resolvedConfig.url);
+        return `${u.origin}${u.pathname}`;
+      } catch {
+        return resolvedConfig.url;
+      }
+    })();
+    throw new Error(
+      `HTTP request failed: ${resolvedConfig.method} ${safeUrl} — ${rootMessage}${underlyingDetail}`,
+    );
+  }
   const text = await response.text();
   let json: unknown = null;
   if (text.length > 0) {

@@ -20,6 +20,7 @@ COPY packages/core-actions/package.json packages/core-actions/
 COPY packages/platform-ui/package.json packages/platform-ui/
 COPY apps/community-digest/package.json apps/community-digest/
 COPY apps/protocol-to-tfl/package.json apps/protocol-to-tfl/
+COPY apps/examples/personal-automations/package.json apps/examples/personal-automations/
 
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store && \
