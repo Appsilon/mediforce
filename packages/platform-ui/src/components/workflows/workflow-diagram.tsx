@@ -93,6 +93,7 @@ type BranchPlaceholderNodeData = {
   fromStepId: string;
   branchIdx: number;
   isActive: boolean;
+  isBackEdge?: boolean;
   onExpand?: () => void;
 };
 
@@ -226,28 +227,41 @@ function BranchPlaceholderNode({ data }: NodeProps<Node<BranchPlaceholderNodeDat
       <Handle id="top" type="target" position={Position.Top} className={HANDLE_CLASS} />
       <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLASS} />
       <Handle id="right-in" type="target" position={Position.Right} className={HANDLE_CLASS} />
+      <Handle id="right-out" type="source" position={Position.Right} className={HANDLE_CLASS} />
       <button
-        onClick={() => { if (!data.isActive) data.onExpand?.(); }}
+        onClick={() => { if (!data.isBackEdge && !data.isActive) data.onExpand?.(); }}
         style={{ width: NODE_WIDTH, height: PLACEHOLDER_HEIGHT }}
         className={cn(
           'group flex items-center gap-2 px-3 rounded-lg border text-left transition-all',
-          data.isActive
+          data.isBackEdge
+            ? 'border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20 cursor-default'
+            : data.isActive
             ? 'border-primary/50 bg-primary/8 cursor-default'
             : 'border-dashed border-slate-200 dark:border-slate-700 bg-background hover:border-primary/50 hover:bg-primary/5 cursor-pointer',
         )}
-        title={data.isActive ? `Active: ${data.label}` : `Show: ${data.label}`}
+        title={data.isBackEdge ? `Returns to: ${data.label}` : data.isActive ? `Active: ${data.label}` : `Show: ${data.label}`}
       >
         <div className={cn(
           'h-2 w-2 rounded-full shrink-0 transition-colors',
-          data.isActive ? 'bg-primary' : 'bg-muted-foreground/25 group-hover:bg-primary/50',
+          data.isBackEdge
+            ? 'bg-amber-400 dark:bg-amber-500'
+            : data.isActive
+            ? 'bg-primary'
+            : 'bg-muted-foreground/25 group-hover:bg-primary/50',
         )} />
         <span className={cn(
           'text-[11px] font-mono truncate transition-colors',
-          data.isActive ? 'text-primary font-semibold' : 'text-muted-foreground/70 group-hover:text-primary',
+          data.isBackEdge
+            ? 'text-amber-600 dark:text-amber-400 font-semibold'
+            : data.isActive
+            ? 'text-primary font-semibold'
+            : 'text-muted-foreground/70 group-hover:text-primary',
         )}>
           {data.label}
         </span>
-        {data.isActive
+        {data.isBackEdge
+          ? <ArrowUp className="ml-auto h-3 w-3 shrink-0 text-amber-500" />
+          : data.isActive
           ? <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-primary" />
           : <ChevronRight className="ml-auto h-3 w-3 shrink-0 text-muted-foreground/30 group-hover:text-primary transition-colors" />
         }
@@ -432,7 +446,7 @@ const edgeTypes = { addStep: AddStepEdge };
 
 type LayoutItem =
   | { kind: 'step'; stepId: string }
-  | { kind: 'placeholder'; id: string; fromStepId: string; branchIdx: number; label: string; isActive: boolean };
+  | { kind: 'placeholder'; id: string; fromStepId: string; branchIdx: number; label: string; isActive: boolean; isBackEdge?: boolean };
 
 function shortenCondition(raw: string | undefined): string | undefined {
   return raw
@@ -517,7 +531,7 @@ function buildLayout(
   // Collected during BFS for edge building after node layout
   const branchStepToFirstButton: { stepId: string; firstButtonId: string }[] = [];
   const activeButtonToFirstStep: { buttonId: string; toStepId: string }[] = [];
-  const collectedBackEdges: { from: string; to: string; label?: string }[] = [];
+  const backEdgeButtonToTarget: { buttonId: string; targetStepId: string }[] = [];
   const accordionSteps = new Set<string>();
 
   let head = 0;
@@ -531,34 +545,35 @@ function buildLayout(
         if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
       }
     } else {
-      // Branching step: separate back-edges (already visited = earlier in layout)
-      // from forward branches (not yet visited = will appear below current step).
+      // Multiple branches: create buttons for ALL branches (forward + back-edge alike).
+      // Forward branches use the accordion (active/inactive). Back-edge branches are amber
+      // buttons that source an arc pointing up to an earlier step.
+      accordionSteps.add(current);
       const forwardOuts = outs.filter(({ to }) => !visited.has(to));
       const backOuts = outs.filter(({ to }) => visited.has(to));
-      for (const { to, label } of backOuts) {
-        collectedBackEdges.push({ from: current, to, label });
-      }
-      if (forwardOuts.length <= 1) {
-        // At most one forward branch — no accordion needed; back-edges rendered separately.
-        for (const { to } of forwardOuts) {
+      const rawIdx = expandedBranches.get(current) ?? 0;
+      const expandedIdx = rawIdx < forwardOuts.length ? rawIdx : 0;
+
+      branchStepToFirstButton.push({ stepId: current, firstButtonId: `__placeholder__${current}__0` });
+
+      // Forward buttons first (stable indices for accordion state)
+      for (let fi = 0; fi < forwardOuts.length; fi++) {
+        const { to, label } = forwardOuts[fi];
+        const isActive = fi === expandedIdx;
+        const id = `__placeholder__${current}__${fi}`;
+        layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: fi, label: shortenCondition(label) ?? `Branch ${fi + 1}`, isActive, isBackEdge: false });
+        if (isActive) {
+          if (to) activeButtonToFirstStep.push({ buttonId: id, toStepId: to });
           if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
         }
-      } else {
-        // Multiple forward branches → accordion buttons.
-        accordionSteps.add(current);
-        const rawIdx = expandedBranches.get(current) ?? 0;
-        const expandedIdx = rawIdx < forwardOuts.length ? rawIdx : 0;
-        branchStepToFirstButton.push({ stepId: current, firstButtonId: `__placeholder__${current}__0` });
-        for (let i = 0; i < forwardOuts.length; i++) {
-          const { to, label } = forwardOuts[i];
-          const isActive = i === expandedIdx;
-          const id = `__placeholder__${current}__${i}`;
-          layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: i, label: shortenCondition(label) ?? `Branch ${i + 1}`, isActive });
-          if (isActive) {
-            if (to) activeButtonToFirstStep.push({ buttonId: id, toStepId: to });
-            if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
-          }
-        }
+      }
+
+      // Back-edge buttons after forward buttons
+      for (let bi = 0; bi < backOuts.length; bi++) {
+        const { to, label } = backOuts[bi];
+        const id = `__placeholder__${current}__${forwardOuts.length + bi}`;
+        layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: forwardOuts.length + bi, label: shortenCondition(label) ?? `Back ${bi + 1}`, isActive: false, isBackEdge: true });
+        if (to) backEdgeButtonToTarget.push({ buttonId: id, targetStepId: to });
       }
     }
   }
@@ -608,6 +623,7 @@ function buildLayout(
           fromStepId: item.fromStepId,
           branchIdx: item.branchIdx,
           isActive: item.isActive,
+          isBackEdge: item.isBackEdge ?? false,
         } as BranchPlaceholderNodeData,
       });
       currentY += PLACEHOLDER_ROW_HEIGHT;
@@ -667,6 +683,13 @@ function buildLayout(
     }
   }
 
+  // Back-edge button → target step (amber arc from button's right-out to target's right-in)
+  for (const { buttonId, targetStepId } of backEdgeButtonToTarget) {
+    if (seqIdxMap.has(buttonId) && seqIdxMap.has(targetStepId)) {
+      addEdge(buttonId, targetStepId);
+    }
+  }
+
   // Edges from definition.transitions (skip accordion steps — handled via branch buttons)
   for (const t of definition.transitions) {
     if (!seqIdxMap.has(t.from) || !seqIdxMap.has(t.to)) continue;
@@ -681,14 +704,6 @@ function buildLayout(
     for (const [name, verdict] of Object.entries(step.verdicts)) {
       if (!verdict.target || !seqIdxMap.has(verdict.target)) continue;
       addEdge(step.id, verdict.target, name);
-    }
-  }
-
-  // Back-edges from branching steps (verdicts / transitions that point to a step already
-  // above the current step in the layout). addEdge deduplicates via edgeSet.
-  for (const { from, to, label } of collectedBackEdges) {
-    if (seqIdxMap.has(from) && seqIdxMap.has(to)) {
-      addEdge(from, to, label);
     }
   }
 
