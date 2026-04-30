@@ -517,6 +517,8 @@ function buildLayout(
   // Collected during BFS for edge building after node layout
   const branchStepToFirstButton: { stepId: string; firstButtonId: string }[] = [];
   const activeButtonToFirstStep: { buttonId: string; toStepId: string }[] = [];
+  const collectedBackEdges: { from: string; to: string; label?: string }[] = [];
+  const accordionSteps = new Set<string>();
 
   let head = 0;
   while (head < bfsQueue.length) {
@@ -529,18 +531,33 @@ function buildLayout(
         if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
       }
     } else {
-      // Branching step: insert ALL branch buttons; only follow expanded branch
-      const rawIdx = expandedBranches.get(current) ?? 0;
-      const expandedIdx = rawIdx < outs.length ? rawIdx : 0;
-      branchStepToFirstButton.push({ stepId: current, firstButtonId: `__placeholder__${current}__0` });
-      for (let i = 0; i < outs.length; i++) {
-        const { to, label } = outs[i];
-        const isActive = i === expandedIdx;
-        const id = `__placeholder__${current}__${i}`;
-        layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: i, label: shortenCondition(label) ?? `Branch ${i + 1}`, isActive });
-        if (isActive) {
-          if (to) activeButtonToFirstStep.push({ buttonId: id, toStepId: to });
+      // Branching step: separate back-edges (already visited = earlier in layout)
+      // from forward branches (not yet visited = will appear below current step).
+      const forwardOuts = outs.filter(({ to }) => !visited.has(to));
+      const backOuts = outs.filter(({ to }) => visited.has(to));
+      for (const { to, label } of backOuts) {
+        collectedBackEdges.push({ from: current, to, label });
+      }
+      if (forwardOuts.length <= 1) {
+        // At most one forward branch — no accordion needed; back-edges rendered separately.
+        for (const { to } of forwardOuts) {
           if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
+        }
+      } else {
+        // Multiple forward branches → accordion buttons.
+        accordionSteps.add(current);
+        const rawIdx = expandedBranches.get(current) ?? 0;
+        const expandedIdx = rawIdx < forwardOuts.length ? rawIdx : 0;
+        branchStepToFirstButton.push({ stepId: current, firstButtonId: `__placeholder__${current}__0` });
+        for (let i = 0; i < forwardOuts.length; i++) {
+          const { to, label } = forwardOuts[i];
+          const isActive = i === expandedIdx;
+          const id = `__placeholder__${current}__${i}`;
+          layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: i, label: shortenCondition(label) ?? `Branch ${i + 1}`, isActive });
+          if (isActive) {
+            if (to) activeButtonToFirstStep.push({ buttonId: id, toStepId: to });
+            if (to && !visited.has(to)) { visited.add(to); bfsQueue.push(to); }
+          }
         }
       }
     }
@@ -650,20 +667,28 @@ function buildLayout(
     }
   }
 
-  // Edges from definition.transitions (skip branching steps — handled above)
+  // Edges from definition.transitions (skip accordion steps — handled via branch buttons)
   for (const t of definition.transitions) {
     if (!seqIdxMap.has(t.from) || !seqIdxMap.has(t.to)) continue;
-    if ((outgoing.get(t.from) ?? []).length > 1) continue; // branching step, handled via buttons
+    if (accordionSteps.has(t.from)) continue;
     addEdge(t.from, t.to, t.when ? `when: ${t.when}` : undefined);
   }
 
-  // Edges from verdicts (skip branching steps — handled above)
+  // Edges from verdicts (skip accordion steps — handled via branch buttons)
   for (const step of definition.steps) {
     if (!seqIdxMap.has(step.id) || !step.verdicts) continue;
-    if ((outgoing.get(step.id) ?? []).length > 1) continue; // branching step
+    if (accordionSteps.has(step.id)) continue;
     for (const [name, verdict] of Object.entries(step.verdicts)) {
       if (!verdict.target || !seqIdxMap.has(verdict.target)) continue;
       addEdge(step.id, verdict.target, name);
+    }
+  }
+
+  // Back-edges from branching steps (verdicts / transitions that point to a step already
+  // above the current step in the layout). addEdge deduplicates via edgeSet.
+  for (const { from, to, label } of collectedBackEdges) {
+    if (seqIdxMap.has(from) && seqIdxMap.has(to)) {
+      addEdge(from, to, label);
     }
   }
 
