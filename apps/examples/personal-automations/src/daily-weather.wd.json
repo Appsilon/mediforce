@@ -1,8 +1,8 @@
 {
   "name": "daily-weather",
   "title": "Daily weather",
-  "description": "Daily 6am weather forecast. Fetches OpenWeatherMap, formats summary, pushes via Pushover and ntfy.sh.",
-  "preamble": "Reference template. Morning weather summary delivered via push notifications.",
+  "description": "Daily 6am weather forecast. Fetches OpenWeatherMap, formats summary, sends via email, Pushover and ntfy.sh.",
+  "preamble": "Reference template. Morning weather summary delivered via email and push notifications.",
   "triggers": [
     {
       "type": "cron",
@@ -44,6 +44,20 @@
             "title": "Weather ${steps.fetch-weather.body.json.city.name}",
             "message": "${steps.fetch-weather.body.json.list[0].weather[0].description}, ${steps.fetch-weather.body.json.list[0].main.temp}°C (feels ${steps.fetch-weather.body.json.list[0].main.feels_like}°C)"
           }
+        }
+      }
+    },
+    {
+      "id": "send-email",
+      "name": "Email forecast",
+      "type": "creation",
+      "executor": "action",
+      "action": {
+        "kind": "email",
+        "config": {
+          "to": "filip@appsilon.com",
+          "subject": "☀️ ${steps.format.title}",
+          "body": "${steps.format.message}"
         }
       }
     },
@@ -93,7 +107,8 @@
   ],
   "transitions": [
     { "from": "fetch-weather", "to": "format" },
-    { "from": "format", "to": "push-pushover" },
+    { "from": "format", "to": "send-email" },
+    { "from": "send-email", "to": "push-pushover" },
     { "from": "push-pushover", "to": "push-ntfy" },
     { "from": "push-ntfy", "to": "done" }
   ]

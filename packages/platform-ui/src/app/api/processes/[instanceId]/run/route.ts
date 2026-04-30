@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv } from '@mediforce/agent-runtime';
+import { validateActionSecrets } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '@/lib/loop-guard';
 
@@ -66,17 +67,25 @@ export async function POST(
     );
     {
       const missingEnv = validateWorkflowEnv(workflowDefinition, workflowSecrets);
-      if (missingEnv.length > 0) {
-        const names = missingEnv.map((m) => m.secretName);
-        console.log(`[auto-runner] Missing env vars for '${initialInstance.definitionName}': ${names.join(', ')}`);
+      const missingActionSecrets = validateActionSecrets(
+        workflowDefinition.steps,
+        workflowSecrets,
+      );
+      const allMissing = [
+        ...missingEnv,
+        ...missingActionSecrets.map((m) => ({ ...m, template: `\${secrets.${m.secretName}}` })),
+      ];
+      if (allMissing.length > 0) {
+        const names = allMissing.map((m) => m.secretName);
+        console.log(`[auto-runner] Missing secrets for '${initialInstance.definitionName}': ${names.join(', ')}`);
         await instanceRepo.update(instanceId, {
           status: 'paused',
           pauseReason: 'missing_env',
-          error: JSON.stringify(missingEnv),
+          error: JSON.stringify(allMissing),
           updatedAt: new Date().toISOString(),
         });
         return NextResponse.json(
-          { error: 'Missing environment variables', missing: missingEnv, instanceId },
+          { error: 'Missing environment variables', missing: allMissing, instanceId },
           { status: 422 },
         );
       }
