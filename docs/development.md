@@ -146,10 +146,6 @@ pnpm build    # builds all packages
 
 ## Deployment
 
-The platform UI deploys via Firebase App Hosting. See `apphosting.yaml` for configuration.
-
-## Infrastructure
-
 Staging and production servers are hosted on **Hetzner**.
 
 | Environment | SSH access |
