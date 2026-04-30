@@ -150,7 +150,7 @@ export function RunsTable({
   const anyBulkBusy = bulkCancelling || bulkArchiving;
 
   return (
-    <div className="rounded-md border overflow-hidden">
+    <div className="rounded-md border overflow-clip">
       {/* Bulk action toolbar — visible only when rows are selected */}
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 border-b text-sm">
@@ -190,7 +190,7 @@ export function RunsTable({
       )}
 
       <table className="w-full text-sm">
-        <thead>
+        <thead className="sticky top-0 z-10 bg-card">
           <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
             <th className="px-4 py-2.5 w-8">
               <input
