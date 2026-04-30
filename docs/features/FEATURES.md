@@ -36,7 +36,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 - [Run Detail — Completed](#run-detail--completed) — verifying all steps finished successfully
 - [Run Detail — Autonomy Badges](#run-detail--autonomy-badges) — seeing which steps are agent-driven vs human
 - [Cancel Run](#cancel-run) — safely stopping a running process with confirmation
-- [Retry Failed Step](#retry-failed-step) — re-running a failed step in place without restarting the workflow
+- [Agent Escalated Recovery](#agent-escalated-recovery) — retry or cancel when an agent step fails and escalates to human
 - [Workflow Status Badges](#workflow-status-badges) — semantic status display (In Progress, Waiting for human, Error, Completed)
 - [Run Report](#run-report) — post-completion summary with timing and step outputs
 - [Report Unavailable](#report-unavailable) — guard preventing report access on in-progress runs
@@ -237,11 +237,15 @@ Stopping a running process requires double confirmation to prevent accidental ca
 
 ![cancel-run](cancel-run.gif)
 
-### Retry Failed Step
+### Agent Escalated Recovery
 
-When a step fails (docker daemon down, flaky network, etc.), clicking Retry on the failed step flips the instance back to running and the auto-runner re-dispatches that step — without restarting from the beginning. Variables from earlier steps are preserved.
+When an agent step fails and escalates to human, an action banner appears with two options: "Fixed, try again" re-queues the step from the current position (variables preserved, no full restart), while "Cancel this run" marks the run as Error and closes it out.
 
 ![retry-step](retry-step.gif)
+
+Cancel flow:
+
+![agent-escalated-cancel](agent-escalated-cancel.gif)
 
 ### Workflow Status Badges
 
@@ -249,7 +253,7 @@ Runs list and run detail show semantic status badges instead of raw `paused` sta
 
 ![workflow-status-badges-list](workflow-status-badges-list.gif)
 
-Error state with banner and "Run again this step" retry button:
+Error state with banner (step_failure — terminal, no retry):
 
 ![workflow-status-badges-error](workflow-status-badges-error.gif)
 
