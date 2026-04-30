@@ -148,6 +148,7 @@
     { "from": "interpret-validation", "to": "human-review", "when": "output.classification == \"recovery\"" },
     { "from": "interpret-validation", "to": "draft-rejection-note", "when": "output.classification == \"escalate\"" },
     { "from": "interpret-validation", "to": "draft-rejection-note", "when": "output.classification == \"chaos\"" },
+    { "from": "interpret-validation", "to": "human-review", "when": "else" },
     { "from": "accept-delivery", "to": "accepted" },
     { "from": "draft-rejection-note", "to": "rejected-with-note" }
   ]

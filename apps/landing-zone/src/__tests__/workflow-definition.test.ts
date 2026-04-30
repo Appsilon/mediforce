@@ -144,7 +144,7 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     expect(result.data.workspace?.remoteAuth).toBe('GITHUB_TOKEN');
   });
 
-  it('interpret-validation has 5 outgoing classification transitions', () => {
+  it('interpret-validation has 5 classification transitions + an else fallback', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
@@ -152,18 +152,29 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     const interpretTransitions = result.data.transitions.filter(
       (transition) => transition.from === 'interpret-validation',
     );
-    expect(interpretTransitions).toHaveLength(5);
+    expect(interpretTransitions).toHaveLength(6);
 
     const allowedTargets = new Set(['accept-delivery', 'human-review', 'draft-rejection-note']);
     for (const transition of interpretTransitions) {
       expect(transition.when).toBeDefined();
-      expect(transition.when).toContain('output.classification');
       expect(allowedTargets.has(transition.to)).toBe(true);
+    }
+
+    const classificationTransitions = interpretTransitions.filter(
+      (transition) => transition.when !== 'else',
+    );
+    const elseTransitions = interpretTransitions.filter(
+      (transition) => transition.when === 'else',
+    );
+
+    expect(classificationTransitions).toHaveLength(5);
+    for (const transition of classificationTransitions) {
+      expect(transition.when).toContain('output.classification');
     }
 
     const expectedClasses = ['clean', 'minor-fix', 'recovery', 'escalate', 'chaos'];
     for (const className of expectedClasses) {
-      const matching = interpretTransitions.filter((transition) =>
+      const matching = classificationTransitions.filter((transition) =>
         transition.when?.includes(`"${className}"`),
       );
       expect(
@@ -173,7 +184,7 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     }
 
     const targetByClass = new Map<string, string>();
-    for (const transition of interpretTransitions) {
+    for (const transition of classificationTransitions) {
       const matched = expectedClasses.find((className) =>
         transition.when?.includes(`"${className}"`),
       );
@@ -184,6 +195,9 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     expect(targetByClass.get('recovery')).toBe('human-review');
     expect(targetByClass.get('escalate')).toBe('draft-rejection-note');
     expect(targetByClass.get('chaos')).toBe('draft-rejection-note');
+
+    expect(elseTransitions).toHaveLength(1);
+    expect(elseTransitions[0].to).toBe('human-review');
   });
 
   it('human-review verdicts unchanged (approve/revise routes preserved)', () => {
