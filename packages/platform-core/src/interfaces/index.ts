@@ -1,7 +1,7 @@
 export type { AuditRepository } from './audit-repository.js';
 export type { AuthService, AuthUser } from './auth-service.js';
 export type { ProcessRepository, WorkflowDefinitionListResult, WorkflowDefinitionGroup } from './process-repository.js';
-export type { ProcessInstanceRepository } from './process-instance-repository.js';
+export type { ProcessInstanceRepository, ListInstancesOptions } from './process-instance-repository.js';
 export type { HumanTaskRepository } from './human-task-repository.js';
 export type { HandoffRepository } from './handoff-repository.js';
 export type { NotificationService, NotificationEvent, NotificationTarget } from './notification-service.js';

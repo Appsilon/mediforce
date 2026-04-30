@@ -5,6 +5,7 @@ import {
   type ProcessInstance,
   type InstanceStatus,
   type StepExecution,
+  type ListInstancesOptions,
 } from '@mediforce/platform-core';
 import type { Firestore } from 'firebase-admin/firestore';
 
@@ -47,6 +48,23 @@ export class FirestoreProcessInstanceRepository
       ...updates,
       updatedAt: new Date().toISOString(),
     });
+  }
+
+  async list(options: ListInstancesOptions): Promise<ProcessInstance[]> {
+    let query: FirebaseFirestore.Query = this.db
+      .collection(this.collectionName)
+      .where('deleted', '==', false);
+
+    if (options.definitionName !== undefined) {
+      query = query.where('definitionName', '==', options.definitionName);
+    }
+    if (options.status !== undefined) {
+      query = query.where('status', '==', options.status);
+    }
+    query = query.orderBy('createdAt', 'desc').limit(options.limit ?? 20);
+
+    const snapshot = await query.get();
+    return snapshot.docs.map((d) => ProcessInstanceSchema.parse(d.data()));
   }
 
   async getByStatus(status: InstanceStatus): Promise<ProcessInstance[]> {
