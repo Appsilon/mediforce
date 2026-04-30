@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmailActionHandler } from '../email.js';
 import type { ActionContext } from '../../types.js';
 
@@ -140,6 +140,32 @@ describe('createEmailActionHandler', () => {
     await expect(
       handler({ to: 'c@x.com', subject: 's', body: 'b' }, baseCtx),
     ).rejects.toThrow('rate limit');
+  });
+
+  it('enforces per-minute sliding window', async () => {
+    const sendEmail = vi.fn().mockResolvedValue({ messageId: 'msg' });
+    const handler = createEmailActionHandler(sendEmail, { perRun: 100, perMinute: 2 });
+
+    let now = 1000000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+
+    await handler({ to: 'a@x.com', subject: 's', body: 'b' },
+      { ...baseCtx, processInstanceId: 'p-1' });
+    await handler({ to: 'b@x.com', subject: 's', body: 'b' },
+      { ...baseCtx, processInstanceId: 'p-2' });
+
+    await expect(
+      handler({ to: 'c@x.com', subject: 's', body: 'b' },
+        { ...baseCtx, processInstanceId: 'p-3' }),
+    ).rejects.toThrow('Email rate limit exceeded: 2 emails per minute');
+
+    // Advance past 60s window — should succeed again
+    now += 61_000;
+    await handler({ to: 'd@x.com', subject: 's', body: 'b' },
+      { ...baseCtx, processInstanceId: 'p-4' });
+
+    expect(sendEmail).toHaveBeenCalledTimes(3);
+    vi.restoreAllMocks();
   });
 
   it('propagates sendEmail errors', async () => {

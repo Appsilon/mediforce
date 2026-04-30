@@ -44,10 +44,6 @@ export const ReshapeActionConfigSchema = z.object({
   values: z.record(z.string(), z.unknown()),
 });
 
-/** email action config: send an email via the platform email provider.
- *  All string fields support `${...}` interpolation. `to` accepts a single
- *  address string or an array — a sole-placeholder returning an array at
- *  runtime is also handled by the handler. */
 export const EmailActionConfigSchema = z.object({
   to: z.union([z.string().min(1), z.array(z.string().min(1))]),
   cc: z.array(z.string()).optional(),

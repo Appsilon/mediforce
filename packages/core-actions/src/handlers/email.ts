@@ -1,23 +1,8 @@
-import type { EmailActionConfig } from '@mediforce/platform-core';
+import type { EmailActionConfig, SendEmailFn } from '@mediforce/platform-core';
 import { interpolate } from '../interpolation.js';
 import type { EmailActionHandler, InterpolationSources } from '../types.js';
 
-export interface SendEmailParams {
-  from?: string;
-  to: string[];
-  cc?: string[];
-  bcc?: string[];
-  replyTo?: string;
-  subject: string;
-  text: string;
-  html?: string;
-}
-
-export interface SendEmailResult {
-  messageId: string;
-}
-
-export type SendEmailFn = (params: SendEmailParams) => Promise<SendEmailResult>;
+export type { SendEmailFn };
 
 export interface EmailRateLimitConfig {
   perRun: number;
@@ -98,8 +83,14 @@ function enforceRateLimit(
   runCounts.set(processInstanceId, currentRunCount + 1);
   minuteTimestamps.push(now);
 
+  // Evict oldest half to bound memory without wiping active run counters
   if (runCounts.size > 10_000) {
+    const entries = [...runCounts.entries()];
+    const half = Math.floor(entries.length / 2);
     runCounts.clear();
+    for (let i = half; i < entries.length; i++) {
+      runCounts.set(entries[i][0], entries[i][1]);
+    }
   }
 }
 
@@ -136,5 +127,12 @@ function interpolateConfig(
   const replyTo = config.replyTo ? String(interpolate(config.replyTo, sources)) : undefined;
   const html = config.html ? String(interpolate(config.html, sources)) : undefined;
 
-  return { to, subject, body, ...(cc ? { cc } : {}), ...(bcc ? { bcc } : {}), ...(from ? { from } : {}), ...(replyTo ? { replyTo } : {}), ...(html ? { html } : {}) };
+  return {
+    to, subject, body,
+    ...(cc ? { cc } : {}),
+    ...(bcc ? { bcc } : {}),
+    ...(from ? { from } : {}),
+    ...(replyTo ? { replyTo } : {}),
+    ...(html ? { html } : {}),
+  };
 }

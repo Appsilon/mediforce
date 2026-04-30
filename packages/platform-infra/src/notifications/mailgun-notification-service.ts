@@ -1,10 +1,7 @@
-import type { NotificationService, NotificationEvent, NotificationTarget } from '@mediforce/platform-core';
-import type { SendEmailParams, SendEmailResult } from '../email/mailgun-client.js';
+import type { NotificationService, NotificationEvent, NotificationTarget, SendEmailFn } from '@mediforce/platform-core';
 
 export class MailgunNotificationService implements NotificationService {
-  constructor(
-    private readonly sendEmail: (params: SendEmailParams) => Promise<SendEmailResult>,
-  ) {}
+  constructor(private readonly sendEmail: SendEmailFn) {}
 
   async send(event: NotificationEvent, targets: NotificationTarget[]): Promise<void> {
     const emailTargets = targets.filter((t) => t.channel === 'email');

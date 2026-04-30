@@ -19,7 +19,7 @@ export { FirestoreHandoffRepository } from './firestore/handoff-repository.js';
 export { MailgunNotificationService } from './notifications/mailgun-notification-service.js';
 export { WebhookNotificationService } from './notifications/webhook-notification-service.js';
 export { createMailgunSender } from './email/mailgun-client.js';
-export type { MailgunConfig, SendEmailParams, SendEmailResult } from './email/mailgun-client.js';
+export type { MailgunConfig } from './email/mailgun-client.js';
 export { FirestoreAgentDefinitionRepository } from './firestore/agent-definition-repository.js';
 export { FirestoreNamespaceRepository } from './firestore/namespace-repository.js';
 export { FirestoreWorkflowSecretsRepository } from './firestore/workflow-secrets-repository.js';

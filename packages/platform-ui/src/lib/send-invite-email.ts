@@ -1,6 +1,4 @@
-import type { SendEmailParams } from '@mediforce/platform-infra';
-
-type SendEmailFn = (params: SendEmailParams) => Promise<{ messageId: string }>;
+import type { SendEmailFn } from '@mediforce/platform-core';
 
 function escapeHtml(value: string): string {
   return value
