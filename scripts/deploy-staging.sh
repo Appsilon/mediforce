@@ -24,7 +24,7 @@ if [ -n "$USE_PCT" ] && [ "$USE_PCT" -gt 80 ]; then
 fi
 
 export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)
-echo "==> Building (SHA: $NEXT_PUBLIC_GIT_SHA)"
+echo "==> Building compose services (SHA: $NEXT_PUBLIC_GIT_SHA)"
 
 if [ "${2:-}" = "--no-cache" ]; then
   $COMPOSE build --no-cache platform-ui
@@ -32,8 +32,14 @@ else
   $COMPOSE build
 fi
 
+echo "==> Building agent runtime images (golden-image, app containers)"
+bash scripts/rebuild-docker-images.sh
+
 echo "==> Restarting services"
 $COMPOSE up -d --force-recreate
+
+echo "==> Pruning dangling images from previous builds"
+docker image prune -f 2>/dev/null || true
 
 echo "==> Done"
 $COMPOSE ps
