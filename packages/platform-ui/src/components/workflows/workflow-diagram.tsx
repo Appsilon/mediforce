@@ -94,6 +94,7 @@ type BranchPlaceholderNodeData = {
   branchIdx: number;
   isActive: boolean;
   isBackEdge?: boolean;
+  backTargetName?: string;
   onExpand?: () => void;
 };
 
@@ -105,6 +106,7 @@ const NODE_INNER_HEIGHT = 85;
 const ROW_GAP = 58;
 
 const HANDLE_CLASS = '!bg-transparent !border-0 !w-px !h-px';
+const PLACEHOLDER_PREFIX = '__placeholder__';
 
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   const isTerminal = data.stepType === 'terminal';
@@ -239,7 +241,7 @@ function BranchPlaceholderNode({ data }: NodeProps<Node<BranchPlaceholderNodeDat
             ? 'border-primary/50 bg-primary/8 cursor-default'
             : 'border-dashed border-slate-200 dark:border-slate-700 bg-background hover:border-primary/50 hover:bg-primary/5 cursor-pointer',
         )}
-        title={data.isBackEdge ? `Returns to: ${data.label}` : data.isActive ? `Active: ${data.label}` : `Show: ${data.label}`}
+        title={data.isBackEdge ? `Returns to: ${data.backTargetName ?? data.label}` : data.isActive ? `Active: ${data.label}` : `Show: ${data.label}`}
       >
         <div className={cn(
           'h-2 w-2 rounded-full shrink-0 transition-colors',
@@ -446,7 +448,7 @@ const edgeTypes = { addStep: AddStepEdge };
 
 type LayoutItem =
   | { kind: 'step'; stepId: string }
-  | { kind: 'placeholder'; id: string; fromStepId: string; branchIdx: number; label: string; isActive: boolean; isBackEdge?: boolean };
+  | { kind: 'placeholder'; id: string; fromStepId: string; branchIdx: number; label: string; isActive: boolean; isBackEdge?: boolean; backTargetName?: string };
 
 function shortenCondition(raw: string | undefined): string | undefined {
   return raw
@@ -554,13 +556,13 @@ function buildLayout(
       const rawIdx = expandedBranches.get(current) ?? 0;
       const expandedIdx = rawIdx < forwardOuts.length ? rawIdx : 0;
 
-      branchStepToFirstButton.push({ stepId: current, firstButtonId: `__placeholder__${current}__0` });
+      branchStepToFirstButton.push({ stepId: current, firstButtonId: `${PLACEHOLDER_PREFIX}${current}__0` });
 
       // Forward buttons first (stable indices for accordion state)
       for (let fi = 0; fi < forwardOuts.length; fi++) {
         const { to, label } = forwardOuts[fi];
         const isActive = fi === expandedIdx;
-        const id = `__placeholder__${current}__${fi}`;
+        const id = `${PLACEHOLDER_PREFIX}${current}__${fi}`;
         layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: fi, label: shortenCondition(label) ?? `Branch ${fi + 1}`, isActive, isBackEdge: false });
         if (isActive) {
           if (to) activeButtonToFirstStep.push({ buttonId: id, toStepId: to });
@@ -571,8 +573,9 @@ function buildLayout(
       // Back-edge buttons after forward buttons
       for (let bi = 0; bi < backOuts.length; bi++) {
         const { to, label } = backOuts[bi];
-        const id = `__placeholder__${current}__${forwardOuts.length + bi}`;
-        layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: forwardOuts.length + bi, label: shortenCondition(label) ?? `Back ${bi + 1}`, isActive: false, isBackEdge: true });
+        const id = `${PLACEHOLDER_PREFIX}${current}__${forwardOuts.length + bi}`;
+        const backTargetName = to ? stepMap.get(to)?.name : undefined;
+        layoutItems.push({ kind: 'placeholder', id, fromStepId: current, branchIdx: forwardOuts.length + bi, label: shortenCondition(label) ?? `Back ${bi + 1}`, isActive: false, isBackEdge: true, backTargetName });
         if (to) backEdgeButtonToTarget.push({ buttonId: id, targetStepId: to });
       }
     }
@@ -624,6 +627,7 @@ function buildLayout(
           branchIdx: item.branchIdx,
           isActive: item.isActive,
           isBackEdge: item.isBackEdge ?? false,
+          backTargetName: item.backTargetName,
         } as BranchPlaceholderNodeData,
       });
       currentY += PLACEHOLDER_ROW_HEIGHT;
@@ -733,6 +737,10 @@ interface WorkflowDiagramProps {
 export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, onPaneClick, selectedStepId, errorStepIds, canMoveUp, canMoveDown }: WorkflowDiagramProps) {
   const [expandedBranches, setExpandedBranches] = useState<Map<string, number>>(new Map());
 
+  useEffect(() => {
+    setExpandedBranches(new Map());
+  }, [definition]);
+
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition, expandedBranches),
     [definition, expandedBranches],
@@ -769,7 +777,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
     });
     const styledEdges: Edge[] = layoutEdges.map((e) => {
       const isForward = e.sourceHandle !== 'right-out';
-      const isPlaceholderEdge = e.target.startsWith('__placeholder__') || e.source.startsWith('__placeholder__');
+      const isPlaceholderEdge = e.target.startsWith(PLACEHOLDER_PREFIX) || e.source.startsWith(PLACEHOLDER_PREFIX);
       if (isForward && onEdgeAdd && !isPlaceholderEdge) {
         return {
           ...e,
@@ -796,6 +804,9 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         style={{ width: '100%', height: `${Math.max(360, height)}px`, ...style }}
       >
         <ReactFlow
+          // ReactFlow infers Node<StepNodeData> from nodeTypes; mixed node types
+          // (step + branchPlaceholder) require this cast. Safe at runtime because
+          // nodeTypes dispatches rendering by the `type` string, not the generic.
           nodes={nodes as Node<StepNodeData>[]}
           edges={edges}
           nodeTypes={nodeTypes}
