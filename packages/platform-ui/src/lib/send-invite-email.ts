@@ -1,3 +1,5 @@
+import type { SendEmailFn } from '@mediforce/platform-core';
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -38,56 +40,19 @@ function emailLayout(senderName: string, bodyHtml: string, footerText: string): 
 </html>`;
 }
 
-async function sendMailgunMessage(params: {
-  toEmail: string;
-  subject: string;
-  text: string;
-  html: string;
-  fromEmail: string;
-  senderName: string;
-  mailgunApiKey: string;
-  mailgunDomain: string;
-}): Promise<void> {
-  const from = `${params.senderName} <${params.fromEmail}>`;
-  const formData = new URLSearchParams();
-  formData.append('from', from);
-  formData.append('to', params.toEmail);
-  formData.append('subject', params.subject);
-  formData.append('text', params.text);
-  formData.append('html', params.html);
-
-  const credentials = Buffer.from(`api:${params.mailgunApiKey}`).toString('base64');
-  const response = await fetch(
-    `https://api.mailgun.net/v3/${params.mailgunDomain}/messages`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData.toString(),
-    },
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Mailgun error ${response.status}: ${body}`);
-  }
-}
-
 export interface SendWorkspaceNotificationEmailParams {
   toEmail: string;
   inviterName: string;
   workspaceName: string;
   workspaceUrl: string;
   appUrl: string;
-  fromEmail: string;
   senderName: string;
-  mailgunApiKey: string;
-  mailgunDomain: string;
 }
 
-export async function sendWorkspaceNotificationEmail(params: SendWorkspaceNotificationEmailParams): Promise<void> {
+export async function sendWorkspaceNotificationEmail(
+  params: SendWorkspaceNotificationEmailParams,
+  sendEmail: SendEmailFn,
+): Promise<void> {
   const bodyHtml = `
     <p style="margin:0 0 8px;font-size:22px;font-weight:600;color:#09090b;letter-spacing:-0.3px">You've been invited</p>
     <p style="margin:0 0 28px;font-size:15px;color:#71717a;line-height:1.5">
@@ -112,15 +77,11 @@ export async function sendWorkspaceNotificationEmail(params: SendWorkspaceNotifi
     `Open workspace: ${params.workspaceUrl}`,
   ].join('\n');
 
-  await sendMailgunMessage({
-    toEmail: params.toEmail,
+  await sendEmail({
+    to: [params.toEmail],
     subject: `You've been invited to ${params.workspaceName} on ${params.senderName}`,
     text,
     html,
-    fromEmail: params.fromEmail,
-    senderName: params.senderName,
-    mailgunApiKey: params.mailgunApiKey,
-    mailgunDomain: params.mailgunDomain,
   });
 }
 
@@ -128,13 +89,13 @@ export interface SendInviteEmailParams {
   toEmail: string;
   temporaryPassword: string;
   appUrl: string;
-  fromEmail: string;
   senderName: string;
-  mailgunApiKey: string;
-  mailgunDomain: string;
 }
 
-export async function sendInviteEmail(params: SendInviteEmailParams): Promise<void> {
+export async function sendInviteEmail(
+  params: SendInviteEmailParams,
+  sendEmail: SendEmailFn,
+): Promise<void> {
   const loginUrl = `${params.appUrl}/login`;
 
   const bodyHtml = `
@@ -179,14 +140,10 @@ export async function sendInviteEmail(params: SendInviteEmailParams): Promise<vo
     `Sign in at: ${loginUrl}`,
   ].join('\n');
 
-  await sendMailgunMessage({
-    toEmail: params.toEmail,
+  await sendEmail({
+    to: [params.toEmail],
     subject: `You've been invited to ${params.senderName}`,
     text,
     html,
-    fromEmail: params.fromEmail,
-    senderName: params.senderName,
-    mailgunApiKey: params.mailgunApiKey,
-    mailgunDomain: params.mailgunDomain,
   });
 }

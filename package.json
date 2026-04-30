@@ -18,7 +18,8 @@
     "dev:ui:queue": "REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
     "typecheck": "tsc -b --noEmit",
     "start": "pnpm --filter @mediforce/platform-ui start",
-    "migrate:handles": "tsx scripts/migrate-user-handles.ts"
+    "migrate:handles": "tsx scripts/migrate-user-handles.ts",
+    "link:cli": "python3 scripts/link-cli.py"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

@@ -44,17 +44,30 @@ export const ReshapeActionConfigSchema = z.object({
   values: z.record(z.string(), z.unknown()),
 });
 
+export const EmailActionConfigSchema = z.object({
+  to: z.union([z.string().min(1), z.array(z.string().min(1))]),
+  cc: z.array(z.string()).optional(),
+  bcc: z.array(z.string()).optional(),
+  from: z.string().optional(),
+  replyTo: z.string().optional(),
+  subject: z.string().min(1),
+  body: z.string().min(1),
+  html: z.string().optional(),
+});
+
 /** Discriminated union of action configs. Future kinds (wait, subworkflow,
- *  email, set) plug in here. */
+ *  set) plug in here. */
 export const ActionConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('http'), config: HttpActionConfigSchema }),
   z.object({ kind: z.literal('reshape'), config: ReshapeActionConfigSchema }),
+  z.object({ kind: z.literal('email'), config: EmailActionConfigSchema }),
 ]);
 
 export type HttpMethod = z.infer<typeof HttpMethodSchema>;
 export type WebhookTriggerConfig = z.infer<typeof WebhookTriggerConfigSchema>;
 export type HttpActionConfig = z.infer<typeof HttpActionConfigSchema>;
 export type ReshapeActionConfig = z.infer<typeof ReshapeActionConfigSchema>;
+export type EmailActionConfig = z.infer<typeof EmailActionConfigSchema>;
 export type ActionConfig = z.infer<typeof ActionConfigSchema>;
 
 export const WorkflowAgentConfigSchema = z.object({
