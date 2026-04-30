@@ -67,21 +67,21 @@ describe('getWorkflowStatus', () => {
       const result = getWorkflowStatus({ status: 'paused', pauseReason: 'step_failure', error: 'Docker exit code 1' });
       expect(result.displayStatus).toBe('error');
       expect(result.reason).toBe('Docker exit code 1');
-      expect(result.isRetryable).toBe(true);
+      expect(result.isRetryable).toBe(false);
     });
 
     it('step_failure without error falls back to generic message', () => {
       const result = getWorkflowStatus({ status: 'paused', pauseReason: 'step_failure' });
       expect(result.displayStatus).toBe('error');
       expect(result.reason).toBe('Step execution failed');
-      expect(result.isRetryable).toBe(true);
+      expect(result.isRetryable).toBe(false);
     });
 
-    it('routing_error is retryable', () => {
+    it('routing_error is not retryable', () => {
       const result = getWorkflowStatus({ status: 'paused', pauseReason: 'routing_error' });
       expect(result.displayStatus).toBe('error');
       expect(result.reason).toBe('Workflow routing error');
-      expect(result.isRetryable).toBe(true);
+      expect(result.isRetryable).toBe(false);
     });
 
     it('max_iterations_exceeded is not retryable', () => {
@@ -107,18 +107,18 @@ describe('getWorkflowStatus', () => {
       expect(result.isRetryable).toBe(false);
     });
 
-    it('status=failed with other error is retryable', () => {
+    it('status=failed with other error is not retryable', () => {
       const result = getWorkflowStatus({ status: 'failed', error: 'Agent timeout after 30s' });
       expect(result.displayStatus).toBe('error');
       expect(result.reason).toBe('Agent timeout after 30s');
-      expect(result.isRetryable).toBe(true);
+      expect(result.isRetryable).toBe(false);
     });
 
-    it('status=failed without error uses fallback message and is retryable', () => {
+    it('status=failed without error uses fallback message and is not retryable', () => {
       const result = getWorkflowStatus({ status: 'failed' });
       expect(result.displayStatus).toBe('error');
       expect(result.reason).toBe('Process failed');
-      expect(result.isRetryable).toBe(true);
+      expect(result.isRetryable).toBe(false);
     });
 
     it('unknown pause reason falls back to error', () => {
