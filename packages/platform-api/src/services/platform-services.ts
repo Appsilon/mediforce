@@ -111,12 +111,28 @@ export function getPlatformServices(): PlatformServices {
     'anthropic/claude-sonnet-4',
   );
 
+  const emailDisabled = process.env.MEDIFORCE_DISABLE_EMAIL === 'true';
   const mailgunApiKey = process.env.MAILGUN_API_KEY ?? '';
   const mailgunDomain = process.env.MAILGUN_DOMAIN ?? '';
   const mailgunFrom = process.env.MAILGUN_FROM_EMAIL ?? '';
   const mailgunSenderName = process.env.MAILGUN_SENDER_NAME ?? 'Mediforce';
 
   const mailgunConfigured = mailgunApiKey !== '' && mailgunDomain !== '' && mailgunFrom !== '';
+  if (!emailDisabled && !mailgunConfigured) {
+    const missing = [
+      !mailgunApiKey && 'MAILGUN_API_KEY',
+      !mailgunDomain && 'MAILGUN_DOMAIN',
+      !mailgunFrom && 'MAILGUN_FROM_EMAIL',
+    ].filter(Boolean).join(', ');
+    throw new Error(
+      `Email is enabled but Mailgun config incomplete (missing: ${missing}). ` +
+      `Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.`,
+    );
+  }
+  if (emailDisabled) {
+    console.log('[platform-services] MEDIFORCE_DISABLE_EMAIL=true — email handler and notifications disabled');
+  }
+
   const mailgunSender = mailgunConfigured
     ? createMailgunSender({
         apiKey: mailgunApiKey,
