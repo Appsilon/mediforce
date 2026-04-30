@@ -126,7 +126,7 @@ export function ProcessDetail({
   const [cancelError, setCancelError] = React.useState<string | null>(null);
 
   const canCancel = wfStatus.displayStatus === 'in_progress' || wfStatus.displayStatus === 'waiting_for_human';
-  const canArchive = wfStatus.displayStatus === 'completed' || wfStatus.displayStatus === 'error';
+  const canArchive = wfStatus.displayStatus === 'completed' || wfStatus.displayStatus === 'error' || wfStatus.displayStatus === 'cancelled';
   const [archiving, setArchiving] = React.useState(false);
 
   async function handleArchiveToggle() {

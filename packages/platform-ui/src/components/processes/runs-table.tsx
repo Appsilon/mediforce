@@ -31,7 +31,7 @@ function isCancellable(run: ProcessInstance): boolean {
 
 function isArchivable(run: ProcessInstance): boolean {
   const { displayStatus } = getWorkflowStatus(run);
-  return (displayStatus === 'completed' || displayStatus === 'error') && run.archived !== true;
+  return (displayStatus === 'completed' || displayStatus === 'error' || displayStatus === 'cancelled') && run.archived !== true;
 }
 
 export function RunsTable({
