@@ -65,6 +65,19 @@
       }
     },
     {
+      "id": "validate-custom",
+      "name": "Validate (custom R rules)",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Run study-specific validation rules (layer 2) using R + pointblank against the delivered .xpt files. Rules defined in validation-rules.yaml owned by data managers. Outputs custom-findings.json with per-rule pass/fail results.",
+      "agent": {
+        "image": "mediforce-landing-zone:latest",
+        "command": "Rscript /workspace/validate_custom.R /workspace/incoming/$(ls /workspace/incoming/ | tail -1) /workspace/validation-rules.yaml /output/result.json"
+      }
+    },
+    {
       "id": "interpret-validation",
       "name": "Interpret validation",
       "type": "creation",
@@ -142,7 +155,8 @@
   "transitions": [
     { "from": "sftp-poll", "to": "no-deliveries", "when": "output.newFiles.length == 0" },
     { "from": "sftp-poll", "to": "validate-script", "when": "output.newFiles.length > 0" },
-    { "from": "validate-script", "to": "interpret-validation" },
+    { "from": "validate-script", "to": "validate-custom" },
+    { "from": "validate-custom", "to": "interpret-validation" },
     { "from": "interpret-validation", "to": "accept-delivery", "when": "output.classification == \"clean\"" },
     { "from": "interpret-validation", "to": "human-review", "when": "output.classification == \"minor-fix\"" },
     { "from": "interpret-validation", "to": "human-review", "when": "output.classification == \"recovery\"" },

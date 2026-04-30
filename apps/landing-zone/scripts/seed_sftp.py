@@ -2,7 +2,7 @@
 """Seed the mock SFTP staging dir with files from a demo variant.
 
 Runs on the host as a developer helper — copies files from
-`studies/{study}/data/{variant}/` into `studies/{study}/data/sftp-staging/`,
+`sample-data/{variant}/` into `sample-data/sftp-staging/`,
 which is mounted into the atmoz/sftp container at /home/cro/upload.
 
 Operator simulates a "new delivery arrives" by:
@@ -19,7 +19,7 @@ simple proxy for "this delivery is overdue".
 
 Usage:
     python apps/landing-zone/scripts/seed_sftp.py --variant clean
-    python apps/landing-zone/scripts/seed_sftp.py --variant mess-late --study CDISCPILOT01
+    python apps/landing-zone/scripts/seed_sftp.py --variant mess-late
 """
 
 from __future__ import annotations
@@ -40,9 +40,9 @@ VARIANTS = (
     "mess-inconsistent-values",
 )
 
-# How far back to set mtimes for the `mess-late` variant. The contract in
-# studies/CDISCPILOT01/config.yaml expects weekly SDTM deliveries, so 14
-# days places the files clearly past the deadline.
+# How far back to set mtimes for the `mess-late` variant. The study
+# contract expects weekly SDTM deliveries, so 14 days places the files
+# clearly past the deadline.
 LATE_OFFSET_DAYS = 14
 
 
@@ -53,7 +53,6 @@ def repo_root() -> Path:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--variant", required=True, choices=VARIANTS, help="Demo data variant to drop into SFTP staging.")
-    parser.add_argument("--study", default="CDISCPILOT01", help="Study ID (default: CDISCPILOT01).")
     return parser.parse_args()
 
 
@@ -95,9 +94,9 @@ def backdate(files: list[Path], days: int) -> None:
 def main() -> int:
     args = parse_args()
 
-    study_data = repo_root() / "apps" / "landing-zone" / "studies" / args.study / "data"
-    source = study_data / args.variant
-    staging = study_data / "sftp-staging"
+    sample_data = repo_root() / "apps" / "landing-zone" / "sample-data"
+    source = sample_data / args.variant
+    staging = sample_data / "sftp-staging"
 
     if not source.is_dir():
         print(

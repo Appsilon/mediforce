@@ -4,14 +4,7 @@ Items deferred from v0.1 scope. Re-evaluate when phase noted starts.
 
 ## Configs storage — extract to dedicated repo (C1)
 
-**v0.1:** Configs in monorepo at `apps/landing-zone/studies/{study-id}/config.yaml`.
-
-**Future:** Move to dedicated repo `mediforce-landing-zone-study-demo` when any of:
-- 2+ studies onboarded
-- Separate review cadence needed for configs vs platform code
-- Cleaning rules PR target (v0.2) makes more sense in dedicated repo (cleaner audit, separate access control for data managers)
-
-At cutover: set `WD.workspace.remote = "Appsilon/mediforce-landing-zone-study-demo"`. Cleaning rules step pushes feature branch + opens PR there.
+**Done.** Study config moved to dedicated repo `Appsilon/mediforce-landing-zone-study-demo`. WD `workspace.remote` points there. Sample data for demos stays in monorepo at `apps/landing-zone/sample-data/`.
 
 ## SFTP integrity hash
 
