@@ -1,48 +1,29 @@
 'use server';
 
-import { stringify as yamlStringify, parse as parseYaml } from 'yaml';
 import { getPlatformServices } from '@/lib/platform-services';
 import {
-  parseProcessDefinition,
   parseWorkflowDefinitionForCreation,
 } from '@mediforce/platform-core';
-import type { ProcessDefinition, ProcessConfig, WorkflowDefinition } from '@mediforce/platform-core';
-import { DefinitionVersionAlreadyExistsError, WorkflowDefinitionVersionAlreadyExistsError, getAdminFirestore } from '@mediforce/platform-infra';
+import type { WorkflowDefinition } from '@mediforce/platform-core';
+import { WorkflowDefinitionVersionAlreadyExistsError, getAdminFirestore } from '@mediforce/platform-infra';
 
 export type SaveDefinitionResult =
   | { success: true; name: string; version: string }
   | { success: false; error: string };
 
-export async function definitionToYaml(definition: Record<string, unknown>): Promise<string> {
-  const { id, ...def } = definition;
-  void id;
-  return yamlStringify(def, { indent: 2 });
-}
-
 /**
- * Build a default "all-human" ProcessConfig from a definition.
- * @deprecated Legacy — use WorkflowDefinition instead.
+ * Save a workflow definition. Accepts raw input and auto-assigns
+ * the next version number.
  */
-function buildAllHumanConfig(definition: ProcessDefinition): ProcessConfig {
-  return {
-    processName: definition.name,
-    configName: 'all-human',
-    configVersion: '1',
-    stepConfigs: definition.steps
-      .filter((s) => s.type !== 'terminal')
-      .map((s) => ({ stepId: s.id, executorType: 'human' as const })),
-  };
-}
-
-/** @deprecated Legacy — saves ProcessDefinition + auto-creates all-human config. */
 export async function saveDefinition(yaml: string, namespace?: string): Promise<SaveDefinitionResult> {
   if (!yaml.trim()) {
     return { success: false, error: 'YAML content is required.' };
   }
 
-  // Parse YAML once so we can inspect the version field type.
+  // Parse YAML
   let raw: unknown;
   try {
+    const { parse: parseYaml } = await import('yaml');
     raw = parseYaml(yaml);
   } catch (err) {
     return { success: false, error: `YAML syntax error: ${(err as Error).message}` };
@@ -51,51 +32,18 @@ export async function saveDefinition(yaml: string, namespace?: string): Promise<
     return { success: false, error: 'YAML document is empty or contains only comments.' };
   }
 
-  // WorkflowDefinition uses an integer version; ProcessDefinition uses a semver string.
-  // Route to the correct collection based on the version field type.
-  if (typeof (raw as Record<string, unknown>).version === 'number') {
-    const { version: _v, createdAt: _c, ...rest } = raw as Record<string, unknown>;
-    const input: unknown = {
-      ...rest,
-      namespace: namespace ?? (rest.namespace as string | undefined),
-    };
-    const result = await saveWorkflowDefinition(input);
-    if (!result.success) return result;
-    return { success: true, name: result.name, version: String(result.version) };
-  }
-
-  // Legacy ProcessDefinition path (semver version string).
-  const result = parseProcessDefinition(yaml);
-  if (!result.success) {
-    return { success: false, error: result.error };
-  }
-
-  if (namespace) {
-    (result.data as Record<string, unknown>).namespace = namespace;
-  }
-
-  const { processRepo } = getPlatformServices();
-
-  try {
-    await processRepo.saveProcessDefinition(result.data);
-    const existing = await processRepo.getProcessConfig(result.data.name, 'all-human', 'v1');
-    if (!existing) {
-      await processRepo.saveProcessConfig(buildAllHumanConfig(result.data));
-    }
-    return { success: true, name: result.data.name, version: result.data.version };
-  } catch (e) {
-    if (e instanceof DefinitionVersionAlreadyExistsError) {
-      return {
-        success: false,
-        error: `Version ${result.data.version} already exists for "${result.data.name}". Bump the version in your YAML.`,
-      };
-    }
-    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
-  }
+  const { version: _v, createdAt: _c, ...rest } = raw as Record<string, unknown>;
+  const input: unknown = {
+    ...rest,
+    namespace: namespace ?? (rest.namespace as string | undefined),
+  };
+  const result = await saveWorkflowDefinition(input);
+  if (!result.success) return result;
+  return { success: true, name: result.name, version: String(result.version) };
 }
 
 // ---------------------------------------------------------------------------
-// WorkflowDefinition (new unified schema)
+// WorkflowDefinition (unified schema)
 // ---------------------------------------------------------------------------
 
 export type ValidationIssue = { path: (string | number)[]; message: string };
@@ -140,7 +88,7 @@ export async function saveWorkflowDefinition(
     return { success: true, name: definition.name, version: definition.version };
   } catch (e) {
     if (e instanceof WorkflowDefinitionVersionAlreadyExistsError) {
-      return { success: false, error: 'Version conflict — please retry.' };
+      return { success: false, error: 'Version conflict -- please retry.' };
     }
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
   }
@@ -183,35 +131,6 @@ export async function setProcessArchived(
   const { processRepo } = getPlatformServices();
   try {
     await processRepo.setProcessArchived(processName, archived);
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
-  }
-}
-
-export async function setConfigArchived(
-  processName: string,
-  configName: string,
-  configVersion: string,
-  archived: boolean,
-): Promise<ArchiveResult> {
-  const { processRepo } = getPlatformServices();
-  try {
-    await processRepo.setConfigArchived(processName, configName, configVersion, archived);
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
-  }
-}
-
-export async function setDefinitionVersionArchived(
-  name: string,
-  version: string,
-  archived: boolean,
-): Promise<ArchiveResult> {
-  const { processRepo } = getPlatformServices();
-  try {
-    await processRepo.setDefinitionVersionArchived(name, version, archived);
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };

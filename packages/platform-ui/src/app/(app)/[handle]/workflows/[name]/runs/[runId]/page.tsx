@@ -2,14 +2,12 @@
 
 import { useParams } from 'next/navigation';
 import { useMemo } from 'react';
-import type { StepExecution, AuditEvent, Step, WorkflowStep } from '@mediforce/platform-core';
+import type { StepExecution, AuditEvent, WorkflowStep } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useAuditEvents } from '@/hooks/use-audit-events';
-import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
-import { useProcessConfig } from '@/hooks/use-process-config';
-import { ProcessDetail } from '@/components/processes/process-detail';
 import { resolveDefinitionSteps } from '@/lib/resolve-definition-steps';
+import { ProcessDetail } from '@/components/processes/process-detail';
 
 type AuditEventWithId = AuditEvent & { id: string };
 type StepExecutionWithId = StepExecution;
@@ -30,47 +28,16 @@ export default function RunDetailPage() {
   );
   const { data: auditEvents, loading: auditLoading, error: auditError } = useAuditEvents(runId ?? null);
 
-  // Load process definition to get steps for the StepStatusPanel
-  // Try both legacy processDefinitions and new workflowDefinitions
-  const { versions: legacyVersions } = useProcessDefinitionVersions(decodedName);
+  // Load workflow definitions to get steps for the StepStatusPanel
   const { definitions: workflowVersions } = useWorkflowDefinitions(decodedName);
 
   const definitionSteps = useMemo(
-    () => resolveDefinitionSteps(instance, legacyVersions, workflowVersions),
-    [instance, legacyVersions, workflowVersions],
+    () => resolveDefinitionSteps(instance, workflowVersions),
+    [instance, workflowVersions],
   );
 
-  // Load ProcessConfig to get per-step autonomy levels (3-part key)
-  const { data: processConfig } = useProcessConfig(
-    instance?.definitionName ?? null,
-    instance?.configName ?? null,
-    instance?.configVersion ?? null,
-  );
-
+  // Build step config map from WorkflowStep definitions embedded in WorkflowDefinition.
   const stepConfigMap = useMemo(() => {
-    // Legacy: config stored separately in processConfigs collection
-    if (processConfig?.stepConfigs) {
-      return new Map(
-        processConfig.stepConfigs.map((sc) => [
-          sc.stepId,
-          {
-            executorType: sc.executorType,
-            autonomyLevel: sc.autonomyLevel,
-            plugin: sc.plugin,
-            model: sc.model,
-            confidenceThreshold: sc.confidenceThreshold,
-            fallbackBehavior: sc.fallbackBehavior,
-            timeoutMinutes: sc.timeoutMinutes,
-            reviewerType: sc.reviewerType,
-            agentConfig: sc.agentConfig,
-          },
-        ]),
-      );
-    }
-
-    // New-style: step config is embedded directly in WorkflowStep definitions.
-    // definitionSteps is typed as Step[] but at runtime holds WorkflowStep objects
-    // for new-style workflow runs, so we cast to access the extra fields.
     if (definitionSteps.length > 0) {
       const entries = definitionSteps
         .map((s) => {
@@ -96,7 +63,7 @@ export default function RunDetailPage() {
     }
 
     return undefined;
-  }, [processConfig, definitionSteps]);
+  }, [definitionSteps]);
 
 
   if (instanceLoading) {

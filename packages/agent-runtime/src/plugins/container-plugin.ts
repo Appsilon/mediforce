@@ -200,6 +200,15 @@ export interface CommitRunWorkspaceOptions {
   agentImage?: string;
 }
 
+export interface WorkspaceManagerLike {
+  createRunWorkspace: WorkspaceManager['createRunWorkspace'];
+  commitStep: WorkspaceManager['commitStep'];
+}
+
+export interface ContainerPluginInit {
+  workspaceManager?: WorkspaceManagerLike;
+}
+
 export abstract class ContainerPlugin implements AgentPlugin {
   abstract readonly metadata: PluginCapabilityMetadata;
 
@@ -210,10 +219,18 @@ export abstract class ContainerPlugin implements AgentPlugin {
   protected repoSkillsDir: string | null = null;
   /** Run-scoped git worktree — populated by `resolveRunWorkspace` at run start. */
   protected runWorkspaceHandle: RunWorkspaceHandle | null = null;
-  protected workspaceManager: WorkspaceManager | null = null;
+  protected workspaceManager: WorkspaceManagerLike | null = null;
+
+  constructor(init: ContainerPluginInit = {}) {
+    this.workspaceManager = init.workspaceManager ?? null;
+  }
 
   abstract initialize(context: AgentContext | WorkflowAgentContext): Promise<void>;
   abstract run(emit: EmitFn): Promise<void>;
+
+  protected createWorkspaceManager(): WorkspaceManagerLike {
+    return new WorkspaceManager();
+  }
 
   /**
    * Provision a per-run git worktree. Every step gets one — if the WD has no
@@ -234,7 +251,7 @@ export abstract class ContainerPlugin implements AgentPlugin {
       : undefined;
 
     if (!this.workspaceManager) {
-      this.workspaceManager = new WorkspaceManager();
+      this.workspaceManager = this.createWorkspaceManager();
     }
 
     const remoteToken = workspaceConfig.remoteAuth

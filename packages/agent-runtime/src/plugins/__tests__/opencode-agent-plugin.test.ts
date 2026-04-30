@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { OpenCodeAgentPlugin } from '../opencode-agent-plugin.js';
+import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager.js';
 
 const originalAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
 beforeEach(() => {
@@ -75,7 +76,7 @@ describe('OpenCodeAgentPlugin', () => {
   let plugin: OpenCodeAgentPlugin;
 
   beforeEach(() => {
-    plugin = new OpenCodeAgentPlugin();
+    plugin = new OpenCodeAgentPlugin({ workspaceManager: createFakeWorkspaceManager() });
   });
 
   describe('initialize', () => {

@@ -46,7 +46,11 @@ export default function StepDetailPage() {
 
   const definition = useMemo(() => {
     if (!instance || versions.length === 0) return null;
-    return versions.find((v) => v.version === instance.definitionVersion) ?? null;
+    const versionNum = parseInt(instance.definitionVersion, 10);
+    if (!isNaN(versionNum)) {
+      return versions.find((v) => v.version === versionNum) ?? null;
+    }
+    return versions.find((v) => String(v.version) === instance.definitionVersion) ?? null;
   }, [instance, versions]);
 
   const definitionStep = useMemo((): Step | null => {

@@ -13,6 +13,7 @@ export {
   AgentConfigSchema,
   StepConfigSchema,
   ProcessNotificationConfigSchema,
+  /** @deprecated Legacy schema -- use WorkflowDefinitionSchema instead */
   ProcessConfigSchema,
   FileMetadataSchema,
   AuditEventSchema,
@@ -162,10 +163,8 @@ export type {
   AuthService,
   AuthUser,
   ProcessRepository,
-  DefinitionListResult,
   WorkflowDefinitionListResult,
   WorkflowDefinitionGroup,
-  InvalidDefinitionEntry,
   ProcessInstanceRepository,
   HumanTaskRepository,
   HandoffRepository,

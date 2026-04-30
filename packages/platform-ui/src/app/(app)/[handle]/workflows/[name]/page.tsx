@@ -106,21 +106,21 @@ export default function ProcessDefinitionPage() {
               <p className="text-sm text-muted-foreground mt-0.5">{latest.description}</p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              {(namespaceOverride ?? (latest as unknown as { namespace?: string }).namespace) && (
+              {(namespaceOverride ?? latest?.namespace) && (
                 <>
                   <span className="flex items-center gap-1">
                     Owned by{' '}
                     <Link
-                      href={`/${namespaceOverride ?? (latest as unknown as { namespace?: string }).namespace}`}
+                      href={`/${namespaceOverride ?? latest?.namespace}`}
                       className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-500/20 transition-colors"
                     >
-                      @{namespaceOverride ?? (latest as unknown as { namespace?: string }).namespace}
+                      @{namespaceOverride ?? latest?.namespace}
                     </Link>
                   </span>
                   <span className="text-border">·</span>
                 </>
               )}
-              {latest && <VersionLabel version={latest.version} title={(latest as unknown as { title?: string }).title} />}
+              {latest && <VersionLabel version={latest.version} title={latest.title} />}
               <span className="flex items-center gap-1">
                 <Layers className="h-3 w-3" />
                 {latest?.steps.length} steps

@@ -114,22 +114,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Process definitions: read by authenticated, write by admin
-    match /processDefinitions/{defId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'process-author'];
-      allow delete: if false;
-    }
-
-    // Process configs: read by authenticated, write by admin
-    match /processConfigs/{configId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'process-author'];
-      allow delete: if false;
-    }
-
     match /humanTasks/{taskId} {
       // Read: user with matching role can see the task queue
       allow read: if request.auth != null

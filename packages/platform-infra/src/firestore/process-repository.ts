@@ -1,29 +1,10 @@
 import {
-  ProcessDefinitionSchema,
   WorkflowDefinitionSchema,
   type ProcessRepository,
-  type ProcessDefinition,
-  type ProcessConfig,
-  type DefinitionListResult,
   type WorkflowDefinition,
   type WorkflowDefinitionListResult,
 } from '@mediforce/platform-core';
 import type { Firestore } from 'firebase-admin/firestore';
-
-/**
- * Error thrown when attempting to save a process definition version
- * that already exists. Definition versions are immutable in Firestore
- * to prevent stale references from running process instances.
- */
-export class DefinitionVersionAlreadyExistsError extends Error {
-  constructor(name: string, version: string) {
-    super(
-      `Process definition "${name}" version "${version}" already exists and cannot be overwritten. ` +
-        `Create a new version to change the definition.`,
-    );
-    this.name = 'DefinitionVersionAlreadyExistsError';
-  }
-}
 
 /**
  * Error thrown when attempting to save a workflow definition version
@@ -41,175 +22,16 @@ export class WorkflowDefinitionVersionAlreadyExistsError extends Error {
 }
 
 /**
- * Error thrown when attempting to save a process config version
- * that already exists. Config versions are immutable in Firestore
- * to prevent stale references from running process instances.
- */
-export class ConfigVersionAlreadyExistsError extends Error {
-  constructor(processName: string, configName: string, configVersion: string) {
-    super(
-      `Process config "${processName}" config "${configName}" version "${configVersion}" already exists and cannot be overwritten. ` +
-        `Create a new version to change the config.`,
-    );
-    this.name = 'ConfigVersionAlreadyExistsError';
-  }
-}
-
-/**
  * Firestore implementation of the ProcessRepository interface.
  * Uses composite keys ({name}:{version}) as document IDs.
  *
- * Enforces definition and config version immutability: saving a version that already
- * exists throws DefinitionVersionAlreadyExistsError / ConfigVersionAlreadyExistsError
- * rather than overwriting.
+ * Enforces workflow definition version immutability: saving a version that already
+ * exists throws WorkflowDefinitionVersionAlreadyExistsError rather than overwriting.
  */
 export class FirestoreProcessRepository implements ProcessRepository {
-  private readonly definitionsCollection = 'processDefinitions';
-  private readonly configsCollection = 'processConfigs';
   private readonly workflowDefinitionsCollection = 'workflowDefinitions';
 
   constructor(private readonly db: Firestore) {}
-
-  private compositeKey(name: string, version: string): string {
-    return `${name}:${version}`;
-  }
-
-  async getProcessDefinition(
-    name: string,
-    version: string,
-  ): Promise<ProcessDefinition | null> {
-    const snapshot = await this.db
-      .collection(this.definitionsCollection)
-      .doc(this.compositeKey(name, version))
-      .get();
-
-    if (!snapshot.exists) {
-      return null;
-    }
-
-    return ProcessDefinitionSchema.parse(snapshot.data());
-  }
-
-  async saveProcessDefinition(definition: ProcessDefinition): Promise<void> {
-    const docRef = this.db
-      .collection(this.definitionsCollection)
-      .doc(this.compositeKey(definition.name, definition.version));
-
-    const existing = await docRef.get();
-    if (existing.exists) {
-      throw new DefinitionVersionAlreadyExistsError(
-        definition.name,
-        definition.version,
-      );
-    }
-
-    await docRef.set(definition);
-  }
-
-  async listProcessDefinitions(): Promise<DefinitionListResult> {
-    const snapshot = await this.db.collection(this.definitionsCollection).get();
-    const result: DefinitionListResult = { valid: [], invalid: [] };
-    for (const docSnap of snapshot.docs) {
-      const raw = docSnap.data();
-      const parsed = ProcessDefinitionSchema.safeParse(raw);
-      if (parsed.success) {
-        result.valid.push(parsed.data);
-      } else {
-        console.debug(
-          `[process-repository] Skipping invalid definition document ${docSnap.id}`,
-        );
-        result.invalid.push({ data: raw, error: parsed.error });
-      }
-    }
-    return result;
-  }
-
-  async getProcessConfig(
-    processName: string,
-    configName: string,
-    configVersion: string,
-  ): Promise<ProcessConfig | null> {
-    const configKey = `${processName}:${configName}:${configVersion}`;
-    const snapshot = await this.db
-      .collection(this.configsCollection)
-      .doc(configKey)
-      .get();
-
-    if (!snapshot.exists) {
-      return null;
-    }
-
-    return snapshot.data() as ProcessConfig;
-  }
-
-  async saveProcessConfig(config: ProcessConfig): Promise<void> {
-    const configKey = `${config.processName}:${config.configName}:${config.configVersion}`;
-    const docRef = this.db.collection(this.configsCollection).doc(configKey);
-
-    const existing = await docRef.get();
-    if (existing.exists) {
-      throw new ConfigVersionAlreadyExistsError(
-        config.processName,
-        config.configName,
-        config.configVersion,
-      );
-    }
-
-    await docRef.set(config);
-  }
-
-  async listProcessConfigs(processName: string): Promise<ProcessConfig[]> {
-    const snapshot = await this.db
-      .collection(this.configsCollection)
-      .where('processName', '==', processName)
-      .get();
-    return snapshot.docs.map((d) => d.data() as ProcessConfig);
-  }
-
-  async setProcessArchived(name: string, archived: boolean): Promise<void> {
-    const legacySnapshot = await this.db
-      .collection(this.definitionsCollection)
-      .where('name', '==', name)
-      .get();
-    for (const d of legacySnapshot.docs) {
-      await this.db
-        .collection(this.definitionsCollection)
-        .doc(d.id)
-        .update({ archived });
-    }
-
-    const workflowSnapshot = await this.db
-      .collection(this.workflowDefinitionsCollection)
-      .where('name', '==', name)
-      .get();
-    for (const d of workflowSnapshot.docs) {
-      await this.db
-        .collection(this.workflowDefinitionsCollection)
-        .doc(d.id)
-        .update({ archived });
-    }
-  }
-
-  async setConfigArchived(
-    processName: string,
-    configName: string,
-    configVersion: string,
-    archived: boolean,
-  ): Promise<void> {
-    const configKey = `${processName}:${configName}:${configVersion}`;
-    await this.db.collection(this.configsCollection).doc(configKey).update({ archived });
-  }
-
-  async setDefinitionVersionArchived(
-    name: string,
-    version: string,
-    archived: boolean,
-  ): Promise<void> {
-    await this.db
-      .collection(this.definitionsCollection)
-      .doc(this.compositeKey(name, version))
-      .update({ archived });
-  }
 
   async getWorkflowDefinition(
     name: string,
@@ -220,37 +42,15 @@ export class FirestoreProcessRepository implements ProcessRepository {
       .doc(`${name}:${version}`)
       .get();
 
-    if (snapshot.exists) {
-      const parsed = WorkflowDefinitionSchema.safeParse(snapshot.data());
-      if (parsed.success) return parsed.data;
-      console.warn(
-        `[process-repository] workflowDefinitions parse failed for ${name}:${version}`,
-        parsed.error.format(),
-      );
-    }
+    if (!snapshot.exists) return null;
 
-    const legacySnap = await this.db
-      .collection(this.definitionsCollection)
-      .where('name', '==', name)
-      .get();
-    for (const legacyDoc of legacySnap.docs) {
-      const raw = legacyDoc.data();
-      const rawVersion = raw.version;
-      const normalizedVersion =
-        typeof rawVersion === 'number'
-          ? rawVersion
-          : typeof rawVersion === 'string'
-            ? parseInt(rawVersion, 10)
-            : NaN;
-      if (normalizedVersion !== version) continue;
+    const parsed = WorkflowDefinitionSchema.safeParse(snapshot.data());
+    if (parsed.success) return parsed.data;
 
-      const wfParsed = WorkflowDefinitionSchema.safeParse({ ...raw, version });
-      if (wfParsed.success) return wfParsed.data;
-      console.warn(
-        `[process-repository] legacy processDefinitions parse failed for ${name}:${version}`,
-        wfParsed.error.format(),
-      );
-    }
+    console.warn(
+      `[process-repository] workflowDefinitions parse failed for ${name}:${version}`,
+      parsed.error.format(),
+    );
 
     return null;
   }
@@ -378,18 +178,20 @@ export class FirestoreProcessRepository implements ProcessRepository {
     return latestVersion;
   }
 
-  async setWorkflowDeleted(name: string, deleted: boolean): Promise<void> {
-    const legacySnapshot = await this.db
-      .collection(this.definitionsCollection)
+  async setProcessArchived(name: string, archived: boolean): Promise<void> {
+    const workflowSnapshot = await this.db
+      .collection(this.workflowDefinitionsCollection)
       .where('name', '==', name)
       .get();
-    for (const d of legacySnapshot.docs) {
+    for (const d of workflowSnapshot.docs) {
       await this.db
-        .collection(this.definitionsCollection)
+        .collection(this.workflowDefinitionsCollection)
         .doc(d.id)
-        .update({ deleted });
+        .update({ archived });
     }
+  }
 
+  async setWorkflowDeleted(name: string, deleted: boolean): Promise<void> {
     const workflowSnapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
       .where('name', '==', name)

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import type { StepExecution } from '@mediforce/platform-core';
+import type { StepExecution, WorkflowStep } from '@mediforce/platform-core';
 
 /**
  * GET /api/processes/:instanceId/steps
  *
- * Returns step-by-step input/output for every step in the process definition.
+ * Returns step-by-step input/output for every step in the workflow definition.
  * For agent steps: data comes from step execution records.
  * For human steps: data comes from instance.variables[stepId].
  *
@@ -41,22 +41,18 @@ export async function GET(
       return NextResponse.json({ error: 'Instance not found' }, { status: 404 });
     }
 
-    const definition = await processRepo.getProcessDefinition(
-      instance.definitionName,
-      instance.definitionVersion,
-    );
+    // Load workflow definition
+    const versionNum = parseInt(instance.definitionVersion, 10);
+    const definition = !isNaN(versionNum)
+      ? await processRepo.getWorkflowDefinition(instance.definitionName, versionNum)
+      : null;
+
     if (!definition) {
       return NextResponse.json(
-        { error: 'Process definition not found' },
+        { error: 'Workflow definition not found' },
         { status: 404 },
       );
     }
-
-    const config = await processRepo.getProcessConfig(
-      instance.definitionName,
-      instance.configName ?? '',
-      instance.configVersion ?? '',
-    );
 
     // Fetch all step executions in one query
     const executions = await instanceRepo.getStepExecutions(instanceId);
@@ -81,8 +77,8 @@ export async function GET(
     for (const step of definition.steps) {
       if (step.type === 'terminal') continue;
 
-      const stepConfig = config?.stepConfigs.find((sc) => sc.stepId === step.id);
-      const executorType = stepConfig?.executorType ?? 'unknown';
+      const wfStep = step as WorkflowStep;
+      const executorType = wfStep.executor ?? 'unknown';
       const execution = executionsByStep.get(step.id) ?? null;
       const stepVariables = variables[step.id] ?? null;
 
@@ -91,11 +87,11 @@ export async function GET(
       if (pastCurrentStep) {
         status = 'pending';
       } else if (step.id === currentStepId) {
-        // Current step — could be running or waiting
+        // Current step -- could be running or waiting
         status = 'running';
         pastCurrentStep = true;
       } else {
-        // Before current step — check if we have output
+        // Before current step -- check if we have output
         const hasOutput = execution?.output !== null || stepVariables !== null;
         status = hasOutput ? 'completed' : 'pending';
       }
@@ -120,7 +116,7 @@ export async function GET(
       } else if (executorType === 'human') {
         // Human steps: the step definition describes what's expected,
         // the output is whatever was submitted (stored in variables)
-        input = step.ui ? { ui: step.ui } : null;
+        input = wfStep.ui ? { ui: wfStep.ui } : null;
         output = stepVariables;
       }
 

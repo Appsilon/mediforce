@@ -3,9 +3,8 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowRight, Bot, User, CheckCircle2, Loader2 } from 'lucide-react';
-import type { StepExecution, ProcessDefinition, ProcessConfig } from '@mediforce/platform-core';
+import type { StepExecution, WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { useSubcollection, useProcessInstance } from '@/hooks/use-process-instances';
-import { useProcessConfig } from '@/hooks/use-process-config';
 import { useCollection } from '@/hooks/use-collection';
 import { where } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
@@ -24,7 +23,7 @@ function formatStepName(stepId: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-type DefinitionDoc = ProcessDefinition & { id: string };
+type WorkflowDefinitionDoc = WorkflowDefinition & { id: string };
 
 export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const handle = useHandleFromPath();
@@ -46,29 +45,32 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
 
   const nextStepId = stepExecution?.gateResult?.next ?? null;
 
-  // Fetch definition to get step metadata
+  // Fetch workflow definition to get step metadata
   const definitionConstraints = React.useMemo(
     () =>
       instance
         ? [
             where('name', '==', instance.definitionName),
-            where('version', '==', instance.definitionVersion),
           ]
         : [],
-    [instance?.definitionName, instance?.definitionVersion], // eslint-disable-line react-hooks/exhaustive-deps
+    [instance?.definitionName], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const { data: definitions, loading: defLoading } = useCollection<DefinitionDoc>(
-    'processDefinitions',
+  const { data: definitions, loading: defLoading } = useCollection<WorkflowDefinitionDoc>(
+    instance ? 'workflowDefinitions' : '',
     definitionConstraints,
   );
-  const definition = definitions[0] ?? null;
 
-  // Fetch config for executor type info
-  const { data: config, loading: configLoading } = useProcessConfig(
-    instance?.definitionName ?? null,
-    instance?.configName ?? null,
-    instance?.configVersion ?? null,
-  );
+  // Find the matching version, or fall back to latest
+  const definition = React.useMemo(() => {
+    if (definitions.length === 0 || !instance) return null;
+    const versionNum = parseInt(instance.definitionVersion, 10);
+    if (!isNaN(versionNum)) {
+      const match = definitions.find((d) => d.version === versionNum);
+      if (match) return match;
+    }
+    // Fall back to latest version
+    return [...definitions].sort((a, b) => b.version - a.version)[0] ?? null;
+  }, [definitions, instance]);
 
   // Find next human task (if one was created for the next step)
   const nextTaskConstraints = React.useMemo(
@@ -87,7 +89,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   );
   const nextHumanTask = nextTasks[0] ?? null;
 
-  const loading = execLoading || instanceLoading || defLoading || configLoading;
+  const loading = execLoading || instanceLoading || defLoading;
 
   if (loading) {
     return (
@@ -98,13 +100,12 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
     );
   }
 
-  // No step execution found or no gate result — nothing to show
+  // No step execution found or no gate result -- nothing to show
   if (!stepExecution || !nextStepId) return null;
 
-  const nextStep = definition?.steps.find((s) => s.id === nextStepId);
-  const nextStepConfig = config?.stepConfigs.find((sc) => sc.stepId === nextStepId);
+  const nextStep = definition?.steps.find((s) => s.id === nextStepId) as WorkflowStep | undefined;
   const isTerminal = nextStep?.type === 'terminal';
-  const executorType = nextStepConfig?.executorType ?? null;
+  const executorType = nextStep?.executor ?? null;
   const processCompleted = instance?.status === 'completed';
 
   // Build the run link
@@ -209,7 +210,7 @@ function StepDescription({
     if (nextHumanTask.status === 'completed') {
       parts.push(`Completed by ${roleLabel}`);
     } else if (nextHumanTask.status === 'claimed') {
-      parts.push(`Claimed — assigned to ${roleLabel}`);
+      parts.push(`Claimed -- assigned to ${roleLabel}`);
     } else {
       parts.push(`Waiting for ${roleLabel}`);
     }
@@ -221,7 +222,7 @@ function StepDescription({
     parts.push(reason);
   }
 
-  return <>{parts.join(' — ')}</>;
+  return <>{parts.join(' -- ')}</>;
 }
 
 function StepLink({
@@ -239,7 +240,7 @@ function StepLink({
   runHref: string | null;
   handle: string;
 }) {
-  // Human step with a task → link to the task
+  // Human step with a task -> link to the task
   if (!isTerminal && !processCompleted && executorType === 'human' && nextHumanTask) {
     return (
       <Link
@@ -255,7 +256,7 @@ function StepLink({
     );
   }
 
-  // Agent step or terminal → link to the run view
+  // Agent step or terminal -> link to the run view
   if (runHref) {
     return (
       <Link

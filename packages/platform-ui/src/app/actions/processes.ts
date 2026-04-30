@@ -51,54 +51,6 @@ export async function startWorkflowRun(
   }
 }
 
-/** @deprecated Use startWorkflowRun instead */
-interface StartRunInput {
-  definitionName: string;
-  definitionVersion: string;
-  configName: string;
-  configVersion: string;
-  triggeredBy: string;
-}
-
-export async function startProcessRun(
-  input: StartRunInput,
-): Promise<{ success: boolean; instanceId?: string; error?: string }> {
-  try {
-    const { manualTrigger } = getPlatformServices();
-
-    const result = await manualTrigger.fireWorkflow({
-      definitionName: input.definitionName,
-      definitionVersion: Number(input.definitionVersion),
-      triggerName: 'start',
-      triggeredBy: input.triggeredBy,
-      payload: {},
-    });
-
-    // Fire-and-forget: trigger auto-runner asynchronously
-    const baseUrl = getAppBaseUrl();
-    fetch(`${baseUrl}/api/processes/${result.instanceId}/run`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
-      },
-      body: JSON.stringify({
-        appContext: {},
-        triggeredBy: input.triggeredBy,
-      }),
-    }).catch((err) => {
-      console.error(`[auto-runner] Failed to trigger run for ${result.instanceId}:`, err);
-    });
-
-    return { success: true, instanceId: result.instanceId };
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : 'Unknown error',
-    };
-  }
-}
-
 export async function resumeProcessRun(
   instanceId: string,
 ): Promise<{ success: boolean; error?: string }> {
