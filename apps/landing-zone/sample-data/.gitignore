@@ -1,0 +1,11 @@
+# CDISC Pilot 3 source data is fetched on demand by fetch_clean.py; not vendored.
+# Mess variants are derived by inject_variants.py and likewise not vendored.
+clean/
+injection/
+mess-encoding/
+mess-missing-domain/
+mess-inconsistent-values/
+
+# Demo deliveries dropped into the mock SFTP — keep the dir, ignore the files.
+sftp-staging/*
+!sftp-staging/.gitkeep

@@ -3,8 +3,8 @@
 # Single user `cro` with password `cro`. This is a LOCAL DEV CREDENTIAL ONLY —
 # not a real secret. Real CRO endpoints (Hetzner staging) are v0.2+.
 #
-# The host directory studies/CDISCPILOT01/data/sftp-staging/ is mounted as
-# the user's upload dir. Files dropped there appear on SFTP at /upload.
+# The host directory sample-data/sftp-staging/ is mounted as the user's
+# upload dir. Files dropped there appear on SFTP at /upload.
 # Use scripts/seed_sftp.py to populate it from the demo variants.
 #
 # Bind on 127.0.0.1 only — do not expose this container to the network.
@@ -23,5 +23,5 @@ services:
     ports:
       - "127.0.0.1:2222:22"
     volumes:
-      - ./studies/CDISCPILOT01/data/sftp-staging:/home/cro/upload
+      - ./sample-data/sftp-staging:/home/cro/upload
     restart: unless-stopped
