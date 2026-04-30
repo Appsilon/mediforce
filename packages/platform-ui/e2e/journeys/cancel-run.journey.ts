@@ -25,8 +25,8 @@ test.describe('Cancel Run Journey', () => {
     await expect(page.getByText(/cannot be undone/i)).toBeVisible();
     await click(page, page.getByRole('button', { name: /confirm cancel/i }));
 
-    // Run shows "Error" badge after cancellation (cancelled runs map to the error display status)
-    await expect(page.getByText(/^error$/i).first()).toBeVisible({ timeout: 10_000 });
+    // Run shows "Cancelled" badge after cancellation (distinct gray badge, not Error)
+    await expect(page.getByText(/^cancelled$/i).first()).toBeVisible({ timeout: 10_000 });
     await showResult(page);
     await endRecording(page);
   });
