@@ -17,6 +17,7 @@ export const AgentConfigSchema = z.object({
   model: z.string().optional(),
   skillsDir: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
+  timeoutMinutes: z.number().optional(),
   command: z.string().optional(),
   inlineScript: z.string().optional(),
   runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),

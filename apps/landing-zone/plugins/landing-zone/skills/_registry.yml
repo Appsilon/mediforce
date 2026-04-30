@@ -1,7 +1,7 @@
 version: "1.0"
-generated: "2026-04-28"
+generated: "2026-04-30"
 standard: "agentskills.io/specification"
-total_skills: 2
+total_skills: 3
 
 domains:
   landing-zone:
@@ -17,3 +17,8 @@ domains:
         complexity: intermediate
         language: multi
         description: Compose a markdown rejection note for the operator to forward to the CRO after a delivery is rejected
+      - id: propose-rules
+        path: propose-rules/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Propose new validation-rules.yaml entries based on rejection findings; append-only, schema-checked; outputs PR title and body for downstream PR-opening step
