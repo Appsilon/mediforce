@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getAdminAuth, getAdminFirestore, FirebaseInviteService } from '@mediforce/platform-infra';
+import { getAdminAuth, getAdminFirestore, FirebaseInviteService, createMailgunSender } from '@mediforce/platform-infra';
 import { sendInviteEmail, sendWorkspaceNotificationEmail } from '@/lib/send-invite-email';
 
 const InviteBodySchema = z.object({
@@ -100,9 +100,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       typeof fromEmail === 'string' && fromEmail !== '';
 
     if (mailgunConfigured) {
+      const sendEmail = createMailgunSender({
+        apiKey: mailgunApiKey as string,
+        domain: mailgunDomain as string,
+        defaultFrom: fromEmail as string,
+        defaultSenderName: senderName,
+      });
+
       try {
         if (isExisting && typeof namespaceHandle === 'string' && namespaceHandle.trim() !== '') {
-          // Existing user — look up workspace display name, send notification email only
           const namespaceDoc = await adminDb.collection('namespaces').doc(namespaceHandle).get();
           const workspaceName = namespaceDoc.exists
             ? (namespaceDoc.data()?.displayName as string | undefined ?? namespaceHandle)
@@ -116,22 +122,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             workspaceName,
             workspaceUrl: `${appUrl}/${namespaceHandle}`,
             appUrl,
-            fromEmail: fromEmail as string,
             senderName,
-            mailgunApiKey: mailgunApiKey as string,
-            mailgunDomain: mailgunDomain as string,
-          });
+          }, sendEmail);
         } else {
-          // New user — send credentials email
           await sendInviteEmail({
             toEmail: email.trim().toLowerCase(),
             temporaryPassword,
             appUrl,
-            fromEmail: fromEmail as string,
             senderName,
-            mailgunApiKey: mailgunApiKey as string,
-            mailgunDomain: mailgunDomain as string,
-          });
+          }, sendEmail);
         }
         emailSent = true;
       } catch (emailErr) {

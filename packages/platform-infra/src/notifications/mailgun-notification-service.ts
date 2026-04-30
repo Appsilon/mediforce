@@ -1,24 +1,19 @@
-import sgMail from '@sendgrid/mail';
 import type { NotificationService, NotificationEvent, NotificationTarget } from '@mediforce/platform-core';
+import type { SendEmailParams, SendEmailResult } from '../email/mailgun-client.js';
 
-export class SendGridNotificationService implements NotificationService {
+export class MailgunNotificationService implements NotificationService {
   constructor(
-    private readonly apiKey: string,
-    private readonly fromEmail: string,
-  ) {
-    sgMail.setApiKey(apiKey);
-  }
+    private readonly sendEmail: (params: SendEmailParams) => Promise<SendEmailResult>,
+  ) {}
 
   async send(event: NotificationEvent, targets: NotificationTarget[]): Promise<void> {
     const emailTargets = targets.filter((t) => t.channel === 'email');
     if (emailTargets.length === 0) return;
 
-    // Promise.allSettled: fire-and-forget; failures are swallowed (never throw to caller)
     await Promise.allSettled(
       emailTargets.map((t) =>
-        sgMail.send({
-          to: t.address,
-          from: this.fromEmail,
+        this.sendEmail({
+          to: [t.address],
           subject: this.buildSubject(event),
           text: this.buildBody(event),
         }),

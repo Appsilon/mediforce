@@ -13,6 +13,10 @@ import {
   FirestoreAgentOAuthTokenRepository,
   getAdminFirestore,
   validateSecretsKey,
+  createMailgunSender,
+  MailgunNotificationService,
+  FirebaseUserDirectoryService,
+  getAdminAuth,
 } from '@mediforce/platform-infra';
 import type { CronTriggerStateRepository } from '@mediforce/platform-core';
 import {
@@ -34,6 +38,7 @@ import {
   ActionRegistry,
   httpActionHandler,
   reshapeActionHandler,
+  createEmailActionHandler,
 } from '@mediforce/core-actions';
 import { WebhookRouter } from '@mediforce/workflow-engine';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
@@ -106,15 +111,38 @@ export function getPlatformServices(): PlatformServices {
     'anthropic/claude-sonnet-4',
   );
 
+  const mailgunApiKey = process.env.MAILGUN_API_KEY ?? '';
+  const mailgunDomain = process.env.MAILGUN_DOMAIN ?? '';
+  const mailgunFrom = process.env.MAILGUN_FROM_EMAIL ?? '';
+  const mailgunSenderName = process.env.MAILGUN_SENDER_NAME ?? 'Mediforce';
+
+  const mailgunConfigured = mailgunApiKey !== '' && mailgunDomain !== '' && mailgunFrom !== '';
+  const mailgunSender = mailgunConfigured
+    ? createMailgunSender({
+        apiKey: mailgunApiKey,
+        domain: mailgunDomain,
+        defaultFrom: mailgunFrom,
+        defaultSenderName: mailgunSenderName,
+      })
+    : undefined;
+
+  const notificationService = mailgunSender
+    ? new MailgunNotificationService(mailgunSender)
+    : undefined;
+  const userDirectoryService = notificationService
+    ? new FirebaseUserDirectoryService(getAdminAuth())
+    : undefined;
+
   const engine = new WorkflowEngine(
     processRepo,
     instanceRepo,
     auditRepo,
     undefined,
     undefined,
-    undefined,
+    notificationService,
     humanTaskRepo,
     coworkSessionRepo,
+    userDirectoryService,
   );
 
   const agentRunner = new AgentRunner(
@@ -127,6 +155,9 @@ export function getPlatformServices(): PlatformServices {
   const actionRegistry = new ActionRegistry();
   actionRegistry.register('http', httpActionHandler);
   actionRegistry.register('reshape', reshapeActionHandler);
+  if (mailgunSender) {
+    actionRegistry.register('email', createEmailActionHandler(mailgunSender));
+  }
 
   const webhookRouter = new WebhookRouter(engine, processRepo);
 

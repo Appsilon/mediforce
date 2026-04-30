@@ -2,6 +2,7 @@ import type {
   ActionConfig,
   HttpActionConfig,
   ReshapeActionConfig,
+  EmailActionConfig,
 } from '@mediforce/platform-core';
 
 /** Sources available to interpolation in action configs.
@@ -52,6 +53,7 @@ export type ActionHandler<TConfig> = (
  *  Add new kinds here as more handlers are introduced. */
 export type HttpActionHandler = ActionHandler<HttpActionConfig>;
 export type ReshapeActionHandler = ActionHandler<ReshapeActionConfig>;
+export type EmailActionHandler = ActionHandler<EmailActionConfig>;
 
 export type AnyActionHandler = ActionHandler<unknown>;
 
