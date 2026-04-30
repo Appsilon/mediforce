@@ -57,7 +57,10 @@ export function AgentOutputReviewPanel({
     return () => window.removeEventListener('message', handler);
   }, [hasPresentation]);
 
-  // Sync theme changes to iframe
+  // Sync theme changes to iframe. Iframe is sandboxed without
+  // `allow-same-origin`, so its origin is null. `postMessage` rejects the
+  // literal string 'null' as targetOrigin — '*' is the only valid value.
+  // Theme payload is benign so wildcard is acceptable.
   React.useEffect(() => {
     if (!hasPresentation) return;
     iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');

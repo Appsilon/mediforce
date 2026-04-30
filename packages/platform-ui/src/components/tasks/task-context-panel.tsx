@@ -37,19 +37,22 @@ export function TaskContextPanel({
     'stepExecutions',
   );
 
-  // Find the completed step execution that directly precedes this human task's step.
-  // Strategy: find the earliest execution of the current stepId, then pick the latest
-  // completed execution (different step) that started before it. This ensures each
-  // review task shows the output that triggered it, not the globally latest output.
+  // Find the completed step execution that directly precedes this human task's
+  // current entry into the review step. On L3 agent-reviewer iteration loops a
+  // single review stepId may be entered multiple times — for each entry the
+  // reviewer wants to see the output produced just before *that* entry, not
+  // before the very first one. So we use the **most recent** start of this
+  // review stepId as the boundary: the latest completed execution from a
+  // different step with `startedAt <= mostRecentReviewStart` is what triggered
+  // the current review iteration.
   const previousStepOutput = React.useMemo(() => {
     if (!executions.length) return null;
 
-    // Find when the current human step first started (i.e. when the task was created)
     const currentStepExecs = executions
       .filter((e) => e.stepId === stepId)
       .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
     const currentStepStart = currentStepExecs.length > 0
-      ? new Date(currentStepExecs[0].startedAt).getTime()
+      ? new Date(currentStepExecs[currentStepExecs.length - 1].startedAt).getTime()
       : Infinity;
 
     const completed = executions
@@ -275,7 +278,12 @@ function ReportPane({ html, loading, error, result }: ReportPaneProps) {
     return () => window.removeEventListener('message', handler);
   }, [html]);
 
-  // Sync theme changes to iframe
+  // Sync theme changes to iframe. Iframe is sandboxed without
+  // `allow-same-origin`, so its origin is null. `postMessage` rejects the
+  // literal string 'null' as targetOrigin and we can't compute the parent
+  // origin from inside the iframe — '*' is the only valid value here. The
+  // payload is benign (theme bool only), and the iframe-side handler does
+  // not act on sensitive data, so wildcard is acceptable.
   React.useEffect(() => {
     if (html === null) return;
     iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');

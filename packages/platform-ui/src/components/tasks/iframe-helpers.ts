@@ -27,8 +27,16 @@ export function buildSrcdoc(
   result: Record<string, unknown> | null,
   isDark: boolean,
 ): string {
-  // Escape closing script tags in data to prevent XSS breakout
-  const safeData = JSON.stringify(result ?? {}).replace(/<\//g, '<\\/');
+  // Escape closing script tags in data to prevent XSS breakout. JSON.stringify
+  // throws on circular refs — agents are unlikely to produce one but we
+  // degrade to `{}` rather than failing the whole render.
+  let safeData: string;
+  try {
+    safeData = JSON.stringify(result ?? {}).replace(/<\//g, '<\\/');
+  } catch (err) {
+    console.warn('[iframe-helpers] result not JSON-serialisable, falling back to empty object', err);
+    safeData = '{}';
+  }
   return `<!DOCTYPE html>
 <html class="${isDark ? 'dark' : ''}">
 <head>
@@ -61,6 +69,10 @@ body {
 <body>
 ${presentation}
 <script>
+// Sandboxed iframes without allow-same-origin get a null origin, so
+// postMessage cannot use a concrete target — '*' is the only valid value
+// here. The parent verifies inbound messages with
+// event.source === iframeRef.current.contentWindow.
 const ro = new ResizeObserver(() => {
   window.parent.postMessage({ type: 'resize', height: document.body.scrollHeight }, '*');
 });
