@@ -21,7 +21,9 @@
     "LAKE_PATH": "/output/lake",
     "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
     "ANTHROPIC_API_KEY": "",
-    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "GITHUB_TOKEN": "{{GITHUB_TOKEN}}",
+    "WORKSPACE_REMOTE": "Appsilon/mediforce-landing-zone-study-demo"
   },
   "triggers": [
     { "name": "poll-sftp", "type": "cron", "schedule": "*/15 * * * *" },
@@ -61,7 +63,8 @@
       "description": "Download newFiles from SFTP and run CDISC CORE rules engine. Catches errors internally — sets scriptStatus to ok or failed. Always exits 0 so the next step (agent interpretation) always runs.",
       "agent": {
         "image": "mediforce-landing-zone:latest",
-        "command": "python3 /scripts/validate.py"
+        "command": "python3 /scripts/validate.py",
+        "timeoutMinutes": 30
       }
     },
     {
@@ -88,7 +91,7 @@
       "agent": {
         "skill": "data-validator",
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
-        "model": "sonnet",
+        "model": "haiku",
         "image": "mediforce-landing-zone:latest",
         "confidenceThreshold": 0.7,
         "fallbackBehavior": "escalate_to_human",
@@ -137,11 +140,46 @@
       "agent": {
         "skill": "draft-rejection-note",
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
-        "model": "sonnet",
+        "model": "haiku",
         "image": "mediforce-landing-zone:latest",
         "confidenceThreshold": 0.7,
         "fallbackBehavior": "continue_with_flag",
         "timeoutMinutes": 5
+      }
+    },
+    {
+      "id": "propose-rules",
+      "name": "Propose validation rules",
+      "type": "review",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "description": "Read findings.json + the existing validation-rules.yaml, propose new study-specific rules to close the gaps the rejected delivery exposed. Pauses for human approval — verdicts: approve (open PR), revise (loop with reviewer comment, e.g. \"no rules needed\").",
+      "agent": {
+        "skill": "propose-rules",
+        "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
+        "model": "haiku",
+        "image": "mediforce-landing-zone:latest",
+        "confidenceThreshold": 0.7,
+        "fallbackBehavior": "escalate_to_human",
+        "timeoutMinutes": 10
+      },
+      "verdicts": {
+        "approve": { "target": "new-rules-branch" },
+        "revise":  { "target": "propose-rules" }
+      }
+    },
+    {
+      "id": "new-rules-branch",
+      "name": "Open rules PR",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Push a branch with the proposed validation-rules.yaml and open a PR against main. Idempotent: skips cleanly when the file is unchanged vs main; force-pushes on retry.",
+      "agent": {
+        "image": "mediforce-landing-zone:latest",
+        "command": "python3 /scripts/open_rules_pr.py"
       }
     },
     {
@@ -164,6 +202,7 @@
     { "from": "interpret-validation", "to": "draft-rejection-note", "when": "output.classification == \"chaos\"" },
     { "from": "interpret-validation", "to": "human-review", "when": "else" },
     { "from": "accept-delivery", "to": "accepted" },
-    { "from": "draft-rejection-note", "to": "rejected-with-note" }
+    { "from": "draft-rejection-note", "to": "propose-rules" },
+    { "from": "new-rules-branch", "to": "rejected-with-note" }
   ]
 }
