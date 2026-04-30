@@ -143,4 +143,73 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     expect(result.data.workspace?.remote).toBe('Appsilon/mediforce-landing-zone-study-demo');
     expect(result.data.workspace?.remoteAuth).toBe('GITHUB_TOKEN');
   });
+
+  it('interpret-validation has 5 classification transitions + an else fallback', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const interpretTransitions = result.data.transitions.filter(
+      (transition) => transition.from === 'interpret-validation',
+    );
+    expect(interpretTransitions).toHaveLength(6);
+
+    const allowedTargets = new Set(['accept-delivery', 'human-review', 'draft-rejection-note']);
+    for (const transition of interpretTransitions) {
+      expect(transition.when).toBeDefined();
+      expect(allowedTargets.has(transition.to)).toBe(true);
+    }
+
+    const classificationTransitions = interpretTransitions.filter(
+      (transition) => transition.when !== 'else',
+    );
+    const elseTransitions = interpretTransitions.filter(
+      (transition) => transition.when === 'else',
+    );
+
+    expect(classificationTransitions).toHaveLength(5);
+    for (const transition of classificationTransitions) {
+      expect(transition.when).toContain('output.classification');
+    }
+
+    const expectedClasses = ['clean', 'minor-fix', 'recovery', 'escalate', 'chaos'];
+    for (const className of expectedClasses) {
+      const matching = classificationTransitions.filter((transition) =>
+        transition.when?.includes(`"${className}"`),
+      );
+      expect(
+        matching.length,
+        `expected exactly one transition matching class "${className}"`,
+      ).toBe(1);
+    }
+
+    const targetByClass = new Map<string, string>();
+    for (const transition of classificationTransitions) {
+      const matched = expectedClasses.find((className) =>
+        transition.when?.includes(`"${className}"`),
+      );
+      if (matched) targetByClass.set(matched, transition.to);
+    }
+    expect(targetByClass.get('clean')).toBe('accept-delivery');
+    expect(targetByClass.get('minor-fix')).toBe('human-review');
+    expect(targetByClass.get('recovery')).toBe('human-review');
+    expect(targetByClass.get('escalate')).toBe('draft-rejection-note');
+    expect(targetByClass.get('chaos')).toBe('draft-rejection-note');
+
+    expect(elseTransitions).toHaveLength(1);
+    expect(elseTransitions[0].to).toBe('human-review');
+  });
+
+  it('human-review verdicts unchanged (approve/revise routes preserved)', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const humanReview = result.data.steps.find((step) => step.id === 'human-review');
+    expect(humanReview).toBeDefined();
+    expect(humanReview?.verdicts).toEqual({
+      approve: { target: 'accept-delivery' },
+      revise: { target: 'draft-rejection-note' },
+    });
+  });
 });

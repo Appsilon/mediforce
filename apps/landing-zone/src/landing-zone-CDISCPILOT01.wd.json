@@ -71,7 +71,7 @@
       "executor": "agent",
       "plugin": "claude-code-agent",
       "autonomyLevel": "L2",
-      "description": "Read findings + scriptStatus. Classify (clean / has-findings / escalate). Render HTML report for human review. On scriptStatus=failed, surface the failure prominently and attempt to extract any partial signal.",
+      "description": "Read deterministic classification (clean / minor-fix / recovery / escalate / chaos) from validate-script output and render an HTML report. Does not classify — the rules engine + router_rules.py decide the class. Surfaces script-failure path (chaos) prominently with traceback when present.",
       "agent": {
         "skill": "data-validator",
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
@@ -143,7 +143,12 @@
     { "from": "sftp-poll", "to": "no-deliveries", "when": "output.newFiles.length == 0" },
     { "from": "sftp-poll", "to": "validate-script", "when": "output.newFiles.length > 0" },
     { "from": "validate-script", "to": "interpret-validation" },
-    { "from": "interpret-validation", "to": "human-review" },
+    { "from": "interpret-validation", "to": "accept-delivery", "when": "output.classification == \"clean\"" },
+    { "from": "interpret-validation", "to": "human-review", "when": "output.classification == \"minor-fix\"" },
+    { "from": "interpret-validation", "to": "human-review", "when": "output.classification == \"recovery\"" },
+    { "from": "interpret-validation", "to": "draft-rejection-note", "when": "output.classification == \"escalate\"" },
+    { "from": "interpret-validation", "to": "draft-rejection-note", "when": "output.classification == \"chaos\"" },
+    { "from": "interpret-validation", "to": "human-review", "when": "else" },
     { "from": "accept-delivery", "to": "accepted" },
     { "from": "draft-rejection-note", "to": "rejected-with-note" }
   ]

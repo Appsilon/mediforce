@@ -4,26 +4,33 @@ Reads the most recent delivery dropped into /workspace/incoming/ by sftp-poll,
 runs the CDISC CORE rules engine against it, and writes structured findings to
 both /workspace (audit trail via run worktree commit) and /output (engine I/O).
 
-The script catches its own exceptions and ALWAYS exits 0. The next step
-(interpret-validation, an LLM agent) reads `scriptStatus` from the result and
-adapts: on `ok` it summarizes findings; on `failed` it surfaces the failure
-prominently to the human reviewer and attempts to extract any partial signal.
+The script catches its own exceptions and ALWAYS exits 0. After running the
+engine (whether it succeeded or failed) the script calls the deterministic
+router (router_rules.classify) to compute a 5-class verdict. The interpret
+step (an LLM agent) reads the classification from input.json and renders the
+HTML report — it does not classify itself.
 
 Inputs:
   /workspace/incoming/{deliveryId}/*.xpt — files downloaded by sftp-poll
   env: VALIDATION_STANDARD (sdtm/adam), VALIDATION_IG_VERSION (e.g. 3.4)
+  env: EXPECTED_DOMAINS — comma-separated list driving chaos threshold
 
 Outputs:
   /output/result.json:
     {
-      "scriptStatus": "ok" | "failed",
-      "deliveryDir":  "incoming/d-..." or null,
-      "findings":     {...} | null,         # raw CORE engine output
-      "findingsCount": int,                 # zero on failure
-      "error":        str (on failure),
-      "traceback":    str (on failure)
+      "scriptStatus":         "ok" | "failed",
+      "deliveryDir":          "incoming/d-..." or null,
+      "findingsPath":         "findings.json" or null,
+      "findingsCount":        int,                 # zero on failure
+      "summary_data":         {...},               # per-finding summary
+      "classification":       "clean|minor-fix|recovery|escalate|chaos",
+      "classificationReason": "1-2 sentence text",
+      "scriptFailedFlag":     bool,
+      "summary":              "1-2 sentence verdict (alias of classificationReason)",
+      "error":                str (on failure),
+      "traceback":            str (on failure)
     }
-  /workspace/findings.json — same content as result.json (audit trail)
+  /workspace/findings.json — raw CORE engine output (audit trail)
 """
 
 from __future__ import annotations
@@ -35,6 +42,9 @@ import sys
 import traceback
 from pathlib import Path
 from typing import Any
+
+import router_rules
+from router_rules import ClassificationResult, Finding
 
 OUTPUT = Path("/output")
 WORKSPACE = Path("/workspace")
@@ -170,6 +180,54 @@ def count_findings(findings: dict[str, Any] | None) -> int:
     return 0
 
 
+def build_router_findings(findings: dict[str, Any] | None) -> list[Finding]:
+    """Map CORE Issue_Summary rows to Finding TypedDicts the router can read.
+
+    Each Issue_Summary row represents a unique rule-finding (one rule fired
+    against one dataset). We do NOT flatten Issue_Details into per-row
+    findings — the router operates on rule-level uniqueness, not row-level
+    repetition.
+    """
+    if not isinstance(findings, dict):
+        return []
+    summary = findings.get("Issue_Summary")
+    if not isinstance(summary, list):
+        return []
+    out: list[Finding] = []
+    for entry in summary:
+        if not isinstance(entry, dict):
+            continue
+        finding: Finding = {}
+        rule_id = entry.get("rule_id") or entry.get("core_id")
+        if isinstance(rule_id, str) and rule_id:
+            finding["rule_id"] = rule_id
+        core_id = entry.get("core_id")
+        if isinstance(core_id, str) and core_id:
+            finding["core_id"] = core_id
+        dataset = entry.get("dataset")
+        if isinstance(dataset, str) and dataset:
+            finding["domain"] = dataset
+        severity = entry.get("severity")
+        if isinstance(severity, str) and severity:
+            finding["severity"] = severity
+        message = entry.get("message")
+        if isinstance(message, str) and message:
+            finding["message"] = message
+        issues = entry.get("issues")
+        if isinstance(issues, int):
+            finding["issues"] = issues
+        out.append(finding)
+    return out
+
+
+def parse_expected_domains() -> list[str] | None:
+    """Read EXPECTED_DOMAINS env var as comma-separated list. Empty → None."""
+    raw = os.environ.get("EXPECTED_DOMAINS", "").strip()
+    if not raw:
+        return None
+    return [token.strip() for token in raw.split(",") if token.strip()]
+
+
 def summarise_findings(findings: dict[str, Any] | None) -> dict[str, Any]:
     """Compact summary suitable for the step output envelope.
 
@@ -215,14 +273,33 @@ def summarise_findings(findings: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def classify_payload(
+    *,
+    script_status: str,
+    findings: dict[str, Any] | None,
+) -> ClassificationResult:
+    """Run the deterministic router against the engine output."""
+    return router_rules.classify(
+        script_status=script_status,
+        findings=build_router_findings(findings),
+        expected_domains=parse_expected_domains(),
+    )
+
+
 def main() -> None:
     delivery = find_latest_delivery()
     if delivery is None:
+        verdict = classify_payload(script_status="failed", findings=None)
         write_result({
             "scriptStatus": "failed",
             "deliveryDir": None,
+            "findingsPath": None,
             "findingsCount": 0,
-            "summary": None,
+            "summary_data": None,
+            "classification": verdict.classification,
+            "classificationReason": verdict.reason,
+            "scriptFailedFlag": verdict.script_failed_flag,
+            "summary": verdict.reason,
             "error": "No delivery directory found in /workspace/incoming",
             "traceback": "",
         })
@@ -234,25 +311,38 @@ def main() -> None:
     try:
         findings = run_cdisc_core(delivery, findings_path)
         write_findings(findings)
+        verdict = classify_payload(script_status="ok", findings=findings)
         write_result({
             "scriptStatus": "ok",
             "deliveryDir": delivery_rel,
             "findingsPath": "findings.json",
             "findingsCount": count_findings(findings),
-            "summary": summarise_findings(findings),
+            "summary_data": summarise_findings(findings),
+            "classification": verdict.classification,
+            "classificationReason": verdict.reason,
+            "scriptFailedFlag": verdict.script_failed_flag,
+            "summary": verdict.reason,
         })
-        print(f"validate: ok, {count_findings(findings)} finding(s)", file=sys.stderr)
+        print(
+            f"validate: ok, {count_findings(findings)} finding(s) → {verdict.classification}",
+            file=sys.stderr,
+        )
     except Exception as error:
+        verdict = classify_payload(script_status="failed", findings=None)
         write_result({
             "scriptStatus": "failed",
             "deliveryDir": delivery_rel,
             "findingsPath": None,
             "findingsCount": 0,
-            "summary": None,
+            "summary_data": None,
+            "classification": verdict.classification,
+            "classificationReason": verdict.reason,
+            "scriptFailedFlag": verdict.script_failed_flag,
+            "summary": verdict.reason,
             "error": f"{type(error).__name__}: {error}",
             "traceback": traceback.format_exc(),
         })
-        print(f"validate: FAILED — {error}", file=sys.stderr)
+        print(f"validate: FAILED — {error} → {verdict.classification}", file=sys.stderr)
 
 
 if __name__ == "__main__":
