@@ -57,7 +57,7 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     const nonTerminal = result.data.steps.filter((step) => step.type !== 'terminal');
     for (const step of nonTerminal) {
       expect(step.executor).toBeDefined();
-      expect(['human', 'agent', 'script']).toContain(step.executor);
+      expect(['human', 'agent', 'script', 'action']).toContain(step.executor);
     }
   });
 
@@ -198,6 +198,50 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
 
     expect(elseTransitions).toHaveLength(1);
     expect(elseTransitions[0].to).toBe('human-review');
+  });
+
+  it('rejection path sends email before reaching terminal', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const emailStep = result.data.steps.find((step) => step.id === 'send-rejection-email');
+    expect(emailStep).toBeDefined();
+    expect(emailStep?.executor).toBe('action');
+    expect(emailStep?.action).toEqual({
+      kind: 'email',
+      config: {
+        to: '${variables.CRO_CONTACT_EMAIL}',
+        subject: '${steps.draft-rejection-note.suggestedSubject}',
+        body: '${steps.draft-rejection-note.rejectionNote}',
+        replyTo: '${variables.DATA_MANAGER_EMAIL}',
+      },
+    });
+
+    const transitions = result.data.transitions;
+    expect(transitions).toContainEqual({ from: 'draft-rejection-note', to: 'send-rejection-email' });
+    expect(transitions).toContainEqual({ from: 'send-rejection-email', to: 'propose-rules' });
+  });
+
+  it('rejection path includes rules proposal and PR after email', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const proposeRules = result.data.steps.find((step) => step.id === 'propose-rules');
+    expect(proposeRules).toBeDefined();
+    expect(proposeRules?.type).toBe('review');
+    expect(proposeRules?.verdicts).toEqual({
+      approve: { target: 'new-rules-branch' },
+      revise: { target: 'propose-rules' },
+    });
+
+    const newRulesBranch = result.data.steps.find((step) => step.id === 'new-rules-branch');
+    expect(newRulesBranch).toBeDefined();
+    expect(newRulesBranch?.executor).toBe('script');
+
+    const transitions = result.data.transitions;
+    expect(transitions).toContainEqual({ from: 'new-rules-branch', to: 'rejected-with-note' });
   });
 
   it('human-review verdicts unchanged (approve/revise routes preserved)', () => {

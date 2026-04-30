@@ -21,7 +21,11 @@
     "LAKE_PATH": "/output/lake",
     "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
     "ANTHROPIC_API_KEY": "",
-    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "GITHUB_TOKEN": "{{GITHUB_TOKEN}}",
+    "WORKSPACE_REMOTE": "Appsilon/mediforce-landing-zone-study-demo",
+    "CRO_CONTACT_EMAIL": "{{CRO_CONTACT_EMAIL_CDISCPILOT01}}",
+    "DATA_MANAGER_EMAIL": "{{DATA_MANAGER_EMAIL_CDISCPILOT01}}"
   },
   "triggers": [
     { "name": "poll-sftp", "type": "cron", "schedule": "*/15 * * * *" },
@@ -60,6 +64,7 @@
       "autonomyLevel": "L4",
       "description": "Download newFiles from SFTP and run CDISC CORE rules engine. Catches errors internally — sets scriptStatus to ok or failed. Always exits 0 so the next step (agent interpretation) always runs.",
       "agent": {
+        "timeoutMinutes": 30,
         "image": "mediforce-landing-zone:latest",
         "command": "python3 /scripts/validate.py"
       }
@@ -88,7 +93,7 @@
       "agent": {
         "skill": "data-validator",
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
-        "model": "sonnet",
+        "model": "haiku",
         "image": "mediforce-landing-zone:latest",
         "confidenceThreshold": 0.7,
         "fallbackBehavior": "escalate_to_human",
@@ -133,11 +138,11 @@
       "executor": "agent",
       "plugin": "claude-code-agent",
       "autonomyLevel": "L1",
-      "description": "Compose a markdown note explaining why the delivery was rejected — what was wrong, what the operator should ask the CRO to fix. Operator copies the note into their own email channel (no auto-send in v0.1).",
+      "description": "Compose a markdown note explaining why the delivery was rejected — what was wrong, what the operator should ask the CRO to fix. Output feeds into the send-rejection-email action step.",
       "agent": {
         "skill": "draft-rejection-note",
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
-        "model": "sonnet",
+        "model": "haiku",
         "image": "mediforce-landing-zone:latest",
         "confidenceThreshold": 0.7,
         "fallbackBehavior": "continue_with_flag",
@@ -145,11 +150,63 @@
       }
     },
     {
+      "id": "send-rejection-email",
+      "name": "Send rejection email",
+      "type": "creation",
+      "executor": "action",
+      "autonomyLevel": "L4",
+      "description": "Send the agent-drafted rejection note to the CRO contact via email. Uses the suggested subject from the draft step and the full markdown note as the body.",
+      "action": {
+        "kind": "email",
+        "config": {
+          "to": "${variables.CRO_CONTACT_EMAIL}",
+          "subject": "${steps.draft-rejection-note.suggestedSubject}",
+          "body": "${steps.draft-rejection-note.rejectionNote}",
+          "replyTo": "${variables.DATA_MANAGER_EMAIL}"
+        }
+      }
+    },
+    {
+      "id": "propose-rules",
+      "name": "Propose validation rules",
+      "type": "review",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L3",
+      "description": "Read findings.json + the existing validation-rules.yaml, propose new study-specific rules to close the gaps the rejected delivery exposed. Pauses for human approval — verdicts: approve (open PR), revise (loop with reviewer comment, e.g. \"no rules needed\").",
+      "verdicts": {
+        "approve": { "target": "new-rules-branch" },
+        "revise": { "target": "propose-rules" }
+      },
+      "agent": {
+        "skill": "propose-rules",
+        "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
+        "model": "haiku",
+        "image": "mediforce-landing-zone:latest",
+        "confidenceThreshold": 0.7,
+        "fallbackBehavior": "escalate_to_human",
+        "timeoutMinutes": 10
+      }
+    },
+    {
+      "id": "new-rules-branch",
+      "name": "Open rules PR",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Push a branch with the proposed validation-rules.yaml and open a PR against main. Idempotent: skips cleanly when the file is unchanged vs main; force-pushes on retry.",
+      "agent": {
+        "command": "python3 /scripts/open_rules_pr.py",
+        "image": "mediforce-landing-zone:latest"
+      }
+    },
+    {
       "id": "rejected-with-note",
-      "name": "Rejected (with note)",
+      "name": "Rejected (email sent)",
       "type": "terminal",
-      "executor": "human",
-      "description": "Operator has a draft rejection note to forward to the CRO."
+      "executor": "script",
+      "description": "Rejection email sent to CRO, rules proposal complete. Audit trail in run branch."
     }
   ],
   "transitions": [
@@ -164,6 +221,8 @@
     { "from": "interpret-validation", "to": "draft-rejection-note", "when": "output.classification == \"chaos\"" },
     { "from": "interpret-validation", "to": "human-review", "when": "else" },
     { "from": "accept-delivery", "to": "accepted" },
-    { "from": "draft-rejection-note", "to": "rejected-with-note" }
+    { "from": "draft-rejection-note", "to": "send-rejection-email" },
+    { "from": "send-rejection-email", "to": "propose-rules" },
+    { "from": "new-rules-branch", "to": "rejected-with-note" }
   ]
 }
