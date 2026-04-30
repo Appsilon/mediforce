@@ -160,7 +160,7 @@ export function RunsTable({
     <div className="rounded-md border overflow-clip">
       {/* Bulk action toolbar — visible only when rows are selected */}
       {selectedIds.size > 0 && (
-        <div ref={toolbarRef} className="sticky top-0 z-20 flex items-center gap-3 px-4 py-2 bg-primary/5 border-b text-sm">
+        <div ref={toolbarRef} className="sticky top-0 z-20 flex items-center gap-3 px-4 py-2 bg-background border-b text-sm">
           <span className="text-xs text-muted-foreground font-medium">
             {selectedIds.size} selected
           </span>
@@ -198,7 +198,7 @@ export function RunsTable({
 
       <table className="w-full text-sm">
         <thead className="sticky z-10 bg-card" style={{ top: toolbarHeight }}>
-          <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
+          <tr className="border-b bg-muted text-xs text-muted-foreground">
             <th className="px-4 py-2.5 w-8">
               <input
                 ref={selectAllRef}
