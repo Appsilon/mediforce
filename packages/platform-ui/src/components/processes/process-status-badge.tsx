@@ -21,11 +21,13 @@ const STATUS_LABELS: Record<WorkflowDisplayStatus, string> = {
 export function ProcessStatusBadge({
   status,
   pauseReason,
+  error,
 }: {
   status: InstanceStatus;
   pauseReason?: string | null;
+  error?: string | null;
 }) {
-  const { displayStatus } = getWorkflowStatus({ status, pauseReason });
+  const { displayStatus } = getWorkflowStatus({ status, pauseReason, error });
   return (
     <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[displayStatus])}>
       {STATUS_LABELS[displayStatus]}
