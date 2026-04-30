@@ -43,10 +43,21 @@ export const ListWorkflowsOutputSchema = z.object({
   definitions: z.array(WorkflowDefinitionGroupSchema),
 });
 
+export const GetWorkflowInputSchema = z.object({
+  name: z.string().min(1),
+  version: z.number().int().positive().optional(),
+});
+
+export const GetWorkflowOutputSchema = z.object({
+  definition: WorkflowDefinitionSchema,
+});
+
 export type RegisterWorkflowInput = z.infer<typeof RegisterWorkflowInputSchema>;
 export type RegisterWorkflowOutput = z.infer<typeof RegisterWorkflowOutputSchema>;
 export type WorkflowDefinitionGroupSummary = z.infer<typeof WorkflowDefinitionGroupSchema>;
 export type ListWorkflowsOutput = z.infer<typeof ListWorkflowsOutputSchema>;
+export type GetWorkflowInput = z.infer<typeof GetWorkflowInputSchema>;
+export type GetWorkflowOutput = z.infer<typeof GetWorkflowOutputSchema>;
 
 /**
  * Options for `mediforce.workflows.register()`. Namespace is a required
