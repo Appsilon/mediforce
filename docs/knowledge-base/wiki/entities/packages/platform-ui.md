@@ -52,7 +52,7 @@ User-facing entry. Workspace-scoped pages (agents, tasks, processes, workflows, 
 - Dev: `9003` (`pnpm dev`).
 - Emulator E2E: `9007`.
 - Firebase emulators: Auth `9099`, Firestore `8080`.
-- Prod: Firebase App Hosting (`apphosting.yaml`).
+- Prod: Hetzner VPS.
 
 ## Relationships
 
