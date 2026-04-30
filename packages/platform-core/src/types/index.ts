@@ -8,6 +8,7 @@ export type {
   StepParam,
   Selection,
   Step,
+  StepType,
   Transition,
   Trigger,
   ProcessDefinition,

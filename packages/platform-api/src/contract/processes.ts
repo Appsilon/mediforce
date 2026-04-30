@@ -4,7 +4,20 @@ import {
   InstanceStatusSchema,
   ProcessInstanceSchema,
   StepExecutionSchema,
+  StepTypeSchema,
 } from '@mediforce/platform-core';
+
+// Mirrors `stepConfigs.executorType` (`human | agent | script`) plus the
+// `'unknown'` fallback the handler emits when no `stepConfig` matches.
+// Kept local to the contract module — the contract layer is the boundary
+// where shape evolution belongs.
+export const StepExecutorTypeSchema = z.enum([
+  'human',
+  'agent',
+  'script',
+  'unknown',
+]);
+export type StepExecutorType = z.infer<typeof StepExecutorTypeSchema>;
 
 /**
  * Contracts for the `processes` domain.
@@ -60,8 +73,8 @@ export const StepEntryStatusSchema = z.enum(['completed', 'running', 'pending'])
 export const StepEntrySchema = z.object({
   stepId: z.string(),
   name: z.string(),
-  type: z.string(),
-  executorType: z.string(),
+  type: StepTypeSchema,
+  executorType: StepExecutorTypeSchema,
   status: StepEntryStatusSchema,
   input: z.record(z.string(), z.unknown()).nullable(),
   output: z.record(z.string(), z.unknown()).nullable(),

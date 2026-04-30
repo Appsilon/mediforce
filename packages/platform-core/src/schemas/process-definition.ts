@@ -29,10 +29,13 @@ export const SelectionSchema = z.union([
   }),
 ]);
 
+export const StepTypeSchema = z.enum(['creation', 'review', 'decision', 'terminal']);
+export type StepType = z.infer<typeof StepTypeSchema>;
+
 export const StepSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  type: z.enum(['creation', 'review', 'decision', 'terminal']).default('creation'),
+  type: StepTypeSchema.default('creation'),
   description: z.string().optional(),
   params: z.array(StepParamSchema).optional(),
   verdicts: z.record(z.string(), VerdictSchema).optional(),

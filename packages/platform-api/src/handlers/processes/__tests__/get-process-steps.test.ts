@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import {
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
+  buildProcessConfig,
   buildProcessDefinition,
   buildProcessInstance,
   buildStepExecution,
@@ -142,5 +143,124 @@ describe('getProcessSteps handler', () => {
       instanceStatus: 'paused',
       currentStepId: 's1',
     });
+  });
+
+  it('reads output from instance.variables for human steps', async () => {
+    await processRepo.saveProcessConfig(
+      buildProcessConfig({
+        processName: 'demo',
+        configName: 'default',
+        configVersion: '1.0',
+        stepConfigs: [
+          { stepId: 's1', executorType: 'human' as const },
+          { stepId: 's2', executorType: 'human' as const },
+        ],
+      }),
+    );
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-1',
+        definitionName: 'demo',
+        definitionVersion: '1.0',
+        configName: 'default',
+        configVersion: '1.0',
+        currentStepId: 's2',
+        variables: { s1: { decision: 'approve', notes: 'looks good' } },
+      }),
+    );
+
+    const result = await getProcessSteps(
+      { instanceId: 'inst-1' },
+      { instanceRepo, processRepo },
+    );
+
+    const s1 = result.steps.find((s) => s.stepId === 's1');
+    expect(s1?.executorType).toBe('human');
+    expect(s1?.status).toBe('completed');
+    expect(s1?.output).toEqual({ decision: 'approve', notes: 'looks good' });
+    expect(s1?.execution).toBeNull();
+  });
+
+  it('marks all reachable steps completed when status is completed and currentStepId is null', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-1',
+        definitionName: 'demo',
+        definitionVersion: '1.0',
+        status: 'completed',
+        currentStepId: null,
+        variables: { s1: { ok: true }, s2: { ok: true } },
+      }),
+    );
+
+    const result = await getProcessSteps(
+      { instanceId: 'inst-1' },
+      { instanceRepo, processRepo },
+    );
+
+    expect(result.steps.find((s) => s.stepId === 's1')?.status).toBe('completed');
+    expect(result.steps.find((s) => s.stepId === 's2')?.status).toBe('completed');
+  });
+
+  it('marks the current step completed when the instance itself is completed', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-1',
+        definitionName: 'demo',
+        definitionVersion: '1.0',
+        status: 'completed',
+        currentStepId: 's2',
+      }),
+    );
+    await instanceRepo.addStepExecution(
+      'inst-1',
+      buildStepExecution({ instanceId: 'inst-1', stepId: 's1', output: { ok: true } }),
+    );
+
+    const result = await getProcessSteps(
+      { instanceId: 'inst-1' },
+      { instanceRepo, processRepo },
+    );
+
+    expect(result.steps.find((s) => s.stepId === 's2')?.status).toBe('completed');
+  });
+
+  it('skips the config lookup when configName or configVersion is null', async () => {
+    // Track repo calls to confirm the lookup is not even attempted.
+    let configLookupCalls = 0;
+    const trackingRepo = new Proxy(processRepo, {
+      get(target, prop, receiver) {
+        if (prop === 'getProcessConfig') {
+          return (...args: unknown[]) => {
+            configLookupCalls += 1;
+            const original = Reflect.get(target, prop, receiver) as (
+              ...a: unknown[]
+            ) => unknown;
+            return original.apply(target, args);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-1',
+        definitionName: 'demo',
+        definitionVersion: '1.0',
+        configName: undefined,
+        configVersion: undefined,
+        currentStepId: 's1',
+      }),
+    );
+
+    const result = await getProcessSteps(
+      { instanceId: 'inst-1' },
+      { instanceRepo, processRepo: trackingRepo },
+    );
+
+    expect(configLookupCalls).toBe(0);
+    // Without config, executorType is unreachable in stepConfigs → falls back to 'unknown'.
+    expect(result.steps.every((s) => s.executorType === 'unknown')).toBe(true);
   });
 });

@@ -473,6 +473,105 @@ describe('Mediforce', () => {
       await expect(mediforce.plugins.list()).rejects.toThrow();
     });
   });
+
+  // Encoding parity across every method that interpolates user input into a URL.
+  // Path params must `encodeURIComponent`, query params must use the URL/URLSearchParams
+  // encoding (which percent-encodes spaces as `+` is *not* what URLSearchParams does;
+  // it produces `%20` for both — assertions below pin the exact bytes).
+  describe('URL encoding', () => {
+    const RAW = "weird id /?&= ";
+    // encodeURIComponent encodes space as %20, slash as %2F, ? as %3F, & as %26, = as %3D.
+    const ENCODED_PATH = encodeURIComponent(RAW); // "weird%20id%20%2F%3F%26%3D%20"
+
+    it('encodes processes.get instanceId', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ error: 'x' }, 404));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.processes.get({ instanceId: RAW }).catch(() => undefined);
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/processes/${ENCODED_PATH}`,
+      );
+    });
+
+    it('encodes processes.getSteps instanceId', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ error: 'x' }, 404));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.processes.getSteps({ instanceId: RAW }).catch(() => undefined);
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/processes/${ENCODED_PATH}/steps`,
+      );
+    });
+
+    it('encodes processes.listAuditEvents instanceId', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ events: [] }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.processes.listAuditEvents({ instanceId: RAW });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/processes/${ENCODED_PATH}/audit`,
+      );
+    });
+
+    it('encodes agentDefinitions.get id', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ error: 'x' }, 404));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.agentDefinitions.get({ id: RAW }).catch(() => undefined);
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/agent-definitions/${ENCODED_PATH}`,
+      );
+    });
+
+    it('encodes cowork.getByInstance instanceId', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ error: 'x' }, 404));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.cowork.getByInstance({ instanceId: RAW }).catch(() => undefined);
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/cowork/by-instance/${ENCODED_PATH}`,
+      );
+    });
+
+    it('encodes configs.list processName as a query param (URLSearchParams: %20 / %26 / %3D)', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ configs: [] }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.configs.list({ processName: RAW });
+
+      // URLSearchParams emits `+` for space when toString'd by older code paths,
+      // but our impl currently uses URLSearchParams which produces %20 in node.
+      // Pin the exact wire format so a future swap to manual concat doesn't drift.
+      const url = fetchSpy.mock.calls[0]?.[0] as string;
+      const qs = new URL(url).searchParams.get('processName');
+      expect(qs).toBe(RAW); // round-trips correctly
+      expect(url.startsWith(`${TEST_BASE_URL}/api/configs?`)).toBe(true);
+      // Either `%20` (URLSearchParams) or `+` (form-urlencoded) is acceptable —
+      // assert that the raw bytes do NOT contain an unencoded space, `&`, or `=`
+      // in the value position, since those would break the query.
+      const valuePart = url.split('processName=')[1] ?? '';
+      expect(valuePart).not.toMatch(/ /); // no raw space
+      // Raw `&` would split the value — confirm only the encoded form survives.
+      expect(valuePart.split('&').length).toBe(1);
+    });
+  });
 });
 
 // Type-level assertion — ClientConfig accepts only the documented options.

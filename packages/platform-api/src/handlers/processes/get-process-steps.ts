@@ -47,11 +47,18 @@ export async function getProcessSteps(
     );
   }
 
-  const config = await processRepo.getProcessConfig(
-    instance.definitionName,
-    instance.configName ?? '',
-    instance.configVersion ?? '',
-  );
+  // "No config" is a first-class case. The pre-migration route called
+  // `getProcessConfig(name, '', '')` when either field was nullish, relying on
+  // the repo to miss and return null — fragile and dependent on how the repo
+  // treats empty-string keys. Skip the lookup explicitly instead.
+  const config =
+    instance.configName === undefined || instance.configVersion === undefined
+      ? null
+      : await processRepo.getProcessConfig(
+          instance.definitionName,
+          instance.configName,
+          instance.configVersion,
+        );
 
   const executions = await instanceRepo.getStepExecutions(instanceId);
 
