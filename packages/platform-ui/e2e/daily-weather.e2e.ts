@@ -24,6 +24,27 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { NextRequest } from 'next/server';
+
+// Mock next/server `after()` to capture the callback. Auto-runner route
+// uses `after()` to run its work after the response flushes; in direct-
+// handler tests no request scope exists, so we capture the callback and
+// the test awaits it explicitly via `flushAfterCallbacks()`.
+const pendingAfterCallbacks: Array<() => Promise<void>> = [];
+async function flushAfterCallbacks(): Promise<void> {
+  while (pendingAfterCallbacks.length > 0) {
+    const fn = pendingAfterCallbacks.shift()!;
+    await fn();
+  }
+}
+vi.mock('next/server', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('next/server')>();
+  return {
+    ...mod,
+    after: (fn: () => Promise<void>) => {
+      pendingAfterCallbacks.push(fn);
+    },
+  };
+});
 import {
   ActionRegistry,
   httpActionHandler,
@@ -249,6 +270,9 @@ describe('daily-weather: fetch → reshape → push×2 → terminal', () => {
       },
     );
     await runPost(runReq, { params: Promise.resolve({ instanceId: runId }) });
+    // Flush captured `after()` callbacks — handler returns 202 immediately
+    // and queues the loop in after(); we run it now to drive execution.
+    await flushAfterCallbacks();
 
     // Poll up to 10s — auto-runner is synchronous so this should hit on the
     // first iteration.
