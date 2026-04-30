@@ -3,7 +3,7 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Agent Escalated Recovery Journey', () => {
-  test('agent_escalated instance — Cancel this run flips status to Error and removes the banner', async ({ page }, testInfo) => {
+  test('agent_escalated instance — Cancel this run flips status to Cancelled and removes the banner', async ({ page }, testInfo) => {
     await setupRecording(page, 'agent-escalated-cancel', testInfo);
 
     // proc-agent-escalated-cancel is seeded as:
@@ -25,8 +25,8 @@ test.describe('Agent Escalated Recovery Journey', () => {
     // Click "Cancel this run" — cancelProcessRun sets status=failed, error='Cancelled by user'
     await click(page, cancelButton);
 
-    // Status badge flips to "Error"; AgentEscalatedBanner removed (instance no longer paused/agent_escalated)
-    await expect(page.getByText(/^error$/i).first()).toBeVisible({ timeout: 10_000 });
+    // Status badge flips to "Cancelled" (gray); AgentEscalatedBanner removed (instance no longer paused/agent_escalated)
+    await expect(page.getByText(/^cancelled$/i).first()).toBeVisible({ timeout: 10_000 });
     await expect(cancelButton).toHaveCount(0);
     await showResult(page);
 

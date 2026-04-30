@@ -99,9 +99,9 @@ describe('getWorkflowStatus', () => {
       expect(result.isRetryable).toBe(false);
     });
 
-    it('status=failed with Cancelled by user is not retryable', () => {
+    it('status=failed with Cancelled by user maps to cancelled display status', () => {
       const result = getWorkflowStatus({ status: 'failed', error: 'Cancelled by user' });
-      expect(result.displayStatus).toBe('error');
+      expect(result.displayStatus).toBe('cancelled');
       expect(result.reason).toBe('Cancelled by user');
       expect(result.rawReason).toBeNull();
       expect(result.isRetryable).toBe(false);

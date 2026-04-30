@@ -3,7 +3,7 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Workflow Status Badges Journey', () => {
-  test('process list shows all four semantic status badges', async ({ page }, testInfo) => {
+  test('process list shows all five semantic status badges', async ({ page }, testInfo) => {
     await setupRecording(page, 'workflow-status-badges-list', testInfo);
 
     // The RunsTable (with status badges) lives at /runs, not /workflows
@@ -11,11 +11,13 @@ test.describe('Workflow Status Badges Journey', () => {
     await expect(page.getByText('All workflow runs across the platform.')).toBeVisible({ timeout: 10_000 });
     await showStep(page);
 
-    // Four display statuses visible in the list
+    // Five display statuses visible in the list
     await expect(page.getByText('In Progress').first()).toBeVisible();
     await expect(page.getByText('Waiting for human').first()).toBeVisible();
     await expect(page.getByText('Error').first()).toBeVisible();
     await expect(page.getByText('Completed').first()).toBeVisible();
+    // proc-cancelled-1 is seeded as status=failed / error='Cancelled by user'
+    await expect(page.getByText('Cancelled').first()).toBeVisible();
     await showResult(page);
 
     await endRecording(page);

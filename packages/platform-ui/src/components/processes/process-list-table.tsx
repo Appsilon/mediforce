@@ -54,7 +54,7 @@ export function ProcessListTable({
               <tr key={inst.id} className="hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3 font-medium">{inst.definitionName}</td>
                 <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{inst.definitionVersion}</td>
-                <td className="px-4 py-3"><ProcessStatusBadge status={inst.status} pauseReason={inst.pauseReason} /></td>
+                <td className="px-4 py-3"><ProcessStatusBadge status={inst.status} pauseReason={inst.pauseReason} error={inst.error} /></td>
                 <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{inst.currentStepId ?? '—'}</td>
                 <td className="px-4 py-3 text-muted-foreground text-xs">
                   {format(new Date(inst.createdAt), 'MMM d, HH:mm')}

@@ -126,7 +126,7 @@ export function ProcessDetail({
   const [cancelError, setCancelError] = React.useState<string | null>(null);
 
   const canCancel = wfStatus.displayStatus === 'in_progress' || wfStatus.displayStatus === 'waiting_for_human';
-  const canArchive = wfStatus.displayStatus === 'completed' || wfStatus.displayStatus === 'error';
+  const canArchive = wfStatus.displayStatus === 'completed' || wfStatus.displayStatus === 'error' || wfStatus.displayStatus === 'cancelled';
   const [archiving, setArchiving] = React.useState(false);
 
   async function handleArchiveToggle() {
@@ -224,7 +224,7 @@ export function ProcessDetail({
 
           {/* Metadata row — status badge, definition, ID, created, duration, report link */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground items-center">
-            <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} />
+            <ProcessStatusBadge status={instance.status} pauseReason={instance.pauseReason} error={instance.error} />
             {instance.archived === true && (
               <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                 <Archive className="h-3 w-3" />

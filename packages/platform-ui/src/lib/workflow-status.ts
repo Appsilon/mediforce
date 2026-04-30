@@ -1,6 +1,6 @@
 import type { InstanceStatus } from '@mediforce/platform-core';
 
-export type WorkflowDisplayStatus = 'in_progress' | 'waiting_for_human' | 'error' | 'completed';
+export type WorkflowDisplayStatus = 'in_progress' | 'waiting_for_human' | 'error' | 'cancelled' | 'completed';
 
 export interface WorkflowStatus {
   displayStatus: WorkflowDisplayStatus;
@@ -81,7 +81,9 @@ export function getWorkflowStatus(instance: {
   if (instance.status === 'failed') {
     // cancelProcessRun sets error='Cancelled by user' — string match is the cheapest gate here;
     // this value is written by cancelProcessRun and must not change without updating this check.
-    const isCancelled = error === 'Cancelled by user';
+    if (error === 'Cancelled by user') {
+      return { displayStatus: 'cancelled', reason: 'Cancelled by user', rawReason: null, isRetryable: false, hasDedicatedBanner: false };
+    }
     return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: false, hasDedicatedBanner: false };
   }
 
