@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin.js';
+import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager.js';
 
 type DockerResult = { cliOutput: string; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
@@ -71,7 +72,7 @@ describe('ClaudeCodeAgentPlugin', () => {
   let plugin: ClaudeCodeAgentPlugin;
 
   beforeEach(() => {
-    plugin = new ClaudeCodeAgentPlugin();
+    plugin = new ClaudeCodeAgentPlugin({ workspaceManager: createFakeWorkspaceManager() });
   });
 
   describe('initialize', () => {

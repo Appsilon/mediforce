@@ -7,7 +7,7 @@ import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/a
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls } from './container-plugin.js';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, type ContainerPluginInit } from './container-plugin.js';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token.js';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
@@ -211,6 +211,10 @@ function buildHttpHeaders(
  */
 export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   protected agentConfig!: AgentConfig;
+
+  constructor(init: ContainerPluginInit = {}) {
+    super(init);
+  }
 
   /** Human-readable agent name for log/status messages (e.g. "Claude Code", "OpenCode"). */
   abstract readonly agentName: string;

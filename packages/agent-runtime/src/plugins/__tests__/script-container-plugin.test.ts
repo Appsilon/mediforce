@@ -7,6 +7,7 @@ import type { ChildProcess } from 'node:child_process';
 import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ScriptContainerPlugin } from '../script-container-plugin.js';
+import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager.js';
 
 // Only mock `spawn` (used for docker run). Leave the rest of child_process
 // real so WorkspaceManager's `execFileSync` calls to git actually work.
@@ -99,7 +100,7 @@ describe('ScriptContainerPlugin', () => {
   let plugin: ScriptContainerPlugin;
 
   beforeEach(() => {
-    plugin = new ScriptContainerPlugin();
+    plugin = new ScriptContainerPlugin({ workspaceManager: createFakeWorkspaceManager() });
     spawnMock.mockReset();
   });
 

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild } from './container-plugin.js';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, type ContainerPluginInit } from './container-plugin.js';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 
@@ -47,6 +47,10 @@ export class ScriptContainerPlugin extends ContainerPlugin {
   private commandDisplay!: string;
   private inlineScript: string | null = null;
   private runtime: string | null = null;
+
+  constructor(init: ContainerPluginInit = {}) {
+    super(init);
+  }
 
   async initialize(context: AgentContext | WorkflowAgentContext): Promise<void> {
     this.context = context;
