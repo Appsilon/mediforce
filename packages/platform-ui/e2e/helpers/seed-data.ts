@@ -320,14 +320,16 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: 'Docker container exited with code 1',
       assignedRoles: ['reviewer'],
     },
-    // Dedicated instance for retry-step test — seeded as failed on a human step
-    // so clicking Retry flips it to running; the auto-runner then creates a
-    // HumanTask and pauses the instance. No plugin or Docker involved.
+    // Dedicated instance for retry-step test — agent escalated on the human-review
+    // step so AgentEscalatedBanner is shown with "Fixed, try again". Clicking it
+    // calls engine.retryStep (paused+agent_escalated is in the allowed list), which
+    // flips status→running; the auto-runner then creates a HumanTask and pauses
+    // with waiting_for_human. No plugin or Docker involved.
     'proc-retry-test': {
       id: 'proc-retry-test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1',
-      status: 'failed',
+      status: 'paused',
       currentStepId: 'human-review',
       variables: {},
       triggerType: 'manual',
@@ -335,8 +337,26 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       createdAt: threeDaysAgo,
       updatedAt: threeDaysAgo,
       createdBy: testUserId,
-      pauseReason: null,
+      pauseReason: 'agent_escalated',
       error: 'Simulated step failure for retry journey',
+      assignedRoles: ['reviewer'],
+    },
+    // Dedicated instance for cancel flow test — isolated from proc-retry-test so
+    // cancelling does not pollute the retry journey.
+    'proc-agent-escalated-cancel': {
+      id: 'proc-agent-escalated-cancel',
+      definitionName: 'Supply Chain Review',
+      definitionVersion: '1',
+      status: 'paused',
+      currentStepId: 'human-review',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: 'agent_escalated',
+      error: 'API rate limit exceeded — retried 3 times',
       assignedRoles: ['reviewer'],
     },
   };
@@ -543,6 +563,24 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       iterationNumber: 0,
       gateResult: null,
       error: 'Simulated step failure for retry journey',
+    },
+  };
+
+  const agentEscalatedCancelStepExecutions: Record<string, Record<string, unknown>> = {
+    'exec-cancel-fail-1': {
+      id: 'exec-cancel-fail-1',
+      instanceId: 'proc-agent-escalated-cancel',
+      stepId: 'human-review',
+      status: 'failed',
+      input: {},
+      output: null,
+      verdict: null,
+      executedBy: 'auto-runner',
+      startedAt: oneHourAgo,
+      completedAt: oneHourAgo,
+      iterationNumber: 0,
+      gateResult: null,
+      error: 'API rate limit exceeded — retried 3 times',
     },
   };
 
@@ -1255,5 +1293,5 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
-  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions };
+  return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions };
 }

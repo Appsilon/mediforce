@@ -64,6 +64,7 @@ REQUIRED_ENV: dict[str, str] = {
     # 64 hex chars — satisfies validateSecretsKey() fail-fast check.
     # No real secrets are encrypted/decrypted during E2E runs.
     "SECRETS_ENCRYPTION_KEY": "0000000000000000000000000000000000000000000000000000000000000000",
+    "MEDIFORCE_DISABLE_EMAIL": "true",
 }
 
 

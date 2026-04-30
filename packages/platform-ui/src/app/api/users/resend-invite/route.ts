@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getAdminAuth, getAdminFirestore, FirebaseInviteService } from '@mediforce/platform-infra';
+import { getAdminAuth, getAdminFirestore, FirebaseInviteService, createMailgunSender } from '@mediforce/platform-infra';
 import { sendInviteEmail } from '@/lib/send-invite-email';
 
 const ResendInviteBodySchema = z.object({
@@ -89,16 +89,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       typeof mailgunDomain === 'string' && mailgunDomain !== '' &&
       typeof fromEmail === 'string' && fromEmail !== ''
     ) {
+      const sendEmail = createMailgunSender({
+        apiKey: mailgunApiKey,
+        domain: mailgunDomain,
+        defaultFrom: fromEmail,
+        defaultSenderName: senderName,
+      });
+
       try {
         await sendInviteEmail({
           toEmail: email,
           temporaryPassword,
           appUrl,
-          fromEmail,
           senderName,
-          mailgunApiKey,
-          mailgunDomain,
-        });
+        }, sendEmail);
         emailSent = true;
       } catch (emailErr) {
         console.error('[resend-invite] Failed to send email:', emailErr);

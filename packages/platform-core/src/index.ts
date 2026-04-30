@@ -52,6 +52,7 @@ export {
   WebhookTriggerConfigSchema,
   HttpActionConfigSchema,
   ReshapeActionConfigSchema,
+  EmailActionConfigSchema,
   ActionConfigSchema,
   validateInputForNextRun,
   validateExecutorAndTriggers,
@@ -132,6 +133,7 @@ export type {
   WebhookTriggerConfig,
   HttpActionConfig,
   ReshapeActionConfig,
+  EmailActionConfig,
   ActionConfig,
   ConversationTurn,
   HumanTurn,
@@ -176,6 +178,9 @@ export type {
   CoworkSessionRepository,
   CronTriggerStateRepository,
   ToolCatalogRepository,
+  SendEmailParams,
+  SendEmailResult,
+  SendEmailFn,
 } from './interfaces/index.js';
 
 // Agent definition schema + repository interface

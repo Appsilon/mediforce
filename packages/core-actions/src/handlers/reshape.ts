@@ -18,7 +18,13 @@ export const reshapeActionHandler: ReshapeActionHandler = async (config, ctx) =>
       `reshape action expected an object output but got ${Array.isArray(result) ? 'array' : typeof result}`,
     );
   }
-  return result as Record<string, unknown>;
+  const output: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(result as Record<string, unknown>)) {
+    if (value !== undefined) {
+      output[key] = value;
+    }
+  }
+  return output;
 };
 
 export type { ReshapeActionHandler };

@@ -47,6 +47,20 @@ function validateEnv(existsSync: (path: string) => boolean): void {
     }
   }
 
+  // --- MAILGUN EMAIL CONFIG ---
+  if (process.env.MEDIFORCE_DISABLE_EMAIL !== 'true') {
+    const mailgunVars = ['MAILGUN_API_KEY', 'MAILGUN_DOMAIN', 'MAILGUN_FROM_EMAIL'] as const;
+    const missingMailgun = mailgunVars.filter(
+      (v) => typeof process.env[v] !== 'string' || process.env[v] === '',
+    );
+    if (missingMailgun.length > 0) {
+      errors.push(
+        `Email is enabled but Mailgun config incomplete (missing: ${missingMailgun.join(', ')}). `
+        + 'Set the env vars or set MEDIFORCE_DISABLE_EMAIL=true to start without email.',
+      );
+    }
+  }
+
   if (errors.length > 0) {
     const divider = '─'.repeat(60);
     const header = `\n${divider}\n  FATAL: Missing or invalid environment variables\n${divider}`;

@@ -116,6 +116,7 @@ jobs:
           # in getPlatformServices(). No real workflow secrets are encrypted/decrypted
           # during E2E runs — this just has to be present and well-formed.
           SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+          MEDIFORCE_DISABLE_EMAIL: 'true'
 
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
