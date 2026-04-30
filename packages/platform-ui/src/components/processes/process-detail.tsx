@@ -19,6 +19,7 @@ import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { useBackNavigation } from '@/hooks/use-back-navigation';
 import { formatStepName } from '@/components/tasks/task-utils';
 import { MissingEnvBanner } from './missing-env-banner';
+import { AgentEscalatedBanner } from './agent-escalated-banner';
 import { PreviousRunBanner } from './previous-run-banner';
 import { formatDuration } from '@/lib/format';
 import { getWorkflowStatus } from '@/lib/workflow-status';
@@ -293,6 +294,9 @@ export function ProcessDetail({
             <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
               {wfStatus.reason}
             </div>
+          )}
+          {wfStatus.rawReason === 'agent_escalated' && instance.error && instance.currentStepId && (
+            <AgentEscalatedBanner instanceId={instance.id} stepId={instance.currentStepId} />
           )}
           {wfStatus.displayStatus === 'error' && !wfStatus.hasDedicatedBanner && (
             <div className="rounded-md bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 px-3 py-2">
