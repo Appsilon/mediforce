@@ -61,6 +61,10 @@ services:
       - DOCKER_OPENROUTER_API_KEY=${DOCKER_OPENROUTER_API_KEY}
       - DOCKER_APP_BASE_URL=http://platform-ui:3000
       - MEDIFORCE_ROOT=/repo
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
+      - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL}
+      - MAILGUN_SENDER_NAME=${MAILGUN_SENDER_NAME:-Mediforce}
       # Firebase Admin SDK credentials for server-side Firestore/Auth access.
       # Mounted read-only from host ./secrets/firebase-admin-sa.json.
       - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-sa.json
