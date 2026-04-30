@@ -60,9 +60,9 @@ export function getWorkflowStatus(instance: {
       case 'missing_env':
         return { displayStatus: 'error', reason: 'Missing environment configuration', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: true };
       case 'step_failure':
-        return { displayStatus: 'error', reason: error ?? 'Step execution failed', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
+        return { displayStatus: 'error', reason: error ?? 'Step execution failed', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'routing_error':
-        return { displayStatus: 'error', reason: 'Workflow routing error', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
+        return { displayStatus: 'error', reason: 'Workflow routing error', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'max_iterations_exceeded':
         return { displayStatus: 'error', reason: 'Maximum review iterations exceeded', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       default:
@@ -82,7 +82,7 @@ export function getWorkflowStatus(instance: {
     // cancelProcessRun sets error='Cancelled by user' — string match is the cheapest gate here;
     // this value is written by cancelProcessRun and must not change without updating this check.
     const isCancelled = error === 'Cancelled by user';
-    return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: !isCancelled, hasDedicatedBanner: false };
+    return { displayStatus: 'error', reason: error ?? 'Process failed', rawReason: null, isRetryable: false, hasDedicatedBanner: false };
   }
 
   return { displayStatus: 'error', reason: 'Unknown status', rawReason: null, isRetryable: false, hasDedicatedBanner: false };

@@ -21,7 +21,7 @@ test.describe('Workflow Status Badges Journey', () => {
     await endRecording(page);
   });
 
-  test('step_failure instance shows Error badge, error banner with message, and Run again button', async ({ page }, testInfo) => {
+  test('step_failure instance shows Error badge and error banner — no retry button', async ({ page }, testInfo) => {
     await setupRecording(page, 'workflow-status-badges-error', testInfo);
 
     // proc-step-failure is seeded as: status=paused, pauseReason=step_failure,
@@ -37,8 +37,8 @@ test.describe('Workflow Status Badges Journey', () => {
     await expect(page.getByText('Docker container exited with code 1')).toBeVisible();
     await showStep(page);
 
-    // "Run again this step" button is visible on the human-review step (step_failure is retryable)
-    await expect(page.getByRole('button', { name: /run again this step/i })).toBeVisible();
+    // No retry button — error state is terminal, steps cannot be re-run
+    await expect(page.getByRole('button', { name: /run again this step/i })).toHaveCount(0);
     await showResult(page);
 
     await endRecording(page);
