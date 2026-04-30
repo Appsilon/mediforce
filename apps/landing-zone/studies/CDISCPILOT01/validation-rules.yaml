@@ -1,0 +1,159 @@
+# Custom validation rules for CDISCPILOT01
+#
+# These rules run AFTER the CDISC CORE engine (layer 2). They encode
+# study-specific business logic that CDISC standards don't cover.
+#
+# Data managers own this file. Changes go through PR review.
+# The R validation script (validate_custom.R) reads this file and
+# executes checks via the pointblank package.
+#
+# Rule format:
+#   domain:    SDTM domain code (DM, AE, LB, etc.)
+#   variable:  SDTM variable name
+#   check:     pointblank check function name
+#   params:    parameters passed to the check function
+#   severity:  Critical | Major | Minor | Warning
+#   message:   human-readable description of what the rule checks
+#
+# Cross-domain rules use domain: "cross" and specify the join in params.
+
+rules:
+  # --- DM (Demographics) ---
+  - id: CUSTOM-DM-001
+    domain: DM
+    variable: ARM
+    check: col_vals_in_set
+    params:
+      set: ["Xanomeline Low Dose", "Xanomeline High Dose", "Placebo"]
+    severity: Critical
+    message: "ARM must match one of the 3 protocol-defined treatment arms"
+
+  - id: CUSTOM-DM-002
+    domain: DM
+    variable: ARMCD
+    check: col_vals_in_set
+    params:
+      set: ["Xan_Lo", "Xan_Hi", "Pbo"]
+    severity: Critical
+    message: "ARMCD must match protocol-defined arm codes"
+
+  - id: CUSTOM-DM-003
+    domain: DM
+    variable: USUBJID
+    check: col_vals_not_null
+    params: {}
+    severity: Critical
+    message: "USUBJID must never be null"
+
+  - id: CUSTOM-DM-004
+    domain: DM
+    variable: USUBJID
+    check: rows_distinct
+    params:
+      columns: [USUBJID]
+    severity: Critical
+    message: "USUBJID must be unique within DM"
+
+  - id: CUSTOM-DM-005
+    domain: DM
+    variable: AGE
+    check: col_vals_between
+    params:
+      left: 50
+      right: 95
+    severity: Major
+    message: "AGE must be between 50-95 (Alzheimer's study inclusion criteria)"
+
+  - id: CUSTOM-DM-006
+    domain: DM
+    variable: SEX
+    check: col_vals_in_set
+    params:
+      set: ["M", "F"]
+    severity: Major
+    message: "SEX must be M or F per CDISC CT"
+
+  # --- AE (Adverse Events) ---
+  - id: CUSTOM-AE-001
+    domain: AE
+    variable: AESEV
+    check: col_vals_in_set
+    params:
+      set: ["MILD", "MODERATE", "SEVERE"]
+    severity: Major
+    message: "AESEV must use standard severity grades"
+
+  - id: CUSTOM-AE-002
+    domain: AE
+    variable: AESER
+    check: col_vals_in_set
+    params:
+      set: ["Y", "N"]
+    severity: Major
+    message: "AESER (serious flag) must be Y or N"
+
+  - id: CUSTOM-AE-003
+    domain: AE
+    variable: AEDECOD
+    check: col_vals_not_null
+    params: {}
+    severity: Major
+    message: "AEDECOD (MedDRA preferred term) must not be null"
+
+  # --- LB (Laboratory) ---
+  - id: CUSTOM-LB-001
+    domain: LB
+    variable: LBORRES
+    check: col_vals_not_null
+    params: {}
+    severity: Minor
+    message: "LBORRES (lab result) should not be null"
+
+  - id: CUSTOM-LB-002
+    domain: LB
+    variable: LBORRESU
+    check: col_vals_not_null
+    params: {}
+    severity: Minor
+    message: "LBORRESU (lab units) should not be null when LBORRES present"
+
+  # --- EX (Exposure) ---
+  - id: CUSTOM-EX-001
+    domain: EX
+    variable: EXTRT
+    check: col_vals_in_set
+    params:
+      set: ["Xanomeline", "Placebo"]
+    severity: Critical
+    message: "EXTRT must match protocol treatment names"
+
+  # --- Cross-domain checks ---
+  - id: CUSTOM-CROSS-001
+    domain: cross
+    check: cross_domain_ref
+    params:
+      left_domain: AE
+      right_domain: DM
+      join_key: USUBJID
+    severity: Critical
+    message: "Every USUBJID in AE must exist in DM"
+
+  - id: CUSTOM-CROSS-002
+    domain: cross
+    check: cross_domain_ref
+    params:
+      left_domain: LB
+      right_domain: DM
+      join_key: USUBJID
+    severity: Critical
+    message: "Every USUBJID in LB must exist in DM"
+
+  - id: CUSTOM-CROSS-003
+    domain: cross
+    check: cross_domain_ref
+    params:
+      left_domain: EX
+      right_domain: DM
+      join_key: USUBJID
+    severity: Critical
+    message: "Every USUBJID in EX must exist in DM"

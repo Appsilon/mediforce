@@ -66,6 +66,10 @@ RUN git clone https://github.com/cdisc-org/cdisc-rules-engine.git /tmp/cdisc-cor
 # importable from any cwd so the engine works no matter where it's run.
 ENV PYTHONPATH=/opt/cdisc
 
+# R packages for custom validation layer (layer 2).
+# haven reads .xpt, pointblank runs declarative checks, yaml parses rules.
+RUN Rscript -e 'install.packages(c("haven", "pointblank", "yaml", "jsonlite", "dplyr"), repos = "https://cloud.r-project.org")'
+
 COPY scripts/ /scripts/
 
 WORKDIR /workspace

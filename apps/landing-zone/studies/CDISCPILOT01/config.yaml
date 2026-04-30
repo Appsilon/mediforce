@@ -4,14 +4,23 @@ sponsor: CDISC (demo)
 cro: Demo CRO Inc.
 
 contract:
+  timeline:
+    enrollmentStart: "2024-01-15"
+    lastPatientLastVisit: "2025-09-30"
+    databaseLock: "2025-11-15"
+    submissionTarget: "2026-03-31"
+    currentPhase: mid              # recruitment | mid | closeout | urgent
+
   expectedDeliveries:
     - name: SDTM full package
       cadence: weekly
       day: monday
+      slaHours: 72                 # CRO must deliver within 72h of data cut
       requiredDomains: [DM, AE, LB, EX, VS, MH, CM]
     - name: ADaM derived
       cadence: monthly
       day: 15
+      slaHours: 120
       requiredDomains: [ADSL, ADAE, ADLB]
 
 sftp:
@@ -26,6 +35,13 @@ validation:
   igVersion: "3.4"
   rulesets: [CDISC, FDA]
   defineXml: data/clean/define.xml
+
+  routerThresholds:
+    minorFixCtRatio: 0.80          # >= 80% CT findings → minor-fix
+    chaosCriticalStructureFraction: 0.50  # > 50% expected domains with critical structure → chaos
+    defaultSeverity: Major         # missing severity treated as this
+
+  customRules: validation-rules.yaml   # pointblank rules file (R layer)
 
 demo:
   variants:
