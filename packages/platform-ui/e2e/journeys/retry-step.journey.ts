@@ -3,33 +3,35 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { setupRecording, click, showStep, showResult, endRecording } from '../helpers/recording';
 
 test.describe('Retry Failed Step Journey', () => {
-  test('clicking Retry flips a failed instance back to running and the auto-runner re-dispatches the step', async ({ page }, testInfo) => {
+  test('agent_escalated instance — Fixed try again retries the step and flips banner to waiting_for_human', async ({ page }, testInfo) => {
     await setupRecording(page, 'retry-step', testInfo);
 
-    // proc-retry-test is seeded with:
-    //   status=failed, currentStepId=human-review, latest execution status=failed
-    // so retryStep's three guards (status, currentStepId, execution.status) are satisfied.
+    // proc-retry-test is seeded as:
+    //   status=paused, pauseReason=agent_escalated, error='Simulated step failure...',
+    //   currentStepId=human-review, latest stepExecution status=failed
+    // so engine.retryStep's three guards (paused+agent_escalated, currentStepId, execution.status) are satisfied.
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-retry-test`);
+    await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
 
-    // Initial state: "Run again this step" button visible on the failed human-review step
-    const retryButton = page.getByRole('button', { name: /run again this step/i });
-    await expect(retryButton).toBeVisible({ timeout: 10_000 });
-    // Instance badge shows "Error" before retry
-    await expect(page.getByText(/^error$/i).first()).toBeVisible();
+    // Initial state: "Waiting for human" badge (agent_escalated maps to waiting_for_human display status)
+    await expect(page.getByText('Waiting for human').first()).toBeVisible();
+    // AgentEscalatedBanner shows "Fixed, try again" button
+    const retryButton = page.getByRole('button', { name: /fixed, try again/i });
+    await expect(retryButton).toBeVisible();
     await showStep(page);
 
-    // Click Retry — server action calls engine.retryStep (flips status→running, clears error)
-    // and fire-and-forgets POST /run which re-enters the auto-runner loop.
+    // Click "Fixed, try again" — server action calls engine.retryStep (flips status→running,
+    // clears pauseReason/error) and fire-and-forgets POST /run which re-enters the auto-runner.
     await click(page, retryButton);
 
     // Auto-runner hits executor='human' for human-review, creates a new HumanTask,
-    // and pauses the instance with pauseReason='waiting_for_human'. The status badge
-    // flips from "Error" to "Waiting for human". This proves the retry mechanism fired AND
-    // the auto-runner re-dispatched the step — without requiring any plugin or Docker.
-    await expect(page.getByText(/waiting for human/i).first()).toBeVisible({ timeout: 20_000 });
-    // Retry button should no longer be visible — the step is no longer 'failed'
+    // and pauses with pauseReason='waiting_for_human'. "Waiting for human" badge remains
+    // visible (now from the human task, not agent escalation). AgentEscalatedBanner
+    // disappears because rawReason is no longer 'agent_escalated'.
+    await expect(page.getByText('Waiting for human').first()).toBeVisible({ timeout: 20_000 });
     await expect(retryButton).toHaveCount(0);
     await showResult(page);
+
     await endRecording(page);
   });
 });
