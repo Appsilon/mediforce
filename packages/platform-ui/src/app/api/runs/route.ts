@@ -1,49 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import type { InstanceStatus } from '@mediforce/platform-core';
-
-const VALID_STATUSES = new Set<InstanceStatus>([
-  'created',
-  'running',
-  'paused',
-  'completed',
-  'failed',
-]);
+import { ListRunsInputSchema } from '@mediforce/platform-api/contract';
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const params = req.nextUrl.searchParams;
 
-  const workflow = params.get('workflow') ?? undefined;
-  const statusRaw = params.get('status') ?? undefined;
-  const limitRaw = params.get('limit');
-  const limit = limitRaw !== null ? Math.min(Math.max(Number(limitRaw) || 20, 1), 100) : 20;
+  const parseResult = ListRunsInputSchema.safeParse({
+    workflow: params.get('workflow') ?? undefined,
+    status: params.get('status') ?? undefined,
+    limit: params.get('limit') ?? undefined,
+  });
 
-  if (statusRaw !== undefined && !VALID_STATUSES.has(statusRaw as InstanceStatus)) {
+  if (!parseResult.success) {
     return NextResponse.json(
-      { error: `Invalid status: ${statusRaw}` },
+      { error: parseResult.error.issues.map((i) => i.message).join('; ') },
       { status: 400 },
     );
   }
-  const status = statusRaw as InstanceStatus | undefined;
 
-  const { instanceRepo } = getPlatformServices();
-  const instances = await instanceRepo.list({
-    definitionName: workflow,
-    status,
-    limit,
-  });
+  const { workflow, status, limit } = parseResult.data;
 
-  const runs = instances.map((inst) => ({
-    runId: inst.id,
-    status: inst.status,
-    definitionName: inst.definitionName,
-    definitionVersion: inst.definitionVersion,
-    currentStepId: inst.currentStepId,
-    error: inst.error,
-    createdAt: inst.createdAt,
-    updatedAt: inst.updatedAt,
-    createdBy: inst.createdBy,
-  }));
+  try {
+    const { instanceRepo } = getPlatformServices();
+    const instances = await instanceRepo.list({
+      definitionName: workflow,
+      status,
+      limit,
+    });
 
-  return NextResponse.json({ runs });
+    const runs = instances.map((inst) => ({
+      runId: inst.id,
+      status: inst.status,
+      definitionName: inst.definitionName,
+      definitionVersion: inst.definitionVersion,
+      currentStepId: inst.currentStepId,
+      error: inst.error,
+      createdAt: inst.createdAt,
+      updatedAt: inst.updatedAt,
+      createdBy: inst.createdBy,
+    }));
+
+    return NextResponse.json({ runs });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
