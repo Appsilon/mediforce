@@ -75,6 +75,20 @@ export const ArchiveVersionOutputSchema = z.object({
 export type ArchiveVersionInput = z.infer<typeof ArchiveVersionInputSchema>;
 export type ArchiveVersionOutput = z.infer<typeof ArchiveVersionOutputSchema>;
 
+export const ArchiveAllInputSchema = z.object({
+  name: z.string().min(1),
+  archived: z.boolean(),
+});
+
+export const ArchiveAllOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  archived: z.boolean(),
+});
+
+export type ArchiveAllInput = z.infer<typeof ArchiveAllInputSchema>;
+export type ArchiveAllOutput = z.infer<typeof ArchiveAllOutputSchema>;
+
 /**
  * Options for `mediforce.workflows.register()`. Namespace is a required
  * query parameter on the wire — modeled here as a separate options arg

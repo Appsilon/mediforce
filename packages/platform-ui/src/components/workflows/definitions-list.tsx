@@ -16,7 +16,7 @@ interface DefinitionsListProps {
 export function DefinitionsList({ workflowName }: DefinitionsListProps) {
   const handle = useHandleFromPath();
   const { definitions, latestVersion, defaultVersion, loading, refreshDefault } = useWorkflowDefinitions(workflowName);
-  const [showArchived, setShowArchived] = React.useState(true);
+  const [showArchived, setShowArchived] = React.useState(false);
   const [archivingVersion, setArchivingVersion] = React.useState<number | null>(null);
 
   const archivedCount = definitions.filter((d) => d.archived === true).length;
@@ -152,8 +152,11 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                   onClick={async (e) => {
                     e.preventDefault();
                     setArchivingVersion(def.version);
-                    await setVersionArchived(workflowName, def.version, !isArchived);
+                    const result = await setVersionArchived(workflowName, def.version, !isArchived);
                     setArchivingVersion(null);
+                    if (!result.success) {
+                      alert(`Failed to ${isArchived ? 'unarchive' : 'archive'} v${def.version}: ${result.error}`);
+                    }
                   }}
                   disabled={isArchiving || isDefault}
                   title={isDefault ? 'Cannot archive the default version' : isArchived ? 'Unarchive this version' : 'Archive this version'}

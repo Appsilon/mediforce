@@ -14,6 +14,8 @@ import {
   ListRunsOutputSchema,
   ArchiveVersionInputSchema,
   ArchiveVersionOutputSchema,
+  ArchiveAllInputSchema,
+  ArchiveAllOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type RegisterWorkflowInput,
@@ -24,6 +26,8 @@ import {
   type GetWorkflowOutput,
   type ArchiveVersionInput,
   type ArchiveVersionOutput,
+  type ArchiveAllInput,
+  type ArchiveAllOutput,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -99,7 +103,7 @@ export class Mediforce {
     list: () => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
     archiveVersion: (input: ArchiveVersionInput) => Promise<ArchiveVersionOutput>;
-    archiveAll: (input: { name: string; archived: boolean }) => Promise<{ success: true; name: string; archived: boolean }>;
+    archiveAll: (input: ArchiveAllInput) => Promise<ArchiveAllOutput>;
   };
 
   readonly runs: {
@@ -206,16 +210,17 @@ export class Mediforce {
         return ArchiveVersionOutputSchema.parse(body);
       },
       archiveAll: async (input) => {
+        const validated = ArchiveAllInputSchema.parse(input);
         const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(input.name)}/archive`,
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/archive`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ archived: input.archived }),
+            body: JSON.stringify({ archived: validated.archived }),
           },
         );
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.archiveAll');
-        return body as { success: true; name: string; archived: boolean };
+        return ArchiveAllOutputSchema.parse(body);
       },
     };
 

@@ -21,6 +21,13 @@ export class WorkflowDefinitionVersionAlreadyExistsError extends Error {
   }
 }
 
+export class WorkflowDefinitionVersionNotFoundError extends Error {
+  constructor(name: string, version: number) {
+    super(`Workflow definition "${name}" version ${version} not found`);
+    this.name = 'WorkflowDefinitionVersionNotFoundError';
+  }
+}
+
 /**
  * Firestore implementation of the ProcessRepository interface.
  * Uses composite keys ({name}:{version}) as document IDs.
@@ -196,7 +203,7 @@ export class FirestoreProcessRepository implements ProcessRepository {
     const docRef = this.db.collection(this.workflowDefinitionsCollection).doc(docId);
     const snap = await docRef.get();
     if (!snap.exists) {
-      throw new Error(`Workflow definition "${name}" version ${version} not found`);
+      throw new WorkflowDefinitionVersionNotFoundError(name, version);
     }
     await docRef.update({ archived });
   }

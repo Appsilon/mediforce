@@ -101,7 +101,9 @@ export class InMemoryProcessRepository implements ProcessRepository {
     const key = this.compositeKey(name, String(version));
     const def = this.workflowDefinitions.get(key);
     if (!def) {
-      throw new Error(`Workflow definition "${name}" version ${version} not found`);
+      const err = new Error(`Workflow definition "${name}" version ${version} not found`);
+      err.name = 'WorkflowDefinitionVersionNotFoundError';
+      throw err;
     }
     this.workflowDefinitions.set(key, { ...def, archived });
   }

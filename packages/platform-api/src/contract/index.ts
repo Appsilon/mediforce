@@ -23,6 +23,10 @@ export {
   ArchiveVersionOutputSchema,
   type ArchiveVersionInput,
   type ArchiveVersionOutput,
+  ArchiveAllInputSchema,
+  ArchiveAllOutputSchema,
+  type ArchiveAllInput,
+  type ArchiveAllOutput,
 } from './workflows.js';
 
 export {
