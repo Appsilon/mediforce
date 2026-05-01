@@ -14,7 +14,7 @@
     "dev:local": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
     "dev:test": "pnpm --filter @mediforce/platform-ui dev:test",
     "dev:redis": "docker run --rm -p 6379:6379 redis:7-alpine",
-    "dev:worker": "REDIS_URL=redis://localhost:6379 tsx packages/agent-queue/src/worker-entry.ts",
+    "dev:worker": "REDIS_URL=redis://localhost:6379 tsx packages/container-worker/src/worker-entry.ts",
     "dev:ui:queue": "REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
     "typecheck": "tsc -b --noEmit",
     "start": "pnpm --filter @mediforce/platform-ui start",

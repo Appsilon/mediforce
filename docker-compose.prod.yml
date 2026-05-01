@@ -76,10 +76,10 @@ services:
       redis:
         condition: service_healthy
 
-  agent-worker:
+  container-worker:
     build:
       context: .
-      dockerfile: packages/agent-queue/Dockerfile.worker
+      dockerfile: packages/container-worker/Dockerfile.worker
     restart: unless-stopped
     mem_limit: ${AGENT_WORKER_MEM_LIMIT:-1280m}
     environment:

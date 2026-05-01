@@ -25,7 +25,7 @@ tags: [concept, docker, spawn-strategy, redis, bullmq]
 
 ## Activation
 
-Env var: `REDIS_URL`. Set → `agent-runtime` swaps Local for Queued via optional `@mediforce/agent-queue`.
+Env var: `REDIS_URL`. Set → `agent-runtime` swaps Local for Queued via optional `@mediforce/container-worker`.
 
 Dev commands for queued path:
 

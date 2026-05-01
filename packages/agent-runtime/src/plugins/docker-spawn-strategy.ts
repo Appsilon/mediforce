@@ -169,11 +169,11 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
  * Output files produced by the container are returned through Redis and
  * written back to the caller's outputDir.
  *
- * Requires REDIS_URL to be set and @mediforce/agent-queue to be installed.
+ * Requires REDIS_URL to be set and @mediforce/container-worker to be installed.
  */
 export class QueuedDockerSpawnStrategy implements DockerSpawnStrategy {
   async spawn(request: DockerSpawnRequest): Promise<DockerSpawnResult> {
-    const { enqueueDockerJob } = await import('@mediforce/agent-queue');
+    const { enqueueDockerJob } = await import('@mediforce/container-worker');
 
     // Collect all files from outputDir to send through Redis
     const inputFiles: Record<string, string> = {};

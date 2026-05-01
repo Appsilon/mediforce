@@ -21,7 +21,7 @@
     "firebase-admin": "^13.6.1"
   },
   "optionalDependencies": {
-    "@mediforce/agent-queue": "workspace:*"
+    "@mediforce/container-worker": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",

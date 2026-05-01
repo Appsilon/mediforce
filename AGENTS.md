@@ -39,7 +39,7 @@ platform-core  (zod schemas, repository interfaces, test factories — zero medi
   ├── platform-infra     (Firestore repos, Firebase auth, SendGrid notifications)
   ├── platform-api       (API contract schemas + pure handlers — depends only on platform-core + zod)
   ├── agent-runtime      (AgentRunner, PluginRegistry, Docker spawn strategies)
-  │     └── agent-queue  (optional — BullMQ, activated by REDIS_URL)
+  │     └── container-worker  (optional — BullMQ, activated by REDIS_URL)
 
 platform-ui  (Next.js 15 App Router, port 9003)
   └── depends on: platform-api (contract types + handler runtime), platform-infra, workflow-engine, agent-runtime

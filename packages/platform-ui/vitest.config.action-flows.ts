@@ -24,7 +24,7 @@ export default defineConfig({
       '@mediforce/platform-api': resolve(__dirname, '../platform-api/src/index.ts'),
       '@mediforce/workflow-engine': resolve(__dirname, '../workflow-engine/src/index.ts'),
       '@mediforce/agent-runtime': resolve(__dirname, '../agent-runtime/src/index.ts'),
-      '@mediforce/agent-queue': resolve(__dirname, '../agent-queue/src/index.ts'),
+      '@mediforce/container-worker': resolve(__dirname, '../container-worker/src/index.ts'),
       '@mediforce/platform-infra': resolve(__dirname, '../platform-infra/src/index.ts'),
       '@mediforce/core-actions': resolve(__dirname, '../core-actions/src/index.ts'),
     },

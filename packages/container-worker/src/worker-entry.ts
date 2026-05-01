@@ -1,7 +1,7 @@
 /**
  * Standalone worker process — picks Docker jobs from BullMQ and executes them.
  *
- * Start with: REDIS_URL=redis://localhost:6379 tsx packages/agent-queue/src/worker-entry.ts
+ * Start with: REDIS_URL=redis://localhost:6379 tsx packages/container-worker/src/worker-entry.ts
  */
 import { Worker } from 'bullmq';
 import { spawn } from 'node:child_process';

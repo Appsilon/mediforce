@@ -72,7 +72,7 @@ let preparedDeployKeyPath: string | null = null;
  * to a private tmp file with 0600 perms so host-side mount modes can't break us.
  *
  * NOTE: Keep in sync with the duplicated copy in
- * `packages/agent-queue/src/docker-image-builder.ts` — agent-queue cannot
+ * `packages/container-worker/src/docker-image-builder.ts` — container-worker cannot
  * import from agent-runtime without dragging in Firebase deps.
  */
 export function prepareDeployKeyPath(): string {
