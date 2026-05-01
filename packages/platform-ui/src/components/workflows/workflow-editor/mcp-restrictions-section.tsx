@@ -174,7 +174,7 @@ function ServerRow({
             }}
             onBlur={commitDraft}
             placeholder="deny tool name…"
-            className="flex-1 min-w-[10ch] bg-transparent text-[11px] font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors placeholder:text-muted-foreground/60 placeholder:italic"
+            className="flex-1 min-w-[10ch] bg-card text-xs font-mono rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors placeholder:text-muted-foreground/60 placeholder:italic"
           />
         </div>
       </div>

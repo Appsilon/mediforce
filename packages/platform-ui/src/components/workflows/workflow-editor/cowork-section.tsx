@@ -1,12 +1,31 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import type { WorkflowStep, McpServerConfig } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
-import { EditableField, Section } from './step-editor-fields';
+import { FieldRow, FieldGroup, Section } from './step-editor-fields';
 
 const VOICE_OPTIONS = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
+
+const ri = 'w-full bg-card text-xs rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors';
+const riMono = `${ri} font-mono`;
+const rs = 'w-full bg-card text-xs rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors cursor-pointer';
+const rt = `${ri} resize-y leading-relaxed`;
+
+const TIP = {
+  model:              'LLM model for the cowork session. For voice, use a realtime-capable model (e.g. gpt-4o-realtime-preview).',
+  voice:              'Voice used for text-to-speech in voice sessions (alloy, echo, fable, onyx, nova, shimmer).',
+  synthesisModel:     'Model used to synthesise spoken responses. Can differ from the main reasoning model.',
+  maxDuration:        'Maximum session duration in seconds. The session auto-ends when this limit is reached.',
+  idleTimeout:        'Seconds of silence before the session auto-ends. Prevents orphaned open sessions.',
+  systemPrompt:       'Instructions for the AI collaborator in the shared workspace. Sets its goal and behaviour for this step.',
+  outputSchema:       'JSON Schema describing the structured artifact both parties are working toward. Guides the AI\'s output format.',
+  mcpName:            'Unique identifier for this MCP server binding.',
+  mcpCommand:         'Command to launch the MCP server process (stdio transport).',
+  mcpUrl:             'URL of the MCP server (HTTP/SSE transport).',
+  mcpAllowedTools:    'Tools the agent may use from this server, comma-separated. Leave empty to allow all tools.',
+};
 
 export function CoworkSection({
   step,
@@ -23,23 +42,24 @@ export function CoworkSection({
   const patchCowork = (patch: Partial<NonNullable<WorkflowStep['cowork']>>) =>
     onChange({ cowork: { ...cowork, ...patch } });
 
-  const selectInline = 'bg-transparent text-xs text-right border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors cursor-pointer';
-
   return (
     <Section title="Cowork">
       {isNewStep && (
         <div className="rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 p-3 mb-3 space-y-1.5">
           <p className="text-xs font-semibold text-teal-700 dark:text-teal-300">What is a Cowork step?</p>
           <p className="text-[11px] text-teal-700/80 dark:text-teal-300/80 leading-relaxed">
-            A Cowork step opens a shared workspace where a human and an AI agent collaborate to produce a structured artifact — a document, decision, or dataset — before the workflow can continue.
+            A Cowork step opens a shared workspace where a human and an AI agent collaborate to produce a structured
+            artifact — a document, decision, or dataset — before the workflow can continue.
           </p>
           <p className="text-[11px] text-teal-700/80 dark:text-teal-300/80 leading-relaxed">
-            Choose <strong>Chat</strong> for a text conversation with Claude, or <strong>Voice</strong> for a spoken session with a real-time voice model. The artifact schema defines the structured output both sides are working toward.
+            Choose <strong>Chat</strong> for a text conversation with Claude, or <strong>Voice</strong> for a spoken
+            session with a real-time voice model. The artifact schema defines the structured output both sides are
+            working toward.
           </p>
         </div>
       )}
 
-      {/* Agent mode toggle */}
+      {/* Mode toggle */}
       <div className="flex gap-1 p-0.5 rounded-lg bg-muted mb-3">
         {(['chat', 'voice-realtime'] as const).map((mode) => (
           <button
@@ -61,76 +81,77 @@ export function CoworkSection({
         ))}
       </div>
 
-      <div className="space-y-1.5">
-        {/* Model */}
-        <EditableField
-          label="Model"
-          value={isVoice ? (cowork.voiceRealtime?.model ?? '') : (cowork.chat?.model ?? '')}
-          placeholder={isVoice ? 'gpt-4o-realtime-preview' : 'anthropic/claude-sonnet-4'}
-          onChange={(v) => isVoice
-            ? patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, model: v || undefined } })
-            : patchCowork({ chat: { ...cowork.chat, model: v || undefined } })
-          }
-        />
+      {/* Fields */}
+      <FieldGroup>
+        <FieldRow label={isVoice ? 'voiceRealtime.model' : 'chat.model'} tooltip={TIP.model}>
+          <input
+            value={isVoice ? (cowork.voiceRealtime?.model ?? '') : (cowork.chat?.model ?? '')}
+            onChange={(e) => isVoice
+              ? patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, model: e.target.value || undefined } })
+              : patchCowork({ chat: { ...cowork.chat, model: e.target.value || undefined } })
+            }
+            className={ri}
+          />
+        </FieldRow>
 
-        {/* Voice-specific fields */}
         {isVoice && (
           <>
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-xs text-muted-foreground shrink-0">Voice</span>
+            <FieldRow label="voiceRealtime.voice" tooltip={TIP.voice}>
               <select
                 value={cowork.voiceRealtime?.voice ?? ''}
                 onChange={(e) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, voice: e.target.value || undefined } })}
-                className={selectInline}
+                className={rs}
               >
                 <option value="">Default</option>
                 {VOICE_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
               </select>
-            </div>
-            <EditableField
-              label="Synthesis model"
-              value={cowork.voiceRealtime?.synthesisModel ?? ''}
-              placeholder="e.g. claude-sonnet-4"
-              onChange={(v) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, synthesisModel: v || undefined } })}
-            />
-            <EditableField
-              label="Max duration"
-              value={cowork.voiceRealtime?.maxDurationSeconds !== undefined ? String(cowork.voiceRealtime.maxDurationSeconds) : ''}
-              placeholder="600"
-              suffix="sec"
-              onChange={(v) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, maxDurationSeconds: v ? Number(v) : undefined } })}
-            />
-            <EditableField
-              label="Idle timeout"
-              value={cowork.voiceRealtime?.idleTimeoutSeconds !== undefined ? String(cowork.voiceRealtime.idleTimeoutSeconds) : ''}
-              placeholder="30"
-              suffix="sec"
-              onChange={(v) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, idleTimeoutSeconds: v ? Number(v) : undefined } })}
-            />
+            </FieldRow>
+
+            <FieldRow label="voiceRealtime.synthesisModel" tooltip={TIP.synthesisModel}>
+              <input
+                value={cowork.voiceRealtime?.synthesisModel ?? ''}
+                onChange={(e) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, synthesisModel: e.target.value || undefined } })}
+                className={ri}
+              />
+            </FieldRow>
+
+            <FieldRow label="voiceRealtime.maxDurationSeconds" tooltip={TIP.maxDuration}>
+              <input
+                type="number"
+                value={cowork.voiceRealtime?.maxDurationSeconds ?? ''}
+                onChange={(e) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, maxDurationSeconds: e.target.value ? Number(e.target.value) : undefined } })}
+                className={ri}
+              />
+            </FieldRow>
+
+            <FieldRow label="voiceRealtime.idleTimeoutSeconds" tooltip={TIP.idleTimeout}>
+              <input
+                type="number"
+                value={cowork.voiceRealtime?.idleTimeoutSeconds ?? ''}
+                onChange={(e) => patchCowork({ voiceRealtime: { ...cowork.voiceRealtime, idleTimeoutSeconds: e.target.value ? Number(e.target.value) : undefined } })}
+                className={ri}
+              />
+            </FieldRow>
           </>
         )}
-      </div>
 
-      {/* System prompt */}
-      <div className="mt-3">
-        <p className="text-[11px] text-muted-foreground mb-1">System prompt</p>
-        <textarea
-          value={cowork.systemPrompt ?? ''}
-          onChange={(e) => patchCowork({ systemPrompt: e.target.value || undefined })}
-          rows={4}
-          placeholder="Instructions for the AI collaborator…"
-          className="w-full text-xs bg-muted/50 rounded-md p-2.5 leading-relaxed border-0 focus:outline-none focus:ring-1 focus:ring-primary resize-y"
-        />
-      </div>
+        <FieldRow label="cowork.systemPrompt" tooltip={TIP.systemPrompt} alignStart>
+          <textarea
+            value={cowork.systemPrompt ?? ''}
+            onChange={(e) => patchCowork({ systemPrompt: e.target.value || undefined })}
+            rows={4}
+            placeholder="Instructions for the AI collaborator…"
+            className={cn(rt, 'placeholder:italic placeholder:text-muted-foreground/40')}
+          />
+        </FieldRow>
 
-      {/* Output schema */}
-      <div className="mt-2">
-        <p className="text-[11px] text-muted-foreground mb-1">Output schema <span className="opacity-60">(JSON)</span></p>
-        <CoworkOutputSchemaEditor
-          value={cowork.outputSchema}
-          onChange={(schema) => patchCowork({ outputSchema: schema })}
-        />
-      </div>
+        <FieldRow label="cowork.outputSchema" tooltip={TIP.outputSchema} alignStart>
+          <CoworkOutputSchemaEditor
+            value={cowork.outputSchema}
+            onChange={(schema) => patchCowork({ outputSchema: schema })}
+          />
+        </FieldRow>
+      </FieldGroup>
 
       {/* MCP Servers */}
       <McpServersEditor
@@ -152,37 +173,20 @@ function McpServersEditor({
   servers: McpServerConfig[];
   onChange: (servers: McpServerConfig[]) => void;
 }) {
-  const addServer = () => {
-    // Empty name/command are UI placeholders; schema validation enforces non-empty at save time.
-    onChange([...servers, { name: '', command: undefined, args: [] }]);
-  };
-
-  const removeServer = (index: number) => {
-    onChange(servers.filter((_, i) => i !== index));
-  };
-
-  const updateServer = (index: number, patch: Partial<McpServerConfig>) => {
-    const updated = servers.map((s, i) => (i === index ? { ...s, ...patch } : s));
-    onChange(updated);
-  };
-
   return (
-    <div className="mt-3">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-[11px] text-muted-foreground">MCP Servers</p>
+    <div className="mt-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">MCP Servers</p>
         <button
-          onClick={addServer}
-          className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors"
+          onClick={() => onChange([...servers, { name: '', command: undefined, args: [] }])}
+          className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
         >
-          <Plus className="h-3 w-3" />
-          Add
+          + Add
         </button>
       </div>
 
       {servers.length === 0 && (
-        <p className="text-[10px] text-muted-foreground/60 italic">
-          No MCP servers configured. Add one to give the AI access to external tools.
-        </p>
+        <p className="text-[11px] text-muted-foreground/50 italic">No MCP servers configured.</p>
       )}
 
       <div className="space-y-2">
@@ -190,8 +194,8 @@ function McpServersEditor({
           <McpServerEntry
             key={index}
             server={server}
-            onChange={(patch) => updateServer(index, patch)}
-            onRemove={() => removeServer(index)}
+            onChange={(patch) => onChange(servers.map((s, i) => (i === index ? { ...s, ...patch } : s)))}
+            onRemove={() => onChange(servers.filter((_, i) => i !== index))}
           />
         ))}
       </div>
@@ -208,8 +212,6 @@ function McpServerEntry({
   onChange: (patch: Partial<McpServerConfig>) => void;
   onRemove: () => void;
 }) {
-  // Transport mode is UI state — derived initially from the data, but then tracked
-  // locally so that an in-progress empty field doesn't flip the mode back.
   const [transportMode, setTransportMode] = useState<'command' | 'url'>(
     server.url !== undefined ? 'url' : 'command',
   );
@@ -225,61 +227,59 @@ function McpServerEntry({
   };
 
   return (
-    <div className="rounded-md bg-muted/50 p-2 space-y-1.5">
-      <div className="flex items-center justify-between">
-        <input
-          value={server.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="server-name"
-          className="bg-transparent text-xs font-medium border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors w-32"
-        />
-        <div className="flex items-center gap-1">
+    <FieldGroup>
+      <FieldRow label="name" tooltip={TIP.mcpName}>
+        <div className="flex items-center gap-2">
+          <input
+            value={server.name}
+            onChange={(e) => onChange({ name: e.target.value })}
+            className={cn(riMono, 'flex-1')}
+          />
           <button
             onClick={toggleTransport}
-            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1"
+            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors border border-border/60 rounded px-1.5 py-0.5 shrink-0"
             title={`Switch to ${transportMode === 'command' ? 'URL' : 'command'} transport`}
           >
             {transportMode === 'command' ? 'stdio' : 'http'}
           </button>
           <button
             onClick={onRemove}
-            className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
+            className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
-      </div>
+      </FieldRow>
 
       {transportMode === 'command' ? (
-        <input
-          value={server.command ?? ''}
-          onChange={(e) => onChange({ command: e.target.value || undefined })}
-          placeholder="e.g. tealflow-mcp"
-          className="w-full bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors"
-        />
+        <FieldRow label="command" tooltip={TIP.mcpCommand}>
+          <input
+            value={server.command ?? ''}
+            onChange={(e) => onChange({ command: e.target.value || undefined })}
+            className={riMono}
+          />
+        </FieldRow>
       ) : (
-        <input
-          value={server.url ?? ''}
-          onChange={(e) => onChange({ url: e.target.value || undefined })}
-          placeholder="e.g. http://localhost:8080/mcp"
-          className="w-full bg-transparent text-xs font-mono border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors"
-        />
+        <FieldRow label="url" tooltip={TIP.mcpUrl}>
+          <input
+            value={server.url ?? ''}
+            onChange={(e) => onChange({ url: e.target.value || undefined })}
+            className={riMono}
+          />
+        </FieldRow>
       )}
 
-      <input
-        value={server.allowedTools?.join(', ') ?? ''}
-        onChange={(e) => {
-          const raw = e.target.value;
-          if (raw.trim() === '') {
-            onChange({ allowedTools: undefined });
-          } else {
-            onChange({ allowedTools: raw.split(',').map((t) => t.trim()).filter(Boolean) });
-          }
-        }}
-        placeholder="Allowed tools (comma-separated, empty = all)"
-        className="w-full bg-transparent text-[11px] border-0 border-b border-transparent hover:border-muted-foreground/20 focus:border-primary px-0 py-0 focus:outline-none transition-colors text-muted-foreground"
-      />
-    </div>
+      <FieldRow label="allowedTools" tooltip={TIP.mcpAllowedTools}>
+        <input
+          value={server.allowedTools?.join(', ') ?? ''}
+          onChange={(e) => {
+            const raw = e.target.value;
+            onChange({ allowedTools: raw.trim() === '' ? undefined : raw.split(',').map((t) => t.trim()).filter(Boolean) });
+          }}
+          className={ri}
+        />
+      </FieldRow>
+    </FieldGroup>
   );
 }
 
@@ -297,7 +297,6 @@ function CoworkOutputSchemaEditor({
   const [draft, setDraft] = useState(() => value !== undefined ? JSON.stringify(value, null, 2) : '');
   const [error, setError] = useState<string | null>(null);
 
-  // Keep draft in sync when value changes externally (e.g. YAML apply)
   const valueRef = useRef(value);
   useEffect(() => {
     if (value !== valueRef.current) {
@@ -308,21 +307,13 @@ function CoworkOutputSchemaEditor({
   }, [value]);
 
   const handleBlur = () => {
-    if (draft.trim() === '') {
-      onChange(undefined);
-      setError(null);
-      return;
-    }
-    try {
-      onChange(JSON.parse(draft));
-      setError(null);
-    } catch {
-      setError('Invalid JSON');
-    }
+    if (draft.trim() === '') { onChange(undefined); setError(null); return; }
+    try { onChange(JSON.parse(draft)); setError(null); }
+    catch { setError('Invalid JSON'); }
   };
 
   return (
-    <div>
+    <div className="w-full">
       <textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -330,8 +321,8 @@ function CoworkOutputSchemaEditor({
         rows={5}
         placeholder={'{\n  "type": "object",\n  "required": [],\n  "properties": {}\n}'}
         className={cn(
-          'w-full text-xs font-mono bg-muted/50 rounded-md p-2.5 leading-relaxed border-0 focus:outline-none focus:ring-1 resize-y',
-          error ? 'ring-1 ring-destructive' : 'focus:ring-primary',
+          rt, 'font-mono text-[11px]',
+          error ? 'border-destructive ring-1 ring-destructive' : '',
         )}
       />
       {error && <p className="text-[10px] text-destructive mt-0.5">{error}</p>}

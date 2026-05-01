@@ -552,10 +552,10 @@ export function WorkflowEditorCanvas({
       </div>{/* end unified toolbar */}
 
       {/* ── Two-column content area ── */}
-      <div className="flex flex-1 overflow-y-auto items-start">
+      <div className="flex flex-1 min-h-0">
 
         {/* Diagram column */}
-        <div className="flex-1 p-6 pt-4">
+        <div className="flex-1 overflow-y-auto p-6 pt-4">
           <WorkflowDiagram
             definition={diagramDefinition}
             className="border-0"
@@ -573,12 +573,11 @@ export function WorkflowEditorCanvas({
         </div>
 
         {/* Side panel */}
-        <div className="w-1/2 shrink-0 border-l bg-background">
+        <div className="w-1/2 shrink-0 border-l bg-background overflow-y-auto relative">
           <div className="p-4 space-y-4">
             {selectedStep ? (
               <>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Edit step</h2>
+                <div className="absolute top-2 right-2 z-10">
                   <button
                     onClick={() => setSelectedStepId(null)}
                     className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
