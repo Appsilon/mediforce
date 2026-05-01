@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { X, HelpCircle, Save, Undo2, Redo2, KeyRound, Code2 } from 'lucide-react';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { EditorState } from '@codemirror/state';
@@ -427,10 +427,10 @@ export function WorkflowEditorCanvas({
   }, [saveSnapshot]);
 
   // ── Diagram definition ─────────────────────────────────────────────────────
-  const diagramDefinition = {
+  const diagramDefinition = useMemo(() => ({
     steps: editedSteps,
     transitions: editedTransitions,
-  } as WorkflowDefinition;
+  }) as WorkflowDefinition, [editedSteps, editedTransitions]);
 
 
 

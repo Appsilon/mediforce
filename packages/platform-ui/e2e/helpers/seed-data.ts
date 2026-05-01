@@ -1276,6 +1276,55 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
+  workflowDefinitions['Diagram Branch Accordion:1'] = {
+    name: 'Diagram Branch Accordion',
+    namespace: 'test',
+    version: 1,
+    description: 'Test workflow for branch accordion diagram feature',
+    steps: [
+      { id: 'classify', name: 'Classify Document', type: 'decision', executor: 'agent', autonomyLevel: 'L2' },
+      { id: 'process-standard', name: 'Standard Processing', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+      { id: 'process-urgent', name: 'Urgent Processing', type: 'creation', executor: 'human' },
+      { id: 'finalize', name: 'Finalize', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [
+      { from: 'classify', to: 'process-standard', when: 'output.type == "standard"' },
+      { from: 'classify', to: 'process-urgent', when: 'output.type == "urgent"' },
+      { from: 'process-standard', to: 'finalize' },
+      { from: 'process-urgent', to: 'finalize' },
+      { from: 'finalize', to: 'done' },
+    ],
+    triggers: [{ type: 'manual', name: 'start' }],
+    createdAt: twoDaysAgo,
+  };
+
+  workflowDefinitions['Diagram Back Edge:1'] = {
+    name: 'Diagram Back Edge',
+    namespace: 'test',
+    version: 1,
+    description: 'Test workflow for back-edge diagram feature',
+    steps: [
+      { id: 'draft', name: 'Draft Document', type: 'creation', executor: 'human' },
+      {
+        id: 'review',
+        name: 'Review Document',
+        type: 'review',
+        executor: 'human',
+        verdicts: {
+          approve: { target: 'done' },
+          revise: { target: 'draft' },
+        },
+      },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [
+      { from: 'draft', to: 'review' },
+    ],
+    triggers: [{ type: 'manual', name: 'start' }],
+    createdAt: twoDaysAgo,
+  };
+
   // Step executions for the new-style workflow run (proc-workflow-run-1)
   // Used by executor identity label tests — vendor-assessment has plugin 'supply-data-collector'
   // in the WorkflowDefinition, so its label should render as 'agent:supply-data-collector'.
