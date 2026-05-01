@@ -108,6 +108,7 @@ export class WorkflowEngine {
       // without needing a one-time backfill of pre-feature instances.
       deleted: false,
       archived: false,
+      namespace: definition.namespace,
       ...(carryOver !== null ? { previousRun: carryOver.values } : {}),
       ...(carryOver?.sourceId !== undefined
         ? { previousRunSourceId: carryOver.sourceId }
