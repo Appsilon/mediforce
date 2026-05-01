@@ -181,7 +181,7 @@ function McpServersEditor({
           onClick={() => onChange([...servers, { name: '', command: undefined, args: [] }])}
           className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
         >
-          + Add
+          Add
         </button>
       </div>
 
@@ -233,6 +233,7 @@ function McpServerEntry({
           <input
             value={server.name}
             onChange={(e) => onChange({ name: e.target.value })}
+            placeholder="server-name"
             className={cn(riMono, 'flex-1')}
           />
           <button
@@ -256,6 +257,7 @@ function McpServerEntry({
           <input
             value={server.command ?? ''}
             onChange={(e) => onChange({ command: e.target.value || undefined })}
+            placeholder="e.g. tealflow-mcp"
             className={riMono}
           />
         </FieldRow>
@@ -264,6 +266,7 @@ function McpServerEntry({
           <input
             value={server.url ?? ''}
             onChange={(e) => onChange({ url: e.target.value || undefined })}
+            placeholder="localhost:8080/mcp"
             className={riMono}
           />
         </FieldRow>

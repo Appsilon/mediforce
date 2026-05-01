@@ -72,6 +72,7 @@ test.describe('Docker-backed workspace E2E', () => {
   // a 500, and the test fails at the first POST before the workspace flow even
   // starts. Fix is server-side admin SDK adoption — out of scope for #213.
   test.skip(process.env.CI === 'true', 'Blocked by #239 (Firestore rules + client-SDK auth)');
+  test.skip(process.env.E2E_RECORD === 'true', 'Excluded from GIF recording — known broken locally, tracked in #239');
   test.skip(!dockerAvailable(), 'Docker daemon not available');
 
   test.beforeAll(() => {
