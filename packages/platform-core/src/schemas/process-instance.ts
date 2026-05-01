@@ -42,6 +42,7 @@ export const ProcessInstanceSchema = z.object({
    * runs can be archived — active runs must be cancelled first.
    */
   archived: z.boolean().default(false),
+  namespace: z.string().min(1).optional(),
   /**
    * Snapshot of outputs carried over from the last successfully completed
    * run of the same workflow name, per the WD's `inputForNextRun` declarations.

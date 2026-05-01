@@ -40,6 +40,9 @@ export class InMemoryProcessInstanceRepository
 
   async list(options: ListInstancesOptions): Promise<ProcessInstance[]> {
     let results = [...this.instances.values()].filter((i) => i.deleted !== true);
+    if (options.namespace !== undefined) {
+      results = results.filter((i) => i.namespace === options.namespace);
+    }
     if (options.definitionName !== undefined) {
       results = results.filter((i) => i.definitionName === options.definitionName);
     }

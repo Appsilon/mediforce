@@ -55,6 +55,9 @@ export class FirestoreProcessInstanceRepository
       .collection(this.collectionName)
       .where('deleted', '==', false);
 
+    if (options.namespace !== undefined) {
+      query = query.where('namespace', '==', options.namespace);
+    }
     if (options.definitionName !== undefined) {
       query = query.where('definitionName', '==', options.definitionName);
     }
