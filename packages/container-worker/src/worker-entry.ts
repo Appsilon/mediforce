@@ -12,6 +12,7 @@ import { getRedisConnection } from './connection.js';
 import { QUEUE_NAME, DockerJobDataSchema } from './schemas.js';
 import type { DockerJobResult } from './schemas.js';
 import { ensureImage } from './docker-image-builder.js';
+import { startHttpServer } from './http-server.js';
 
 /**
  * If inputFiles are provided (remote caller), create a local temp dir,
@@ -191,6 +192,8 @@ const worker = new Worker(
   },
 );
 
+const httpServer = startHttpServer();
+
 worker.on('ready', () => {
   console.log(`[worker] Ready — listening on queue '${QUEUE_NAME}'`);
 });
@@ -203,6 +206,7 @@ worker.on('failed', (job, error) => {
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, async () => {
     console.log(`[worker] ${sig} received — shutting down`);
+    httpServer.close();
     await worker.close();
     process.exit(0);
   });

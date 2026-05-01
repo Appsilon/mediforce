@@ -33,6 +33,8 @@ services:
     build:
       context: .
       dockerfile: packages/container-worker/Dockerfile.worker
+    expose:
+      - "3001"
     environment:
       - REDIS_URL=redis://redis:6379
     volumes:

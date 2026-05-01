@@ -28,5 +28,7 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
 
   container-worker:
+    expose:
+      - "3001"
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379

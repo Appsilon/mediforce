@@ -22,6 +22,15 @@ export {
 } from './workflows.js';
 
 export {
+  DockerImageInfoSchema,
+  DockerDiskInfoSchema,
+  DockerInfoResponseSchema,
+  type DockerImageInfo,
+  type DockerDiskInfo,
+  type DockerInfoResponse,
+} from './system.js';
+
+export {
   GetRunInputSchema,
   GetRunOutputSchema,
   StartRunInputSchema,

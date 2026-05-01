@@ -82,6 +82,8 @@ services:
       dockerfile: packages/container-worker/Dockerfile.worker
     restart: unless-stopped
     mem_limit: ${AGENT_WORKER_MEM_LIMIT:-1280m}
+    expose:
+      - "3001"
     environment:
       - REDIS_URL=redis://redis:6379
     volumes:
