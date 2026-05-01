@@ -452,8 +452,8 @@ test.describe('Workflow Editor Journey', () => {
     // Executor is shown as a read-only locked field (no toggle buttons)
     await expect(stepEditor.getByText('executor')).toBeVisible();
     await expect(stepEditor.getByTitle(/executor is set at creation/i)).toBeVisible();
-    // The icon header shows the Agent label
-    await expect(stepEditor.getByText('Agent')).toBeVisible();
+    // The icon header shows the Agent label (exact match avoids tooltip text false positives)
+    await expect(stepEditor.getByText('Agent', { exact: true })).toBeVisible();
     await showStep(page);
 
     // Deselect and verify YAML reflects agent executor with plugin field

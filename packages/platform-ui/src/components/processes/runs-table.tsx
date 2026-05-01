@@ -260,7 +260,7 @@ export function RunsTable({
                   <ProcessStatusBadge status={run.status} pauseReason={run.pauseReason} error={run.error} />
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy.slice(0, 8)) : '—'}
+                  {run.createdBy ? (userNames.get(run.createdBy) ?? run.createdBy) : '—'}
                 </td>
                 <td className="px-4 py-3 text-xs">
                   {run.currentStepId ? (

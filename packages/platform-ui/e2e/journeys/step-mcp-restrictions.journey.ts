@@ -33,8 +33,9 @@ test.describe('Step MCP Restrictions Journey', () => {
     await expect(sidePanel.getByText('MCP Restrictions', { exact: true })).toBeVisible({ timeout: 10_000 });
     // The binding list hydrates after an API call to
     // /api/agent-definitions/mcp-test-agent/mcp-servers. On cold compile this
-    // can exceed the default 5s — match the section-heading tolerance above.
-    await expect(sidePanel.getByText('filesystem').first()).toBeVisible({ timeout: 10_000 });
+    // route may take 15-20s to compile for the first time, so use a generous
+    // timeout here.
+    await expect(sidePanel.getByText('filesystem').first()).toBeVisible({ timeout: 30_000 });
     await showStep(page);
 
     // Toggle "Disable" for filesystem

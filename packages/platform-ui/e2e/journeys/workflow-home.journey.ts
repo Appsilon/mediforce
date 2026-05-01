@@ -31,7 +31,7 @@ test.describe('Workflow Home Journey', () => {
     // Navigate to run detail
     const hash = page.getByText('#proc-r').first();
     await click(page, hash);
-    await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 30_000 });
     await showResult(page);
     await endRecording(page);
   });
