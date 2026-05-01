@@ -27,6 +27,6 @@ services:
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
 
-  agent-worker:
+  container-worker:
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379

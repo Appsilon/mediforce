@@ -51,3 +51,33 @@ export const StartRunOutputSchema = z.object({
 
 export type StartRunInput = z.infer<typeof StartRunInputSchema>;
 export type StartRunOutput = z.infer<typeof StartRunOutputSchema>;
+
+/**
+ * Contract for `GET /api/runs`.
+ */
+export const ListRunsInputSchema = z.object({
+  workflow: z.string().min(1).optional(),
+  status: z
+    .enum(['created', 'running', 'paused', 'completed', 'failed'])
+    .optional(),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
+export const ListRunsOutputSchema = z.object({
+  runs: z.array(
+    z.object({
+      runId: z.string().min(1),
+      status: InstanceStatusSchema,
+      definitionName: z.string().min(1),
+      definitionVersion: z.string().min(1),
+      currentStepId: z.string().nullable(),
+      error: z.string().nullable(),
+      createdAt: z.string().datetime(),
+      updatedAt: z.string().datetime(),
+      createdBy: z.string().min(1),
+    }),
+  ),
+});
+
+export type ListRunsInput = z.infer<typeof ListRunsInputSchema>;
+export type ListRunsOutput = z.infer<typeof ListRunsOutputSchema>;

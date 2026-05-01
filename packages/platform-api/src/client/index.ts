@@ -10,6 +10,8 @@ import {
   GetRunOutputSchema,
   StartRunInputSchema,
   StartRunOutputSchema,
+  ListRunsInputSchema,
+  ListRunsOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type RegisterWorkflowInput,
@@ -22,6 +24,8 @@ import {
   type GetRunOutput,
   type StartRunInput,
   type StartRunOutput,
+  type ListRunsInput,
+  type ListRunsOutput,
 } from '../contract/index.js';
 
 /**
@@ -93,6 +97,7 @@ export class Mediforce {
   };
 
   readonly runs: {
+    list: (input?: ListRunsInput) => Promise<ListRunsOutput>;
     get: (input: GetRunInput) => Promise<GetRunOutput>;
     start: (input: StartRunInput) => Promise<StartRunOutput>;
   };
@@ -184,6 +189,17 @@ export class Mediforce {
     };
 
     this.runs = {
+      list: async (input) => {
+        const validated = ListRunsInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          workflow: validated.workflow,
+          status: validated.status,
+          limit: validated.limit !== undefined ? String(validated.limit) : undefined,
+        });
+        const res = await this.request(`/api/runs${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.runs.list');
+        return ListRunsOutputSchema.parse(body);
+      },
       get: async (input) => {
         const validated = GetRunInputSchema.parse(input);
         const res = await this.request(

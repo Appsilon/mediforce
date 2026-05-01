@@ -89,22 +89,6 @@ importers:
         specifier: workspace:*
         version: link:../../packages/platform-core
 
-  packages/agent-queue:
-    dependencies:
-      bullmq:
-        specifier: ^5.52.0
-        version: 5.74.1
-      zod:
-        specifier: ^4.0.0
-        version: 4.3.6
-    devDependencies:
-      '@types/node':
-        specifier: ^24.12.2
-        version: 24.12.2
-      vitest:
-        specifier: ^4.0.0
-        version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
-
   packages/agent-runtime:
     dependencies:
       '@mediforce/platform-core':
@@ -121,9 +105,9 @@ importers:
         specifier: ^4.0.0
         version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
     optionalDependencies:
-      '@mediforce/agent-queue':
+      '@mediforce/container-worker':
         specifier: workspace:*
-        version: link:../agent-queue
+        version: link:../container-worker
 
   packages/cli:
     dependencies:
@@ -136,6 +120,22 @@ importers:
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^24.12.2
+        version: 24.12.2
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+
+  packages/container-worker:
+    dependencies:
+      bullmq:
+        specifier: ^5.52.0
+        version: 5.74.1
       zod:
         specifier: ^4.0.0
         version: 4.3.6
@@ -460,9 +460,9 @@ importers:
         specifier: ^4.0.0
         version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
     optionalDependencies:
-      '@mediforce/agent-queue':
+      '@mediforce/container-worker':
         specifier: workspace:*
-        version: link:../agent-queue
+        version: link:../container-worker
 
   packages/workflow-engine:
     dependencies:

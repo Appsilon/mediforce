@@ -3,6 +3,7 @@ import type {
   ProcessInstance,
   InstanceStatus,
   StepExecution,
+  ListInstancesOptions,
 } from '../index.js';
 
 /**
@@ -35,6 +36,18 @@ export class InMemoryProcessInstanceRepository
       throw new Error(`ProcessInstance not found: ${instanceId}`);
     }
     this.instances.set(instanceId, { ...existing, ...updates });
+  }
+
+  async list(options: ListInstancesOptions): Promise<ProcessInstance[]> {
+    let results = [...this.instances.values()].filter((i) => i.deleted !== true);
+    if (options.definitionName !== undefined) {
+      results = results.filter((i) => i.definitionName === options.definitionName);
+    }
+    if (options.status !== undefined) {
+      results = results.filter((i) => i.status === options.status);
+    }
+    results.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return results.slice(0, options.limit ?? 20);
   }
 
   async getByStatus(status: InstanceStatus): Promise<ProcessInstance[]> {

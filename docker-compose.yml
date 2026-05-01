@@ -29,10 +29,10 @@ services:
       redis:
         condition: service_healthy
 
-  agent-worker:
+  container-worker:
     build:
       context: .
-      dockerfile: packages/agent-queue/Dockerfile.worker
+      dockerfile: packages/container-worker/Dockerfile.worker
     environment:
       - REDIS_URL=redis://redis:6379
     volumes:

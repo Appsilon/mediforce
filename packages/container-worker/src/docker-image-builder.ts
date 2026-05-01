@@ -2,7 +2,7 @@
  * Lazy Docker image builder for the BullMQ worker.
  *
  * Lightweight copy of agent-runtime/plugins/docker-image-builder.ts.
- * Duplicated to avoid pulling agent-runtime (and Firebase) into agent-queue.
+ * Duplicated to avoid pulling agent-runtime (and Firebase) into container-worker.
  */
 import { execSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -17,7 +17,7 @@ let preparedDeployKeyPath: string | null = null;
 /**
  * NOTE: Keep in sync with the exported copy in
  * `packages/agent-runtime/src/plugins/container-plugin.ts`.
- * Duplicated so agent-queue stays free of agent-runtime (and Firebase) deps.
+ * Duplicated so container-worker stays free of agent-runtime (and Firebase) deps.
  */
 function prepareDeployKeyPath(): string {
   const source = process.env.DEPLOY_KEY_PATH ?? join(homedir(), '.ssh', 'deploy_key');

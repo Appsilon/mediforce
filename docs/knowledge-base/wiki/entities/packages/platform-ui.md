@@ -14,7 +14,7 @@ User-facing entry. Workspace-scoped pages (agents, tasks, processes, workflows, 
 
 ## Dependencies
 
-- Internal: [`platform-infra`](./platform-infra.md), [`platform-core`](./platform-core.md), [`workflow-engine`](./workflow-engine.md), [`agent-runtime`](./agent-runtime.md), `mcp-client`, [`supply-intelligence-plugins`](./supply-intelligence-plugins.md); optionally `agent-queue`.
+- Internal: [`platform-infra`](./platform-infra.md), [`platform-core`](./platform-core.md), [`workflow-engine`](./workflow-engine.md), [`agent-runtime`](./agent-runtime.md), `mcp-client`, [`supply-intelligence-plugins`](./supply-intelligence-plugins.md); optionally `container-worker`.
 - External: `next@15`, `react`, `radix-ui`, `firebase`, `playwright`.
 
 ## Key entry points

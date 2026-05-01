@@ -2,10 +2,17 @@ import type { ProcessInstance } from '../schemas/process-instance.js';
 import type { StepExecution } from '../schemas/step-execution.js';
 import type { InstanceStatus } from '../schemas/process-instance.js';
 
+export interface ListInstancesOptions {
+  definitionName?: string;
+  status?: InstanceStatus;
+  limit?: number;
+}
+
 export interface ProcessInstanceRepository {
   create(instance: ProcessInstance): Promise<ProcessInstance>;
   getById(instanceId: string): Promise<ProcessInstance | null>;
   update(instanceId: string, updates: Partial<ProcessInstance>): Promise<void>;
+  list(options: ListInstancesOptions): Promise<ProcessInstance[]>;
   getByStatus(status: InstanceStatus): Promise<ProcessInstance[]>;
   getByDefinition(name: string, version: string): Promise<ProcessInstance[]>;
   /**

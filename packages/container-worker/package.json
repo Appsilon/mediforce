@@ -1,5 +1,5 @@
 {
-  "name": "@mediforce/agent-queue",
+  "name": "@mediforce/container-worker",
   "version": "0.0.1",
   "private": true,
   "type": "module",

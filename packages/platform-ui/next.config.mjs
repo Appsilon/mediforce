@@ -21,7 +21,7 @@ const nextConfig = {
     '@mediforce/platform-api',
     '@mediforce/workflow-engine',
     '@mediforce/agent-runtime',
-    '@mediforce/agent-queue',
+    '@mediforce/container-worker',
     '@mediforce/mcp-client',
     '@mediforce/core-actions',
     // @hookform/resolvers/zod imports `zod/v4/core` without declaring zod
@@ -48,7 +48,7 @@ const nextConfig = {
       '@mediforce/platform-api': path.join(packagesDir, 'platform-api/src/index.ts'),
       '@mediforce/workflow-engine': path.join(packagesDir, 'workflow-engine/src/index.ts'),
       '@mediforce/agent-runtime': path.join(packagesDir, 'agent-runtime/src/index.ts'),
-      '@mediforce/agent-queue': path.join(packagesDir, 'agent-queue/src/index.ts'),
+      '@mediforce/container-worker': path.join(packagesDir, 'container-worker/src/index.ts'),
       '@mediforce/mcp-client': path.join(packagesDir, 'mcp-client/src/index.ts'),
       '@mediforce/core-actions': path.join(packagesDir, 'core-actions/src/index.ts'),
       // Pin zod to platform-ui's own copy so `@hookform/resolvers/zod` (which
