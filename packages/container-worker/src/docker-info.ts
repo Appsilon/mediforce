@@ -1,26 +1,25 @@
-import { execSync } from 'node:child_process';
-import { z } from 'zod';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
-export const DockerImageSchema = z.object({
-  repository: z.string(),
-  tag: z.string(),
-  id: z.string(),
-  size: z.string(),
-  created: z.string(),
-});
+const execFileAsync = promisify(execFile);
 
-export type DockerImage = z.infer<typeof DockerImageSchema>;
+export interface DockerImage {
+  repository: string;
+  tag: string;
+  id: string;
+  size: string;
+  created: string;
+}
 
-export const DockerDiskUsageSchema = z.object({
-  images: z.object({ totalCount: z.number(), size: z.string() }),
-  containers: z.object({ totalCount: z.number(), active: z.number(), size: z.string() }),
-  buildCache: z.object({ size: z.string() }),
-});
+export interface DockerDiskUsage {
+  images: { totalCount: number; size: string };
+  containers: { totalCount: number; active: number; size: string };
+  buildCache: { size: string };
+}
 
-export type DockerDiskUsage = z.infer<typeof DockerDiskUsageSchema>;
-
-export function listImages(): DockerImage[] {
-  const raw = execSync("docker images --format '{{json .}}'", { stdio: 'pipe' }).toString().trim();
+export async function listImages(): Promise<DockerImage[]> {
+  const { stdout } = await execFileAsync('docker', ['images', '--format', '{{json .}}']);
+  const raw = stdout.trim();
   if (raw.length === 0) return [];
 
   return raw.split('\n').map((line) => {
@@ -35,9 +34,9 @@ export function listImages(): DockerImage[] {
   });
 }
 
-export function getDiskUsage(): DockerDiskUsage {
-  const raw = execSync("docker system df --format '{{json .}}'", { stdio: 'pipe' }).toString().trim();
-  const rows = raw.split('\n').map((line) => JSON.parse(line));
+export async function getDiskUsage(): Promise<DockerDiskUsage> {
+  const { stdout } = await execFileAsync('docker', ['system', 'df', '--format', '{{json .}}']);
+  const rows = stdout.trim().split('\n').map((line) => JSON.parse(line));
 
   const find = (type: string) => rows.find((r) => r.Type === type);
 

@@ -37,6 +37,7 @@ services:
       - "3001"
     environment:
       - REDIS_URL=redis://redis:6379
+      - WORKER_HTTP_PORT=3001
     volumes:
       # Worker needs Docker socket to spawn containers
       - /var/run/docker.sock:/var/run/docker.sock

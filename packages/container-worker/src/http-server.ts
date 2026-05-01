@@ -11,7 +11,7 @@ function jsonResponse(res: import('node:http').ServerResponse, status: number, b
 }
 
 export function startHttpServer(): Server {
-  const server = createServer((req, res) => {
+  const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${WORKER_HTTP_PORT}`);
 
     if (req.method !== 'GET') {
@@ -26,7 +26,7 @@ export function startHttpServer(): Server {
 
     if (url.pathname === '/images') {
       try {
-        const images = listImages();
+        const images = await listImages();
         jsonResponse(res, 200, images);
       } catch (err) {
         jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
@@ -36,7 +36,7 @@ export function startHttpServer(): Server {
 
     if (url.pathname === '/disk') {
       try {
-        const disk = getDiskUsage();
+        const disk = await getDiskUsage();
         jsonResponse(res, 200, disk);
       } catch (err) {
         jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });

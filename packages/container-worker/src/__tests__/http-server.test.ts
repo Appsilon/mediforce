@@ -41,7 +41,7 @@ describe('HTTP info server', () => {
 
   it('GET /images returns image list', async () => {
     const images = [{ repository: 'test', tag: 'latest', id: 'abc', size: '100MB', created: '1 day ago' }];
-    mockListImages.mockReturnValue(images);
+    mockListImages.mockResolvedValue(images);
 
     const { port } = await getServer();
     const res = await fetch(`http://localhost:${port}/images`);
@@ -55,7 +55,7 @@ describe('HTTP info server', () => {
       containers: { totalCount: 2, active: 1, size: '100MB' },
       buildCache: { size: '500MB' },
     };
-    mockGetDiskUsage.mockReturnValue(disk);
+    mockGetDiskUsage.mockResolvedValue(disk);
 
     const { port } = await getServer();
     const res = await fetch(`http://localhost:${port}/disk`);
@@ -76,7 +76,7 @@ describe('HTTP info server', () => {
   });
 
   it('returns 500 when docker command fails', async () => {
-    mockListImages.mockImplementation(() => { throw new Error('docker not found'); });
+    mockListImages.mockRejectedValue(new Error('docker not found'));
 
     const { port } = await getServer();
     const res = await fetch(`http://localhost:${port}/images`);
