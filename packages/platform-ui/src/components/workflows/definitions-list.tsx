@@ -1,10 +1,11 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
-import { ChevronRight, Pencil, Loader2 } from 'lucide-react';
+import { ChevronRight, Pencil, Loader2, Archive, ArchiveRestore, Eye, EyeOff } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { VersionLabel } from '@/components/ui/version-label';
-import { setDefaultWorkflowVersion } from '@/app/actions/definitions';
+import { setDefaultWorkflowVersion, setVersionArchived } from '@/app/actions/definitions';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
@@ -15,6 +16,13 @@ interface DefinitionsListProps {
 export function DefinitionsList({ workflowName }: DefinitionsListProps) {
   const handle = useHandleFromPath();
   const { definitions, latestVersion, defaultVersion, loading, refreshDefault } = useWorkflowDefinitions(workflowName);
+  const [showArchived, setShowArchived] = React.useState(true);
+  const [archivingVersion, setArchivingVersion] = React.useState<number | null>(null);
+
+  const archivedCount = definitions.filter((d) => d.archived === true).length;
+  const visibleDefinitions = showArchived
+    ? definitions
+    : definitions.filter((d) => d.archived !== true);
 
   if (loading) {
     return (
@@ -45,9 +53,26 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {definitions.length} version{definitions.length !== 1 ? 's' : ''}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            {definitions.length} version{definitions.length !== 1 ? 's' : ''}
+          </p>
+          {archivedCount > 0 && (
+            <button
+              onClick={() => setShowArchived((v) => !v)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
+                showArchived
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+              )}
+            >
+              {showArchived
+                ? <><EyeOff className="h-3.5 w-3.5" />Hide archived ({archivedCount})</>
+                : <><Eye className="h-3.5 w-3.5" />Show archived ({archivedCount})</>}
+            </button>
+          )}
+        </div>
         <Link
           href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${latestVersion}`}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
@@ -58,10 +83,11 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
       </div>
 
       <div className="rounded-lg border divide-y">
-        {definitions.map((def) => {
+        {visibleDefinitions.map((def) => {
           const isDefault = def.version === defaultVersion;
           const isArchived = def.archived === true;
           const canSetDefault = !isDefault && !isArchived;
+          const isArchiving = archivingVersion === def.version;
 
           return (
             <div
@@ -121,6 +147,29 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                     Make default
                   </button>
                 )}
+
+                <button
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    setArchivingVersion(def.version);
+                    await setVersionArchived(workflowName, def.version, !isArchived);
+                    setArchivingVersion(null);
+                  }}
+                  disabled={isArchiving || isDefault}
+                  title={isDefault ? 'Cannot archive the default version' : isArchived ? 'Unarchive this version' : 'Archive this version'}
+                  className={cn(
+                    'rounded-md p-1 transition-colors',
+                    isDefault
+                      ? 'invisible'
+                      : isArchiving
+                        ? 'opacity-50 pointer-events-none'
+                        : 'text-muted-foreground/60 hover:text-foreground md:opacity-0 md:group-hover:opacity-100',
+                  )}
+                >
+                  {isArchived
+                    ? <ArchiveRestore className="h-3.5 w-3.5" />
+                    : <Archive className="h-3.5 w-3.5" />}
+                </button>
 
                 <Link
                   href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}

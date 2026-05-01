@@ -25,6 +25,7 @@ import { workflowGetCommand } from './commands/workflow-get.js';
 import { runGetCommand } from './commands/run-get.js';
 import { runListCommand } from './commands/run-list.js';
 import { runStartCommand } from './commands/run-start.js';
+import { workflowArchiveCommand } from './commands/workflow-archive.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -39,6 +40,7 @@ Commands:
   workflow register --file <path> --namespace <ns>   Register a workflow definition
   workflow list                                      List registered workflow definitions
   workflow get <name>                                Fetch a workflow definition
+  workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
   run list                                           List recent runs
   run start --workflow <name>                        Start a new run (manual trigger)
   run get <runId>                                    Fetch a single run's status
@@ -64,6 +66,7 @@ Subcommands:
   register --file <path> --namespace <ns>   Register a workflow definition
   list                                      List registered workflow definitions
   get <name>                                Fetch a workflow definition
+  archive <name> --version <n>|--all        Archive/unarchive workflow versions
 
 Run \`mediforce workflow <subcommand> --help\` for subcommand-specific flags.
 `;
@@ -112,6 +115,9 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'workflow' && subcommand === 'get') {
     return workflowGetCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'workflow' && subcommand === 'archive') {
+    return workflowArchiveCommand({ argv: rest, env: input.env, output });
   }
   if (command === 'run' && subcommand === 'list') {
     return runListCommand({ argv: rest, env: input.env, output });
