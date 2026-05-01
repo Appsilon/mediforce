@@ -89,8 +89,21 @@ export class InMemoryProcessRepository implements ProcessRepository {
     return latest;
   }
 
-  async setProcessArchived(_name: string, _archived: boolean): Promise<void> {
-    // No-op in test double
+  async setProcessArchived(name: string, archived: boolean): Promise<void> {
+    for (const [key, def] of this.workflowDefinitions) {
+      if (def.name === name) {
+        this.workflowDefinitions.set(key, { ...def, archived });
+      }
+    }
+  }
+
+  async setVersionArchived(name: string, version: number, archived: boolean): Promise<void> {
+    const key = this.compositeKey(name, String(version));
+    const def = this.workflowDefinitions.get(key);
+    if (!def) {
+      throw new Error(`Workflow definition "${name}" version ${version} not found`);
+    }
+    this.workflowDefinitions.set(key, { ...def, archived });
   }
 
   async setWorkflowDeleted(_name: string, _deleted: boolean): Promise<void> {

@@ -191,6 +191,16 @@ export class FirestoreProcessRepository implements ProcessRepository {
     }
   }
 
+  async setVersionArchived(name: string, version: number, archived: boolean): Promise<void> {
+    const docId = `${name}:${version}`;
+    const docRef = this.db.collection(this.workflowDefinitionsCollection).doc(docId);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      throw new Error(`Workflow definition "${name}" version ${version} not found`);
+    }
+    await docRef.update({ archived });
+  }
+
   async setWorkflowDeleted(name: string, deleted: boolean): Promise<void> {
     const workflowSnapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
