@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
+import { WorkflowDefinitionVersionNotFoundError } from '@mediforce/platform-infra';
 import { getCallerNamespaces } from '../../../../auth.js';
 
 export async function POST(
@@ -41,8 +42,12 @@ export async function POST(
     await processRepo.setVersionArchived(name, version, archived);
     return NextResponse.json({ success: true, name, version, archived });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    const status = message.includes('not found') ? 404 : 500;
-    return NextResponse.json({ error: message }, { status });
+    if (err instanceof WorkflowDefinitionVersionNotFoundError) {
+      return NextResponse.json({ error: err.message }, { status: 404 });
+    }
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Unknown error' },
+      { status: 500 },
+    );
   }
 }
