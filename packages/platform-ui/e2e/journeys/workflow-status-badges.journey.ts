@@ -8,7 +8,7 @@ test.describe('Workflow Status Badges Journey', () => {
 
     // The RunsTable (with status badges) lives at /runs, not /workflows
     await page.goto(`/${TEST_ORG_HANDLE}/runs`);
-    await expect(page.getByText('All workflow runs across the platform.')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('All workflow runs across the platform.')).toBeVisible({ timeout: 30_000 });
     await showStep(page);
 
     // Five display statuses visible in the list

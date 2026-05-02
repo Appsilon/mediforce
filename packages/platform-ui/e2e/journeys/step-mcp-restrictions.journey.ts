@@ -24,7 +24,7 @@ test.describe('Step MCP Restrictions Journey', () => {
 
     // Click the agent node (the first step is "Process" with agentId set)
     await click(page, page.locator('.react-flow__node').filter({ hasText: 'Process' }).first());
-    await expect(page.getByRole('heading', { name: /edit step/i })).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-testid="step-editor"]')).toBeVisible({ timeout: 5_000 });
 
     // MCP Restrictions section appears with one server hydrated from
     // /api/agent-definitions/mcp-test-agent/mcp-servers. Section titles in the
@@ -33,8 +33,9 @@ test.describe('Step MCP Restrictions Journey', () => {
     await expect(sidePanel.getByText('MCP Restrictions', { exact: true })).toBeVisible({ timeout: 10_000 });
     // The binding list hydrates after an API call to
     // /api/agent-definitions/mcp-test-agent/mcp-servers. On cold compile this
-    // can exceed the default 5s — match the section-heading tolerance above.
-    await expect(sidePanel.getByText('filesystem').first()).toBeVisible({ timeout: 10_000 });
+    // route may take 15-20s to compile for the first time, so use a generous
+    // timeout here.
+    await expect(sidePanel.getByText('filesystem').first()).toBeVisible({ timeout: 30_000 });
     await showStep(page);
 
     // Toggle "Disable" for filesystem

@@ -1,7 +1,71 @@
 'use client';
 
 import React from 'react';
+import { Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// ---------------------------------------------------------------------------
+// Shared input style tokens — import these instead of defining locally
+// ---------------------------------------------------------------------------
+
+export const inputBase = 'w-full bg-card text-xs rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors';
+export const inputBaseMono = `${inputBase} font-mono`;
+export const selectBase = `${inputBase} cursor-pointer`;
+export const textareaBase = `${inputBase} resize-y leading-relaxed`;
+
+// ---------------------------------------------------------------------------
+
+function FieldTooltip({ text }: { text: string }) {
+  return (
+    <div className="relative group/tip inline-flex items-center shrink-0" data-testid="field-tooltip-trigger">
+      <Info className="h-3 w-3 text-muted-foreground/30 group-hover/tip:text-primary/50 cursor-help transition-colors" />
+      <div className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover/tip:block w-56 rounded-md bg-popover border border-border shadow-md px-2.5 py-2 text-[10px] text-popover-foreground leading-relaxed pointer-events-none">
+        {text}
+      </div>
+    </div>
+  );
+}
+
+export function FieldRow({
+  label,
+  children,
+  error,
+  alignStart,
+  tooltip,
+}: {
+  label: string;
+  children: React.ReactNode;
+  error?: string;
+  alignStart?: boolean;
+  tooltip?: string;
+}) {
+  return (
+    <div className="border-b border-border/30 last:border-0">
+      <div className={cn('grid grid-cols-[184px_1fr] gap-x-3 px-3 py-1', alignStart ? 'items-start' : 'items-center')}>
+        <div className="flex items-center gap-1 min-w-0">
+          <span className="font-mono text-[11px] text-muted-foreground/60 select-none leading-5 truncate" title={label}>{label}</span>
+          {tooltip && <FieldTooltip text={tooltip} />}
+        </div>
+        <div className="min-w-0">{children}</div>
+      </div>
+      {/* pl-[208px] = 184px label col + 12px gap-x-3 + 12px px-3 — must match grid-cols-[184px_1fr] */}
+      {error && <p className="text-[10px] text-red-500 pb-1 pl-[208px]">{error}</p>}
+    </div>
+  );
+}
+
+export function FieldGroup({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-md border border-border/50">{children}</div>;
+}
+
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 px-0.5">{title}</p>
+      {children}
+    </div>
+  );
+}
 
 export function EditableField({ label, value, onChange, mono, placeholder, suffix }: {
   label: string; value: string; onChange: (v: string) => void;
@@ -23,15 +87,6 @@ export function EditableField({ label, value, onChange, mono, placeholder, suffi
         />
         {suffix && <span className="text-[10px] text-muted-foreground">{suffix}</span>}
       </div>
-    </div>
-  );
-}
-
-export function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">{title}</p>
-      {children}
     </div>
   );
 }
