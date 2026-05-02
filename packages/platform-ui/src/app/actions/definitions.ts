@@ -95,6 +95,61 @@ export async function saveWorkflowDefinition(
 }
 
 // ---------------------------------------------------------------------------
+// Workflow repository (workspace.remote / workspace.remoteAuth)
+// ---------------------------------------------------------------------------
+
+export type SaveWorkflowRepositoryResult =
+  | { success: true; name: string; version: number }
+  | { success: false; error: string };
+
+export async function saveWorkflowRepository(
+  name: string,
+  workspace: { remote?: string; remoteAuth?: string },
+): Promise<SaveWorkflowRepositoryResult> {
+  if (!name.trim()) return { success: false, error: 'Workflow name is required.' };
+
+  const { processRepo } = getPlatformServices();
+
+  try {
+    const latestVersion = await processRepo.getLatestWorkflowVersion(name);
+    if (latestVersion === 0) {
+      return { success: false, error: `Workflow "${name}" not found or has no versions yet.` };
+    }
+    const latest = await processRepo.getWorkflowDefinition(name, latestVersion);
+    if (!latest) {
+      return { success: false, error: `Latest version ${latestVersion} of "${name}" not found.` };
+    }
+
+    const cleanedWorkspace: { remote?: string; remoteAuth?: string } = {};
+    const remote = workspace.remote?.trim();
+    const remoteAuth = workspace.remoteAuth?.trim();
+    if (remote) cleanedWorkspace.remote = remote;
+    if (remoteAuth) cleanedWorkspace.remoteAuth = remoteAuth;
+
+    const { version: _v, createdAt: _c, ...rest } = latest as WorkflowDefinition & {
+      createdAt?: string;
+    };
+
+    const input: Record<string, unknown> = { ...rest };
+    if (Object.keys(cleanedWorkspace).length > 0) {
+      input.workspace = cleanedWorkspace;
+    } else {
+      delete input.workspace;
+    }
+    delete (input as Record<string, unknown>).id;
+
+    const saved = await saveWorkflowDefinition(input);
+    if (!saved.success) {
+      return { success: false, error: saved.error };
+    }
+    await processRepo.setDefaultWorkflowVersion(name, saved.version);
+    return { success: true, name: saved.name, version: saved.version };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Default version
 // ---------------------------------------------------------------------------
 
