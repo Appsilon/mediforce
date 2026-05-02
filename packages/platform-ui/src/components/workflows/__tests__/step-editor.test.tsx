@@ -192,16 +192,10 @@ describe('StepEditor', () => {
       />,
     );
 
-    // Each FieldRow with a tooltip renders an Info icon (role="img" or svg).
-    // We verify by checking that cursor-help elements exist (the Info icons).
-    // The icons are rendered as SVG inside the FieldTooltip component.
-    const container = document.querySelector('.space-y-4');
-    expect(container).not.toBeNull();
-
-    // At least the identity section fields have tooltips
-    // "name", "id", "description", "type", "executor" all get Info icons
-    const infoIcons = document.querySelectorAll('svg.lucide-info');
-    expect(infoIcons.length).toBeGreaterThan(0);
+    // Identity fields (name, id, description, type, executor) all have tooltips.
+    // FieldTooltip renders with data-testid="field-tooltip-trigger".
+    const tooltipTriggers = document.querySelectorAll('[data-testid="field-tooltip-trigger"]');
+    expect(tooltipTriggers.length).toBeGreaterThan(0);
   });
 
   it('[RENDER] agent config fields are shown for agent executor', () => {

@@ -16,7 +16,7 @@ import {
   RUNTIME_OPTIONS,
 } from './constants';
 import { CoworkSection } from './cowork-section';
-import { FieldRow, FieldGroup, Section } from './step-editor-fields';
+import { FieldRow, FieldGroup, Section, inputBase, inputBaseMono, selectBase, textareaBase } from './step-editor-fields';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
 
 // ---------------------------------------------------------------------------
@@ -66,14 +66,10 @@ export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: Wor
   };
 }
 
-// ---------------------------------------------------------------------------
-// Input style tokens
-// ---------------------------------------------------------------------------
-
-const ri = 'w-full bg-card text-xs rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors';
-const riMono = `${ri} font-mono`;
-const rs = 'w-full bg-card text-xs rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors cursor-pointer';
-const rt = `${ri} resize-y leading-relaxed`;
+const ri = inputBase;
+const riMono = inputBaseMono;
+const rs = selectBase;
+const rt = textareaBase;
 
 // ---------------------------------------------------------------------------
 // Executor / step-type icon maps (mirrors workflow-diagram.tsx)

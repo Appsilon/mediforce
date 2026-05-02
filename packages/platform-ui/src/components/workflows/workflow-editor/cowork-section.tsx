@@ -4,14 +4,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { WorkflowStep, McpServerConfig } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
-import { FieldRow, FieldGroup, Section } from './step-editor-fields';
+import { FieldRow, FieldGroup, Section, inputBase, inputBaseMono, selectBase, textareaBase } from './step-editor-fields';
 
 const VOICE_OPTIONS = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
 
-const ri = 'w-full bg-card text-xs rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors';
-const riMono = `${ri} font-mono`;
-const rs = 'w-full bg-card text-xs rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors cursor-pointer';
-const rt = `${ri} resize-y leading-relaxed`;
+const ri = inputBase;
+const riMono = inputBaseMono;
+const rs = selectBase;
+const rt = textareaBase;
 
 const TIP = {
   model:              'LLM model for the cowork session. For voice, use a realtime-capable model (e.g. gpt-4o-realtime-preview).',
