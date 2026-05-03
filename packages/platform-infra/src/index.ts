@@ -3,6 +3,7 @@ export { FirestoreAuditRepository } from './firestore/audit-repository.js';
 export {
   FirestoreProcessRepository,
   WorkflowDefinitionVersionAlreadyExistsError,
+  WorkflowDefinitionVersionNotFoundError,
 } from './firestore/process-repository.js';
 export { FirestoreProcessInstanceRepository } from './firestore/process-instance-repository.js';
 export { FirebaseAuthService } from './auth/firebase-auth-service.js';
@@ -31,4 +32,5 @@ export { FirestoreAgentOAuthTokenRepository } from './firestore/agent-oauth-toke
 export { validateSecretsKey } from './crypto/secrets-cipher.js';
 export { getAdminAuth, getAdminFirestore } from './auth/firebase-admin-init.js';
 export { FirebaseInviteService } from './auth/firebase-invite-service.js';
+export { backfillInstanceNamespaces } from './migrations/backfill-instance-namespaces.js';
 

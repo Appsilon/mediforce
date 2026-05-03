@@ -19,6 +19,14 @@ export {
   type ListWorkflowsOutput,
   type GetWorkflowInput,
   type GetWorkflowOutput,
+  ArchiveVersionInputSchema,
+  ArchiveVersionOutputSchema,
+  type ArchiveVersionInput,
+  type ArchiveVersionOutput,
+  ArchiveAllInputSchema,
+  ArchiveAllOutputSchema,
+  type ArchiveAllInput,
+  type ArchiveAllOutput,
 } from './workflows.js';
 
 export {

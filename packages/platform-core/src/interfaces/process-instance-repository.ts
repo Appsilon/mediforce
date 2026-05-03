@@ -5,6 +5,7 @@ import type { InstanceStatus } from '../schemas/process-instance.js';
 export interface ListInstancesOptions {
   definitionName?: string;
   status?: InstanceStatus;
+  namespace?: string;
   limit?: number;
 }
 

@@ -137,6 +137,20 @@ export async function setProcessArchived(
   }
 }
 
+export async function setVersionArchived(
+  name: string,
+  version: number,
+  archived: boolean,
+): Promise<ArchiveResult> {
+  const { processRepo } = getPlatformServices();
+  try {
+    await processRepo.setVersionArchived(name, version, archived);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Delete helpers (soft-delete)
 // ---------------------------------------------------------------------------
