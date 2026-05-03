@@ -103,6 +103,7 @@ export function buildProcessInstance(
     assignedRoles: [],
     deleted: false,
     archived: false,
+    namespace: 'test',
     ...overrides,
   };
 }
