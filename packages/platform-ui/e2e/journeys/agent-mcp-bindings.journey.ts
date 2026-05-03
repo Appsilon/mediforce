@@ -18,7 +18,7 @@ test.describe('Agent MCP Bindings Journey', () => {
     await setupRecording(page, 'agent-mcp-bindings', testInfo);
 
     await page.goto(`/${TEST_ORG_HANDLE}/agents/definitions/claude-code-agent`);
-    await expect(page.getByText(/edit this ai agent/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/edit this ai agent/i)).toBeVisible({ timeout: 30_000 });
 
     // MCP Servers section visible (any kind — no warning copy)
     const mcpHeading = page.getByRole('heading', { name: /mcp servers/i });

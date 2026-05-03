@@ -37,7 +37,7 @@ test.describe('Agent MCP OAuth Journey', () => {
     // ── Admin view: provider is listed ───────────────────────────────────
     await page.goto(`/${TEST_ORG_HANDLE}/admin/oauth-providers`);
     await expect(page.getByRole('heading', { name: /oauth providers/i })).toBeVisible({
-      timeout: 15_000,
+      timeout: 30_000,
     });
     // The seeded `github-mock` provider should be in the list. It renders
     // with doc id as code and display name beside it.

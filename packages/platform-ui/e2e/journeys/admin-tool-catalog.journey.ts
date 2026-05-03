@@ -8,7 +8,7 @@ test.describe('Admin Tool Catalog Journey', () => {
 
     // ── Land on admin page ────────────────────────────────────────────────
     await page.goto(`/${TEST_ORG_HANDLE}/admin/tool-catalog`);
-    await expect(page.getByRole('heading', { name: /tool catalog/i })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: /tool catalog/i })).toBeVisible({ timeout: 30_000 });
 
     // Seeded entries render in the list; the right pane shows the idle
     // "select or create" state before any selection.

@@ -567,10 +567,10 @@ export function WorkflowEditorCanvas({
       </div>{/* end unified toolbar */}
 
       {/* ── Two-column content area ── */}
-      <div className="flex flex-1 overflow-y-auto items-start">
+      <div className="flex flex-1 min-h-0">
 
         {/* Diagram column */}
-        <div className="flex-1 p-6 pt-4">
+        <div className="flex-1 overflow-y-auto p-6 pt-4">
           <WorkflowDiagram
             definition={diagramDefinition}
             className="border-0"
@@ -589,19 +589,18 @@ export function WorkflowEditorCanvas({
         </div>
 
         {/* Side panel */}
-        <div className="w-1/2 shrink-0 border-l bg-background">
-          <div className="p-4 space-y-4">
-            {selectedStep ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Edit step</h2>
-                  <button
-                    onClick={() => setSelectedStepId(null)}
-                    className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
+        <div className="w-1/2 shrink-0 border-l bg-background flex flex-col min-h-0">
+          {selectedStep ? (
+            <>
+              <div className="shrink-0 flex justify-end px-2 pt-2">
+                <button
+                  onClick={() => setSelectedStepId(null)}
+                  className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
                 <StepEditor
                   step={selectedStep}
                   allSteps={editedSteps}
@@ -610,9 +609,10 @@ export function WorkflowEditorCanvas({
                   errors={stepErrors?.[selectedStep.id]}
                   imageWarning={warningStepIds?.get(selectedStep.id)}
                 />
-              </>
+              </div>
+            </>
             ) : rightPanelView === 'secrets' ? (
-              <>
+              <div className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold">Secrets</h2>
                   <button
@@ -631,9 +631,9 @@ export function WorkflowEditorCanvas({
                 ) : (
                   <p className="text-sm text-muted-foreground">Save the workflow first to manage secrets.</p>
                 )}
-              </>
+              </div>
             ) : (
-              <>
+              <div className="p-4 space-y-4">
                 <YamlCodeEditor
                   value={yamlDraft}
                   onChange={(v) => { setYamlDraft(v); setYamlError(null); }}
@@ -643,9 +643,8 @@ export function WorkflowEditorCanvas({
                     {savePanel}
                   </div>
                 )}
-              </>
+              </div>
             )}
-          </div>
         </div>
 
       </div>{/* end two-column */}

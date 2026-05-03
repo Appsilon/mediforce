@@ -121,7 +121,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Clicking a node opens "Edit step" panel
     await click(page, page.locator('.react-flow__node').first());
-    await expect(page.getByRole('heading', { name: /edit step/i })).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-testid="step-editor"]')).toBeVisible({ timeout: 5_000 });
     await showResult(page);
 
     // No legacy "Edit" button
@@ -320,7 +320,7 @@ test.describe('Workflow Editor Journey', () => {
 
     // Select a step — YAML editor and Save YAML button are hidden
     await click(page, page.locator('.react-flow__node').first());
-    await expect(page.getByRole('heading', { name: /edit step/i })).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-testid="step-editor"]')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('.cm-editor')).not.toBeVisible();
     await expect(page.getByRole('button', { name: /apply yaml/i })).not.toBeVisible();
     await showResult(page);
@@ -413,14 +413,14 @@ test.describe('Workflow Editor Journey', () => {
 
     // Click a node — step editor opens, YAML editor hides
     await click(page, page.locator('.react-flow__node').first());
-    await expect(page.getByRole('heading', { name: /edit step/i })).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-testid="step-editor"]')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('.cm-editor')).not.toBeVisible();
     await showStep(page);
 
     // Click empty canvas space — pane click triggers deselect, YAML editor returns
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
     await expect(page.locator('.cm-editor')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('heading', { name: /edit step/i })).not.toBeVisible();
+    await expect(page.locator('[data-testid="step-editor"]')).not.toBeVisible();
     await showResult(page);
 
     await endRecording(page);
@@ -428,7 +428,7 @@ test.describe('Workflow Editor Journey', () => {
 
   // ── Executor switching clears stale YAML fields ───────────────────────────
 
-  test('switching executor removes stale fields from YAML', async ({ page }, testInfo) => {
+  test('executor chosen at creation is locked in the editor and reflected in YAML', async ({ page }, testInfo) => {
     await setupRecording(page, 'workflow-editor-executor-switch', testInfo);
     await page.goto(SUPPLY_CHAIN_DEFINITION_URL);
 
@@ -443,23 +443,25 @@ test.describe('Workflow Editor Journey', () => {
     await click(page, executorButton(page, 'agent'));
     await expect(page.locator('.react-flow__node')).toHaveCount(initialNodeCount + 1, { timeout: 5_000 });
 
-    // Click the new step node to open the step editor
+    // Click the new step node — step editor opens showing the icon header
     await click(page, page.locator('.react-flow__node').filter({ hasText: /New Step/i }));
-    await expect(page.getByRole('heading', { name: /edit step/i })).toBeVisible({ timeout: 5_000 });
+    const stepEditor = page.locator('[data-testid="step-editor"]');
+    await expect(stepEditor).toBeVisible({ timeout: 5_000 });
     await showStep(page);
 
-    // Switch executor to human directly in the open step editor
-    await click(page, stepEditorExecutorButton(page, 'human').first());
+    // Executor is shown as a read-only locked field (no toggle buttons)
+    await expect(stepEditor.getByText('executor')).toBeVisible();
+    await expect(stepEditor.getByTitle(/executor is set at creation/i)).toBeVisible();
+    // The icon header shows the Agent label (exact match avoids tooltip text false positives)
+    await expect(stepEditor.getByText('Agent', { exact: true })).toBeVisible();
     await showStep(page);
 
-    // Deselect and verify YAML no longer contains agent-specific fields
+    // Deselect and verify YAML reflects agent executor with plugin field
     await page.locator('.react-flow__pane').click({ position: { x: 10, y: 10 } });
     const yamlContent = page.locator('.cm-content');
     await expect(yamlContent).toBeVisible({ timeout: 10_000 });
-    // The new step should be human — agent-specific plugin must be gone
-    await expect(yamlContent).not.toContainText('opencode-agent');
-    // executor: human must appear in the YAML for the new step
-    await expect(yamlContent).toContainText('executor: human', { timeout: 5_000 });
+    await expect(yamlContent).toContainText('executor: agent');
+    await expect(yamlContent).toContainText('opencode-agent');
     await showResult(page);
 
     await endRecording(page);
