@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { User, Bot, Terminal, Users, Lock } from 'lucide-react';
+import { User, Bot, Terminal, Users, Lock, AlertTriangle } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
@@ -132,12 +132,14 @@ export function StepEditor({
   workflowName,
   onChange,
   errors,
+  imageWarning,
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
   workflowName?: string;
   onChange: (patch: Partial<WorkflowStep>) => void;
   errors?: Record<string, string>;
+  imageWarning?: string;
 }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
@@ -542,6 +544,12 @@ export function StepEditor({
             onChange={(v) => onChange({ agent: { ...step.agent, command: v || undefined } })} />
           <EditableField label="Image" value={step.agent?.image ?? ''} mono placeholder="docker-image:tag"
             onChange={(v) => onChange({ agent: { ...step.agent, image: v || undefined } })} />
+          {imageWarning && (
+            <div className="flex items-center gap-1.5 px-1 -mt-1">
+              <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
+              <span className="text-[11px] text-amber-600 dark:text-amber-400">{imageWarning}</span>
+            </div>
+          )}
           <div>
             <p className="text-[11px] text-muted-foreground mb-1">Inline script</p>
             <textarea

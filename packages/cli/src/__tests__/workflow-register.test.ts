@@ -182,4 +182,29 @@ describe('workflow register command', () => {
     const parsed: unknown = JSON.parse(output.stdoutLines.join('\n'));
     expect(parsed).toMatchObject({ error: 'Validation failed', status: 400 });
   });
+
+  it('warns about missing Docker images after successful registration', async () => {
+    const wd = buildWorkflowDefinition({ name: 'img-wf' });
+    wd.steps[0].executor = 'script';
+    wd.steps[0].agent = { image: 'mediforce/nonexistent-image:v99' };
+    const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
+    void _v; void _n; void _c;
+    const imgFile = path.join(tempDir, 'img-workflow.json');
+    await writeFile(imgFile, JSON.stringify(body), 'utf-8');
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ success: true, name: 'img-wf', version: 1 }, 201),
+    );
+
+    const output = captureOutput();
+    const code = await workflowRegisterCommand({
+      argv: ['--file', imgFile, '--namespace', 'Appsilon'],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+    expect(code).toBe(0);
+    const stderr = output.stderrLines.join('\n');
+    expect(stderr).toContain('Docker image(s) not found locally');
+    expect(stderr).toContain('mediforce/nonexistent-image:v99');
+  });
 });

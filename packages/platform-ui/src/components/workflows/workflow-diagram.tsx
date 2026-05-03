@@ -17,7 +17,7 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal, Users, Trash2, Plus, PenLine, Search, GitBranch, Flag, ArrowUp, ArrowDown, ChevronRight, ChevronDown } from 'lucide-react';
+import { User, Bot, Terminal, Users, Trash2, Plus, PenLine, Search, GitBranch, Flag, ArrowUp, ArrowDown, ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -83,6 +83,8 @@ type StepNodeData = {
   autonomyLevel?: string;
   plugin?: string;
   hasError?: boolean;
+  hasWarning?: boolean;
+  warningTooltip?: string;
   onDelete?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -153,7 +155,9 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             ? `${style.activeBorder} ${style.activeRing} shadow-lg`
             : data.hasError
               ? 'border-red-400 ring-2 ring-red-200 dark:ring-red-900/50'
-              : style.border,
+              : data.hasWarning
+                ? 'border-amber-400 ring-2 ring-amber-200 dark:ring-amber-900/50'
+                : style.border,
         )}
       >
         {(data.onMoveUp || data.onMoveDown || data.onDelete) && (
@@ -216,6 +220,12 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
                 </span>
               )}
             </div>
+            {data.hasWarning && (
+              <div className="flex items-center gap-1 mt-1" title={data.warningTooltip}>
+                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 truncate">Image not found</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -730,11 +740,12 @@ interface WorkflowDiagramProps {
   onPaneClick?: () => void;
   selectedStepId?: string | null;
   errorStepIds?: Set<string>;
+  warningStepIds?: Map<string, string>;
   canMoveUp?: Set<string>;
   canMoveDown?: Set<string>;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, onPaneClick, selectedStepId, errorStepIds, canMoveUp, canMoveDown }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, onPaneClick, selectedStepId, errorStepIds, warningStepIds, canMoveUp, canMoveDown }: WorkflowDiagramProps) {
   const [expandedBranches, setExpandedBranches] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -769,6 +780,8 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         data: {
           ...d,
           hasError: errorStepIds?.has(n.id) ?? false,
+          hasWarning: warningStepIds?.has(n.id) ?? false,
+          warningTooltip: warningStepIds?.get(n.id),
           onDelete: onNodeDelete && d.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
           onMoveUp: onNodeMoveUp && canMoveUp?.has(n.id) ? () => onNodeMoveUp(n.id) : undefined,
           onMoveDown: onNodeMoveDown && canMoveDown?.has(n.id) ? () => onNodeMoveDown(n.id) : undefined,
@@ -788,7 +801,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
       return e;
     });
     return { nodes: styledNodes as Node[], edges: styledEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, canMoveUp, canMoveDown]);
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onEdgeAdd, canMoveUp, canMoveDown]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {

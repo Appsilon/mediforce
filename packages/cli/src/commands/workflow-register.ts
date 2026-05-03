@@ -1,5 +1,7 @@
 import { parseArgs } from 'node:util';
 import { readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import {
   RegisterWorkflowInputSchema,
@@ -9,10 +11,44 @@ import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import { resolveConfig } from '../config.js';
 import { printJson, printError, type OutputSink } from '../output.js';
 
+const execFileAsync = promisify(execFile);
+
 interface CommandInput {
   argv: string[];
   env: Record<string, string | undefined>;
   output: OutputSink;
+}
+
+async function checkImageExists(image: string): Promise<boolean> {
+  try {
+    await execFileAsync('docker', ['image', 'inspect', image]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function warnMissingImages(body: RegisterWorkflowInput, output: OutputSink, jsonMode: boolean): Promise<void> {
+  const images = new Set<string>();
+  for (const step of body.steps) {
+    const image = (step as { agent?: { image?: string } }).agent?.image;
+    if (typeof image === 'string' && image.length > 0) images.add(image);
+  }
+  if (images.size === 0) return;
+
+  const missing: string[] = [];
+  for (const image of images) {
+    if (!await checkImageExists(image)) missing.push(image);
+  }
+  if (missing.length === 0) return;
+
+  if (jsonMode) {
+    output.stderr(JSON.stringify({ warning: 'Missing Docker images', images: missing }));
+  } else {
+    output.stderr(`\nWarning: ${String(missing.length)} Docker image(s) not found locally:`);
+    for (const img of missing) output.stderr(`  - ${img}`);
+    output.stderr('These steps will fail at runtime unless images are built or pulled.');
+  }
 }
 
 const HELP = `Usage: mediforce workflow register --file <path> --namespace <ns> [options]
@@ -170,6 +206,7 @@ export async function workflowRegisterCommand(input: CommandInput): Promise<numb
         `Registered ${result.name} v${String(result.version)} (namespace: ${flags.namespace})`,
       );
     }
+    await warnMissingImages(body, input.output, jsonMode);
     return 0;
   } catch (err) {
     if (err instanceof ApiError) {
