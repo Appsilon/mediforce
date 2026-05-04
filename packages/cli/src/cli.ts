@@ -29,6 +29,9 @@ import { workflowArchiveCommand } from './commands/workflow-archive.js';
 import { systemStatusCommand, systemImagesCommand, systemDiskCommand, systemRmiCommand } from './commands/system-status.js';
 import { agentListCommand } from './commands/agent-list.js';
 import { agentGetCommand } from './commands/agent-get.js';
+import { modelListCommand } from './commands/model-list.js';
+import { modelGetCommand } from './commands/model-get.js';
+import { modelSyncCommand } from './commands/model-sync.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -46,6 +49,9 @@ Commands:
   workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
   agent list                                         List agent definitions
   agent get <id>                                     Fetch an agent definition
+  model list                                         List models in registry
+  model get <id>                                     Fetch a model from registry
+  model sync                                         Sync models from OpenRouter
   run list                                           List recent runs
   run start --workflow <name>                        Start a new run (manual trigger)
   run get <runId>                                    Fetch a single run's status
@@ -87,6 +93,16 @@ Subcommands:
   get <id>            Fetch an agent definition
 
 Run \`mediforce agent <subcommand> --help\` for subcommand-specific flags.
+`;
+
+const MODEL_HELP = `Usage: mediforce model <subcommand> [options]
+
+Subcommands:
+  list                List models in registry
+  get <id>            Fetch a model from registry
+  sync                Sync models from OpenRouter
+
+Run \`mediforce model <subcommand> --help\` for subcommand-specific flags.
 `;
 
 const RUN_HELP = `Usage: mediforce run <subcommand> [options]
@@ -141,6 +157,12 @@ export async function runCli(input: RunCliInput): Promise<number> {
     output.stderr(RUN_HELP);
     return 2;
   }
+  if (command === 'model' && subcommand === undefined) {
+    output.stderr('mediforce model: missing subcommand');
+    output.stderr('');
+    output.stderr(MODEL_HELP);
+    return 2;
+  }
   if (command === 'system' && subcommand === undefined) {
     output.stderr('mediforce system: missing subcommand');
     output.stderr('');
@@ -165,6 +187,15 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'agent' && subcommand === 'get') {
     return agentGetCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'model' && subcommand === 'list') {
+    return modelListCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'model' && subcommand === 'get') {
+    return modelGetCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'model' && subcommand === 'sync') {
+    return modelSyncCommand({ argv: rest, env: input.env, output });
   }
   if (command === 'run' && subcommand === 'list') {
     return runListCommand({ argv: rest, env: input.env, output });

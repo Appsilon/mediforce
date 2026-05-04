@@ -1,0 +1,90 @@
+import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore';
+import {
+  ModelRegistryEntrySchema,
+  type ModelRegistryEntry,
+  type ModelRegistryRepository,
+  type CreateModelRegistryEntryInput,
+  type UpdateModelRegistryEntryInput,
+} from '@mediforce/platform-core';
+
+function encodeModelId(id: string): string {
+  return id.replaceAll('/', '__');
+}
+
+function decodeModelId(docId: string): string {
+  return docId.replaceAll('__', '/');
+}
+
+function toModel(docId: string, data: Record<string, unknown>): ModelRegistryEntry {
+  return ModelRegistryEntrySchema.parse({
+    ...data,
+    id: decodeModelId(docId),
+    createdAt:
+      data.createdAt instanceof Timestamp
+        ? data.createdAt.toDate().toISOString()
+        : String(data.createdAt),
+    updatedAt:
+      data.updatedAt instanceof Timestamp
+        ? data.updatedAt.toDate().toISOString()
+        : String(data.updatedAt),
+  });
+}
+
+export class FirestoreModelRegistryRepository implements ModelRegistryRepository {
+  constructor(private readonly db: Firestore) {}
+
+  private get col() {
+    return this.db.collection('modelRegistry');
+  }
+
+  async getById(id: string): Promise<ModelRegistryEntry | null> {
+    const snap = await this.col.doc(encodeModelId(id)).get();
+    if (!snap.exists) return null;
+    return toModel(snap.id, snap.data() as Record<string, unknown>);
+  }
+
+  async list(): Promise<ModelRegistryEntry[]> {
+    const snap = await this.col.get();
+    return snap.docs.map((d) => toModel(d.id, d.data()));
+  }
+
+  async upsert(entry: CreateModelRegistryEntryInput): Promise<ModelRegistryEntry> {
+    const docId = encodeModelId(entry.id);
+    const ref = this.col.doc(docId);
+    const now = FieldValue.serverTimestamp();
+    const existing = await ref.get();
+    const createdAt = existing.exists ? (existing.data()?.createdAt ?? now) : now;
+    await ref.set({ ...entry, createdAt, updatedAt: now });
+    const snap = await ref.get();
+    return toModel(snap.id, snap.data() as Record<string, unknown>);
+  }
+
+  async update(input: UpdateModelRegistryEntryInput): Promise<ModelRegistryEntry> {
+    const { id, ...fields } = input;
+    const ref = this.col.doc(encodeModelId(id));
+    await ref.update({ ...fields, updatedAt: FieldValue.serverTimestamp() });
+    const snap = await ref.get();
+    return toModel(snap.id, snap.data() as Record<string, unknown>);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.col.doc(encodeModelId(id)).delete();
+  }
+
+  async bulkUpsert(entries: CreateModelRegistryEntryInput[]): Promise<number> {
+    const batchSize = 500;
+    let synced = 0;
+    for (let offset = 0; offset < entries.length; offset += batchSize) {
+      const chunk = entries.slice(offset, offset + batchSize);
+      const batch = this.db.batch();
+      const now = FieldValue.serverTimestamp();
+      for (const entry of chunk) {
+        const ref = this.col.doc(encodeModelId(entry.id));
+        batch.set(ref, { ...entry, createdAt: now, updatedAt: now }, { merge: true });
+      }
+      await batch.commit();
+      synced += chunk.length;
+    }
+    return synced;
+  }
+}

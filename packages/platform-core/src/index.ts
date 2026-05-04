@@ -197,6 +197,19 @@ export type {
 } from './schemas/agent-definition.js';
 export type { AgentDefinitionRepository } from './repositories/agent-definition-repository.js';
 
+// Model registry schema + repository interface
+export {
+  ModelRegistryEntrySchema,
+  CreateModelRegistryEntryInputSchema,
+  UpdateModelRegistryEntryInputSchema,
+} from './schemas/model-registry.js';
+export type {
+  ModelRegistryEntry,
+  CreateModelRegistryEntryInput,
+  UpdateModelRegistryEntryInput,
+} from './schemas/model-registry.js';
+export type { ModelRegistryRepository } from './repositories/model-registry-repository.js';
+
 // OAuth — Step 5
 export {
   OAuthProviderConfigSchema,

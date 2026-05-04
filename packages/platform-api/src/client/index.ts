@@ -44,6 +44,16 @@ import {
   type ListAgentsOutput,
   type GetAgentInput,
   type GetAgentOutput,
+  ListModelsInputSchema,
+  ListModelsOutputSchema,
+  GetModelInputSchema,
+  GetModelOutputSchema,
+  SyncModelsOutputSchema,
+  type ListModelsInput,
+  type ListModelsOutput,
+  type GetModelInput,
+  type GetModelOutput,
+  type SyncModelsOutput,
 } from '../contract/index.js';
 
 /**
@@ -125,6 +135,12 @@ export class Mediforce {
   readonly agents: {
     list: () => Promise<ListAgentsOutput>;
     get: (input: GetAgentInput) => Promise<GetAgentOutput>;
+  };
+
+  readonly models: {
+    list: (input?: ListModelsInput) => Promise<ListModelsOutput>;
+    get: (input: GetModelInput) => Promise<GetModelOutput>;
+    sync: () => Promise<SyncModelsOutput>;
   };
 
   readonly system: {
@@ -257,6 +273,36 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agents.get');
         return GetAgentOutputSchema.parse(body);
+      },
+    };
+
+    this.models = {
+      list: async (input) => {
+        if (input) ListModelsInputSchema.parse(input);
+        const qs = input
+          ? toSearchParams({
+              provider: input.provider,
+              supportsTools: input.supportsTools !== undefined ? String(input.supportsTools) : undefined,
+              supportsVision: input.supportsVision !== undefined ? String(input.supportsVision) : undefined,
+              minContextLength: input.minContextLength !== undefined ? String(input.minContextLength) : undefined,
+            })
+          : '';
+        const res = await this.request(`/api/model-registry${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.models.list');
+        return ListModelsOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetModelInputSchema.parse(input);
+        const res = await this.request(
+          `/api/model-registry/${encodeURIComponent(validated.id)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.models.get');
+        return GetModelOutputSchema.parse(body);
+      },
+      sync: async () => {
+        const res = await this.request('/api/model-registry/sync', { method: 'POST' });
+        const body = await parseJsonOrThrow(res, 'mediforce.models.sync');
+        return SyncModelsOutputSchema.parse(body);
       },
     };
 

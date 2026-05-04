@@ -216,3 +216,12 @@ export {
   CronTriggerStateSchema,
   type CronTriggerState,
 } from './cron-trigger-state.js';
+
+export {
+  ModelRegistryEntrySchema,
+  CreateModelRegistryEntryInputSchema,
+  UpdateModelRegistryEntryInputSchema,
+  type ModelRegistryEntry,
+  type CreateModelRegistryEntryInput,
+  type UpdateModelRegistryEntryInput,
+} from './model-registry.js';

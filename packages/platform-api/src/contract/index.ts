@@ -63,3 +63,16 @@ export {
   type ListRunsInput,
   type ListRunsOutput,
 } from './runs.js';
+
+export {
+  ListModelsInputSchema,
+  ListModelsOutputSchema,
+  GetModelInputSchema,
+  GetModelOutputSchema,
+  SyncModelsOutputSchema,
+  type ListModelsInput,
+  type ListModelsOutput,
+  type GetModelInput,
+  type GetModelOutput,
+  type SyncModelsOutput,
+} from './models.js';
