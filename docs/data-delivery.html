@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="preload" as="image" href="images/mediforce-lz-run-workflow.webp" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -609,6 +610,103 @@
     @media (max-width: 639px) {
       .footer-inner { flex-direction: column; gap: 0.75rem; text-align: center; }
     }
+
+    /* ── Hero preview ── */
+    .hero-preview {
+      position: relative;
+      margin-top: 3.5rem;
+      z-index: 1;
+    }
+    .hero-preview::before {
+      content: '';
+      position: absolute;
+      inset: 8px;
+      border-radius: 1rem;
+      background: radial-gradient(ellipse at center, rgba(13,148,136,0.25) 0%, rgba(88,101,242,0.15) 50%, transparent 80%);
+      filter: blur(24px);
+      z-index: 0;
+    }
+    .hero-preview img {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      border-radius: 0.875rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 72px rgba(0,0,0,0.13);
+      display: block;
+    }
+
+    /* ── Showcase sections ── */
+    .showcase-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2.5rem;
+      align-items: center;
+      margin-top: 3rem;
+    }
+    @media (min-width: 768px) {
+      .showcase-layout { grid-template-columns: 1fr 1fr; gap: 4rem; }
+      .showcase-layout--reverse .showcase-visual { order: -1; }
+    }
+    .showcase-text .section-label { margin-bottom: 0.75rem; }
+    .showcase-text h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.25;
+      margin-bottom: 0.875rem;
+    }
+    @media (min-width: 640px) { .showcase-text h2 { font-size: 1.75rem; } }
+    .showcase-text p { font-size: 0.9375rem; color: var(--text-60); line-height: 1.75; }
+    .showcase-img {
+      width: 100%;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.09);
+      display: block;
+      cursor: zoom-in;
+    }
+
+    /* ── Image modal ── */
+    .img-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0,0,0,0.82);
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      cursor: zoom-out;
+    }
+    .img-modal.is-open { display: flex; }
+    .img-modal img {
+      max-width: 100%;
+      max-height: 90vh;
+      border-radius: 0.75rem;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+      cursor: default;
+      display: block;
+    }
+    .img-modal-close {
+      position: fixed;
+      top: 1.25rem;
+      right: 1.25rem;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      font-size: 1.25rem;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .img-modal-close:hover { background: rgba(255,255,255,0.22); }
   </style>
 </head>
 <body>
@@ -653,6 +751,15 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
         </a>
       </div>
+      <div class="hero-preview">
+        <img
+          src="images/mediforce-lz-run-workflow.webp"
+          alt="Mediforce workflows page — starting a CDISC data validation run"
+          loading="eager"
+          fetchpriority="high"
+          decoding="async"
+        />
+      </div>
     </div>
   </section>
 
@@ -692,6 +799,28 @@
           </div>
           <h3>Audit trails are assembled after the fact</h3>
           <p>Documentation for regulators is reconstructed from emails and spreadsheets weeks after decisions were made. Gaps and inconsistencies are discovered during inspection, not during the review itself.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Showcase: Workflow Editor -->
+  <section class="section">
+    <div class="container">
+      <div class="showcase-layout">
+        <div class="showcase-text">
+          <div class="section-label">Visual Workflow Designer</div>
+          <h2>Design your process once.<br>Run it forever.</h2>
+          <p>Mediforce's visual workflow editor lets you wire together script steps, AI agents, and human review gates without writing infrastructure code. Every step type - SFTP poll, CDISC validation, human approval - is a node in the graph. Change the flow, not the code.</p>
+        </div>
+        <div class="showcase-visual">
+          <img
+            src="images/mediforce-lz-editor.webp"
+            alt="Mediforce visual workflow editor showing the CDISC data validation pipeline"
+            class="showcase-img"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
       </div>
     </div>
@@ -779,6 +908,28 @@
     </div>
   </section>
 
+  <!-- Showcase: Validation Report -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="showcase-layout showcase-layout--reverse">
+        <div class="showcase-text">
+          <div class="section-label">Human Review</div>
+          <h2>Everything the data manager needs.</h2>
+          <p>When a delivery needs a decision, the data manager sees a single-page validation report: severity heatmap, top findings by priority, and two buttons - Accept or Reject. The full audit record writes itself. No spreadsheets, no email threading, no re-running the validator to remember what the numbers were.</p>
+        </div>
+        <div class="showcase-visual">
+          <img
+            src="images/mediforce-lz-validation-report.webp"
+            alt="Data manager reviewing the CDISC validation report with Accept and Reject actions"
+            class="showcase-img"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Data Manager Experience -->
   <section class="section section--alt">
     <div class="container">
@@ -821,6 +972,28 @@
             <h3>Forward the rejection note</h3>
             <p>If you rejected: a markdown rejection note is waiting in the next task, drafted by the agent, scoped to the actual findings. Copy, paste into email, send. Done.</p>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Showcase: New Rules -->
+  <section class="section">
+    <div class="container">
+      <div class="showcase-layout">
+        <div class="showcase-text">
+          <div class="section-label">Continuous Improvement</div>
+          <h2>Agents that learn from<br>every delivery.</h2>
+          <p>When the same fixable issue appears across multiple CRO deliveries - a site ID format variant, a controlled term mismatch - the agent proposes a new cleaning rule. Rules are surfaced as a readable suggestion, reviewed by a human before they go live. The system gets smarter without getting opaque.</p>
+        </div>
+        <div class="showcase-visual">
+          <img
+            src="images/mediforce-lz-new-rules.webp"
+            alt="AI agent proposing new CDISC validation rules based on observed delivery patterns"
+            class="showcase-img"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
       </div>
     </div>
@@ -874,6 +1047,28 @@
           </div>
           <h3>Regulatory Routing</h3>
           <p>Findings are automatically mapped to the regulatory standard the study targets - FDA, PMDA, or EMA - so the report and escalation tone are always jurisdiction-appropriate.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Showcase: Pull Request -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="showcase-layout showcase-layout--reverse">
+        <div class="showcase-text">
+          <div class="section-label">Audit by Design</div>
+          <h2>Every rule is a PR.<br>Every change is reviewed.</h2>
+          <p>Proposed cleaning rules are opened as pull requests against the study config repository - reviewable in GitHub, versioned, and instantly reversible. The agent shows its reasoning; the reviewer approves or rejects. No shadow config files, no undocumented changes, no "who changed this and why" at inspection time.</p>
+        </div>
+        <div class="showcase-visual">
+          <img
+            src="images/mediforce-lz-pull-request.webp"
+            alt="GitHub pull request opened by the AI agent with proposed CDISC validation cleaning rules"
+            class="showcase-img"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
       </div>
     </div>
@@ -963,6 +1158,42 @@
       </nav>
     </div>
   </footer>
+
+  <!-- Image modal -->
+  <div id="img-modal" class="img-modal" role="dialog" aria-modal="true" aria-label="Image preview">
+    <button class="img-modal-close" id="img-modal-close" aria-label="Close">&#x2715;</button>
+    <img id="img-modal-img" src="" alt="" />
+  </div>
+
+  <script>
+    (function () {
+      var modal    = document.getElementById('img-modal');
+      var modalImg = document.getElementById('img-modal-img');
+      var closeBtn = document.getElementById('img-modal-close');
+
+      document.querySelectorAll('.showcase-img').forEach(function (img) {
+        img.addEventListener('click', function () {
+          modalImg.src = img.src;
+          modalImg.alt = img.alt;
+          modal.classList.add('is-open');
+          document.body.style.overflow = 'hidden';
+        });
+      });
+
+      function closeModal() {
+        modal.classList.remove('is-open');
+        document.body.style.overflow = '';
+      }
+
+      closeBtn.addEventListener('click', closeModal);
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeModal();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeModal();
+      });
+    })();
+  </script>
 
   <!-- EmailJS — https://emailjs.com
        Setup (one time):

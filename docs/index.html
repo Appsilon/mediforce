@@ -544,6 +544,19 @@
     .case-study-cta { margin-top: 3rem; text-align: center; }
     .btn--primary { background: var(--accent); color: #fff; border-color: transparent; }
     .btn--primary:hover { background: var(--accent-dark); }
+
+    /* ── Case study preview screenshot ── */
+    .case-preview {
+      margin: 3rem 0 1rem;
+      border-radius: 0.875rem;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 12px 48px rgba(0,0,0,0.09);
+    }
+    .case-preview img {
+      width: 100%;
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -791,6 +804,14 @@
           </div>
         </div>
 
+      </div>
+      <div class="case-preview">
+        <img
+          src="images/mediforce-lz-validation-report.webp"
+          alt="Data manager reviewing the validation report in Mediforce — Accept or Reject decision UI"
+          loading="lazy"
+          decoding="async"
+        />
       </div>
       <div class="case-study-cta">
         <a href="data-delivery.html" class="btn btn--primary">See this workflow in action</a>
