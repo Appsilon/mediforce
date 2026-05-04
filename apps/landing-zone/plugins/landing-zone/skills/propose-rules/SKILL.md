@@ -5,8 +5,6 @@ description: "Propose new study-specific validation rules for the landing-zone w
 
 # Propose Rules
 
-<!-- TEMPORARY (remove once propose-rules demo flow is stable): this skill currently includes a forcing function that requires at least 1 rule per iteration so the end-to-end demo (rules → branch → PR) always exercises a non-empty diff. Once the upstream flow is hardened to handle empty proposals gracefully, delete the TEMPORARY blocks in the Workflow section and restore the "empty is valid" guidance. -->
-
 ## Purpose
 
 After a CDISC delivery is rejected, the platform-recorded findings expose specific gaps in the layer-2 validation rules (`validation-rules.yaml`). This skill reads the findings and the existing rules file, identifies which findings represent missing edit checks, and appends new rules in Filip's pointblank schema. The output is a structured proposal that a human reviews; on approve, the next step opens a PR against the study repo's `main` branch.
@@ -50,8 +48,6 @@ This skill is the agent half of a `type: 'review'` step at autonomy level L3. Th
 
 ## Workflow
 
-> **TEMPORARY (remove once propose-rules demo flow is stable)**: you MUST propose at least 1 rule per iteration, even if findings are minimal. If no obvious candidate emerges from findings, fall back to a defensive baseline rule for the most critical SDTM variable (`RFICDTC`, `RFXSTDTC`, `RFENDTC`) using `col_vals_not_null`. Mark such fallback rules with `severity: Minor` and a message indicating they were proposed as a baseline gap-filler. Never emit `proposedRules: []`.
-
 ### Step 1 — Read state
 
 Read in this order:
@@ -74,8 +70,6 @@ If this is the first pass (no `verdict` field, or `verdict: "approve"` is imposs
 
 ### Step 3 — Pick candidates from findings
 
-> **TEMPORARY (remove once propose-rules demo flow is stable)**: you MUST propose at least 1 rule per iteration, even if findings are minimal. If no obvious candidate emerges from findings, fall back to a defensive baseline rule for the most critical SDTM variable (`RFICDTC`, `RFXSTDTC`, `RFENDTC`) using `col_vals_not_null`. Mark such fallback rules with `severity: Minor` and a message indicating they were proposed as a baseline gap-filler. Never emit `proposedRules: []`.
-
 A finding becomes a rule candidate only when ALL of these hold:
 
 - It names a specific SDTM `domain` and `variable` (or a clear cross-domain reference)
@@ -89,7 +83,7 @@ Skip candidates that:
 - Duplicate existing rules (even with slightly different params — propose an issue/comment for the human instead, do not create a near-duplicate)
 - Need data the agent can't see (e.g., "compare against external reference")
 
-Aim for between 1 and 8 new rules per iteration. **Always emit at least 1** — see TEMPORARY rule at top of this section.
+Aim for between 1 and 8 new rules per iteration. If there are zero candidates that's a valid outcome — emit `proposedRules: []` and explain in `summary`. The downstream script step will detect no diff and skip PR creation cleanly.
 
 ### Step 4 — Construct rule entries
 
