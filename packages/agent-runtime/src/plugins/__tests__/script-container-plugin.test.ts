@@ -293,6 +293,62 @@ describe('ScriptContainerPlugin', () => {
       expect(dockerArgs[volumeIdx + 1]).toMatch(/.*:\/output$/);
     });
 
+    it('[DATA] streams stdout lines as assistant events as they arrive (live, before close)', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      const mockChild = createMockChild();
+
+      // Capture how many assistant events were already emitted at the moment
+      // we push each stdout chunk. If streaming is live, each push grows the
+      // count BEFORE we ever emit `close`. Without live streaming, all the
+      // assistant events appear only after `close`.
+      const eventCountAtChunkEmit: number[] = [];
+
+      spawnMock.mockImplementation(() => {
+        const stdout = mockChild.stdout as Readable;
+        // Schedule three chunks then close, with microtask spacing so we can
+        // observe interleaved emits.
+        void (async () => {
+          await new Promise((r) => setTimeout(r, 5));
+          stdout.push('row 1 processed\n');
+          await new Promise((r) => setTimeout(r, 5));
+          eventCountAtChunkEmit.push(events.filter((e) => e.type === 'assistant').length);
+
+          stdout.push('row 2 processed\n');
+          await new Promise((r) => setTimeout(r, 5));
+          eventCountAtChunkEmit.push(events.filter((e) => e.type === 'assistant').length);
+
+          stdout.push('row 3 processed\n');
+          await new Promise((r) => setTimeout(r, 5));
+          eventCountAtChunkEmit.push(events.filter((e) => e.type === 'assistant').length);
+
+          stdout.push(null);
+          (mockChild.stderr as Readable).push(null);
+          mockChild.emit('close', 0, null);
+        })();
+        return mockChild;
+      });
+
+      await plugin.run(emit);
+
+      // The counts captured BEFORE close should reflect live arrival.
+      // After chunk 1 there should be at least 1 event, etc.
+      expect(eventCountAtChunkEmit[0]).toBeGreaterThanOrEqual(1);
+      expect(eventCountAtChunkEmit[1]).toBeGreaterThanOrEqual(2);
+      expect(eventCountAtChunkEmit[2]).toBeGreaterThanOrEqual(3);
+
+      const assistantEvents = events.filter((e) => e.type === 'assistant');
+      const texts = assistantEvents.map((e) => {
+        const parsed = JSON.parse(e.payload as string) as { text: string };
+        return parsed.text;
+      });
+      expect(texts).toContain('row 1 processed');
+      expect(texts).toContain('row 2 processed');
+      expect(texts).toContain('row 3 processed');
+    });
+
     it('[DATA] writes input.json to the output directory', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);

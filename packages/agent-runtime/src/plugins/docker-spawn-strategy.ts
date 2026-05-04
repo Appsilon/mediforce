@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import { appendFile, readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { ensureImage } from './docker-image-builder.js';
+import { createLineStreamReader } from '../utils/line-stream.js';
 
 export interface ImageBuildMeta {
   image: string;
@@ -36,6 +37,17 @@ export interface DockerSpawnRequest {
    * Used by LocalDockerSpawnStrategy to write parsed log entries in real-time.
    */
   lineProcessor?: (rawLine: string) => string[];
+  /**
+   * When provided, called once for each complete stdout line as it arrives from the
+   * container (live, before the process exits). Lets plugins surface real-time progress
+   * via `emit({ type: 'activity', ... })` instead of waiting for the buffered stdout
+   * after exit. Honoured only by LocalDockerSpawnStrategy — the queued strategy cannot
+   * pass functions across the Redis boundary, so live streaming is unavailable there
+   * and callers receive only the final buffered stdout in DockerSpawnResult.
+   */
+  onStdoutLine?: (line: string) => void;
+  /** Same as onStdoutLine but for stderr. */
+  onStderrLine?: (line: string) => void;
   /** When present, strategy ensures the image exists (lazy build) before docker run. */
   imageBuild?: ImageBuildMeta;
 }
@@ -87,27 +99,54 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
 
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
+      const pendingLogWrites: Promise<unknown>[] = [];
 
-      let stdoutBuffer = '';
-      child.stdout.on('data', (chunk: Buffer) => {
-        stdoutChunks.push(chunk);
-        if (logFile && logDirReady) {
-          stdoutBuffer += chunk.toString('utf-8');
-          const lines = stdoutBuffer.split('\n');
-          stdoutBuffer = lines.pop() ?? '';
-          const trimmedLines = lines.map((l) => l.trim()).filter((l) => l.length > 0);
-          if (trimmedLines.length === 0) return;
+      // Per-line handler: surface to plugin via callback (live activity events) and,
+      // when a logFile is configured, append the processed/raw line to disk.
+      const handleStdoutLine = (line: string): void => {
+        const trimmed = line.trim();
+        if (request.onStdoutLine && trimmed.length > 0) {
+          try {
+            request.onStdoutLine(trimmed);
+          } catch (err) {
+            // Never let a callback failure tear down the container; emit a
+            // breadcrumb so the issue isn't silent.
+            console.warn('[docker-local] onStdoutLine callback threw:', err);
+          }
+        }
+        if (logFile && logDirReady && trimmed.length > 0) {
           if (request.lineProcessor) {
-            const entries = trimmedLines.flatMap((l) => request.lineProcessor!(l));
+            const entries = request.lineProcessor(trimmed);
             if (entries.length > 0) {
-              void logDirReady.then(() => appendFile(logFile, entries.join('\n') + '\n'));
+              pendingLogWrites.push(
+                logDirReady.then(() => appendFile(logFile, entries.join('\n') + '\n')),
+              );
             }
           } else {
-            void logDirReady.then(() =>
-              Promise.all(trimmedLines.map((l) => appendFile(logFile, l + '\n'))),
+            pendingLogWrites.push(
+              logDirReady.then(() => appendFile(logFile, trimmed + '\n')),
             );
           }
         }
+      };
+
+      const handleStderrLine = (line: string): void => {
+        const trimmed = line.trim();
+        if (request.onStderrLine && trimmed.length > 0) {
+          try {
+            request.onStderrLine(trimmed);
+          } catch (err) {
+            console.warn('[docker-local] onStderrLine callback threw:', err);
+          }
+        }
+      };
+
+      const stdoutReader = createLineStreamReader(handleStdoutLine);
+      const stderrReader = createLineStreamReader(handleStderrLine);
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdoutChunks.push(chunk);
+        stdoutReader.push(chunk);
       });
 
       child.stderr.on('data', (chunk: Buffer) => {
@@ -117,6 +156,7 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
           const cidMatch = text.match(/^([0-9a-f]{12,64})\s*$/m);
           if (cidMatch) containerId = cidMatch[1];
         }
+        stderrReader.push(chunk);
       });
 
       child.on('error', (error) => {
@@ -129,19 +169,15 @@ export class LocalDockerSpawnStrategy implements DockerSpawnStrategy {
         settled = true;
         clearTimeout(timeoutHandle);
 
-        const remaining = stdoutBuffer.trim();
-        const flush =
-          logFile && logDirReady && remaining
-            ? logDirReady.then(() => {
-                if (request.lineProcessor) {
-                  const entries = request.lineProcessor(remaining);
-                  return entries.length > 0 ? appendFile(logFile, entries.join('\n') + '\n') : undefined;
-                }
-                return appendFile(logFile, remaining + '\n');
-              })
-            : Promise.resolve();
+        // Flush trailing partial lines (no newline at EOF) through the same
+        // per-line path so logging + onStdoutLine/onStderrLine see them too.
+        stdoutReader.flush();
+        stderrReader.flush();
 
-        void flush.then(() => {
+        // Wait for any in-flight log writes queued by handleStdoutLine before
+        // resolving — preserves the previous "log file is fully written by the
+        // time the caller sees the result" contract.
+        void Promise.allSettled(pendingLogWrites).then(() => {
           resolve({
             stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
             stderr: Buffer.concat(stderrChunks).toString('utf-8'),
