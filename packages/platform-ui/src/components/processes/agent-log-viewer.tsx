@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { FileText, Bot, CheckCircle2, Search, FolderOpen, Copy, Check, Circle, ListTodo, Loader2, Clock } from 'lucide-react';
+import { Bot, Terminal, CheckCircle2, Copy, Check, Circle, ListTodo, Loader2, Clock } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 
@@ -22,21 +22,22 @@ interface LogEntry {
 interface AgentLogFile {
   stepId: string;
   file: string;
+  executor: string;
 }
 
 interface AgentLogViewerProps {
   logFiles: AgentLogFile[];
   initialStepId?: string | null;
+  runningStepIds?: Set<string>;
 }
 
 interface AgentLogSection {
   stepId: string;
+  executor: string;
   entries: LogEntry[];
   rawContent: string | null;
   error: string | null;
 }
-
-import type { LucideIcon } from 'lucide-react';
 
 /** Classify a log entry into a display category. Handles both old (kind) and new (type+subtype) formats. */
 function classifyEntry(entry: LogEntry): 'tool_call' | 'tool_result' | 'assistant_text' | 'result' | 'skip' {
@@ -53,11 +54,6 @@ function classifyEntry(entry: LogEntry): 'tool_call' | 'tool_result' | 'assistan
   return 'skip';
 }
 
-const TOOL_ICONS: Record<string, LucideIcon> = {
-  Read: FileText,
-  Glob: FolderOpen,
-  Grep: Search,
-};
 
 /** Shorten temp paths to just the filename for readability. */
 function cleanPath(value: string): string {
@@ -135,10 +131,8 @@ function ToolCallEntry({ entry }: { entry: LogEntry }) {
     return <TodoWriteEntry todos={entry.input.todos} />;
   }
 
-  const IconComponent: LucideIcon = (entry.tool ? TOOL_ICONS[entry.tool] : undefined) ?? Bot;
   const inputStr = entry.input ? cleanPath(JSON.stringify(entry.input)) : '';
 
-  // Extract the most useful info from common tool inputs
   let summary = '';
   if (entry.input) {
     if (entry.tool === 'Read' && typeof entry.input.file_path === 'string') {
@@ -160,9 +154,6 @@ function ToolCallEntry({ entry }: { entry: LogEntry }) {
 
   return (
     <div className="flex items-start gap-2 py-1">
-      <div className="mt-0.5 shrink-0 w-5 h-5 rounded bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-        <IconComponent className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-      </div>
       <div className="min-w-0 flex-1">
         <span className="text-xs font-medium text-purple-700 dark:text-purple-300">{entry.tool}</span>
         {summary && (
@@ -176,10 +167,7 @@ function ToolCallEntry({ entry }: { entry: LogEntry }) {
 function AssistantEntry({ entry }: { entry: LogEntry }) {
   const text = (entry.text ?? '').slice(0, 300).replace(/\n/g, ' ');
   return (
-    <div className="flex items-start gap-2 py-1.5">
-      <div className="mt-0.5 shrink-0 w-5 h-5 rounded bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-        <Bot className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-      </div>
+    <div className="py-1.5">
       <p className="text-xs text-foreground/80 italic">{text}</p>
     </div>
   );
@@ -196,11 +184,8 @@ function ToolResultEntry({ entry }: { entry: LogEntry }) {
   }
 
   return (
-    <div className="flex items-start gap-2 py-1">
-      <div className="mt-0.5 shrink-0 w-5 h-5 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-        <CheckCircle2 className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-      </div>
-      <div className="min-w-0 flex-1">
+    <div className="py-1">
+      <div className="min-w-0">
         {toolName && (
           <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{toolName} </span>
         )}
@@ -214,10 +199,7 @@ function ToolResultEntry({ entry }: { entry: LogEntry }) {
 
 function ResultEntry({ entry }: { entry: LogEntry }) {
   return (
-    <div className="flex items-start gap-2 py-1.5">
-      <div className="mt-0.5 shrink-0 w-5 h-5 rounded bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-        <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-      </div>
+    <div className="py-1.5">
       <span className="text-xs font-medium text-green-700 dark:text-green-300">
         Done ({entry.subtype ?? 'completed'})
       </span>
@@ -309,7 +291,7 @@ function LogGroupList({ groups }: { groups: LogGroup[] }) {
 async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
   let response: Response;
   try {
-    response = await apiFetch(`/api/agent-logs?file=${encodeURIComponent(file)}`);
+    response = await apiFetch(`/api/step-logs?file=${encodeURIComponent(file)}`);
   } catch (fetchError) {
     const msg = fetchError instanceof Error ? fetchError.message : String(fetchError);
     return { entries: [], rawContent: null, error: `Network error (token/auth): ${msg}` };
@@ -411,7 +393,7 @@ function AgentTabContent({ section }: { section: AgentLogSection }) {
 
       {isEmpty && !section.error && (
         <p className="text-xs text-muted-foreground py-2">
-          Initializing agent log...
+          Initializing log...
         </p>
       )}
 
@@ -462,7 +444,7 @@ function ThinkingIndicator() {
   );
 }
 
-export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps) {
+export function AgentLogViewer({ logFiles, initialStepId, runningStepIds = new Set() }: AgentLogViewerProps) {
   const [sections, setSections] = React.useState<AgentLogSection[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [pollingActive, setPollingActive] = React.useState(logFiles.length > 0);
@@ -498,7 +480,7 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
       const results = await Promise.all(
         logFiles.map(async (logFile) => {
           const result = await fetchSingleLog(logFile.file);
-          return { stepId: logFile.stepId, ...result };
+          return { stepId: logFile.stepId, executor: logFile.executor, ...result };
         }),
       );
       setSections(results);
@@ -592,7 +574,10 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted',
                   )}
                 >
-                  <Bot className={cn('h-3 w-3', isActive ? 'text-blue-500' : 'text-muted-foreground/60')} />
+                  {section.executor === 'script'
+                    ? <Terminal className={cn('h-3 w-3', isActive ? 'text-yellow-500' : 'text-muted-foreground/60')} />
+                    : <Bot className={cn('h-3 w-3', isActive ? 'text-blue-500' : 'text-muted-foreground/60')} />
+                  }
                   {section.stepId}
                   {section.entries.length > 0 && (
                     <span className={cn(
@@ -631,8 +616,8 @@ export function AgentLogViewer({ logFiles, initialStepId }: AgentLogViewerProps)
             <AgentTabContent section={activeSection} />
           )}
 
-          {/* Thinking indicator — only when we have log lines and are waiting for more */}
-          {pollingActive && activeSection && activeSection.entries.length > 0 && !isSectionTerminal(activeSection) && (
+          {/* Thinking indicator — only while the step is actively running */}
+          {pollingActive && activeSection && activeSection.entries.length > 0 && !isSectionTerminal(activeSection) && runningStepIds.has(activeSection.stepId) && (
             <ThinkingIndicator />
           )}
         </div>

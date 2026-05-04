@@ -9,6 +9,7 @@ import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, type ContainerPluginInit } from './container-plugin.js';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token.js';
+import { createLineStreamReader } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
  *  but the agent context carries no OAuth token entry for that server. The
@@ -750,7 +751,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
 
       // Create activity log file for observability
-      const logsDir = join(tmpdir(), 'mediforce-agent-logs');
+      const logsDir = join(tmpdir(), 'mediforce-step-logs');
       await mkdir(logsDir, { recursive: true });
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const logFile = join(logsDir, `${this.context.processInstanceId}_${this.context.stepId}_${timestamp}.log`);
@@ -1237,25 +1238,22 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }, timeoutMs);
 
       const rawLines: string[] = [];
-      let buffer = '';
 
-      child.stdout.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString('utf-8');
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+      const stdoutReader = createLineStreamReader((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        rawLines.push(trimmed);
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          rawLines.push(trimmed);
-
-          if (logFile) {
-            const logEntries = this.processOutputLine(trimmed);
-            if (logEntries.length > 0) {
-              appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
-            }
+        if (logFile) {
+          const logEntries = this.processOutputLine(trimmed);
+          if (logEntries.length > 0) {
+            appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
           }
         }
+      });
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdoutReader.push(chunk);
       });
 
       const stderrChunks: Buffer[] = [];
@@ -1271,15 +1269,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         settled = true;
         clearTimeout(timeoutHandle);
 
-        if (buffer.trim()) {
-          rawLines.push(buffer.trim());
-          if (logFile) {
-            const logEntries = this.processOutputLine(buffer.trim());
-            if (logEntries.length > 0) {
-              appendFile(logFile, logEntries.join('\n') + '\n').catch(() => {});
-            }
-          }
-        }
+        // Flush trailing partial line (no newline at EOF) through the same path.
+        stdoutReader.flush();
 
         const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
         const timeoutMinutes = Math.round(timeoutMs / 60_000);
