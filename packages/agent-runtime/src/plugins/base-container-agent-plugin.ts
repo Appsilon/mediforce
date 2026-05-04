@@ -9,7 +9,7 @@ import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, type ContainerPluginInit } from './container-plugin.js';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token.js';
-import { createLineStreamReader } from '../utils/line-stream.js';
+import { createLineStreamReader } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
  *  but the agent context carries no OAuth token entry for that server. The

@@ -13,6 +13,7 @@ import { QUEUE_NAME, DockerJobDataSchema } from './schemas.js';
 import type { DockerJobResult } from './schemas.js';
 import { ensureImage } from './docker-image-builder.js';
 import { startHttpServer } from './http-server.js';
+import { createLineStreamReader } from '@mediforce/platform-core';
 
 /**
  * If inputFiles are provided (remote caller), create a local temp dir,
@@ -99,25 +100,20 @@ async function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
 
-    // Stream stdout lines to log file in realtime
-    let stdoutBuffer = '';
+    // Stream stdout lines to log file in realtime via the shared line-buffer helper.
+    const stdoutReader = createLineStreamReader((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      if (logFile && logDirReady) {
+        logDirReady.then(() =>
+          appendFile(logFile, trimmed + '\n'),
+        ).catch(() => {});
+      }
+    });
+
     child.stdout.on('data', (chunk: Buffer) => {
       stdoutChunks.push(chunk);
-
-      if (logFile && logDirReady) {
-        stdoutBuffer += chunk.toString('utf-8');
-        const lines = stdoutBuffer.split('\n');
-        stdoutBuffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed) {
-            logDirReady.then(() =>
-              appendFile(logFile, trimmed + '\n'),
-            ).catch(() => {});
-          }
-        }
-      }
+      stdoutReader.push(chunk);
     });
 
     child.stderr.on('data', (chunk: Buffer) => {
@@ -142,12 +138,8 @@ async function processDockerJob(rawData: unknown): Promise<DockerJobResult> {
       const stdout = Buffer.concat(stdoutChunks).toString('utf-8');
       const stderr = Buffer.concat(stderrChunks).toString('utf-8');
 
-      // Flush remaining buffer to log
-      if (logFile && logDirReady && stdoutBuffer.trim()) {
-        logDirReady.then(() =>
-          appendFile(logFile, stdoutBuffer.trim() + '\n'),
-        ).catch(() => {});
-      }
+      // Flush trailing partial line through the same per-line path.
+      stdoutReader.flush();
 
       // If remote caller sent inputFiles, collect output files to return through Redis
       if (hasInputFiles) {

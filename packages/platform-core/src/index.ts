@@ -276,3 +276,7 @@ export {
 // Collaboration (handoff registry, RBAC)
 export { handoffTypeRegistry, RbacService, RbacError } from './collaboration/index.js';
 export type { HandoffTypeRegistration } from './collaboration/index.js';
+
+// Utils (zero-dep helpers shared across runtime + worker)
+export { createLineStreamReader } from './utils/line-stream.js';
+export type { LineStreamReader } from './utils/line-stream.js';

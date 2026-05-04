@@ -133,6 +133,9 @@ importers:
 
   packages/container-worker:
     dependencies:
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../platform-core
       bullmq:
         specifier: ^5.52.0
         version: 5.74.1

@@ -7,10 +7,11 @@
  * complete line to a callback as it arrives. The trailing partial chunk (if
  * any) is held until the next `data` event or the final flush.
  *
- * Used by both `LocalDockerSpawnStrategy` (to surface live container output
- * to plugins) and `BaseContainerAgentPlugin.spawnLocalProcess` (to feed
- * agent JSONL output into log files in real time). Extracted into its own
- * module so the line-splitting logic lives in exactly one place.
+ * Lives in platform-core (zero-dep utility) so both `agent-runtime`
+ * (LocalDockerSpawnStrategy, BaseContainerAgentPlugin.spawnLocalProcess) and
+ * `container-worker` (worker-entry's docker-run loop) can share a single
+ * implementation. Keeping the line-splitting in one place is the whole point —
+ * any drift between agent-side and worker-side parsing is a parity bug.
  */
 
 export interface LineStreamReader {

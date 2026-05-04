@@ -195,23 +195,17 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
       console.log(`[ScriptContainer] Spawning: docker ${dockerArgs.join(' ')}`);
 
-      // Delegate container execution to the spawn strategy.
-      // Live streaming: hand the strategy per-line callbacks so each container
-      // stdout/stderr line is forwarded to the activity feed as it arrives,
-      // not buffered until exit. This matters for long-running steps (CDISC
-      // CORE validation, R analyses) where the UI used to show nothing for
-      // minutes and then dump the full log at the end. The callbacks are
-      // synchronous and `emit` returns a Promise — we don't await it inside
-      // the callback (would block stream consumption), but the events are
-      // still ordered per stream because Node delivers `data` events serially.
+      // Delegate container execution to the spawn strategy. Each stdout/stderr line
+      // is forwarded to the activity feed as it arrives (local strategy) or replayed
+      // line-for-line after exit (queued strategy) — payloads are byte-identical, only
+      // the timing differs. We don't await `emit` inside the callback (would block
+      // stream consumption); FirestoreAgentEventLog serializes per-step writes so
+      // sequence numbers stay monotonic, and the final `await emit({type:'result'})`
+      // below waits for all in-flight live emits to land before resolving.
       const strategy = getDockerSpawnStrategy();
-      const isQueuedStrategy = Boolean(process.env.REDIS_URL);
-      const liveStreamingActive = !isQueuedStrategy;
-      const liveLines: string[] = [];
 
       const emitLine = (text: string): void => {
-        liveLines.push(text);
-        void emit({
+        emit({
           type: 'assistant',
           payload: JSON.stringify({
             ts: new Date().toISOString(),
@@ -220,6 +214,8 @@ export class ScriptContainerPlugin extends ContainerPlugin {
             text,
           }),
           timestamp: new Date().toISOString(),
+        }).catch((err) => {
+          console.warn('[ScriptContainer] activity emit failed:', err);
         });
       };
 
@@ -233,31 +229,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         outputDir,
         logFile: null,
         imageBuild: this.imageBuild,
-        onStdoutLine: liveStreamingActive ? (line) => emitLine(line) : undefined,
-        onStderrLine: liveStreamingActive ? (line) => emitLine(`[stderr] ${line}`) : undefined,
+        onStdoutLine: emitLine,
+        onStderrLine: (line) => emitLine(`[stderr] ${line}`),
       });
-
-      // Queued strategy can't carry function callbacks across the Redis boundary,
-      // so it returns the buffered stdout/stderr after exit. Replay the lines
-      // here so the UI still gets the same activity events (just not live).
-      if (!liveStreamingActive) {
-        for (const line of spawnResult.stdout.split('\n').filter(Boolean)) {
-          await emit({
-            type: 'assistant',
-            payload: JSON.stringify({ ts: new Date().toISOString(), type: 'assistant', subtype: 'text', text: line }),
-            timestamp: new Date().toISOString(),
-          });
-        }
-        for (const line of spawnResult.stderr.split('\n').filter(Boolean)) {
-          await emit({
-            type: 'assistant',
-            payload: JSON.stringify({ ts: new Date().toISOString(), type: 'assistant', subtype: 'text', text: `[stderr] ${line}` }),
-            timestamp: new Date().toISOString(),
-          });
-        }
-      }
-      // Ensure compiler retains the live-buffer reference (also useful for future debugging).
-      void liveLines;
 
       if (spawnResult.exitCode !== 0) {
         const exitInfo = spawnResult.signal
