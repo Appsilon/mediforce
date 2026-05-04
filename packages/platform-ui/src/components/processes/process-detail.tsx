@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ArrowLeft, FileBarChart, Archive, ArchiveRestore } from 'lucide-react';
-import type { ProcessInstance, StepExecution, AuditEvent, Step } from '@mediforce/platform-core';
+import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
@@ -91,17 +91,24 @@ export function ProcessDetail({
     const logEvents = agentEvents.filter(
       (e) => e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:'),
     );
+    const stepExecutorMap = new Map(definitionSteps.map((s) => [s.id, (s as unknown as WorkflowStep).executor]));
     const unsorted = logEvents.map((e) => {
       const fullPath = (e.payload as string).replace('agent activity log: ', '');
       return {
         stepId: e.stepId,
         file: fullPath.split('/').pop() ?? '',
+        executor: stepExecutorMap.get(e.stepId) ?? 'agent',
       };
     }).filter((entry) => entry.file.length > 0);
 
     const stepOrder = new Map(definitionSteps.map((s, i) => [s.id, i]));
     return unsorted.sort((a, b) => (stepOrder.get(a.stepId) ?? 0) - (stepOrder.get(b.stepId) ?? 0));
   }, [agentEvents, definitionSteps]);
+
+  const runningStepIds = React.useMemo(
+    () => new Set(stepExecutions.filter((e) => e.status === 'running').map((e) => e.stepId)),
+    [stepExecutions],
+  );
 
   const [rightTab, setRightTab] = React.useState<string>(() =>
     agentLogFiles.length > 0 ? 'agent-log' : 'audit',
@@ -346,7 +353,7 @@ export function ProcessDetail({
         {/* Tab bar */}
         <div className="flex gap-1 border-b shrink-0">
           {[
-            ...(agentLogFiles.length > 0 ? [{ value: 'agent-log', label: 'Agent Log' }] : []),
+            ...(agentLogFiles.length > 0 ? [{ value: 'agent-log', label: 'Step Log' }] : []),
             { value: 'audit', label: 'Audit Log' },
           ].map(({ value, label }) => (
             <button
@@ -365,7 +372,7 @@ export function ProcessDetail({
 
         {/* Agent Log — flex-fills remaining height, internal scroll handles auto-scroll-to-bottom */}
         <div className={`flex-1 min-h-0 pt-4 ${rightTab === 'agent-log' ? 'flex flex-col overflow-hidden' : 'hidden'}`}>
-          <AgentLogViewer logFiles={agentLogFiles} initialStepId={agentLogStepId} />
+          <AgentLogViewer logFiles={agentLogFiles} initialStepId={agentLogStepId} runningStepIds={runningStepIds} />
         </div>
 
         {/* Audit Log — outer div scrolls, effect scrolls to bottom on updates */}

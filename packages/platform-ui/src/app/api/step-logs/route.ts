@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { getAdminAuth } from '@mediforce/platform-infra';
 
-const LOGS_DIR = `${tmpdir()}/mediforce-agent-logs`;
+const LOGS_DIR = `${tmpdir()}/mediforce-step-logs`;
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // Defense-in-depth: verify the Firebase ID token explicitly even though

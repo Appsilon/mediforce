@@ -1,4 +1,4 @@
-import { readFile, mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
+import { readFile, mkdtemp, writeFile, rm, realpath, mkdir, appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
@@ -195,6 +195,17 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
       console.log(`[ScriptContainer] Spawning: docker ${dockerArgs.join(' ')}`);
 
+      const logsDir = join(tmpdir(), 'mediforce-step-logs');
+      await mkdir(logsDir, { recursive: true });
+      const logTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const logFile = join(logsDir, `${this.context.processInstanceId}_${this.context.stepId}_${logTimestamp}.log`);
+
+      await emit({
+        type: 'status',
+        payload: `agent activity log: ${logFile}`,
+        timestamp: new Date().toISOString(),
+      });
+
       // Delegate container execution to the spawn strategy. Each stdout/stderr line
       // is forwarded to the activity feed as it arrives (local strategy) or replayed
       // line-for-line after exit (queued strategy) — payloads are byte-identical, only
@@ -205,14 +216,16 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       const strategy = getDockerSpawnStrategy();
 
       const emitLine = (text: string): void => {
+        const entry = JSON.stringify({
+          ts: new Date().toISOString(),
+          type: 'assistant',
+          subtype: 'text',
+          text,
+        });
+        appendFile(logFile, entry + '\n').catch(() => {});
         emit({
           type: 'assistant',
-          payload: JSON.stringify({
-            ts: new Date().toISOString(),
-            type: 'assistant',
-            subtype: 'text',
-            text,
-          }),
+          payload: entry,
           timestamp: new Date().toISOString(),
         }).catch((err) => {
           console.warn('[ScriptContainer] activity emit failed:', err);
@@ -227,7 +240,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         processInstanceId: this.context.processInstanceId,
         stepId: this.context.stepId,
         outputDir,
-        logFile: null,
+        logFile,
         imageBuild: this.imageBuild,
         onStdoutLine: emitLine,
         onStderrLine: (line) => emitLine(`[stderr] ${line}`),

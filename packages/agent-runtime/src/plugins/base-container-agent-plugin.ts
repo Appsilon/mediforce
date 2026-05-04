@@ -751,7 +751,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
 
       // Create activity log file for observability
-      const logsDir = join(tmpdir(), 'mediforce-agent-logs');
+      const logsDir = join(tmpdir(), 'mediforce-step-logs');
       await mkdir(logsDir, { recursive: true });
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const logFile = join(logsDir, `${this.context.processInstanceId}_${this.context.stepId}_${timestamp}.log`);
