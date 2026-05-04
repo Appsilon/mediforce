@@ -8,7 +8,7 @@ import { ArrowLeft, CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, Exte
 import type { StepExecution, Step, AgentEvent } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
-import { cn } from '@/lib/utils';
+import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 import { formatDuration, formatStepName } from '@/lib/format';
 
 function StatusIcon({ status }: { status: string }) {
@@ -321,6 +321,7 @@ function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepEx
 // ── Git Section ─────────────────────────────────────────────────────────────
 
 function GitSection({ git }: { git: { commitSha: string; branch: string; changedFiles: string[]; repoUrl: string } }) {
+  const browsable = isBrowsableRepoUrl(git.repoUrl);
   return (
     <div className="p-4 space-y-2">
       <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
@@ -329,39 +330,54 @@ function GitSection({ git }: { git: { commitSha: string; branch: string; changed
       </h3>
       <div className="flex items-center gap-4 text-sm">
         <span className="font-mono text-xs">{git.branch}</span>
-        <a
-          href={`${git.repoUrl}/commit/${git.commitSha}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
-        >
-          {git.commitSha.slice(0, 7)}
-          <ExternalLink className="h-3 w-3" />
-        </a>
-        <a
-          href={`${git.repoUrl}/compare/main...${git.branch}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-        >
-          View diff
-          <ExternalLink className="h-3.5 w-3.5" />
-        </a>
+        {browsable ? (
+          <>
+            <a
+              href={`${git.repoUrl}/commit/${git.commitSha}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
+            >
+              {git.commitSha.slice(0, 7)}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+            <a
+              href={`${git.repoUrl}/compare/main...${git.branch}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              View diff
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </>
+        ) : (
+          <span className="font-mono text-xs text-muted-foreground">
+            {git.commitSha.slice(0, 7)}
+          </span>
+        )}
       </div>
       {git.changedFiles.length > 0 && (
         <ul className="space-y-0.5">
           {git.changedFiles.map((file: string) => (
             <li key={file}>
-              <a
-                href={`${git.repoUrl}/blob/${git.commitSha}/${file}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm font-mono text-primary hover:underline"
-              >
-                <FileText className="h-3 w-3" />
-                {file}
-                <ExternalLink className="h-3 w-3" />
-              </a>
+              {browsable ? (
+                <a
+                  href={`${git.repoUrl}/blob/${git.commitSha}/${file}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm font-mono text-primary hover:underline"
+                >
+                  <FileText className="h-3 w-3" />
+                  {file}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-sm font-mono text-muted-foreground">
+                  <FileText className="h-3 w-3" />
+                  {file}
+                </span>
+              )}
             </li>
           ))}
         </ul>
