@@ -22,6 +22,10 @@ vi.mock('@/lib/platform-services', () => ({
       getById: mockInstanceGetById,
       update: mockInstanceUpdate,
       addStepExecution: mockInstanceAddStepExecution,
+      // Iteration tracking reads prior executions for the current step on
+      // this instance. Default to empty list — individual tests can override
+      // via `mockInstanceGetStepExecutions.mockResolvedValueOnce(...)`.
+      getStepExecutions: vi.fn().mockResolvedValue([]),
     },
     processRepo: {
       getWorkflowDefinition: mockGetWorkflowDefinition,

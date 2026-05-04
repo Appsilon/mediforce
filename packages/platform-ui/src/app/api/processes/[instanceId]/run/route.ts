@@ -339,6 +339,11 @@ export async function POST(
 
           const executionId = crypto.randomUUID();
           const startedAt = new Date().toISOString();
+          // Iteration count = number of prior executions of this same step on
+          // this instance. Lets revise loops surface as iter 1, 2, 3 in audit
+          // and UI rather than every execution showing as iter 0.
+          const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
+            .filter((e) => e.stepId === instance.currentStepId).length;
           await instanceRepo.addStepExecution(instanceId, {
             id: executionId,
             instanceId,
@@ -350,7 +355,7 @@ export async function POST(
             executedBy: 'auto-runner',
             startedAt,
             completedAt: null,
-            iterationNumber: 0,
+            iterationNumber: priorExecutionsForStep,
             gateResult: null,
             error: null,
           });
@@ -458,6 +463,11 @@ export async function POST(
           const stepInput = { ...previousStepOutput, steps: instance.variables };
 
           const executionId = crypto.randomUUID();
+          // Iteration count = number of prior executions of this same step on
+          // this instance. Lets revise loops surface as iter 1, 2, 3 in audit
+          // and UI rather than every execution showing as iter 0.
+          const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
+            .filter((e) => e.stepId === instance.currentStepId).length;
           await instanceRepo.addStepExecution(instanceId, {
             id: executionId,
             instanceId,
@@ -469,7 +479,7 @@ export async function POST(
             executedBy: 'auto-runner',
             startedAt: new Date().toISOString(),
             completedAt: null,
-            iterationNumber: 0,
+            iterationNumber: priorExecutionsForStep,
             gateResult: null,
             error: null,
           });
