@@ -867,6 +867,47 @@ export default function WorkspaceConfigPage() {
           )}
         </div>
 
+        {/* ── Section 4: Administration ──────────────────────────────────── */}
+        {canEditProfile && (
+          <div className="mb-10 space-y-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Administration</h2>
+            <div className="rounded-lg border bg-card px-4 py-5 space-y-3">
+              <Link
+                href={`/${handle}/admin/infrastructure`}
+                className="flex items-center justify-between group"
+              >
+                <div>
+                  <p className="text-sm font-medium group-hover:text-primary transition-colors">Infrastructure</p>
+                  <p className="text-xs text-muted-foreground">Docker images and disk usage</p>
+                </div>
+                <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 group-hover:text-primary transition-colors" />
+              </Link>
+              <div className="border-t" />
+              <Link
+                href={`/${handle}/admin/tool-catalog`}
+                className="flex items-center justify-between group"
+              >
+                <div>
+                  <p className="text-sm font-medium group-hover:text-primary transition-colors">Tool catalog</p>
+                  <p className="text-xs text-muted-foreground">MCP servers available to agents</p>
+                </div>
+                <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 group-hover:text-primary transition-colors" />
+              </Link>
+              <div className="border-t" />
+              <Link
+                href={`/${handle}/admin/oauth-providers`}
+                className="flex items-center justify-between group"
+              >
+                <div>
+                  <p className="text-sm font-medium group-hover:text-primary transition-colors">OAuth providers</p>
+                  <p className="text-xs text-muted-foreground">External authentication for MCP tools</p>
+                </div>
+                <ArrowLeft className="h-4 w-4 text-muted-foreground rotate-180 group-hover:text-primary transition-colors" />
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* ── Danger zone ───────────────────────────────────────────────────── */}
         {!isOwner && currentUserMember !== undefined && (
           <div className="rounded-lg border border-destructive/30 bg-card px-4 py-5">
