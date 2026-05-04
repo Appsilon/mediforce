@@ -23,6 +23,13 @@ interface OpenRouterModel {
   supported_parameters: string[];
 }
 
+function parsePrice(raw: string | undefined | null): number {
+  if (raw === undefined || raw === null || raw === '') return 0;
+  const value = parseFloat(raw);
+  if (Number.isNaN(value) || value < 0) return 0;
+  return value;
+}
+
 function transformModel(model: OpenRouterModel): CreateModelRegistryEntryInput {
   const provider = model.id.split('/')[0];
   return {
@@ -32,10 +39,10 @@ function transformModel(model: OpenRouterModel): CreateModelRegistryEntryInput {
     contextLength: model.context_length,
     maxCompletionTokens: model.top_provider?.max_completion_tokens ?? null,
     pricing: {
-      input: parseFloat(model.pricing.prompt),
-      output: parseFloat(model.pricing.completion),
+      input: parsePrice(model.pricing.prompt),
+      output: parsePrice(model.pricing.completion),
       ...(model.pricing.input_cache_read
-        ? { cacheRead: parseFloat(model.pricing.input_cache_read) }
+        ? { cacheRead: parsePrice(model.pricing.input_cache_read) }
         : {}),
     },
     modality: model.architecture?.modality ?? 'text->text',

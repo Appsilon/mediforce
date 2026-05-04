@@ -73,14 +73,18 @@ export class FirestoreModelRegistryRepository implements ModelRegistryRepository
 
   async bulkUpsert(entries: CreateModelRegistryEntryInput[]): Promise<number> {
     const batchSize = 500;
+    const existingSnap = await this.col.select().get();
+    const existingIds = new Set(existingSnap.docs.map((d) => d.id));
     let synced = 0;
     for (let offset = 0; offset < entries.length; offset += batchSize) {
       const chunk = entries.slice(offset, offset + batchSize);
       const batch = this.db.batch();
       const now = FieldValue.serverTimestamp();
       for (const entry of chunk) {
-        const ref = this.col.doc(encodeModelId(entry.id));
-        batch.set(ref, { ...entry, createdAt: now, updatedAt: now }, { merge: true });
+        const docId = encodeModelId(entry.id);
+        const ref = this.col.doc(docId);
+        const isNew = !existingIds.has(docId);
+        batch.set(ref, { ...entry, updatedAt: now, ...(isNew ? { createdAt: now } : {}) }, { merge: true });
       }
       await batch.commit();
       synced += chunk.length;

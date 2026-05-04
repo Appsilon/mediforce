@@ -34,7 +34,7 @@ const LIST_OPTIONS = {
 } as const;
 
 function formatContext(tokens: number): string {
-  if (tokens >= 1_000_000) return `${String(tokens / 1_000_000)}M`;
+  if (tokens >= 1_000_000) return `${String(Math.round(tokens / 1_000_000))}M`;
   return `${String(Math.round(tokens / 1000))}K`;
 }
 

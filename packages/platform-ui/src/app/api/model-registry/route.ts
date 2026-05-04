@@ -10,8 +10,15 @@ export async function GET(request: Request): Promise<NextResponse> {
     const value = searchParams.get(key);
     if (value !== null) raw[key] = value;
   }
-  const input = ListModelsInputSchema.parse(raw);
-  const { modelRegistryRepo } = getPlatformServices();
-  const result = await listModels(input, { modelRegistryRepo });
-  return NextResponse.json(result);
+  try {
+    const input = ListModelsInputSchema.parse(raw);
+    const { modelRegistryRepo } = getPlatformServices();
+    const result = await listModels(input, { modelRegistryRepo });
+    return NextResponse.json(result);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to list models' },
+      { status: 500 },
+    );
+  }
 }
