@@ -11,14 +11,14 @@ interface CommandInput {
 
 const HELP = `Usage: mediforce agent get <id> [options]
 
-Fetch an agent definition by ID. Outputs the full definition JSON.
+Fetch an agent definition by ID.
 
 Positional:
   <id>                 Agent definition ID
 
 Optional flags:
   --base-url <url>     API base URL (default: http://localhost:9003)
-  --json               Emit JSON (default for this command)
+  --json               Emit JSON instead of human-readable output
   --help, -h           Show this help text
 `;
 
@@ -75,16 +75,22 @@ export async function agentGetCommand(input: CommandInput): Promise<number> {
   const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
   try {
     const result = await mediforce.agents.get({ id });
-    const json = JSON.stringify(result.agent, null, 2);
-
-    if (!jsonMode) {
-      const agent = result.agent;
-      const skillCount = agent.skillFileNames.length;
-      input.output.stdout(
-        `${agent.name}  (${agent.foundationModel}, ${String(skillCount)} skill(s))`,
-      );
+    if (jsonMode) {
+      printJson(input.output, result);
+      return 0;
     }
-    input.output.stdout(json);
+    const agent = result.agent;
+    input.output.stdout(`Agent ${agent.id}`);
+    input.output.stdout(`  name:          ${agent.name}`);
+    input.output.stdout(`  kind:          ${agent.kind}`);
+    input.output.stdout(`  model:         ${agent.foundationModel}`);
+    input.output.stdout(`  description:   ${agent.description}`);
+    if (agent.runtimeId !== undefined) {
+      input.output.stdout(`  runtimeId:     ${agent.runtimeId}`);
+    }
+    if (agent.skillFileNames.length > 0) {
+      input.output.stdout(`  skills:        ${agent.skillFileNames.join(', ')}`);
+    }
     return 0;
   } catch (err) {
     if (err instanceof ApiError) {

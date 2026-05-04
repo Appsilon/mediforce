@@ -73,8 +73,7 @@ export async function agentListCommand(input: CommandInput): Promise<number> {
     }
     input.output.stdout(`Found ${String(result.agents.length)} agent(s):`);
     for (const agent of result.agents) {
-      const model = agent.foundationModel || 'no model';
-      input.output.stdout(`  ${agent.id}  ${agent.name}  (${model})`);
+      input.output.stdout(`  ${agent.id}  ${agent.name}  (${agent.foundationModel})`);
     }
     return 0;
   } catch (err) {
