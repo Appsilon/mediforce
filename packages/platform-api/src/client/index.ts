@@ -17,6 +17,9 @@ import {
   ArchiveAllInputSchema,
   ArchiveAllOutputSchema,
   DockerInfoResponseSchema,
+  ListAgentsOutputSchema,
+  GetAgentInputSchema,
+  GetAgentOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type RegisterWorkflowInput,
@@ -36,6 +39,9 @@ import {
   type ListRunsInput,
   type ListRunsOutput,
   type DockerInfoResponse,
+  type ListAgentsOutput,
+  type GetAgentInput,
+  type GetAgentOutput,
 } from '../contract/index.js';
 
 /**
@@ -114,8 +120,14 @@ export class Mediforce {
     start: (input: StartRunInput) => Promise<StartRunOutput>;
   };
 
+  readonly agents: {
+    list: () => Promise<ListAgentsOutput>;
+    get: (input: GetAgentInput) => Promise<GetAgentOutput>;
+  };
+
   readonly system: {
     dockerInfo: () => Promise<DockerInfoResponse>;
+    removeImage: (imageId: string) => Promise<{ deleted: string }>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -230,6 +242,22 @@ export class Mediforce {
       },
     };
 
+    this.agents = {
+      list: async () => {
+        const res = await this.request('/api/agent-definitions');
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.list');
+        return ListAgentsOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetAgentInputSchema.parse(input);
+        const res = await this.request(
+          `/api/agent-definitions/${encodeURIComponent(validated.id)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.get');
+        return GetAgentOutputSchema.parse(body);
+      },
+    };
+
     this.runs = {
       list: async (input) => {
         const validated = ListRunsInputSchema.parse(input ?? {});
@@ -267,6 +295,15 @@ export class Mediforce {
         const res = await this.request('/api/system/docker-info');
         const body = await parseJsonOrThrow(res, 'mediforce.system.dockerInfo');
         return DockerInfoResponseSchema.parse(body);
+      },
+      removeImage: async (imageId: string) => {
+        const res = await this.request('/api/system/docker-images', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId }),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.system.removeImage');
+        return body as { deleted: string };
       },
     };
   }

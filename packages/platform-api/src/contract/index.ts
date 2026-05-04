@@ -39,6 +39,15 @@ export {
 } from './system.js';
 
 export {
+  ListAgentsOutputSchema,
+  GetAgentInputSchema,
+  GetAgentOutputSchema,
+  type ListAgentsOutput,
+  type GetAgentInput,
+  type GetAgentOutput,
+} from './agents.js';
+
+export {
   GetRunInputSchema,
   GetRunOutputSchema,
   StartRunInputSchema,

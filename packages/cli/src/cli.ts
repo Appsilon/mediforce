@@ -27,6 +27,8 @@ import { runListCommand } from './commands/run-list.js';
 import { runStartCommand } from './commands/run-start.js';
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
 import { systemStatusCommand, systemImagesCommand, systemDiskCommand } from './commands/system-status.js';
+import { agentListCommand } from './commands/agent-list.js';
+import { agentGetCommand } from './commands/agent-get.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -42,6 +44,8 @@ Commands:
   workflow list                                      List registered workflow definitions
   workflow get <name>                                Fetch a workflow definition
   workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
+  agent list                                         List agent definitions
+  agent get <id>                                     Fetch an agent definition
   run list                                           List recent runs
   run start --workflow <name>                        Start a new run (manual trigger)
   run get <runId>                                    Fetch a single run's status
@@ -73,6 +77,15 @@ Subcommands:
   archive <name> --version <n>|--all        Archive/unarchive workflow versions
 
 Run \`mediforce workflow <subcommand> --help\` for subcommand-specific flags.
+`;
+
+const AGENT_HELP = `Usage: mediforce agent <subcommand> [options]
+
+Subcommands:
+  list                List agent definitions
+  get <id>            Fetch an agent definition
+
+Run \`mediforce agent <subcommand> --help\` for subcommand-specific flags.
 `;
 
 const RUN_HELP = `Usage: mediforce run <subcommand> [options]
@@ -114,6 +127,12 @@ export async function runCli(input: RunCliInput): Promise<number> {
     output.stderr(WORKFLOW_HELP);
     return 2;
   }
+  if (command === 'agent' && subcommand === undefined) {
+    output.stderr('mediforce agent: missing subcommand');
+    output.stderr('');
+    output.stderr(AGENT_HELP);
+    return 2;
+  }
   if (command === 'run' && subcommand === undefined) {
     output.stderr('mediforce run: missing subcommand');
     output.stderr('');
@@ -138,6 +157,12 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'workflow' && subcommand === 'archive') {
     return workflowArchiveCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'agent' && subcommand === 'list') {
+    return agentListCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'agent' && subcommand === 'get') {
+    return agentGetCommand({ argv: rest, env: input.env, output });
   }
   if (command === 'run' && subcommand === 'list') {
     return runListCommand({ argv: rest, env: input.env, output });
