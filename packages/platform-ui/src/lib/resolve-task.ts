@@ -194,9 +194,29 @@ export async function resolveTask(
     // Verdict must be in stepOutput for verdict-based routing
     stepOutput.verdict = verdict;
 
-    // Reviewer comment flows to downstream steps as context
+    // Reviewer comment flows to downstream steps as context. We expose two
+    // shapes so downstream agents can consume whichever is most convenient:
+    //
+    //  - `reviewerComment` — raw text. Stable field, small ergonomic surface,
+    //    fine for skills that already know to read it.
+    //  - `reviewerCallToAction` — same text wrapped in a clearly-fenced block
+    //    so it stands out when the agent prints input.json. The fence text is
+    //    self-explanatory ("source of truth", "address before anything else"),
+    //    so even a skill that did NOT explicitly reach for the field will
+    //    notice the banner if it dumps the input for debugging. This is a
+    //    cheap nudge — no engine/system-prompt change needed.
     if (comment.length > 0) {
       stepOutput.reviewerComment = comment;
+      stepOutput.reviewerCallToAction =
+        `=== REVIEWER FEEDBACK ON PRIOR ITERATION (verdict=${verdict}) ===\n` +
+        `\n` +
+        `THIS IS THE SOURCE OF TRUTH for this iteration. Address it before ` +
+        `anything else. Do not return the same output as the prior iteration ` +
+        `unless the comment explicitly approves it.\n` +
+        `\n` +
+        `${comment}\n` +
+        `\n` +
+        `=== END REVIEWER FEEDBACK ===`;
     }
   }
 
