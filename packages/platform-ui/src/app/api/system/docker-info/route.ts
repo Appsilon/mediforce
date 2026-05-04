@@ -13,16 +13,6 @@ function isLocalAgentMode(): boolean {
   return process.env.ALLOW_LOCAL_AGENTS === 'true' && !process.env.REDIS_URL;
 }
 
-function hasApiKey(req: NextRequest): boolean {
-  const provided = req.headers.get('X-Api-Key');
-  if (provided === null) return false;
-  const adminKey = process.env.PLATFORM_ADMIN_API_KEY;
-  if (typeof adminKey === 'string' && adminKey !== '' && provided === adminKey) return true;
-  const platformKey = process.env.PLATFORM_API_KEY;
-  if (typeof platformKey === 'string' && platformKey !== '' && provided === platformKey) return true;
-  return false;
-}
-
 async function fetchFromLocalDocker(): Promise<DockerInfoResponse> {
   const [imagesResult, diskResult] = await Promise.all([
     execFileAsync('docker', ['images', '--format', '{{json .}}']),
@@ -79,14 +69,7 @@ async function fetchFromContainerWorker(): Promise<DockerInfoResponse> {
   return { available: true, images: imagesParsed.data, disk: diskParsed.data };
 }
 
-export async function GET(req: NextRequest): Promise<NextResponse<DockerInfoResponse | { error: string }>> {
-  if (!hasApiKey(req)) {
-    return NextResponse.json(
-      { error: 'Forbidden — API key required' },
-      { status: 403 },
-    );
-  }
-
+export async function GET(_req: NextRequest): Promise<NextResponse<DockerInfoResponse>> {
   try {
     const result = isLocalAgentMode()
       ? await fetchFromLocalDocker()
