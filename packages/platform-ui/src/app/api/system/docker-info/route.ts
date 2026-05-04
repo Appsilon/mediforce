@@ -13,11 +13,14 @@ function isLocalAgentMode(): boolean {
   return process.env.ALLOW_LOCAL_AGENTS === 'true' && !process.env.REDIS_URL;
 }
 
-function hasAdminApiKey(req: NextRequest): boolean {
-  const adminKey = process.env.PLATFORM_ADMIN_API_KEY;
-  if (typeof adminKey !== 'string' || adminKey === '') return false;
+function hasApiKey(req: NextRequest): boolean {
   const provided = req.headers.get('X-Api-Key');
-  return provided === adminKey;
+  if (provided === null) return false;
+  const adminKey = process.env.PLATFORM_ADMIN_API_KEY;
+  if (typeof adminKey === 'string' && adminKey !== '' && provided === adminKey) return true;
+  const platformKey = process.env.PLATFORM_API_KEY;
+  if (typeof platformKey === 'string' && platformKey !== '' && provided === platformKey) return true;
+  return false;
 }
 
 async function fetchFromLocalDocker(): Promise<DockerInfoResponse> {
@@ -77,9 +80,9 @@ async function fetchFromContainerWorker(): Promise<DockerInfoResponse> {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse<DockerInfoResponse | { error: string }>> {
-  if (!hasAdminApiKey(req)) {
+  if (!hasApiKey(req)) {
     return NextResponse.json(
-      { error: 'Forbidden — admin API key required' },
+      { error: 'Forbidden — API key required' },
       { status: 403 },
     );
   }

@@ -1,9 +1,8 @@
 import { parseArgs } from 'node:util';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { Mediforce, ApiError } from '@mediforce/platform-api/client';
+import type { DockerInfoResponse } from '@mediforce/platform-api/contract';
+import { resolveConfig } from '../config.js';
 import { printJson, printError, type OutputSink } from '../output.js';
-
-const execFileAsync = promisify(execFile);
 
 interface CommandInput {
   argv: string[];
@@ -11,72 +10,11 @@ interface CommandInput {
   output: OutputSink;
 }
 
-const HELP = `Usage: mediforce system status [options]
-
-Show Docker infrastructure status: images, disk usage, and daemon connectivity.
-
-Optional flags:
-  --json         Emit JSON instead of human-readable output
-  --help, -h     Show this help text
-`;
-
 const OPTIONS = {
+  'base-url': { type: 'string' },
   json: { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
 } as const;
-
-interface DockerImage {
-  repository: string;
-  tag: string;
-  id: string;
-  size: string;
-  created: string;
-}
-
-interface DiskRow {
-  type: string;
-  totalCount: number;
-  active: number;
-  size: string;
-}
-
-async function isDockerAvailable(): Promise<boolean> {
-  try {
-    await execFileAsync('docker', ['info']);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function listImages(): Promise<DockerImage[]> {
-  const { stdout } = await execFileAsync('docker', ['images', '--format', '{{json .}}']);
-  const raw = stdout.trim();
-  if (raw.length === 0) return [];
-  return raw.split('\n').map((line) => {
-    const parsed = JSON.parse(line);
-    return {
-      repository: parsed.Repository,
-      tag: parsed.Tag,
-      id: parsed.ID,
-      size: parsed.Size,
-      created: parsed.CreatedSince,
-    };
-  });
-}
-
-async function getDiskUsage(): Promise<DiskRow[]> {
-  const { stdout } = await execFileAsync('docker', ['system', 'df', '--format', '{{json .}}']);
-  return stdout.trim().split('\n').map((line) => {
-    const parsed = JSON.parse(line);
-    return {
-      type: parsed.Type,
-      totalCount: Number(parsed.TotalCount ?? 0),
-      active: Number(parsed.Active ?? 0),
-      size: parsed.Size ?? '0B',
-    };
-  });
-}
 
 function padRight(str: string, len: number): string {
   return str.length >= len ? str : str + ' '.repeat(len - str.length);
@@ -86,140 +24,142 @@ function padLeft(str: string, len: number): string {
   return str.length >= len ? str : ' '.repeat(len - str.length) + str;
 }
 
-export async function systemStatusCommand(input: CommandInput): Promise<number> {
-  let flags: { json?: boolean; help?: boolean };
+async function fetchDockerInfo(input: CommandInput): Promise<DockerInfoResponse> {
+  const config = resolveConfig({ flagBaseUrl: input.argv.includes('--base-url')
+    ? input.argv[input.argv.indexOf('--base-url') + 1]
+    : undefined, env: input.env });
+  const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
+  return mediforce.system.dockerInfo();
+}
+
+function printImages(output: OutputSink, data: Extract<DockerInfoResponse, { available: true }>): void {
+  output.stdout(`${padRight('REPOSITORY', 35)} ${padRight('TAG', 15)} ${padLeft('SIZE', 10)} ${padRight('CREATED', 15)}`);
+  for (const img of data.images) {
+    output.stdout(
+      `${padRight(img.repository, 35)} ${padRight(img.tag, 15)} ${padLeft(img.size, 10)} ${padRight(img.created, 15)}`,
+    );
+  }
+  output.stdout(`\n${String(data.images.length)} image(s)`);
+}
+
+function printDisk(output: OutputSink, data: Extract<DockerInfoResponse, { available: true }>): void {
+  output.stdout(`${padRight('TYPE', 20)} ${padLeft('COUNT', 6)} ${padLeft('ACTIVE', 7)} ${padLeft('SIZE', 10)}`);
+  const disk = data.disk;
+  output.stdout(`${padRight('Images', 20)} ${padLeft(String(disk.images.totalCount), 6)} ${padLeft('—', 7)} ${padLeft(disk.images.size, 10)}`);
+  output.stdout(`${padRight('Containers', 20)} ${padLeft(String(disk.containers.totalCount), 6)} ${padLeft(String(disk.containers.active), 7)} ${padLeft(disk.containers.size, 10)}`);
+  output.stdout(`${padRight('Build Cache', 20)} ${padLeft('—', 6)} ${padLeft('—', 7)} ${padLeft(disk.buildCache.size, 10)}`);
+}
+
+function parseFlags(input: CommandInput): { flags: { 'base-url'?: string; json?: boolean; help?: boolean } } | { error: string } {
   try {
     const parsed = parseArgs({ args: input.argv, options: OPTIONS, strict: true, allowPositionals: false });
-    flags = parsed.values;
+    return { flags: parsed.values };
   } catch (err) {
-    input.output.stderr(`mediforce system status: ${String(err)}`);
-    return 2;
+    return { error: String(err) };
   }
+}
+
+function handleApiError(err: unknown, output: OutputSink, jsonMode: boolean): number {
+  if (err instanceof ApiError) {
+    printError(output, { error: err.message, status: err.status, body: err.body }, jsonMode);
+  } else {
+    printError(output, { error: err instanceof Error ? err.message : String(err) }, jsonMode);
+  }
+  return 1;
+}
+
+export async function systemStatusCommand(input: CommandInput): Promise<number> {
+  const result = parseFlags(input);
+  if ('error' in result) { input.output.stderr(`mediforce system status: ${result.error}`); return 2; }
+  const { flags } = result;
 
   if (flags.help === true) {
-    input.output.stdout(HELP);
+    input.output.stdout('Usage: mediforce system status [--base-url <url>] [--json] [--help]\n\nShow Docker infrastructure status: images, disk usage, and connectivity.\n');
     return 0;
   }
 
   const jsonMode = flags.json === true;
-  const dockerOk = await isDockerAvailable();
-
-  if (!dockerOk) {
-    if (jsonMode) {
-      printJson(input.output, { available: false, error: 'Docker daemon not reachable' });
-    } else {
-      input.output.stderr('Docker daemon not reachable. Is Docker running?');
-    }
-    return 1;
-  }
 
   try {
-    const [images, disk] = await Promise.all([listImages(), getDiskUsage()]);
+    const config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
+    const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
+    const data = await mediforce.system.dockerInfo();
 
-    if (jsonMode) {
-      printJson(input.output, { available: true, images, disk });
+    if (jsonMode) { printJson(input.output, data); return 0; }
+
+    if (data.available === false) {
+      input.output.stdout('Docker: unavailable (container-worker not reachable)');
       return 0;
     }
 
     input.output.stdout('Docker: connected\n');
-
-    // Images table
-    input.output.stdout(`${padRight('REPOSITORY', 35)} ${padRight('TAG', 15)} ${padRight('SIZE', 10)} ${padRight('CREATED', 15)}`);
-    for (const img of images) {
-      input.output.stdout(
-        `${padRight(img.repository, 35)} ${padRight(img.tag, 15)} ${padLeft(img.size, 10)} ${padRight(img.created, 15)}`,
-      );
-    }
-    input.output.stdout(`\n${String(images.length)} image(s)\n`);
-
-    // Disk table
-    input.output.stdout(`${padRight('TYPE', 20)} ${padLeft('COUNT', 6)} ${padLeft('ACTIVE', 7)} ${padLeft('SIZE', 10)}`);
-    for (const row of disk) {
-      input.output.stdout(
-        `${padRight(row.type, 20)} ${padLeft(String(row.totalCount), 6)} ${padLeft(String(row.active), 7)} ${padLeft(row.size, 10)}`,
-      );
-    }
-
+    printImages(input.output, data);
+    input.output.stdout('');
+    printDisk(input.output, data);
     return 0;
   } catch (err) {
-    printError(input.output, { error: `Docker query failed: ${err instanceof Error ? err.message : String(err)}` }, jsonMode);
-    return 1;
+    return handleApiError(err, input.output, jsonMode);
   }
 }
 
 export async function systemImagesCommand(input: CommandInput): Promise<number> {
-  let flags: { json?: boolean; help?: boolean };
-  try {
-    const parsed = parseArgs({ args: input.argv, options: OPTIONS, strict: true, allowPositionals: false });
-    flags = parsed.values;
-  } catch (err) {
-    input.output.stderr(`mediforce system images: ${String(err)}`);
-    return 2;
-  }
+  const result = parseFlags(input);
+  if ('error' in result) { input.output.stderr(`mediforce system images: ${result.error}`); return 2; }
+  const { flags } = result;
 
   if (flags.help === true) {
-    input.output.stdout('Usage: mediforce system images [--json] [--help]\n\nList Docker images available on the host.\n');
+    input.output.stdout('Usage: mediforce system images [--base-url <url>] [--json] [--help]\n\nList Docker images available on the platform.\n');
     return 0;
   }
 
   const jsonMode = flags.json === true;
 
   try {
-    const images = await listImages();
+    const config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
+    const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
+    const data = await mediforce.system.dockerInfo();
 
-    if (jsonMode) {
-      printJson(input.output, { images });
+    if (data.available === false) {
+      if (jsonMode) { printJson(input.output, { images: [], available: false }); }
+      else { input.output.stdout('Docker unavailable — no images to show.'); }
       return 0;
     }
 
-    input.output.stdout(`${padRight('REPOSITORY', 35)} ${padRight('TAG', 15)} ${padRight('SIZE', 10)} ${padRight('CREATED', 15)}`);
-    for (const img of images) {
-      input.output.stdout(
-        `${padRight(img.repository, 35)} ${padRight(img.tag, 15)} ${padLeft(img.size, 10)} ${padRight(img.created, 15)}`,
-      );
-    }
-    input.output.stdout(`\n${String(images.length)} image(s)`);
+    if (jsonMode) { printJson(input.output, { images: data.images }); return 0; }
+    printImages(input.output, data);
     return 0;
   } catch (err) {
-    printError(input.output, { error: `Failed to list images: ${err instanceof Error ? err.message : String(err)}` }, jsonMode);
-    return 1;
+    return handleApiError(err, input.output, jsonMode);
   }
 }
 
 export async function systemDiskCommand(input: CommandInput): Promise<number> {
-  let flags: { json?: boolean; help?: boolean };
-  try {
-    const parsed = parseArgs({ args: input.argv, options: OPTIONS, strict: true, allowPositionals: false });
-    flags = parsed.values;
-  } catch (err) {
-    input.output.stderr(`mediforce system disk: ${String(err)}`);
-    return 2;
-  }
+  const result = parseFlags(input);
+  if ('error' in result) { input.output.stderr(`mediforce system disk: ${result.error}`); return 2; }
+  const { flags } = result;
 
   if (flags.help === true) {
-    input.output.stdout('Usage: mediforce system disk [--json] [--help]\n\nShow Docker disk usage breakdown.\n');
+    input.output.stdout('Usage: mediforce system disk [--base-url <url>] [--json] [--help]\n\nShow Docker disk usage breakdown.\n');
     return 0;
   }
 
   const jsonMode = flags.json === true;
 
   try {
-    const disk = await getDiskUsage();
+    const config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
+    const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
+    const data = await mediforce.system.dockerInfo();
 
-    if (jsonMode) {
-      printJson(input.output, { disk });
+    if (data.available === false) {
+      if (jsonMode) { printJson(input.output, { disk: null, available: false }); }
+      else { input.output.stdout('Docker unavailable — no disk info to show.'); }
       return 0;
     }
 
-    input.output.stdout(`${padRight('TYPE', 20)} ${padLeft('COUNT', 6)} ${padLeft('ACTIVE', 7)} ${padLeft('SIZE', 10)}`);
-    for (const row of disk) {
-      input.output.stdout(
-        `${padRight(row.type, 20)} ${padLeft(String(row.totalCount), 6)} ${padLeft(String(row.active), 7)} ${padLeft(row.size, 10)}`,
-      );
-    }
+    if (jsonMode) { printJson(input.output, { disk: data.disk }); return 0; }
+    printDisk(input.output, data);
     return 0;
   } catch (err) {
-    printError(input.output, { error: `Failed to get disk usage: ${err instanceof Error ? err.message : String(err)}` }, jsonMode);
-    return 1;
+    return handleApiError(err, input.output, jsonMode);
   }
 }

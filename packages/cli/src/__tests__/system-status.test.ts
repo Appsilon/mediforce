@@ -1,76 +1,75 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { systemStatusCommand, systemImagesCommand, systemDiskCommand } from '../commands/system-status.js';
-import { captureOutput } from './test-helpers.js';
+import { captureOutput, jsonResponse } from './test-helpers.js';
 
-vi.mock('node:child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:child_process')>();
-  return {
-    ...actual,
-    execFile: vi.fn((_cmd: string, args: string[], cb: (err: Error | null, result: { stdout: string; stderr: string }) => void) => {
-      if (args[0] === 'info') {
-        cb(null, { stdout: 'OK', stderr: '' });
-        return;
-      }
-      if (args[0] === 'images') {
-        cb(null, {
-          stdout: [
-            JSON.stringify({ Repository: 'mediforce/agent', Tag: 'latest', ID: 'abc123', Size: '1.2GB', CreatedSince: '2 days ago' }),
-            JSON.stringify({ Repository: 'python', Tag: '3.11-slim', ID: 'def456', Size: '200MB', CreatedSince: '3 weeks ago' }),
-          ].join('\n'),
-          stderr: '',
-        });
-        return;
-      }
-      if (args[0] === 'system') {
-        cb(null, {
-          stdout: [
-            JSON.stringify({ Type: 'Images', TotalCount: '5', Active: '2', Size: '4GB' }),
-            JSON.stringify({ Type: 'Containers', TotalCount: '3', Active: '1', Size: '500MB' }),
-            JSON.stringify({ Type: 'Build Cache', TotalCount: '10', Active: '0', Size: '1.5GB' }),
-          ].join('\n'),
-          stderr: '',
-        });
-        return;
-      }
-      cb(new Error(`unexpected args: ${args.join(' ')}`), { stdout: '', stderr: '' });
-    }),
-  };
+const DOCKER_INFO_RESPONSE = {
+  available: true,
+  images: [
+    { repository: 'mediforce/agent', tag: 'latest', id: 'abc123', size: '1.2GB', created: '2 days ago' },
+    { repository: 'python', tag: '3.11-slim', id: 'def456', size: '200MB', created: '3 weeks ago' },
+  ],
+  disk: {
+    images: { totalCount: 5, size: '4GB' },
+    containers: { totalCount: 3, active: 1, size: '500MB' },
+    buildCache: { size: '1.5GB' },
+  },
+};
+
+beforeEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('system status', () => {
   it('shows images and disk in human mode', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(DOCKER_INFO_RESPONSE));
     const output = captureOutput();
-    const code = await systemStatusCommand({ argv: [], env: {}, output });
+    const code = await systemStatusCommand({ argv: [], env: { MEDIFORCE_API_KEY: 'k' }, output });
     expect(code).toBe(0);
     const text = output.stdoutLines.join('\n');
     expect(text).toContain('Docker: connected');
     expect(text).toContain('mediforce/agent');
-    expect(text).toContain('Images');
     expect(text).toContain('2 image(s)');
+    expect(text).toContain('Images');
   });
 
   it('emits JSON when --json', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(DOCKER_INFO_RESPONSE));
     const output = captureOutput();
-    const code = await systemStatusCommand({ argv: ['--json'], env: {}, output });
+    const code = await systemStatusCommand({ argv: ['--json'], env: { MEDIFORCE_API_KEY: 'k' }, output });
     expect(code).toBe(0);
     const parsed = JSON.parse(output.stdoutLines.join('\n'));
     expect(parsed.available).toBe(true);
     expect(parsed.images).toHaveLength(2);
-    expect(parsed.disk).toHaveLength(3);
+  });
+
+  it('handles unavailable docker', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ available: false }));
+    const output = captureOutput();
+    const code = await systemStatusCommand({ argv: [], env: { MEDIFORCE_API_KEY: 'k' }, output });
+    expect(code).toBe(0);
+    expect(output.stdoutLines.join('\n')).toContain('unavailable');
   });
 
   it('shows help', async () => {
     const output = captureOutput();
-    const code = await systemStatusCommand({ argv: ['--help'], env: {}, output });
+    const code = await systemStatusCommand({ argv: ['--help'], env: { MEDIFORCE_API_KEY: 'k' }, output });
     expect(code).toBe(0);
     expect(output.stdoutLines.join('\n')).toContain('Usage:');
+  });
+
+  it('accepts --base-url', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(DOCKER_INFO_RESPONSE));
+    const output = captureOutput();
+    await systemStatusCommand({ argv: ['--base-url', 'http://remote:9003'], env: { MEDIFORCE_API_KEY: 'k' }, output });
+    expect(fetchSpy.mock.calls[0][0]).toContain('http://remote:9003');
   });
 });
 
 describe('system images', () => {
   it('lists images in table format', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(DOCKER_INFO_RESPONSE));
     const output = captureOutput();
-    const code = await systemImagesCommand({ argv: [], env: {}, output });
+    const code = await systemImagesCommand({ argv: [], env: { MEDIFORCE_API_KEY: 'k' }, output });
     expect(code).toBe(0);
     const text = output.stdoutLines.join('\n');
     expect(text).toContain('mediforce/agent');
@@ -79,8 +78,9 @@ describe('system images', () => {
   });
 
   it('emits JSON when --json', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(DOCKER_INFO_RESPONSE));
     const output = captureOutput();
-    const code = await systemImagesCommand({ argv: ['--json'], env: {}, output });
+    const code = await systemImagesCommand({ argv: ['--json'], env: { MEDIFORCE_API_KEY: 'k' }, output });
     expect(code).toBe(0);
     const parsed = JSON.parse(output.stdoutLines.join('\n'));
     expect(parsed.images).toHaveLength(2);
@@ -89,8 +89,9 @@ describe('system images', () => {
 
 describe('system disk', () => {
   it('shows disk usage table', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(DOCKER_INFO_RESPONSE));
     const output = captureOutput();
-    const code = await systemDiskCommand({ argv: [], env: {}, output });
+    const code = await systemDiskCommand({ argv: [], env: { MEDIFORCE_API_KEY: 'k' }, output });
     expect(code).toBe(0);
     const text = output.stdoutLines.join('\n');
     expect(text).toContain('Images');
@@ -99,10 +100,11 @@ describe('system disk', () => {
   });
 
   it('emits JSON when --json', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(DOCKER_INFO_RESPONSE));
     const output = captureOutput();
-    const code = await systemDiskCommand({ argv: ['--json'], env: {}, output });
+    const code = await systemDiskCommand({ argv: ['--json'], env: { MEDIFORCE_API_KEY: 'k' }, output });
     expect(code).toBe(0);
     const parsed = JSON.parse(output.stdoutLines.join('\n'));
-    expect(parsed.disk).toHaveLength(3);
+    expect(parsed.disk).toBeDefined();
   });
 });
