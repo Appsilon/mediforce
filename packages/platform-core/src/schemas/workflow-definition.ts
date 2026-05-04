@@ -164,6 +164,13 @@ export const WorkflowStepSchema = z.object({
   /** Required when executor='action'. Discriminated by `kind`. */
   action: ActionConfigSchema.optional(),
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(),
+  /** When true, an exception thrown by the step (e.g. action handler error,
+   *  unexpected runtime failure) is logged as a warning and the workflow
+   *  advances to the next step instead of failing the whole instance. The
+   *  step execution is recorded with status='failed' so the failure stays
+   *  visible in the audit trail. Useful for non-critical side-effects like
+   *  email notifications where the rest of the pipeline must run regardless. */
+  continueOnError: z.boolean().optional(),
   plugin: z.string().optional(),
   /** References an AgentDefinition by its deterministic slug (doc id).
    *  The referenced definition carries canonical MCP server bindings

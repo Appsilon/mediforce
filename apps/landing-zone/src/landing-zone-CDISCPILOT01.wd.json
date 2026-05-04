@@ -155,14 +155,15 @@
       "type": "creation",
       "executor": "action",
       "autonomyLevel": "L4",
-      "description": "Send the agent-drafted rejection note to the CRO contact via email. Uses the suggested subject from the draft step and the full markdown note as the body.",
+      "continueOnError": true,
+      "description": "Send the agent-drafted rejection note to the CRO contact via email. Uses the suggested subject from the draft step and the full markdown note as the body. Best-effort — if Mailgun fails, the workflow logs a warning and continues so the rules-proposal flow still happens.",
       "action": {
         "kind": "email",
         "config": {
-          "to": "${variables.CRO_CONTACT_EMAIL}",
+          "to": "${secrets.CRO_CONTACT_EMAIL_CDISCPILOT01}",
           "subject": "${steps.draft-rejection-note.suggestedSubject}",
           "body": "${steps.draft-rejection-note.rejectionNote}",
-          "replyTo": "${variables.DATA_MANAGER_EMAIL}"
+          "replyTo": "${secrets.DATA_MANAGER_EMAIL_CDISCPILOT01}"
         }
       }
     },

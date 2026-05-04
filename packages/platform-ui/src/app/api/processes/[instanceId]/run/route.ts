@@ -400,12 +400,43 @@ export async function POST(
           } catch (err) {
             const rootMessage = err instanceof Error ? err.message : String(err);
             const message = `Step '${currentStep.id}' (action: ${currentStep.action.kind}) failed: ${rootMessage}`;
-            console.error(`[auto-runner] Action step '${currentStep.id}' failed:`, err);
             await instanceRepo.updateStepExecution(instanceId, executionId, {
               status: 'failed',
               completedAt: new Date().toISOString(),
               error: message,
             });
+
+            if (currentStep.continueOnError === true) {
+              console.warn(
+                `[auto-runner] Action step '${currentStep.id}' failed but continueOnError=true — logging as warning and advancing:`,
+                err,
+              );
+              await auditRepo.append({
+                actorId: 'auto-runner',
+                actorType: 'system',
+                actorRole: 'orchestrator',
+                action: 'process.run.step.warning',
+                description: `Step '${currentStep.id}' failed (continueOnError=true): ${rootMessage}`,
+                timestamp: new Date().toISOString(),
+                inputSnapshot: { stepId: currentStep.id, actionKind: currentStep.action.kind },
+                outputSnapshot: { error: rootMessage },
+                basis: 'continueOnError flag set on step — workflow advances despite failure',
+                entityType: 'processInstance',
+                entityId: instanceId,
+                processInstanceId: instanceId,
+                processDefinitionVersion: initialInstance.definitionVersion,
+              });
+              // Advance with an empty output envelope so transitions can fire normally.
+              await engine.advanceStep(
+                instanceId,
+                {},
+                { id: 'auto-runner', role: 'system' },
+              );
+              stepsExecuted++;
+              continue;
+            }
+
+            console.error(`[auto-runner] Action step '${currentStep.id}' failed:`, err);
             await instanceRepo.update(instanceId, {
               status: 'failed',
               error: message,
