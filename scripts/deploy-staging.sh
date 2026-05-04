@@ -10,11 +10,9 @@ echo "==> Pulling latest code"
 git fetch origin
 git checkout "$DEPLOY_SHA"
 
-echo "==> Pruning Docker build cache + unused images"
-# Unconditional prune — daemon-level builder GC cap (see /etc/docker/daemon.json)
-# provides the steady-state guarantee; this keeps each deploy's working set lean.
+echo "==> Pruning Docker build cache (keeping tagged images)"
 docker builder prune -af 2>/dev/null || true
-docker image prune -af 2>/dev/null || true
+docker image prune -f 2>/dev/null || true
 
 # Early warning if the Docker data volume is filling up
 DOCKER_ROOT=$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)

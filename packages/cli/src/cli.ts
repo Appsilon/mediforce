@@ -26,7 +26,7 @@ import { runGetCommand } from './commands/run-get.js';
 import { runListCommand } from './commands/run-list.js';
 import { runStartCommand } from './commands/run-start.js';
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
-import { systemStatusCommand, systemImagesCommand, systemDiskCommand } from './commands/system-status.js';
+import { systemStatusCommand, systemImagesCommand, systemDiskCommand, systemRmiCommand } from './commands/system-status.js';
 import { agentListCommand } from './commands/agent-list.js';
 import { agentGetCommand } from './commands/agent-get.js';
 import { consoleOutput, type OutputSink } from './output.js';
@@ -51,6 +51,7 @@ Commands:
   run get <runId>                                    Fetch a single run's status
   system status                                      Docker infrastructure status
   system images                                      List Docker images on host
+  system rmi <imageId>                               Remove a Docker image
   system disk                                        Docker disk usage breakdown
 
 Common flags:
@@ -103,6 +104,7 @@ const SYSTEM_HELP = `Usage: mediforce system <subcommand> [options]
 Subcommands:
   status     Full infrastructure status (images + disk + connectivity)
   images     List Docker images on the host
+  rmi <id>   Remove a Docker image by ID or name:tag
   disk       Docker disk usage breakdown
 
 Run \`mediforce system <subcommand> --help\` for subcommand-specific flags.
@@ -178,6 +180,9 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'system' && subcommand === 'images') {
     return systemImagesCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'system' && subcommand === 'rmi') {
+    return systemRmiCommand({ argv: rest, env: input.env, output });
   }
   if (command === 'system' && subcommand === 'disk') {
     return systemDiskCommand({ argv: rest, env: input.env, output });

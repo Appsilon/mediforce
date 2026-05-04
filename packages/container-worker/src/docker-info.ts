@@ -34,6 +34,11 @@ export async function listImages(): Promise<DockerImage[]> {
   });
 }
 
+export async function removeImage(imageId: string): Promise<string> {
+  const { stdout } = await execFileAsync('docker', ['rmi', imageId]);
+  return stdout.trim();
+}
+
 export async function getDiskUsage(): Promise<DockerDiskUsage> {
   const { stdout } = await execFileAsync('docker', ['system', 'df', '--format', '{{json .}}']);
   const rows = stdout.trim().split('\n').map((line) => JSON.parse(line));

@@ -9,6 +9,7 @@ interface DockerImagesState {
   disk: DockerDiskInfo | null;
   isAvailable: boolean;
   isLoading: boolean;
+  refresh: () => void;
 }
 
 const REFRESH_INTERVAL_MS = 60_000;
@@ -18,15 +19,17 @@ const DockerImagesContext = createContext<DockerImagesState>({
   disk: null,
   isAvailable: false,
   isLoading: true,
+  refresh: () => {},
 });
 
 export function DockerImagesProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<DockerImagesState>({
+  const [state, setState] = useState<Omit<DockerImagesState, 'refresh'>>({
     images: [],
     disk: null,
     isAvailable: false,
     isLoading: true,
   });
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,10 +55,12 @@ export function DockerImagesProvider({ children }: { children: ReactNode }) {
     fetchDockerInfo();
     const interval = setInterval(fetchDockerInfo, REFRESH_INTERVAL_MS);
     return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  }, [tick]);
+
+  const refresh = () => setTick((t) => t + 1);
 
   return (
-    <DockerImagesContext.Provider value={state}>
+    <DockerImagesContext.Provider value={{ ...state, refresh }}>
       {children}
     </DockerImagesContext.Provider>
   );

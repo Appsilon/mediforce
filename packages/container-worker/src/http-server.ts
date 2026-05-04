@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http';
-import { listImages, getDiskUsage } from './docker-info.js';
+import { listImages, getDiskUsage, removeImage } from './docker-info.js';
 
 const WORKER_HTTP_PORT = process.env.WORKER_HTTP_PORT !== undefined
   ? Number(process.env.WORKER_HTTP_PORT)
@@ -13,6 +13,21 @@ function jsonResponse(res: import('node:http').ServerResponse, status: number, b
 export function startHttpServer(): Server {
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${WORKER_HTTP_PORT}`);
+
+    if (req.method === 'DELETE' && url.pathname.startsWith('/images/')) {
+      const imageId = decodeURIComponent(url.pathname.slice('/images/'.length));
+      if (imageId.length === 0) {
+        jsonResponse(res, 400, { error: 'Missing image ID' });
+        return;
+      }
+      try {
+        const output = await removeImage(imageId);
+        jsonResponse(res, 200, { deleted: imageId, output });
+      } catch (err) {
+        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+      return;
+    }
 
     if (req.method !== 'GET') {
       jsonResponse(res, 405, { error: 'Method not allowed' });
