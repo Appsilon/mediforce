@@ -31,9 +31,10 @@ interface WorkflowSecretsEditorProps {
   namespace: string;
   workflowName: string;
   userId: string;
+  suggestedKeys?: string[];
 }
 
-export function WorkflowSecretsEditor({ namespace, workflowName, userId }: WorkflowSecretsEditorProps) {
+export function WorkflowSecretsEditor({ namespace, workflowName, userId, suggestedKeys }: WorkflowSecretsEditorProps) {
   const [secrets, setSecrets] = React.useState<Array<{ key: string; value: string }>>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -61,6 +62,17 @@ export function WorkflowSecretsEditor({ namespace, workflowName, userId }: Workf
       });
     return () => { cancelled = true; };
   }, [namespace, workflowName, userId]);
+
+  React.useEffect(() => {
+    if (loading || !suggestedKeys || suggestedKeys.length === 0) return;
+    setSecrets((prev) => {
+      const existingKeys = new Set(prev.map((s) => s.key));
+      const toAdd = suggestedKeys.filter((k) => !existingKeys.has(k));
+      if (toAdd.length === 0) return prev;
+      setDirty(true);
+      return [...prev, ...toAdd.map((key) => ({ key, value: '' }))];
+    });
+  }, [loading, suggestedKeys]);
 
   const handleSave = async () => {
     setSaving(true);

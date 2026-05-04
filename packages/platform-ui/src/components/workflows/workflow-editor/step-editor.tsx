@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag } from 'lucide-react';
+import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
@@ -195,12 +195,14 @@ export function StepEditor({
   workflowName,
   onChange,
   errors,
+  imageWarning,
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
   workflowName?: string;
   onChange: (patch: Partial<WorkflowStep>) => void;
   errors?: Record<string, string>;
+  imageWarning?: string;
 }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
@@ -479,6 +481,12 @@ export function StepEditor({
               className={riMono}
             />
           </FieldRow>
+          {imageWarning && (
+            <div className="flex items-center gap-1.5 px-3 -mt-1">
+              <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
+              <span className="text-[11px] text-amber-600 dark:text-amber-400">{imageWarning}</span>
+            </div>
+          )}
 
           <FieldRow label="agent.dockerfile" tooltip={TIP.agentDockerfile}>
             <input

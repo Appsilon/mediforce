@@ -26,6 +26,7 @@ import { runGetCommand } from './commands/run-get.js';
 import { runListCommand } from './commands/run-list.js';
 import { runStartCommand } from './commands/run-start.js';
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
+import { systemStatusCommand, systemImagesCommand, systemDiskCommand } from './commands/system-status.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -44,6 +45,9 @@ Commands:
   run list                                           List recent runs
   run start --workflow <name>                        Start a new run (manual trigger)
   run get <runId>                                    Fetch a single run's status
+  system status                                      Docker infrastructure status
+  system images                                      List Docker images on host
+  system disk                                        Docker disk usage breakdown
 
 Common flags:
   --base-url <url>   API base URL (default: http://localhost:9003,
@@ -81,6 +85,16 @@ Subcommands:
 Run \`mediforce run <subcommand> --help\` for subcommand-specific flags.
 `;
 
+const SYSTEM_HELP = `Usage: mediforce system <subcommand> [options]
+
+Subcommands:
+  status     Full infrastructure status (images + disk + connectivity)
+  images     List Docker images on the host
+  disk       Docker disk usage breakdown
+
+Run \`mediforce system <subcommand> --help\` for subcommand-specific flags.
+`;
+
 export async function runCli(input: RunCliInput): Promise<number> {
   const output = input.output ?? consoleOutput;
   const args = input.argv;
@@ -106,6 +120,12 @@ export async function runCli(input: RunCliInput): Promise<number> {
     output.stderr(RUN_HELP);
     return 2;
   }
+  if (command === 'system' && subcommand === undefined) {
+    output.stderr('mediforce system: missing subcommand');
+    output.stderr('');
+    output.stderr(SYSTEM_HELP);
+    return 2;
+  }
 
   if (command === 'workflow' && subcommand === 'register') {
     return workflowRegisterCommand({ argv: rest, env: input.env, output });
@@ -127,6 +147,15 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'run' && subcommand === 'start') {
     return runStartCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'system' && subcommand === 'status') {
+    return systemStatusCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'system' && subcommand === 'images') {
+    return systemImagesCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'system' && subcommand === 'disk') {
+    return systemDiskCommand({ argv: rest, env: input.env, output });
   }
 
   output.stderr(`Unknown command: ${[command, subcommand].filter(Boolean).join(' ')}`);

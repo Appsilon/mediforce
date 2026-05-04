@@ -1,27 +1,24 @@
 'use client';
 
 import * as React from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { useRouter } from 'next/navigation';
-import { Play, ChevronDown, Loader2, Check } from 'lucide-react';
+import { Play, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
+import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
 import { startWorkflowRun } from '@/app/actions/processes';
+import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
 
 interface StartRunButtonProps {
   workflowName: string;
-  /** If provided, starts this specific version. Otherwise uses default/latest. */
   version?: number;
-  /** Show version dropdown (split button). */
   showVersionPicker?: boolean;
-  /** Whether the workflow declares a `manual` trigger. When false the button
-   * renders disabled with an explanatory tooltip. Defaults to true so callers
-   * that haven't been migrated keep working. */
   hasManualTrigger?: boolean;
-  /** Whether the workflow is archived. When true the button renders disabled
-   * with an explanatory tooltip. */
   archived?: boolean;
 }
 
@@ -36,12 +33,45 @@ export function StartRunButton({
   const handle = useHandleFromPath();
   const { firebaseUser } = useAuth();
   const { definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowDefinitions(workflowName);
+  const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [pendingVersion, setPendingVersion] = React.useState<number | undefined>(undefined);
+  const [secretKeys, setSecretKeys] = React.useState<string[] | undefined>(undefined);
+  const [secretKeysLoading, setSecretKeysLoading] = React.useState(true);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const effectiveVersion = version ?? hookEffectiveVersion;
+
+  const effectiveDefinition = React.useMemo(
+    () => definitions.find((d) => d.version === effectiveVersion),
+    [definitions, effectiveVersion],
+  );
+
+  React.useEffect(() => {
+    if (!handle || !workflowName || !firebaseUser) return;
+    let cancelled = false;
+    setSecretKeysLoading(true);
+    getWorkflowSecretKeys(handle, workflowName, firebaseUser.uid)
+      .then((keys) => { if (!cancelled) { setSecretKeys(keys); setSecretKeysLoading(false); } })
+      .catch(() => { if (!cancelled) { setSecretKeys(undefined); setSecretKeysLoading(false); } });
+    return () => { cancelled = true; };
+  }, [handle, workflowName, firebaseUser]);
+
+  const warnings = React.useMemo(() => {
+    if (!effectiveDefinition) return [];
+    return runPreflightChecks(effectiveDefinition, {
+      dockerImages,
+      dockerAvailable,
+      secretKeys,
+    });
+  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys]);
+
+  const preflightLoading = dockerLoading || secretKeysLoading;
+  const hasWarnings = warnings.length > 0;
+  const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
   React.useEffect(() => {
     if (!dropdownOpen) return;
@@ -54,13 +84,14 @@ export function StartRunButton({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [dropdownOpen]);
 
-  async function handleStart(v?: number) {
+  async function executeStart(v?: number) {
     const targetVersion = v ?? effectiveVersion;
     if (!firebaseUser || targetVersion === 0) return;
 
     setStarting(true);
     setError(null);
     setDropdownOpen(false);
+    setDialogOpen(false);
 
     const result = await startWorkflowRun({
       definitionName: workflowName,
@@ -77,7 +108,15 @@ export function StartRunButton({
     }
   }
 
-  // Reasons the button cannot be used. Order matters — first match wins for tooltip text.
+  function handleStart(v?: number) {
+    if (hasWarnings) {
+      setPendingVersion(v);
+      setDialogOpen(true);
+    } else {
+      executeStart(v);
+    }
+  }
+
   const disabledReason: string | null = archived
     ? 'Workflow is archived'
     : !hasManualTrigger
@@ -85,36 +124,114 @@ export function StartRunButton({
       : effectiveVersion === 0
         ? 'No workflow version available'
         : null;
-  const isDisabled = disabledReason !== null || starting;
-  const tooltip = disabledReason ?? undefined;
+  const isDisabled = disabledReason !== null || starting || preflightLoading;
+  const tooltip = preflightLoading ? 'Checking workflow readiness...' : (disabledReason ?? undefined);
 
   const errorBanner = error ? (
     <p className="mt-1 text-xs text-destructive max-w-xs truncate" title={error}>{error}</p>
   ) : null;
 
-  // Simple button — no version picker
+  const buttonClasses = 'bg-primary text-primary-foreground hover:bg-primary/90';
+
+  const buttonIcon = starting || preflightLoading
+    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+    : <Play className="h-3.5 w-3.5" />;
+
+  const buttonLabel = starting ? 'Starting...' : preflightLoading ? 'Checking...' : 'Start Run';
+
+  const warningBadge = hasWarnings && !isDisabled ? (
+    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">
+      {warnings.length}
+    </span>
+  ) : null;
+
+  const preflightDialog = (
+    <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md rounded-lg border bg-background p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="rounded-full bg-muted p-2">
+              <CircleDot className="h-5 w-5 text-amber-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <Dialog.Title className="text-sm font-semibold">Before you start</Dialog.Title>
+              <Dialog.Description className="text-xs text-muted-foreground mt-0.5">
+                {warnings.length} item{warnings.length !== 1 ? 's' : ''} to review for a smooth run.
+              </Dialog.Description>
+            </div>
+            <Dialog.Close className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+              <X className="h-4 w-4" />
+            </Dialog.Close>
+          </div>
+
+          <div className="space-y-3 max-h-60 overflow-y-auto">
+            <WarningGroup
+              title="Missing Docker images"
+              warnings={warnings.filter((w) => w.category === 'missing-image')}
+            />
+            <WarningGroup
+              title="Missing secrets"
+              warnings={warnings.filter((w) => w.category === 'missing-secret')}
+            />
+          </div>
+
+          <div className="flex items-center gap-2 mt-5">
+            {missingSecretKeys.length > 0 && (
+              <button
+                onClick={() => {
+                  setDialogOpen(false);
+                  const setupParam = missingSecretKeys.join(',');
+                  router.push(`/${handle}/workflows/${encodeURIComponent(workflowName)}?tab=secrets&setup=${encodeURIComponent(setupParam)}`);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                Set secrets
+              </button>
+            )}
+            <div className="flex-1" />
+            <Dialog.Close className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors">
+              Close
+            </Dialog.Close>
+            <button
+              onClick={() => executeStart(pendingVersion)}
+              className="rounded-md bg-primary hover:bg-primary/90 px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors"
+            >
+              Start anyway
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+
   if (!showVersionPicker || definitions.length <= 1) {
     return (
       <div>
-        <button
-          disabled={isDisabled}
-          onClick={() => handleStart()}
-          title={tooltip}
-          aria-disabled={isDisabled}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-            isDisabled && 'opacity-50 cursor-not-allowed hover:bg-primary',
-          )}
-        >
-          {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-          {starting ? 'Starting...' : 'Start Run'}
-        </button>
+        <div className="relative inline-flex">
+          <button
+            disabled={isDisabled}
+            onClick={() => handleStart()}
+            title={tooltip}
+            aria-disabled={isDisabled}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap',
+              buttonClasses,
+              isDisabled && 'opacity-50 cursor-not-allowed',
+            )}
+          >
+            {buttonIcon}
+            {buttonLabel}
+          </button>
+          {warningBadge}
+        </div>
         {errorBanner}
+        {preflightDialog}
       </div>
     );
   }
 
-  // Split button — main action + version dropdown
   return (
     <div>
       <div className="relative inline-flex" ref={dropdownRef}>
@@ -124,12 +241,13 @@ export function StartRunButton({
           title={tooltip}
           aria-disabled={isDisabled}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap',
-            isDisabled && 'opacity-50 cursor-not-allowed hover:bg-primary',
+            'inline-flex items-center gap-1.5 rounded-l-md px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap',
+            buttonClasses,
+            isDisabled && 'opacity-50 cursor-not-allowed',
           )}
         >
-          {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-          {starting ? 'Starting...' : 'Start Run'}
+          {buttonIcon}
+          {buttonLabel}
         </button>
         <button
           disabled={isDisabled}
@@ -137,12 +255,14 @@ export function StartRunButton({
           title={tooltip}
           aria-disabled={isDisabled}
           className={cn(
-            'inline-flex items-center rounded-r-md border-l border-primary-foreground/20 bg-primary px-1.5 py-1.5 text-primary-foreground hover:bg-primary/90 transition-colors',
-            isDisabled && 'opacity-50 cursor-not-allowed hover:bg-primary',
+            'inline-flex items-center rounded-r-md border-l border-white/20 px-1.5 py-1.5 transition-colors',
+            buttonClasses,
+            isDisabled && 'opacity-50 cursor-not-allowed',
           )}
         >
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', dropdownOpen && 'rotate-180')} />
         </button>
+        {warningBadge}
 
         {dropdownOpen && (
           <div className="absolute right-0 top-full mt-1 z-10 min-w-[200px] rounded-md border bg-popover shadow-md">
@@ -172,6 +292,35 @@ export function StartRunButton({
         )}
       </div>
       {errorBanner}
+      {preflightDialog}
+    </div>
+  );
+}
+
+function formatStepList(names: string[], max: number = 3): string {
+  if (names.length <= max) return names.join(', ');
+  return `${names.slice(0, max).join(', ')}, +${String(names.length - max)} more`;
+}
+
+function WarningGroup({ title, warnings }: { title: string; warnings: PreflightWarning[] }) {
+  if (warnings.length === 0) return null;
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground mb-1.5">{title}</p>
+      <ul className="space-y-2.5">
+        {warnings.map((w, idx) => (
+          <li key={idx} className="text-xs">
+            <div className="flex items-start gap-2">
+              <span className="text-amber-500 shrink-0 mt-0.5">•</span>
+              <div>
+                <p className="font-mono font-medium">{w.resource}</p>
+                <p className="text-muted-foreground mt-0.5">Used by: {formatStepList(w.stepNames)}</p>
+                <p className="text-muted-foreground/70 mt-0.5">{w.hint}</p>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

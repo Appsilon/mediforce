@@ -16,6 +16,7 @@ import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core'
 import { StepEditor } from './workflow-editor/step-editor';
 import { WorkflowSecretsEditor } from './workflow-secrets-editor';
 import { computeMoveEligibility, ensureTerminalConnected } from './workflow-editor-utils';
+import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 
 // ---------------------------------------------------------------------------
 // YAML code editor (CodeMirror 6)
@@ -165,6 +166,20 @@ export function WorkflowEditorCanvas({
 
   // ── Move eligibility (all steps, used by diagram hover buttons) ─────────────
   const { canMoveUp: canMoveUpSet, canMoveDown: canMoveDownSet } = computeMoveEligibility(editedSteps, editedTransitions);
+
+  // ── Docker image warnings ─────────────────────────────────────────────────
+  const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
+  const warningStepIds = useMemo(() => {
+    if (!dockerAvailable) return undefined;
+    const map = new Map<string, string>();
+    for (const step of editedSteps) {
+      const image = step.agent?.image;
+      if (typeof image === 'string' && image.length > 0 && !isImageAvailable(dockerImages, image)) {
+        map.set(step.id, `Image '${image}' not available on platform`);
+      }
+    }
+    return map.size > 0 ? map : undefined;
+  }, [dockerAvailable, dockerImages, editedSteps]);
 
   // ── History ────────────────────────────────────────────────────────────────
   // Keep refs in sync so saveSnapshot can read current state without being
@@ -567,6 +582,7 @@ export function WorkflowEditorCanvas({
             onPaneClick={() => { setSelectedStepId(null); setRightPanelView('yaml'); }}
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
+            warningStepIds={warningStepIds}
             canMoveUp={canMoveUpSet}
             canMoveDown={canMoveDownSet}
           />
@@ -591,6 +607,7 @@ export function WorkflowEditorCanvas({
                   workflowName={workflowName}
                   onChange={(patch) => updateStep(selectedStep.id, patch)}
                   errors={stepErrors?.[selectedStep.id]}
+                  imageWarning={warningStepIds?.get(selectedStep.id)}
                 />
               </div>
             </>

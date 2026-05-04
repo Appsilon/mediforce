@@ -16,6 +16,7 @@ import {
   ArchiveVersionOutputSchema,
   ArchiveAllInputSchema,
   ArchiveAllOutputSchema,
+  DockerInfoResponseSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type RegisterWorkflowInput,
@@ -34,6 +35,7 @@ import {
   type StartRunOutput,
   type ListRunsInput,
   type ListRunsOutput,
+  type DockerInfoResponse,
 } from '../contract/index.js';
 
 /**
@@ -110,6 +112,10 @@ export class Mediforce {
     list: (input?: ListRunsInput) => Promise<ListRunsOutput>;
     get: (input: GetRunInput) => Promise<GetRunOutput>;
     start: (input: StartRunInput) => Promise<StartRunOutput>;
+  };
+
+  readonly system: {
+    dockerInfo: () => Promise<DockerInfoResponse>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -253,6 +259,14 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.runs.start');
         return StartRunOutputSchema.parse(body);
+      },
+    };
+
+    this.system = {
+      dockerInfo: async () => {
+        const res = await this.request('/api/system/docker-info');
+        const body = await parseJsonOrThrow(res, 'mediforce.system.dockerInfo');
+        return DockerInfoResponseSchema.parse(body);
       },
     };
   }
