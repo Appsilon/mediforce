@@ -104,32 +104,66 @@ def run_cdisc_core(delivery: Path, output_path: Path) -> dict[str, Any]:
         )
 
     args = [
-        "python3", "/opt/cdisc/core.py",
+        "python3", "-u", "/opt/cdisc/core.py",
         "validate",
         "--standard", standard,
         "--version", ig_version,
         "--output", output_basename,
         "--output-format", "json",
+        # Per-file progress lines (default `bar` uses TTY escape codes — hostile
+        # to log capture). `verbose_output` is the line-based mode designed for
+        # non-TTY consumers like our docker-logs pipe.
+        "--progress", "verbose_output",
+        # Engine-level info logging (default is `disabled`).
+        "--log-level", "info",
     ]
     for dataset in dataset_files:
         args.extend(["--dataset-path", str(dataset)])
 
-    proc = subprocess.run(
+    # Stream CORE engine output live to our stdout/stderr so `docker logs -f`
+    # shows real-time progress. We also keep a small tail so the eventual
+    # error message (if the engine fails) carries useful context.
+    print(
+        f"validate: running CDISC CORE — standard={standard} version={ig_version} "
+        f"datasets={len(dataset_files)}",
+        flush=True,
+    )
+
+    proc = subprocess.Popen(
         args,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
-        timeout=600,
+        bufsize=1,  # line-buffered
         cwd="/opt/cdisc",
     )
-    if proc.returncode != 0:
+
+    tail: list[str] = []
+    tail_max = 50
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+        tail.append(line)
+        if len(tail) > tail_max:
+            tail.pop(0)
+
+    try:
+        return_code = proc.wait(timeout=600)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        raise RuntimeError("core validate timed out after 600s")
+
+    if return_code != 0:
+        tail_text = "".join(tail).strip() or "(no output)"
         raise RuntimeError(
-            f"core validate failed (exit {proc.returncode}): "
-            f"{proc.stderr.strip() or proc.stdout.strip() or '(no output)'}"
+            f"core validate failed (exit {return_code}): {tail_text}"
         )
     if not expected_output.exists():
+        tail_text = "".join(tail).strip() or "(empty)"
         raise RuntimeError(
             f"core validate produced no output at {expected_output}. "
-            f"stdout: {proc.stdout.strip() or '(empty)'}"
+            f"stdout (tail): {tail_text}"
         )
     return json.loads(expected_output.read_text())
 
