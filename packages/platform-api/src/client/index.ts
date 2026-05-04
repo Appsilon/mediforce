@@ -17,6 +17,7 @@ import {
   ArchiveAllInputSchema,
   ArchiveAllOutputSchema,
   DockerInfoResponseSchema,
+  RemoveImageOutputSchema,
   ListAgentsOutputSchema,
   GetAgentInputSchema,
   GetAgentOutputSchema,
@@ -39,6 +40,7 @@ import {
   type ListRunsInput,
   type ListRunsOutput,
   type DockerInfoResponse,
+  type RemoveImageOutput,
   type ListAgentsOutput,
   type GetAgentInput,
   type GetAgentOutput,
@@ -127,7 +129,7 @@ export class Mediforce {
 
   readonly system: {
     dockerInfo: () => Promise<DockerInfoResponse>;
-    removeImage: (imageId: string) => Promise<{ deleted: string }>;
+    removeImage: (imageId: string) => Promise<RemoveImageOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -297,13 +299,13 @@ export class Mediforce {
         return DockerInfoResponseSchema.parse(body);
       },
       removeImage: async (imageId: string) => {
-        const res = await this.request('/api/system/docker-images', {
+        const res = await this.request('/api/admin/docker-images', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageId }),
         });
         const body = await parseJsonOrThrow(res, 'mediforce.system.removeImage');
-        return body as { deleted: string };
+        return RemoveImageOutputSchema.parse(body);
       },
     };
   }

@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http';
-import { listImages, getDiskUsage } from './docker-info.js';
+import { listImages, getDiskUsage, removeImage } from './docker-info.js';
 
 const WORKER_HTTP_PORT = process.env.WORKER_HTTP_PORT !== undefined
   ? Number(process.env.WORKER_HTTP_PORT)
@@ -10,9 +10,35 @@ function jsonResponse(res: import('node:http').ServerResponse, status: number, b
   res.end(JSON.stringify(body));
 }
 
+const WORKER_SECRET = process.env.CONTAINER_WORKER_SECRET ?? '';
+
+function requireSecret(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse): boolean {
+  if (WORKER_SECRET === '') return true;
+  const provided = req.headers['x-worker-secret'];
+  if (provided === WORKER_SECRET) return true;
+  jsonResponse(res, 401, { error: 'Unauthorized — invalid or missing X-Worker-Secret' });
+  return false;
+}
+
 export function startHttpServer(): Server {
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${WORKER_HTTP_PORT}`);
+
+    if (req.method === 'DELETE' && url.pathname.startsWith('/images/')) {
+      if (!requireSecret(req, res)) return;
+      const imageId = decodeURIComponent(url.pathname.slice('/images/'.length));
+      if (imageId.length === 0) {
+        jsonResponse(res, 400, { error: 'Missing image ID' });
+        return;
+      }
+      try {
+        const output = await removeImage(imageId);
+        jsonResponse(res, 200, { deleted: imageId, output });
+      } catch (err) {
+        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+      return;
+    }
 
     if (req.method !== 'GET') {
       jsonResponse(res, 405, { error: 'Method not allowed' });

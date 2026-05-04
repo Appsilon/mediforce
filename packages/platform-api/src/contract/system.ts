@@ -25,6 +25,11 @@ export const DockerInfoResponseSchema = z.discriminatedUnion('available', [
   }),
 ]);
 
+export const RemoveImageOutputSchema = z.object({
+  deleted: z.string(),
+});
+
 export type DockerImageInfo = z.infer<typeof DockerImageInfoSchema>;
 export type DockerDiskInfo = z.infer<typeof DockerDiskInfoSchema>;
 export type DockerInfoResponse = z.infer<typeof DockerInfoResponseSchema>;
+export type RemoveImageOutput = z.infer<typeof RemoveImageOutputSchema>;

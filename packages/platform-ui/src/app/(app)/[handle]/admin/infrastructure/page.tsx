@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown } from 'lucide-react';
+import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown, Trash2 } from 'lucide-react';
+import { apiFetch } from '@/lib/api-fetch';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { cn } from '@/lib/utils';
@@ -54,9 +55,35 @@ export default function AdminInfrastructurePage() {
   const handle = Array.isArray(rawHandle) ? rawHandle[0] : (rawHandle ?? '');
   const router = useRouter();
   const { canAdmin, loading: roleLoading } = useNamespaceRole(handle);
-  const { images, disk, isAvailable, isLoading } = useDockerImages();
+  const { images, disk, isAvailable, isLoading, refresh } = useDockerImages();
   const [sortField, setSortField] = useState<SortField>('size');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDeleteImage(imageId: string) {
+    if (!confirm(`Delete image ${imageId}?`)) return;
+    setDeletingId(imageId);
+    setDeleteError(null);
+    try {
+      const res = await apiFetch('/api/admin/docker-images', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Unknown error' }));
+        setDeleteError(data.error ?? `Failed to delete (${res.status})`);
+      }
+      refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete image');
+      refresh();
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   useEffect(() => {
     if (!roleLoading && !canAdmin) {
@@ -107,6 +134,12 @@ export default function AdminInfrastructurePage() {
         </div>
       ) : (
         <>
+          {deleteError && (
+            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20 p-3 flex items-center justify-between">
+              <p className="text-sm text-red-700 dark:text-red-400">{deleteError}</p>
+              <button onClick={() => setDeleteError(null)} className="text-xs text-red-500 hover:text-red-700">Dismiss</button>
+            </div>
+          )}
           {disk && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <DiskCard
@@ -147,6 +180,7 @@ export default function AdminInfrastructurePage() {
                       <th className="px-4 py-2 font-medium">ID</th>
                       <SortHeader label="Size" field="size" current={sortField} dir={sortDir} onSort={toggleSort} align="right" />
                       <SortHeader label="Created" field="created" current={sortField} dir={sortDir} onSort={toggleSort} align="right" />
+                      <th className="px-4 py-2 font-medium w-10" />
                     </tr>
                   </thead>
                   <tbody>
@@ -166,6 +200,16 @@ export default function AdminInfrastructurePage() {
                         <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{img.id}</td>
                         <td className="px-4 py-2 text-right text-xs">{humanSize(img.size)}</td>
                         <td className="px-4 py-2 text-right text-xs text-muted-foreground">{img.created}</td>
+                        <td className="px-4 py-2 text-center">
+                          <button
+                            onClick={() => handleDeleteImage(img.id)}
+                            disabled={deletingId === img.id}
+                            className="text-muted-foreground hover:text-red-500 disabled:opacity-30 transition-colors"
+                            title={`Delete ${img.repository}:${img.tag}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
