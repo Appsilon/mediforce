@@ -14,7 +14,7 @@ COPY packages/platform-infra/package.json packages/platform-infra/
 COPY packages/platform-api/package.json packages/platform-api/
 COPY packages/workflow-engine/package.json packages/workflow-engine/
 COPY packages/agent-runtime/package.json packages/agent-runtime/
-COPY packages/agent-queue/package.json packages/agent-queue/
+COPY packages/container-worker/package.json packages/container-worker/
 COPY packages/mcp-client/package.json packages/mcp-client/
 COPY packages/core-actions/package.json packages/core-actions/
 COPY packages/platform-ui/package.json packages/platform-ui/

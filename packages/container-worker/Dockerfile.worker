@@ -13,7 +13,7 @@ WORKDIR /app
 
 # Copy package manifests for dependency install
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
-COPY packages/agent-queue/package.json packages/agent-queue/
+COPY packages/container-worker/package.json packages/container-worker/
 COPY packages/platform-core/package.json packages/platform-core/
 
 # Install dependencies — pnpm store persisted via BuildKit cache mount
@@ -23,8 +23,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     (pnpm install --frozen-lockfile || pnpm install)
 
 # Copy source
-COPY packages/agent-queue/ packages/agent-queue/
+COPY packages/container-worker/ packages/container-worker/
 COPY packages/platform-core/ packages/platform-core/
 COPY tsconfig.json ./
 
-CMD ["pnpm", "tsx", "packages/agent-queue/src/worker-entry.ts"]
+CMD ["pnpm", "tsx", "packages/container-worker/src/worker-entry.ts"]
