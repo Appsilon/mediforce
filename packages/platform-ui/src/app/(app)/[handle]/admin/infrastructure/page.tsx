@@ -60,18 +60,25 @@ export default function AdminInfrastructurePage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   async function handleDeleteImage(imageId: string) {
     if (!confirm(`Delete image ${imageId}?`)) return;
     setDeletingId(imageId);
+    setDeleteError(null);
     try {
-      await apiFetch('/api/system/docker-images', {
+      const res = await apiFetch('/api/admin/docker-images', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageId }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Unknown error' }));
+        setDeleteError(data.error ?? `Failed to delete (${res.status})`);
+      }
       refresh();
-    } catch {
-      // refresh anyway to show current state
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete image');
       refresh();
     } finally {
       setDeletingId(null);
@@ -127,6 +134,12 @@ export default function AdminInfrastructurePage() {
         </div>
       ) : (
         <>
+          {deleteError && (
+            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20 p-3 flex items-center justify-between">
+              <p className="text-sm text-red-700 dark:text-red-400">{deleteError}</p>
+              <button onClick={() => setDeleteError(null)} className="text-xs text-red-500 hover:text-red-700">Dismiss</button>
+            </div>
+          )}
           {disk && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <DiskCard

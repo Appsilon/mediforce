@@ -297,12 +297,15 @@ export class Mediforce {
         return DockerInfoResponseSchema.parse(body);
       },
       removeImage: async (imageId: string) => {
-        const res = await this.request('/api/system/docker-images', {
+        const res = await this.request('/api/admin/docker-images', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageId }),
         });
         const body = await parseJsonOrThrow(res, 'mediforce.system.removeImage');
+        if (typeof body !== 'object' || body === null || typeof (body as Record<string, unknown>).deleted !== 'string') {
+          throw new ApiError(res.status, 'Invalid response from mediforce.system.removeImage', body);
+        }
         return body as { deleted: string };
       },
     };

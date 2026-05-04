@@ -126,39 +126,44 @@ export async function systemImagesCommand(input: CommandInput): Promise<number> 
 }
 
 export async function systemRmiCommand(input: CommandInput): Promise<number> {
+  let flags: { 'base-url'?: string; json?: boolean; help?: boolean };
+  let positionals: string[];
   try {
     const parsed = parseArgs({ args: input.argv, options: OPTIONS, strict: true, allowPositionals: true });
-    const flags = parsed.values;
-    const positionals = parsed.positionals;
+    flags = parsed.values;
+    positionals = parsed.positionals;
+  } catch (err) {
+    input.output.stderr(`mediforce system rmi: ${String(err)}`);
+    return 2;
+  }
 
-    if (flags.help === true) {
-      input.output.stdout('Usage: mediforce system rmi <imageId> [--base-url <url>] [--json] [--help]\n\nRemove a Docker image by ID or name:tag.\n');
-      return 0;
-    }
+  if (flags.help === true) {
+    input.output.stdout('Usage: mediforce system rmi <imageId> [--base-url <url>] [--json] [--help]\n\nRemove a Docker image by ID or name:tag.\n');
+    return 0;
+  }
 
-    const imageId = positionals[0];
-    if (!imageId) {
-      input.output.stderr('mediforce system rmi: missing image ID');
-      input.output.stderr('Usage: mediforce system rmi <imageId>');
-      return 2;
-    }
+  const imageId = positionals[0];
+  if (!imageId) {
+    input.output.stderr('mediforce system rmi: missing image ID');
+    input.output.stderr('Usage: mediforce system rmi <imageId>');
+    return 2;
+  }
 
-    const jsonMode = flags.json === true;
+  const jsonMode = flags.json === true;
+
+  try {
     const config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
     const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
     const result = await mediforce.system.removeImage(imageId);
 
-    if (jsonMode) { printJson(input.output, result); return 0; }
+    if (jsonMode) {
+      printJson(input.output, result);
+      return 0;
+    }
     input.output.stdout(`Deleted: ${result.deleted}`);
     return 0;
   } catch (err) {
-    const jsonMode = input.argv.includes('--json');
-    if (err instanceof ApiError) {
-      printError(input.output, { error: err.message, status: err.status, body: err.body }, jsonMode);
-    } else {
-      printError(input.output, { error: err instanceof Error ? err.message : String(err) }, jsonMode);
-    }
-    return 1;
+    return handleApiError(err, input.output, jsonMode);
   }
 }
 
