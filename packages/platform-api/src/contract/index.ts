@@ -33,9 +33,11 @@ export {
   DockerImageInfoSchema,
   DockerDiskInfoSchema,
   DockerInfoResponseSchema,
+  RemoveImageOutputSchema,
   type DockerImageInfo,
   type DockerDiskInfo,
   type DockerInfoResponse,
+  type RemoveImageOutput,
 } from './system.js';
 
 export {

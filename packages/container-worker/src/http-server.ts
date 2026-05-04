@@ -10,11 +10,22 @@ function jsonResponse(res: import('node:http').ServerResponse, status: number, b
   res.end(JSON.stringify(body));
 }
 
+const WORKER_SECRET = process.env.CONTAINER_WORKER_SECRET ?? '';
+
+function requireSecret(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse): boolean {
+  if (WORKER_SECRET === '') return true;
+  const provided = req.headers['x-worker-secret'];
+  if (provided === WORKER_SECRET) return true;
+  jsonResponse(res, 401, { error: 'Unauthorized — invalid or missing X-Worker-Secret' });
+  return false;
+}
+
 export function startHttpServer(): Server {
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${WORKER_HTTP_PORT}`);
 
     if (req.method === 'DELETE' && url.pathname.startsWith('/images/')) {
+      if (!requireSecret(req, res)) return;
       const imageId = decodeURIComponent(url.pathname.slice('/images/'.length));
       if (imageId.length === 0) {
         jsonResponse(res, 400, { error: 'Missing image ID' });

@@ -70,8 +70,15 @@ export async function DELETE(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ deleted: imageId, output: result.stdout.trim() });
     }
 
+    const workerHeaders: Record<string, string> = {};
+    const workerSecret = process.env.CONTAINER_WORKER_SECRET;
+    if (typeof workerSecret === 'string' && workerSecret !== '') {
+      workerHeaders['X-Worker-Secret'] = workerSecret;
+    }
+
     const res = await fetch(`${CONTAINER_WORKER_URL}/images/${encodeURIComponent(imageId)}`, {
       method: 'DELETE',
+      headers: workerHeaders,
     });
 
     if (!res.ok) {
