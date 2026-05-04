@@ -33,13 +33,14 @@ export function StartRunButton({
   const handle = useHandleFromPath();
   const { firebaseUser } = useAuth();
   const { definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowDefinitions(workflowName);
-  const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
+  const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [pendingVersion, setPendingVersion] = React.useState<number | undefined>(undefined);
   const [secretKeys, setSecretKeys] = React.useState<string[] | undefined>(undefined);
+  const [secretKeysLoading, setSecretKeysLoading] = React.useState(true);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const effectiveVersion = version ?? hookEffectiveVersion;
@@ -52,9 +53,10 @@ export function StartRunButton({
   React.useEffect(() => {
     if (!handle || !workflowName || !firebaseUser) return;
     let cancelled = false;
+    setSecretKeysLoading(true);
     getWorkflowSecretKeys(handle, workflowName, firebaseUser.uid)
-      .then((keys) => { if (!cancelled) setSecretKeys(keys); })
-      .catch(() => { if (!cancelled) setSecretKeys(undefined); });
+      .then((keys) => { if (!cancelled) { setSecretKeys(keys); setSecretKeysLoading(false); } })
+      .catch(() => { if (!cancelled) { setSecretKeys(undefined); setSecretKeysLoading(false); } });
     return () => { cancelled = true; };
   }, [handle, workflowName, firebaseUser]);
 
@@ -67,6 +69,7 @@ export function StartRunButton({
     });
   }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys]);
 
+  const preflightLoading = dockerLoading || secretKeysLoading;
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
@@ -121,8 +124,8 @@ export function StartRunButton({
       : effectiveVersion === 0
         ? 'No workflow version available'
         : null;
-  const isDisabled = disabledReason !== null || starting;
-  const tooltip = disabledReason ?? undefined;
+  const isDisabled = disabledReason !== null || starting || preflightLoading;
+  const tooltip = preflightLoading ? 'Checking workflow readiness...' : (disabledReason ?? undefined);
 
   const errorBanner = error ? (
     <p className="mt-1 text-xs text-destructive max-w-xs truncate" title={error}>{error}</p>
@@ -130,9 +133,11 @@ export function StartRunButton({
 
   const buttonClasses = 'bg-primary text-primary-foreground hover:bg-primary/90';
 
-  const buttonIcon = starting
+  const buttonIcon = starting || preflightLoading
     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
     : <Play className="h-3.5 w-3.5" />;
+
+  const buttonLabel = starting ? 'Starting...' : preflightLoading ? 'Checking...' : 'Start Run';
 
   const warningBadge = hasWarnings && !isDisabled ? (
     <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">
@@ -217,7 +222,7 @@ export function StartRunButton({
             )}
           >
             {buttonIcon}
-            {starting ? 'Starting...' : 'Start Run'}
+            {buttonLabel}
           </button>
           {warningBadge}
         </div>
@@ -243,7 +248,7 @@ export function StartRunButton({
           )}
         >
           {buttonIcon}
-          {starting ? 'Starting...' : 'Start Run'}
+          {buttonLabel}
         </button>
         <button
           disabled={isDisabled}
