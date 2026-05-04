@@ -67,12 +67,12 @@ export function runPreflightChecks(
     });
   }
 
-  for (const [key, { stepNames }] of secretMap) {
+  for (const [key, { stepNames, envVar }] of secretMap) {
     warnings.push({
       category: 'missing-secret',
       resource: key,
       stepNames,
-      message: `Secret '${key}' not configured`,
+      message: `Secret '${key}' not configured (referenced as ${envVar})`,
       hint: 'Add this secret in the Secrets panel for this workflow.',
     });
   }

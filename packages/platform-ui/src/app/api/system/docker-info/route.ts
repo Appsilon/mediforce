@@ -20,14 +20,14 @@ async function fetchFromLocalDocker(): Promise<DockerInfoResponse> {
   ]);
 
   const rawImages = imagesResult.stdout.trim();
-  const images = rawImages.length === 0 ? [] : rawImages.split('\n').map((line) => {
+  const rawImageList = rawImages.length === 0 ? [] : rawImages.split('\n').map((line) => {
     const parsed = JSON.parse(line);
     return {
-      repository: parsed.Repository as string,
-      tag: parsed.Tag as string,
-      id: parsed.ID as string,
-      size: parsed.Size as string,
-      created: parsed.CreatedSince as string,
+      repository: parsed.Repository,
+      tag: parsed.Tag,
+      id: parsed.ID,
+      size: parsed.Size,
+      created: parsed.CreatedSince,
     };
   });
 
@@ -37,13 +37,20 @@ async function fetchFromLocalDocker(): Promise<DockerInfoResponse> {
   const ctrRow = find('Containers');
   const cacheRow = find('Build Cache');
 
-  const disk = {
-    images: { totalCount: Number(imgRow?.TotalCount ?? 0), size: (imgRow?.Size ?? '0B') as string },
-    containers: { totalCount: Number(ctrRow?.TotalCount ?? 0), active: Number(ctrRow?.Active ?? 0), size: (ctrRow?.Size ?? '0B') as string },
-    buildCache: { size: (cacheRow?.Size ?? '0B') as string },
+  const rawDisk = {
+    images: { totalCount: Number(imgRow?.TotalCount ?? 0), size: String(imgRow?.Size ?? '0B') },
+    containers: { totalCount: Number(ctrRow?.TotalCount ?? 0), active: Number(ctrRow?.Active ?? 0), size: String(ctrRow?.Size ?? '0B') },
+    buildCache: { size: String(cacheRow?.Size ?? '0B') },
   };
 
-  return { available: true, images, disk };
+  const imagesParsed = z.array(DockerImageInfoSchema).safeParse(rawImageList);
+  const diskParsed = DockerDiskInfoSchema.safeParse(rawDisk);
+
+  if (!imagesParsed.success || !diskParsed.success) {
+    return { available: false };
+  }
+
+  return { available: true, images: imagesParsed.data, disk: diskParsed.data };
 }
 
 async function fetchFromContainerWorker(): Promise<DockerInfoResponse> {

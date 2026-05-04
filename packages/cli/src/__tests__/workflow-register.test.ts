@@ -14,10 +14,7 @@ beforeEach(async () => {
   tempDir = await mkdtemp(path.join(tmpdir(), 'mediforce-cli-test-'));
   wdFile = path.join(tempDir, 'workflow.json');
   const wd = buildWorkflowDefinition({ name: 'sample-wf' });
-  const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
-  void _v;
-  void _n;
-  void _c;
+  const { version: _version, namespace: _namespace, createdAt: _createdAt, ...body } = wd;
   await writeFile(wdFile, JSON.stringify(body), 'utf-8');
 });
 
@@ -91,10 +88,7 @@ describe('workflow register command', () => {
     // `parseWorkflowDefinitionForCreation` server-side keeps the two in
     // lockstep — see workflow-register.ts dry-run path.
     const wd = buildWorkflowDefinition({ name: 'sample-wf' });
-    const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
-    void _v;
-    void _n;
-    void _c;
+    const { version: _version, namespace: _namespace, createdAt: _createdAt, ...body } = wd;
     const malformed = {
       ...body,
       inputForNextRun: [{ stepId: 'does-not-exist', output: 'x', as: 'y' }],
@@ -188,7 +182,6 @@ describe('workflow register command', () => {
     wd.steps[0].executor = 'script';
     wd.steps[0].agent = { image: 'mediforce/nonexistent-image:v99' };
     const { version: _v, namespace: _n, createdAt: _c, ...body } = wd;
-    void _v; void _n; void _c;
     const imgFile = path.join(tempDir, 'img-workflow.json');
     await writeFile(imgFile, JSON.stringify(body), 'utf-8');
 

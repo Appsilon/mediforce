@@ -13,11 +13,11 @@ type SortField = 'repository' | 'size' | 'created';
 type SortDir = 'asc' | 'desc';
 
 function parseSize(size: string): number {
-  const match = size.match(/^([\d.]+)\s*(B|KB|MB|GB|TB|kB)$/i);
+  const match = size.match(/^([\d.]+)\s*(B|[kKMGT]B)$/);
   if (!match) return 0;
   const num = parseFloat(match[1]);
-  const unit = match[2].toUpperCase();
-  const multipliers: Record<string, number> = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3, TB: 1024 ** 4 };
+  const unit = match[2];
+  const multipliers: Record<string, number> = { B: 1, kB: 1000, KB: 1000, MB: 1000 ** 2, GB: 1000 ** 3, TB: 1000 ** 4 };
   return num * (multipliers[unit] ?? 1);
 }
 
@@ -32,9 +32,9 @@ function parseAge(created: string): number {
 
 function humanSize(size: string): string {
   const bytes = parseSize(size);
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(0)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes >= 1000 ** 3) return `${(bytes / 1000 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1000 ** 2) return `${(bytes / 1000 ** 2).toFixed(0)} MB`;
+  if (bytes >= 1000) return `${(bytes / 1000).toFixed(0)} kB`;
   return size;
 }
 
@@ -108,7 +108,7 @@ export default function AdminInfrastructurePage() {
       ) : (
         <>
           {disk && (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <DiskCard
                 icon={<Container className="h-4 w-4" />}
                 title="Images"

@@ -24,14 +24,6 @@ function padLeft(str: string, len: number): string {
   return str.length >= len ? str : ' '.repeat(len - str.length) + str;
 }
 
-async function fetchDockerInfo(input: CommandInput): Promise<DockerInfoResponse> {
-  const config = resolveConfig({ flagBaseUrl: input.argv.includes('--base-url')
-    ? input.argv[input.argv.indexOf('--base-url') + 1]
-    : undefined, env: input.env });
-  const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
-  return mediforce.system.dockerInfo();
-}
-
 function printImages(output: OutputSink, data: Extract<DockerInfoResponse, { available: true }>): void {
   output.stdout(`${padRight('REPOSITORY', 35)} ${padRight('TAG', 15)} ${padLeft('SIZE', 10)} ${padRight('CREATED', 15)}`);
   for (const img of data.images) {

@@ -235,7 +235,6 @@ export function StartRunButton({
   return (
     <div>
       <div className="relative inline-flex" ref={dropdownRef}>
-        {warningBadge}
         <button
           disabled={isDisabled}
           onClick={() => handleStart()}
@@ -263,6 +262,7 @@ export function StartRunButton({
         >
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', dropdownOpen && 'rotate-180')} />
         </button>
+        {warningBadge}
 
         {dropdownOpen && (
           <div className="absolute right-0 top-full mt-1 z-10 min-w-[200px] rounded-md border bg-popover shadow-md">
