@@ -23,11 +23,23 @@ describe('runPreflightChecks', () => {
     expect(result).toEqual([]);
   });
 
-  it('warns about missing Docker image', () => {
+  it('warns about missing Docker image grouped by resource', () => {
     const wd = makeDefinition({ image: 'mediforce/nonexistent:v1' });
     const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ category: 'missing-image', message: expect.stringContaining('nonexistent') });
+    expect(result[0]).toMatchObject({
+      category: 'missing-image',
+      resource: 'mediforce/nonexistent:v1',
+      stepNames: [wd.steps[0].name],
+      hint: expect.stringContaining('build source'),
+    });
+  });
+
+  it('skips image warning when repo + commit configured (engine auto-builds)', () => {
+    const wd = makeDefinition({ image: 'mediforce/nonexistent:v1' });
+    wd.steps[0].agent = { ...wd.steps[0].agent, repo: 'git@github.com:org/repo.git', commit: 'abc1234' };
+    const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    expect(result.filter((w) => w.category === 'missing-image')).toEqual([]);
   });
 
   it('skips image check when docker unavailable', () => {
@@ -36,17 +48,40 @@ describe('runPreflightChecks', () => {
     expect(result).toEqual([]);
   });
 
-  it('warns about missing secret', () => {
+  it('warns about missing secret grouped by key', () => {
     const wd = makeDefinition({ env: { API_KEY: '{{MY_SECRET}}' } });
     const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ category: 'missing-secret', message: expect.stringContaining('MY_SECRET') });
+    expect(result[0]).toMatchObject({
+      category: 'missing-secret',
+      resource: 'MY_SECRET',
+      stepNames: [wd.steps[0].name],
+      hint: expect.stringContaining('Secrets panel'),
+    });
   });
 
   it('no warning when secret is configured', () => {
     const wd = makeDefinition({ env: { API_KEY: '{{MY_SECRET}}' } });
     const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: ['MY_SECRET'] });
     expect(result.filter((w) => w.category === 'missing-secret')).toEqual([]);
+  });
+
+  it('groups same resource across multiple steps', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf' });
+    wd.steps[0].executor = 'script';
+    wd.steps[0].agent = { image: 'bad:v1' };
+    wd.steps[0].env = { KEY: '{{SHARED_SECRET}}' };
+    const reviewStep = wd.steps.find((s) => s.type === 'review');
+    if (reviewStep) {
+      reviewStep.executor = 'agent';
+      reviewStep.agent = { image: 'bad:v1' };
+      reviewStep.env = { KEY: '{{SHARED_SECRET}}' };
+    }
+    const result = runPreflightChecks(wd, { dockerImages: IMAGES, dockerAvailable: true, secretKeys: [] });
+    const imageWarning = result.find((w) => w.category === 'missing-image');
+    const secretWarning = result.find((w) => w.category === 'missing-secret');
+    expect(imageWarning?.stepNames.length).toBeGreaterThanOrEqual(2);
+    expect(secretWarning?.stepNames.length).toBeGreaterThanOrEqual(2);
   });
 
   it('detects both missing image and missing secret', () => {

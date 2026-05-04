@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, Eye, EyeOff } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
@@ -24,8 +24,12 @@ import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-e
 export default function ProcessDefinitionPage() {
   const { name, handle } = useParams<{ name: string; handle: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const decodedName = decodeURIComponent(name);
 
+  const initialTab = searchParams.get('tab') === 'secrets' ? 'secrets' : 'runs';
+  const setupKeys = searchParams.get('setup')?.split(',').filter(Boolean) ?? [];
+  const [activeTab, setActiveTab] = React.useState(initialTab);
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
 
   const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName);
@@ -217,7 +221,7 @@ export default function ProcessDefinitionPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs.Root defaultValue="runs" className="flex flex-1 flex-col">
+      <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
         <Tabs.List className="flex border-b px-6 gap-0">
           {['runs', 'definitions', 'secrets'].map((tab) => (
             <Tabs.Trigger
@@ -287,6 +291,7 @@ export default function ProcessDefinitionPage() {
                 namespace={handle}
                 workflowName={decodedName}
                 userId={firebaseUser.uid}
+                suggestedKeys={setupKeys}
               />
             )}
           </div>
