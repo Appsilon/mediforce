@@ -17,16 +17,21 @@ interface MemberResponse extends MemberDoc {
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const adminAuth = getAdminAuth();
 
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (token === '') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const apiKey = req.headers.get('X-Api-Key');
+  const expectedKey = process.env.PLATFORM_API_KEY;
+  const apiKeyOk = Boolean(apiKey) && Boolean(expectedKey) && apiKey === expectedKey;
 
-  try {
-    await adminAuth.verifyIdToken(token);
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!apiKeyOk) {
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (token === '') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    try {
+      await adminAuth.verifyIdToken(token);
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   const handle = req.nextUrl.searchParams.get('handle');

@@ -11,18 +11,23 @@ const ResendInviteBodySchema = z.object({
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const adminAuth = getAdminAuth();
 
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (token === '') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const apiKey = req.headers.get('X-Api-Key');
+  const expectedKey = process.env.PLATFORM_API_KEY;
+  const apiKeyOk = Boolean(apiKey) && Boolean(expectedKey) && apiKey === expectedKey;
 
-  let callerUid: string;
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
-    callerUid = decoded.uid;
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  let callerUid: string | null = null;
+  if (!apiKeyOk) {
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (token === '') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    try {
+      const decoded = await adminAuth.verifyIdToken(token);
+      callerUid = decoded.uid;
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   let body: unknown;
@@ -42,15 +47,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const adminDb = getAdminFirestore();
 
-    const memberSnap = await adminDb
-      .collection('namespaces')
-      .doc(namespaceHandle)
-      .collection('members')
-      .doc(callerUid)
-      .get();
-    const memberRole = memberSnap.exists ? (memberSnap.data()?.role as string | undefined) : undefined;
-    if (memberRole !== 'owner' && memberRole !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (callerUid !== null) {
+      const memberSnap = await adminDb
+        .collection('namespaces')
+        .doc(namespaceHandle)
+        .collection('members')
+        .doc(callerUid)
+        .get();
+      const memberRole = memberSnap.exists ? (memberSnap.data()?.role as string | undefined) : undefined;
+      if (memberRole !== 'owner' && memberRole !== 'admin') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     const inviteService = new FirebaseInviteService(adminAuth, adminDb);
