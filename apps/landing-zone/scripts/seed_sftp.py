@@ -62,6 +62,54 @@ VARIANTS = (
     "mess-inconsistent-values",
 )
 
+# Named scenarios — preset combinations of (variant, file filter) for common
+# demo/test paths. Keep this list small and meaningful. To add a one-off, use
+# --variant + --only directly. Each scenario doc string is shown in --help.
+#
+# `only`: glob patterns matched against entry name (case-insensitive). None = all files.
+SCENARIOS: dict[str, dict] = {
+    "smoke-broken": {
+        "variant": "injection",
+        "only": ["DM.xpt"],
+        "doc": "fast: single 79KB DM.xpt with SEX=X + RFXSTDTC>RFXENDTC violations. ~30s validate-script. Reaches propose-rules.",
+    },
+    "smoke-clean": {
+        "variant": "clean",
+        "only": ["DM.xpt"],
+        "doc": "fast: single 111KB clean DM.xpt, no findings. Reaches human-review (always-route).",
+    },
+    "full-broken": {
+        "variant": "injection",
+        "only": None,
+        "doc": "full injection delivery (5 files, ~40MB). 5 SDTM violations. ~5 min validate-script. Reaches propose-rules.",
+    },
+    "full-clean": {
+        "variant": "clean",
+        "only": None,
+        "doc": "full clean delivery (5 files, ~60MB). No findings. Reaches human-review.",
+    },
+    "chaos-encoding": {
+        "variant": "mess-encoding",
+        "only": ["DM.xpt"],
+        "doc": "DM with raw CP1252 bytes. Triggers UnicodeDecodeError → chaos path → draft-rejection-note.",
+    },
+    "mess-inconsistent": {
+        "variant": "mess-inconsistent-values",
+        "only": ["DM.xpt"],
+        "doc": "DM with rotating SITEID values (NY/New York/new york). Inconsistency findings.",
+    },
+    "missing-domain": {
+        "variant": "mess-missing-domain",
+        "only": None,
+        "doc": "clean minus AE.xpt. Triggers expected-domains pre-flight finding.",
+    },
+    "late-delivery": {
+        "variant": "mess-late",
+        "only": None,
+        "doc": "clean delivery with mtimes backdated 14 days. Contract cadence-breach demo.",
+    },
+}
+
 # How far back to set mtimes for the `mess-late` variant. The study
 # contract expects weekly SDTM deliveries, so 14 days places the files
 # clearly past the deadline.
@@ -77,10 +125,23 @@ def parse_args() -> argparse.Namespace:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    scenario_help = "Named scenario preset (variant + file filter). Available:\n" + "\n".join(
+        f"  {name:20s} {info['doc']}" for name, info in SCENARIOS.items()
+    )
+    parser.add_argument(
+        "--scenario",
+        choices=tuple(SCENARIOS.keys()),
+        help=scenario_help,
+    )
     parser.add_argument(
         "--variant",
         choices=VARIANTS,
         help="Demo data variant to drop into the destination.",
+    )
+    parser.add_argument(
+        "--only",
+        nargs="+",
+        help="Filter --variant copy to entry names matching any of these globs (e.g. --only DM.xpt define.xml).",
     )
     parser.add_argument(
         "--files",
@@ -99,10 +160,20 @@ def parse_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
 
+    # Scenario expansion: scenario sets variant+only, mutually exclusive with --variant/--files.
+    if args.scenario:
+        if args.variant or args.files or args.only:
+            parser.error("--scenario is mutually exclusive with --variant / --files / --only")
+        preset = SCENARIOS[args.scenario]
+        args.variant = preset["variant"]
+        args.only = preset["only"]
+
     if not (args.variant or args.files or args.wipe):
-        parser.error("at least one of --variant, --files, or --wipe is required")
+        parser.error("at least one of --scenario, --variant, --files, or --wipe is required")
     if args.variant and args.files:
         parser.error("--variant and --files are mutually exclusive")
+    if args.only and not args.variant:
+        parser.error("--only requires --variant (or --scenario)")
     return args
 
 
@@ -344,11 +415,24 @@ def main() -> int:
         if args.variant:
             source = sample_data / args.variant
             entries = collect_variant_entries(source)
+            if args.only:
+                import fnmatch
+                patterns = [p.lower() for p in args.only]
+                entries = [
+                    e for e in entries
+                    if any(fnmatch.fnmatchcase(e.name.lower(), p) for p in patterns)
+                ]
+                if not entries:
+                    print(
+                        f"seed_sftp: warning — --only filter matched no entries in {source}",
+                        file=sys.stderr,
+                    )
             for entry in entries:
                 sink.put(entry, entry.name)
                 copied_names.append(entry.name)
+            filter_note = f" (filtered by --only={args.only})" if args.only else ""
             print(
-                f"seed_sftp: copied {len(copied_names)} entries from {source} to {sink.describe()}",
+                f"seed_sftp: copied {len(copied_names)} entries from {source} to {sink.describe()}{filter_note}",
                 file=sys.stderr,
             )
         elif args.files:
