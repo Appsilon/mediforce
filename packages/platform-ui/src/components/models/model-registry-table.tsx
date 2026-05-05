@@ -7,12 +7,15 @@ import type { ModelRegistryEntry } from '@mediforce/platform-core';
 type SortField = 'name' | 'provider' | 'contextLength' | 'pricingInput' | 'pricingOutput';
 type SortDir = 'asc' | 'desc';
 
+const PAGE_SIZE = 50;
+
 function formatContext(tokens: number): string {
   if (tokens >= 1_000_000) return `${String(Math.round(tokens / 1_000_000))}M`;
   return `${String(Math.round(tokens / 1000))}K`;
 }
 
 function formatPrice(perToken: number): string {
+  if (perToken < 0 || Number.isNaN(perToken)) return '—';
   const perMillion = perToken * 1_000_000;
   if (perMillion === 0) return 'free';
   if (perMillion < 0.01) return `$${perMillion.toFixed(4)}`;
@@ -30,6 +33,7 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
   const [visionFilter, setVisionFilter] = useState(false);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [page, setPage] = useState(0);
 
   const providers = useMemo(() => {
     const set = new Set(models.map((m) => m.provider));
@@ -37,6 +41,7 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
   }, [models]);
 
   const filtered = useMemo(() => {
+    setPage(0);
     let result = models;
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -196,8 +201,8 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {sorted.map((model) => (
-              <tr key={model.id} className="hover:bg-muted/30 transition-colors">
+            {sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((model, i) => (
+              <tr key={model.id} className={`hover:bg-muted/30 transition-colors ${i % 2 === 1 ? 'bg-muted/20' : ''}`}>
                 <td className="px-3 py-2 font-medium">{model.name}</td>
                 <td className="px-3 py-2 text-muted-foreground">{model.provider}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatContext(model.contextLength)}</td>
@@ -220,10 +225,34 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
         </table>
       </div>
 
-      {/* Count */}
-      <p className="text-sm text-muted-foreground">
-        Showing {sorted.length} of {models.length} models
-      </p>
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Showing {Math.min(page * PAGE_SIZE + 1, sorted.length)}–{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of {sorted.length} models
+          {sorted.length !== models.length && ` (${models.length} total)`}
+        </p>
+        {sorted.length > PAGE_SIZE && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(page - 1)}
+              disabled={page === 0}
+              className="rounded-md border px-3 py-1 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-muted-foreground">
+              {page + 1} / {Math.ceil(sorted.length / PAGE_SIZE)}
+            </span>
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={(page + 1) * PAGE_SIZE >= sorted.length}
+              className="rounded-md border px-3 py-1 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
