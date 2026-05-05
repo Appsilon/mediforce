@@ -117,7 +117,7 @@ vi.mock('@/app/actions/workflow-secrets', () => ({
 }));
 
 vi.mock('@/lib/resolve-agent-identity', () => ({
-  resolveAgentIdentityPrompt: vi.fn().mockResolvedValue(undefined),
+  resolveAgentIdentity: vi.fn().mockResolvedValue({ prompt: undefined, warnings: [] }),
 }));
 
 // Import after mock setup

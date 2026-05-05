@@ -21,7 +21,7 @@ import type {
   WorkflowStep,
 } from '@mediforce/platform-core';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
-import { resolveAgentIdentityPrompt } from './resolve-agent-identity';
+import { resolveAgentIdentity } from './resolve-agent-identity';
 
 export interface WorkflowAgentStepResult {
   instanceId: string;
@@ -141,10 +141,15 @@ export async function executeAgentStep(
 
   // Resolve agent identity prompt (systemPrompt + skill file contents) from
   // the AgentDefinition. Returns undefined when step has no agentId or agent
-  // has no systemPrompt/skills.
-  const agentIdentityPrompt = workflowStep.agentId !== undefined
-    ? await resolveAgentIdentityPrompt(workflowStep.agentId, agentDefinitionRepo)
-    : undefined;
+  // has no systemPrompt/skills. Warnings logged for visibility.
+  let agentIdentityPrompt: string | undefined;
+  if (workflowStep.agentId !== undefined) {
+    const identity = await resolveAgentIdentity(workflowStep.agentId, agentDefinitionRepo);
+    agentIdentityPrompt = identity.prompt;
+    for (const w of identity.warnings) {
+      console.warn(`[agent-identity] step=${stepId} skill="${w.path}": ${w.reason}`);
+    }
+  }
 
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
