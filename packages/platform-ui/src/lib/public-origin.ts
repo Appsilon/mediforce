@@ -1,3 +1,5 @@
+import { getConfiguredAppBaseUrl } from './app-base-url';
+
 /** Resolve the public origin (`scheme://host[:port]`) for absolute URLs the
  *  server emits — OAuth `redirect_uri`, post-callback redirects, etc.
  *
@@ -10,27 +12,15 @@
  *  domain — the redirect_uri then mismatches the value registered on the
  *  OAuth provider, and the provider rejects the flow.
  *
- *  Resolution order:
- *    1. `APP_BASE_URL`        — explicit server-side public URL
- *    2. `NEXT_PUBLIC_APP_URL` — same value bundled into client (we accept it
- *                               here as a fallback so deployments that already
- *                               set the public variant work without a second
- *                               env var)
- *    3. `request.url.origin`  — last-resort fallback, fine on local dev where
- *                               there's no proxy hop
+ *  Resolution: prefer the env-configured base URL (via `getConfiguredAppBaseUrl`,
+ *  which reads `APP_BASE_URL` then `NEXT_PUBLIC_APP_URL`). Fall back to
+ *  `request.url.origin` only when neither is set — fine on local dev where
+ *  there's no proxy hop. The `request` argument is unused in the env-set
+ *  case; kept on the signature for that last-resort fallback.
  *
- *  No automatic detection from `X-Forwarded-Host` / `X-Forwarded-Proto` — that
- *  path is risky (header spoofing) and Next 15 doesn't expose a built-in
- *  trust-bound for it. Explicit > magical. */
+ *  No automatic `X-Forwarded-Host` / `X-Forwarded-Proto` detection — Next 15
+ *  doesn't expose a trust-bound and auto-trusting opens header spoofing.
+ *  Explicit env > implicit detection. */
 export function publicOrigin(request: Request): string {
-  const candidate = process.env.APP_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL;
-  if (candidate !== undefined && candidate !== '') {
-    try {
-      return new URL(candidate).origin;
-    } catch {
-      // Fall through to request-based default. The misconfiguration is
-      // surfaced in logs by the consumer (e.g. wrong redirect_uri).
-    }
-  }
-  return new URL(request.url).origin;
+  return getConfiguredAppBaseUrl() ?? new URL(request.url).origin;
 }

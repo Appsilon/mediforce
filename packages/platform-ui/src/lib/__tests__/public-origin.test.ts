@@ -52,6 +52,14 @@ describe('publicOrigin', () => {
     expect(publicOrigin(REQUEST_FROM_LOCALHOST)).toBe('http://localhost:9003');
   });
 
+  it('treats empty APP_BASE_URL as unset and falls through to NEXT_PUBLIC_APP_URL', () => {
+    // Docker compose's ${VAR:-fallback} can leave APP_BASE_URL="" in the
+    // environment — `||` (not `??`) handles that correctly.
+    process.env.APP_BASE_URL = '';
+    process.env.NEXT_PUBLIC_APP_URL = 'https://staging.mediforce.ai';
+    expect(publicOrigin(REQUEST_FROM_DOCKER_HOSTNAME)).toBe('https://staging.mediforce.ai');
+  });
+
   it('falls back gracefully when env var is not a valid URL', () => {
     process.env.APP_BASE_URL = 'not a url';
     expect(publicOrigin(REQUEST_FROM_LOCALHOST)).toBe('http://localhost:9003');
