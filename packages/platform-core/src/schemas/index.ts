@@ -219,9 +219,13 @@ export {
 
 export {
   ModelRegistryEntrySchema,
+  ModelRegistryMetaSchema,
   CreateModelRegistryEntryInputSchema,
   UpdateModelRegistryEntryInputSchema,
+  UpdateRankingsInputSchema,
   type ModelRegistryEntry,
+  type ModelRegistryMeta,
   type CreateModelRegistryEntryInput,
   type UpdateModelRegistryEntryInput,
+  type UpdateRankingsInput,
 } from './model-registry.js';

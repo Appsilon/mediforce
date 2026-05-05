@@ -2,6 +2,7 @@ import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore'
 import {
   ModelRegistryEntrySchema,
   type ModelRegistryEntry,
+  type ModelRegistryMeta,
   type ModelRegistryRepository,
   type CreateModelRegistryEntryInput,
   type UpdateModelRegistryEntryInput,
@@ -22,6 +23,7 @@ function toModel(docId: string, data: Record<string, unknown>): ModelRegistryEnt
   return ModelRegistryEntrySchema.parse({
     ...data,
     id: decodeModelId(docId),
+    requestCount: data.requestCount ?? null,
     createdAt:
       data.createdAt instanceof Timestamp
         ? data.createdAt.toDate().toISOString()
@@ -32,6 +34,8 @@ function toModel(docId: string, data: Record<string, unknown>): ModelRegistryEnt
         : String(data.updatedAt),
   });
 }
+
+const META_DOC_ID = '_meta';
 
 export class FirestoreModelRegistryRepository implements ModelRegistryRepository {
   constructor(private readonly db: Firestore) {}
@@ -48,7 +52,9 @@ export class FirestoreModelRegistryRepository implements ModelRegistryRepository
 
   async list(): Promise<ModelRegistryEntry[]> {
     const snap = await this.col.get();
-    return snap.docs.map((d) => toModel(d.id, d.data()));
+    return snap.docs
+      .filter((d) => d.id !== META_DOC_ID)
+      .map((d) => toModel(d.id, d.data()));
   }
 
   async upsert(entry: CreateModelRegistryEntryInput): Promise<ModelRegistryEntry> {
@@ -93,5 +99,32 @@ export class FirestoreModelRegistryRepository implements ModelRegistryRepository
       synced += chunk.length;
     }
     return synced;
+  }
+
+  async updateRankings(rankings: Array<{ id: string; requestCount: number }>): Promise<number> {
+    const batchSize = 500;
+    let updated = 0;
+    for (let offset = 0; offset < rankings.length; offset += batchSize) {
+      const chunk = rankings.slice(offset, offset + batchSize);
+      const batch = this.db.batch();
+      for (const { id, requestCount } of chunk) {
+        const ref = this.col.doc(encodeModelId(id));
+        batch.update(ref, { requestCount });
+      }
+      await batch.commit();
+      updated += chunk.length;
+    }
+    await this.col.doc(META_DOC_ID).set(
+      { rankingsUpdatedAt: new Date().toISOString() },
+      { merge: true },
+    );
+    return updated;
+  }
+
+  async getMeta(): Promise<ModelRegistryMeta> {
+    const snap = await this.col.doc(META_DOC_ID).get();
+    if (!snap.exists) return { rankingsUpdatedAt: null };
+    const data = snap.data() as Record<string, unknown>;
+    return { rankingsUpdatedAt: (data.rankingsUpdatedAt as string) ?? null };
   }
 }

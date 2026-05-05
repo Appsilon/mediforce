@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ModelRegistryEntrySchema } from '@mediforce/platform-core';
+import { ModelRegistryEntrySchema, ModelRegistryMetaSchema, UpdateRankingsInputSchema } from '@mediforce/platform-core';
 
 export const ListModelsInputSchema = z
   .object({
@@ -37,3 +37,19 @@ export const SyncModelsOutputSchema = z.object({
 });
 
 export type SyncModelsOutput = z.infer<typeof SyncModelsOutputSchema>;
+
+export { UpdateRankingsInputSchema };
+export type UpdateRankingsInput = z.infer<typeof UpdateRankingsInputSchema>;
+
+export const UpdateRankingsOutputSchema = z.object({
+  updated: z.number(),
+  rankingsUpdatedAt: z.string(),
+});
+
+export type UpdateRankingsOutput = z.infer<typeof UpdateRankingsOutputSchema>;
+
+export const GetMetaOutputSchema = z.object({
+  meta: ModelRegistryMetaSchema,
+});
+
+export type GetMetaOutput = z.infer<typeof GetMetaOutputSchema>;

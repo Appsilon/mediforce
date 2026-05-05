@@ -1,5 +1,6 @@
 import type {
   ModelRegistryEntry,
+  ModelRegistryMeta,
   CreateModelRegistryEntryInput,
   UpdateModelRegistryEntryInput,
 } from '../schemas/model-registry.js';
@@ -11,4 +12,6 @@ export interface ModelRegistryRepository {
   update(input: UpdateModelRegistryEntryInput): Promise<ModelRegistryEntry>;
   delete(id: string): Promise<void>;
   bulkUpsert(entries: CreateModelRegistryEntryInput[]): Promise<number>;
+  updateRankings(rankings: Array<{ id: string; requestCount: number }>): Promise<number>;
+  getMeta(): Promise<ModelRegistryMeta>;
 }

@@ -3,7 +3,7 @@ import type { ModelRegistryRepository, CreateModelRegistryEntryInput, ModelRegis
 import { syncModels } from '../sync-models.js';
 
 function stubEntry(): ModelRegistryEntry {
-  return { id: 'test/m', name: 'm', provider: 'test', contextLength: 0, maxCompletionTokens: null, pricing: { input: 0, output: 0 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'], supportsTools: false, supportsVision: false, source: 'openrouter' as const, lastSyncedAt: '', createdAt: '', updatedAt: '' };
+  return { id: 'test/m', name: 'm', provider: 'test', contextLength: 0, maxCompletionTokens: null, pricing: { input: 0, output: 0 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'], supportsTools: false, supportsVision: false, source: 'openrouter' as const, requestCount: null, lastSyncedAt: '', createdAt: '', updatedAt: '' };
 }
 
 function makeRepo(): ModelRegistryRepository {
@@ -14,6 +14,8 @@ function makeRepo(): ModelRegistryRepository {
     update: async () => stubEntry(),
     delete: async () => {},
     bulkUpsert: async (items: CreateModelRegistryEntryInput[]) => items.length,
+    updateRankings: async (rankings) => rankings.length,
+    getMeta: async () => ({ rankingsUpdatedAt: null }),
   };
 }
 

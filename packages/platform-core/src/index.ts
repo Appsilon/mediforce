@@ -200,13 +200,17 @@ export type { AgentDefinitionRepository } from './repositories/agent-definition-
 // Model registry schema + repository interface
 export {
   ModelRegistryEntrySchema,
+  ModelRegistryMetaSchema,
   CreateModelRegistryEntryInputSchema,
   UpdateModelRegistryEntryInputSchema,
+  UpdateRankingsInputSchema,
 } from './schemas/model-registry.js';
 export type {
   ModelRegistryEntry,
+  ModelRegistryMeta,
   CreateModelRegistryEntryInput,
   UpdateModelRegistryEntryInput,
+  UpdateRankingsInput,
 } from './schemas/model-registry.js';
 export type { ModelRegistryRepository } from './repositories/model-registry-repository.js';
 

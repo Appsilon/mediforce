@@ -15,6 +15,7 @@ function makeEntry(overrides: Partial<ModelRegistryEntry> & { id: string }): Mod
     supportsTools: true,
     supportsVision: false,
     source: 'openrouter' as const,
+    requestCount: null,
     lastSyncedAt: '2026-05-04T00:00:00Z',
     createdAt: '2026-05-04T00:00:00Z',
     updatedAt: '2026-05-04T00:00:00Z',
@@ -30,6 +31,8 @@ function makeRepo(entries: ModelRegistryEntry[]): ModelRegistryRepository {
     update: async () => entries[0],
     delete: async () => {},
     bulkUpsert: async (items: CreateModelRegistryEntryInput[]) => items.length,
+    updateRankings: async (rankings) => rankings.length,
+    getMeta: async () => ({ rankingsUpdatedAt: null }),
   };
 }
 

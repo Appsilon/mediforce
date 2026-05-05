@@ -17,9 +17,14 @@ export const ModelRegistryEntrySchema = z.object({
   supportsTools: z.boolean(),
   supportsVision: z.boolean(),
   source: z.enum(['openrouter', 'manual']),
+  requestCount: z.number().nullable(),
   lastSyncedAt: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+export const ModelRegistryMetaSchema = z.object({
+  rankingsUpdatedAt: z.string().nullable(),
 });
 
 export type ModelRegistryEntry = z.infer<typeof ModelRegistryEntrySchema>;
@@ -34,3 +39,14 @@ export type CreateModelRegistryEntryInput = z.infer<typeof CreateModelRegistryEn
 export const UpdateModelRegistryEntryInputSchema = CreateModelRegistryEntryInputSchema.partial().required({ id: true });
 
 export type UpdateModelRegistryEntryInput = z.infer<typeof UpdateModelRegistryEntryInputSchema>;
+
+export type ModelRegistryMeta = z.infer<typeof ModelRegistryMetaSchema>;
+
+export const UpdateRankingsInputSchema = z.object({
+  rankings: z.array(z.object({
+    id: z.string(),
+    requestCount: z.number(),
+  })),
+});
+
+export type UpdateRankingsInput = z.infer<typeof UpdateRankingsInputSchema>;
