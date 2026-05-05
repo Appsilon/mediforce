@@ -53,16 +53,16 @@ export default function ModelsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Model Registry</h1>
           <p className="text-sm text-muted-foreground mt-1">
             LLM models synced from OpenRouter. Use this data when selecting models for workflow steps.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4 shrink-0">
           {lastSynced && (
             <span className="text-xs text-muted-foreground">
               Synced {formatRelativeTime(lastSynced)}
@@ -71,7 +71,7 @@ export default function ModelsPage() {
           <button
             onClick={handleSync}
             disabled={syncing}
-            className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Syncing...' : 'Sync Now'}
