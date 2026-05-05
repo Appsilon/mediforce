@@ -135,15 +135,15 @@ export async function modelListCommand(input: CommandInput): Promise<number> {
     });
 
     input.output.stdout(`Found ${String(models.length)} model(s):\n`);
-    input.output.stdout(`  ${'MODEL'.padEnd(40)} ${'CTX'.padStart(6)}  ${'IN $/M'.padStart(10)}  ${'OUT $/M'.padStart(10)}  ${'REQUESTS'.padStart(8)}  CAPS`);
-    input.output.stdout(`  ${'─'.repeat(40)} ${'─'.repeat(6)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(8)}  ${'─'.repeat(12)}`);
+    input.output.stdout(`  ${'NAME'.padEnd(40)} ${'CONTEXT'.padStart(8)}  ${'PRICE-IN'.padStart(10)}  ${'PRICE-OUT'.padStart(10)}  ${'POPULARITY'.padStart(10)}  CAPS`);
+    input.output.stdout(`  ${'─'.repeat(40)} ${'─'.repeat(8)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(12)}`);
     for (const model of models) {
       const ctx = formatContext(model.contextLength);
       const inPrice = formatPrice(model.pricing.input);
       const outPrice = formatPrice(model.pricing.output);
       const caps = [model.supportsTools ? 'tools' : '', model.supportsVision ? 'vision' : ''].filter(Boolean).join(',');
       const rank = model.requestCount !== null ? formatRequests(model.requestCount) : '';
-      input.output.stdout(`  ${model.id.padEnd(40)} ${ctx.padStart(6)}  ${inPrice.padStart(10)}  ${outPrice.padStart(10)}  ${rank.padStart(8)}  ${caps}`);
+      input.output.stdout(`  ${model.id.padEnd(40)} ${ctx.padStart(8)}  ${inPrice.padStart(10)}  ${outPrice.padStart(10)}  ${rank.padStart(10)}  ${caps}`);
     }
     return 0;
   } catch (err) {
