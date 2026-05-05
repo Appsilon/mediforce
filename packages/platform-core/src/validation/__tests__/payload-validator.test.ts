@@ -89,7 +89,17 @@ describe('validatePayload', () => {
       [field({ name: 'tags', type: 'multiselect', options: ['one', 'two'] })],
     );
     expect(result.valid).toBe(false);
-    expect(result.errors[0]!.message).toMatch(/invalid option/);
+    expect(result.errors[0]!.message).toMatch(/invalid options/);
+  });
+
+  it('reports all invalid multiselect options in one error', () => {
+    const result = validatePayload(
+      { tags: ['bad1', 'bad2', 'ok'] },
+      [field({ name: 'tags', type: 'multiselect', options: ['ok', 'also-ok'] })],
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]!.message).toContain('bad1');
+    expect(result.errors[0]!.message).toContain('bad2');
   });
 
   it('accepts valid multiselect', () => {
@@ -104,6 +114,23 @@ describe('validatePayload', () => {
     const result = validatePayload({ notes: 42 }, [field({ name: 'notes', type: 'textarea' })]);
     expect(result.valid).toBe(false);
     expect(result.errors[0]!.message).toMatch(/string/);
+  });
+
+  it('rejects invalid date string', () => {
+    const result = validatePayload(
+      { dob: 'not-a-date' },
+      [field({ name: 'dob', type: 'date' })],
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]!.message).toMatch(/not a valid date/);
+  });
+
+  it('accepts valid ISO date', () => {
+    const result = validatePayload(
+      { dob: '2024-01-15' },
+      [field({ name: 'dob', type: 'date' })],
+    );
+    expect(result.valid).toBe(true);
   });
 
   it('collects multiple errors', () => {

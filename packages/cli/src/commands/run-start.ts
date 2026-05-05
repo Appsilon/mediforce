@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import { resolveConfig } from '../config.js';
@@ -127,7 +127,7 @@ export async function runStartCommand(input: CommandInput): Promise<number> {
       raw = await input.stdin();
     } else {
       try {
-        raw = readFileSync(flags['input-file'], 'utf-8');
+        raw = await readFile(flags['input-file'], 'utf-8');
       } catch (err) {
         printError(
           input.output,

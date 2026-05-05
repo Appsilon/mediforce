@@ -73,6 +73,9 @@ function validateFieldType(
       if (typeof value !== 'string') {
         return { field: name, message: `'${name}' must be a date string` };
       }
+      if (isNaN(Date.parse(value))) {
+        return { field: name, message: `'${name}' is not a valid date` };
+      }
       return null;
 
     case 'select':
@@ -89,10 +92,9 @@ function validateFieldType(
         return { field: name, message: `'${name}' must be an array` };
       }
       if (options) {
-        for (const item of value) {
-          if (typeof item !== 'string' || !options.includes(item)) {
-            return { field: name, message: `'${name}' contains invalid option '${String(item)}'; allowed: ${options.join(', ')}` };
-          }
+        const invalid = value.filter((item) => typeof item !== 'string' || !options.includes(item));
+        if (invalid.length > 0) {
+          return { field: name, message: `'${name}' contains invalid options: ${invalid.map(String).join(', ')}; allowed: ${options.join(', ')}` };
         }
       }
       return null;

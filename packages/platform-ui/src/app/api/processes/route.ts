@@ -8,7 +8,7 @@ interface StartWorkflowBody {
   version?: string | number;
   triggeredBy: string;
   triggerName?: string;
-  payload?: Record<string, unknown>;
+  payload?: Record<string, unknown> | null;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -27,9 +27,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    if (body.payload !== undefined && body.payload !== null && (typeof body.payload !== 'object' || Array.isArray(body.payload))) {
+      return NextResponse.json(
+        { error: 'payload must be a JSON object or omitted' },
+        { status: 400 },
+      );
+    }
+    const payload: Record<string, unknown> = (body.payload as Record<string, unknown>) ?? {};
+
     const definition = await processRepo.getWorkflowDefinition(body.definitionName, version);
-    if (definition?.triggerInput && definition.triggerInput.length > 0) {
-      const validation = validatePayload(body.payload ?? {}, definition.triggerInput);
+    if (!definition) {
+      return NextResponse.json(
+        { error: `Workflow definition '${body.definitionName}' v${version} not found` },
+        { status: 404 },
+      );
+    }
+    if (definition.triggerInput && definition.triggerInput.length > 0) {
+      const validation = validatePayload(payload, definition.triggerInput);
       if (!validation.valid) {
         return NextResponse.json(
           { error: 'Invalid payload', details: validation.errors },
@@ -43,7 +57,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       definitionVersion: version,
       triggerName: body.triggerName ?? 'manual',
       triggeredBy: body.triggeredBy,
-      payload: body.payload ?? {},
+      payload,
     });
 
     // Fire-and-forget: trigger auto-runner asynchronously
@@ -55,7 +69,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
       },
       body: JSON.stringify({
-        appContext: body.payload ?? {},
+        appContext: payload,
         triggeredBy: body.triggeredBy,
       }),
     }).catch((err) => {

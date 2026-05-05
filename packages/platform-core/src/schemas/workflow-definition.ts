@@ -423,6 +423,7 @@ export function parseWorkflowDefinitionForCreation(input: unknown) {
     .superRefine((wd, ctx) => {
       validateInputForNextRun(wd, ctx);
       validateExecutorAndTriggers(wd, ctx);
+      validateVerdicts(wd, ctx);
       validateTriggerInput(wd, ctx);
     })
     .safeParse(input);
