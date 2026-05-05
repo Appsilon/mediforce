@@ -8,11 +8,11 @@ import { useAuth } from '@/contexts/auth-context';
 import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
 import { cn } from '@/lib/utils';
 import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
+import { ModelPicker } from './model-picker';
 import {
   AUTONOMY_LEVELS,
   STEP_TYPE_LABELS,
   FALLBACK_OPTIONS,
-  KNOWN_MODELS,
   RUNTIME_OPTIONS,
 } from './constants';
 import { CoworkSection } from './cowork-section';
@@ -206,6 +206,7 @@ export function StepEditor({
 }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
+  const selectedPluginDefaultModel = plugins.find((p) => p.name === step.plugin)?.metadata?.foundationModel;
   const { firebaseUser } = useAuth();
   const { handle } = useParams<{ handle: string }>();
   const [secretKeys, setSecretKeys] = useState<string[]>([]);
@@ -355,16 +356,12 @@ export function StepEditor({
           </FieldRow>
 
           <FieldRow label="agent.model" tooltip={TIP.agentModel}>
-            <select
-              value={step.agent?.model ?? ''}
-              onChange={(e) => updateAgent({ model: e.target.value || undefined })}
+            <ModelPicker
+              value={step.agent?.model}
+              onChange={(model) => updateAgent({ model })}
+              defaultModel={selectedPluginDefaultModel}
               className={rs}
-            >
-              {KNOWN_MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              {step.agent?.model && !KNOWN_MODELS.some((m) => m.value === step.agent?.model) && (
-                <option value={step.agent.model}>{step.agent.model}</option>
-              )}
-            </select>
+            />
           </FieldRow>
 
           <FieldRow label="agent.skill" tooltip={TIP.agentSkill}>
