@@ -76,6 +76,39 @@ describe('InMemoryOAuthProviderRepository', () => {
     expect(await repo.delete('acme', 'github')).toBe(true);
     expect(await repo.delete('acme', 'github')).toBe(false);
   });
+
+  describe('upsert', () => {
+    it('creates a fresh provider when none exists', async () => {
+      const created = await repo.upsert('acme', providerInput);
+      expect(created.id).toBe('github');
+      expect(created.createdAt).toBe(created.updatedAt);
+      const fetched = await repo.get('acme', 'github');
+      expect(fetched?.clientId).toBe('Iv1.xxx');
+    });
+
+    it('preserves createdAt and refreshes updatedAt on replace', async () => {
+      const first = await repo.upsert('acme', providerInput);
+      const replaced = await repo.upsert('acme', { ...providerInput, name: 'Renamed' });
+      expect(replaced.createdAt).toBe(first.createdAt);
+      expect(replaced.updatedAt > first.updatedAt).toBe(true);
+      expect(replaced.name).toBe('Renamed');
+    });
+
+    it('replaces all fields (no field merge)', async () => {
+      await repo.upsert('acme', providerInput);
+      const replaced = await repo.upsert('acme', {
+        id: 'github',
+        name: 'GitHub',
+        clientId: 'Iv1.new',
+        clientSecret: 'new-secret',
+        authorizeUrl: providerInput.authorizeUrl,
+        tokenUrl: providerInput.tokenUrl,
+        scopes: ['repo', 'read:user'],
+      });
+      expect(replaced.userInfoUrl).toBeUndefined();
+      expect(replaced.clientSecret).toBe('new-secret');
+    });
+  });
 });
 
 const tokenFixture: AgentOAuthToken = {

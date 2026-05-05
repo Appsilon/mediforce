@@ -80,6 +80,40 @@ export const UpdateOAuthProviderInputSchema = CreateOAuthProviderInputSchema.omi
 
 export type UpdateOAuthProviderInput = z.infer<typeof UpdateOAuthProviderInputSchema>;
 
+/** Seed-time entry for `data/seeds/oauth-providers.json`. Mirrors the
+ *  runtime config but replaces `clientId`/`clientSecret` with names of env
+ *  vars to resolve at boot. Lets us check provider URLs/scopes into the
+ *  repo while keeping per-deployment credentials in env files. */
+export const OAuthProviderSeedEntrySchema = z.object({
+  id: z.string().min(1).regex(/^[a-z0-9][a-z0-9-]*$/),
+  name: z.string().min(1),
+  authorizeUrl: z.string().url(),
+  tokenUrl: z.string().url(),
+  revokeUrl: z.string().url().optional(),
+  userInfoUrl: z.string().url().optional(),
+  scopes: z.array(z.string().min(1)).min(1),
+  tokenEndpointAuthMethod: z
+    .enum(['client_secret_basic', 'client_secret_post', 'none'])
+    .optional(),
+  iconUrl: z.string().url().optional(),
+  /** Name of env var holding the OAuth App client id. */
+  clientIdEnv: z.string().min(1),
+  /** Name of env var holding the client secret. Optional for public
+   *  clients (PKCE-only, `tokenEndpointAuthMethod: 'none'`). */
+  clientSecretEnv: z.string().min(1).optional(),
+}).strict();
+
+export type OAuthProviderSeedEntry = z.infer<typeof OAuthProviderSeedEntrySchema>;
+
+/** Top-level shape of `data/seeds/oauth-providers.json` — namespace handle
+ *  → list of seed entries. */
+export const OAuthProviderSeedFileSchema = z.record(
+  z.string().min(1),
+  z.array(OAuthProviderSeedEntrySchema),
+);
+
+export type OAuthProviderSeedFile = z.infer<typeof OAuthProviderSeedFileSchema>;
+
 /** Built-in provider presets. UI exposes these as "Add GitHub" / "Add Google"
  *  buttons that pre-fill the admin form. Admin still supplies clientId +
  *  clientSecret for their own OAuth App. */

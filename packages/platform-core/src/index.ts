@@ -203,6 +203,8 @@ export {
   PublicOAuthProviderConfigSchema,
   CreateOAuthProviderInputSchema,
   UpdateOAuthProviderInputSchema,
+  OAuthProviderSeedEntrySchema,
+  OAuthProviderSeedFileSchema,
   OAUTH_PROVIDER_PRESETS,
 } from './schemas/oauth-provider.js';
 export type {
@@ -210,6 +212,8 @@ export type {
   PublicOAuthProviderConfig,
   CreateOAuthProviderInput,
   UpdateOAuthProviderInput,
+  OAuthProviderSeedEntry,
+  OAuthProviderSeedFile,
 } from './schemas/oauth-provider.js';
 export {
   AgentOAuthTokenSchema,

@@ -73,6 +73,26 @@ export class FirestoreOAuthProviderRepository implements OAuthProviderRepository
     return updated;
   }
 
+  async upsert(
+    namespace: string,
+    input: CreateOAuthProviderInput,
+  ): Promise<OAuthProviderConfig> {
+    const ref = this.col(namespace).doc(input.id);
+    const existing = await ref.get();
+    const now = new Date().toISOString();
+    const createdAt = existing.exists
+      ? OAuthProviderConfigSchema.parse({ ...existing.data(), id: existing.id }).createdAt
+      : now;
+    const config: OAuthProviderConfig = OAuthProviderConfigSchema.parse({
+      ...input,
+      createdAt,
+      updatedAt: now,
+    });
+    const { id: _id, ...body } = config;
+    await ref.set(body);
+    return config;
+  }
+
   async delete(namespace: string, id: string): Promise<boolean> {
     const ref = this.col(namespace).doc(id);
     const snap = await ref.get();

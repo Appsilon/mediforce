@@ -189,4 +189,40 @@ describe('FirestoreOAuthProviderRepository', () => {
     expect(result).toBe(true);
     expect(mockDelete).toHaveBeenCalledTimes(1);
   });
+
+  describe('upsert', () => {
+    it('creates a new doc when none exists, with createdAt == updatedAt', async () => {
+      mockGet.mockResolvedValueOnce({ exists: false });
+      const created = await repo.upsert('acme', providerInput);
+
+      expect(created.id).toBe('github');
+      expect(created.createdAt).toBe(created.updatedAt);
+      expect(mockSet).toHaveBeenCalledTimes(1);
+      const persisted = mockSet.mock.calls[0][0] as Record<string, unknown>;
+      expect(persisted.id).toBeUndefined();
+      expect(persisted.clientId).toBe('Iv1.xxx');
+    });
+
+    it('preserves createdAt and refreshes updatedAt when doc already exists', async () => {
+      const existing = storedProviderFor(providerInput, {
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      });
+      mockGet.mockResolvedValueOnce({
+        exists: true,
+        id: 'github',
+        data: () => existing,
+      });
+
+      const replaced = await repo.upsert('acme', { ...providerInput, name: 'Renamed' });
+
+      expect(replaced.createdAt).toBe(existing.createdAt);
+      expect(replaced.updatedAt > existing.updatedAt).toBe(true);
+      expect(replaced.name).toBe('Renamed');
+
+      expect(mockSet).toHaveBeenCalledTimes(1);
+      const persisted = mockSet.mock.calls[0][0] as Record<string, unknown>;
+      expect(persisted.name).toBe('Renamed');
+    });
+  });
 });

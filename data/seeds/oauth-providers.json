@@ -1,0 +1,14 @@
+{
+  "appsilon": [
+    {
+      "id": "github",
+      "name": "GitHub",
+      "authorizeUrl": "https://github.com/login/oauth/authorize",
+      "tokenUrl": "https://github.com/login/oauth/access_token",
+      "userInfoUrl": "https://api.github.com/user",
+      "scopes": ["repo", "read:user"],
+      "clientIdEnv": "OAUTH_GITHUB_CLIENT_ID",
+      "clientSecretEnv": "OAUTH_GITHUB_CLIENT_SECRET"
+    }
+  ]
+}

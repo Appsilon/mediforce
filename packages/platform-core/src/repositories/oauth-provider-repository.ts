@@ -25,6 +25,11 @@ export interface OAuthProviderRepository {
     patch: UpdateOAuthProviderInput,
   ): Promise<OAuthProviderConfig | null>;
 
+  /** Idempotent create-or-replace by id. Used by the boot-time seeder so
+   *  redeploys converge on the JSON-defined config without manual cleanup.
+   *  `createdAt` is preserved across replaces; `updatedAt` is refreshed. */
+  upsert(namespace: string, input: CreateOAuthProviderInput): Promise<OAuthProviderConfig>;
+
   /** Delete a provider. No-op if the id does not exist. Returns whether
    *  a document was actually removed. */
   delete(namespace: string, id: string): Promise<boolean>;

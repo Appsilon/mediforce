@@ -43,6 +43,7 @@ import {
 import { WebhookRouter } from '@mediforce/workflow-engine';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
 import { seedBuiltinToolCatalog } from './seed-tool-catalog.js';
+import { seedBuiltinOAuthProviders } from './seed-oauth-providers.js';
 import { backfillInstanceNamespaces } from '@mediforce/platform-infra';
 
 let services: PlatformServices | null = null;
@@ -207,6 +208,9 @@ export function getPlatformServices(): PlatformServices {
     });
     seedBuiltinToolCatalog(toolCatalogRepo).catch((err) => {
       console.error('[platform-services] Failed to seed built-in tool catalog:', err);
+    });
+    seedBuiltinOAuthProviders(oauthProviderRepo).catch((err) => {
+      console.error('[platform-services] Failed to seed built-in OAuth providers:', err);
     });
     backfillInstanceNamespaces(db, processRepo).catch((err) => {
       console.error('[platform-services] Failed to backfill instance namespaces:', err);

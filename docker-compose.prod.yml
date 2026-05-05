@@ -65,6 +65,11 @@ services:
       - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
       - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL}
       - MAILGUN_SENDER_NAME=${MAILGUN_SENDER_NAME:-Mediforce}
+      # OAuth provider credentials — auto-seeded into Firestore on boot
+      # from data/seeds/oauth-providers.json. Each entry is optional;
+      # when unset, that provider is skipped at boot.
+      - OAUTH_GITHUB_CLIENT_ID=${OAUTH_GITHUB_CLIENT_ID:-}
+      - OAUTH_GITHUB_CLIENT_SECRET=${OAUTH_GITHUB_CLIENT_SECRET:-}
       # Firebase Admin SDK credentials for server-side Firestore/Auth access.
       # Mounted read-only from host ./secrets/firebase-admin-sa.json.
       - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-sa.json

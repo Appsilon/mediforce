@@ -62,6 +62,23 @@ export class InMemoryOAuthProviderRepository implements OAuthProviderRepository 
     return updated;
   }
 
+  async upsert(
+    namespace: string,
+    input: CreateOAuthProviderInput,
+  ): Promise<OAuthProviderConfig> {
+    const scope = this.store.get(namespace) ?? new Map<string, OAuthProviderConfig>();
+    const existing = scope.get(input.id);
+    const now = new Date(this.clock++).toISOString();
+    const config: OAuthProviderConfig = {
+      ...input,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    scope.set(input.id, config);
+    this.store.set(namespace, scope);
+    return config;
+  }
+
   async delete(namespace: string, id: string): Promise<boolean> {
     const scope = this.store.get(namespace);
     if (!scope) return false;
