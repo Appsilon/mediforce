@@ -8,7 +8,7 @@ import type { AgentOutputData } from './task-utils';
 import { formatStepName } from './task-utils';
 import { buildSrcdoc, isIframeResizeMessage } from './iframe-helpers';
 import { apiFetch } from '@/lib/api-fetch';
-import { cn } from '@/lib/utils';
+import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 
 interface AgentOutputReviewPanelProps {
   agentOutput: AgentOutputData;
@@ -166,15 +166,21 @@ export function AgentOutputReviewPanel({
                 <GitBranch className="h-3 w-3" />
                 <span className="font-mono">{agentOutput.gitMetadata.branch}</span>
               </span>
-              <a
-                href={`${agentOutput.gitMetadata.repoUrl}/commit/${agentOutput.gitMetadata.commitSha}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 font-mono hover:text-foreground transition-colors"
-              >
-                {agentOutput.gitMetadata.commitSha.slice(0, 7)}
-                <ExternalLink className="h-3 w-3" />
-              </a>
+              {isBrowsableRepoUrl(agentOutput.gitMetadata.repoUrl) ? (
+                <a
+                  href={`${agentOutput.gitMetadata.repoUrl}/commit/${agentOutput.gitMetadata.commitSha}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-mono hover:text-foreground transition-colors"
+                >
+                  {agentOutput.gitMetadata.commitSha.slice(0, 7)}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : (
+                <span className="font-mono">
+                  {agentOutput.gitMetadata.commitSha.slice(0, 7)}
+                </span>
+              )}
             </>
           )}
         </div>
@@ -246,15 +252,17 @@ export function AgentOutputReviewPanel({
 
         {hasGitTab && agentOutput.gitMetadata !== null && (
           <Tabs.Content value="git" className="p-4 space-y-4">
-            <a
-              href={`${agentOutput.gitMetadata.repoUrl}/compare/main...${agentOutput.gitMetadata.branch}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-            >
-              View diff on GitHub
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+            {isBrowsableRepoUrl(agentOutput.gitMetadata.repoUrl) && (
+              <a
+                href={`${agentOutput.gitMetadata.repoUrl}/compare/main...${agentOutput.gitMetadata.branch}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                View diff on GitHub
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
             {agentOutput.gitMetadata.changedFiles.length > 0 && (
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
@@ -263,15 +271,21 @@ export function AgentOutputReviewPanel({
                 <ul className="space-y-1">
                   {agentOutput.gitMetadata.changedFiles.map((file) => (
                     <li key={file}>
-                      <a
-                        href={`${agentOutput.gitMetadata!.repoUrl}/blob/${agentOutput.gitMetadata!.commitSha}/${file}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm font-mono text-primary hover:underline"
-                      >
-                        {file}
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                      {isBrowsableRepoUrl(agentOutput.gitMetadata!.repoUrl) ? (
+                        <a
+                          href={`${agentOutput.gitMetadata!.repoUrl}/blob/${agentOutput.gitMetadata!.commitSha}/${file}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm font-mono text-primary hover:underline"
+                        >
+                          {file}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-sm font-mono text-muted-foreground">
+                          {file}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>

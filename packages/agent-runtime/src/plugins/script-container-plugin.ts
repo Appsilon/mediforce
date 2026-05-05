@@ -172,10 +172,19 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         await writeFile(scriptPath, this.inlineScript, 'utf-8');
       }
 
-      const timeoutMs = DEFAULT_TIMEOUT_MS;
+      const timeoutMinutes = isWorkflowAgentContext(this.context)
+        ? (this.context.step.agent as AgentConfig | undefined)?.timeoutMinutes
+        : this.context.config.stepConfigs.find(
+            (sc: StepConfig) => sc.stepId === this.context.stepId,
+          )?.agentConfig?.timeoutMinutes;
+      const timeoutMs = typeof timeoutMinutes === 'number' && timeoutMinutes > 0
+        ? timeoutMinutes * 60_000
+        : DEFAULT_TIMEOUT_MS;
       const containerName = `mediforce-script-${this.context.processInstanceId}-${this.context.stepId}`.slice(0, 63);
 
       const envFlags: string[] = [];
+      envFlags.push('-e', `RUN_ID=${this.context.processInstanceId}`);
+      envFlags.push('-e', `STEP_ID=${this.context.stepId}`);
       for (const [key, value] of Object.entries(this.resolvedEnv.vars)) {
         envFlags.push('-e', `${key}=${value}`);
       }

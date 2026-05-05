@@ -66,7 +66,7 @@
       "agent": {
         "timeoutMinutes": 30,
         "image": "mediforce-landing-zone:latest",
-        "command": "python3 /scripts/validate.py"
+        "command": "python3 -u /scripts/validate.py"
       }
     },
     {
@@ -79,7 +79,7 @@
       "description": "Run study-specific validation rules (layer 2) using R + pointblank against the delivered .xpt files. Rules defined in validation-rules.yaml owned by data managers. Outputs custom-findings.json with per-rule pass/fail results.",
       "agent": {
         "image": "mediforce-landing-zone:latest",
-        "command": "Rscript /workspace/validate_custom.R /workspace/incoming/$(ls /workspace/incoming/ | tail -1) /workspace/validation-rules.yaml /output/result.json"
+        "command": "sh /scripts/validate_custom.sh"
       }
     },
     {
@@ -155,14 +155,15 @@
       "type": "creation",
       "executor": "action",
       "autonomyLevel": "L4",
-      "description": "Send the agent-drafted rejection note to the CRO contact via email. Uses the suggested subject from the draft step and the full markdown note as the body.",
+      "continueOnError": true,
+      "description": "Send the agent-drafted rejection note to the CRO contact via email. Uses the suggested subject from the draft step and the full markdown note as the body. Best-effort — if Mailgun fails, the workflow logs a warning and continues so the rules-proposal flow still happens.",
       "action": {
         "kind": "email",
         "config": {
-          "to": "${variables.CRO_CONTACT_EMAIL}",
+          "to": "${secrets.CRO_CONTACT_EMAIL_CDISCPILOT01}",
           "subject": "${steps.draft-rejection-note.suggestedSubject}",
           "body": "${steps.draft-rejection-note.rejectionNote}",
-          "replyTo": "${variables.DATA_MANAGER_EMAIL}"
+          "replyTo": "${secrets.DATA_MANAGER_EMAIL_CDISCPILOT01}"
         }
       }
     },
@@ -214,12 +215,7 @@
     { "from": "sftp-poll", "to": "validate-script", "when": "output.newFiles.length > 0" },
     { "from": "validate-script", "to": "validate-custom" },
     { "from": "validate-custom", "to": "interpret-validation" },
-    { "from": "interpret-validation", "to": "accept-delivery", "when": "output.classification == \"clean\"" },
-    { "from": "interpret-validation", "to": "human-review", "when": "output.classification == \"minor-fix\"" },
-    { "from": "interpret-validation", "to": "human-review", "when": "output.classification == \"recovery\"" },
-    { "from": "interpret-validation", "to": "draft-rejection-note", "when": "output.classification == \"escalate\"" },
-    { "from": "interpret-validation", "to": "draft-rejection-note", "when": "output.classification == \"chaos\"" },
-    { "from": "interpret-validation", "to": "human-review", "when": "else" },
+    { "from": "interpret-validation", "to": "human-review" },
     { "from": "accept-delivery", "to": "accepted" },
     { "from": "draft-rejection-note", "to": "send-rejection-email" },
     { "from": "send-rejection-email", "to": "propose-rules" },

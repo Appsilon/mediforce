@@ -151,10 +151,9 @@ export class FirestoreProcessRepository implements ProcessRepository {
 
     let latestVersion = 0;
     for (const docSnap of snapshot.docs) {
-      const raw = docSnap.data();
-      const parsed = WorkflowDefinitionSchema.safeParse(raw);
-      if (parsed.success && parsed.data.version > latestVersion) {
-        latestVersion = parsed.data.version;
+      const rawVersion = docSnap.data().version;
+      if (typeof rawVersion === 'number' && rawVersion > latestVersion) {
+        latestVersion = rawVersion;
       }
     }
     return latestVersion;
@@ -176,10 +175,9 @@ export class FirestoreProcessRepository implements ProcessRepository {
 
     let latestVersion = 0;
     for (const docSnap of snapshot.docs) {
-      const raw = docSnap.data();
-      const parsed = WorkflowDefinitionSchema.safeParse(raw);
-      if (parsed.success && parsed.data.version > latestVersion) {
-        latestVersion = parsed.data.version;
+      const rawVersion = docSnap.data().version;
+      if (typeof rawVersion === 'number' && rawVersion > latestVersion) {
+        latestVersion = rawVersion;
       }
     }
     return latestVersion;

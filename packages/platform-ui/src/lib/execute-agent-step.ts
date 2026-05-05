@@ -233,6 +233,12 @@ export async function executeAgentStep(
     const reviewTaskNow = new Date().toISOString();
     const assignedRole = workflowStep.allowedRoles?.[0] ?? 'reviewer';
 
+    // Iteration count = number of prior executions of this step on this
+    // instance. Lets the UI/audit show "Iter N of M" instead of every L3
+    // review task showing as iteration 0.
+    const priorReviewExecutions = (await instanceRepo.getStepExecutions(instanceId))
+      .filter((e) => e.stepId === stepId).length;
+
     await humanTaskRepo.create({
       id: reviewTaskId,
       processInstanceId: instanceId,
@@ -257,7 +263,7 @@ export async function executeAgentStep(
           presentation: envelope?.presentation ?? null,
           escalationReason,
         },
-        iterationNumber: 0,
+        iterationNumber: priorReviewExecutions,
       },
       creationReason: 'agent_review_l3',
     });

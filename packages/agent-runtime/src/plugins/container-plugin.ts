@@ -297,11 +297,17 @@ export abstract class ContainerPlugin implements AgentPlugin {
       agentImage: opts.agentImage,
     });
 
+    // Run branches are committed locally and never pushed (see comment above).
+    // Even when a remote is configured, the commit/branch does not yet exist
+    // on GitHub — emitting `remoteUrl` here produces broken `/commit/<sha>`,
+    // `/compare/main...<branch>` and `/blob/<sha>/<file>` links in the UI.
+    // Use the bare repo path so consumers can detect "not a real URL" and
+    // render the metadata as plain text instead of GitHub deep links.
     const metadata: GitMetadata = {
       commitSha: commit.commitSha,
       branch: this.runWorkspaceHandle.branch,
       changedFiles: commit.changedFiles,
-      repoUrl: this.runWorkspaceHandle.remoteUrl ?? this.runWorkspaceHandle.bareRepoPath,
+      repoUrl: this.runWorkspaceHandle.bareRepoPath,
     };
 
     await writeFile(join(outputDir, 'git-result.json'), JSON.stringify(metadata, null, 2), 'utf-8');
