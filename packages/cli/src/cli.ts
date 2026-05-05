@@ -32,6 +32,9 @@ import { agentGetCommand } from './commands/agent-get.js';
 import { modelListCommand } from './commands/model-list.js';
 import { modelGetCommand } from './commands/model-get.js';
 import { modelSyncCommand } from './commands/model-sync.js';
+import { secretSetCommand } from './commands/secret-set.js';
+import { secretListCommand } from './commands/secret-list.js';
+import { secretDeleteCommand } from './commands/secret-delete.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -52,6 +55,9 @@ Commands:
   model list                                         List models in registry
   model get <id>                                     Fetch a model from registry
   model sync                                         Sync models from OpenRouter
+  secret set --workflow <name> --namespace <ns> --key <key>  Set a secret
+  secret list --workflow <name> --namespace <ns>     List secret keys
+  secret delete --workflow <name> --namespace <ns> --key <key>  Delete a secret
   run list                                           List recent runs
   run start --workflow <name>                        Start a new run (manual trigger)
   run get <runId>                                    Fetch a single run's status
@@ -103,6 +109,16 @@ Subcommands:
   sync                Sync models from OpenRouter
 
 Run \`mediforce model <subcommand> --help\` for subcommand-specific flags.
+`;
+
+const SECRET_HELP = `Usage: mediforce secret <subcommand> [options]
+
+Subcommands:
+  set --workflow <name> --namespace <ns> --key <key>     Set a secret
+  list --workflow <name> --namespace <ns>                List secret key names
+  delete --workflow <name> --namespace <ns> --key <key>  Delete a secret
+
+Run \`mediforce secret <subcommand> --help\` for subcommand-specific flags.
 `;
 
 const RUN_HELP = `Usage: mediforce run <subcommand> [options]
@@ -163,6 +179,12 @@ export async function runCli(input: RunCliInput): Promise<number> {
     output.stderr(MODEL_HELP);
     return 2;
   }
+  if (command === 'secret' && subcommand === undefined) {
+    output.stderr('mediforce secret: missing subcommand');
+    output.stderr('');
+    output.stderr(SECRET_HELP);
+    return 2;
+  }
   if (command === 'system' && subcommand === undefined) {
     output.stderr('mediforce system: missing subcommand');
     output.stderr('');
@@ -205,6 +227,15 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'run' && subcommand === 'start') {
     return runStartCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'secret' && subcommand === 'set') {
+    return secretSetCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'secret' && subcommand === 'list') {
+    return secretListCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'secret' && subcommand === 'delete') {
+    return secretDeleteCommand({ argv: rest, env: input.env, output });
   }
   if (command === 'system' && subcommand === 'status') {
     return systemStatusCommand({ argv: rest, env: input.env, output });
