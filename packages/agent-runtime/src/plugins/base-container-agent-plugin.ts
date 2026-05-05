@@ -1003,7 +1003,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       parts.push(this.context.workflowDefinition.preamble);
     }
 
-    // 1. Skill prompt from SKILL.md
+    // 0b. Agent identity + skills from AgentDefinition (resolved by platform-ui)
+    if (isWorkflowAgentContext(this.context) && this.context.agentIdentityPrompt) {
+      parts.push(this.context.agentIdentityPrompt);
+    }
+
+    // 1. Skill prompt from SKILL.md (step-level override — takes precedence over agent skills)
     if (this.agentConfig.skill && this.agentConfig.skillsDir) {
       const skillContent = await this.readSkillFile(
         this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath),

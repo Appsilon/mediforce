@@ -92,6 +92,11 @@ export interface WorkflowAgentContext {
    *  config is `{ type: 'oauth', ... }`. Consumed by writeMcpConfig to
    *  synthesize the Authorization header at spawn time. */
   oauthTokens?: Record<string, ResolvedOAuthBinding>;
+  /** Pre-assembled prompt sections from the AgentDefinition referenced by
+   *  step.agentId: the agent's systemPrompt + resolved skill file contents.
+   *  Populated by platform-ui's executeAgentStep (downloads from Storage).
+   *  Injected into buildPrompt() after the workflow preamble. */
+  agentIdentityPrompt?: string;
 }
 
 // EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp
