@@ -38,6 +38,23 @@ export async function getWorkflowSecretKeys(
   return getRepo().getSecretKeys(namespace, workflowName);
 }
 
+/** Get secret keys for multiple workflows in one round-trip */
+export async function getWorkflowSecretKeysBatch(
+  namespace: string,
+  workflowNames: string[],
+  userId: string,
+): Promise<Record<string, string[]>> {
+  await requireNamespaceMember(namespace, userId);
+  const repo = getRepo();
+  const results = await Promise.all(
+    workflowNames.map(async (name) => {
+      const keys = await repo.getSecretKeys(namespace, name);
+      return [name, keys] as const;
+    }),
+  );
+  return Object.fromEntries(results);
+}
+
 /** Get full secrets (values included) — for the secrets management page */
 export async function getWorkflowSecrets(
   namespace: string,
