@@ -102,6 +102,32 @@ describe('validatePayload', () => {
     expect(result.errors[0]!.message).toContain('bad2');
   });
 
+  it('rejects required multiselect with empty array', () => {
+    const result = validatePayload(
+      { tags: [] },
+      [field({ name: 'tags', type: 'multiselect', required: true, options: ['a', 'b'] })],
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]!.message).toMatch(/at least one selection/);
+  });
+
+  it('accepts optional multiselect with empty array', () => {
+    const result = validatePayload(
+      { tags: [] },
+      [field({ name: 'tags', type: 'multiselect', options: ['a', 'b'] })],
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects NaN as number', () => {
+    const result = validatePayload(
+      { count: NaN },
+      [field({ name: 'count', type: 'number' })],
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]!.message).toMatch(/number/);
+  });
+
   it('accepts valid multiselect', () => {
     const result = validatePayload(
       { tags: ['one', 'two'] },
@@ -143,5 +169,40 @@ describe('validatePayload', () => {
     );
     expect(result.valid).toBe(false);
     expect(result.errors.length).toBe(3);
+  });
+
+  describe('API route integration scenario', () => {
+    const triggerInput = [
+      field({ name: 'ruleId', type: 'string', required: true }),
+      field({ name: 'priority', type: 'select', options: ['low', 'medium', 'high'] }),
+      field({ name: 'tags', type: 'multiselect', required: true, options: ['safety', 'efficacy'] }),
+      field({ name: 'dryRun', type: 'boolean' }),
+    ];
+
+    it('accepts valid full payload', () => {
+      const result = validatePayload(
+        { ruleId: 'CORE-000127', priority: 'high', tags: ['safety'], dryRun: false },
+        triggerInput,
+      );
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('rejects payload missing required fields', () => {
+      const result = validatePayload({}, triggerInput);
+      expect(result.valid).toBe(false);
+      const fieldNames = result.errors.map((e) => e.field);
+      expect(fieldNames).toContain('ruleId');
+      expect(fieldNames).toContain('tags');
+    });
+
+    it('rejects payload with unknown + wrong type + invalid option', () => {
+      const result = validatePayload(
+        { ruleId: 123, priority: 'critical', tags: ['safety'], unknown: 'x' },
+        triggerInput,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors.length).toBe(3);
+    });
   });
 });

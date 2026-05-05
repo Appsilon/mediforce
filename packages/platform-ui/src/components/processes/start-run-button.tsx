@@ -58,8 +58,9 @@ export function StartRunButton({
   const [inputValues, setInputValues] = React.useState<Record<string, unknown>>({});
 
   React.useEffect(() => {
+    const fields = effectiveDefinition?.triggerInput ?? [];
     const initial: Record<string, unknown> = {};
-    for (const field of triggerInput) {
+    for (const field of fields) {
       if (field.default !== undefined) {
         initial[field.name] = field.default;
       } else if (field.type === 'boolean') {
@@ -71,7 +72,7 @@ export function StartRunButton({
       }
     }
     setInputValues(initial);
-  }, [effectiveDefinition?.version]);
+  }, [effectiveDefinition]);
 
   React.useEffect(() => {
     if (!handle || !workflowName || !firebaseUser) return;
@@ -134,17 +135,25 @@ export function StartRunButton({
     }
   }
 
-  const requiredInputMissing = triggerInput.some(
-    (field) => field.required && (inputValues[field.name] === '' || inputValues[field.name] === undefined),
-  );
+  const requiredInputMissing = triggerInput.some((field) => {
+    if (!field.required) return false;
+    const val = inputValues[field.name];
+    if (val === '' || val === undefined) return true;
+    if (field.type === 'multiselect' && Array.isArray(val) && val.length === 0) return true;
+    return false;
+  });
 
   function buildPayload(): Record<string, unknown> {
     const payload: Record<string, unknown> = {};
     for (const field of triggerInput) {
       const raw = inputValues[field.name];
       if (raw === '' || raw === undefined) continue;
+      if (Array.isArray(raw) && raw.length === 0) continue;
       if (field.type === 'number') {
-        payload[field.name] = Number(raw);
+        const num = parseFloat(String(raw));
+        if (!isNaN(num)) {
+          payload[field.name] = num;
+        }
       } else {
         payload[field.name] = raw;
       }
@@ -230,8 +239,9 @@ export function StartRunButton({
                   <button
                     onClick={() => {
                       setDialogOpen(false);
-                      const setupParam = missingSecretKeys.join(',');
-                      router.push(`/${handle}/workflows/${encodeURIComponent(workflowName)}?tab=secrets&setup=${encodeURIComponent(setupParam)}`);
+                      const setup = encodeURIComponent(missingSecretKeys.join(','));
+                      const wf = encodeURIComponent(workflowName);
+                      router.push(`/${handle}/workflows/${wf}?tab=secrets&setup=${setup}`);
                     }}
                     className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                   >

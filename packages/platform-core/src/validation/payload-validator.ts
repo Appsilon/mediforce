@@ -34,6 +34,11 @@ export function validatePayload(
       continue;
     }
 
+    if (field.required && type === 'multiselect' && Array.isArray(value) && value.length === 0) {
+      errors.push({ field: field.name, message: `required field '${field.name}' must have at least one selection` });
+      continue;
+    }
+
     const typeError = validateFieldType(field.name, value, type, field.options);
     if (typeError) {
       errors.push(typeError);
@@ -58,7 +63,7 @@ function validateFieldType(
       return null;
 
     case 'number':
-      if (typeof value !== 'number') {
+      if (typeof value !== 'number' || isNaN(value)) {
         return { field: name, message: `'${name}' must be a number` };
       }
       return null;

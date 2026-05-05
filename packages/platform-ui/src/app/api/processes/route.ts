@@ -27,13 +27,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
-    if (body.payload !== undefined && body.payload !== null && (typeof body.payload !== 'object' || Array.isArray(body.payload))) {
+    const rawPayload = body.payload;
+    if (rawPayload !== undefined && rawPayload !== null
+      && (typeof rawPayload !== 'object' || Array.isArray(rawPayload))) {
       return NextResponse.json(
         { error: 'payload must be a JSON object or omitted' },
         { status: 400 },
       );
     }
-    const payload: Record<string, unknown> = (body.payload as Record<string, unknown>) ?? {};
+    const payload: Record<string, unknown> =
+      (rawPayload as Record<string, unknown>) ?? {};
 
     const definition = await processRepo.getWorkflowDefinition(body.definitionName, version);
     if (!definition) {

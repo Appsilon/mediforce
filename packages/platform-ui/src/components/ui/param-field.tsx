@@ -78,7 +78,7 @@ function renderInput(
     );
   }
 
-  if ((type === 'select' || param.options) && param.options && param.options.length > 0) {
+  if (param.options && param.options.length > 0) {
     return (
       <select
         value={String(value ?? '')}
