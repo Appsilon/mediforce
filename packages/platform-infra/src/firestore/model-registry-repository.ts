@@ -102,10 +102,13 @@ export class FirestoreModelRegistryRepository implements ModelRegistryRepository
   }
 
   async updateRankings(rankings: Array<{ id: string; requestCount: number }>): Promise<number> {
+    const existingSnap = await this.col.select().get();
+    const existingIds = new Set(existingSnap.docs.map((d) => d.id));
+    const valid = rankings.filter((r) => existingIds.has(encodeModelId(r.id)));
     const batchSize = 500;
     let updated = 0;
-    for (let offset = 0; offset < rankings.length; offset += batchSize) {
-      const chunk = rankings.slice(offset, offset + batchSize);
+    for (let offset = 0; offset < valid.length; offset += batchSize) {
+      const chunk = valid.slice(offset, offset + batchSize);
       const batch = this.db.batch();
       for (const { id, requestCount } of chunk) {
         const ref = this.col.doc(encodeModelId(id));

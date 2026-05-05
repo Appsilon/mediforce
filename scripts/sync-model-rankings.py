@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scrape OpenRouter /rankings page for model popularity data and POST to Mediforce API.
+"""Sync model registry from OpenRouter API, then scrape rankings for popularity data.
 
 Usage:
     python3 scripts/sync-model-rankings.py [--base-url URL]
@@ -12,6 +12,19 @@ import os
 import re
 import sys
 import urllib.request
+
+
+def sync_models(base_url: str, api_key: str) -> dict:
+    """POST to /api/model-registry/sync to refresh all models from OpenRouter API."""
+    url = f"{base_url}/api/model-registry/sync"
+    req = urllib.request.Request(
+        url,
+        data=b"",
+        headers={"X-Api-Key": api_key},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
 def scrape_rankings() -> list[dict]:
@@ -32,7 +45,7 @@ def scrape_rankings() -> list[dict]:
         sys.exit(1)
 
     rankings = []
-    for model_id, name, count in matches:
+    for model_id, _name, count in matches:
         rankings.append({"id": model_id, "requestCount": int(count)})
 
     rankings.sort(key=lambda x: x["requestCount"], reverse=True)
@@ -52,7 +65,7 @@ def post_rankings(rankings: list[dict], base_url: str, api_key: str) -> dict:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -67,16 +80,28 @@ def main():
         print("ERROR: Set MEDIFORCE_API_KEY env var.", file=sys.stderr)
         sys.exit(1)
 
-    print("Scraping OpenRouter /rankings...")
-    rankings = scrape_rankings()
-    print(f"Found {len(rankings)} models with request counts.")
-    print(f"Top 5:")
-    for r in rankings[:5]:
-        print(f"  {r['requestCount']:>12,}  {r['id']}")
+    # Step 1: Sync model metadata from OpenRouter API
+    print(f"Step 1: Syncing models from OpenRouter API via {base_url}...")
+    sync_result = sync_models(base_url, api_key)
+    print(f"  Synced {sync_result['synced']} models ({sync_result['total']} from OpenRouter).")
 
-    print(f"\nPosting to {base_url}/api/model-registry/rankings...")
+    # Step 2: Scrape rankings from OpenRouter /rankings page
+    print("\nStep 2: Scraping OpenRouter /rankings for popularity data...")
+    rankings = scrape_rankings()
+    print(f"  Found {len(rankings)} models with request counts.")
+    print(f"  Top 5:")
+    for r in rankings[:5]:
+        print(f"    {r['requestCount']:>12,}  {r['id']}")
+
+    # Step 3: POST rankings to Mediforce
+    print(f"\nStep 3: Posting rankings to {base_url}...")
     result = post_rankings(rankings, base_url, api_key)
-    print(f"Updated {result['updated']} models. Rankings updated at: {result['rankingsUpdatedAt']}")
+    print(f"  Updated {result['updated']} of {len(rankings)} models.")
+    print(f"  Rankings updated at: {result['rankingsUpdatedAt']}")
+
+    skipped = len(rankings) - result["updated"]
+    if skipped > 0:
+        print(f"  ({skipped} models from rankings not found in registry — variant slugs or new models)")
 
 
 if __name__ == "__main__":
