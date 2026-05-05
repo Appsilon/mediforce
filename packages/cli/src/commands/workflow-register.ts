@@ -31,8 +31,11 @@ async function checkImageExists(image: string): Promise<boolean> {
 async function warnMissingImages(body: RegisterWorkflowInput, output: OutputSink, jsonMode: boolean): Promise<void> {
   const images = new Set<string>();
   for (const step of body.steps) {
-    const image = (step as { agent?: { image?: string } }).agent?.image;
-    if (typeof image === 'string' && image.length > 0) images.add(image);
+    const agent = (step as { agent?: { image?: string; repo?: string; commit?: string } }).agent;
+    const image = agent?.image;
+    const hasBuildSource = typeof agent?.repo === 'string' && agent.repo.length > 0
+      && typeof agent?.commit === 'string' && agent.commit.length > 0;
+    if (typeof image === 'string' && image.length > 0 && !hasBuildSource) images.add(image);
   }
   if (images.size === 0) return;
 

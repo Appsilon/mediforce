@@ -112,7 +112,22 @@ export function useProcessDefinitions() {
     return result;
   }, [allDocs]);
 
-  return { definitions, stepsByDefinition, loading, error };
+  const latestDocs = useMemo((): Map<string, WorkflowDefinitionDoc> => {
+    const byName = new Map<string, WorkflowDefinitionDoc[]>();
+    for (const d of allDocs) {
+      const existing = byName.get(d.name) ?? [];
+      existing.push(d);
+      byName.set(d.name, existing);
+    }
+    const result = new Map<string, WorkflowDefinitionDoc>();
+    for (const [name, docs] of byName) {
+      const latest = [...docs].sort((a, b) => compareSemver(String(b.version), String(a.version)))[0];
+      if (latest) result.set(name, latest);
+    }
+    return result;
+  }, [allDocs]);
+
+  return { definitions, stepsByDefinition, latestDocs, loading, error };
 }
 
 export function useProcessDefinitionVersions(name: string) {
