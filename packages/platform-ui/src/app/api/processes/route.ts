@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { validatePayload } from '@mediforce/platform-core';
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 
 interface StartWorkflowBody {
@@ -22,6 +23,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json(
           { error: `No workflow definition found for '${body.definitionName}'` },
           { status: 404 },
+        );
+      }
+    }
+
+    const definition = await processRepo.getWorkflowDefinition(body.definitionName, version);
+    if (definition?.triggerInput && definition.triggerInput.length > 0) {
+      const validation = validatePayload(body.payload ?? {}, definition.triggerInput);
+      if (!validation.valid) {
+        return NextResponse.json(
+          { error: 'Invalid payload', details: validation.errors },
+          { status: 400 },
         );
       }
     }

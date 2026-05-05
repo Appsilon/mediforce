@@ -253,6 +253,26 @@ function validateExecutorAndTriggers(
   });
 }
 
+function validateTriggerInput(
+  wd: {
+    triggerInput?: Array<{ name: string; type?: string }>;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (!wd.triggerInput) return;
+  const seen = new Set<string>();
+  wd.triggerInput.forEach((field, i) => {
+    if (seen.has(field.name)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['triggerInput', i, 'name'],
+        message: `triggerInput[${i}].name '${field.name}' is duplicated (must be unique)`,
+      });
+    }
+    seen.add(field.name);
+  });
+}
+
 function validateInputForNextRun(
   wd: {
     steps: Array<{ id: string }>;
@@ -344,6 +364,12 @@ function validateVerdicts(
  * prefer {@link parseWorkflowDefinitionForCreation} which applies the
  * refinement for you.
  */
+export const TriggerInputFieldSchema = StepParamSchema.extend({
+  type: z.enum(['string', 'number', 'boolean', 'date', 'select', 'multiselect', 'textarea']).default('string'),
+});
+
+export type TriggerInputField = z.infer<typeof TriggerInputFieldSchema>;
+
 export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -369,6 +395,7 @@ export const WorkflowDefinitionBaseSchema = z.object({
   deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
   inputForNextRun: z.array(InputForNextRunEntrySchema).optional(),
+  triggerInput: z.array(TriggerInputFieldSchema).optional(),
 });
 
 export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine(
@@ -376,10 +403,11 @@ export const WorkflowDefinitionSchema = WorkflowDefinitionBaseSchema.superRefine
     validateInputForNextRun(wd, ctx);
     validateExecutorAndTriggers(wd, ctx);
     validateVerdicts(wd, ctx);
+    validateTriggerInput(wd, ctx);
   },
 );
 
-export { validateInputForNextRun, validateExecutorAndTriggers, validateVerdicts };
+export { validateInputForNextRun, validateExecutorAndTriggers, validateVerdicts, validateTriggerInput };
 
 /**
  * Default parse path for registering a new WorkflowDefinition (API routes,
@@ -395,6 +423,7 @@ export function parseWorkflowDefinitionForCreation(input: unknown) {
     .superRefine((wd, ctx) => {
       validateInputForNextRun(wd, ctx);
       validateExecutorAndTriggers(wd, ctx);
+      validateTriggerInput(wd, ctx);
     })
     .safeParse(input);
 }
@@ -416,6 +445,7 @@ export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit({
 }).superRefine((wd, ctx) => {
   validateInputForNextRun(wd, ctx);
   validateExecutorAndTriggers(wd, ctx);
+  validateTriggerInput(wd, ctx);
 });
 
 export type WorkflowTemplate = z.infer<typeof WorkflowTemplateSchema>;
