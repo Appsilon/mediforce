@@ -265,7 +265,7 @@ export function StartRunButton({
         {warningBadge}
 
         {dropdownOpen && (
-          <div className="absolute right-0 top-full mt-1 z-10 min-w-[200px] rounded-md border bg-popover shadow-md">
+          <div className="absolute right-0 top-full mt-1 z-30 min-w-[200px] rounded-md border bg-popover shadow-md">
             {definitions.filter((def) => def.archived !== true).map((def) => {
               const isEffective = def.version === effectiveVersion;
 
