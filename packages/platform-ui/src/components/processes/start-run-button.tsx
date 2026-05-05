@@ -12,6 +12,7 @@ import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
 
 interface StartRunButtonProps {
@@ -34,6 +35,7 @@ export function StartRunButton({
   const { firebaseUser } = useAuth();
   const { definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowDefinitions(workflowName);
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
+  const openRouterCredits = useOpenRouterCredits();
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
@@ -66,10 +68,14 @@ export function StartRunButton({
       dockerImages,
       dockerAvailable,
       secretKeys,
+      openRouterCredits: openRouterCredits.isLoading ? undefined : {
+        available: openRouterCredits.available,
+        remaining: openRouterCredits.remaining,
+      },
     });
-  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys]);
+  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining]);
 
-  const preflightLoading = dockerLoading || secretKeysLoading;
+  const preflightLoading = dockerLoading || secretKeysLoading || openRouterCredits.isLoading;
   const hasWarnings = warnings.length > 0;
   const missingSecretKeys = warnings.filter((w) => w.category === 'missing-secret').map((w) => w.resource);
 
@@ -173,6 +179,10 @@ export function StartRunButton({
             <WarningGroup
               title="Missing secrets"
               warnings={warnings.filter((w) => w.category === 'missing-secret')}
+            />
+            <WarningGroup
+              title="LLM credits"
+              warnings={warnings.filter((w) => w.category === 'low-credits')}
             />
           </div>
 
@@ -313,7 +323,7 @@ function WarningGroup({ title, warnings }: { title: string; warnings: PreflightW
             <div className="flex items-start gap-2">
               <span className="text-amber-500 shrink-0 mt-0.5">•</span>
               <div>
-                <p className="font-mono font-medium">{w.resource}</p>
+                <p className="font-mono font-medium">{w.message || w.resource}</p>
                 <p className="text-muted-foreground mt-0.5">Used by: {formatStepList(w.stepNames)}</p>
                 <p className="text-muted-foreground/70 mt-0.5">{w.hint}</p>
               </div>
