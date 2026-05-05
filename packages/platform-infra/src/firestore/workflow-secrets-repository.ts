@@ -78,4 +78,47 @@ export class FirestoreWorkflowSecretsRepository {
   async deleteSecrets(namespace: string, workflowName: string): Promise<void> {
     await this.docRef(namespace, workflowName).delete();
   }
+
+  async upsertSecret(namespace: string, workflowName: string, key: string, value: string): Promise<void> {
+    const ref = this.docRef(namespace, workflowName);
+    await this.db.runTransaction(async (tx) => {
+      const snapshot = await tx.get(ref);
+      const existing: Record<string, string> = {};
+      if (snapshot.exists) {
+        const data = snapshot.data();
+        if (data?.secrets && typeof data.secrets === 'object') {
+          const parsed = WorkflowSecretsSchema.parse(data);
+          Object.assign(existing, this.decryptSecrets(parsed.secrets));
+        }
+      }
+      existing[key] = value;
+      const doc: WorkflowSecrets = {
+        workflowName,
+        namespace,
+        secrets: this.encryptSecrets(existing),
+        updatedAt: new Date().toISOString(),
+      };
+      tx.set(ref, doc);
+    });
+  }
+
+  async deleteSecret(namespace: string, workflowName: string, key: string): Promise<void> {
+    const ref = this.docRef(namespace, workflowName);
+    await this.db.runTransaction(async (tx) => {
+      const snapshot = await tx.get(ref);
+      if (!snapshot.exists) return;
+      const data = snapshot.data();
+      if (!data?.secrets || typeof data.secrets !== 'object') return;
+      const parsed = WorkflowSecretsSchema.parse(data);
+      const existing = this.decryptSecrets(parsed.secrets);
+      delete existing[key];
+      const doc: WorkflowSecrets = {
+        workflowName,
+        namespace,
+        secrets: this.encryptSecrets(existing),
+        updatedAt: new Date().toISOString(),
+      };
+      tx.set(ref, doc);
+    });
+  }
 }

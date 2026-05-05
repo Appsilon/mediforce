@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server';
 import {
-  getAdminFirestore,
-  FirestoreWorkflowSecretsRepository,
-} from '@mediforce/platform-infra';
+  SetSecretInputSchema,
+  ListSecretKeysInputSchema,
+  DeleteSecretInputSchema,
+} from '@mediforce/platform-api/contract';
 import { getPlatformServices } from '@/lib/platform-services';
 import { getCallerNamespaces } from '../workflow-definitions/auth.js';
-
-function getSecretsRepo() {
-  getPlatformServices();
-  return new FirestoreWorkflowSecretsRepository(getAdminFirestore());
-}
 
 /**
  * GET /api/workflow-secrets?namespace=x&workflow=y
@@ -17,25 +13,28 @@ function getSecretsRepo() {
  * Returns secret key names only (never values).
  */
 export async function GET(request: Request): Promise<NextResponse> {
-  const { namespaceRepo } = getPlatformServices();
+  const { namespaceRepo, secretsRepo } = getPlatformServices();
   const callerNs = await getCallerNamespaces(request, namespaceRepo);
   if (callerNs instanceof NextResponse) return callerNs;
 
   const url = new URL(request.url);
-  const namespace = url.searchParams.get('namespace');
-  const workflow = url.searchParams.get('workflow');
-  if (!namespace || !workflow) {
+  const parsed = ListSecretKeysInputSchema.safeParse({
+    namespace: url.searchParams.get('namespace') ?? undefined,
+    workflow: url.searchParams.get('workflow') ?? undefined,
+  });
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Missing required query parameters: namespace, workflow' },
+      { error: parsed.error.issues.map((i) => i.message).join('; ') },
       { status: 400 },
     );
   }
 
+  const { namespace, workflow } = parsed.data;
   if (callerNs !== null && !callerNs.has(namespace)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const keys = await getSecretsRepo().getSecretKeys(namespace, workflow);
+  const keys = await secretsRepo.getSecretKeys(namespace, workflow);
   return NextResponse.json({ keys });
 }
 
@@ -44,27 +43,14 @@ export async function GET(request: Request): Promise<NextResponse> {
  *
  * Body: { "key": "SECRET_NAME", "value": "secret-value" }
  *
- * Upserts a single secret key. Existing secrets for the workflow are preserved.
+ * Upserts a single secret key atomically. Existing secrets are preserved.
  */
 export async function PUT(request: Request): Promise<NextResponse> {
-  const { namespaceRepo } = getPlatformServices();
+  const { namespaceRepo, secretsRepo } = getPlatformServices();
   const callerNs = await getCallerNamespaces(request, namespaceRepo);
   if (callerNs instanceof NextResponse) return callerNs;
 
   const url = new URL(request.url);
-  const namespace = url.searchParams.get('namespace');
-  const workflow = url.searchParams.get('workflow');
-  if (!namespace || !workflow) {
-    return NextResponse.json(
-      { error: 'Missing required query parameters: namespace, workflow' },
-      { status: 400 },
-    );
-  }
-
-  if (callerNs !== null && !callerNs.has(namespace)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -72,63 +58,55 @@ export async function PUT(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    typeof (body as Record<string, unknown>).key !== 'string' ||
-    typeof (body as Record<string, unknown>).value !== 'string'
-  ) {
+  const parsed = SetSecretInputSchema.safeParse({
+    namespace: url.searchParams.get('namespace') ?? undefined,
+    workflow: url.searchParams.get('workflow') ?? undefined,
+    ...(typeof body === 'object' && body !== null ? body : {}),
+  });
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Body must contain "key" (string) and "value" (string)' },
+      { error: parsed.error.issues.map((i) => i.message).join('; ') },
       { status: 400 },
     );
   }
 
-  const { key, value } = body as { key: string; value: string };
-  if (key.length === 0 || value.length === 0) {
-    return NextResponse.json(
-      { error: 'Both "key" and "value" must be non-empty strings' },
-      { status: 400 },
-    );
+  const { namespace, workflow, key, value } = parsed.data;
+  if (callerNs !== null && !callerNs.has(namespace)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const repo = getSecretsRepo();
-  const existing = await repo.getSecrets(namespace, workflow);
-  existing[key] = value;
-  await repo.setSecrets(namespace, workflow, existing);
-
+  await secretsRepo.upsertSecret(namespace, workflow, key, value);
   return NextResponse.json({ ok: true });
 }
 
 /**
  * DELETE /api/workflow-secrets?namespace=x&workflow=y&key=SECRET_NAME
  *
- * Removes a single secret key.
+ * Removes a single secret key atomically.
  */
 export async function DELETE(request: Request): Promise<NextResponse> {
-  const { namespaceRepo } = getPlatformServices();
+  const { namespaceRepo, secretsRepo } = getPlatformServices();
   const callerNs = await getCallerNamespaces(request, namespaceRepo);
   if (callerNs instanceof NextResponse) return callerNs;
 
   const url = new URL(request.url);
-  const namespace = url.searchParams.get('namespace');
-  const workflow = url.searchParams.get('workflow');
-  const key = url.searchParams.get('key');
-  if (!namespace || !workflow || !key) {
+  const parsed = DeleteSecretInputSchema.safeParse({
+    namespace: url.searchParams.get('namespace') ?? undefined,
+    workflow: url.searchParams.get('workflow') ?? undefined,
+    key: url.searchParams.get('key') ?? undefined,
+  });
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Missing required query parameters: namespace, workflow, key' },
+      { error: parsed.error.issues.map((i) => i.message).join('; ') },
       { status: 400 },
     );
   }
 
+  const { namespace, workflow, key } = parsed.data;
   if (callerNs !== null && !callerNs.has(namespace)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const repo = getSecretsRepo();
-  const existing = await repo.getSecrets(namespace, workflow);
-  delete existing[key];
-  await repo.setSecrets(namespace, workflow, existing);
-
+  await secretsRepo.deleteSecret(namespace, workflow, key);
   return NextResponse.json({ ok: true });
 }

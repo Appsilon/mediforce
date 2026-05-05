@@ -12,6 +12,7 @@ import {
   FirestoreOAuthProviderRepository,
   FirestoreAgentOAuthTokenRepository,
   FirestoreModelRegistryRepository,
+  FirestoreWorkflowSecretsRepository,
   getAdminFirestore,
   validateSecretsKey,
   createMailgunSender,
@@ -70,6 +71,7 @@ export interface PlatformServices {
   oauthProviderRepo: FirestoreOAuthProviderRepository;
   agentOAuthTokenRepo: FirestoreAgentOAuthTokenRepository;
   modelRegistryRepo: FirestoreModelRegistryRepository;
+  secretsRepo: FirestoreWorkflowSecretsRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -94,6 +96,7 @@ export function getPlatformServices(): PlatformServices {
   const oauthProviderRepo = new FirestoreOAuthProviderRepository(db);
   const agentOAuthTokenRepo = new FirestoreAgentOAuthTokenRepository(db);
   const modelRegistryRepo = new FirestoreModelRegistryRepository(db);
+  const secretsRepo = new FirestoreWorkflowSecretsRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -202,6 +205,7 @@ export function getPlatformServices(): PlatformServices {
     oauthProviderRepo,
     agentOAuthTokenRepo,
     modelRegistryRepo,
+    secretsRepo,
   };
 
   if (!seedingStarted) {
