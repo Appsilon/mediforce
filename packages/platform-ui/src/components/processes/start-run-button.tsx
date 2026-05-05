@@ -68,9 +68,12 @@ export function StartRunButton({
       dockerImages,
       dockerAvailable,
       secretKeys,
-      openRouterCredits: openRouterCredits.isLoading ? undefined : openRouterCredits,
+      openRouterCredits: openRouterCredits.isLoading ? undefined : {
+        available: openRouterCredits.available,
+        remaining: openRouterCredits.remaining,
+      },
     });
-  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, openRouterCredits]);
+  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining]);
 
   const preflightLoading = dockerLoading || secretKeysLoading || openRouterCredits.isLoading;
   const hasWarnings = warnings.length > 0;
@@ -320,7 +323,7 @@ function WarningGroup({ title, warnings }: { title: string; warnings: PreflightW
             <div className="flex items-start gap-2">
               <span className="text-amber-500 shrink-0 mt-0.5">•</span>
               <div>
-                <p className="font-mono font-medium">{w.message}</p>
+                <p className="font-mono font-medium">{w.message || w.resource}</p>
                 <p className="text-muted-foreground mt-0.5">Used by: {formatStepList(w.stepNames)}</p>
                 <p className="text-muted-foreground/70 mt-0.5">{w.hint}</p>
               </div>
