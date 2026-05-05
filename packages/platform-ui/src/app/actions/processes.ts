@@ -173,6 +173,108 @@ export async function archiveProcessRun(
   }
 }
 
+export interface BulkOperationResult {
+  succeeded: string[];
+  failed: Array<{ id: string; error: string }>;
+}
+
+export async function bulkCancelProcessRuns(
+  instanceIds: string[],
+): Promise<BulkOperationResult> {
+  const { instanceRepo, auditRepo } = getPlatformServices();
+  const now = new Date().toISOString();
+  const succeeded: string[] = [];
+  const failed: Array<{ id: string; error: string }> = [];
+
+  const instances = await Promise.all(
+    instanceIds.map((id) => instanceRepo.getById(id)),
+  );
+
+  await Promise.all(
+    instances.map(async (instance, index) => {
+      const id = instanceIds[index];
+      if (!instance) {
+        failed.push({ id, error: 'Run not found' });
+        return;
+      }
+      if (instance.status !== 'running' && instance.status !== 'paused') {
+        failed.push({ id, error: `Cannot cancel a ${instance.status} run` });
+        return;
+      }
+      await instanceRepo.update(id, {
+        status: 'failed',
+        error: 'Cancelled by user',
+        updatedAt: now,
+      });
+      await auditRepo.append({
+        actorId: 'user',
+        actorType: 'user',
+        actorRole: 'operator',
+        action: 'instance.cancelled',
+        description: `Run cancelled by operator (was ${instance.status}${instance.currentStepId ? ` at step '${instance.currentStepId}'` : ''})`,
+        timestamp: now,
+        inputSnapshot: { previousStatus: instance.status, currentStepId: instance.currentStepId },
+        outputSnapshot: { status: 'failed', error: 'Cancelled by user' },
+        basis: 'User-initiated bulk cancel via UI',
+        entityType: 'processInstance',
+        entityId: id,
+        processInstanceId: id,
+        processDefinitionVersion: instance.definitionVersion,
+      });
+      succeeded.push(id);
+    }),
+  );
+
+  return { succeeded, failed };
+}
+
+export async function bulkArchiveProcessRuns(
+  instanceIds: string[],
+): Promise<BulkOperationResult> {
+  const { instanceRepo, auditRepo } = getPlatformServices();
+  const now = new Date().toISOString();
+  const succeeded: string[] = [];
+  const failed: Array<{ id: string; error: string }> = [];
+
+  const instances = await Promise.all(
+    instanceIds.map((id) => instanceRepo.getById(id)),
+  );
+
+  await Promise.all(
+    instances.map(async (instance, index) => {
+      const id = instanceIds[index];
+      if (!instance) {
+        failed.push({ id, error: 'Run not found' });
+        return;
+      }
+      const { displayStatus } = getWorkflowStatus(instance);
+      if (displayStatus === 'in_progress' || displayStatus === 'waiting_for_human') {
+        failed.push({ id, error: 'Cannot archive an active run' });
+        return;
+      }
+      await instanceRepo.update(id, { archived: true, updatedAt: now });
+      await auditRepo.append({
+        actorId: 'user',
+        actorType: 'user',
+        actorRole: 'operator',
+        action: 'instance.archived',
+        description: 'Run archived by operator',
+        timestamp: now,
+        inputSnapshot: { previousArchived: instance.archived ?? false },
+        outputSnapshot: { archived: true },
+        basis: 'User-initiated bulk archive via UI',
+        entityType: 'processInstance',
+        entityId: id,
+        processInstanceId: id,
+        processDefinitionVersion: instance.definitionVersion,
+      });
+      succeeded.push(id);
+    }),
+  );
+
+  return { succeeded, failed };
+}
+
 export async function cancelProcessRun(
   instanceId: string,
 ): Promise<{ success: boolean; error?: string }> {

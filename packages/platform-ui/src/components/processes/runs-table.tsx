@@ -9,7 +9,7 @@ import { ProcessStatusBadge } from './process-status-badge';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
-import { archiveProcessRun, cancelProcessRun } from '@/app/actions/processes';
+import { archiveProcessRun, bulkCancelProcessRuns, bulkArchiveProcessRuns } from '@/app/actions/processes';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 
 interface RunsTableProps {
@@ -108,16 +108,14 @@ export function RunsTable({
 
   async function handleBulkCancel() {
     setBulkCancelling(true);
-    await Promise.allSettled(cancellableSelected.map((r) => cancelProcessRun(r.id)));
+    await bulkCancelProcessRuns(cancellableSelected.map((r) => r.id));
     setBulkCancelling(false);
-    setSelectedIds(new Set());
   }
 
   async function handleBulkArchive() {
     setBulkArchiving(true);
-    await Promise.allSettled(archivableSelected.map((r) => archiveProcessRun(r.id, true)));
+    await bulkArchiveProcessRuns(archivableSelected.map((r) => r.id));
     setBulkArchiving(false);
-    setSelectedIds(new Set());
   }
 
   const effectiveRunHref = runHref ?? ((run: ProcessInstance) =>
