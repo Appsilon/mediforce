@@ -12,7 +12,6 @@ import {
   type CreateOAuthProviderInput,
 } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
-import { getConfiguredAppBaseUrl } from '@/lib/app-base-url';
 
 interface DiscoverBody {
   /** Namespace to scope the resulting provider doc. Required because
@@ -221,8 +220,7 @@ function existingHeaderValueTemplate(
 }
 
 function buildCallbackUrl(request: Request, providerSlug: string): string {
-  // Public origin — see lib/app-base-url for why request.url isn't trusted.
-  const origin = getConfiguredAppBaseUrl() ?? new URL(request.url).origin;
+  const origin = new URL(request.url).origin;
   return `${origin}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
 }
 
