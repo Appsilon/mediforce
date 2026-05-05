@@ -38,6 +38,12 @@ function formatContext(tokens: number): string {
   return `${String(Math.round(tokens / 1000))}K`;
 }
 
+function formatRequests(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M req`;
+  if (count >= 1_000) return `${Math.round(count / 1000)}K req`;
+  return `${String(count)} req`;
+}
+
 function formatPrice(perToken: number): string {
   const perMillion = perToken * 1_000_000;
   if (perMillion === 0) return 'free';
@@ -106,7 +112,8 @@ export async function modelListCommand(input: CommandInput): Promise<number> {
       const inPrice = formatPrice(model.pricing.input);
       const outPrice = formatPrice(model.pricing.output);
       const caps = [model.supportsTools ? 'tools' : '', model.supportsVision ? 'vision' : ''].filter(Boolean).join(',');
-      input.output.stdout(`  ${model.id.padEnd(40)} ${ctx.padStart(6)}  in:${inPrice.padStart(10)}  out:${outPrice.padStart(10)}  ${caps}`);
+      const rank = model.requestCount !== null ? formatRequests(model.requestCount) : '';
+      input.output.stdout(`  ${model.id.padEnd(40)} ${ctx.padStart(6)}  in:${inPrice.padStart(10)}  out:${outPrice.padStart(10)}  ${rank.padStart(8)}  ${caps}`);
     }
     return 0;
   } catch (err) {

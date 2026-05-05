@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Search, ArrowUp, ArrowDown } from 'lucide-react';
 import type { ModelRegistryEntry } from '@mediforce/platform-core';
 
-type SortField = 'name' | 'provider' | 'contextLength' | 'pricingInput' | 'pricingOutput';
+type SortField = 'name' | 'provider' | 'contextLength' | 'pricingInput' | 'pricingOutput' | 'requestCount';
 type SortDir = 'asc' | 'desc';
 
 const PAGE_SIZE = 50;
@@ -12,6 +12,13 @@ const PAGE_SIZE = 50;
 function formatContext(tokens: number): string {
   if (tokens >= 1_000_000) return `${String(Math.round(tokens / 1_000_000))}M`;
   return `${String(Math.round(tokens / 1000))}K`;
+}
+
+function formatRequests(count: number | null): string {
+  if (count === null) return '';
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${Math.round(count / 1000)}K`;
+  return String(count);
 }
 
 function formatPrice(perToken: number): string {
@@ -29,10 +36,11 @@ interface ModelRegistryTableProps {
 export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState('');
+  const [showTopPicks, setShowTopPicks] = useState(true);
   const [toolsFilter, setToolsFilter] = useState(false);
   const [visionFilter, setVisionFilter] = useState(false);
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [sortField, setSortField] = useState<SortField>('requestCount');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(0);
 
   const providers = useMemo(() => {
@@ -40,8 +48,19 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
     return Array.from(set).sort();
   }, [models]);
 
+  const topPickIds = useMemo(() => {
+    const ranked = models
+      .filter((m) => m.requestCount !== null && m.requestCount > 0)
+      .sort((a, b) => (b.requestCount ?? 0) - (a.requestCount ?? 0))
+      .slice(0, 30);
+    return new Set(ranked.map((m) => m.id));
+  }, [models]);
+
   const filtered = useMemo(() => {
     let result = models;
+    if (showTopPicks) {
+      result = result.filter((m) => topPickIds.has(m.id));
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -61,7 +80,7 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
       result = result.filter((m) => m.supportsVision);
     }
     return result;
-  }, [models, search, providerFilter, toolsFilter, visionFilter]);
+  }, [models, showTopPicks, topPickIds, search, providerFilter, toolsFilter, visionFilter]);
 
   const maxPage = Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1);
   const clampedPage = Math.min(page, maxPage);
@@ -85,6 +104,9 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
           break;
         case 'pricingOutput':
           cmp = a.pricing.output - b.pricing.output;
+          break;
+        case 'requestCount':
+          cmp = (a.requestCount ?? 0) - (b.requestCount ?? 0);
           break;
       }
       return sortDir === 'asc' ? cmp : -cmp;
@@ -123,6 +145,12 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
             className="w-full rounded-md border bg-background pl-9 pr-3 py-2 text-sm"
           />
         </div>
+        <button
+          onClick={() => setShowTopPicks(!showTopPicks)}
+          className={`rounded-md border px-3 py-2 text-sm transition-colors ${showTopPicks ? 'border-primary text-primary bg-primary/5' : 'hover:bg-accent'}`}
+        >
+          Top picks
+        </button>
         <select
           aria-label="Provider"
           value={providerFilter}
@@ -198,6 +226,13 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
                 Out $/M
                 <SortIcon field="pricingOutput" />
               </th>
+              <th
+                className="px-3 py-2 text-right font-medium cursor-pointer select-none"
+                onClick={() => handleSort('requestCount')}
+              >
+                Popularity
+                <SortIcon field="requestCount" />
+              </th>
               <th className="px-3 py-2 text-center font-medium">Tools</th>
               <th className="px-3 py-2 text-center font-medium">Vision</th>
             </tr>
@@ -210,13 +245,14 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
                 <td className="px-3 py-2 text-right tabular-nums">{formatContext(model.contextLength)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatPrice(model.pricing.input)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatPrice(model.pricing.output)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{formatRequests(model.requestCount)}</td>
                 <td className="px-3 py-2 text-center">{model.supportsTools ? '✓' : ''}</td>
                 <td className="px-3 py-2 text-center">{model.supportsVision ? '✓' : ''}</td>
               </tr>
             ))}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
                   {models.length === 0
                     ? 'No models in registry. Sync from OpenRouter to populate.'
                     : 'No models match your filters.'}
