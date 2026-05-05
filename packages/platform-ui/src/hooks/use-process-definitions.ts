@@ -41,6 +41,21 @@ function compareSemver(a: string, b: string): number {
   return 0;
 }
 
+function getLatestByName(docs: WorkflowDefinitionDoc[]): Map<string, WorkflowDefinitionDoc> {
+  const byName = new Map<string, WorkflowDefinitionDoc[]>();
+  for (const doc of docs) {
+    const existing = byName.get(doc.name) ?? [];
+    existing.push(doc);
+    byName.set(doc.name, existing);
+  }
+  const result = new Map<string, WorkflowDefinitionDoc>();
+  for (const [name, group] of byName) {
+    const latest = [...group].sort((a, b) => compareSemver(String(b.version), String(a.version)))[0];
+    if (latest) result.set(name, latest);
+  }
+  return result;
+}
+
 export function useProcessDefinitions() {
   const workflowConstraints = useMemo(() => [orderBy('name', 'asc')], []);
 
@@ -53,26 +68,25 @@ export function useProcessDefinitions() {
     return workflowData.filter((doc) => !doc.deleted);
   }, [workflowData]);
 
-  const definitions = useMemo((): DefinitionGroup[] => {
-    const byName = new Map<string, { versions: DefinitionVersion[]; docs: WorkflowDefinitionDoc[] }>();
+  const latestDocs = useMemo(() => getLatestByName(allDocs), [allDocs]);
 
+  const definitions = useMemo((): DefinitionGroup[] => {
+    const byName = new Map<string, DefinitionVersion[]>();
     for (const def of allDocs) {
-      const entry = byName.get(def.name) ?? { versions: [], docs: [] };
-      const versionStr = String(def.version);
-      entry.versions.push({
-        version: versionStr,
+      const entry = byName.get(def.name) ?? [];
+      entry.push({
+        version: String(def.version),
         stepCount: def.steps.length,
         triggerCount: def.triggers.length,
         title: def.title,
         description: def.description,
       });
-      entry.docs.push(def);
       byName.set(def.name, entry);
     }
 
-    return Array.from(byName.entries()).map(([name, { versions, docs }]) => {
+    return Array.from(byName.entries()).map(([name, versions]) => {
       const sorted = [...versions].sort((a, b) => compareSemver(b.version, a.version));
-      const latestDoc = [...docs].sort((a, b) => compareSemver(String(b.version), String(a.version)))[0];
+      const latestDoc = latestDocs.get(name)!;
       const latest = sorted[0];
       const hasManualTrigger = latestDoc.triggers.some((trigger) => trigger.type === 'manual');
       return {
@@ -89,30 +103,20 @@ export function useProcessDefinitions() {
         namespace: latestDoc.namespace,
       };
     });
-  }, [allDocs]);
+  }, [allDocs, latestDocs]);
 
-  /** Map from definition name to ordered non-terminal step IDs (latest version). */
   const stepsByDefinition = useMemo((): Map<string, string[]> => {
-    const byName = new Map<string, WorkflowDefinitionDoc[]>();
-    for (const doc of allDocs) {
-      const existing = byName.get(doc.name) ?? [];
-      existing.push(doc);
-      byName.set(doc.name, existing);
-    }
     const result = new Map<string, string[]>();
-    for (const [name, docs] of byName) {
-      const latest = [...docs].sort((a, b) => compareSemver(String(b.version), String(a.version)))[0];
-      if (latest) {
-        result.set(
-          name,
-          latest.steps.filter((step) => step.type !== 'terminal').map((step) => step.id),
-        );
-      }
+    for (const [name, doc] of latestDocs) {
+      result.set(
+        name,
+        doc.steps.filter((step) => step.type !== 'terminal').map((step) => step.id),
+      );
     }
     return result;
-  }, [allDocs]);
+  }, [latestDocs]);
 
-  return { definitions, stepsByDefinition, loading, error };
+  return { definitions, stepsByDefinition, latestDocs, loading, error };
 }
 
 export function useProcessDefinitionVersions(name: string) {

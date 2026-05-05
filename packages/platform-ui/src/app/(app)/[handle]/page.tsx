@@ -16,6 +16,7 @@ import { useProcessDefinitions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
 import { useMyTasks } from '@/hooks/use-tasks';
 import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus } from '@/components/processes/process-card';
+import { WorkflowProblems } from '@/components/processes/workflow-problems';
 import { cn } from '@/lib/utils';
 import { NamespaceSchema } from '@mediforce/platform-core';
 import type { Namespace, ProcessInstance } from '@mediforce/platform-core';
@@ -400,7 +401,7 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [showArchived, setShowArchived] = React.useState(false);
 
-  const { definitions, stepsByDefinition, loading: defsLoading } = useProcessDefinitions();
+  const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions();
   const { data: allInstances, loading: instancesLoading } = useProcessInstances('all');
   const { data: activeTasks } = useMyTasks(null);
 
@@ -449,6 +450,8 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
 
   return (
     <div className="flex flex-col gap-4">
+      <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />
+
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Workflows</h2>
         <div className="flex items-center gap-2">
