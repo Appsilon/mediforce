@@ -103,7 +103,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const activeModel = FOUNDATION_MODELS.find((m) => m.id === selectedModelId);
   const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
 
-  const MAX_SKILL_FILES = 100;
+  const MAX_SKILL_FILES = 10;
   const MAX_SKILL_FILE_BYTES = 100 * 1024;
   const [skillFileErrors, setSkillFileErrors] = useState<string[]>([]);
 
@@ -359,7 +359,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".yaml,.yml,.json,.md,.txt,.xlsx,.xls,.csv"
+                accept=".yaml,.yml,.json,.md,.txt,.csv"
                 onChange={(e) => {
                   if (e.target.files) { addSkillFiles(e.target.files); e.target.value = ''; }
                 }}
