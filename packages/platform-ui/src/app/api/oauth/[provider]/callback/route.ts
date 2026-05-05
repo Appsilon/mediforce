@@ -3,6 +3,7 @@ import { verifyState, type OAuthStatePayload } from '@mediforce/agent-runtime';
 import type { AgentOAuthToken, OAuthProviderConfig } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
+import { publicOrigin } from '@/lib/public-origin';
 
 /** Platform-owned callback for the OAuth authorization-code flow. Provider
  *  redirects here after consent. No user session (external origin), so the
@@ -28,12 +29,11 @@ interface ProviderUserInfo {
 }
 
 function buildSelfCallbackUrl(request: Request, providerSlug: string): string {
-  const origin = new URL(request.url).origin;
-  return `${origin}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
+  return `${publicOrigin(request)}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
 }
 
 function redirectSuccess(request: Request, state: OAuthStatePayload): NextResponse {
-  const origin = new URL(request.url).origin;
+  const origin = publicOrigin(request);
   const destination = `${origin}/${encodeURIComponent(state.namespace)}/agents/definitions/${encodeURIComponent(state.agentId)}?connected=${encodeURIComponent(state.serverName)}`;
   return NextResponse.redirect(destination, 302);
 }
@@ -43,7 +43,7 @@ function redirectError(
   reason: string,
   state: OAuthStatePayload | null,
 ): NextResponse {
-  const origin = new URL(request.url).origin;
+  const origin = publicOrigin(request);
   const destination =
     state !== null
       ? `${origin}/${encodeURIComponent(state.namespace)}/agents/definitions/${encodeURIComponent(state.agentId)}?oauthError=${encodeURIComponent(reason)}`

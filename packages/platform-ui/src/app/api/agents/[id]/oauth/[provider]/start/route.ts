@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { signState, generateNonce, generatePkcePair } from '@mediforce/agent-runtime';
 import { getPlatformServices } from '@/lib/platform-services';
 import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
+import { publicOrigin } from '@/lib/public-origin';
 import {
   requireFirebaseUid,
   requireNamespaceFromQuery,
@@ -13,12 +14,12 @@ const StartBodySchema = z.object({
   serverName: z.string().min(1),
 });
 
-/** Returns the redirect URL derived from the incoming request plus the
- *  platform-wide callback path. Provider OAuth Apps must register this
- *  URL verbatim. */
+/** Returns the redirect URL the OAuth provider is told to send the user
+ *  back to after authorize. Origin comes from APP_BASE_URL (preferred) or
+ *  NEXT_PUBLIC_APP_URL — see lib/public-origin for why we don't trust
+ *  request.url here. Provider OAuth Apps must register this URL verbatim. */
 function buildCallbackUrl(request: Request, providerSlug: string): string {
-  const origin = new URL(request.url).origin;
-  return `${origin}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
+  return `${publicOrigin(request)}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
 }
 
 function buildAuthorizeUrl(params: {

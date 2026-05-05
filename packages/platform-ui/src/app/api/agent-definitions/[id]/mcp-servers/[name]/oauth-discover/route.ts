@@ -12,6 +12,7 @@ import {
   type CreateOAuthProviderInput,
 } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
+import { publicOrigin } from '@/lib/public-origin';
 
 interface DiscoverBody {
   /** Namespace to scope the resulting provider doc. Required because
@@ -220,8 +221,7 @@ function existingHeaderValueTemplate(
 }
 
 function buildCallbackUrl(request: Request, providerSlug: string): string {
-  const origin = new URL(request.url).origin;
-  return `${origin}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
+  return `${publicOrigin(request)}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
 }
 
 function buildDisplayName(issuerUrl: string, serverName: string): string {
