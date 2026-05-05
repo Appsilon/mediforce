@@ -116,6 +116,10 @@ vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretsForRuntime: vi.fn().mockResolvedValue({}),
 }));
 
+vi.mock('@/lib/resolve-agent-identity', () => ({
+  resolveAgentIdentityPrompt: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Import after mock setup
 import { executeAgentStep } from '../execute-agent-step';
 
