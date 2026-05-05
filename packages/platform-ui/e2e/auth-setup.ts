@@ -56,6 +56,7 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedSubcollection('processInstances', 'proc-agent-escalated-cancel', 'stepExecutions', data.agentEscalatedCancelStepExecutions);
   await seedSubcollection('processInstances', 'proc-workflow-run-1', 'stepExecutions', data.workflowRunStepExecutions);
   await seedCollection('coworkSessions', data.coworkSessions);
+  await seedCollection('modelRegistry', data.modelRegistry);
 
   // 4. Sign in via test-login page to capture auth state
   // First load warms up Next.js compilation — allow extra time

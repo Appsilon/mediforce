@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench } from 'lucide-react';
+import { User, GitBranch, Bot, Activity, LogOut, Menu, X, Plus, Play, ChevronDown, Building2, Check, ArrowLeft, ChevronRight, Wrench, Database } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { useAuth } from '@/contexts/auth-context';
@@ -83,6 +83,7 @@ function buildBreadcrumbs(pathname: string, handle: string, prefix: string): Cru
     const agents: Crumb = { label: 'Agents', href: `${prefix}/agents` };
     if (!s1) return [{ ...agents, href: null }];
     if (s1 === 'new') return [agents, { label: 'New Agent', href: null }];
+    if (s1 === 'models') return [agents, { label: 'Models', href: null }];
     if (s1 === 'definitions') return [agents, { label: 'Configure Agent', href: null }];
     return [agents];
   }
@@ -277,14 +278,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ? pathname === fullHref || pathname === `${fullHref}/`
             : pathname.startsWith(fullHref);
           return (
-            <NavItem
-              key={item.label}
-              href={fullHref}
-              label={item.label}
-              icon={item.icon}
-              badge={item.badge}
-              active={isActive}
-            />
+            <React.Fragment key={item.label}>
+              <NavItem
+                href={fullHref}
+                label={item.label}
+                icon={item.icon}
+                badge={item.badge}
+                active={isActive}
+              />
+              {item.href === '/agents' && (
+                <div className="pl-4">
+                  <NavItem
+                    href={`${handlePrefix}/agents/models`}
+                    label="Models"
+                    icon={Database}
+                    badge={null}
+                    active={pathname.startsWith(`${handlePrefix}/agents/models`)}
+                  />
+                </div>
+              )}
+            </React.Fragment>
           );
         })}
         <div className="my-2 border-t" />
