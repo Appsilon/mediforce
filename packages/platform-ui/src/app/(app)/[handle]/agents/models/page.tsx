@@ -11,6 +11,7 @@ export default function ModelsPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch('/api/model-registry')
@@ -24,6 +25,7 @@ export default function ModelsPage() {
           setLastSynced(latest.lastSyncedAt);
         }
       })
+      .catch(() => setError('Failed to load models.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -85,6 +87,10 @@ export default function ModelsPage() {
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="h-10 rounded-md bg-muted/50 animate-pulse" />
           ))}
+        </div>
+      ) : error ? (
+        <div className="rounded-md border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-800 dark:text-red-300">
+          {error}
         </div>
       ) : (
         <ModelRegistryTable models={models} />

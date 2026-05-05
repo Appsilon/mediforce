@@ -7,6 +7,9 @@ import {
   type UpdateModelRegistryEntryInput,
 } from '@mediforce/platform-core';
 
+// OpenRouter IDs use provider/model format. Firestore doc IDs can't contain
+// slashes, so we encode as provider__model. This is lossy if an ID ever
+// contains literal "__", but no OpenRouter model uses that pattern.
 function encodeModelId(id: string): string {
   return id.replaceAll('/', '__');
 }

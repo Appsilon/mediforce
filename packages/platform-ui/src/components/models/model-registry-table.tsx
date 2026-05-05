@@ -41,7 +41,6 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
   }, [models]);
 
   const filtered = useMemo(() => {
-    setPage(0);
     let result = models;
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -63,6 +62,9 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
     }
     return result;
   }, [models, search, providerFilter, toolsFilter, visionFilter]);
+
+  const maxPage = Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1);
+  const clampedPage = Math.min(page, maxPage);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -201,7 +203,7 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((model, i) => (
+            {sorted.slice(clampedPage * PAGE_SIZE, (clampedPage + 1) * PAGE_SIZE).map((model, i) => (
               <tr key={model.id} className={`hover:bg-muted/30 transition-colors ${i % 2 === 1 ? 'bg-muted/20' : ''}`}>
                 <td className="px-3 py-2 font-medium">{model.name}</td>
                 <td className="px-3 py-2 text-muted-foreground">{model.provider}</td>
@@ -228,24 +230,24 @@ export function ModelRegistryTable({ models }: ModelRegistryTableProps) {
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {Math.min(page * PAGE_SIZE + 1, sorted.length)}–{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of {sorted.length} models
+          Showing {Math.min(clampedPage * PAGE_SIZE + 1, sorted.length)}–{Math.min((clampedPage + 1) * PAGE_SIZE, sorted.length)} of {sorted.length} models
           {sorted.length !== models.length && ` (${models.length} total)`}
         </p>
         {sorted.length > PAGE_SIZE && (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setPage(page - 1)}
-              disabled={page === 0}
+              onClick={() => setPage(clampedPage - 1)}
+              disabled={clampedPage === 0}
               className="rounded-md border px-3 py-1 text-sm hover:bg-accent transition-colors disabled:opacity-50"
             >
               Previous
             </button>
             <span className="text-sm text-muted-foreground">
-              {page + 1} / {Math.ceil(sorted.length / PAGE_SIZE)}
+              {clampedPage + 1} / {Math.ceil(sorted.length / PAGE_SIZE)}
             </span>
             <button
-              onClick={() => setPage(page + 1)}
-              disabled={(page + 1) * PAGE_SIZE >= sorted.length}
+              onClick={() => setPage(clampedPage + 1)}
+              disabled={(clampedPage + 1) * PAGE_SIZE >= sorted.length}
               className="rounded-md border px-3 py-1 text-sm hover:bg-accent transition-colors disabled:opacity-50"
             >
               Next

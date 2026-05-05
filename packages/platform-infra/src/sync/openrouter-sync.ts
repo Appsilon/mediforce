@@ -64,6 +64,9 @@ export async function syncFromOpenRouter(
   }
   const json = await response.json();
   const models: OpenRouterModel[] = Array.isArray(json) ? json : json.data;
+  if (!Array.isArray(models)) {
+    throw new Error('Unexpected OpenRouter response shape: expected array of models');
+  }
   const entries = models.map(transformModel);
   const synced = await repo.bulkUpsert(entries);
   return { synced, total: models.length };

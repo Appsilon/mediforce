@@ -84,7 +84,7 @@ export async function modelGetCommand(input: CommandInput): Promise<number> {
     input.output.stdout(`Modality:    ${m.modality}`);
     input.output.stdout(`Tools:       ${m.supportsTools ? 'yes' : 'no'}`);
     input.output.stdout(`Vision:      ${m.supportsVision ? 'yes' : 'no'}`);
-    input.output.stdout(`Pricing:     in=$${String(m.pricing.input * 1_000_000)}/M  out=$${String(m.pricing.output * 1_000_000)}/M`);
+    input.output.stdout(`Pricing:     in=$${(m.pricing.input * 1_000_000).toFixed(2)}/M  out=$${(m.pricing.output * 1_000_000).toFixed(2)}/M`);
     input.output.stdout(`Source:      ${m.source}`);
     input.output.stdout(`Last synced: ${m.lastSyncedAt}`);
     return 0;

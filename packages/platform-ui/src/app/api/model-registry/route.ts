@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getPlatformServices } from '@/lib/platform-services';
 import { listModels } from '@mediforce/platform-api/handlers';
 import { ListModelsInputSchema } from '@mediforce/platform-api/contract';
@@ -16,6 +17,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     const result = await listModels(input, { modelRegistryRepo });
     return NextResponse.json(result);
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to list models' },
       { status: 500 },

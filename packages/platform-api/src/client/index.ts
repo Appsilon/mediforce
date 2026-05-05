@@ -278,13 +278,13 @@ export class Mediforce {
 
     this.models = {
       list: async (input) => {
-        if (input) ListModelsInputSchema.parse(input);
-        const qs = input
+        const validated = input ? ListModelsInputSchema.parse(input) : undefined;
+        const qs = validated
           ? toSearchParams({
-              provider: input.provider,
-              supportsTools: input.supportsTools !== undefined ? String(input.supportsTools) : undefined,
-              supportsVision: input.supportsVision !== undefined ? String(input.supportsVision) : undefined,
-              minContextLength: input.minContextLength !== undefined ? String(input.minContextLength) : undefined,
+              provider: validated.provider,
+              supportsTools: validated.supportsTools !== undefined ? String(validated.supportsTools) : undefined,
+              supportsVision: validated.supportsVision !== undefined ? String(validated.supportsVision) : undefined,
+              minContextLength: validated.minContextLength !== undefined ? String(validated.minContextLength) : undefined,
             })
           : '';
         const res = await this.request(`/api/model-registry${qs}`);
