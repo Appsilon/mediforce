@@ -23,6 +23,7 @@ function toModel(docId: string, data: Record<string, unknown>): ModelRegistryEnt
   return ModelRegistryEntrySchema.parse({
     ...data,
     id: decodeModelId(docId),
+    canonicalSlug: data.canonicalSlug ?? null,
     requestCount: data.requestCount ?? null,
     createdAt:
       data.createdAt instanceof Timestamp
@@ -102,17 +103,33 @@ export class FirestoreModelRegistryRepository implements ModelRegistryRepository
   }
 
   async updateRankings(rankings: Array<{ id: string; requestCount: number }>): Promise<number> {
-    const existingSnap = await this.col.select().get();
-    const existingIds = new Set(existingSnap.docs.map((d) => d.id));
-    const valid = rankings.filter((r) => existingIds.has(encodeModelId(r.id)));
+    const existingSnap = await this.col.select('canonicalSlug').get();
+    const docIdSet = new Set<string>();
+    const slugToDocId = new Map<string, string>();
+    for (const doc of existingSnap.docs) {
+      if (doc.id === META_DOC_ID) continue;
+      docIdSet.add(doc.id);
+      const slug = doc.data().canonicalSlug as string | undefined;
+      if (slug) slugToDocId.set(slug, doc.id);
+    }
+
+    const resolved: Array<{ docId: string; requestCount: number }> = [];
+    for (const { id, requestCount } of rankings) {
+      const encoded = encodeModelId(id);
+      if (docIdSet.has(encoded)) {
+        resolved.push({ docId: encoded, requestCount });
+      } else if (slugToDocId.has(id)) {
+        resolved.push({ docId: slugToDocId.get(id)!, requestCount });
+      }
+    }
+
     const batchSize = 500;
     let updated = 0;
-    for (let offset = 0; offset < valid.length; offset += batchSize) {
-      const chunk = valid.slice(offset, offset + batchSize);
+    for (let offset = 0; offset < resolved.length; offset += batchSize) {
+      const chunk = resolved.slice(offset, offset + batchSize);
       const batch = this.db.batch();
-      for (const { id, requestCount } of chunk) {
-        const ref = this.col.doc(encodeModelId(id));
-        batch.update(ref, { requestCount });
+      for (const { docId, requestCount } of chunk) {
+        batch.update(this.col.doc(docId), { requestCount });
       }
       await batch.commit();
       updated += chunk.length;

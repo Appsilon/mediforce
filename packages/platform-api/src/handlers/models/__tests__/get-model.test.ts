@@ -16,6 +16,7 @@ function makeEntry(id: string): ModelRegistryEntry {
     supportsTools: true,
     supportsVision: false,
     source: 'openrouter' as const,
+    canonicalSlug: null,
     requestCount: null,
     lastSyncedAt: '2026-05-04T00:00:00Z',
     createdAt: '2026-05-04T00:00:00Z',

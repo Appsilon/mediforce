@@ -4,6 +4,7 @@ const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 
 interface OpenRouterModel {
   id: string;
+  canonical_slug?: string;
   name: string;
   context_length: number;
   architecture: {
@@ -34,6 +35,7 @@ function transformModel(model: OpenRouterModel): CreateModelRegistryEntryInput {
   const provider = model.id.split('/')[0];
   return {
     id: model.id,
+    canonicalSlug: model.canonical_slug ?? null,
     name: model.name,
     provider,
     contextLength: model.context_length,

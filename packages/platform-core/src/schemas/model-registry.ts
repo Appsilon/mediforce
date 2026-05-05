@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const ModelRegistryEntrySchema = z.object({
   id: z.string(),
+  canonicalSlug: z.string().nullable(),
   name: z.string(),
   provider: z.string(),
   contextLength: z.number(),
