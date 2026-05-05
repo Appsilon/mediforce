@@ -1,7 +1,7 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertTriangle, Pencil, Plus, Server, Trash2, X } from 'lucide-react';
+import { AlertTriangle, GitBranch, Pencil, Plus, Server, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AgentMcpBinding, AgentMcpBindingMap, ToolCatalogEntry } from '@mediforce/platform-core';
 import {
@@ -20,7 +20,7 @@ interface AgentMcpSectionProps {
 
 type DialogState =
   | { kind: 'closed' }
-  | { kind: 'create' }
+  | { kind: 'create'; preset?: 'github-mcp' }
   | { kind: 'edit'; name: string; binding: AgentMcpBinding };
 
 export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
@@ -88,14 +88,24 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
           <Server className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">MCP Servers</h2>
         </div>
-        <button
-          type="button"
-          onClick={() => setDialog({ kind: 'create' })}
-          className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
-        >
-          <Plus className="h-3 w-3" />
-          Add server
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDialog({ kind: 'create', preset: 'github-mcp' })}
+            className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+          >
+            <GitBranch className="h-3 w-3" />
+            Add GitHub MCP
+          </button>
+          <button
+            type="button"
+            onClick={() => setDialog({ kind: 'create' })}
+            className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+          >
+            <Plus className="h-3 w-3" />
+            Add server
+          </button>
+        </div>
       </header>
 
       <p className="text-xs text-muted-foreground">
@@ -153,6 +163,8 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
                   <>
                     Edit binding <span className="font-mono">{dialog.name}</span>
                   </>
+                ) : dialog.kind === 'create' && dialog.preset === 'github-mcp' ? (
+                  'Add GitHub MCP server'
                 ) : (
                   'Add MCP server'
                 )}
@@ -166,12 +178,17 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
             <div className="overflow-y-auto px-5 py-4">
               {dialog.kind !== 'closed' && (
                 <AgentMcpBindingForm
-                  key={dialog.kind === 'edit' ? `edit:${dialog.name}` : 'create'}
+                  key={
+                    dialog.kind === 'edit'
+                      ? `edit:${dialog.name}`
+                      : dialog.preset ?? 'create'
+                  }
                   existing={dialog.kind === 'edit' ? { name: dialog.name, binding: dialog.binding } : null}
                   existingNames={existingNames}
                   catalogEntries={catalog}
                   agentId={agentId}
                   namespace={handle}
+                  preset={dialog.kind === 'create' ? dialog.preset : undefined}
                   onSubmit={handleSubmit}
                   onCancel={() => setDialog({ kind: 'closed' })}
                 />

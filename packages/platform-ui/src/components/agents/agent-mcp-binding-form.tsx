@@ -15,6 +15,35 @@ import { listOAuthProviders } from '@/lib/oauth-admin-client';
 
 const nameRegex = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 
+/** Built-in form presets surfaced as one-click "Add X MCP" buttons.
+ *  Pre-fills name + transport + transport-specific defaults so the user
+ *  only needs to click Save (or tweak as needed). */
+export type McpBindingPreset = 'github-mcp';
+
+interface HttpPresetDefaults {
+  url: string;
+  authMode: 'oauth' | 'headers';
+  oauthProvider?: string;
+}
+
+interface PresetDefaults {
+  name: string;
+  transport: 'stdio' | 'http';
+  http?: HttpPresetDefaults;
+}
+
+const PRESET_DEFAULTS: Record<McpBindingPreset, PresetDefaults> = {
+  'github-mcp': {
+    name: 'github',
+    transport: 'http',
+    http: {
+      url: 'https://api.githubcopilot.com/mcp/',
+      authMode: 'oauth',
+      oauthProvider: 'github',
+    },
+  },
+};
+
 const StdioFormSchema = z.object({
   catalogId: z.string().min(1, 'Choose a catalog entry'),
   allowedTools: z.array(z.object({ value: z.string() })),
@@ -71,6 +100,8 @@ interface AgentMcpBindingFormProps {
   catalogEntries: ToolCatalogEntry[];
   agentId: string;
   namespace: string;
+  /** Optional preset that pre-fills the form for one-click MCP setup. */
+  preset?: McpBindingPreset;
   onSubmit: (name: string, binding: AgentMcpBinding) => Promise<void>;
   onCancel: () => void;
 }
@@ -81,13 +112,17 @@ export function AgentMcpBindingForm({
   catalogEntries,
   agentId,
   namespace,
+  preset,
   onSubmit,
   onCancel,
 }: AgentMcpBindingFormProps) {
   const isEdit = existing !== null;
-  const [name, setName] = useState(existing?.name ?? '');
+  const presetDefaults = preset !== undefined ? PRESET_DEFAULTS[preset] : null;
+  const [name, setName] = useState(existing?.name ?? presetDefaults?.name ?? '');
   const [nameError, setNameError] = useState<string | null>(null);
-  const [transport, setTransport] = useState<'stdio' | 'http'>(existing?.binding.type ?? 'stdio');
+  const [transport, setTransport] = useState<'stdio' | 'http'>(
+    existing?.binding.type ?? presetDefaults?.transport ?? 'stdio',
+  );
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   function validateName(value: string): string | null {
@@ -174,6 +209,7 @@ export function AgentMcpBindingForm({
         <HttpFields
           key="http-fields"
           initial={existing?.binding.type === 'http' ? existing.binding : null}
+          presetHttp={presetDefaults?.http ?? null}
           agentId={agentId}
           namespace={namespace}
           existingServerName={existing?.name ?? null}
@@ -281,6 +317,7 @@ function StdioFields({
 
 function HttpFields({
   initial,
+  presetHttp,
   agentId,
   namespace,
   existingServerName,
@@ -290,6 +327,7 @@ function HttpFields({
   submitLabel,
 }: {
   initial: Extract<AgentMcpBinding, { type: 'http' }> | null;
+  presetHttp: HttpPresetDefaults | null;
   agentId: string;
   namespace: string;
   existingServerName: string | null;
@@ -306,17 +344,21 @@ function HttpFields({
   const initialAuthMode: 'none' | 'headers' | 'oauth' = useMemo(() => {
     if (initial?.auth?.type === 'oauth') return 'oauth';
     if (initial?.auth?.type === 'headers') return 'headers';
+    if (presetHttp !== null) return presetHttp.authMode;
     return 'none';
-  }, [initial]);
+  }, [initial, presetHttp]);
 
   const form = useForm<HttpFormValues>({
     resolver: zodResolver(HttpFormSchema),
     defaultValues: {
-      url: initial?.url ?? '',
+      url: initial?.url ?? presetHttp?.url ?? '',
       allowedTools: (initial?.allowedTools ?? []).map((value) => ({ value })),
       authMode: initialAuthMode,
       headers: initialHeaders,
-      oauthProvider: initial?.auth?.type === 'oauth' ? initial.auth.provider : '',
+      oauthProvider:
+        initial?.auth?.type === 'oauth'
+          ? initial.auth.provider
+          : presetHttp?.oauthProvider ?? '',
       oauthHeaderName:
         initial?.auth?.type === 'oauth' ? initial.auth.headerName : 'Authorization',
       oauthHeaderValueTemplate:
@@ -347,6 +389,20 @@ function HttpFields({
       cancelled = true;
     };
   }, [namespace]);
+
+  // Re-sync the provider <select> with the form value once providers load.
+  // The defaultValue path is initialized synchronously, but the matching
+  // <option> only renders after the async fetch — without this, presets
+  // and edit-mode bindings show an empty selection until the user touches
+  // the dropdown.
+  useEffect(() => {
+    if (providers.length === 0) return;
+    const target = form.getValues('oauthProvider');
+    if (target === undefined || target === '') return;
+    if (providers.some((p) => p.id === target)) {
+      form.setValue('oauthProvider', target, { shouldDirty: false });
+    }
+  }, [providers, form]);
 
   const selectedProvider = useMemo(
     () => providers.find((p) => p.id === oauthProviderId) ?? null,
