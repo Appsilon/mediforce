@@ -82,3 +82,18 @@ export {
   type UpdateRankingsOutput,
   type GetMetaOutput,
 } from './models.js';
+
+export {
+  SetSecretInputSchema,
+  SetSecretOutputSchema,
+  ListSecretKeysInputSchema,
+  ListSecretKeysOutputSchema,
+  DeleteSecretInputSchema,
+  DeleteSecretOutputSchema,
+  type SetSecretInput,
+  type SetSecretOutput,
+  type ListSecretKeysInput,
+  type ListSecretKeysOutput,
+  type DeleteSecretInput,
+  type DeleteSecretOutput,
+} from './secrets.js';

@@ -21,6 +21,12 @@ import {
   ListAgentsOutputSchema,
   GetAgentInputSchema,
   GetAgentOutputSchema,
+  SetSecretInputSchema,
+  SetSecretOutputSchema,
+  ListSecretKeysInputSchema,
+  ListSecretKeysOutputSchema,
+  DeleteSecretInputSchema,
+  DeleteSecretOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type RegisterWorkflowInput,
@@ -44,6 +50,12 @@ import {
   type ListAgentsOutput,
   type GetAgentInput,
   type GetAgentOutput,
+  type SetSecretInput,
+  type SetSecretOutput,
+  type ListSecretKeysInput,
+  type ListSecretKeysOutput,
+  type DeleteSecretInput,
+  type DeleteSecretOutput,
   ListModelsInputSchema,
   ListModelsOutputSchema,
   GetModelInputSchema,
@@ -141,6 +153,12 @@ export class Mediforce {
     list: (input?: ListModelsInput) => Promise<ListModelsOutput>;
     get: (input: GetModelInput) => Promise<GetModelOutput>;
     sync: () => Promise<SyncModelsOutput>;
+  };
+
+  readonly secrets: {
+    set: (input: SetSecretInput) => Promise<SetSecretOutput>;
+    list: (input: ListSecretKeysInput) => Promise<ListSecretKeysOutput>;
+    delete: (input: DeleteSecretInput) => Promise<DeleteSecretOutput>;
   };
 
   readonly system: {
@@ -335,6 +353,38 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.runs.start');
         return StartRunOutputSchema.parse(body);
+      },
+    };
+
+    this.secrets = {
+      set: async (input) => {
+        const validated = SetSecretInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace, workflow: validated.workflow });
+        const res = await this.request(`/api/workflow-secrets${qs}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: validated.key, value: validated.value }),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.secrets.set');
+        return SetSecretOutputSchema.parse(body);
+      },
+      list: async (input) => {
+        const validated = ListSecretKeysInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace, workflow: validated.workflow });
+        const res = await this.request(`/api/workflow-secrets${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.secrets.list');
+        return ListSecretKeysOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteSecretInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflow: validated.workflow,
+          key: validated.key,
+        });
+        const res = await this.request(`/api/workflow-secrets${qs}`, { method: 'DELETE' });
+        const body = await parseJsonOrThrow(res, 'mediforce.secrets.delete');
+        return DeleteSecretOutputSchema.parse(body);
       },
     };
 
