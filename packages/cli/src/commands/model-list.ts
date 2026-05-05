@@ -9,6 +9,9 @@ interface CommandInput {
   output: OutputSink;
 }
 
+const SORT_FIELDS = ['name', 'provider', 'context', 'price-in', 'price-out', 'popularity'] as const;
+type SortField = (typeof SORT_FIELDS)[number];
+
 const HELP = `Usage: mediforce model list [options]
 
 List models in the registry.
@@ -18,6 +21,8 @@ Optional flags:
   --tools                  Only models that support tool use
   --vision                 Only models that support vision
   --min-context <tokens>   Only models with at least N context tokens
+  --sort <field>           Sort by: ${SORT_FIELDS.join(', ')} (default: name)
+  --desc                   Sort descending (default: ascending)
   --base-url <url>         API base URL (default: http://localhost:9003)
   --json                   Emit JSON instead of human-readable output
   --help, -h               Show this help text
@@ -28,6 +33,8 @@ const LIST_OPTIONS = {
   tools: { type: 'boolean' },
   vision: { type: 'boolean' },
   'min-context': { type: 'string' },
+  sort: { type: 'string' },
+  desc: { type: 'boolean' },
   'base-url': { type: 'string' },
   json: { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
@@ -57,6 +64,8 @@ export async function modelListCommand(input: CommandInput): Promise<number> {
     tools?: boolean;
     vision?: boolean;
     'min-context'?: string;
+    sort?: string;
+    desc?: boolean;
     'base-url'?: string;
     json?: boolean;
     help?: boolean;
@@ -106,14 +115,35 @@ export async function modelListCommand(input: CommandInput): Promise<number> {
       input.output.stdout('No models found. Run `mediforce model sync` to populate from OpenRouter.');
       return 0;
     }
-    input.output.stdout(`Found ${String(result.models.length)} model(s):\n`);
-    for (const model of result.models) {
+    const sortField = (flags.sort ?? 'name') as SortField;
+    if (!SORT_FIELDS.includes(sortField)) {
+      input.output.stderr(`Invalid --sort value: ${sortField}. Valid: ${SORT_FIELDS.join(', ')}`);
+      return 2;
+    }
+    const descending = flags.desc === true;
+    const models = [...result.models].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'name': cmp = a.name.localeCompare(b.name); break;
+        case 'provider': cmp = a.provider.localeCompare(b.provider); break;
+        case 'context': cmp = a.contextLength - b.contextLength; break;
+        case 'price-in': cmp = a.pricing.input - b.pricing.input; break;
+        case 'price-out': cmp = a.pricing.output - b.pricing.output; break;
+        case 'popularity': cmp = (a.requestCount ?? 0) - (b.requestCount ?? 0); break;
+      }
+      return descending ? -cmp : cmp;
+    });
+
+    input.output.stdout(`Found ${String(models.length)} model(s):\n`);
+    input.output.stdout(`  ${'MODEL'.padEnd(40)} ${'CTX'.padStart(6)}  ${'IN $/M'.padStart(10)}  ${'OUT $/M'.padStart(10)}  ${'REQUESTS'.padStart(8)}  CAPS`);
+    input.output.stdout(`  ${'─'.repeat(40)} ${'─'.repeat(6)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(8)}  ${'─'.repeat(12)}`);
+    for (const model of models) {
       const ctx = formatContext(model.contextLength);
       const inPrice = formatPrice(model.pricing.input);
       const outPrice = formatPrice(model.pricing.output);
       const caps = [model.supportsTools ? 'tools' : '', model.supportsVision ? 'vision' : ''].filter(Boolean).join(',');
       const rank = model.requestCount !== null ? formatRequests(model.requestCount) : '';
-      input.output.stdout(`  ${model.id.padEnd(40)} ${ctx.padStart(6)}  in:${inPrice.padStart(10)}  out:${outPrice.padStart(10)}  ${rank.padStart(8)}  ${caps}`);
+      input.output.stdout(`  ${model.id.padEnd(40)} ${ctx.padStart(6)}  ${inPrice.padStart(10)}  ${outPrice.padStart(10)}  ${rank.padStart(8)}  ${caps}`);
     }
     return 0;
   } catch (err) {
