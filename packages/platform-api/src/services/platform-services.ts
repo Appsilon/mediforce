@@ -11,6 +11,7 @@ import {
   FirestoreNamespaceRepository,
   FirestoreOAuthProviderRepository,
   FirestoreAgentOAuthTokenRepository,
+  FirestoreModelRegistryRepository,
   getAdminFirestore,
   validateSecretsKey,
   createMailgunSender,
@@ -68,6 +69,7 @@ export interface PlatformServices {
   namespaceRepo: FirestoreNamespaceRepository;
   oauthProviderRepo: FirestoreOAuthProviderRepository;
   agentOAuthTokenRepo: FirestoreAgentOAuthTokenRepository;
+  modelRegistryRepo: FirestoreModelRegistryRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -91,6 +93,7 @@ export function getPlatformServices(): PlatformServices {
   const namespaceRepo = new FirestoreNamespaceRepository(db);
   const oauthProviderRepo = new FirestoreOAuthProviderRepository(db);
   const agentOAuthTokenRepo = new FirestoreAgentOAuthTokenRepository(db);
+  const modelRegistryRepo = new FirestoreModelRegistryRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();
@@ -198,6 +201,7 @@ export function getPlatformServices(): PlatformServices {
     namespaceRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    modelRegistryRepo,
   };
 
   if (!seedingStarted) {

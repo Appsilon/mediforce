@@ -866,7 +866,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
             'CLI execution completed',
           ],
           annotations: [],
-          model: this.agentConfig.model ?? `${this.agentName}-cli`,
+          model: this.agentConfig.model ?? this.metadata?.foundationModel ?? `${this.agentName}-cli`,
           duration_ms,
           result: cleanResult,
           ...(spawnResult.gitMetadata ? { gitMetadata: spawnResult.gitMetadata } : {}),

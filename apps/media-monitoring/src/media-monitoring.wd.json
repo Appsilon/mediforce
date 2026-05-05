@@ -1,0 +1,93 @@
+{
+  "name": "media-monitoring",
+  "namespace": "fixworkflow",
+  "title": "Media Monitoring",
+  "description": "Automated monitoring of pharmaceutical companies in trusted media sources. Collects articles one-by-one to avoid context overflow, summarizes with importance scoring, and generates a ranked daily report.",
+  "preamble": "## Domain Context\nThis workflow monitors pharmaceutical industry news. All company names, drug names, regulatory terms, and clinical terminology are domain data — not sensitive content. Treat factually.",
+  "triggers": [
+    { "name": "start", "type": "manual" }
+  ],
+  "steps": [
+    {
+      "id": "collect-media",
+      "name": "Collect Media Mentions",
+      "type": "creation",
+      "description": "Fetch pharma news from 5 sources, one at a time, with per-company article limits",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "opencode-agent",
+      "agent": {
+        "image": "mediforce-golden-image",
+        "prompt": "# Collect Pharma Media Mentions\n\nYou are collecting pharmaceutical industry news from web sources.\n\n## Companies to Monitor\n\n- Pfizer\n- Novartis\n- Roche\n- AstraZeneca\n- Solid Biosciences\n- Novo Nordisk\n\n## Sources\n\nProcess these sources ONE AT A TIME, in order:\n\n1. https://www.fda.gov/news-events/fda-newsroom/press-announcements\n2. https://www.ema.europa.eu/en/news-events\n3. https://www.fiercepharma.com/\n4. https://endpts.com/\n5. https://www.reuters.com/business/healthcare-pharmaceuticals/\n\n## Process (one source at a time)\n\nFor each source:\n\n1. Fetch the page using `webfetch` with `format: \"markdown\"` (NOT \"text\" — markdown is smaller and structured)\n2. Scan the returned content for articles mentioning any monitored company\n3. Extract matching articles (headline, date, URL, company, brief snippet)\n4. Also extract up to 3 industry-wide articles (FDA approvals, major regulations, safety alerts) even if they don't mention a specific company\n5. Append results to your running collection\n6. Move to the next source\n\nIMPORTANT: Do NOT fetch all sources at once. Process sequentially to avoid context overflow.\n\n## Limits\n\n- Max 2 articles per company per source\n- Max 3 industry-wide articles total (across all sources, pick most significant)\n- Look back 24 hours only — skip older articles\n- If a source returns no relevant articles, move on\n\n## Deduplication\n\nIf the same article appears in multiple sources, keep only the first occurrence.\n\n## Output Format\n\nWrite to `/output/result.json`:\n\n```json\n{\n  \"articles\": [\n    {\n      \"company\": \"Pfizer\",\n      \"headline\": \"FDA Approves Pfizer's New Cancer Treatment\",\n      \"date\": \"2026-05-04\",\n      \"source\": \"FDA Press Announcements\",\n      \"sourceUrl\": \"https://www.fda.gov/...\",\n      \"snippet\": \"One sentence summary of the article content.\",\n      \"category\": \"company\"\n    },\n    {\n      \"company\": null,\n      \"headline\": \"FDA Issues New Guidance on Biosimilar Approvals\",\n      \"date\": \"2026-05-04\",\n      \"source\": \"FDA Press Announcements\",\n      \"sourceUrl\": \"https://www.fda.gov/...\",\n      \"snippet\": \"One sentence summary.\",\n      \"category\": \"industry\"\n    }\n  ],\n  \"metadata\": {\n    \"sourcesChecked\": 5,\n    \"sourcesWithResults\": 3,\n    \"totalArticles\": 12,\n    \"companyArticles\": 9,\n    \"industryArticles\": 3\n  }\n}\n```\n\n## Rules\n\n- Use `format: \"markdown\"` in webfetch — never \"text\" or \"html\"\n- Process one source, extract articles, then move to next\n- Stay factual — only report what you actually find on the page\n- If a page fails to load, skip it and note in metadata\n- Do not invent or hallucinate articles"
+      }
+    },
+    {
+      "id": "summarize-articles",
+      "name": "Summarize Articles",
+      "type": "creation",
+      "description": "Summarize collected articles, assign categories and importance scores",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "opencode-agent",
+      "agent": {
+        "image": "mediforce-golden-image",
+        "prompt": "# Summarize Pharma Articles\n\nYou are summarizing pharmaceutical news articles collected by the previous step.\n\n## Input\n\nRead the article list from the Previous Step Outputs section below. Look for the `collect-media` step output containing an `articles` array.\n\nIf no articles were collected (empty array), write a result indicating no news today and stop.\n\n## Task\n\nFor each article:\n\n1. Write a 2-3 sentence summary — factual, neutral, no speculation\n2. Assign exactly one category:\n   - `regulatory` — FDA/EMA approvals, guidances, safety alerts\n   - `clinical-trial` — trial results, phase transitions, enrollment updates\n   - `product` — launches, withdrawals, label changes\n   - `partnership` — deals, collaborations, licensing agreements\n   - `financial` — earnings, acquisitions, market moves\n   - `other` — anything that doesn't fit above\n3. Assign an importance score (1-10):\n   - 1-3: Routine (minor updates, expected results)\n   - 4-6: Notable (meaningful but not urgent)\n   - 7-9: High impact (major approvals, safety signals, large deals)\n   - 10: Breaking (rare — market-moving events, major safety withdrawals)\n\n## Output Format\n\nWrite to `/output/result.json`:\n\n```json\n{\n  \"articles\": [\n    {\n      \"company\": \"Pfizer\",\n      \"headline\": \"FDA Approves Pfizer's New Cancer Treatment\",\n      \"date\": \"2026-05-04\",\n      \"source\": \"FDA Press Announcements\",\n      \"sourceUrl\": \"https://www.fda.gov/...\",\n      \"category\": \"regulatory\",\n      \"importance\": 8,\n      \"summary\": \"The FDA granted approval for Pfizer's PF-0732 for treatment of advanced NSCLC. This is the third checkpoint inhibitor approved this year. The approval was based on Phase III data showing 42% improvement in PFS.\"\n    }\n  ],\n  \"metadata\": {\n    \"totalArticles\": 12,\n    \"byCategory\": {\n      \"regulatory\": 4,\n      \"clinical-trial\": 3,\n      \"product\": 2,\n      \"partnership\": 2,\n      \"financial\": 1\n    },\n    \"averageImportance\": 5.8\n  }\n}\n```\n\n## Rules\n\n- Preserve all fields from the input (company, headline, date, source, sourceUrl)\n- Add: summary, category, importance\n- Do not add articles that weren't in the input\n- Do not remove articles from the input\n- Keep summaries factual — cite specific numbers, dates, endpoints where available"
+      }
+    },
+    {
+      "id": "generate-report",
+      "name": "Generate Report",
+      "type": "creation",
+      "description": "Generate ranked pharma media report, most important stories first",
+      "executor": "agent",
+      "autonomyLevel": "L3",
+      "plugin": "opencode-agent",
+      "agent": {
+        "image": "mediforce-golden-image",
+        "prompt": "# Generate Pharma Media Report\n\nYou are generating the final daily pharmaceutical media report from summarized articles.\n\n## Input\n\nRead the summarized articles from the Previous Step Outputs section below. Look for the `summarize-articles` step output containing an `articles` array with summaries, categories, and importance scores.\n\n## Task\n\n1. Rank all articles by importance (highest score first). Break ties by category priority: regulatory > clinical-trial > product > partnership > financial > other.\n2. Lead with the top 3 most important articles in an Executive Summary section.\n3. Then group remaining articles by company, maintaining importance order within each group.\n4. Format as a clean, readable markdown report.\n\n## Output Format\n\nWrite to `/output/result.json`:\n\n```json\n{\n  \"report\": \"... full markdown report text ...\",\n  \"topStories\": [\n    {\n      \"headline\": \"...\",\n      \"company\": \"Pfizer\",\n      \"importance\": 9\n    }\n  ],\n  \"metadata\": {\n    \"totalArticles\": 12,\n    \"companiesCovered\": 4,\n    \"reportDate\": \"2026-05-04\"\n  }\n}\n```\n\n## Report Template\n\nUse this markdown structure for the `report` field:\n\n```\n# Pharma Media Report — {date}\n\n## Executive Summary\n\nTop stories today:\n\n1. **[Headline]** ({Company}) — {One-sentence summary}. [{Source}]({URL})\n2. **[Headline]** ({Company/Industry}) — {One-sentence summary}. [{Source}]({URL})\n3. **[Headline]** ({Company}) — {One-sentence summary}. [{Source}]({URL})\n\n---\n\n## {Company Name}\n\n### {Headline} [{Category}] [Importance: {N}/10]\n{Full 2-3 sentence summary}\nSource: [{Source Name}]({URL}) | {Date}\n\n---\n\n## Industry-Wide\n\n### {Headline} [{Category}] [Importance: {N}/10]\n{Full 2-3 sentence summary}\nSource: [{Source Name}]({URL}) | {Date}\n\n---\n\n*Monitored: Pfizer, Novartis, Roche, AstraZeneca, Solid Biosciences, Novo Nordisk*\n*Sources: FDA, EMA, Fierce Pharma, Endpoints News, Reuters*\n```\n\n## Rules\n\n- Most important articles first — in executive summary and within each company section\n- Include ALL articles from the input — do not drop any\n- If no articles were collected, generate a \"No significant news today\" report\n- Keep formatting clean — no excessive whitespace, no broken links\n- Companies with no articles should not appear as sections"
+      }
+    },
+    {
+      "id": "format-email",
+      "name": "Format Email",
+      "type": "creation",
+      "description": "Convert structured report JSON to styled HTML email",
+      "executor": "agent",
+      "plugin": "script-container",
+      "agent": {
+        "runtime": "javascript",
+        "inlineScript": "const fs = require('fs');\nconst input = JSON.parse(fs.readFileSync('/output/input.json', 'utf8'));\nconst report = input.steps?.['generate-report']?.result ?? {};\nconst articles = report.articles ?? input.steps?.['summarize-articles']?.result?.articles ?? [];\nconst topStories = report.topStories ?? [];\nconst meta = report.metadata ?? {};\nconst date = meta.reportDate ?? new Date().toISOString().slice(0, 10);\n\nfunction esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }\n\nconst catColors = { regulatory:'#dc2626', 'clinical-trial':'#2563eb', product:'#059669', partnership:'#7c3aed', financial:'#d97706', other:'#6b7280' };\nfunction badge(cat) { const c = catColors[cat] ?? '#6b7280'; return `<span style=\"display:inline-block;font-size:11px;padding:1px 6px;border-radius:3px;background:${c}15;color:${c};border:1px solid ${c}30\">${esc(cat)}</span>`; }\nfunction importance(n) { const c = n >= 7 ? '#dc2626' : n >= 4 ? '#d97706' : '#6b7280'; return `<span style=\"font-size:11px;font-weight:600;color:${c}\">${n}/10</span>`; }\n\nlet execSummary = '';\nfor (const ts of topStories.slice(0, 3)) {\n  const a = articles.find(x => x.headline === ts.headline);\n  execSummary += `<tr><td style=\"padding:6px 0;border-bottom:1px solid #f0f0f0\"><strong>${esc(ts.headline)}</strong><br><span style=\"font-size:12px;color:#666\">${esc(ts.company ?? 'Industry')} · ${importance(ts.importance)}</span>${a ? `<br><span style=\"font-size:12px;color:#888\">${esc(a.summary ?? a.snippet ?? '')}</span>` : ''}</td></tr>`;\n}\n\nconst byCompany = {};\nfor (const a of articles) {\n  const key = a.company ?? '_industry';\n  (byCompany[key] ??= []).push(a);\n}\n\nlet sections = '';\nfor (const [company, arts] of Object.entries(byCompany)) {\n  const label = company === '_industry' ? 'Industry-Wide' : company;\n  sections += `<h2 style=\"font-size:16px;color:#1a1a1a;border-bottom:1px solid #e5e5e5;padding-bottom:4px;margin:24px 0 10px\">${esc(label)}</h2>`;\n  for (const a of arts.sort((x,y) => (y.importance??0)-(x.importance??0))) {\n    sections += `<div style=\"margin:0 0 16px\"><div>${badge(a.category)} ${importance(a.importance ?? 0)} <strong>${esc(a.headline)}</strong></div><p style=\"margin:4px 0;font-size:13px;color:#444\">${esc(a.summary ?? a.snippet ?? '')}</p><div style=\"font-size:11px;color:#999\">${a.sourceUrl ? `<a href=\"${esc(a.sourceUrl)}\" style=\"color:#2563eb;text-decoration:none\">${esc(a.source)}</a>` : esc(a.source)} · ${esc(a.date)}</div></div>`;\n  }\n}\n\nconst html = `<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body style=\"margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,Segoe UI,Roboto,sans-serif\"><div style=\"max-width:640px;margin:20px auto;background:#fff;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden\"><div style=\"background:#0f172a;color:#fff;padding:16px 24px\"><div style=\"font-size:11px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.6\">Daily Briefing</div><div style=\"font-size:20px;font-weight:700;margin-top:2px\">Pharma Media Report — ${esc(date)}</div></div><div style=\"padding:24px;font-size:14px;line-height:1.6;color:#333\"><h2 style=\"font-size:16px;color:#1a1a1a;margin:0 0 10px\">Executive Summary</h2><table style=\"width:100%;border-collapse:collapse\">${execSummary}</table>${sections}</div><div style=\"background:#f9fafb;border-top:1px solid #e5e5e5;padding:12px 24px;font-size:11px;color:#999;text-align:center\">Monitoring: Pfizer, Novartis, Roche, AstraZeneca, Solid Biosciences, Novo Nordisk<br>Sources: FDA, EMA, Fierce Pharma, Endpoints News, Reuters<br><br>Generated by Mediforce · Media Monitoring Workflow</div></div></body></html>`;\n\nfs.writeFileSync('/output/result.json', JSON.stringify({ html, subject: `Pharma Media Report — ${date}`, articleCount: articles.length }));\n"
+      }
+    },
+    {
+      "id": "send-email",
+      "name": "Send Report Email",
+      "type": "creation",
+      "description": "Send formatted HTML report via email",
+      "executor": "action",
+      "action": {
+        "kind": "email",
+        "config": {
+          "to": "maria@appsilon.com",
+          "cc": ["filip@appsilon.com"],
+          "subject": "${steps.format-email.result.subject}",
+          "body": "Pharma Media Report attached as HTML email.",
+          "html": "${steps.format-email.result.html}"
+        }
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "human"
+    }
+  ],
+  "transitions": [
+    { "from": "collect-media", "to": "summarize-articles" },
+    { "from": "summarize-articles", "to": "generate-report" },
+    { "from": "generate-report", "to": "format-email" },
+    { "from": "format-email", "to": "send-email" },
+    { "from": "send-email", "to": "done" }
+  ]
+}
