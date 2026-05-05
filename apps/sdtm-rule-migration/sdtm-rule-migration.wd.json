@@ -1,0 +1,67 @@
+{
+  "name": "sdtm-rule-migration",
+  "namespace": "vedha",
+  "title": "SDTM Rule Migration",
+  "description": "Verify and migrate CDISC CORE rules from old authoring portal to GitHub. Agent uses SDTM Rule Author skills to validate rule, prepare YAML, and open a PR to core-contributor.",
+  "preamble": "## Domain Context\nThis workflow processes CDISC SDTM conformance rules for the CORE rules engine. All terminology (SDTM domains, SDTMIG variables, CDISC CORE rule IDs like CORE-000127, CG-prefixed checks) refers to clinical data standards — not patient data. Treat as technical domain content.\n\n## Process\nCDISC volunteers migrate rules from the legacy rule authoring portal to GitHub (verisianHQ/core-contributor). Each rule is verified against SDTMIG, mock data is highlighted, and a rule-specific PR is opened. Sample PR: verisianHQ/core-contributor#259.",
+  "workspace": {
+    "remote": "verisianHQ/core-contributor",
+    "remoteAuth": "GITHUB_TOKEN"
+  },
+  "env": {
+    "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+    "GITHUB_TOKEN": "{{GITHUB_TOKEN}}"
+  },
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "steps": [
+    {
+      "id": "verify-rule",
+      "name": "Verify & Author Rule",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "opencode-agent",
+      "autonomyLevel": "L2",
+      "agentId": "EuE7ujAyRJaRy4iQpvzx",
+      "description": "Agent reads the rule from the repo (by ruleId), verifies it against SDTMIG, corrects any issues, prepares the final YAML, and highlights relevant mock data rows.",
+      "agent": {
+        "prompt": "You have the CDISC CORE rule repository checked out in your workspace.\n\n## Task\n\n1. Find the rule specified by `input.ruleId` in the repository (check `rules/` directory for YAML files).\n2. Using your SDTM Rule Authoring and SDTMIG Reference skills, verify the rule:\n   - Is the rule logic correct per SDTMIG v3.4?\n   - Are all referenced variables valid SDTM domains/columns?\n   - Is the YAML structure conformant with CORE engine schema?\n3. If issues found, fix them and write the corrected YAML.\n4. Identify which rows in the Excel mock data would trigger this rule.\n5. Output a JSON with: ruleId, status (verified|corrected|not_found), changes made, mock data highlights, and the final rule YAML content.\n\n## Output\n\nWrite result to `{output_directory}/result.json`.",
+        "model": "openrouter/anthropic/claude-sonnet-4",
+        "timeoutMinutes": 10
+      },
+      "review": {
+        "type": "human",
+        "verdicts": {
+          "approve": { "target": "open-pr" },
+          "revise": { "target": "verify-rule" }
+        }
+      }
+    },
+    {
+      "id": "open-pr",
+      "name": "Open PR",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Push a branch with the verified rule YAML and open a PR against main in verisianHQ/core-contributor. Idempotent: force-pushes on retry, handles 422 (PR exists).",
+      "agent": {
+        "command": "python3 /scripts/open_rule_pr.py",
+        "image": "mediforce-sdtm-rules:latest"
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Rule verified and PR opened. Volunteer can review the PR on GitHub."
+    }
+  ],
+  "transitions": [
+    { "from": "verify-rule", "to": "open-pr", "when": "verdict == 'approve'" },
+    { "from": "verify-rule", "to": "verify-rule", "when": "verdict == 'revise'" },
+    { "from": "open-pr", "to": "done" }
+  ]
+}
