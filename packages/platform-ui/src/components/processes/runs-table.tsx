@@ -10,7 +10,9 @@ import { useUserDisplayNames } from '@/hooks/use-users';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { archiveProcessRun, bulkCancelProcessRuns, bulkArchiveProcessRuns } from '@/app/actions/processes';
+import type { BulkOperationResult } from '@/app/actions/processes';
 import { getWorkflowStatus } from '@/lib/workflow-status';
+import { useToast } from '@/components/command-palette/toast-provider';
 
 interface RunsTableProps {
   runs: ProcessInstance[];
@@ -43,6 +45,7 @@ export function RunsTable({
   activeTaskByInstance,
 }: RunsTableProps) {
   const handle = useHandleFromPath();
+  const { toast } = useToast();
   const userNames = useUserDisplayNames();
   const [archivingIds, setArchivingIds] = React.useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
@@ -106,15 +109,27 @@ export function RunsTable({
   const cancellableSelected = runs.filter((r) => selectedIds.has(r.id) && isCancellable(r));
   const archivableSelected = runs.filter((r) => selectedIds.has(r.id) && isArchivable(r));
 
+  function reportBulkResult(result: BulkOperationResult, action: string) {
+    if (result.failed.length > 0) {
+      toast({
+        title: `${result.failed.length} run(s) failed to ${action}`,
+        description: result.failed.map((f) => f.error).join('; '),
+        variant: 'error',
+      });
+    }
+  }
+
   async function handleBulkCancel() {
     setBulkCancelling(true);
-    await bulkCancelProcessRuns(cancellableSelected.map((r) => r.id));
+    const result = await bulkCancelProcessRuns(cancellableSelected.map((r) => r.id));
+    reportBulkResult(result, 'cancel');
     setBulkCancelling(false);
   }
 
   async function handleBulkArchive() {
     setBulkArchiving(true);
-    await bulkArchiveProcessRuns(archivableSelected.map((r) => r.id));
+    const result = await bulkArchiveProcessRuns(archivableSelected.map((r) => r.id));
+    reportBulkResult(result, 'archive');
     setBulkArchiving(false);
   }
 
