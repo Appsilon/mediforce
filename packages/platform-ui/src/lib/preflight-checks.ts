@@ -2,7 +2,7 @@ import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 
 export interface PreflightWarning {
-  category: 'missing-image' | 'missing-secret';
+  category: 'missing-image' | 'missing-secret' | 'low-credits';
   resource: string;
   stepNames: string[];
   message: string;
@@ -11,12 +11,20 @@ export interface PreflightWarning {
 
 const TEMPLATE_RE = /^\{\{(?:[A-Z]+:)?([A-Za-z0-9_-]+)\}\}$/;
 
+export interface OpenRouterCreditsInfo {
+  available: boolean;
+  remaining: number;
+}
+
+const LOW_CREDITS_THRESHOLD = 0.5;
+
 export function runPreflightChecks(
   definition: WorkflowDefinition,
   options: {
     dockerImages?: DockerImageInfo[];
     dockerAvailable: boolean;
     secretKeys?: string[];
+    openRouterCredits?: OpenRouterCreditsInfo;
   },
 ): PreflightWarning[] {
   const imageMap = new Map<string, string[]>();
@@ -75,6 +83,24 @@ export function runPreflightChecks(
       message: `Secret '${key}' not configured (referenced as ${envVar})`,
       hint: 'Add this secret in the Secrets panel for this workflow.',
     });
+  }
+
+  if (options.openRouterCredits?.available && options.openRouterCredits.remaining <= LOW_CREDITS_THRESHOLD) {
+    const agentSteps = definition.steps
+      .filter((s) => s.executor === 'agent')
+      .map((s) => s.name);
+    if (agentSteps.length > 0) {
+      const remaining = options.openRouterCredits.remaining;
+      warnings.push({
+        category: 'low-credits',
+        resource: 'OPENROUTER_API_KEY',
+        stepNames: agentSteps,
+        message: remaining <= 0
+          ? 'OpenRouter credits exhausted ($0.00 remaining)'
+          : `OpenRouter credits low ($${remaining.toFixed(2)} remaining)`,
+        hint: 'Top up credits at https://openrouter.ai/settings/credits or the run will fail.',
+      });
+    }
   }
 
   return warnings;

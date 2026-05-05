@@ -103,9 +103,31 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const activeModel = FOUNDATION_MODELS.find((m) => m.id === selectedModelId);
   const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
 
+  const MAX_SKILL_FILES = 10;
+  const MAX_SKILL_FILE_BYTES = 100 * 1024;
+  const [skillFileErrors, setSkillFileErrors] = useState<string[]>([]);
+
   function addSkillFiles(incoming: FileList | File[]) {
     const files = Array.from(incoming);
-    setNewSkillFiles((prev) => [...prev, ...files]);
+    const errors: string[] = [];
+    const totalAfter = existingSkillPaths.length + newSkillFiles.length + files.length;
+    if (totalAfter > MAX_SKILL_FILES) {
+      errors.push(`Maximum ${MAX_SKILL_FILES} skill files allowed.`);
+      setSkillFileErrors(errors);
+      return;
+    }
+    const accepted: File[] = [];
+    for (const file of files) {
+      if (file.size > MAX_SKILL_FILE_BYTES) {
+        errors.push(`"${file.name}" exceeds 100 KB — split into smaller files or reduce content.`);
+      } else {
+        accepted.push(file);
+      }
+    }
+    setSkillFileErrors(errors);
+    if (accepted.length > 0) {
+      setNewSkillFiles((prev) => [...prev, ...accepted]);
+    }
   }
 
   function handleSkillDrop(event: React.DragEvent<HTMLDivElement>) {
@@ -337,13 +359,21 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".yaml,.yml,.json,.md,.txt"
+                accept=".yaml,.yml,.json,.md,.txt,.csv"
                 onChange={(e) => {
                   if (e.target.files) { addSkillFiles(e.target.files); e.target.value = ''; }
                 }}
                 className="hidden"
               />
             </div>
+
+            {skillFileErrors.length > 0 && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                {skillFileErrors.map((err, i) => (
+                  <p key={i} className="text-xs text-destructive">{err}</p>
+                ))}
+              </div>
+            )}
 
             {(existingSkillPaths.length > 0 || newSkillFiles.length > 0) && (
               <ul className="space-y-1.5">
