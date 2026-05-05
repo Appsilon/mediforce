@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { AppShell } from '@/components/app-shell';
 import { CommandPaletteProvider } from '@/components/command-palette';
 import { DockerImagesProvider } from '@/contexts/docker-images-context';
+import { OpenRouterCreditsProvider } from '@/contexts/openrouter-credits-context';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { firebaseUser, loading, mustChangePassword } = useAuth();
@@ -35,9 +36,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <DockerImagesProvider>
-      <CommandPaletteProvider>
-        <AppShell>{children}</AppShell>
-      </CommandPaletteProvider>
+      <OpenRouterCreditsProvider>
+        <CommandPaletteProvider>
+          <AppShell>{children}</AppShell>
+        </CommandPaletteProvider>
+      </OpenRouterCreditsProvider>
     </DockerImagesProvider>
   );
 }
