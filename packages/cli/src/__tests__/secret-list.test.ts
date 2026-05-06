@@ -89,6 +89,23 @@ describe('secret list command', () => {
     expect(parsed.status).toBe(401);
   });
 
+  it('lists namespace-level secrets when --workflow omitted', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ keys: ['OPENROUTER_API_KEY'] }),
+    );
+    const output = captureOutput();
+    const code = await secretListCommand({
+      argv: ['--namespace', 'ns-1'],
+      env: BASE_ENV,
+      output,
+    });
+    expect(code).toBe(0);
+    const url = fetchSpy.mock.calls[0]![0] as string;
+    expect(url).toContain('namespace=ns-1');
+    expect(url).not.toContain('workflow=');
+    expect(output.stdoutLines.join('\n')).toMatch(/namespace "ns-1"/);
+  });
+
   it('verifies fetch URL contains correct query params', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({ keys: [] }),

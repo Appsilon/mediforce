@@ -8,7 +8,7 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, callerCanAccess } from '@/lib/api-auth';
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo } = getPlatformServices();
+  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
   const caller = await resolveCallerIdentity(request, namespaceRepo);
   if (caller instanceof NextResponse) return caller;
 
@@ -29,12 +29,14 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const keys = await secretsRepo.getSecretKeys(namespace, workflow);
+  const keys = workflow
+    ? await secretsRepo.getSecretKeys(namespace, workflow)
+    : await namespaceSecretsRepo.getSecretKeys(namespace);
   return NextResponse.json({ keys });
 }
 
 export async function PUT(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo } = getPlatformServices();
+  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
   const caller = await resolveCallerIdentity(request, namespaceRepo);
   if (caller instanceof NextResponse) return caller;
 
@@ -63,12 +65,16 @@ export async function PUT(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await secretsRepo.upsertSecret(namespace, workflow, key, value);
+  if (workflow) {
+    await secretsRepo.upsertSecret(namespace, workflow, key, value);
+  } else {
+    await namespaceSecretsRepo.upsertSecret(namespace, key, value);
+  }
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo } = getPlatformServices();
+  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
   const caller = await resolveCallerIdentity(request, namespaceRepo);
   if (caller instanceof NextResponse) return caller;
 
@@ -90,6 +96,10 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await secretsRepo.deleteSecret(namespace, workflow, key);
+  if (workflow) {
+    await secretsRepo.deleteSecret(namespace, workflow, key);
+  } else {
+    await namespaceSecretsRepo.deleteSecret(namespace, key);
+  }
   return NextResponse.json({ ok: true });
 }

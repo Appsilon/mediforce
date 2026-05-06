@@ -37,6 +37,8 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
     return result;
   }, [latestDocs, handle]);
 
+  const namespaceSecretKeys = secretKeysCtx?.namespaceKeys;
+
   const warnings = React.useMemo((): WorkflowWarning[] => {
     const all: WorkflowWarning[] = [];
     for (const doc of namespaceDocs) {
@@ -45,13 +47,14 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
         dockerImages,
         dockerAvailable,
         secretKeys,
+        namespaceSecretKeys,
       });
       for (const warning of checks) {
         all.push({ ...warning, workflowName: doc.name, workflowTitle: doc.title });
       }
     }
     return all;
-  }, [namespaceDocs, dockerImages, dockerAvailable, secretKeysCtx]);
+  }, [namespaceDocs, dockerImages, dockerAvailable, secretKeysCtx, namespaceSecretKeys]);
 
   const isLoading = loading || dockerLoading || (secretKeysCtx?.loading ?? false);
 

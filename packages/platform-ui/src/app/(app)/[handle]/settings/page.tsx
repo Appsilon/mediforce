@@ -32,6 +32,7 @@ import { WORKSPACE_ICONS, WORKSPACE_ICON_KEYS, getWorkspaceIcon, WORKSPACE_DEFAU
 import { NamespaceMemberSchema } from '@mediforce/platform-core';
 import type { NamespaceMember } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
+import { NamespaceSecretsEditor } from '@/components/namespace/namespace-secrets-editor';
 
 type NamespaceMemberWithId = NamespaceMember & { id: string };
 
@@ -867,7 +868,17 @@ export default function WorkspaceConfigPage() {
           )}
         </div>
 
-        {/* ── Section 4: Administration ──────────────────────────────────── */}
+        {/* ── Section 4: Workspace Secrets ──────────────────────────────── */}
+        {canEditProfile && firebaseUser?.uid && (
+          <div className="mb-10 space-y-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace Secrets</h2>
+            <div className="rounded-lg border bg-card px-4 py-5">
+              <NamespaceSecretsEditor namespace={handle} userId={firebaseUser.uid} />
+            </div>
+          </div>
+        )}
+
+        {/* ── Section 5: Administration ──────────────────────────────────── */}
         {canEditProfile && (
           <div className="mb-10 space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Administration</h2>

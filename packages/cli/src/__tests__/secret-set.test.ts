@@ -127,6 +127,23 @@ describe('secret set command', () => {
     expect(code).toBe(2);
   });
 
+  it('sets namespace-level secret when --workflow omitted', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ ok: true }),
+    );
+    const output = captureOutput();
+    const code = await secretSetCommand({
+      argv: ['--namespace', 'ns-1', '--key', 'TOKEN', '--value', 'val'],
+      env: BASE_ENV,
+      output,
+    });
+    expect(code).toBe(0);
+    const url = fetchSpy.mock.calls[0]![0] as string;
+    expect(url).toContain('namespace=ns-1');
+    expect(url).not.toContain('workflow=');
+    expect(output.stdoutLines.join('\n')).toMatch(/namespace "ns-1"/);
+  });
+
   it('emits JSON on success when --json set', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ok: true }));
     const output = captureOutput();
