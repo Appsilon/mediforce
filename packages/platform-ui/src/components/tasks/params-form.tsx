@@ -8,6 +8,7 @@ import { completeParamsTask } from '@/app/actions/tasks';
 import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
+import { ParamField } from '@/components/ui/param-field';
 import type { StepParam } from '@mediforce/platform-core';
 
 interface ParamsFormProps {
@@ -121,88 +122,6 @@ export function ParamsForm({
         {submitting ? 'Submitting...' : 'Submit'}
       </button>
     </form>
-  );
-}
-
-function ParamField({
-  param,
-  value,
-  onChange,
-  disabled,
-}: {
-  param: StepParam;
-  value: unknown;
-  onChange: (value: unknown) => void;
-  disabled: boolean;
-}) {
-  const inputClasses = cn(
-    'w-full rounded-md border bg-background px-3 py-2 text-sm',
-    'placeholder:text-muted-foreground',
-    'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
-    disabled && 'opacity-50 cursor-not-allowed',
-  );
-
-  return (
-    <div className="space-y-1.5">
-      <label className="flex items-baseline gap-1.5 text-sm font-medium">
-        {param.name}
-        {param.required && <span className="text-destructive">*</span>}
-      </label>
-      {param.description && (
-        <p className="text-xs text-muted-foreground">{param.description}</p>
-      )}
-
-      {param.options && param.options.length > 0 ? (
-        <select
-          value={String(value ?? '')}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={disabled}
-          className={inputClasses}
-        >
-          <option value="">Select...</option>
-          {param.options.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      ) : param.type === 'boolean' ? (
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={Boolean(value)}
-            onChange={(event) => onChange(event.target.checked)}
-            disabled={disabled}
-            className="h-4 w-4 rounded border"
-          />
-          {param.description ?? param.name}
-        </label>
-      ) : param.type === 'number' ? (
-        <input
-          type="number"
-          value={value === undefined ? '' : String(value)}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={disabled}
-          placeholder={param.default !== undefined ? String(param.default) : undefined}
-          className={inputClasses}
-        />
-      ) : param.type === 'date' ? (
-        <input
-          type="date"
-          value={String(value ?? '')}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={disabled}
-          className={inputClasses}
-        />
-      ) : (
-        <textarea
-          value={String(value ?? '')}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={disabled}
-          placeholder={param.default !== undefined ? String(param.default) : undefined}
-          rows={3}
-          className={cn(inputClasses, 'resize-y min-h-[72px]')}
-        />
-      )}
-    </div>
   );
 }
 

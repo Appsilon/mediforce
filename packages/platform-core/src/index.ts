@@ -48,6 +48,7 @@ export {
   WorkflowDefinitionBaseSchema,
   WorkflowTemplateSchema,
   InputForNextRunEntrySchema,
+  TriggerInputFieldSchema,
   HttpMethodSchema,
   WebhookTriggerConfigSchema,
   HttpActionConfigSchema,
@@ -56,6 +57,7 @@ export {
   ActionConfigSchema,
   validateInputForNextRun,
   validateExecutorAndTriggers,
+  validateTriggerInput,
   parseWorkflowDefinitionForCreation,
   parseWorkflowTemplate,
   ConversationTurnSchema,
@@ -129,6 +131,7 @@ export type {
   WorkflowStep,
   WorkflowDefinition,
   WorkflowTemplate,
+  TriggerInputField,
   HttpMethod,
   WebhookTriggerConfig,
   HttpActionConfig,
@@ -277,6 +280,8 @@ export {
 // Validation
 export { validateProcessConfig } from './validation/config-validator.js';
 export type { ConfigValidationResult } from './validation/config-validator.js';
+export { validatePayload } from './validation/payload-validator.js';
+export type { PayloadValidationError, PayloadValidationResult } from './validation/payload-validator.js';
 
 // MCP resolver (pure; wires AgentDefinition + step restrictions + catalog)
 export {

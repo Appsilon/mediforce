@@ -3,7 +3,7 @@
 import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useRouter } from 'next/navigation';
-import { Play, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound } from 'lucide-react';
+import { Play, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRound, FileInput } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useOpenRouterCredits } from '@/hooks/use-openrouter-credits';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
+import { ParamField } from '@/components/ui/param-field';
+import type { TriggerInputField } from '@mediforce/platform-core';
 
 interface StartRunButtonProps {
   workflowName: string;
@@ -51,6 +53,28 @@ export function StartRunButton({
     () => definitions.find((d) => d.version === effectiveVersion),
     [definitions, effectiveVersion],
   );
+
+  const triggerInput: TriggerInputField[] = effectiveDefinition?.triggerInput ?? [];
+  const hasTriggerInput = triggerInput.length > 0;
+
+  const [inputValues, setInputValues] = React.useState<Record<string, unknown>>({});
+
+  React.useEffect(() => {
+    const fields = effectiveDefinition?.triggerInput ?? [];
+    const initial: Record<string, unknown> = {};
+    for (const field of fields) {
+      if (field.default !== undefined) {
+        initial[field.name] = field.default;
+      } else if (field.type === 'boolean') {
+        initial[field.name] = false;
+      } else if (field.type === 'multiselect') {
+        initial[field.name] = [];
+      } else {
+        initial[field.name] = '';
+      }
+    }
+    setInputValues(initial);
+  }, [effectiveDefinition]);
 
   React.useEffect(() => {
     if (!handle || !workflowName || !firebaseUser) return;
@@ -99,10 +123,13 @@ export function StartRunButton({
     setDropdownOpen(false);
     setDialogOpen(false);
 
+    const payload = hasTriggerInput ? buildPayload() : undefined;
+
     const result = await startWorkflowRun({
       definitionName: workflowName,
       definitionVersion: targetVersion,
       triggeredBy: firebaseUser.uid,
+      payload,
     });
 
     if (result.success && result.instanceId) {
@@ -114,8 +141,34 @@ export function StartRunButton({
     }
   }
 
+  const requiredInputMissing = triggerInput.some((field) => {
+    if (!field.required) return false;
+    const val = inputValues[field.name];
+    if (val === '' || val === undefined) return true;
+    if (field.type === 'multiselect' && Array.isArray(val) && val.length === 0) return true;
+    return false;
+  });
+
+  function buildPayload(): Record<string, unknown> {
+    const payload: Record<string, unknown> = {};
+    for (const field of triggerInput) {
+      const raw = inputValues[field.name];
+      if (raw === '' || raw === undefined) continue;
+      if (Array.isArray(raw) && raw.length === 0) continue;
+      if (field.type === 'number') {
+        const num = parseFloat(String(raw));
+        if (!isNaN(num)) {
+          payload[field.name] = num;
+        }
+      } else {
+        payload[field.name] = raw;
+      }
+    }
+    return payload;
+  }
+
   function handleStart(v?: number) {
-    if (hasWarnings) {
+    if (hasTriggerInput || hasWarnings) {
       setPendingVersion(v);
       setDialogOpen(true);
     } else {
@@ -151,6 +204,8 @@ export function StartRunButton({
     </span>
   ) : null;
 
+  const startButtonLabel = hasWarnings ? 'Start anyway' : 'Start run';
+
   const preflightDialog = (
     <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
       <Dialog.Portal>
@@ -158,12 +213,20 @@ export function StartRunButton({
         <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md rounded-lg border bg-background p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <div className="flex items-start gap-3 mb-4">
             <div className="rounded-full bg-muted p-2">
-              <CircleDot className="h-5 w-5 text-amber-500" />
+              {hasTriggerInput ? (
+                <FileInput className="h-5 w-5 text-primary" />
+              ) : (
+                <CircleDot className="h-5 w-5 text-amber-500" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <Dialog.Title className="text-sm font-semibold">Before you start</Dialog.Title>
+              <Dialog.Title className="text-sm font-semibold">
+                {hasTriggerInput ? 'Run input' : 'Before you start'}
+              </Dialog.Title>
               <Dialog.Description className="text-xs text-muted-foreground mt-0.5">
-                {warnings.length} item{warnings.length !== 1 ? 's' : ''} to review for a smooth run.
+                {hasTriggerInput
+                  ? 'Provide input values for this workflow run.'
+                  : `${warnings.length} item${warnings.length !== 1 ? 's' : ''} to review for a smooth run.`}
               </Dialog.Description>
             </div>
             <Dialog.Close className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -171,44 +234,73 @@ export function StartRunButton({
             </Dialog.Close>
           </div>
 
-          <div className="space-y-3 max-h-60 overflow-y-auto">
-            <WarningGroup
-              title="Missing Docker images"
-              warnings={warnings.filter((w) => w.category === 'missing-image')}
-            />
-            <WarningGroup
-              title="Missing secrets"
-              warnings={warnings.filter((w) => w.category === 'missing-secret')}
-            />
-            <WarningGroup
-              title="LLM credits"
-              warnings={warnings.filter((w) => w.category === 'low-credits')}
-            />
-          </div>
+          {hasWarnings && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                  {warnings.length} warning{warnings.length !== 1 ? 's' : ''}
+                </span>
+                {missingSecretKeys.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setDialogOpen(false);
+                      const setup = encodeURIComponent(missingSecretKeys.join(','));
+                      const wf = encodeURIComponent(workflowName);
+                      router.push(`/${handle}/workflows/${wf}?tab=secrets&setup=${setup}`);
+                    }}
+                    className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    <KeyRound className="h-3 w-3" />
+                    Set secrets
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                <WarningGroup
+                  title="Missing Docker images"
+                  warnings={warnings.filter((w) => w.category === 'missing-image')}
+                />
+                <WarningGroup
+                  title="Missing secrets"
+                  warnings={warnings.filter((w) => w.category === 'missing-secret')}
+                />
+                <WarningGroup
+                  title="LLM credits"
+                  warnings={warnings.filter((w) => w.category === 'low-credits')}
+                />
+              </div>
+            </div>
+          )}
+
+          {hasTriggerInput && (
+            <div className="space-y-4 max-h-80 overflow-y-auto">
+              {triggerInput.map((field) => (
+                <ParamField
+                  key={field.name}
+                  param={field}
+                  value={inputValues[field.name]}
+                  onChange={(value) => setInputValues((prev) => ({ ...prev, [field.name]: value }))}
+                  disabled={starting}
+                />
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center gap-2 mt-5">
-            {missingSecretKeys.length > 0 && (
-              <button
-                onClick={() => {
-                  setDialogOpen(false);
-                  const setupParam = missingSecretKeys.join(',');
-                  router.push(`/${handle}/workflows/${encodeURIComponent(workflowName)}?tab=secrets&setup=${encodeURIComponent(setupParam)}`);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
-              >
-                <KeyRound className="h-3.5 w-3.5" />
-                Set secrets
-              </button>
-            )}
             <div className="flex-1" />
             <Dialog.Close className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors">
-              Close
+              Cancel
             </Dialog.Close>
             <button
               onClick={() => executeStart(pendingVersion)}
-              className="rounded-md bg-primary hover:bg-primary/90 px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors"
+              disabled={hasTriggerInput && requiredInputMissing}
+              className={cn(
+                'rounded-md bg-primary hover:bg-primary/90 px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors',
+                hasTriggerInput && requiredInputMissing && 'opacity-50 cursor-not-allowed',
+              )}
             >
-              Start anyway
+              {startButtonLabel}
             </button>
           </div>
         </Dialog.Content>

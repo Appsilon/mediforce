@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { validatePayload } from '@mediforce/platform-core';
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 
 interface StartWorkflowBody {
@@ -7,7 +8,7 @@ interface StartWorkflowBody {
   version?: string | number;
   triggeredBy: string;
   triggerName?: string;
-  payload?: Record<string, unknown>;
+  payload?: Record<string, unknown> | null;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -26,12 +27,40 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    const rawPayload = body.payload;
+    if (rawPayload !== undefined && rawPayload !== null
+      && (typeof rawPayload !== 'object' || Array.isArray(rawPayload))) {
+      return NextResponse.json(
+        { error: 'payload must be a JSON object or omitted' },
+        { status: 400 },
+      );
+    }
+    const payload: Record<string, unknown> =
+      (rawPayload as Record<string, unknown>) ?? {};
+
+    const definition = await processRepo.getWorkflowDefinition(body.definitionName, version);
+    if (!definition) {
+      return NextResponse.json(
+        { error: `Workflow definition '${body.definitionName}' v${version} not found` },
+        { status: 404 },
+      );
+    }
+    if (definition.triggerInput && definition.triggerInput.length > 0) {
+      const validation = validatePayload(payload, definition.triggerInput);
+      if (!validation.valid) {
+        return NextResponse.json(
+          { error: 'Invalid payload', details: validation.errors },
+          { status: 400 },
+        );
+      }
+    }
+
     const result = await manualTrigger.fireWorkflow({
       definitionName: body.definitionName,
       definitionVersion: version,
       triggerName: body.triggerName ?? 'manual',
       triggeredBy: body.triggeredBy,
-      payload: body.payload ?? {},
+      payload,
     });
 
     // Fire-and-forget: trigger auto-runner asynchronously
@@ -43,7 +72,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
       },
       body: JSON.stringify({
-        appContext: body.payload ?? {},
+        appContext: payload,
         triggeredBy: body.triggeredBy,
       }),
     }).catch((err) => {
