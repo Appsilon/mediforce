@@ -1325,6 +1325,26 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
+  workflowDefinitions['Trigger Input Test:1'] = {
+    name: 'Trigger Input Test',
+    namespace: 'test',
+    version: 1,
+    title: 'Workflow with trigger inputs',
+    description: 'Test workflow that requires trigger input fields at start',
+    steps: [
+      { id: 'process', name: 'Process Data', type: 'creation', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'process', to: 'done' }],
+    triggers: [{ type: 'manual', name: 'start' }],
+    triggerInput: [
+      { name: 'studyId', type: 'string', required: true, description: 'Study identifier' },
+      { name: 'priority', type: 'select', required: false, options: ['low', 'normal', 'high'], default: 'normal', description: 'Run priority' },
+      { name: 'dryRun', type: 'boolean', required: false, default: false, description: 'Dry run mode' },
+    ],
+    createdAt: twoDaysAgo,
+  };
+
   // Step executions for the new-style workflow run (proc-workflow-run-1)
   // Used by executor identity label tests — vendor-assessment has plugin 'supply-data-collector'
   // in the WorkflowDefinition, so its label should render as 'agent:supply-data-collector'.
