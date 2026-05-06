@@ -3,7 +3,7 @@ import { signState, generateNonce, generatePkcePair } from '@mediforce/agent-run
 import { getPlatformServices } from '@/lib/platform-services';
 import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
 import { getConfiguredAppBaseUrl } from '@/lib/app-base-url';
-import { requireAdminForNamespace } from '../../../helpers';
+import { requireAdminContextForNamespace } from '../../../helpers';
 
 function buildCallbackUrl(request: Request, providerSlug: string): string {
   const origin = getConfiguredAppBaseUrl() ?? new URL(request.url).origin;
@@ -43,9 +43,9 @@ export async function POST(
 ): Promise<NextResponse> {
   const { id: connectionId } = await params;
   const services = getPlatformServices();
-  const namespaceOrResponse = await requireAdminForNamespace(request, services.namespaceRepo);
-  if (namespaceOrResponse instanceof NextResponse) return namespaceOrResponse;
-  const namespace = namespaceOrResponse;
+  const ctx = await requireAdminContextForNamespace(request, services.namespaceRepo);
+  if (ctx instanceof NextResponse) return ctx;
+  const { namespace, callerUid } = ctx;
 
   const connection = await services.connectionRepo.getById(namespace, connectionId);
   if (connection === null) {
@@ -79,23 +79,12 @@ export async function POST(
     );
   }
 
-  // Caller identity: prefer the verified Firebase uid from the
-  // requireAdminForNamespace path. When the request authed via
-  // `PLATFORM_ADMIN_API_KEY` (server-to-server), there is no uid; use a
-  // synthetic actor id so the audit field is present and recognizable.
-  const authHeader = request.headers.get('Authorization') ?? '';
-  const tokenForUid = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  let connectedBy = 'admin-api-key';
-  if (tokenForUid !== '') {
-    try {
-      const { getAdminAuth } = await import('@mediforce/platform-infra');
-      const decoded = await getAdminAuth().verifyIdToken(tokenForUid);
-      connectedBy = decoded.uid;
-    } catch {
-      // requireAdminForNamespace already passed via PLATFORM_ADMIN_API_KEY
-      // — keep the synthetic actor.
-    }
-  }
+  // Caller identity for the audit field: the admin context already
+  // resolved this from the same request — Firebase uid when the caller
+  // authed with a Bearer token, or null (PLATFORM_ADMIN_API_KEY path),
+  // in which case we record a synthetic actor so the field is always
+  // present and machine-recognizable.
+  const connectedBy = callerUid ?? 'admin-api-key';
 
   const pkce = await generatePkcePair();
   const state = await signState(

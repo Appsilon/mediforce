@@ -31,13 +31,12 @@ async function seedConnection(
   await repos.conn.create(NAMESPACE, {
     id: 'github-mediforce',
     name: 'GitHub (Mediforce)',
-    auth: {
-      type: 'oauth',
-      providerId: 'github',
-      accessToken: overrides.accessToken ?? 'gho_old',
-      refreshToken: overrides.refreshToken ?? 'ghr_old',
-      expiresAt: overrides.expiresAt,
-    },
+    auth: { type: 'oauth', providerId: 'github' },
+  });
+  await repos.conn.setTokens(NAMESPACE, 'github-mediforce', {
+    accessToken: overrides.accessToken ?? 'gho_old',
+    refreshToken: overrides.refreshToken ?? 'ghr_old',
+    ...(overrides.expiresAt !== undefined ? { expiresAt: overrides.expiresAt } : {}),
   });
 }
 
@@ -203,12 +202,11 @@ describe('getValidToken — refresh path', () => {
     await conn.create(NAMESPACE, {
       id: 'github-mediforce',
       name: 'GitHub',
-      auth: {
-        type: 'oauth',
-        providerId: 'github',
-        accessToken: 'expired',
-        expiresAt: now() - 1,
-      },
+      auth: { type: 'oauth', providerId: 'github' },
+    });
+    await conn.setTokens(NAMESPACE, 'github-mediforce', {
+      accessToken: 'expired',
+      expiresAt: now() - 1,
     });
     await expect(
       getValidToken(NAMESPACE, 'github-mediforce', {
@@ -225,13 +223,12 @@ describe('getValidToken — refresh path', () => {
     await conn.create(NAMESPACE, {
       id: 'github-mediforce',
       name: 'GitHub',
-      auth: {
-        type: 'oauth',
-        providerId: 'github',
-        accessToken: 'old',
-        refreshToken: 'r',
-        expiresAt: now() - 1,
-      },
+      auth: { type: 'oauth', providerId: 'github' },
+    });
+    await conn.setTokens(NAMESPACE, 'github-mediforce', {
+      accessToken: 'old',
+      refreshToken: 'r',
+      expiresAt: now() - 1,
     });
     await provider.delete(NAMESPACE, 'github');
 

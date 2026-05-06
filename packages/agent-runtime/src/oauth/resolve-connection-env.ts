@@ -117,11 +117,18 @@ export async function resolveConnectionEnv(
 
   // Phase 2 — collect alias entries per provider, detect collisions.
   // alias → list of contributing connection ids (preserves discovery order).
+  // Memoize per providerId so two connections backed by the same provider
+  // (the common `github × N` case) only hit Firestore once.
   const aliasContributors = new Map<string, string[]>();
+  const providerCache = new Map<string, readonly string[]>();
   for (const t of tokens) {
     if (t.providerId === null) continue;
-    const provider = await deps.oauthProviderRepo.get(namespace, t.providerId);
-    const aliases = provider?.envAlias ?? [];
+    let aliases = providerCache.get(t.providerId);
+    if (aliases === undefined) {
+      const provider = await deps.oauthProviderRepo.get(namespace, t.providerId);
+      aliases = provider?.envAlias ?? [];
+      providerCache.set(t.providerId, aliases);
+    }
     for (const alias of aliases) {
       const existing = aliasContributors.get(alias) ?? [];
       existing.push(t.connectionId);

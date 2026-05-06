@@ -558,5 +558,54 @@ describe('ScriptContainerPlugin', () => {
       expect(envEntries).toContain('EXISTING_VAR=literal-value');
       expect(envEntries).toContain('CONN_GITHUB_MEDIFORCE_TOKEN=from-connection');
     });
+
+    it('[DATA] step env shadows a CONN_<ID>_TOKEN injected by the connection layer', async () => {
+      // Workflow-level env explicitly sets CONN_GITHUB_MEDIFORCE_TOKEN to a
+      // literal — the connection-resolved token must NOT overwrite it. This
+      // is the documented "debug hatch" precedence; the test pins it so a
+      // future precedence flip surfaces here loudly.
+      const step: WorkflowStep = {
+        id: 'run-script',
+        name: 'Run Script',
+        type: 'creation',
+        executor: 'script',
+        agent: { image: 'mediforce-r:latest', command: 'Rscript /scripts/run.R' },
+        env: { CONN_GITHUB_MEDIFORCE_TOKEN: 'literal-debug-override' },
+        connections: ['github-mediforce'],
+      };
+      const workflowDefinition: WorkflowDefinition = {
+        name: 'test-wf',
+        version: 1,
+        namespace: 'test',
+        steps: [step],
+        transitions: [],
+        triggers: [{ type: 'manual', name: 'Start' }],
+      };
+      const context: WorkflowAgentContext = {
+        stepId: 'run-script',
+        processInstanceId: 'pi-001',
+        definitionVersion: '1',
+        stepInput: {},
+        autonomyLevel: 'L4',
+        workflowDefinition,
+        step,
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+        resolvedConnectionEnv: { CONN_GITHUB_MEDIFORCE_TOKEN: 'from-connection-resolver' },
+      };
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockSpawnSuccess(createMockChild());
+      await plugin.run(emit);
+
+      const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+      const envEntries: string[] = [];
+      for (let i = 0; i < dockerArgs.length - 1; i += 1) {
+        if (dockerArgs[i] === '-e') envEntries.push(dockerArgs[i + 1]);
+      }
+      expect(envEntries).toContain('CONN_GITHUB_MEDIFORCE_TOKEN=literal-debug-override');
+      expect(envEntries).not.toContain('CONN_GITHUB_MEDIFORCE_TOKEN=from-connection-resolver');
+    });
   });
 });

@@ -266,6 +266,52 @@ describe('CreateConnectionInputSchema / UpdateConnectionInputSchema', () => {
     const result = UpdateConnectionInputSchema.safeParse({ id: 'x', name: 'y' });
     expect(result.success).toBe(false);
   });
+
+  it('CreateConnectionInputSchema rejects accessToken in auth (OAuth flow only writes tokens)', () => {
+    const result = CreateConnectionInputSchema.safeParse({
+      id: 'github-mediforce',
+      name: 'GitHub',
+      auth: { type: 'oauth', providerId: 'github', accessToken: 'attacker-planted-token' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('CreateConnectionInputSchema rejects refreshToken in auth', () => {
+    const result = CreateConnectionInputSchema.safeParse({
+      id: 'github-mediforce',
+      name: 'GitHub',
+      auth: { type: 'oauth', providerId: 'github', refreshToken: 'planted' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('CreateConnectionInputSchema rejects expiresAt / connectedBy / scope etc. in auth', () => {
+    const fields = ['expiresAt', 'scope', 'providerUserId', 'accountLogin', 'connectedAt', 'connectedBy'] as const;
+    for (const f of fields) {
+      const result = CreateConnectionInputSchema.safeParse({
+        id: 'gh',
+        name: 'gh',
+        auth: { type: 'oauth', providerId: 'github', [f]: f === 'expiresAt' || f === 'connectedAt' ? 1_900_000_000_000 : 'value' },
+      });
+      expect(result.success, `field ${f} should be rejected`).toBe(false);
+    }
+  });
+
+  it('UpdateConnectionInputSchema rejects accessToken in auth patch', () => {
+    const result = UpdateConnectionInputSchema.safeParse({
+      auth: { type: 'oauth', providerId: 'github', accessToken: 'attacker' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('CreateConnectionInputSchema accepts headers auth verbatim (no token stripping needed)', () => {
+    const result = CreateConnectionInputSchema.safeParse({
+      id: 'static-jira',
+      name: 'Jira',
+      auth: { type: 'headers', headers: { 'X-Api-Key': '{{SECRET:k}}' } },
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('ConnectionTokenUpdateSchema', () => {

@@ -33,15 +33,13 @@ async function seedConnection(
   repo: InMemoryConnectionRepository,
   overrides: { id?: string; providerId?: string; accessToken?: string },
 ): Promise<void> {
+  const id = overrides.id ?? 'github-mediforce';
   await repo.create(NS, {
-    id: overrides.id ?? 'github-mediforce',
+    id,
     name: 'GitHub',
-    auth: {
-      type: 'oauth',
-      providerId: overrides.providerId ?? 'github',
-      accessToken: overrides.accessToken ?? 'gho_fresh',
-    },
+    auth: { type: 'oauth', providerId: overrides.providerId ?? 'github' },
   });
+  await repo.setTokens(NS, id, { accessToken: overrides.accessToken ?? 'gho_fresh' });
 }
 
 describe('resolveConnectionEnv', () => {
@@ -150,8 +148,9 @@ describe('resolveConnectionEnv', () => {
     await connRepo.create(NS, {
       id: 'slack-team',
       name: 'Slack',
-      auth: { type: 'oauth', providerId: 'slack', accessToken: 'xoxb_y' },
+      auth: { type: 'oauth', providerId: 'slack' },
     });
+    await connRepo.setTokens(NS, 'slack-team', { accessToken: 'xoxb_y' });
 
     const result = await resolveConnectionEnv(NS, ['gh', 'slack-team'], {
       connectionRepo: connRepo,
@@ -170,13 +169,12 @@ describe('resolveConnectionEnv', () => {
     await connRepo.create(NS, {
       id: 'github-mediforce',
       name: 'GitHub',
-      auth: {
-        type: 'oauth',
-        providerId: 'github',
-        accessToken: 'gho_old',
-        refreshToken: 'ghr_xyz',
-        expiresAt: expiredAt,
-      },
+      auth: { type: 'oauth', providerId: 'github' },
+    });
+    await connRepo.setTokens(NS, 'github-mediforce', {
+      accessToken: 'gho_old',
+      refreshToken: 'ghr_xyz',
+      expiresAt: expiredAt,
     });
     const fetchImpl = vi.fn().mockResolvedValueOnce(
       new Response(

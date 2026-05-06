@@ -130,7 +130,7 @@ describe('migrateNamespaceConnections', () => {
     expect(report.migratedTokens).toBe(1);
     expect(report.skipped).toEqual([]);
 
-    const conn = await connRepo.getById(NS, 'github');
+    const conn = await connRepo.getById(NS, 'agent-1-github');
     expect(conn).not.toBeNull();
     if (conn?.auth.type === 'oauth') {
       expect(conn.auth.providerId).toBe('github');
@@ -138,15 +138,78 @@ describe('migrateNamespaceConnections', () => {
       expect(conn.auth.refreshToken).toBe('ghr_existing');
     }
 
-    const entry = await catalogRepo.getById(NS, 'github-mcp');
+    const entry = await catalogRepo.getById(NS, 'agent-1-github-mcp');
     expect(entry?.mcp).toEqual({ type: 'http', url: 'https://api.githubcopilot.com/mcp/' });
-    expect(entry?.connectionId).toBe('github');
+    expect(entry?.connectionId).toBe('agent-1-github');
 
     const updatedAgent = await agentRepo.getById('agent-1');
     const updatedBinding = updatedAgent?.mcpServers?.github;
     expect(updatedBinding?.type).toBe('catalog');
     if (updatedBinding?.type === 'catalog') {
-      expect(updatedBinding.catalogId).toBe('github-mcp');
+      expect(updatedBinding.catalogId).toBe('agent-1-github-mcp');
+    }
+  });
+
+  it('two agents sharing a server name get distinct Connections (no silent coalescing)', async () => {
+    await agentRepo.create(
+      makeAgent('agent-a', {
+        github: {
+          type: 'http',
+          url: 'https://api.x/',
+          auth: { type: 'oauth', provider: 'github', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' },
+        },
+      }),
+    );
+    await agentRepo.create(
+      makeAgent('agent-b', {
+        github: {
+          type: 'http',
+          url: 'https://api.x/',
+          auth: { type: 'oauth', provider: 'github', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' },
+        },
+      }),
+    );
+    await tokenRepo.put(NS, 'agent-a', 'github', {
+      provider: 'github', accessToken: 'TOKEN_A', scope: 'repo',
+      providerUserId: '1', accountLogin: 'alice', connectedAt: 1, connectedBy: 'uid-a',
+    });
+    await tokenRepo.put(NS, 'agent-b', 'github', {
+      provider: 'github', accessToken: 'TOKEN_B', scope: 'repo',
+      providerUserId: '2', accountLogin: 'bob', connectedAt: 2, connectedBy: 'uid-b',
+    });
+
+    const report = await migrateNamespaceConnections(NS, deps());
+    expect(report.createdConnections).toBe(2);
+    expect(report.migratedTokens).toBe(2);
+
+    const connA = await connRepo.getById(NS, 'agent-a-github');
+    const connB = await connRepo.getById(NS, 'agent-b-github');
+    expect(connA?.auth.type === 'oauth' && connA.auth.accessToken).toBe('TOKEN_A');
+    expect(connB?.auth.type === 'oauth' && connB.auth.accessToken).toBe('TOKEN_B');
+  });
+
+  it('drops empty-string optional fields from migrated tokens (back-compat)', async () => {
+    await agentRepo.create(
+      makeAgent('agent-1', {
+        github: {
+          type: 'http', url: 'https://api.x/',
+          auth: { type: 'oauth', provider: 'github', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' },
+        },
+      }),
+    );
+    // Older row with valid required fields but accidentally-empty optional refreshToken.
+    await tokenRepo.put(NS, 'agent-1', 'github', {
+      provider: 'github', accessToken: 'gho_x', scope: 'repo',
+      providerUserId: '1', accountLogin: 'alice', connectedAt: 1, connectedBy: 'uid-a',
+      // simulate legacy: cast away the type to inject the empty string
+    } as Parameters<typeof tokenRepo.put>[3]);
+
+    const report = await migrateNamespaceConnections(NS, deps());
+    expect(report.migratedTokens).toBe(1);
+    expect(report.skipped).toEqual([]);
+    const conn = await connRepo.getById(NS, 'agent-1-github');
+    if (conn?.auth.type === 'oauth') {
+      expect(conn.auth.accessToken).toBe('gho_x');
     }
   });
 
@@ -163,7 +226,7 @@ describe('migrateNamespaceConnections', () => {
 
     const report = await migrateNamespaceConnections(NS, deps());
     expect(report.createdConnections).toBe(1);
-    const conn = await connRepo.getById(NS, 'jira');
+    const conn = await connRepo.getById(NS, 'agent-2-jira');
     expect(conn?.auth.type).toBe('headers');
   });
 
@@ -201,6 +264,7 @@ describe('migrateNamespaceConnections', () => {
     const updated = await agentRepo.getById('agent-1');
     if (updated?.mcpServers?.github?.type === 'catalog') {
       expect(updated.mcpServers.github.allowedTools).toEqual(['search', 'view']);
+      expect(updated.mcpServers.github.catalogId).toBe('agent-1-github-mcp');
     }
   });
 

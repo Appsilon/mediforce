@@ -128,7 +128,13 @@ export class FirestoreConnectionRepository implements ConnectionRepository {
         },
         updatedAt: new Date().toISOString(),
       });
-      tx.set(ref, this.toBody(updated));
+      // Use `merge: true` so any unknown top-level fields written by a
+      // newer deploy in a rolling-deploy scenario are preserved instead of
+      // wiped — `.strict()` parse strips them from our typed view but the
+      // doc itself keeps them. Token fields land via the merged `auth`
+      // map (which is a single field, replaced wholesale — that's fine,
+      // tokens belong together).
+      tx.set(ref, this.toBody(updated), { merge: true });
       return updated;
     });
   }
@@ -145,10 +151,12 @@ export class FirestoreConnectionRepository implements ConnectionRepository {
       const result = await fn(current);
       // If the callback returned a Connection for this same id, persist it
       // inside the transaction so concurrent callers see the new state.
+      // `merge: true` preserves unknown top-level fields (forwards-compat
+      // for rolling deploys); known fields are overwritten as expected.
       const candidate = parseAsConnection(result, id);
       if (candidate !== null) {
         const updated: Connection = { ...candidate, updatedAt: new Date().toISOString() };
-        tx.set(ref, this.toBody(updated));
+        tx.set(ref, this.toBody(updated), { merge: true });
       }
       return result;
     });

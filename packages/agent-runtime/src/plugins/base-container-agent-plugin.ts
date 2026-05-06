@@ -30,6 +30,28 @@ export class OAuthTokenUnavailableError extends Error {
   }
 }
 
+/** Connection-routed counterpart of OAuthTokenUnavailableError: an HTTP MCP
+ *  server resolves auth via a `connectionId` (new catalog-ref binding), but
+ *  the Connection has no usable access token yet (admin created the
+ *  Connection record but never clicked "Connect"). Carries `connectionId`
+ *  separately from the legacy `provider` field so UI handlers can dispatch
+ *  to "/admin/connections/[id]" instead of the agent OAuth modal. */
+export class ConnectionTokenUnavailableForServerError extends Error {
+  public readonly serverName: string;
+  public readonly connectionId: string;
+
+  constructor(serverName: string, connectionId: string) {
+    super(
+      `MCP server "${serverName}" is routed through Connection "${connectionId}", ` +
+      `which has no access token yet. Connect the Connection via /admin/connections/${connectionId}, ` +
+      `then retry the step.`,
+    );
+    this.name = 'ConnectionTokenUnavailableForServerError';
+    this.serverName = serverName;
+    this.connectionId = connectionId;
+  }
+}
+
 const __filename_base = fileURLToPath(import.meta.url);
 const __dirname_base = dirname(__filename_base);
 
@@ -192,7 +214,7 @@ function buildHttpHeaders(
     if (bundle === undefined) {
       // The Connection exists but the token has not been connected yet —
       // surface a clear error rather than ship an unauthenticated request.
-      throw new OAuthTokenUnavailableError(serverName, `connection:${connectionId}`);
+      throw new ConnectionTokenUnavailableForServerError(serverName, connectionId);
     }
     const headerValue = renderOAuthHeader(bundle.headerValueTemplate, bundle.accessToken);
     return { [bundle.headerName]: headerValue };

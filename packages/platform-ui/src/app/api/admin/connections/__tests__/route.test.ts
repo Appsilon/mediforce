@@ -147,6 +147,44 @@ describe('POST /api/admin/connections', () => {
     expect(body.connection.auth.refreshToken).toBeUndefined();
   });
 
+  it('[SECURITY] LIST response strips token material from every connection', async () => {
+    await connectionRepo.create(NS, oauthInput);
+    await connectionRepo.setTokens(NS, 'github-mediforce', {
+      accessToken: 'gho_secret_xyz',
+      refreshToken: 'ghr_secret_xyz',
+    });
+    const res = await LIST(get(''));
+    const body = await res.json();
+    expect(body.connections).toHaveLength(1);
+    for (const conn of body.connections) {
+      expect(conn.auth.accessToken).toBeUndefined();
+      expect(conn.auth.refreshToken).toBeUndefined();
+    }
+  });
+
+  it('[SECURITY] POST refuses to create a Connection with accessToken in auth', async () => {
+    const res = await CREATE(post({
+      ...oauthInput,
+      auth: { type: 'oauth', providerId: 'github', accessToken: 'attacker-token' },
+    }));
+    expect(res.status).toBe(400);
+    expect(await connectionRepo.getById(NS, 'github-mediforce')).toBeNull();
+  });
+
+  it('[SECURITY] PATCH refuses to write accessToken into auth (OAuth flow only)', async () => {
+    await connectionRepo.create(NS, oauthInput);
+    const res = await PATCH(patch('/github-mediforce', {
+      auth: { type: 'oauth', providerId: 'github', accessToken: 'attacker-token' },
+    }), {
+      params: Promise.resolve({ id: 'github-mediforce' }),
+    });
+    expect(res.status).toBe(400);
+    const persisted = await connectionRepo.getById(NS, 'github-mediforce');
+    if (persisted?.auth.type === 'oauth') {
+      expect(persisted.auth.accessToken).toBeUndefined();
+    }
+  });
+
   it('[ERROR] 400 on missing required fields', async () => {
     const res = await CREATE(post({ id: 'gh' }));
     expect(res.status).toBe(400);

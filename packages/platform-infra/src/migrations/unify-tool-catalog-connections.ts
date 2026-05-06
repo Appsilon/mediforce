@@ -34,12 +34,13 @@ export interface MigrationReport {
  *  document onto its target Connection.
  *
  *  Determinism — ids per binding:
- *    Connection id   : `<serverName>` (lowercased; falls back to provider id when serverName collides)
- *    Catalog entry id: `<serverName>-mcp` for the catalog-ref binding
+ *    Connection id   : `<agentId>-<serverName>` (lowercased + sanitized)
+ *    Catalog entry id: `<agentId>-<serverName>-mcp` for the catalog-ref binding
  *
- *  No dedup across agents — per the design decision, two agents that share
- *  a server name independently get their own Connection. Admins may
- *  consolidate later through the UI without losing audit trail.
+ *  IDs are namespaced by agentId so two agents that share a server name
+ *  (e.g. both call their GitHub server `github`) get distinct Connections
+ *  with distinct tokens — no silent cross-agent token sharing. Admins
+ *  consolidate redundant Connections later through the UI.
  *
  *  Idempotency: every step checks for prior run output and skips.
  *
@@ -87,8 +88,9 @@ export async function migrateNamespaceConnections(
       const auth = binding.auth;
       const providerId = auth?.type === 'oauth' ? auth.provider : null;
 
-      // Build deterministic ids.
-      const connectionId = sanitizeId(serverName);
+      // Build deterministic ids — namespaced by agentId so two agents that
+      // share a server name don't silently coalesce onto one Connection.
+      const connectionId = sanitizeId(`${agent.id}-${serverName}`);
       const catalogId = `${connectionId}-mcp`;
 
       // Create Connection if not present. Prefer oauth shape when binding
@@ -134,23 +136,40 @@ export async function migrateNamespaceConnections(
         if (token !== null) {
           // setTokens throws when the connection isn't oauth-typed; we set
           // it to oauth above for any provider-id'd binding so this is safe.
+          // Token-update schema requires non-empty strings on optional fields.
+          // Older agent-oauth-token rows occasionally landed with empty
+          // strings (pre-validation era); drop those before passing through
+          // so the schema doesn't reject otherwise-valid rows.
+          const cleanToken = {
+            accessToken: token.accessToken,
+            ...(typeof token.refreshToken === 'string' && token.refreshToken !== ''
+              ? { refreshToken: token.refreshToken }
+              : {}),
+            ...(typeof token.expiresAt === 'number' && token.expiresAt > 0
+              ? { expiresAt: token.expiresAt }
+              : {}),
+            ...(typeof token.scope === 'string' && token.scope !== ''
+              ? { scope: token.scope }
+              : {}),
+            ...(typeof token.providerUserId === 'string' && token.providerUserId !== ''
+              ? { providerUserId: token.providerUserId }
+              : {}),
+            ...(typeof token.accountLogin === 'string' && token.accountLogin !== ''
+              ? { accountLogin: token.accountLogin }
+              : {}),
+            ...(typeof token.connectedBy === 'string' && token.connectedBy !== ''
+              ? { connectedBy: token.connectedBy }
+              : {}),
+          };
           try {
-            await deps.connectionRepo.setTokens(namespace, connectionId, {
-              accessToken: token.accessToken,
-              ...(token.refreshToken !== undefined ? { refreshToken: token.refreshToken } : {}),
-              ...(token.expiresAt !== undefined ? { expiresAt: token.expiresAt } : {}),
-              scope: token.scope,
-              providerUserId: token.providerUserId,
-              accountLogin: token.accountLogin,
-              connectedBy: token.connectedBy,
-            });
+            await deps.connectionRepo.setTokens(namespace, connectionId, cleanToken);
             report.migratedTokens += 1;
-          } catch {
+          } catch (err) {
             report.skipped.push({
               namespace,
               agentId: agent.id,
               serverName,
-              reason: 'token copy failed (connection not oauth-typed?)',
+              reason: `token copy failed: ${err instanceof Error ? err.message : String(err)}`,
             });
           }
         }
@@ -179,7 +198,11 @@ export async function migrateNamespaceConnections(
 function sanitizeId(raw: string): string {
   // Lowercase, replace non-alphanumeric runs with single dashes, strip
   // leading/trailing dashes, prefix with letter when a digit comes first.
+  // Empty input (or all-symbol input that collapses to '') would produce
+  // an invalid id; fall back to a stable placeholder so the schema never
+  // sees an empty slug.
   const lower = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (lower === '') return 'unnamed';
   return /^[a-z]/.test(lower) ? lower : `c-${lower}`;
 }
 

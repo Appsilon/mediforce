@@ -3,7 +3,11 @@ import {
   type Connection,
   type PublicConnection,
 } from '@mediforce/platform-core';
-export { requireAdminForNamespace } from '../oauth-providers/helpers';
+export {
+  requireAdminForNamespace,
+  requireAdminContextForNamespace,
+  type AdminNamespaceContext,
+} from '../oauth-providers/helpers';
 
 /** Strip OAuth token material from a Connection before it leaves the API
  *  surface. `accessToken` and `refreshToken` are never serialized to UI;

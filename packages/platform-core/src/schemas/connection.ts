@@ -78,14 +78,39 @@ export const PublicConnectionSchema = ConnectionSchema.transform((conn) => {
 
 export type PublicConnection = z.infer<typeof PublicConnectionSchema>;
 
-/** Input for creating a Connection. Server fills `createdAt`/`updatedAt`. */
+/** Auth shape accepted on `create` and `patch` — drops every field that
+ *  carries token material so the OAuth flow remains the only writer of
+ *  tokens. Admins can still attach an oauth-typed Connection (providerId)
+ *  or a headers Connection (header bag); they cannot plant an
+ *  `accessToken` directly via REST. */
+const CreatableOAuthAuthSchema = ConnectionOAuthAuthSchema.omit({
+  accessToken: true,
+  refreshToken: true,
+  expiresAt: true,
+  scope: true,
+  providerUserId: true,
+  accountLogin: true,
+  connectedAt: true,
+  connectedBy: true,
+});
+
+const CreatableConnectionAuthSchema = z.discriminatedUnion('type', [
+  CreatableOAuthAuthSchema,
+  ConnectionHeadersAuthSchema,
+]);
+
+/** Input for creating a Connection. Server fills `createdAt`/`updatedAt`.
+ *  Token fields are stripped from the auth shape — only the OAuth callback
+ *  (via `setTokens`) may write them. */
 export const CreateConnectionInputSchema = ConnectionSchema.omit({
   createdAt: true,
   updatedAt: true,
-});
+  auth: true,
+}).extend({ auth: CreatableConnectionAuthSchema });
 
 export type CreateConnectionInput = z.infer<typeof CreateConnectionInputSchema>;
 
+/** Patch input — same token-stripping as create. */
 export const UpdateConnectionInputSchema = CreateConnectionInputSchema
   .omit({ id: true })
   .partial();
@@ -108,7 +133,14 @@ export type ConnectionTokenUpdate = z.infer<typeof ConnectionTokenUpdateSchema>;
 
 /** Map a Connection id to the canonical `CONN_<NORMALIZED>_TOKEN` env var
  *  name. Hyphens become underscores so the result is a valid POSIX
- *  identifier. */
+ *  identifier. The input must already match `CONNECTION_ID_PATTERN`
+ *  (every persisted Connection does); arbitrary strings are rejected at
+ *  runtime so a malformed env name can never reach a child process. */
 export function connectionTokenEnvName(connectionId: string): string {
+  if (!CONNECTION_ID_PATTERN.test(connectionId)) {
+    throw new Error(
+      `connectionTokenEnvName: id "${connectionId}" does not match CONNECTION_ID_PATTERN`,
+    );
+  }
   return `CONN_${connectionId.replace(/-/g, '_').toUpperCase()}_TOKEN`;
 }
