@@ -9,6 +9,7 @@ import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
 import { startWorkflowRun } from '@/app/actions/processes';
 import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
+import { useWorkflowSecretKeysContext } from '@/hooks/use-workflow-secret-keys';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
@@ -43,8 +44,9 @@ export function StartRunButton({
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [pendingVersion, setPendingVersion] = React.useState<number | undefined>(undefined);
-  const [secretKeys, setSecretKeys] = React.useState<string[] | undefined>(undefined);
-  const [secretKeysLoading, setSecretKeysLoading] = React.useState(true);
+  const secretKeysCtx = useWorkflowSecretKeysContext();
+  const [localSecretKeys, setLocalSecretKeys] = React.useState<string[] | undefined>(undefined);
+  const [localSecretsLoading, setLocalSecretsLoading] = React.useState(true);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const effectiveVersion = version ?? hookEffectiveVersion;
@@ -53,6 +55,9 @@ export function StartRunButton({
     () => definitions.find((d) => d.version === effectiveVersion),
     [definitions, effectiveVersion],
   );
+
+  const hasContext = secretKeysCtx !== null;
+  const uid = firebaseUser?.uid;
 
   const triggerInput: TriggerInputField[] = effectiveDefinition?.triggerInput ?? [];
   const hasTriggerInput = triggerInput.length > 0;
@@ -77,14 +82,21 @@ export function StartRunButton({
   }, [effectiveDefinition]);
 
   React.useEffect(() => {
-    if (!handle || !workflowName || !firebaseUser) return;
+    if (hasContext) {
+      setLocalSecretsLoading(false);
+      return;
+    }
+    if (!handle || !workflowName || !uid) return;
     let cancelled = false;
-    setSecretKeysLoading(true);
-    getWorkflowSecretKeys(handle, workflowName, firebaseUser.uid)
-      .then((keys) => { if (!cancelled) { setSecretKeys(keys); setSecretKeysLoading(false); } })
-      .catch(() => { if (!cancelled) { setSecretKeys(undefined); setSecretKeysLoading(false); } });
+    setLocalSecretsLoading(true);
+    getWorkflowSecretKeys(handle, workflowName, uid)
+      .then((keys) => { if (!cancelled) { setLocalSecretKeys(keys); setLocalSecretsLoading(false); } })
+      .catch(() => { if (!cancelled) { setLocalSecretKeys(undefined); setLocalSecretsLoading(false); } });
     return () => { cancelled = true; };
-  }, [handle, workflowName, firebaseUser]);
+  }, [hasContext, handle, workflowName, uid]);
+
+  const secretKeys = hasContext ? secretKeysCtx.getKeys(workflowName) : localSecretKeys;
+  const secretKeysLoading = hasContext ? secretKeysCtx.loading : localSecretsLoading;
 
   const warnings = React.useMemo(() => {
     if (!effectiveDefinition) return [];

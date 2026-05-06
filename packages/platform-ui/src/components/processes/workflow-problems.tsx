@@ -4,8 +4,7 @@ import * as React from 'react';
 import { AlertTriangle, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { useDockerImages } from '@/hooks/use-docker-images';
-import { useAuth } from '@/contexts/auth-context';
-import { getWorkflowSecretKeysBatch } from '@/app/actions/workflow-secrets';
+import { useWorkflowSecretKeysContext } from '@/hooks/use-workflow-secret-keys';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { cn } from '@/lib/utils';
 
@@ -23,10 +22,8 @@ interface WorkflowProblemsProps {
 }
 
 export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProblemsProps) {
-  const { firebaseUser } = useAuth();
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
-  const [secretsByWorkflow, setSecretsByWorkflow] = React.useState<Map<string, string[]>>(new Map());
-  const [secretsLoading, setSecretsLoading] = React.useState(true);
+  const secretKeysCtx = useWorkflowSecretKeysContext();
   const [showAll, setShowAll] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
 
@@ -40,45 +37,10 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
     return result;
   }, [latestDocs, handle]);
 
-  const namespaceDocIds = React.useMemo(
-    () => namespaceDocs.map((d) => d.id).sort().join(','),
-    [namespaceDocs],
-  );
-
-  React.useEffect(() => {
-    if (!handle || !firebaseUser || namespaceDocs.length === 0) {
-      setSecretsLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setSecretsLoading(true);
-
-    const workflowNames = namespaceDocs.map((d) => d.name);
-    getWorkflowSecretKeysBatch(handle, workflowNames, firebaseUser.uid)
-      .then((result) => {
-        if (cancelled) return;
-        const map = new Map<string, string[]>();
-        for (const [name, keys] of Object.entries(result)) {
-          map.set(name, keys);
-        }
-        setSecretsByWorkflow(map);
-        setSecretsLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.warn('[WorkflowProblems] Failed to fetch secret keys:', err);
-        setSecretsByWorkflow(new Map());
-        setSecretsLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handle, firebaseUser, namespaceDocIds]);
-
   const warnings = React.useMemo((): WorkflowWarning[] => {
     const all: WorkflowWarning[] = [];
     for (const doc of namespaceDocs) {
-      const secretKeys = secretsByWorkflow.get(doc.name);
+      const secretKeys = secretKeysCtx?.getKeys(doc.name);
       const checks = runPreflightChecks(doc, {
         dockerImages,
         dockerAvailable,
@@ -89,9 +51,9 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
       }
     }
     return all;
-  }, [namespaceDocs, dockerImages, dockerAvailable, secretsByWorkflow]);
+  }, [namespaceDocs, dockerImages, dockerAvailable, secretKeysCtx]);
 
-  const isLoading = loading || dockerLoading || secretsLoading;
+  const isLoading = loading || dockerLoading || (secretKeysCtx?.loading ?? false);
 
   if (isLoading || warnings.length === 0) return null;
 

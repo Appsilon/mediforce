@@ -211,13 +211,14 @@ export function StepEditor({
   const { handle } = useParams<{ handle: string }>();
   const [secretKeys, setSecretKeys] = useState<string[]>([]);
 
+  const uid = firebaseUser?.uid;
   useEffect(() => {
-    if (handle && workflowName && firebaseUser) {
-      getWorkflowSecretKeys(handle, workflowName, firebaseUser.uid)
+    if (handle && workflowName && uid) {
+      getWorkflowSecretKeys(handle, workflowName, uid)
         .then(setSecretKeys)
         .catch((err) => console.error('Failed to load secret keys:', err));
     }
-  }, [handle, workflowName, firebaseUser]);
+  }, [handle, workflowName, uid]);
 
   const otherSteps = allSteps.filter((s) => s.id !== step.id);
   const isAgent  = step.executor === 'agent'  && step.type !== 'terminal';
