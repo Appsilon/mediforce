@@ -40,9 +40,9 @@ test.describe('Trigger Input Journey', () => {
     // Click Start run
     await click(page, startButton);
 
-    // Navigated to run detail page
-    await expect(page.getByText('Trigger Input Test')).toBeVisible({ timeout: 30_000 });
-    await expect(page).toHaveURL(/\/runs\//);
+    // Run created — verify on workflow page (run visible in list)
+    await expect(page).toHaveURL(/Trigger%20Input%20Test/, { timeout: 30_000 });
+    await expect(page.getByText('In Progress').first()).toBeVisible({ timeout: 10_000 });
     await showResult(page);
     await endRecording(page);
   });
