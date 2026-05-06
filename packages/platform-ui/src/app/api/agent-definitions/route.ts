@@ -10,7 +10,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (caller instanceof NextResponse) return caller;
 
   const agents = await agentDefinitionRepo.list();
-  const filtered = filterByNamespace(caller, agents as Array<{ namespace?: string } & Record<string, unknown>>);
+  const filtered = filterByNamespace(caller, agents);
   return NextResponse.json({ agents: filtered });
 }
 
@@ -23,9 +23,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   const body = await request.json();
   const input = CreateAgentDefinitionInputSchema.parse(body);
 
-  const ns = (body as Record<string, unknown>).namespace;
-  if (typeof ns === 'string') {
-    const denied = requireNamespaceAccess(caller, ns);
+  if (typeof input.namespace === 'string') {
+    const denied = requireNamespaceAccess(caller, input.namespace);
     if (denied) return denied;
   }
 

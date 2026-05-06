@@ -11,7 +11,8 @@ import { useMyTasks } from '@/hooks/use-tasks';
 import { RunsTable } from '@/components/processes/runs-table';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { setProcessArchived, transferWorkflowNamespace, setWorkflowVisibility } from '@/app/actions/definitions';
+import { setProcessArchived, transferWorkflowNamespace } from '@/app/actions/definitions';
+import { apiFetch } from '@/lib/api-fetch';
 import { VersionLabel } from '@/components/ui/version-label';
 import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
 import { formatCron } from '@/lib/format-cron';
@@ -199,10 +200,17 @@ export default function ProcessDefinitionPage() {
                     const newVisibility = isPrivate ? 'public' : 'private';
                     setMenuOpen(false);
                     setTogglingVisibility(true);
-                    const result = await setWorkflowVisibility(decodedName, newVisibility);
-                    setTogglingVisibility(false);
-                    if (result.success) {
-                      setVisibilityOverride(newVisibility);
+                    try {
+                      const res = await apiFetch(`/api/workflow-definitions/${encodeURIComponent(decodedName)}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ visibility: newVisibility }),
+                      });
+                      if (res.ok) {
+                        setVisibilityOverride(newVisibility);
+                      }
+                    } finally {
+                      setTogglingVisibility(false);
                     }
                   }}
                   disabled={togglingVisibility}

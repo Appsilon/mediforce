@@ -17,7 +17,7 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const denied = requireNamespaceAccess(caller, (agent as unknown as { namespace?: string }).namespace);
+  const denied = requireNamespaceAccess(caller, agent.namespace);
   if (denied) return denied;
 
   return NextResponse.json({ mcpServers: agent.mcpServers ?? {} });

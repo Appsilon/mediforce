@@ -31,7 +31,7 @@ export async function PUT(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const denied = requireNamespaceAccess(caller, (agent as unknown as { namespace?: string }).namespace);
+  const denied = requireNamespaceAccess(caller, agent.namespace);
   if (denied) return denied;
 
   const nextMcpServers = { ...(agent.mcpServers ?? {}), [name]: parsed.data };
@@ -54,7 +54,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const denied = requireNamespaceAccess(caller, (agent as unknown as { namespace?: string }).namespace);
+  const denied = requireNamespaceAccess(caller, agent.namespace);
   if (denied) return denied;
 
   const rest = { ...(agent.mcpServers ?? {}) };

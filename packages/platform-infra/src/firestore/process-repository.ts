@@ -211,7 +211,9 @@ export class FirestoreProcessRepository implements ProcessRepository {
       .collection(this.workflowDefinitionsCollection)
       .where('name', '==', name)
       .get();
-    if (snapshot.empty) return;
+    if (snapshot.empty) {
+      throw new Error(`Workflow '${name}' not found`);
+    }
     const batch = this.db.batch();
     for (const d of snapshot.docs) {
       batch.update(d.ref, { visibility });

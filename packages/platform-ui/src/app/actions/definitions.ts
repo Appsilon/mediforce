@@ -210,25 +210,6 @@ export async function deleteWorkflow(
 }
 
 // ---------------------------------------------------------------------------
-// Visibility
-// ---------------------------------------------------------------------------
-
-export type SetVisibilityResult = { success: true } | { success: false; error: string };
-
-export async function setWorkflowVisibility(
-  workflowName: string,
-  visibility: 'public' | 'private',
-): Promise<SetVisibilityResult> {
-  const { processRepo } = getPlatformServices();
-  try {
-    await processRepo.setWorkflowVisibility(workflowName, visibility);
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Transfer workflow namespace
 // ---------------------------------------------------------------------------
 
