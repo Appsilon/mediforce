@@ -219,23 +219,9 @@ export async function setWorkflowVisibility(
   workflowName: string,
   visibility: 'public' | 'private',
 ): Promise<SetVisibilityResult> {
+  const { processRepo } = getPlatformServices();
   try {
-    getPlatformServices();
-    const db = getAdminFirestore();
-
-    const snapshot = await db
-      .collection('workflowDefinitions')
-      .where('name', '==', workflowName)
-      .get();
-
-    if (snapshot.empty) {
-      return { success: false, error: `No workflow found with name "${workflowName}".` };
-    }
-
-    for (const docSnap of snapshot.docs) {
-      await db.collection('workflowDefinitions').doc(docSnap.id).update({ visibility });
-    }
-
+    await processRepo.setWorkflowVisibility(workflowName, visibility);
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };

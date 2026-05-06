@@ -72,7 +72,7 @@ export default function ProcessDefinitionPage() {
   }, [menuOpen]);
 
   const latest = versions[0] ?? null;
-  const currentVisibility = visibilityOverride ?? latest?.visibility ?? 'public';
+  const currentVisibility = visibilityOverride ?? latest?.visibility ?? 'private';
   const isPrivate = currentVisibility === 'private';
   const hasManualTrigger = latest?.triggers?.some(
     (trigger: { type: string }) => trigger.type === 'manual',

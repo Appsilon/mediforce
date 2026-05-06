@@ -62,17 +62,3 @@ export function filterByNamespace<T extends { namespace?: string }>(
   return items.filter((item) => typeof item.namespace === 'string' && caller.namespaces.has(item.namespace));
 }
 
-/**
- * Backward-compatible shim. Existing callers that use the old
- * `getCallerNamespaces` return type (Set | null | NextResponse) keep working.
- * New code should use `resolveCallerIdentity` directly.
- */
-export async function getCallerNamespaces(
-  request: Request,
-  namespaceRepo: FirestoreNamespaceRepository,
-): Promise<Set<string> | null | NextResponse> {
-  const identity = await resolveCallerIdentity(request, namespaceRepo);
-  if (identity instanceof NextResponse) return identity;
-  if (identity.kind === 'apiKey') return null;
-  return identity.namespaces;
-}

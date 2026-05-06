@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { WorkflowVisibilitySchema } from '@mediforce/platform-core';
-import { getAdminFirestore } from '@mediforce/platform-infra';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, callerCanAccess, requireNamespaceAccess } from '@/lib/api-auth';
 
@@ -43,7 +42,7 @@ export async function GET(
   }
 
   if (!callerCanAccess(caller, definition.namespace)) {
-    if (definition.visibility === 'private') {
+    if (definition.visibility !== 'public') {
       return NextResponse.json(
         { error: `Workflow '${name}' not found` },
         { status: 404 },
@@ -54,13 +53,6 @@ export async function GET(
   return NextResponse.json({ definition });
 }
 
-/**
- * PATCH /api/workflow-definitions/:name
- *
- * Update mutable fields on all versions of a workflow.
- * Currently supports: { visibility: 'public' | 'private' }
- * Requires namespace membership (owner/admin enforced at UI level).
- */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ name: string }> },
@@ -94,15 +86,7 @@ export async function PATCH(
     );
   }
 
-  const db = getAdminFirestore();
-  const snapshot = await db
-    .collection('workflowDefinitions')
-    .where('name', '==', name)
-    .get();
-
-  for (const docSnap of snapshot.docs) {
-    await db.collection('workflowDefinitions').doc(docSnap.id).update({ visibility: parsed.data });
-  }
+  await processRepo.setWorkflowVisibility(name, parsed.data);
 
   return NextResponse.json({ success: true, name, visibility: parsed.data });
 }

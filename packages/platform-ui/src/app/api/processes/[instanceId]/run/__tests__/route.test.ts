@@ -22,9 +22,6 @@ vi.mock('@/lib/platform-services', () => ({
       getById: mockInstanceGetById,
       update: mockInstanceUpdate,
       addStepExecution: mockInstanceAddStepExecution,
-      // Iteration tracking reads prior executions for the current step on
-      // this instance. Default to empty list — individual tests can override
-      // via `mockInstanceGetStepExecutions.mockResolvedValueOnce(...)`.
       getStepExecutions: vi.fn().mockResolvedValue([]),
     },
     processRepo: {
@@ -37,7 +34,13 @@ vi.mock('@/lib/platform-services', () => ({
       create: mockHumanTaskCreate,
       getByInstanceId: mockHumanTaskGetByInstanceId,
     },
+    namespaceRepo: {},
   }),
+}));
+
+vi.mock('@/lib/api-auth', () => ({
+  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
+  requireNamespaceAccess: () => null,
 }));
 
 // Mock executeAgentStep — the unified agent step executor

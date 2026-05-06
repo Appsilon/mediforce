@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv } from '@mediforce/agent-runtime';
 import { validateActionSecrets } from '@mediforce/core-actions';
@@ -16,7 +17,11 @@ export async function POST(
   { params }: { params: Promise<{ instanceId: string }> },
 ): Promise<NextResponse> {
   const { instanceId } = await params;
-  const { instanceRepo, processRepo, auditRepo } = getPlatformServices();
+  const { instanceRepo, processRepo, auditRepo, namespaceRepo } = getPlatformServices();
+
+  const caller = await resolveCallerIdentity(req, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
+
   let stepsExecuted = 0;
   let definitionVersion = 'unknown';
   let lastActiveStepId: string | null = null;
@@ -29,6 +34,9 @@ export async function POST(
     if (!initialInstance) {
       return NextResponse.json({ error: 'Instance not found' }, { status: 404 });
     }
+
+    const denied = requireNamespaceAccess(caller, initialInstance.namespace);
+    if (denied) return denied;
 
     definitionVersion = initialInstance.definitionVersion;
 
