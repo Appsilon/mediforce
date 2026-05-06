@@ -14,22 +14,25 @@ interface RunProcessBody {
 }
 
 /**
- * In-memory idempotency lock: instanceId → expiry epoch ms. Prevents two
- * concurrent `after()` loops from racing when the same instance receives
- * back-to-back POSTs (e.g. UI button double-click). Single-process scope —
- * the in-loop `hasPendingTask` / `hasActiveSession` guards stay the
- * authoritative cross-process protection.
+ * In-memory idempotency lock: prevents two concurrent `after()` loops from
+ * racing when the same instance receives back-to-back POSTs (e.g. UI button
+ * double-click). The lock is held for the entire duration of the auto-runner
+ * loop and released in `finally` when the loop exits — there is no TTL,
+ * because agent/script steps can run for many minutes and any TTL short
+ * enough to bound a stuck lock is also short enough to expire mid-step,
+ * which would defeat the guard.
+ *
+ * Single-process scope only. With multiple Next.js workers/replicas a second
+ * worker would not see this Map; the in-loop `hasPendingTask` /
+ * `hasActiveSession` guards remain the authoritative cross-process
+ * protection. TODO: distributed lock (Firestore transaction or Redis) once
+ * the platform-ui scales out beyond a single process.
  */
-const RUN_LOCK_TTL_MS = 30_000;
-const runLocks = new Map<string, number>();
+const runLocks = new Set<string>();
 
 function tryAcquireRunLock(instanceId: string): boolean {
-  const now = Date.now();
-  const existing = runLocks.get(instanceId);
-  if (existing !== undefined && existing > now) {
-    return false;
-  }
-  runLocks.set(instanceId, now + RUN_LOCK_TTL_MS);
+  if (runLocks.has(instanceId)) return false;
+  runLocks.add(instanceId);
   return true;
 }
 

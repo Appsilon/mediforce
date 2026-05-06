@@ -168,6 +168,13 @@ describe('POST /api/processes/[instanceId]/run', () => {
 
       // Agent step should have been executed exactly once
       expect(mockExecuteAgentStep).toHaveBeenCalledTimes(1);
+      // Step execution recorded for that one step (was: json.stepsExecuted === 1
+      // before the after() refactor dropped the response body)
+      expect(mockInstanceAddStepExecution).toHaveBeenCalledTimes(1);
+      expect(mockInstanceAddStepExecution).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({ stepId: 'gather-data', status: 'running' }),
+      );
     });
 
     it('[ERROR] stuck loop safety guard triggers after MAX_SAME_STEP_ITERATIONS', async () => {
@@ -313,6 +320,9 @@ describe('POST /api/processes/[instanceId]/run', () => {
 
       // Both agent steps should have been executed
       expect(mockExecuteAgentStep).toHaveBeenCalledTimes(2);
+      // Step execution recorded for both steps (was: json.stepsExecuted === 2
+      // before the after() refactor dropped the response body)
+      expect(mockInstanceAddStepExecution).toHaveBeenCalledTimes(2);
     });
 
     it('[DATA] terminal step as first step — loop exits immediately', async () => {
@@ -336,6 +346,9 @@ describe('POST /api/processes/[instanceId]/run', () => {
       await afterCallback!();
 
       expect(mockExecuteAgentStep).not.toHaveBeenCalled();
+      // No step execution recorded — terminal exits before any work (was:
+      // json.stepsExecuted === 0 before the after() refactor)
+      expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
     });
 
     it('[ERROR] unknown step ID fails the instance', async () => {

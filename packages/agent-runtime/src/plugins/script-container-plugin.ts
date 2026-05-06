@@ -447,10 +447,22 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         stderrBuf = flushLines(stderrBuf + text, '[stderr] ');
       });
 
+      let killTimer: NodeJS.Timeout | null = null;
       const timer = setTimeout(() => {
         child.kill('SIGTERM');
-        setTimeout(() => { if (!child.killed) child.kill('SIGKILL'); }, 5_000);
+        killTimer = setTimeout(() => {
+          killTimer = null;
+          if (!child.killed) child.kill('SIGKILL');
+        }, 5_000);
       }, timeoutMs);
+
+      const clearTimers = (): void => {
+        clearTimeout(timer);
+        if (killTimer !== null) {
+          clearTimeout(killTimer);
+          killTimer = null;
+        }
+      };
 
       // Spawn errors (e.g. ENOENT when the runtime binary isn't installed)
       // fire 'error' but never 'close'. Without this listener the Promise
@@ -460,7 +472,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       child.on('error', (err) => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
+        clearTimers();
         flushBuffers();
         const msg = err instanceof Error ? err.message : String(err);
         emitLine(`[stderr] spawn failed: ${msg}`);
@@ -475,7 +487,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       child.on('close', (exitCode, signal) => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
+        clearTimers();
         flushBuffers();
         resolve({ stdout, stderr, exitCode, signal: signal ?? null });
       });

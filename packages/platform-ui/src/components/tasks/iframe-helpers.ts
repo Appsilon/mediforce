@@ -53,14 +53,17 @@ export function buildSrcdoc(
   isDark: boolean,
 ): string {
   // Escape closing script tags in data to prevent XSS breakout. JSON.stringify
-  // throws on circular refs — agents are unlikely to produce one but we
-  // degrade to `{}` rather than failing the whole render.
+  // throws on circular refs — agents are unlikely to produce one, but instead
+  // of silently degrading to `{}` (which looks like a normal "no data" case)
+  // we surface the failure as `window.__data__._error` so the presenter can
+  // distinguish it from a missing payload.
   let safeData: string;
   try {
     safeData = JSON.stringify(result ?? {}).replace(/<\//g, '<\\/');
   } catch (err) {
-    console.warn('[iframe-helpers] result not JSON-serialisable, falling back to empty object', err);
-    safeData = '{}';
+    const msg = err instanceof Error ? err.message : 'unknown error';
+    console.warn('[iframe-helpers] result not JSON-serialisable:', err);
+    safeData = JSON.stringify({ _error: `result not serialisable: ${msg}` });
   }
   return `<!DOCTYPE html>
 <html class="${isDark ? 'dark' : ''}">
