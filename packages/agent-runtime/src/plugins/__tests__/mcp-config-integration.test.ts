@@ -199,37 +199,22 @@ describe('writeMcpConfig integration', () => {
     await cleanup();
   });
 
-  it('[DATA] resolves {{SECRET}} from process.env fallback', async () => {
-    const originalEnv = process.env.FALLBACK_TOKEN;
-    process.env.FALLBACK_TOKEN = 'env-fallback-token';
+  it('[ERROR] throws when {{SECRET}} not in workflow secrets (no process.env fallback)', async () => {
+    const context = buildContextWithMcpServers([
+      {
+        name: 'env-server',
+        command: 'node',
+        args: ['/opt/mcp/server.js'],
+        env: { TOKEN: '{{FALLBACK_TOKEN}}' },
+      },
+    ]);
+    await plugin.initialize(context);
 
-    try {
-      const context = buildContextWithMcpServers([
-        {
-          name: 'env-server',
-          command: 'node',
-          args: ['/opt/mcp/server.js'],
-          env: { TOKEN: '{{FALLBACK_TOKEN}}' },
-        },
-      ]);
-      await plugin.initialize(context);
+    await expect(
+      (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir),
+    ).rejects.toThrow(/FALLBACK_TOKEN.*not configured/);
 
-      await (plugin as unknown as WriteMcpConfigTarget).writeMcpConfig(tmpDir);
-
-      const raw = await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8');
-      const parsed = JSON.parse(raw) as {
-        mcpServers: Record<string, { command: string; args: string[]; env?: Record<string, string> }>;
-      };
-
-      expect(parsed.mcpServers['env-server']?.env?.TOKEN).toBe('env-fallback-token');
-    } finally {
-      if (originalEnv === undefined) {
-        delete process.env.FALLBACK_TOKEN;
-      } else {
-        process.env.FALLBACK_TOKEN = originalEnv;
-      }
-      await cleanup();
-    }
+    await cleanup();
   });
 
   it('[DATA] omits env key when server has no env configured', async () => {

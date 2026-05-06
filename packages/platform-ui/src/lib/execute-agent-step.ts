@@ -21,6 +21,7 @@ import type {
   WorkflowStep,
 } from '@mediforce/platform-core';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
+import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
 import { resolveAgentIdentity } from './resolve-agent-identity';
 
 export interface WorkflowAgentStepResult {
@@ -109,11 +110,13 @@ export async function executeAgentStep(
     reviewerType: 'none',
   });
 
-  // Pre-fetch workflow secrets for {{TEMPLATE}} resolution
-  const workflowSecrets = await getWorkflowSecretsForRuntime(
-    workflowDefinition.namespace,
-    workflowDefinition.name,
-  );
+  // Pre-fetch secrets for {{TEMPLATE}} resolution.
+  // Namespace secrets provide org-wide defaults; workflow secrets override per-workflow.
+  const [namespaceSecrets, perWorkflowSecrets] = await Promise.all([
+    getNamespaceSecretsForRuntime(workflowDefinition.namespace),
+    getWorkflowSecretsForRuntime(workflowDefinition.namespace, workflowDefinition.name),
+  ]);
+  const workflowSecrets = { ...namespaceSecrets, ...perWorkflowSecrets };
 
   // Pre-resolve MCP configuration from the agent definition + step restrictions
   // + tool catalog. undefined when step.agentId is unset. Namespace-scoped

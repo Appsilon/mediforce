@@ -216,6 +216,11 @@ export {
 } from './workflow-secret.js';
 
 export {
+  NamespaceSecretsSchema,
+  type NamespaceSecrets,
+} from './namespace-secret.js';
+
+export {
   CronTriggerStateSchema,
   type CronTriggerState,
 } from './cron-trigger-state.js';
