@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 /**
  * GET /api/tasks/:taskId
@@ -7,17 +8,25 @@ import { getPlatformServices } from '@/lib/platform-services';
  * Returns full task details including completionData (agent output for review tasks).
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ taskId: string }> },
 ): Promise<NextResponse> {
   try {
     const { taskId } = await params;
-    const { humanTaskRepo } = getPlatformServices();
+    const { humanTaskRepo, instanceRepo, namespaceRepo } = getPlatformServices();
+
+    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    if (caller instanceof NextResponse) return caller;
+
     const task = await humanTaskRepo.getById(taskId);
 
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
+
+    const instance = await instanceRepo.getById(task.processInstanceId);
+    const denied = requireNamespaceAccess(caller, instance?.namespace);
+    if (denied) return denied;
 
     return NextResponse.json(task);
   } catch (err) {

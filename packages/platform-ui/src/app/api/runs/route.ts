@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { ListRunsInputSchema } from '@mediforce/platform-api/contract';
-import { getCallerNamespaces } from '../workflow-definitions/auth.js';
+import { resolveCallerIdentity, filterByNamespace } from '@/lib/api-auth';
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const params = req.nextUrl.searchParams;
@@ -23,8 +23,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   try {
     const { instanceRepo, namespaceRepo } = getPlatformServices();
-    const callerNs = await getCallerNamespaces(req, namespaceRepo);
-    if (callerNs instanceof NextResponse) return callerNs;
+    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    if (caller instanceof NextResponse) return caller;
 
     const instances = await instanceRepo.list({
       definitionName: workflow,
@@ -32,9 +32,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       limit,
     });
 
-    const filtered = callerNs === null
-      ? instances
-      : instances.filter((inst) => inst.namespace === undefined || callerNs.has(inst.namespace));
+    const filtered = filterByNamespace(caller, instances);
 
     const runs = filtered.map((inst) => ({
       runId: inst.id,

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import { getCallerNamespaces } from '../../auth.js';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 export async function POST(
   request: NextRequest,
@@ -24,8 +24,16 @@ export async function POST(
   }
 
   const { processRepo, namespaceRepo } = getPlatformServices();
-  const callerNs = await getCallerNamespaces(request, namespaceRepo);
-  if (callerNs instanceof NextResponse) return callerNs;
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
+
+  const latestVersion = await processRepo.getLatestWorkflowVersion(name);
+  if (latestVersion === 0) {
+    return NextResponse.json({ error: `Workflow '${name}' not found` }, { status: 404 });
+  }
+  const definition = await processRepo.getWorkflowDefinition(name, latestVersion);
+  const denied = requireNamespaceAccess(caller, definition?.namespace);
+  if (denied) return denied;
 
   try {
     await processRepo.setProcessArchived(name, archived);

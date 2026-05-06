@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { WorkflowDefinitionVersionNotFoundError } from '@mediforce/platform-infra';
-import { getCallerNamespaces } from '../../../../auth.js';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 export async function POST(
   request: NextRequest,
@@ -32,12 +32,13 @@ export async function POST(
   }
 
   const { processRepo, namespaceRepo } = getPlatformServices();
-  const callerNs = await getCallerNamespaces(request, namespaceRepo);
-  if (callerNs instanceof NextResponse) return callerNs;
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
 
-  // Skip getWorkflowDefinition() — it uses safeParse and returns null for
-  // schema-invalid versions, which are exactly the ones we want to archive.
-  // setVersionArchived checks doc existence directly in Firestore.
+  const definition = await processRepo.getWorkflowDefinition(name, version);
+  const denied = requireNamespaceAccess(caller, definition?.namespace);
+  if (denied) return denied;
+
   try {
     await processRepo.setVersionArchived(name, version, archived);
     return NextResponse.json({ success: true, name, version, archived });

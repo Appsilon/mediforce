@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { executeAgentStep } from '@/lib/execute-agent-step';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 interface AdvanceStepBody {
   stepId: string;
@@ -16,12 +17,18 @@ export async function POST(
     const { instanceId } = await params;
     const body = await req.json() as AdvanceStepBody;
 
-    // Load instance + definition to get the WorkflowStep
-    const { instanceRepo, processRepo } = getPlatformServices();
+    const { instanceRepo, processRepo, namespaceRepo } = getPlatformServices();
+
+    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    if (caller instanceof NextResponse) return caller;
+
     const instance = await instanceRepo.getById(instanceId);
     if (!instance) {
       return NextResponse.json({ error: 'Instance not found' }, { status: 404 });
     }
+
+    const denied = requireNamespaceAccess(caller, instance.namespace);
+    if (denied) return denied;
 
     const versionNum = parseInt(instance.definitionVersion, 10);
     const latestVersion = isNaN(versionNum)

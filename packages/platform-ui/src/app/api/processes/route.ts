@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validatePayload } from '@mediforce/platform-core';
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 interface StartWorkflowBody {
   definitionName: string;
@@ -14,7 +15,10 @@ interface StartWorkflowBody {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body = (await req.json()) as StartWorkflowBody;
-    const { manualTrigger, processRepo } = getPlatformServices();
+    const { manualTrigger, processRepo, namespaceRepo } = getPlatformServices();
+
+    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    if (caller instanceof NextResponse) return caller;
 
     let version = body.definitionVersion ?? (body.version ? Number(body.version) : undefined);
     if (!version) {
@@ -45,6 +49,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         { status: 404 },
       );
     }
+    const denied = requireNamespaceAccess(caller, definition.namespace);
+    if (denied) return denied;
+
     if (definition.triggerInput && definition.triggerInput.length > 0) {
       const validation = validatePayload(payload, definition.triggerInput);
       if (!validation.valid) {

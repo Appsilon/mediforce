@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server';
 import { AgentMcpBindingSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string; name: string }> },
 ): Promise<NextResponse> {
   const { id, name } = await params;
+  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
+
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== 'object') {
@@ -21,11 +26,13 @@ export async function PUT(
     );
   }
 
-  const { agentDefinitionRepo } = getPlatformServices();
   const agent = await agentDefinitionRepo.getById(id);
   if (agent === null) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
+
+  const denied = requireNamespaceAccess(caller, (agent as unknown as { namespace?: string }).namespace);
+  if (denied) return denied;
 
   const nextMcpServers = { ...(agent.mcpServers ?? {}), [name]: parsed.data };
   const updated = await agentDefinitionRepo.update(id, { mcpServers: nextMcpServers });
@@ -33,15 +40,22 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string; name: string }> },
 ): Promise<NextResponse> {
   const { id, name } = await params;
-  const { agentDefinitionRepo } = getPlatformServices();
+  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
+
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
+
   const agent = await agentDefinitionRepo.getById(id);
   if (agent === null) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
+
+  const denied = requireNamespaceAccess(caller, (agent as unknown as { namespace?: string }).namespace);
+  if (denied) return denied;
 
   const rest = { ...(agent.mcpServers ?? {}) };
   delete rest[name];

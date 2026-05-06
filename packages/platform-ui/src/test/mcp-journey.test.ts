@@ -72,6 +72,12 @@ vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => fake.services,
 }));
 
+vi.mock('@/lib/api-auth', () => ({
+  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
+  requireNamespaceAccess: () => null,
+  filterByNamespace: (_caller: unknown, items: unknown[]) => items,
+}));
+
 // Route handlers are imported AFTER vi.mock declaration (which is hoisted
 // anyway) so they resolve `@/lib/platform-services` to the fake.
 import * as catalogRoute from '@/app/api/admin/tool-catalog/route';

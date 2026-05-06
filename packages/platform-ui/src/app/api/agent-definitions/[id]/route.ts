@@ -1,17 +1,26 @@
 import { NextResponse } from 'next/server';
 import { UpdateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
-  const { agentDefinitionRepo } = getPlatformServices();
+  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
+
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
+
   const agent = await agentDefinitionRepo.getById(id);
   if (!agent) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
+
+  const denied = requireNamespaceAccess(caller, (agent as unknown as { namespace?: string }).namespace);
+  if (denied) return denied;
+
   return NextResponse.json({ agent });
 }
 
@@ -20,9 +29,21 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
+  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
+
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
+
+  const agent = await agentDefinitionRepo.getById(id);
+  if (!agent) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  const denied = requireNamespaceAccess(caller, (agent as unknown as { namespace?: string }).namespace);
+  if (denied) return denied;
+
   const body = await request.json();
   const input = UpdateAgentDefinitionInputSchema.parse(body);
-  const { agentDefinitionRepo } = getPlatformServices();
-  const agent = await agentDefinitionRepo.update(id, input);
-  return NextResponse.json({ agent });
+  const updated = await agentDefinitionRepo.update(id, input);
+  return NextResponse.json({ agent: updated });
 }

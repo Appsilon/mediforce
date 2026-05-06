@@ -10,6 +10,7 @@ vi.mock('@/lib/platform-services', () => ({
     instanceRepo: {
       getById: vi.fn().mockResolvedValue({
         id: 'inst-001',
+        namespace: 'test-ns',
         definitionName: 'test-workflow',
         definitionVersion: '1',
         status: 'running',
@@ -25,7 +26,13 @@ vi.mock('@/lib/platform-services', () => ({
       }),
       getLatestWorkflowVersion: vi.fn().mockResolvedValue(1),
     },
+    namespaceRepo: {},
   }),
+}));
+
+vi.mock('@/lib/api-auth', () => ({
+  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
+  requireNamespaceAccess: () => null,
 }));
 
 vi.mock('@/lib/execute-agent-step', () => ({

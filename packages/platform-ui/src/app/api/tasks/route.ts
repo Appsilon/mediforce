@@ -1,3 +1,4 @@
+// TODO: Add namespace access checks — createRouteAdapter doesn't support auth easily
 import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { listTasks } from '@mediforce/platform-api/handlers';

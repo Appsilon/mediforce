@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 /**
  * Polling endpoint for webhook + manual triggers:
@@ -18,16 +19,22 @@ import { getPlatformServices } from '@/lib/platform-services';
  * processes/<runId>` — without a second roundtrip to list workflows.
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ runId: string }> },
 ): Promise<NextResponse> {
   const { runId } = await params;
-  const { instanceRepo, processRepo } = getPlatformServices();
-  const instance = await instanceRepo.getById(runId);
+  const { instanceRepo, processRepo, namespaceRepo } = getPlatformServices();
 
+  const caller = await resolveCallerIdentity(req, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
+
+  const instance = await instanceRepo.getById(runId);
   if (!instance) {
     return NextResponse.json({ error: 'Run not found' }, { status: 404 });
   }
+
+  const denied = requireNamespaceAccess(caller, instance.namespace);
+  if (denied) return denied;
 
   let finalOutput: unknown = null;
   if (instance.status === 'completed' || instance.status === 'failed') {

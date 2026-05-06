@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 /**
  * POST /api/processes/:instanceId/resume
@@ -7,17 +8,23 @@ import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
  * Resumes a paused instance (e.g. after agent escalation) and re-triggers the auto-runner.
  */
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ instanceId: string }> },
 ): Promise<NextResponse> {
   try {
     const { instanceId } = await params;
-    const { instanceRepo, auditRepo } = getPlatformServices();
+    const { instanceRepo, auditRepo, namespaceRepo } = getPlatformServices();
+
+    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    if (caller instanceof NextResponse) return caller;
 
     const instance = await instanceRepo.getById(instanceId);
     if (!instance) {
       return NextResponse.json({ error: 'Instance not found' }, { status: 404 });
     }
+
+    const denied = requireNamespaceAccess(caller, instance.namespace);
+    if (denied) return denied;
 
     if (instance.status !== 'paused') {
       return NextResponse.json(

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 /**
  * POST /api/cowork/:sessionId/finalize
@@ -14,12 +15,19 @@ export async function POST(
   { params }: { params: Promise<{ sessionId: string }> },
 ): Promise<NextResponse> {
   const { sessionId } = await params;
-  const { coworkSessionRepo, instanceRepo, auditRepo, engine } = getPlatformServices();
+  const { coworkSessionRepo, instanceRepo, auditRepo, engine, namespaceRepo } = getPlatformServices();
+
+  const caller = await resolveCallerIdentity(req, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
 
   const session = await coworkSessionRepo.getById(sessionId);
   if (!session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
+
+  const nsInstance = await instanceRepo.getById(session.processInstanceId);
+  const denied = requireNamespaceAccess(caller, nsInstance?.namespace);
+  if (denied) return denied;
 
   if (session.status !== 'active') {
     return NextResponse.json(

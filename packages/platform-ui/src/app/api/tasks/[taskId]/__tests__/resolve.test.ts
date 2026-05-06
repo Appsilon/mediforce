@@ -24,8 +24,14 @@ vi.mock('@/lib/platform-services', () => ({
       update: mockInstanceUpdate,
     },
     engine: { advanceStep: mockAdvanceStep, advanceWorkflowStep: mockAdvanceStep },
+    namespaceRepo: {},
   }),
   getAppBaseUrl: () => 'http://localhost:3000',
+}));
+
+vi.mock('@/lib/api-auth', () => ({
+  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
+  requireNamespaceAccess: () => null,
 }));
 
 vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response()));
@@ -46,12 +52,14 @@ function makeRequest(taskId: string, body: unknown): NextRequest {
 
 const pausedInstance = {
   id: 'inst-1',
+  namespace: 'test-ns',
   status: 'paused',
   currentStepId: 'extract-metadata',
 };
 
 const advancedInstance = {
   id: 'inst-1',
+  namespace: 'test-ns',
   status: 'running',
   currentStepId: 'extract-metadata',
 };
@@ -85,6 +93,7 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
     // Return advanced instance on second call (for response)
     mockInstanceGetById
       .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(advancedInstance);
 
     const res = await POST(
@@ -116,6 +125,7 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
     mockGetById.mockResolvedValue(l3Task);
     mockInstanceGetById
       .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(advancedInstance);
 
     await POST(
@@ -133,6 +143,7 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
     mockGetById.mockResolvedValue(pendingTask);
     mockClaim.mockResolvedValue(afterClaim);
     mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(advancedInstance);
 
@@ -289,6 +300,7 @@ describe('POST /api/tasks/:taskId/resolve — selection', () => {
     mockGetById.mockResolvedValue(claimedSelectionTask);
     mockInstanceGetById
       .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(advancedInstance);
 
     const res = await POST(
@@ -315,6 +327,7 @@ describe('POST /api/tasks/:taskId/resolve — selection', () => {
   it('[DATA] revise works without selectedIndex', async () => {
     mockGetById.mockResolvedValue(claimedSelectionTask);
     mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(advancedInstance);
 
@@ -399,6 +412,7 @@ describe('POST /api/tasks/:taskId/resolve — file-upload', () => {
     mockGetById.mockResolvedValue(claimedUploadTask);
     mockInstanceGetById
       .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(advancedInstance);
 
     const res = await POST(
@@ -430,6 +444,7 @@ describe('POST /api/tasks/:taskId/resolve — file-upload', () => {
     mockGetById.mockResolvedValue(pendingUpload);
     mockClaim.mockResolvedValue(afterClaim);
     mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(advancedInstance);
 
@@ -531,6 +546,7 @@ describe('POST /api/tasks/:taskId/resolve — file-upload', () => {
     mockGetById.mockResolvedValue(sdtmTask);
     mockInstanceGetById
       .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(advancedInstance);
 
     const res = await POST(
@@ -546,6 +562,7 @@ describe('POST /api/tasks/:taskId/resolve — file-upload', () => {
   it('[DATA] triggers auto-runner after resolution', async () => {
     mockGetById.mockResolvedValue(claimedUploadTask);
     mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(pausedInstance)
       .mockResolvedValueOnce(advancedInstance);
 

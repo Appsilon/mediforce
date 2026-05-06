@@ -1,11 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGetByProcess = vi.fn();
+const mockGetById = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     auditRepo: { getByProcess: mockGetByProcess },
+    instanceRepo: { getById: mockGetById },
+    namespaceRepo: {},
   }),
+}));
+
+vi.mock('@/lib/api-auth', () => ({
+  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
+  requireNamespaceAccess: () => null,
 }));
 
 import { GET } from '../route';
@@ -20,6 +28,8 @@ function makeRequest(instanceId: string) {
 describe('GET /api/processes/[instanceId]/audit', () => {
   beforeEach(() => {
     mockGetByProcess.mockReset();
+    mockGetById.mockReset();
+    mockGetById.mockResolvedValue({ id: 'inst-001', namespace: 'test-ns' });
   });
 
   it('[DATA] returns audit events for a process instance', async () => {
@@ -47,6 +57,15 @@ describe('GET /api/processes/[instanceId]/audit', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual([]);
+  });
+
+  it('[ERROR] returns 404 when instance not found', async () => {
+    mockGetById.mockResolvedValue(null);
+    const { req, params } = makeRequest('inst-001');
+
+    const res = await GET(req, { params });
+
+    expect(res.status).toBe(404);
   });
 
   it('[ERROR] returns 500 when repository throws', async () => {

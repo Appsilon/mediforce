@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import { getCallerNamespaces } from '../auth.js';
+import { resolveCallerIdentity, callerCanAccess } from '@/lib/api-auth';
 
 export async function GET(
   request: NextRequest,
@@ -10,8 +10,8 @@ export async function GET(
   const versionParam = request.nextUrl.searchParams.get('version');
 
   const { processRepo, namespaceRepo } = getPlatformServices();
-  const callerNs = await getCallerNamespaces(request, namespaceRepo);
-  if (callerNs instanceof NextResponse) return callerNs;
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
 
   let version: number;
   if (versionParam !== null) {
@@ -35,16 +35,18 @@ export async function GET(
   const definition = await processRepo.getWorkflowDefinition(name, version);
   if (definition === null) {
     return NextResponse.json(
-      { error: `Workflow '${name}' v${version} not found` },
+      { error: `Workflow '${name}' not found` },
       { status: 404 },
     );
   }
 
-  if (callerNs !== null && !callerNs.has(definition.namespace)) {
-    return NextResponse.json(
-      { error: `Workflow '${name}' not found` },
-      { status: 404 },
-    );
+  if (!callerCanAccess(caller, definition.namespace)) {
+    if (definition.visibility === 'private') {
+      return NextResponse.json(
+        { error: `Workflow '${name}' not found` },
+        { status: 404 },
+      );
+    }
   }
 
   return NextResponse.json({ definition });

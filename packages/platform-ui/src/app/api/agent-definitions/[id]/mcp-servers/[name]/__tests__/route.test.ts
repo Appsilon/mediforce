@@ -10,7 +10,13 @@ vi.mock('@/lib/platform-services', () => ({
       getById: mockAgentGetById,
       update: mockAgentUpdate,
     },
+    namespaceRepo: {},
   }),
+}));
+
+vi.mock('@/lib/api-auth', () => ({
+  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
+  requireNamespaceAccess: () => null,
 }));
 
 import { PUT, DELETE } from '../route';

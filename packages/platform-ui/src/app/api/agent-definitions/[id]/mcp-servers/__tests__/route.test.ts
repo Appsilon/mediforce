@@ -8,7 +8,13 @@ vi.mock('@/lib/platform-services', () => ({
     agentDefinitionRepo: {
       getById: mockAgentGetById,
     },
+    namespaceRepo: {},
   }),
+}));
+
+vi.mock('@/lib/api-auth', () => ({
+  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
+  requireNamespaceAccess: () => null,
 }));
 
 import { GET } from '../route';

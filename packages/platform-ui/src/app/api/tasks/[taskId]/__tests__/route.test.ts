@@ -24,8 +24,14 @@ vi.mock('@/lib/platform-services', () => ({
       update: mockInstanceUpdate,
     },
     engine: { advanceStep: mockAdvanceStep },
+    namespaceRepo: {},
   }),
   getAppBaseUrl: () => 'http://localhost:3000',
+}));
+
+vi.mock('@/lib/api-auth', () => ({
+  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
+  requireNamespaceAccess: () => null,
 }));
 
 // Suppress fire-and-forget fetch in complete route

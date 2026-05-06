@@ -370,6 +370,9 @@ export const TriggerInputFieldSchema = StepParamSchema.extend({
 
 export type TriggerInputField = z.infer<typeof TriggerInputFieldSchema>;
 
+export const WorkflowVisibilitySchema = z.enum(['public', 'private']);
+export type WorkflowVisibility = z.infer<typeof WorkflowVisibilitySchema>;
+
 export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -378,6 +381,7 @@ export const WorkflowDefinitionBaseSchema = z.object({
    *  tool catalog all key off this field — a workflow without one is
    *  not a runnable workflow. */
   namespace: z.string().min(1),
+  visibility: WorkflowVisibilitySchema.default('public').optional(),
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   preamble: z.string().optional(),

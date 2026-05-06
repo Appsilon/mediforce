@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 /**
  * POST /api/tasks/:taskId/complete
@@ -30,14 +31,21 @@ export async function POST(
 
     const comment = body.comment ?? '';
 
-    const { humanTaskRepo, instanceRepo, auditRepo, engine } =
+    const { humanTaskRepo, instanceRepo, auditRepo, engine, namespaceRepo } =
       getPlatformServices();
+
+    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    if (caller instanceof NextResponse) return caller;
 
     // 1. Load and validate task
     const task = await humanTaskRepo.getById(taskId);
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
+
+    const nsInstance = await instanceRepo.getById(task.processInstanceId);
+    const denied = requireNamespaceAccess(caller, nsInstance?.namespace);
+    if (denied) return denied;
 
     if (task.status !== 'claimed') {
       return NextResponse.json(

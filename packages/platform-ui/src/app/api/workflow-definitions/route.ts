@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
 import { getPlatformServices } from '@/lib/platform-services';
-import { getCallerNamespaces } from './auth.js';
+import { resolveCallerIdentity, requireNamespaceAccess, callerCanAccess } from '@/lib/api-auth';
 
 /**
  * GET /api/workflow-definitions
@@ -13,8 +13,8 @@ import { getCallerNamespaces } from './auth.js';
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const { processRepo, namespaceRepo } = getPlatformServices();
-  const callerNs = await getCallerNamespaces(request, namespaceRepo);
-  if (callerNs instanceof NextResponse) return callerNs;
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
 
   const { definitions } = await processRepo.listWorkflowDefinitions(false);
 
@@ -28,11 +28,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     };
   });
 
-  const filtered = callerNs === null
+  const filtered = caller.kind === 'apiKey'
     ? result
     : result.filter((item) => {
         const ns = item.definition?.namespace;
-        return typeof ns === 'string' && callerNs.has(ns);
+        if (typeof ns !== 'string') return false;
+        if (caller.namespaces.has(ns)) return true;
+        return item.definition?.visibility !== 'private';
       });
 
   return NextResponse.json({ definitions: filtered });
@@ -49,6 +51,10 @@ export async function GET(request: Request): Promise<NextResponse> {
  * It overrides any `namespace` field in the request body.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const { namespaceRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
+
   const url = new URL(request.url);
   const namespace = url.searchParams.get('namespace');
   if (!namespace) {
@@ -57,6 +63,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 400 },
     );
   }
+
+  const denied = requireNamespaceAccess(caller, namespace);
+  if (denied) return denied;
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== 'object') {

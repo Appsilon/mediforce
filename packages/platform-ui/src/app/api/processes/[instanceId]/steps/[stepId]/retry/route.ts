@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { InvalidTransitionError } from '@mediforce/workflow-engine';
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 /**
  * POST /api/processes/:instanceId/steps/:stepId/retry
@@ -10,12 +11,19 @@ import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
  * of prior steps.
  */
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ instanceId: string; stepId: string }> },
 ): Promise<NextResponse> {
   try {
     const { instanceId, stepId } = await params;
-    const { engine } = getPlatformServices();
+    const { engine, instanceRepo, namespaceRepo } = getPlatformServices();
+
+    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    if (caller instanceof NextResponse) return caller;
+
+    const instance = await instanceRepo.getById(instanceId);
+    const denied = requireNamespaceAccess(caller, instance?.namespace);
+    if (denied) return denied;
 
     const result = await engine.retryStep(instanceId, stepId, {
       id: 'api-user',
