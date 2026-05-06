@@ -139,18 +139,21 @@ export async function patchDocumentFields(
 
 /** Delete a single Firestore document by its full path
  *  (e.g. `namespaces/test/agentOAuthTokens/oauth-test-agent__github-mcp`).
- *  Returns true if the doc was deleted, false if it didn't exist. */
-export async function deleteDocument(docPath: string): Promise<boolean> {
+ *  Each path segment is URL-encoded so segments containing `#`, `?`, spaces,
+ *  or other URL-special characters route correctly. Missing docs are a
+ *  no-op — callers can use this for idempotent cleanup. */
+export async function deleteDocument(docPath: string): Promise<void> {
   const basePath = `${FIRESTORE_EMULATOR}/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-  const res = await fetch(`${basePath}/${docPath}`, {
+  const encodedPath = docPath.split('/').map(encodeURIComponent).join('/');
+  const res = await fetch(`${basePath}/${encodedPath}`, {
     method: 'DELETE',
     headers: EMULATOR_ADMIN_HEADERS,
+    signal: AbortSignal.timeout(5000),
   });
-  if (res.status === 404) return false;
+  if (res.status === 404) return;
   if (!res.ok) {
     throw new Error(`Failed to delete ${docPath}: ${await res.text()}`);
   }
-  return true;
 }
 
 export async function seedSubcollection(
