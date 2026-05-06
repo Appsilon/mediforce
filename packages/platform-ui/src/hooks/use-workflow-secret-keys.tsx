@@ -6,7 +6,6 @@ import { useAuth } from '@/contexts/auth-context';
 
 interface WorkflowSecretKeysContextValue {
   getKeys: (workflowName: string) => string[] | undefined;
-  allKeys: Map<string, string[]>;
   loading: boolean;
 }
 
@@ -46,8 +45,9 @@ export function WorkflowSecretKeysProvider({
         setSecretsByWorkflow(map);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
+        console.warn('[WorkflowSecretKeys] Failed to fetch secret keys:', err);
         setSecretsByWorkflow(new Map());
         setLoading(false);
       });
@@ -62,8 +62,8 @@ export function WorkflowSecretKeysProvider({
   );
 
   const value = React.useMemo(
-    () => ({ getKeys, allKeys: secretsByWorkflow, loading }),
-    [getKeys, secretsByWorkflow, loading],
+    () => ({ getKeys, loading }),
+    [getKeys, loading],
   );
 
   return (
