@@ -9,16 +9,18 @@ interface CommandInput {
   output: OutputSink;
 }
 
-const HELP = `Usage: mediforce secret delete --workflow <name> --namespace <ns> --key <key> [options]
+const HELP = `Usage: mediforce secret delete --namespace <ns> --key <key> [--workflow <name>] [options]
 
-Delete a single secret from a workflow.
+Delete a single secret.
+Without --workflow: deletes a workspace-level secret.
+With --workflow: deletes a workflow-level secret.
 
 Required flags:
-  --workflow <name>    Workflow name
   --namespace <ns>    Namespace handle
   --key <key>         Secret key name to delete
 
 Optional flags:
+  --workflow <name>    Workflow name (omit for workspace-level secret)
   --base-url <url>    API base URL (default: http://localhost:9003)
   --json              Emit JSON instead of human-readable output
   --help, -h          Show this help text
@@ -63,8 +65,8 @@ export async function secretDeleteCommand(input: CommandInput): Promise<number> 
     return 0;
   }
 
-  if (!flags.workflow || !flags.namespace || !flags.key) {
-    printError(input.output, { error: '--workflow, --namespace, and --key are required' }, jsonMode);
+  if (!flags.namespace || !flags.key) {
+    printError(input.output, { error: '--namespace and --key are required' }, jsonMode);
     input.output.stderr('');
     input.output.stderr(HELP);
     return 2;
@@ -82,13 +84,16 @@ export async function secretDeleteCommand(input: CommandInput): Promise<number> 
   try {
     await mediforce.secrets.delete({
       namespace: flags.namespace,
-      workflow: flags.workflow,
+      ...(flags.workflow ? { workflow: flags.workflow } : {}),
       key: flags.key,
     });
     if (jsonMode) {
       printJson(input.output, { ok: true });
     } else {
-      input.output.stdout(`Secret "${flags.key}" deleted from workflow "${flags.workflow}" in namespace "${flags.namespace}".`);
+      const scope = flags.workflow
+        ? `workflow "${flags.workflow}" in namespace "${flags.namespace}"`
+        : `namespace "${flags.namespace}"`;
+      input.output.stdout(`Secret "${flags.key}" deleted from ${scope}.`);
     }
     return 0;
   } catch (err) {

@@ -78,6 +78,23 @@ describe('secret delete command', () => {
     expect(parsed.status).toBe(404);
   });
 
+  it('deletes namespace-level secret when --workflow omitted', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ ok: true }),
+    );
+    const output = captureOutput();
+    const code = await secretDeleteCommand({
+      argv: ['--namespace', 'ns-1', '--key', 'OLD_KEY'],
+      env: BASE_ENV,
+      output,
+    });
+    expect(code).toBe(0);
+    const url = fetchSpy.mock.calls[0]![0] as string;
+    expect(url).toContain('namespace=ns-1');
+    expect(url).not.toContain('workflow=');
+    expect(output.stdoutLines.join('\n')).toMatch(/namespace "ns-1"/);
+  });
+
   it('exits 2 when API key missing', async () => {
     const output = captureOutput();
     const code = await secretDeleteCommand({

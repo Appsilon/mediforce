@@ -10,27 +10,28 @@ interface CommandInput {
   stdin?: () => Promise<string>;
 }
 
-const HELP = `Usage: mediforce secret set --workflow <name> --namespace <ns> --key <key> [options]
+const HELP = `Usage: mediforce secret set --namespace <ns> --key <key> [--workflow <name>] [options]
 
-Set a single secret for a workflow. The value is encrypted at rest.
+Set a single secret. The value is encrypted at rest.
+Without --workflow: sets a workspace-level secret (shared across all workflows).
+With --workflow: sets a workflow-level secret (overrides workspace secrets).
 
 Required flags:
-  --workflow <name>    Workflow name
   --namespace <ns>    Namespace handle
   --key <key>         Secret key name
 
-Value source (exactly one required):
+Optional flags:
+  --workflow <name>    Workflow name (omit for workspace-level secret)
   --value <val>       Secret value (visible in shell history — prefer --stdin)
   --stdin             Read value from stdin (pipe-friendly, no shell history)
-
-Optional flags:
   --base-url <url>    API base URL (default: http://localhost:9003)
   --json              Emit JSON instead of human-readable output
   --help, -h          Show this help text
 
 Examples:
-  mediforce secret set --workflow my-wf --namespace my-ns --key API_TOKEN --value sk-abc
-  echo "sk-abc" | mediforce secret set --workflow my-wf --namespace my-ns --key API_TOKEN --stdin
+  mediforce secret set --namespace my-ns --key OPENROUTER_API_KEY --value sk-or-...
+  mediforce secret set --namespace my-ns --workflow my-wf --key API_TOKEN --value sk-abc
+  echo "sk-abc" | mediforce secret set --namespace my-ns --key API_TOKEN --stdin
 `;
 
 const SET_OPTIONS = {
@@ -85,8 +86,8 @@ export async function secretSetCommand(input: CommandInput): Promise<number> {
     return 0;
   }
 
-  if (!flags.workflow || !flags.namespace || !flags.key) {
-    printError(input.output, { error: '--workflow, --namespace, and --key are required' }, jsonMode);
+  if (!flags.namespace || !flags.key) {
+    printError(input.output, { error: '--namespace and --key are required' }, jsonMode);
     input.output.stderr('');
     input.output.stderr(HELP);
     return 2;
@@ -127,14 +128,17 @@ export async function secretSetCommand(input: CommandInput): Promise<number> {
   try {
     await mediforce.secrets.set({
       namespace: flags.namespace,
-      workflow: flags.workflow,
+      ...(flags.workflow ? { workflow: flags.workflow } : {}),
       key: flags.key,
       value: secretValue,
     });
     if (jsonMode) {
       printJson(input.output, { ok: true });
     } else {
-      input.output.stdout(`Secret "${flags.key}" set for workflow "${flags.workflow}" in namespace "${flags.namespace}".`);
+      const scope = flags.workflow
+        ? `workflow "${flags.workflow}" in namespace "${flags.namespace}"`
+        : `namespace "${flags.namespace}"`;
+      input.output.stdout(`Secret "${flags.key}" set for ${scope}.`);
     }
     return 0;
   } catch (err) {
