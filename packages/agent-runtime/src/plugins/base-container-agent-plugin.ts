@@ -894,12 +894,26 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         ? parsedResult.confidence_rationale
         : undefined;
 
-      const tokenUsage = parsedResult.tokenUsage !== null
+      let tokenUsage: { inputTokens: number; outputTokens: number } | undefined;
+
+      // First: check if agent reported tokenUsage in its result
+      if (parsedResult.tokenUsage !== null
         && typeof parsedResult.tokenUsage === 'object'
         && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
-        && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number'
-        ? parsedResult.tokenUsage as { inputTokens: number; outputTokens: number }
-        : undefined;
+        && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
+        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number };
+      }
+
+      // Second: check stream event for CLI-reported usage (Claude Code stream-json)
+      if (!tokenUsage) {
+        try {
+          const rawEvent = JSON.parse(spawnResult.cliOutput) as Record<string, unknown>;
+          const usage = rawEvent.usage as Record<string, number> | undefined;
+          if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
+            tokenUsage = { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens };
+          }
+        } catch { /* cliOutput not parseable as single JSON — skip */ }
+      }
 
       // Strip envelope-level fields from result to avoid duplication in UI
       const { confidence: _c, confidence_rationale: _cr, tokenUsage: _tu, ...cleanResult } = parsedResult;
