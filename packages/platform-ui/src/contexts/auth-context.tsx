@@ -195,7 +195,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
-      setLoading(false);
 
       if (user !== null) {
         const profile: Record<string, string> = {};
@@ -204,13 +203,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (user.email !== null) profile.email = user.email;
         profile.uid = user.uid;
 
-        // Read mustChangePassword FIRST before any writes — pending writes to the same
-        // document can cause the Firestore SDK to return an optimistic local snapshot that
-        // omits server-side fields the client hasn't seen yet (e.g. mustChangePassword).
+        // Resolve mustChangePassword BEFORE clearing loading — layout reads
+        // both flags to decide whether to redirect to /change-password.
+        // Clearing loading first would let layout render with the default
+        // mustChangePassword=false and skip the redirect (CI race condition).
         getDoc(doc(db, 'users', user.uid)).then((snap) => {
           if (snap.exists()) {
             setMustChangePassword(snap.data().mustChangePassword === true);
           }
+          setLoading(false);
           if (Object.keys(profile).length > 0) {
             setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch((err) => {
               console.error('[auth] Failed to update user profile doc:', err);
@@ -220,11 +221,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('[auth] ensurePersonalNamespace failed:', err);
           });
         }).catch((err) => {
-          // Fail-closed: if we cannot read mustChangePassword, assume it is true so
-          // the forced-reset gate is never silently bypassed by a rules rejection or
-          // transient network error.
           console.error('[auth] Failed to read user doc for mustChangePassword — failing closed:', err);
           setMustChangePassword(true);
+          setLoading(false);
           if (Object.keys(profile).length > 0) {
             setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch((writeErr) => {
               console.error('[auth] Failed to update user profile doc:', writeErr);
@@ -236,6 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       } else {
         setMustChangePassword(false);
+        setLoading(false);
       }
     });
     return unsub;

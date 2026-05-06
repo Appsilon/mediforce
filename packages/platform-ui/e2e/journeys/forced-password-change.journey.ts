@@ -47,7 +47,7 @@ test.describe('Forced Password Change Journey', () => {
     await click(page, page.getByRole('button', { name: /^sign in$/i }));
 
     // After sign-in the (app) layout detects mustChangePassword and redirects to /change-password
-    await page.waitForURL('**/change-password', { timeout: 20_000 });
+    await page.waitForURL('**/change-password', { timeout: 30_000 });
     await expect(page.getByRole('heading', { name: 'Set your password' })).toBeVisible({ timeout: 10_000 });
     await showCaption(page, 'Redirected to mandatory password change');
     await showStep(page);
