@@ -41,3 +41,22 @@ export function getConfiguredAppBaseUrl(): string | undefined {
 export function getAppBaseUrl(): string {
   return getConfiguredAppBaseUrl() ?? `http://localhost:${process.env.PORT ?? '3000'}`;
 }
+
+/** Public origin for absolute URLs the server emits to real clients — OAuth
+ *  `redirect_uri`, post-callback redirects. Prefers the env-configured base
+ *  URL; falls back to `request.url.origin` only on local dev where neither
+ *  env var is set and there is no proxy hop.
+ *
+ *  The `request.url` fallback assumes Next.js always supplies a valid URL,
+ *  which holds in practice — malformed request URLs are rejected by Node's
+ *  HTTP parser before they reach a route handler. */
+export function publicOrigin(request: Request): string {
+  return getConfiguredAppBaseUrl() ?? new URL(request.url).origin;
+}
+
+/** Canonical OAuth callback URL for a given provider slug. All three OAuth
+ *  route handlers (start, callback, oauth-discover) must send the provider
+ *  to the same URL — centralised here so they can't drift. */
+export function buildOAuthCallbackUrl(request: Request, providerSlug: string): string {
+  return `${publicOrigin(request)}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
+}
