@@ -3,10 +3,9 @@
  *
  * Merge order: config-level env (defaults) ← step-level env (overrides).
  * Template syntax (two equivalent forms, both resolve the same way):
- *   - `{{NAME}}` — bare key, resolved from:
- *       1. Workflow secrets (Firestore, per-namespace per-workflow) under NAME
- *       2. process.env[NAME]
- *       3. process.env[DOCKER_NAME]
+ *   - `{{NAME}}` — bare key, resolved from secrets (namespace + workflow,
+ *     pre-merged by the caller). No process.env fallback — all agent secrets
+ *     must be configured via workspace or workflow secrets panel.
  *   - `{{SECRET:name}}` — namespaced form, resolved the same way under `name`.
  *
  * `{{OAUTH:provider}}` is reserved for OAuth token injection, which flows
@@ -47,18 +46,13 @@ export function resolveValue(value: string, workflowSecrets?: Record<string, str
     );
   }
 
-  // namespace === 'SECRET' or undefined: treat as a secret lookup
   if (workflowSecrets && key in workflowSecrets && workflowSecrets[key] !== '') {
     return workflowSecrets[key];
   }
-  const resolved = process.env[key] || process.env[`DOCKER_${key}`];
-  if (resolved === undefined || resolved === '') {
-    throw new Error(
-      `Env var template "${value}" references secret "${key}" which is not set. ` +
-      `Configure it in workflow secrets or set server env "${key}" (or "DOCKER_${key}")`,
-    );
-  }
-  return resolved;
+  throw new Error(
+    `Secret "${key}" is not configured. ` +
+    `Add it in workspace settings (shared across workflows) or the workflow's Secrets panel.`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -97,8 +91,6 @@ export function validateWorkflowEnv(
 
       const key = parsed.key;
       if (workflowSecrets && key in workflowSecrets && workflowSecrets[key] !== '') continue;
-      const resolved = process.env[key] || process.env[`DOCKER_${key}`];
-      if (resolved !== undefined && resolved !== '') continue;
 
       if (!missingMap.has(key)) {
         missingMap.set(key, { secretName: key, template: value, steps: [] });

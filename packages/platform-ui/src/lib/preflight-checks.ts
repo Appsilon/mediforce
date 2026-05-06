@@ -24,6 +24,7 @@ export function runPreflightChecks(
     dockerImages?: DockerImageInfo[];
     dockerAvailable: boolean;
     secretKeys?: string[];
+    namespaceSecretKeys?: string[];
     openRouterCredits?: OpenRouterCreditsInfo;
   },
 ): PreflightWarning[] {
@@ -48,13 +49,17 @@ export function runPreflightChecks(
       }
     }
 
-    if (options.secretKeys) {
+    if (options.secretKeys || options.namespaceSecretKeys) {
+      const allKeys = [
+        ...(options.secretKeys ?? []),
+        ...(options.namespaceSecretKeys ?? []),
+      ];
       const env = { ...definition.env, ...step.env };
       for (const [varName, value] of Object.entries(env)) {
         const match = TEMPLATE_RE.exec(value);
         if (match === null) continue;
         const key = match[1];
-        if (!options.secretKeys.includes(key)) {
+        if (!allKeys.includes(key)) {
           const existing = secretMap.get(key);
           if (existing) { existing.stepNames.push(step.name); }
           else { secretMap.set(key, { stepNames: [step.name], envVar: varName }); }
@@ -81,7 +86,7 @@ export function runPreflightChecks(
       resource: key,
       stepNames,
       message: `Secret '${key}' not configured (referenced as ${envVar})`,
-      hint: 'Add this secret in the Secrets panel for this workflow.',
+      hint: 'Add this secret in workspace settings (shared) or the workflow Secrets panel (per-workflow).',
     });
   }
 
