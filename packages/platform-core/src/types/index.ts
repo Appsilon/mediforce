@@ -42,6 +42,7 @@ export type {
 export type {
   Annotation,
   GitMetadata,
+  TokenUsage,
   AgentOutputEnvelope,
 } from '../schemas/agent-output-envelope.js';
 

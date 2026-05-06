@@ -894,8 +894,15 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         ? parsedResult.confidence_rationale
         : undefined;
 
+      const tokenUsage = parsedResult.tokenUsage !== null
+        && typeof parsedResult.tokenUsage === 'object'
+        && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
+        && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number'
+        ? parsedResult.tokenUsage as { inputTokens: number; outputTokens: number }
+        : undefined;
+
       // Strip envelope-level fields from result to avoid duplication in UI
-      const { confidence: _c, confidence_rationale: _cr, ...cleanResult } = parsedResult;
+      const { confidence: _c, confidence_rationale: _cr, tokenUsage: _tu, ...cleanResult } = parsedResult;
 
       // Persist any deliverable file from the output dir before it gets cleaned up
       const deliverableFile = await this.persistDeliverableFile(
@@ -928,6 +935,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           ...(spawnResult.gitMetadata ? { gitMetadata: spawnResult.gitMetadata } : {}),
           ...(spawnResult.presentation ? { presentation: spawnResult.presentation } : {}),
           ...(deliverableFile ? { deliverableFile } : {}),
+          ...(tokenUsage ? { tokenUsage } : {}),
         },
         timestamp: new Date().toISOString(),
       });

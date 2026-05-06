@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle2, ExternalLink, Gauge, GitBranch, Clock, FileText } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Gauge, GitBranch, Clock, FileText, DollarSign } from 'lucide-react';
 import type { StepExecution, AgentOutputSnapshot } from '@mediforce/platform-core';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
-import { formatDuration, formatStepName } from '@/lib/format';
+import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
 
 interface RunResultsPanelProps {
   stepExecutions: StepExecution[];
@@ -89,6 +89,13 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
               <Clock className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-muted-foreground">Duration:</span>
               <span>{formatDuration(output.duration_ms)}</span>
+            </div>
+          )}
+          {output.estimatedCostUsd !== null && output.estimatedCostUsd !== undefined && (
+            <div className="flex items-center gap-1.5">
+              <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">Cost:</span>
+              <span className="font-medium">{formatCostUsd(output.estimatedCostUsd)}</span>
             </div>
           )}
         </div>

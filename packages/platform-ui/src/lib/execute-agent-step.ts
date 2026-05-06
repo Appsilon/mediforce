@@ -13,12 +13,13 @@ import {
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
 } from '@mediforce/agent-runtime';
-import type {
-  AgentOAuthTokenRepository,
-  OAuthProviderRepository,
-  ResolvedMcpConfig,
-  WorkflowDefinition,
-  WorkflowStep,
+import {
+  calculateEstimatedCost,
+  type AgentOAuthTokenRepository,
+  type OAuthProviderRepository,
+  type ResolvedMcpConfig,
+  type WorkflowDefinition,
+  type WorkflowStep,
 } from '@mediforce/platform-core';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
@@ -58,6 +59,7 @@ export async function executeAgentStep(
     toolCatalogRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    modelRegistryRepo,
   } = getPlatformServices();
 
   const instance = await instanceRepo.getById(instanceId);
@@ -205,6 +207,8 @@ export async function executeAgentStep(
             duration_ms: envelope.duration_ms ?? null,
             gitMetadata: envelope.gitMetadata ?? null,
             deliverableFile: (envelope.deliverableFile as string | undefined) ?? null,
+            tokenUsage: envelope.tokenUsage ?? null,
+            estimatedCostUsd: await estimateCost(envelope, modelRegistryRepo),
           }
         : null,
     });
@@ -539,4 +543,14 @@ async function loadOAuthTokens(
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
+}
+
+async function estimateCost(
+  envelope: { model: string | null; tokenUsage?: { inputTokens: number; outputTokens: number } },
+  modelRegistryRepo: { getById(id: string): Promise<{ pricing: { input: number; output: number } } | null> },
+): Promise<number | null> {
+  if (!envelope.tokenUsage || !envelope.model) return null;
+  const entry = await modelRegistryRepo.getById(envelope.model);
+  if (!entry) return null;
+  return calculateEstimatedCost(envelope.tokenUsage, entry.pricing);
 }
