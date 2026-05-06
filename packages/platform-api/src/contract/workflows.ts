@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   WorkflowDefinitionBaseSchema,
   WorkflowDefinitionSchema,
+  WorkflowVisibilitySchema,
 } from '@mediforce/platform-core';
 
 /**
@@ -88,6 +89,20 @@ export const ArchiveAllOutputSchema = z.object({
 
 export type ArchiveAllInput = z.infer<typeof ArchiveAllInputSchema>;
 export type ArchiveAllOutput = z.infer<typeof ArchiveAllOutputSchema>;
+
+export const SetVisibilityInputSchema = z.object({
+  name: z.string().min(1),
+  visibility: WorkflowVisibilitySchema,
+});
+
+export const SetVisibilityOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  visibility: WorkflowVisibilitySchema,
+});
+
+export type SetVisibilityInput = z.infer<typeof SetVisibilityInputSchema>;
+export type SetVisibilityOutput = z.infer<typeof SetVisibilityOutputSchema>;
 
 /**
  * Options for `mediforce.workflows.register()`. Namespace is a required

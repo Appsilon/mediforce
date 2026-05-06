@@ -27,6 +27,10 @@ export {
   ArchiveAllOutputSchema,
   type ArchiveAllInput,
   type ArchiveAllOutput,
+  SetVisibilityInputSchema,
+  SetVisibilityOutputSchema,
+  type SetVisibilityInput,
+  type SetVisibilityOutput,
 } from './workflows.js';
 
 export {

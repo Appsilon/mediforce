@@ -65,6 +65,7 @@ Required flags:
   --namespace <ns>     Namespace that owns the registered workflow
 
 Optional flags:
+  --visibility <v>     Override visibility (public | private)
   --base-url <url>     API base URL (default: http://localhost:9003)
   --dry-run            Validate the file locally without calling the API
   --json               Emit JSON instead of human-readable output
@@ -74,6 +75,7 @@ Optional flags:
 const REGISTER_OPTIONS = {
   file: { type: 'string' },
   namespace: { type: 'string' },
+  visibility: { type: 'string' },
   'base-url': { type: 'string' },
   'dry-run': { type: 'boolean' },
   json: { type: 'boolean' },
@@ -84,6 +86,7 @@ export async function workflowRegisterCommand(input: CommandInput): Promise<numb
   let flags: {
     file?: string;
     namespace?: string;
+    visibility?: string;
     'base-url'?: string;
     'dry-run'?: boolean;
     json?: boolean;
@@ -119,6 +122,11 @@ export async function workflowRegisterCommand(input: CommandInput): Promise<numb
     return 2;
   }
 
+  if (flags.visibility !== undefined && flags.visibility !== 'public' && flags.visibility !== 'private') {
+    printError(input.output, { error: '--visibility must be "public" or "private"' }, jsonMode);
+    return 2;
+  }
+
   let raw: string;
   try {
     raw = await readFile(flags.file, 'utf-8');
@@ -147,6 +155,9 @@ export async function workflowRegisterCommand(input: CommandInput): Promise<numb
       return 1;
     }
     body = result.data;
+    if (flags.visibility !== undefined) {
+      body = { ...body, visibility: flags.visibility as 'public' | 'private' };
+    }
   } catch (err) {
     printError(input.output, { error: `Invalid JSON: ${String(err)}` }, jsonMode);
     return 1;

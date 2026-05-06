@@ -297,7 +297,7 @@ export function buildWorkflowDefinition(
     name: 'test-workflow',
     version: 1,
     namespace: 'test',
-    visibility: 'public',
+    visibility: 'private',
     steps: [
       {
         id: 'intake',

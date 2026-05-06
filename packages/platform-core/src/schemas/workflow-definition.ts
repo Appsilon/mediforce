@@ -381,7 +381,7 @@ export const WorkflowDefinitionBaseSchema = z.object({
    *  tool catalog all key off this field — a workflow without one is
    *  not a runnable workflow. */
   namespace: z.string().min(1),
-  visibility: WorkflowVisibilitySchema.default('public').optional(),
+  visibility: WorkflowVisibilitySchema.default('private').optional(),
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   preamble: z.string().optional(),

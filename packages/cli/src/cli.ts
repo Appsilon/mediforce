@@ -26,6 +26,7 @@ import { runGetCommand } from './commands/run-get.js';
 import { runListCommand } from './commands/run-list.js';
 import { runStartCommand } from './commands/run-start.js';
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
+import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility.js';
 import { systemStatusCommand, systemImagesCommand, systemDiskCommand, systemRmiCommand } from './commands/system-status.js';
 import { agentListCommand } from './commands/agent-list.js';
 import { agentGetCommand } from './commands/agent-get.js';
@@ -49,6 +50,7 @@ Commands:
   workflow register --file <path> --namespace <ns>   Register a workflow definition
   workflow list                                      List registered workflow definitions
   workflow get <name>                                Fetch a workflow definition
+  workflow set-visibility <name> --visibility <v>    Set workflow visibility (public|private)
   workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
   agent list                                         List agent definitions
   agent get <id>                                     Fetch an agent definition
@@ -87,6 +89,7 @@ Subcommands:
   register --file <path> --namespace <ns>   Register a workflow definition
   list                                      List registered workflow definitions
   get <name>                                Fetch a workflow definition
+  set-visibility <name> --visibility <v>    Set workflow visibility (public|private)
   archive <name> --version <n>|--all        Archive/unarchive workflow versions
 
 Run \`mediforce workflow <subcommand> --help\` for subcommand-specific flags.
@@ -203,6 +206,9 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'workflow' && subcommand === 'archive') {
     return workflowArchiveCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'workflow' && subcommand === 'set-visibility') {
+    return workflowSetVisibilityCommand({ argv: rest, env: input.env, output });
   }
   if (command === 'agent' && subcommand === 'list') {
     return agentListCommand({ argv: rest, env: input.env, output });

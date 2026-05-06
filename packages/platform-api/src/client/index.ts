@@ -16,6 +16,8 @@ import {
   ArchiveVersionOutputSchema,
   ArchiveAllInputSchema,
   ArchiveAllOutputSchema,
+  SetVisibilityInputSchema,
+  SetVisibilityOutputSchema,
   DockerInfoResponseSchema,
   RemoveImageOutputSchema,
   ListAgentsOutputSchema,
@@ -39,6 +41,8 @@ import {
   type ArchiveVersionOutput,
   type ArchiveAllInput,
   type ArchiveAllOutput,
+  type SetVisibilityInput,
+  type SetVisibilityOutput,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -136,6 +140,7 @@ export class Mediforce {
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
     archiveVersion: (input: ArchiveVersionInput) => Promise<ArchiveVersionOutput>;
     archiveAll: (input: ArchiveAllInput) => Promise<ArchiveAllOutput>;
+    setVisibility: (input: SetVisibilityInput) => Promise<SetVisibilityOutput>;
   };
 
   readonly runs: {
@@ -275,6 +280,19 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.archiveAll');
         return ArchiveAllOutputSchema.parse(body);
+      },
+      setVisibility: async (input) => {
+        const validated = SetVisibilityInputSchema.parse(input);
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ visibility: validated.visibility }),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.setVisibility');
+        return SetVisibilityOutputSchema.parse(body);
       },
     };
 
