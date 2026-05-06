@@ -49,3 +49,10 @@ export function getAppBaseUrl(): string {
 export function publicOrigin(request: Request): string {
   return getConfiguredAppBaseUrl() ?? new URL(request.url).origin;
 }
+
+/** Canonical OAuth callback URL for a given provider slug. All three OAuth
+ *  route handlers (start, callback, oauth-discover) must send the provider
+ *  to the same URL — centralised here so they can't drift. */
+export function buildOAuthCallbackUrl(request: Request, providerSlug: string): string {
+  return `${publicOrigin(request)}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
+}

@@ -12,7 +12,7 @@ import {
   type CreateOAuthProviderInput,
 } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
-import { publicOrigin } from '@/lib/app-base-url';
+import { buildOAuthCallbackUrl } from '@/lib/app-base-url';
 
 interface DiscoverBody {
   /** Namespace to scope the resulting provider doc. Required because
@@ -95,7 +95,7 @@ export async function POST(
     );
   }
 
-  const redirectUri = buildCallbackUrl(request, existingProviderSlug(binding, authServer.issuer));
+  const redirectUri = buildOAuthCallbackUrl(request, existingProviderSlug(binding, authServer.issuer));
   const providerSlug = existingProviderSlug(binding, authServer.issuer);
   const authMethod = pickAuthMethod(authServer.token_endpoint_auth_methods_supported);
   const scopes = chooseScopes(resourceMetadata.scopes_supported, authServer.scopes_supported);
@@ -220,9 +220,6 @@ function existingHeaderValueTemplate(
   return undefined;
 }
 
-function buildCallbackUrl(request: Request, providerSlug: string): string {
-  return `${publicOrigin(request)}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
-}
 
 function buildDisplayName(issuerUrl: string, serverName: string): string {
   const host = new URL(issuerUrl).hostname;

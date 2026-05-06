@@ -3,7 +3,7 @@ import { verifyState, type OAuthStatePayload } from '@mediforce/agent-runtime';
 import type { AgentOAuthToken, OAuthProviderConfig } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
-import { publicOrigin } from '@/lib/app-base-url';
+import { buildOAuthCallbackUrl, publicOrigin } from '@/lib/app-base-url';
 
 /** Platform-owned callback for the OAuth authorization-code flow. Provider
  *  redirects here after consent. No user session (external origin), so the
@@ -28,9 +28,6 @@ interface ProviderUserInfo {
   accountLogin: string;
 }
 
-function buildSelfCallbackUrl(request: Request, providerSlug: string): string {
-  return `${publicOrigin(request)}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
-}
 
 function redirectSuccess(request: Request, state: OAuthStatePayload): NextResponse {
   const origin = publicOrigin(request);
@@ -185,7 +182,7 @@ export async function GET(
   const exchange = await exchangeCode({
     provider,
     code,
-    redirectUri: buildSelfCallbackUrl(request, providerSlug),
+    redirectUri: buildOAuthCallbackUrl(request, providerSlug),
     codeVerifier: state.codeVerifier,
   });
   if (exchange === null) {
