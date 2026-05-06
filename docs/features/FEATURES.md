@@ -273,6 +273,16 @@ Reports are only available for completed runs. Accessing the report URL for a ru
 
 ![run-report-unavailable](run-report-unavailable.gif)
 
+### Trigger Input
+
+Workflow definitions can declare expected inputs via `triggerInput`. When starting a run, the dialog renders a form with typed fields (string, number, boolean, select, multiselect, textarea, date) instead of requiring raw JSON. Required fields disable the Start button until filled. Payload is validated server-side with strict mode (unknown fields rejected).
+
+![trigger-input](trigger-input.gif)
+
+Cancel closes the dialog without starting a run:
+
+![trigger-input-cancel](trigger-input-cancel.gif)
+
 ---
 
 ## Co-work

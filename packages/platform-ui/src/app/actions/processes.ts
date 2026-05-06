@@ -8,6 +8,7 @@ interface StartWorkflowRunInput {
   definitionName: string;
   definitionVersion: number;
   triggeredBy: string;
+  payload?: Record<string, unknown>;
 }
 
 export async function startWorkflowRun(
@@ -16,12 +17,14 @@ export async function startWorkflowRun(
   try {
     const { manualTrigger } = getPlatformServices();
 
+    const payload = input.payload ?? {};
+
     const context: WorkflowTriggerContext = {
       definitionName: input.definitionName,
       definitionVersion: input.definitionVersion,
       triggerName: 'start',
       triggeredBy: input.triggeredBy,
-      payload: {},
+      payload,
     };
 
     const result = await manualTrigger.fireWorkflow(context);
@@ -35,7 +38,7 @@ export async function startWorkflowRun(
         'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
       },
       body: JSON.stringify({
-        appContext: {},
+        appContext: payload,
         triggeredBy: input.triggeredBy,
       }),
     }).catch((err) => {
