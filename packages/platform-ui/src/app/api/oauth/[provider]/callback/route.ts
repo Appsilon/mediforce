@@ -3,7 +3,7 @@ import { verifyState, type OAuthStatePayload } from '@mediforce/agent-runtime';
 import type { AgentOAuthToken, OAuthProviderConfig } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
-import { getConfiguredAppBaseUrl } from '@/lib/app-base-url';
+import { publicOrigin } from '@/lib/app-base-url';
 
 /** Platform-owned callback for the OAuth authorization-code flow. Provider
  *  redirects here after consent. No user session (external origin), so the
@@ -26,13 +26,6 @@ interface TokenExchangeResponse {
 interface ProviderUserInfo {
   providerUserId: string;
   accountLogin: string;
-}
-
-// Public origin for absolute URLs we emit — see lib/app-base-url for why we
-// don't trust request.url. Falls back to request.url.origin only on local
-// dev where APP_BASE_URL / NEXT_PUBLIC_APP_URL are unset.
-function publicOrigin(request: Request): string {
-  return getConfiguredAppBaseUrl() ?? new URL(request.url).origin;
 }
 
 function buildSelfCallbackUrl(request: Request, providerSlug: string): string {

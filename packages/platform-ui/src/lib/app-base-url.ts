@@ -41,3 +41,11 @@ export function getConfiguredAppBaseUrl(): string | undefined {
 export function getAppBaseUrl(): string {
   return getConfiguredAppBaseUrl() ?? `http://localhost:${process.env.PORT ?? '3000'}`;
 }
+
+/** Public origin for absolute URLs the server emits to real clients — OAuth
+ *  `redirect_uri`, post-callback redirects. Prefers the env-configured base
+ *  URL; falls back to `request.url.origin` only on local dev where neither
+ *  env var is set and there is no proxy hop. */
+export function publicOrigin(request: Request): string {
+  return getConfiguredAppBaseUrl() ?? new URL(request.url).origin;
+}
