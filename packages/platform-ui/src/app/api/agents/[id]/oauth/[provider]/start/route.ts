@@ -14,7 +14,6 @@ const StartBodySchema = z.object({
   serverName: z.string().min(1),
 });
 
-
 function buildAuthorizeUrl(params: {
   base: string;
   clientId: string;

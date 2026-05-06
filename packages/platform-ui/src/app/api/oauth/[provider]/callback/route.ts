@@ -28,7 +28,6 @@ interface ProviderUserInfo {
   accountLogin: string;
 }
 
-
 function redirectSuccess(request: Request, state: OAuthStatePayload): NextResponse {
   const origin = publicOrigin(request);
   const destination = `${origin}/${encodeURIComponent(state.namespace)}/agents/definitions/${encodeURIComponent(state.agentId)}?connected=${encodeURIComponent(state.serverName)}`;

@@ -45,7 +45,11 @@ export function getAppBaseUrl(): string {
 /** Public origin for absolute URLs the server emits to real clients — OAuth
  *  `redirect_uri`, post-callback redirects. Prefers the env-configured base
  *  URL; falls back to `request.url.origin` only on local dev where neither
- *  env var is set and there is no proxy hop. */
+ *  env var is set and there is no proxy hop.
+ *
+ *  The `request.url` fallback assumes Next.js always supplies a valid URL,
+ *  which holds in practice — malformed request URLs are rejected by Node's
+ *  HTTP parser before they reach a route handler. */
 export function publicOrigin(request: Request): string {
   return getConfiguredAppBaseUrl() ?? new URL(request.url).origin;
 }

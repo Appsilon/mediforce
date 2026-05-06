@@ -220,7 +220,6 @@ function existingHeaderValueTemplate(
   return undefined;
 }
 
-
 function buildDisplayName(issuerUrl: string, serverName: string): string {
   const host = new URL(issuerUrl).hostname;
   return `${serverName} (${host})`;
