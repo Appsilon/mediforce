@@ -58,6 +58,7 @@ function buildMockWorkflowAgentContext(
     name: 'test-workflow',
     version: 1,
     namespace: 'test',
+    visibility: 'private',
     steps: [step],
     transitions: [],
     triggers: [{ type: 'manual', name: 'start' }],

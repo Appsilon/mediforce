@@ -12,6 +12,7 @@ const def: WorkflowDefinition = {
   name: 'retry-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'upload', name: 'Upload', type: 'creation', executor: 'human' },
     { id: 'deploy', name: 'Deploy', type: 'creation', executor: 'agent' },

@@ -22,6 +22,7 @@ const coworkDesignerDef: WorkflowDefinition = {
   name: 'cowork-designer-test',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     {
       id: 'intake',

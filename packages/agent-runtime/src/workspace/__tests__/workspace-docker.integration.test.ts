@@ -63,6 +63,7 @@ function buildScriptContext(overrides: {
     name: overrides.wdName ?? `wd-script-${Math.random().toString(36).slice(2, 8)}`,
     namespace: '_default',
     version: 1,
+    visibility: 'private',
     steps: [step],
     transitions: [],
     triggers: [{ type: 'manual', name: 'start' }],
