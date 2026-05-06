@@ -82,16 +82,30 @@ export type UpdateOAuthProviderInput = z.infer<typeof UpdateOAuthProviderInputSc
 
 /** Built-in provider presets. UI exposes these as "Add GitHub" / "Add Google"
  *  buttons that pre-fill the admin form. Admin still supplies clientId +
- *  clientSecret for their own OAuth App. */
+ *  clientSecret for their own OAuth App.
+ *
+ *  GitHub preset is shaped for the **GitHub App** user-server OAuth flow
+ *  (not classic OAuth Apps, not app-level JWT). The admin form synthesises
+ *  the final `authorizeUrl` from the App's slug — `installations/new` is the
+ *  install-then-authorize path, so users granting access install the App on
+ *  the right account/org in one step. Permissions come from the App's
+ *  installation, so the requested OAuth `scopes` stay minimal. */
 export const OAUTH_PROVIDER_PRESETS = {
   github: {
     id: 'github',
     name: 'GitHub',
-    authorizeUrl: 'https://github.com/login/oauth/authorize',
+    // Placeholder — the form's "GitHub App slug" field overwrites this on type.
+    // The literal "your-app-slug" passes z.string().url() but is blocked by
+    // a custom check at submit time.
+    authorizeUrl: 'https://github.com/apps/your-app-slug/installations/new',
     tokenUrl: 'https://github.com/login/oauth/access_token',
     revokeUrl: undefined,
     userInfoUrl: 'https://api.github.com/user',
-    scopes: ['repo', 'read:user'],
+    // GitHub Apps ignore the `scope` parameter on user OAuth — repo / write
+    // permissions come from the App's installation. Keep `read:user` so the
+    // userInfo call works for displaying the connected GitHub account.
+    scopes: ['read:user'],
+    iconUrl: 'https://github.githubassets.com/favicons/favicon.svg',
   },
   google: {
     id: 'google',

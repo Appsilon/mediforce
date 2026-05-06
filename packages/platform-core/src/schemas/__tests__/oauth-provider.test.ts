@@ -117,11 +117,17 @@ describe('UpdateOAuthProviderInputSchema', () => {
 });
 
 describe('OAUTH_PROVIDER_PRESETS', () => {
-  it('github preset has the canonical endpoints', () => {
+  it('github preset uses the GitHub App installation URL pattern', () => {
+    // Placeholder slug — admin form rewrites this from a "GitHub App slug" field.
     expect(OAUTH_PROVIDER_PRESETS.github.authorizeUrl).toBe(
-      'https://github.com/login/oauth/authorize',
+      'https://github.com/apps/your-app-slug/installations/new',
     );
-    expect(OAUTH_PROVIDER_PRESETS.github.scopes).toContain('repo');
+    expect(OAUTH_PROVIDER_PRESETS.github.tokenUrl).toBe(
+      'https://github.com/login/oauth/access_token',
+    );
+    // GitHub Apps ignore OAuth scopes (permissions come from install) — only
+    // userInfo-related scope is needed.
+    expect(OAUTH_PROVIDER_PRESETS.github.scopes).toContain('read:user');
   });
 
   it('google preset has the token + revoke endpoints', () => {

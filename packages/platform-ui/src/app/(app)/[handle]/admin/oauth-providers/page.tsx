@@ -199,7 +199,7 @@ export default function AdminOAuthProvidersPage() {
               className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
             >
               <KeyRound className="h-3.5 w-3.5" />
-              Add GitHub
+              Add GitHub App
             </button>
             <button
               type="button"

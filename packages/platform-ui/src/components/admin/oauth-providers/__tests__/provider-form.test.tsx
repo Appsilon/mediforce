@@ -5,6 +5,10 @@ import type { OAuthProviderConfig } from '@mediforce/platform-core';
 
 import { ProviderForm } from '../provider-form';
 
+async function openAdvanced(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /Advanced/i }));
+}
+
 function makeProvider(overrides: Partial<OAuthProviderConfig> = {}): OAuthProviderConfig {
   return {
     id: 'github',
@@ -36,7 +40,8 @@ describe('ProviderForm', () => {
     expect(screen.getByRole('button', { name: /^Create$/i })).toBeInTheDocument();
   });
 
-  it('pre-fills GitHub preset fields', () => {
+  it('pre-fills GitHub App preset fields (advanced section reveals URLs/scopes)', async () => {
+    const user = userEvent.setup();
     render(
       <ProviderForm
         provider={null}
@@ -47,8 +52,16 @@ describe('ProviderForm', () => {
 
     expect((screen.getByLabelText(/^Id$/i) as HTMLInputElement).value).toBe('github');
     expect((screen.getByLabelText(/^Name$/i) as HTMLInputElement).value).toBe('GitHub');
+
+    // URL/scope inputs are hidden until the advanced section is opened
+    expect(screen.queryByLabelText(/^Authorize URL$/i)).toBeNull();
+
+    await openAdvanced(user);
+
+    // GitHub App preset starts with a placeholder authorize URL — the slug
+    // field rewrites it on type.
     expect((screen.getByLabelText(/^Authorize URL$/i) as HTMLInputElement).value).toBe(
-      'https://github.com/login/oauth/authorize',
+      'https://github.com/apps/your-app-slug/installations/new',
     );
     expect((screen.getByLabelText(/^Token URL$/i) as HTMLInputElement).value).toBe(
       'https://github.com/login/oauth/access_token',
@@ -56,10 +69,65 @@ describe('ProviderForm', () => {
     expect((screen.getByLabelText(/^User info URL$/i) as HTMLInputElement).value).toBe(
       'https://api.github.com/user',
     );
-    expect((screen.getByLabelText(/^Scopes$/i) as HTMLTextAreaElement).value).toBe('repo read:user');
+    expect((screen.getByLabelText(/^Scopes$/i) as HTMLTextAreaElement).value).toBe('read:user');
   });
 
-  it('pre-fills Google preset fields including revokeUrl', () => {
+  it('renders the GitHub App setup guide and slug field for github preset', () => {
+    render(
+      <ProviderForm
+        provider={null}
+        preset="github"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Setting up a GitHub App/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^GitHub App slug$/i)).toBeInTheDocument();
+  });
+
+  it('synthesises Authorize URL from the GitHub App slug as the admin types', async () => {
+    const user = userEvent.setup();
+    render(
+      <ProviderForm
+        provider={null}
+        preset="github"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText(/^GitHub App slug$/i), 'mediforce-staging');
+
+    await openAdvanced(user);
+
+    expect((screen.getByLabelText(/^Authorize URL$/i) as HTMLInputElement).value).toBe(
+      'https://github.com/apps/mediforce-staging/installations/new',
+    );
+  });
+
+  it('blocks submit when the App slug placeholder is left untouched', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      <ProviderForm
+        provider={null}
+        preset="github"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.type(screen.getByLabelText(/^Client id$/i), 'cid');
+    await user.type(screen.getByLabelText(/^Client secret$/i), 'csecret');
+    await user.click(screen.getByRole('button', { name: /^Create$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Fill in your GitHub App slug/i)).toBeInTheDocument();
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('pre-fills Google preset fields including revokeUrl', async () => {
+    const user = userEvent.setup();
     render(
       <ProviderForm
         provider={null}
@@ -70,12 +138,69 @@ describe('ProviderForm', () => {
 
     expect((screen.getByLabelText(/^Id$/i) as HTMLInputElement).value).toBe('google');
     expect((screen.getByLabelText(/^Name$/i) as HTMLInputElement).value).toBe('Google');
+
+    await openAdvanced(user);
+
     expect((screen.getByLabelText(/^Revoke URL$/i) as HTMLInputElement).value).toBe(
       'https://oauth2.googleapis.com/revoke',
     );
     expect((screen.getByLabelText(/^Scopes$/i) as HTMLTextAreaElement).value).toBe(
       'openid email profile',
     );
+  });
+
+  it('hides advanced section by default in preset mode and shows it on demand', async () => {
+    const user = userEvent.setup();
+    render(
+      <ProviderForm
+        provider={null}
+        preset="github"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    // Visible from the start
+    expect(screen.getByLabelText(/^Id$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Name$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Client id$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Client secret$/i)).toBeInTheDocument();
+
+    // Hidden behind the toggle
+    expect(screen.queryByLabelText(/^Authorize URL$/i)).toBeNull();
+    expect(screen.queryByLabelText(/^Token URL$/i)).toBeNull();
+    expect(screen.queryByLabelText(/^Scopes$/i)).toBeNull();
+
+    const toggle = screen.getByRole('button', { name: /Advanced/i });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    await user.click(toggle);
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByLabelText(/^Authorize URL$/i)).toBeInTheDocument();
+  });
+
+  it('opens advanced section by default for custom create and edit modes', () => {
+    const { unmount } = render(
+      <ProviderForm
+        provider={null}
+        preset={null}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    // Custom create — advanced open
+    expect(screen.getByLabelText(/^Authorize URL$/i)).toBeInTheDocument();
+    unmount();
+
+    // Edit mode (provider set, preset null) — advanced open
+    render(
+      <ProviderForm
+        provider={makeProvider({ id: 'acme', name: 'Acme' })}
+        preset={null}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText(/^Authorize URL$/i)).toBeInTheDocument();
   });
 
   it('pre-fills edit form from existing provider', () => {
@@ -106,7 +231,7 @@ describe('ProviderForm', () => {
     expect(screen.getByRole('button', { name: /^Save$/i })).toBeInTheDocument();
   });
 
-  it('submits payload with tokenized scopes on create', async () => {
+  it('submits a GitHub App preset payload with synthesised authorizeUrl', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
@@ -120,6 +245,7 @@ describe('ProviderForm', () => {
 
     await user.type(screen.getByLabelText(/^Client id$/i), 'test-client-id');
     await user.type(screen.getByLabelText(/^Client secret$/i), 'test-secret');
+    await user.type(screen.getByLabelText(/^GitHub App slug$/i), 'mediforce-prod');
     await user.click(screen.getByRole('button', { name: /^Create$/i }));
 
     await waitFor(() => {
@@ -131,10 +257,13 @@ describe('ProviderForm', () => {
     expect(payload.name).toBe('GitHub');
     expect(payload.clientId).toBe('test-client-id');
     expect(payload.clientSecret).toBe('test-secret');
-    expect(payload.authorizeUrl).toBe('https://github.com/login/oauth/authorize');
-    expect(payload.scopes).toEqual(['repo', 'read:user']);
+    expect(payload.authorizeUrl).toBe(
+      'https://github.com/apps/mediforce-prod/installations/new',
+    );
+    expect(payload.scopes).toEqual(['read:user']);
     expect(payload.revokeUrl).toBeUndefined();
-    expect(payload.iconUrl).toBeUndefined();
+    expect(payload.iconUrl).toBe('https://github.githubassets.com/favicons/favicon.svg');
+    expect(payload.appSlug).toBeUndefined();
   });
 
   it('submits payload with revokeUrl and iconUrl when provided', async () => {
@@ -200,6 +329,8 @@ describe('ProviderForm', () => {
       />,
     );
 
+    await user.type(screen.getByLabelText(/^GitHub App slug$/i), 'demo-app');
+    await openAdvanced(user);
     const scopesTextarea = screen.getByLabelText(/^Scopes$/i);
     await user.clear(scopesTextarea);
     await user.type(scopesTextarea, 'repo,read:user org:read');
@@ -250,7 +381,10 @@ describe('ProviderForm', () => {
       />,
     );
 
-    // Clear scopes to trigger min-length failure
+    // Clear scopes to trigger min-length failure (slug filled to isolate the
+    // scope-validation path from the App-slug placeholder check).
+    await user.type(screen.getByLabelText(/^GitHub App slug$/i), 'demo-app');
+    await openAdvanced(user);
     const scopesTextarea = screen.getByLabelText(/^Scopes$/i);
     await user.clear(scopesTextarea);
 
