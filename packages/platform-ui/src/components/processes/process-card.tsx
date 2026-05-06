@@ -148,6 +148,11 @@ export function ProcessCard({
                     @{definition.namespace}
                   </span>
                 )}
+                {definition.visibility === 'private' && (
+                  <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
+                    Private
+                  </span>
+                )}
                 {definition.archived && (
                   <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                     Archived

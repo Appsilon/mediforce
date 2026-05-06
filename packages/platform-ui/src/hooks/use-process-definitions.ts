@@ -28,6 +28,7 @@ export interface DefinitionGroup {
   url?: string;
   archived?: boolean;
   namespace?: string;
+  visibility?: string;
 }
 
 function compareSemver(a: string, b: string): number {
@@ -101,6 +102,7 @@ export function useProcessDefinitions() {
         url: latestDoc.url,
         archived: latestDoc.archived,
         namespace: latestDoc.namespace,
+        visibility: (latestDoc as Record<string, unknown>).visibility as string | undefined,
       };
     });
   }, [allDocs, latestDocs]);
