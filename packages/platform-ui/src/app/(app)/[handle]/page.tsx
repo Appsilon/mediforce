@@ -17,6 +17,7 @@ import { useProcessInstances } from '@/hooks/use-process-instances';
 import { useMyTasks } from '@/hooks/use-tasks';
 import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus } from '@/components/processes/process-card';
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
+import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
 import { cn } from '@/lib/utils';
 import { NamespaceSchema } from '@mediforce/platform-core';
 import type { Namespace, ProcessInstance } from '@mediforce/platform-core';
@@ -418,6 +419,7 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
   }, [activeTasks]);
 
   const namespacedDefinitions = useMemo(() => definitions.filter((d) => d.namespace === handle), [definitions, handle]);
+  const workflowNames = useMemo(() => namespacedDefinitions.map((d) => d.name), [namespacedDefinitions]);
   const hasArchivedDefinitions = namespacedDefinitions.some((d) => d.archived === true);
 
   const visibleDefinitions = useMemo(() => {
@@ -449,6 +451,7 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
   }, [visibleDefinitions, instancesByDefinition]);
 
   return (
+    <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
     <div className="flex flex-col gap-4">
       <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />
 
@@ -519,6 +522,7 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
         </div>
       )}
     </div>
+    </WorkflowSecretKeysProvider>
   );
 }
 
