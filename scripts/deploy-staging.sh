@@ -10,15 +10,17 @@ echo "==> Pulling latest code"
 git fetch origin
 git checkout "$DEPLOY_SHA"
 
-echo "==> Pruning Docker build cache (keeping tagged images)"
-docker builder prune -af 2>/dev/null || true
-docker image prune -f 2>/dev/null || true
-
-# Early warning if the Docker data volume is filling up
+# Only prune when the Docker data volume is actually filling up — unconditional
+# `builder prune -af` evicts the layer cache and forces every agent image to rebuild
+# from scratch on each deploy, which is the main cause of staging deploy timeouts.
 DOCKER_ROOT=$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)
 USE_PCT=$(df --output=pcent "$DOCKER_ROOT" | tail -1 | tr -dc '0-9')
 if [ -n "$USE_PCT" ] && [ "$USE_PCT" -gt 80 ]; then
-  echo "WARN: docker volume at ${USE_PCT}% (${DOCKER_ROOT}) — GC cap may need lowering" >&2
+  echo "==> Docker volume at ${USE_PCT}% (${DOCKER_ROOT}) — pruning build cache"
+  docker builder prune -af 2>/dev/null || true
+  docker image prune -f 2>/dev/null || true
+else
+  echo "==> Docker volume at ${USE_PCT:-?}% — skipping prune to keep layer cache"
 fi
 
 export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)
