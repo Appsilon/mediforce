@@ -34,21 +34,47 @@ export async function getNamespaceSecretKeys(
   return getRepo().getSecretKeys(namespace);
 }
 
-export async function getNamespaceSecrets(
-  namespace: string,
-  userId: string,
-): Promise<Record<string, string>> {
-  await requireNamespaceMember(namespace, userId);
-  return getRepo().getSecrets(namespace);
+export interface SecretPreview {
+  key: string;
+  preview: string;
 }
 
-export async function saveNamespaceSecrets(
+function maskValue(value: string): string {
+  if (value.length > 12) {
+    return `${value.slice(0, 4)}...${value.slice(-4)}`;
+  }
+  return '•'.repeat(8);
+}
+
+export async function getNamespaceSecretPreviews(
   namespace: string,
-  secrets: Record<string, string>,
+  userId: string,
+): Promise<SecretPreview[]> {
+  await requireNamespaceMember(namespace, userId);
+  const secrets = await getRepo().getSecrets(namespace);
+  return Object.entries(secrets).map(([key, value]) => ({
+    key,
+    preview: maskValue(value),
+  }));
+}
+
+export async function upsertNamespaceSecret(
+  namespace: string,
+  key: string,
+  value: string,
   userId: string,
 ): Promise<void> {
   await requireNamespaceMember(namespace, userId);
-  await getRepo().setSecrets(namespace, secrets);
+  await getRepo().upsertSecret(namespace, key, value);
+}
+
+export async function deleteNamespaceSecret(
+  namespace: string,
+  key: string,
+  userId: string,
+): Promise<void> {
+  await requireNamespaceMember(namespace, userId);
+  await getRepo().deleteSecret(namespace, key);
 }
 
 export async function getNamespaceSecretsForRuntime(

@@ -1,8 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { Eye, EyeOff, Plus, Trash2, Save, Info, ClipboardPaste } from 'lucide-react';
-import { getNamespaceSecrets, saveNamespaceSecrets } from '@/app/actions/namespace-secrets';
+import { Plus, Trash2, Save, Info, ClipboardPaste } from 'lucide-react';
+import {
+  getNamespaceSecretPreviews,
+  upsertNamespaceSecret,
+  deleteNamespaceSecret,
+  type SecretPreview,
+} from '@/app/actions/namespace-secrets';
 
 function parseEnvText(text: string): Array<{ key: string; value: string }> | null {
   const lines = text.split('\n').filter((line) => {
@@ -25,30 +30,44 @@ function parseEnvText(text: string): Array<{ key: string; value: string }> | nul
   return parsed.length > 0 ? parsed : null;
 }
 
+interface Row {
+  key: string;
+  value: string;
+  preview?: string;
+  isNew: boolean;
+  changed: boolean;
+}
+
 interface NamespaceSecretsEditorProps {
   namespace: string;
   userId: string;
 }
 
 export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEditorProps) {
-  const [secrets, setSecrets] = React.useState<Array<{ key: string; value: string }>>([]);
+  const [rows, setRows] = React.useState<Row[]>([]);
+  const [deletedKeys, setDeletedKeys] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
-  const [dirty, setDirty] = React.useState(false);
-  const [revealedIndices, setRevealedIndices] = React.useState<Set<number>>(new Set());
   const [saveMessage, setSaveMessage] = React.useState<string | null>(null);
   const [bulkMode, setBulkMode] = React.useState(false);
   const [bulkText, setBulkText] = React.useState('');
   const [bulkPreview, setBulkPreview] = React.useState<Array<{ key: string; value: string }> | null>(null);
 
+  const dirty = rows.some((r) => r.changed || r.isNew) || deletedKeys.length > 0;
+
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getNamespaceSecrets(namespace, userId)
-      .then((data) => {
+    getNamespaceSecretPreviews(namespace, userId)
+      .then((previews) => {
         if (cancelled) return;
-        const entries = Object.entries(data).map(([key, value]) => ({ key, value }));
-        setSecrets(entries);
+        setRows(previews.map((p) => ({
+          key: p.key,
+          value: '',
+          preview: p.preview,
+          isNew: false,
+          changed: false,
+        })));
         setLoading(false);
       })
       .catch((error) => {
@@ -63,15 +82,28 @@ export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEd
     setSaving(true);
     setSaveMessage(null);
     try {
-      const record: Record<string, string> = {};
-      for (const { key, value } of secrets) {
-        const trimmedKey = key.trim();
-        if (trimmedKey !== '') {
-          record[trimmedKey] = value;
+      const ops: Promise<void>[] = [];
+      for (const row of rows) {
+        if ((row.changed || row.isNew) && row.key.trim() !== '' && row.value !== '') {
+          ops.push(upsertNamespaceSecret(namespace, row.key.trim(), row.value, userId));
         }
       }
-      await saveNamespaceSecrets(namespace, record, userId);
-      setDirty(false);
+      for (const key of deletedKeys) {
+        ops.push(deleteNamespaceSecret(namespace, key, userId));
+      }
+      await Promise.all(ops);
+
+      setRows((prev) => prev
+        .filter((r) => r.key.trim() !== '' && (r.value !== '' || !r.isNew))
+        .map((r) => ({
+          ...r,
+          preview: r.changed || r.isNew ? maskLocally(r.value) : r.preview,
+          value: '',
+          isNew: false,
+          changed: false,
+        })),
+      );
+      setDeletedKeys([]);
       setSaveMessage('Secrets saved');
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
@@ -84,27 +116,27 @@ export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEd
   };
 
   const addRow = () => {
-    setSecrets((prev) => [...prev, { key: '', value: '' }]);
-    setDirty(true);
+    setRows((prev) => [...prev, { key: '', value: '', isNew: true, changed: false }]);
   };
 
   const removeRow = (index: number) => {
-    setSecrets((prev) => prev.filter((_, idx) => idx !== index));
-    setDirty(true);
+    setRows((prev) => {
+      const row = prev[index];
+      if (row && !row.isNew && row.key.trim() !== '') {
+        setDeletedKeys((dk) => [...dk, row.key]);
+      }
+      return prev.filter((_, idx) => idx !== index);
+    });
   };
 
   const updateRow = (index: number, field: 'key' | 'value', newValue: string) => {
-    setSecrets((prev) => prev.map((row, idx) => (idx === index ? { ...row, [field]: newValue } : row)));
-    setDirty(true);
-  };
-
-  const toggleReveal = (index: number) => {
-    setRevealedIndices((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
+    setRows((prev) => prev.map((row, idx) => {
+      if (idx !== index) return row;
+      const updated = { ...row, [field]: newValue };
+      if (field === 'value' && newValue !== '') updated.changed = true;
+      if (field === 'key' && row.isNew) updated.changed = true;
+      return updated;
+    }));
   };
 
   if (loading) {
@@ -125,11 +157,11 @@ export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEd
           Workspace secrets are shared across all workflows. Individual workflows can override
           them with workflow-level secrets. Use{' '}
           <code className="rounded bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 font-mono text-xs">{'{{KEY}}'}</code>{' '}
-          syntax in step env vars.
+          syntax in step env vars. Secret values cannot be read back after saving.
         </span>
       </div>
 
-      {secrets.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No workspace secrets configured yet.</p>
       ) : (
         <div className="space-y-2">
@@ -138,35 +170,23 @@ export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEd
             <span>Value</span>
             <span />
           </div>
-          {secrets.map((row, index) => (
+          {rows.map((row, index) => (
             <div key={index} className="grid grid-cols-[1fr_1fr_72px] gap-2 items-center">
               <input
                 type="text"
                 value={row.key}
                 onChange={(event) => updateRow(index, 'key', event.target.value)}
                 placeholder="SECRET_NAME"
-                className="h-9 rounded-md border bg-background px-3 text-sm font-mono"
+                disabled={!row.isNew}
+                className="h-9 rounded-md border bg-background px-3 text-sm font-mono disabled:opacity-70"
               />
-              <div className="relative">
-                <input
-                  type={revealedIndices.has(index) ? 'text' : 'password'}
-                  value={row.value}
-                  onChange={(event) => updateRow(index, 'value', event.target.value)}
-                  placeholder="secret value"
-                  className="h-9 w-full rounded-md border bg-background px-3 pr-9 text-sm font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => toggleReveal(index)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {revealedIndices.has(index) ? (
-                    <EyeOff className="h-3.5 w-3.5" />
-                  ) : (
-                    <Eye className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </div>
+              <input
+                type="text"
+                value={row.changed || row.isNew ? row.value : ''}
+                onChange={(event) => updateRow(index, 'value', event.target.value)}
+                placeholder={row.preview ?? 'secret value'}
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm font-mono placeholder:text-muted-foreground/60"
+              />
               <button
                 type="button"
                 onClick={() => removeRow(index)}
@@ -211,17 +231,18 @@ export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEd
               disabled={!bulkPreview}
               onClick={() => {
                 if (!bulkPreview) return;
-                const merged = [...secrets];
-                for (const entry of bulkPreview) {
-                  const idx = merged.findIndex((s) => s.key === entry.key);
-                  if (idx >= 0) {
-                    merged[idx] = entry;
-                  } else {
-                    merged.push(entry);
+                setRows((prev) => {
+                  const merged = [...prev];
+                  for (const entry of bulkPreview) {
+                    const idx = merged.findIndex((s) => s.key === entry.key);
+                    if (idx >= 0) {
+                      merged[idx] = { ...merged[idx], value: entry.value, changed: true };
+                    } else {
+                      merged.push({ key: entry.key, value: entry.value, isNew: true, changed: true });
+                    }
                   }
-                }
-                setSecrets(merged);
-                setDirty(true);
+                  return merged;
+                });
                 setBulkMode(false);
                 setBulkText('');
                 setBulkPreview(null);
@@ -280,4 +301,9 @@ export function NamespaceSecretsEditor({ namespace, userId }: NamespaceSecretsEd
       </div>
     </div>
   );
+}
+
+function maskLocally(value: string): string {
+  if (value.length > 12) return `${value.slice(0, 4)}...${value.slice(-4)}`;
+  return '•'.repeat(8);
 }
