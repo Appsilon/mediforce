@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   title: 'Mediforce',
   description: 'Agent-human workflow platform',
   icons: {
+    icon: '/favicon.ico',
     apple: '/apple-touch-icon.png',
   },
   appleWebApp: {
