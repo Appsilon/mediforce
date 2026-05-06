@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getAppBaseUrl, getConfiguredAppBaseUrl } from '../app-base-url';
+import { getAppBaseUrl, getConfiguredAppBaseUrl, publicOrigin, buildOAuthCallbackUrl } from '../app-base-url';
 
 describe('getConfiguredAppBaseUrl', () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -79,5 +79,59 @@ describe('getAppBaseUrl (with localhost fallback)', () => {
   it('falls back to localhost with custom PORT', () => {
     process.env.PORT = '9003';
     expect(getAppBaseUrl()).toBe('http://localhost:9003');
+  });
+});
+
+describe('publicOrigin', () => {
+  let originalEnv: NodeJS.ProcessEnv;
+  const dockerRequest = new Request('http://e195cf41c355:3000/api/oauth/github/callback');
+  const localRequest = new Request('http://localhost:9003/api/oauth/github/callback');
+
+  beforeEach(() => {
+    originalEnv = { ...process.env };
+    delete process.env.APP_BASE_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('returns env URL when set', () => {
+    process.env.APP_BASE_URL = 'https://staging.mediforce.ai';
+    expect(publicOrigin(dockerRequest)).toBe('https://staging.mediforce.ai');
+  });
+
+  it('falls back to request.url.origin when no env var set', () => {
+    expect(publicOrigin(localRequest)).toBe('http://localhost:9003');
+  });
+});
+
+describe('buildOAuthCallbackUrl', () => {
+  let originalEnv: NodeJS.ProcessEnv;
+  const request = new Request('http://localhost:9003/any');
+
+  beforeEach(() => {
+    originalEnv = { ...process.env };
+    delete process.env.APP_BASE_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('builds canonical callback URL from env origin', () => {
+    process.env.APP_BASE_URL = 'https://staging.mediforce.ai';
+    expect(buildOAuthCallbackUrl(request, 'github')).toBe(
+      'https://staging.mediforce.ai/api/oauth/github/callback',
+    );
+  });
+
+  it('encodes provider slug', () => {
+    process.env.APP_BASE_URL = 'https://staging.mediforce.ai';
+    expect(buildOAuthCallbackUrl(request, 'my provider')).toBe(
+      'https://staging.mediforce.ai/api/oauth/my%20provider/callback',
+    );
   });
 });
