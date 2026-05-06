@@ -29,7 +29,21 @@ export const RemoveImageOutputSchema = z.object({
   deleted: z.string(),
 });
 
+export const OpenRouterCreditsInputSchema = z.object({
+  namespace: z.string().min(1),
+});
+
+export const OpenRouterCreditsOutputSchema = z.object({
+  available: z.boolean(),
+  limit: z.number(),
+  usage: z.number(),
+  remaining: z.number(),
+  error: z.string().optional(),
+});
+
 export type DockerImageInfo = z.infer<typeof DockerImageInfoSchema>;
 export type DockerDiskInfo = z.infer<typeof DockerDiskInfoSchema>;
 export type DockerInfoResponse = z.infer<typeof DockerInfoResponseSchema>;
 export type RemoveImageOutput = z.infer<typeof RemoveImageOutputSchema>;
+export type OpenRouterCreditsInput = z.infer<typeof OpenRouterCreditsInputSchema>;
+export type OpenRouterCreditsOutput = z.infer<typeof OpenRouterCreditsOutputSchema>;
