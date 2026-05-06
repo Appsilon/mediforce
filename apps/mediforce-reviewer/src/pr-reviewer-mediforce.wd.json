@@ -2,7 +2,7 @@
   "name": "pr-reviewer-mediforce",
   "namespace": "appsilon",
   "title": "PR Reviewer — Mediforce",
-  "description": "Pick an open PR (not draft, no comments yet) on Appsilon/mediforce, run the code-review skill on the diff, and post the review as a single comment on the PR. Manual trigger; no schedule.",
+  "description": "Pick an open PR (not draft, no human comments yet) on Appsilon/mediforce, run the code-review skill on the diff, and post the review as a single comment on the PR. Runs every 15 minutes; manual trigger also available.",
   "preamble": "## Context\nThis workflow audits open PRs on the Appsilon/mediforce repository. Steps 1 and 3 use a GitHub-MCP-bound agent (user-to-server OAuth, scoped to the user's installation) to fetch and post on the PR. Step 2 is sandboxed (no GitHub access) and runs the `code-review` skill on the inline diff carried over from step 1.",
   "env": {
     "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
@@ -10,6 +10,7 @@
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
   },
   "triggers": [
+    { "name": "poll-prs", "type": "cron", "schedule": "*/15 * * * *" },
     { "name": "manual", "type": "manual" }
   ],
   "steps": [
