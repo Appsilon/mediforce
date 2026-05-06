@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TokenUsageSchema } from './agent-output-envelope.js';
 
 export const StepExecutionStatusSchema = z.enum([
   'pending',
@@ -35,10 +36,7 @@ export const AgentOutputSnapshotSchema = z.object({
     repoUrl: z.string(),
   }).nullable(),
   deliverableFile: z.string().nullable().optional(),
-  tokenUsage: z.object({
-    inputTokens: z.number(),
-    outputTokens: z.number(),
-  }).nullable().optional(),
+  tokenUsage: TokenUsageSchema.nullable().optional(),
   estimatedCostUsd: z.number().nullable().optional(),
 });
 

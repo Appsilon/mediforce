@@ -904,7 +904,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number };
       }
 
-      // Second: check stream event for CLI-reported usage (Claude Code stream-json)
+      // Second: check stream event for CLI-reported usage (e.g. Claude Code stream-json result event)
+      // parseAgentOutput() returns a single JSON object for the final result event.
       if (!tokenUsage) {
         try {
           const rawEvent = JSON.parse(spawnResult.cliOutput) as Record<string, unknown>;
@@ -912,7 +913,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
             tokenUsage = { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens };
           }
-        } catch { /* cliOutput not parseable as single JSON — skip */ }
+        } catch {
+          agentLog('cost.tokenExtraction', 'could not extract token usage from CLI output', {
+            stepId, instanceId, cliOutputLength: spawnResult.cliOutput.length,
+          });
+        }
       }
 
       // Strip envelope-level fields from result to avoid duplication in UI
