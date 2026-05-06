@@ -127,6 +127,22 @@ export class ScriptContainerPlugin extends ContainerPlugin {
     // Resolve env vars from definition-level + step-level env + workflow secrets
     const workflowSecrets = isWorkflowAgentContext(context) ? context.workflowSecrets : undefined;
     this.resolveEnvironment(definitionEnv, stepEnv, workflowSecrets);
+
+    // Merge in pre-resolved Connection env (CONN_<ID>_TOKEN + provider
+    // aliases). Computed by executeAgentStep via `resolveConnectionEnv`
+    // before the plugin runs — runtime stays decoupled from Firestore. We
+    // intentionally merge AFTER step env so an explicit step-level
+    // override can shadow an alias if needed (rare; mostly a debug hatch).
+    const connectionEnv = isWorkflowAgentContext(context) ? context.resolvedConnectionEnv : undefined;
+    if (connectionEnv !== undefined) {
+      for (const [key, value] of Object.entries(connectionEnv)) {
+        if (this.resolvedEnv.vars[key] === undefined) {
+          this.resolvedEnv.vars[key] = value;
+          this.resolvedEnv.injectedKeys.push(key);
+        }
+      }
+    }
+
     this.imageBuild = resolveImageBuild(this.image, agentConfig, context, this.resolvedEnv.vars);
   }
 

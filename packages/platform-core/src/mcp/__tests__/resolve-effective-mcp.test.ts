@@ -393,6 +393,109 @@ describe('resolveEffectiveMcp', () => {
     });
   });
 
+  describe('catalog-ref binding (PR A — additive)', () => {
+    it('resolves catalog-ref pointing at a new-shape http entry, carrying connectionId through', () => {
+      const catalog = makeCatalog([
+        {
+          id: 'github-mcp',
+          name: 'GitHub MCP',
+          connectionId: 'github-mediforce',
+          mcp: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' },
+        },
+      ]);
+      const agent = makeAgent({
+        github: { type: 'catalog', catalogId: 'github-mcp' },
+      });
+      const result = resolveEffectiveMcp(agent, makeStep(), catalog);
+      const gh = asHttp(result.servers.github);
+      expect(gh.url).toBe('https://api.githubcopilot.com/mcp/');
+      expect(gh.connectionId).toBe('github-mediforce');
+      expect(gh.auth).toBeUndefined();
+    });
+
+    it('resolves catalog-ref pointing at a new-shape stdio entry with extraEnv', () => {
+      const catalog = makeCatalog([
+        {
+          id: 'tealflow-mcp',
+          mcp: {
+            type: 'stdio',
+            command: 'npx',
+            args: ['-y', '@tealflow/mcp'],
+            extraEnv: { TEALFLOW_REGION: 'eu' },
+          },
+          connectionId: 'tealflow-prod',
+        },
+      ]);
+      const agent = makeAgent({
+        teal: { type: 'catalog', catalogId: 'tealflow-mcp' },
+      });
+      const result = resolveEffectiveMcp(agent, makeStep(), catalog);
+      const teal = asStdio(result.servers.teal);
+      expect(teal.command).toBe('npx');
+      expect(teal.env).toEqual({ TEALFLOW_REGION: 'eu' });
+      expect(teal.connectionId).toBe('tealflow-prod');
+    });
+
+    it('resolves catalog-ref pointing at a legacy entry (no mcp field) as stdio', () => {
+      const catalog = makeCatalog([
+        {
+          id: 'legacy-pg',
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-postgres'],
+          env: { PGURL: '{{SECRET:pg_url}}' },
+        },
+      ]);
+      const agent = makeAgent({
+        pg: { type: 'catalog', catalogId: 'legacy-pg' },
+      });
+      const result = resolveEffectiveMcp(agent, makeStep(), catalog);
+      const pg = asStdio(result.servers.pg);
+      expect(pg.command).toBe('npx');
+      expect(pg.env).toEqual({ PGURL: '{{SECRET:pg_url}}' });
+      expect(pg.connectionId).toBeUndefined();
+    });
+
+    it('throws CatalogEntryNotFoundError when the catalog-ref target is missing', () => {
+      const agent = makeAgent({
+        ghost: { type: 'catalog', catalogId: 'not-in-catalog' },
+      });
+      expect(() =>
+        resolveEffectiveMcp(agent, makeStep(), new Map()),
+      ).toThrow(CatalogEntryNotFoundError);
+    });
+
+    it('legacy stdio binding pointing at a new-shape http-only entry surfaces as catalog-not-found', () => {
+      const catalog = makeCatalog([
+        {
+          id: 'http-only',
+          mcp: { type: 'http', url: 'https://x.test/mcp' },
+        },
+      ]);
+      const agent = makeAgent({
+        oops: { type: 'stdio', catalogId: 'http-only' },
+      });
+      expect(() =>
+        resolveEffectiveMcp(agent, makeStep(), catalog),
+      ).toThrow(CatalogEntryNotFoundError);
+    });
+
+    it('catalog-ref carries allowedTools through and accepts step-level denyTools', () => {
+      const catalog = makeCatalog([
+        { id: 'gh', mcp: { type: 'http', url: 'https://api.x/mcp' } },
+      ]);
+      const agent = makeAgent({
+        github: { type: 'catalog', catalogId: 'gh', allowedTools: ['a', 'b', 'c'] },
+      });
+      const result = resolveEffectiveMcp(
+        agent,
+        makeStep({ github: { denyTools: ['b'] } }),
+        catalog,
+      );
+      const gh = asHttp(result.servers.github);
+      expect(gh.allowedTools).toEqual(['a', 'c']);
+    });
+  });
+
   describe('purity', () => {
     it('does not mutate the input agent.mcpServers', () => {
       const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);

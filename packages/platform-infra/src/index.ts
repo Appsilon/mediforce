@@ -29,10 +29,16 @@ export { FirestoreCronTriggerStateRepository } from './firestore/cron-trigger-st
 export { FirestoreToolCatalogRepository } from './firestore/tool-catalog-repository.js';
 export { FirestoreOAuthProviderRepository } from './firestore/oauth-provider-repository.js';
 export { FirestoreAgentOAuthTokenRepository } from './firestore/agent-oauth-token-repository.js';
+export { FirestoreConnectionRepository } from './firestore/connection-repository.js';
 export { validateSecretsKey } from './crypto/secrets-cipher.js';
 export { getAdminAuth, getAdminFirestore } from './auth/firebase-admin-init.js';
 export { FirebaseInviteService } from './auth/firebase-invite-service.js';
 export { backfillInstanceNamespaces } from './migrations/backfill-instance-namespaces.js';
+export {
+  migrateNamespaceConnections,
+  type MigrationDeps as ConnectionsMigrationDeps,
+  type MigrationReport as ConnectionsMigrationReport,
+} from './migrations/unify-tool-catalog-connections.js';
 export { FirestoreModelRegistryRepository } from './firestore/model-registry-repository.js';
 export { syncFromOpenRouter } from './sync/openrouter-sync.js';
 

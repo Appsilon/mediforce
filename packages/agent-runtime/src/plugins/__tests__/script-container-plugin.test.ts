@@ -4,8 +4,13 @@ import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
-import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
-import type { ProcessConfig } from '@mediforce/platform-core';
+import type {
+  AgentContext,
+  EmitFn,
+  EmitPayload,
+  WorkflowAgentContext,
+} from '../../interfaces/agent-plugin.js';
+import type { ProcessConfig, WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import { ScriptContainerPlugin } from '../script-container-plugin.js';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager.js';
 
@@ -456,6 +461,102 @@ describe('ScriptContainerPlugin', () => {
       await plugin.run(emit);
 
       expect(capturedOutputDir).not.toBeNull();
+    });
+  });
+
+  describe('connections (workflow context)', () => {
+    function buildWorkflowContext(
+      resolvedConnectionEnv: Record<string, string> | undefined,
+    ): WorkflowAgentContext {
+      const step: WorkflowStep = {
+        id: 'run-script',
+        name: 'Run Script',
+        type: 'creation',
+        executor: 'script',
+        agent: { image: 'mediforce-r:latest', command: 'Rscript /scripts/run.R' },
+        env: { EXISTING_VAR: 'literal-value' },
+        ...(resolvedConnectionEnv !== undefined ? { connections: ['github-mediforce'] } : {}),
+      };
+      const workflowDefinition: WorkflowDefinition = {
+        name: 'test-wf',
+        version: 1,
+        namespace: 'test',
+        steps: [step],
+        transitions: [],
+        triggers: [{ type: 'manual', name: 'Start' }],
+      };
+      return {
+        stepId: 'run-script',
+        processInstanceId: 'pi-001',
+        definitionVersion: '1',
+        stepInput: {},
+        autonomyLevel: 'L4',
+        workflowDefinition,
+        step,
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+        ...(resolvedConnectionEnv !== undefined ? { resolvedConnectionEnv } : {}),
+      };
+    }
+
+    it('[DATA] merges resolvedConnectionEnv into the docker -e env flags', async () => {
+      const context = buildWorkflowContext({
+        CONN_GITHUB_MEDIFORCE_TOKEN: 'gho_secret_abc',
+        GITHUB_TOKEN: 'gho_secret_abc',
+      });
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockSpawnSuccess(createMockChild());
+      await plugin.run(emit);
+
+      const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+      const envEntries: string[] = [];
+      for (let i = 0; i < dockerArgs.length - 1; i += 1) {
+        if (dockerArgs[i] === '-e') envEntries.push(dockerArgs[i + 1]);
+      }
+      expect(envEntries).toContain('CONN_GITHUB_MEDIFORCE_TOKEN=gho_secret_abc');
+      expect(envEntries).toContain('GITHUB_TOKEN=gho_secret_abc');
+      expect(envEntries).toContain('EXISTING_VAR=literal-value');
+    });
+
+    it('[DATA] runs without connection env when no connections requested', async () => {
+      const context = buildWorkflowContext(undefined);
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockSpawnSuccess(createMockChild());
+      await plugin.run(emit);
+
+      const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+      const envEntries: string[] = [];
+      for (let i = 0; i < dockerArgs.length - 1; i += 1) {
+        if (dockerArgs[i] === '-e') envEntries.push(dockerArgs[i + 1]);
+      }
+      // Existing step env is still present, no CONN_ vars sneak in.
+      expect(envEntries).toContain('EXISTING_VAR=literal-value');
+      expect(envEntries.find((e) => e.startsWith('CONN_'))).toBeUndefined();
+    });
+
+    it('[DATA] step env wins over connection env on key collision', async () => {
+      const context = buildWorkflowContext({
+        CONN_GITHUB_MEDIFORCE_TOKEN: 'from-connection',
+        EXISTING_VAR: 'from-connection',
+      });
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockSpawnSuccess(createMockChild());
+      await plugin.run(emit);
+
+      const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+      const envEntries: string[] = [];
+      for (let i = 0; i < dockerArgs.length - 1; i += 1) {
+        if (dockerArgs[i] === '-e') envEntries.push(dockerArgs[i + 1]);
+      }
+      // Step-level env wins (literal-value), not the connection-injected value.
+      expect(envEntries).toContain('EXISTING_VAR=literal-value');
+      expect(envEntries).toContain('CONN_GITHUB_MEDIFORCE_TOKEN=from-connection');
     });
   });
 });

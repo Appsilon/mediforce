@@ -11,6 +11,7 @@ import type {
 } from '../index.js';
 import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
 import type { CoworkSession } from '../schemas/cowork-session.js';
+import type { Connection } from '../schemas/connection.js';
 
 // ---------------------------------------------------------------------------
 // Internal counter for deterministic sequential IDs
@@ -355,6 +356,22 @@ export function buildCoworkSession(
     createdAt: DEFAULT_TIMESTAMP,
     updatedAt: DEFAULT_UPDATED_TIMESTAMP,
     finalizedAt: null,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildConnection
+// ---------------------------------------------------------------------------
+
+export function buildConnection(overrides?: Partial<Connection>): Connection {
+  const id = overrides?.id ?? nextId('conn').replace(/_/g, '-').toLowerCase();
+  return {
+    id,
+    name: overrides?.name ?? 'Test Connection',
+    auth: { type: 'oauth', providerId: 'github' },
+    createdAt: DEFAULT_TIMESTAMP,
+    updatedAt: DEFAULT_UPDATED_TIMESTAMP,
     ...overrides,
   };
 }

@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
-import { ToolCatalogEntryBaseSchema } from '@mediforce/platform-core';
+import { UpdateConnectionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveNamespaceFromQuery } from '../helpers';
-
-/** Partial-update payload: id cannot be renamed — bindings reference it. */
-const ToolCatalogEntryPatchSchema = ToolCatalogEntryBaseSchema.omit({ id: true }).partial().strict();
+import { requireAdminForNamespace, toPublicConnection } from '../helpers';
 
 export async function GET(
   request: Request,
@@ -12,14 +9,14 @@ export async function GET(
 ): Promise<NextResponse> {
   const { id } = await params;
   const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
+  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
   if (namespace instanceof NextResponse) return namespace;
 
-  const entry = await services.toolCatalogRepo.getById(namespace, id);
-  if (entry === null) {
+  const connection = await services.connectionRepo.getById(namespace, id);
+  if (connection === null) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  return NextResponse.json({ entry });
+  return NextResponse.json({ connection: toPublicConnection(connection) });
 }
 
 export async function PATCH(
@@ -28,7 +25,7 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const { id } = await params;
   const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
+  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
   if (namespace instanceof NextResponse) return namespace;
 
   const body = await request.json().catch(() => null);
@@ -36,7 +33,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'JSON body is required' }, { status: 400 });
   }
 
-  const parsed = ToolCatalogEntryPatchSchema.safeParse(body);
+  const parsed = UpdateConnectionInputSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Validation failed', issues: parsed.error.issues },
@@ -44,13 +41,11 @@ export async function PATCH(
     );
   }
 
-  const existing = await services.toolCatalogRepo.getById(namespace, id);
-  if (existing === null) {
+  const updated = await services.connectionRepo.update(namespace, id, parsed.data);
+  if (updated === null) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-
-  const entry = await services.toolCatalogRepo.upsert(namespace, { ...existing, ...parsed.data, id });
-  return NextResponse.json({ entry });
+  return NextResponse.json({ connection: toPublicConnection(updated) });
 }
 
 export async function DELETE(
@@ -59,9 +54,12 @@ export async function DELETE(
 ): Promise<NextResponse> {
   const { id } = await params;
   const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
+  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
   if (namespace instanceof NextResponse) return namespace;
 
-  await services.toolCatalogRepo.delete(namespace, id);
+  const deleted = await services.connectionRepo.delete(namespace, id);
+  if (!deleted) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
   return NextResponse.json({ success: true });
 }

@@ -75,12 +75,29 @@ export {
   AgentMcpBindingMapSchema,
   StdioAgentMcpBindingSchema,
   HttpAgentMcpBindingSchema,
+  CatalogRefAgentMcpBindingSchema,
   HttpAuthConfigSchema,
   HttpHeadersAuthSchema,
   HttpOAuthAuthSchema,
   StepMcpRestrictionSchema,
   StepMcpRestrictionEntrySchema,
   ToolCatalogEntrySchema,
+  ToolCatalogEntryBaseSchema,
+  HttpMcpExposureSchema,
+  StdioMcpExposureSchema,
+  McpExposureSchema,
+  getCatalogEntryStdio,
+  getCatalogEntryHttp,
+  ConnectionSchema,
+  ConnectionAuthSchema,
+  ConnectionOAuthAuthSchema,
+  ConnectionHeadersAuthSchema,
+  ConnectionTokenUpdateSchema,
+  CreateConnectionInputSchema,
+  UpdateConnectionInputSchema,
+  PublicConnectionSchema,
+  CONNECTION_ID_PATTERN,
+  connectionTokenEnvName,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -154,12 +171,24 @@ export type {
   AgentMcpBindingMap,
   StdioAgentMcpBinding,
   HttpAgentMcpBinding,
+  CatalogRefAgentMcpBinding,
   HttpAuthConfig,
   HttpHeadersAuth,
   HttpOAuthAuth,
   StepMcpRestriction,
   StepMcpRestrictionEntry,
   ToolCatalogEntry,
+  HttpMcpExposure,
+  StdioMcpExposure,
+  McpExposure,
+  Connection,
+  ConnectionAuth,
+  ConnectionOAuthAuth,
+  ConnectionHeadersAuth,
+  ConnectionTokenUpdate,
+  CreateConnectionInput,
+  UpdateConnectionInput,
+  PublicConnection,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)
@@ -182,9 +211,16 @@ export type {
   CoworkSessionRepository,
   CronTriggerStateRepository,
   ToolCatalogRepository,
+  ConnectionRepository,
   SendEmailParams,
   SendEmailResult,
   SendEmailFn,
+} from './interfaces/index.js';
+
+export {
+  ConnectionAlreadyExistsError,
+  ConnectionNotOAuthError,
+  ConnectionNotFoundError,
 } from './interfaces/index.js';
 
 // Agent definition schema + repository interface
@@ -245,6 +281,18 @@ export {
 } from './repositories/oauth-provider-repository.js';
 export type { AgentOAuthTokenRepository } from './repositories/agent-oauth-token-repository.js';
 
+// OAuth — connection-level token refresh (single source of truth across
+// HTTP MCP resolver, stdio MCP env injection, script-step env injection).
+export {
+  getValidToken,
+  ConnectionRefreshRejectedError,
+  ConnectionTokenUnavailableError,
+  ConnectionProviderMissingError,
+  CONNECTION_REFRESH_MARGIN_MS,
+  type GetValidTokenDeps,
+  type ValidToken,
+} from './oauth/refresh-connection-token.js';
+
 // Parser (YAML process definition parsing)
 export { parseProcessDefinition, type ParseResult } from './parser/index.js';
 export { formatZodErrors } from './parser/index.js';
@@ -262,6 +310,8 @@ export {
   InMemoryCronTriggerStateRepository,
   InMemoryOAuthProviderRepository,
   InMemoryAgentOAuthTokenRepository,
+  InMemoryToolCatalogRepository,
+  InMemoryConnectionRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,
@@ -274,6 +324,7 @@ export {
   buildAgentOutputEnvelope,
   buildFileMetadata,
   buildCoworkSession,
+  buildConnection,
   resetFactorySequence,
 } from './testing/index.js';
 

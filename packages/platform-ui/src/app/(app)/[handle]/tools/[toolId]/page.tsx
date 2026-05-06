@@ -93,7 +93,9 @@ export default function ToolDetailPage() {
     );
   }
 
-  const command = `${entry.command}${entry.args && entry.args.length > 0 ? ' ' + entry.args.join(' ') : ''}`;
+  const command = entry.command !== undefined
+    ? `${entry.command}${entry.args && entry.args.length > 0 ? ' ' + entry.args.join(' ') : ''}`
+    : '(no stdio command)';
 
   return (
     <div className="flex flex-1 flex-col p-6">

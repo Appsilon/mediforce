@@ -10,6 +10,7 @@ export { InMemoryCronTriggerStateRepository } from './in-memory-cron-trigger-sta
 export { InMemoryToolCatalogRepository } from './in-memory-tool-catalog-repository.js';
 export { InMemoryOAuthProviderRepository } from './in-memory-oauth-provider-repository.js';
 export { InMemoryAgentOAuthTokenRepository } from './in-memory-agent-oauth-token-repository.js';
+export { InMemoryConnectionRepository } from './in-memory-connection-repository.js';
 
 // Test factories
 export {
@@ -24,5 +25,6 @@ export {
   buildAgentOutputEnvelope,
   buildFileMetadata,
   buildCoworkSession,
+  buildConnection,
   resetFactorySequence,
 } from './factories.js';

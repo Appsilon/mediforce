@@ -180,8 +180,23 @@ function buildHttpHeaders(
   auth: { type: 'headers'; headers: Record<string, string> } | { type: 'oauth'; provider: string; headerName: string; headerValueTemplate: string; scopes?: string[] } | undefined,
   oauthTokens: Record<string, { accessToken: string; headerName: string; headerValueTemplate: string }> | undefined,
   workflowSecrets: Record<string, string> | undefined,
+  connectionId?: string,
 ): Record<string, string> | undefined {
-  if (auth === undefined) return undefined;
+  // Branch 1: new catalog-ref binding routed through a Connection. The
+  // resolver leaves `auth` unset and stamps `connectionId` on the resolved
+  // server; loadOAuthTokens populates `oauthTokens[serverName]` from the
+  // Connection's token. Synthesize the standard Bearer header here.
+  if (auth === undefined) {
+    if (connectionId === undefined) return undefined;
+    const bundle = oauthTokens?.[serverName];
+    if (bundle === undefined) {
+      // The Connection exists but the token has not been connected yet —
+      // surface a clear error rather than ship an unauthenticated request.
+      throw new OAuthTokenUnavailableError(serverName, `connection:${connectionId}`);
+    }
+    const headerValue = renderOAuthHeader(bundle.headerValueTemplate, bundle.accessToken);
+    return { [bundle.headerName]: headerValue };
+  }
 
   if (auth.type === 'headers') {
     const resolved: Record<string, string> = {};
@@ -372,6 +387,18 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
             resolvedEnv[key] = resolveValue(value, workflowSecrets);
           }
         }
+        // Merge in Connection-backed env (CONN_<ID>_TOKEN) when the
+        // catalog entry routes auth through a Connection. The actual
+        // values are pre-resolved upstream by executeAgentStep so the
+        // writer never reaches into Firestore.
+        const connectionEnv = isWorkflowAgentContext(this.context)
+          ? this.context.stdioConnectionEnvByServer?.[name]
+          : undefined;
+        if (connectionEnv !== undefined) {
+          for (const [key, value] of Object.entries(connectionEnv)) {
+            resolvedEnv[key] = value;
+          }
+        }
         mcpConfig[name] = {
           type: 'stdio',
           command: server.command,
@@ -380,7 +407,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           ...allowedToolsPart,
         };
       } else {
-        const headers = buildHttpHeaders(name, server.auth, oauthTokens, workflowSecrets);
+        const headers = buildHttpHeaders(
+          name,
+          server.auth,
+          oauthTokens,
+          workflowSecrets,
+          server.connectionId,
+        );
         mcpConfig[name] = {
           type: 'http',
           url: server.url,

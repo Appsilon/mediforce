@@ -3,6 +3,10 @@ import type {
   HttpAuthConfig,
   ToolCatalogEntry,
 } from '../schemas/agent-mcp-binding.js';
+import {
+  getCatalogEntryHttp,
+  getCatalogEntryStdio,
+} from '../schemas/agent-mcp-binding.js';
 import type { AgentDefinition } from '../schemas/agent-definition.js';
 import type { WorkflowStep } from '../schemas/workflow-definition.js';
 
@@ -74,6 +78,12 @@ type ResolvedMcpServerShared = {
    *  servers whose allowlist was emptied by denyTools are dropped from
    *  the result. */
   allowedTools?: string[];
+  /** When the binding routed through a ToolCatalogEntry that carries a
+   *  Connection reference, this is the Connection id. Downstream consumers
+   *  (HTTP MCP writer, stdio env injector, script-step env injector) use
+   *  this to resolve fresh tokens via `getValidToken`. Absent for legacy
+   *  bindings (inline auth on http; stdio entries without connectionId). */
+  connectionId?: string;
 };
 
 export type ResolvedStdioMcpServer = ResolvedMcpServerShared & {
@@ -165,21 +175,68 @@ function resolveBinding(
     if (entry === undefined) {
       throw new CatalogEntryNotFoundError(name, binding.catalogId);
     }
+    const stdio = getCatalogEntryStdio(entry);
+    if (stdio === null) {
+      // Existing 'stdio' binding pointed at an entry that does not expose
+      // an stdio transport (e.g. a new-shape http-only entry). Surface as
+      // catalog-not-found rather than silently degrading.
+      throw new CatalogEntryNotFoundError(name, binding.catalogId);
+    }
     return {
       type: 'stdio',
-      command: entry.command,
-      args: entry.args,
-      env: entry.env,
+      command: stdio.command,
+      args: stdio.args,
+      env: stdio.env,
+      allowedTools: binding.allowedTools ? [...binding.allowedTools] : undefined,
+      connectionId: entry.connectionId,
+    };
+  }
+
+  if (binding.type === 'http') {
+    return {
+      type: 'http',
+      url: binding.url,
+      auth: binding.auth,
       allowedTools: binding.allowedTools ? [...binding.allowedTools] : undefined,
     };
   }
 
-  return {
-    type: 'http',
-    url: binding.url,
-    auth: binding.auth,
-    allowedTools: binding.allowedTools ? [...binding.allowedTools] : undefined,
-  };
+  // Catalog-ref binding (PR A): look up the catalog entry, dispatch on the
+  // entry's transport. Connection lookup + token fetch happens downstream
+  // (writer / env injector) so this resolver stays pure and synchronous.
+  const entry = catalog.get(binding.catalogId);
+  if (entry === undefined) {
+    throw new CatalogEntryNotFoundError(name, binding.catalogId);
+  }
+
+  const http = getCatalogEntryHttp(entry);
+  if (http !== null) {
+    return {
+      type: 'http',
+      url: http.url,
+      // Auth comes from `connectionId` (resolved downstream). Legacy
+      // `auth` field intentionally undefined — the catalog-ref shape
+      // never carries inline auth.
+      allowedTools: binding.allowedTools ? [...binding.allowedTools] : undefined,
+      connectionId: entry.connectionId,
+    };
+  }
+
+  const stdio = getCatalogEntryStdio(entry);
+  if (stdio !== null) {
+    return {
+      type: 'stdio',
+      command: stdio.command,
+      args: stdio.args,
+      env: stdio.env,
+      allowedTools: binding.allowedTools ? [...binding.allowedTools] : undefined,
+      connectionId: entry.connectionId,
+    };
+  }
+
+  // The schema's refine guarantees an entry has either legacy command or
+  // an mcp exposure, so this branch is unreachable in well-formed data.
+  throw new CatalogEntryNotFoundError(name, binding.catalogId);
 }
 
 /** Apply a step-level denyTools subtraction to a resolved server. Safe

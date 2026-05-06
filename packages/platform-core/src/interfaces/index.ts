@@ -11,3 +11,9 @@ export type { AgentRunRepository } from './agent-run-repository.js';
 export type { CoworkSessionRepository } from './cowork-session-repository.js';
 export type { CronTriggerStateRepository } from './cron-trigger-state-repository.js';
 export type { ToolCatalogRepository } from './tool-catalog-repository.js';
+export {
+  ConnectionAlreadyExistsError,
+  ConnectionNotOAuthError,
+  ConnectionNotFoundError,
+  type ConnectionRepository,
+} from './connection-repository.js';

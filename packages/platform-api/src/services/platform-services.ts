@@ -11,6 +11,7 @@ import {
   FirestoreNamespaceRepository,
   FirestoreOAuthProviderRepository,
   FirestoreAgentOAuthTokenRepository,
+  FirestoreConnectionRepository,
   FirestoreModelRegistryRepository,
   FirestoreWorkflowSecretsRepository,
   getAdminFirestore,
@@ -70,6 +71,7 @@ export interface PlatformServices {
   namespaceRepo: FirestoreNamespaceRepository;
   oauthProviderRepo: FirestoreOAuthProviderRepository;
   agentOAuthTokenRepo: FirestoreAgentOAuthTokenRepository;
+  connectionRepo: FirestoreConnectionRepository;
   modelRegistryRepo: FirestoreModelRegistryRepository;
   secretsRepo: FirestoreWorkflowSecretsRepository;
 }
@@ -95,6 +97,7 @@ export function getPlatformServices(): PlatformServices {
   const namespaceRepo = new FirestoreNamespaceRepository(db);
   const oauthProviderRepo = new FirestoreOAuthProviderRepository(db);
   const agentOAuthTokenRepo = new FirestoreAgentOAuthTokenRepository(db);
+  const connectionRepo = new FirestoreConnectionRepository(db);
   const modelRegistryRepo = new FirestoreModelRegistryRepository(db);
   const secretsRepo = new FirestoreWorkflowSecretsRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
@@ -204,6 +207,7 @@ export function getPlatformServices(): PlatformServices {
     namespaceRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    connectionRepo,
     modelRegistryRepo,
     secretsRepo,
   };

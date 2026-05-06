@@ -64,6 +64,56 @@ describe('OAuthProviderConfigSchema', () => {
     const result = OAuthProviderConfigSchema.safeParse({ ...validInput, allowEvil: true });
     expect(result.success).toBe(false);
   });
+
+  describe('envAlias', () => {
+    it('parses a provider with a single envAlias', () => {
+      const result = OAuthProviderConfigSchema.safeParse({
+        ...validInput,
+        envAlias: ['GITHUB_TOKEN'],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('parses a provider with multiple envAliases', () => {
+      const result = OAuthProviderConfigSchema.safeParse({
+        ...validInput,
+        envAlias: ['GITHUB_TOKEN', 'GH_TOKEN'],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects lowercase envAlias entries (POSIX env name)', () => {
+      const result = OAuthProviderConfigSchema.safeParse({
+        ...validInput,
+        envAlias: ['github_token'],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects envAlias entries starting with digit', () => {
+      const result = OAuthProviderConfigSchema.safeParse({
+        ...validInput,
+        envAlias: ['1TOKEN'],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects envAlias entries with hyphens', () => {
+      const result = OAuthProviderConfigSchema.safeParse({
+        ...validInput,
+        envAlias: ['GITHUB-TOKEN'],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('parses a provider with no envAlias (back-compat)', () => {
+      const result = OAuthProviderConfigSchema.safeParse(validInput);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.envAlias).toBeUndefined();
+      }
+    });
+  });
 });
 
 describe('PublicOAuthProviderConfigSchema', () => {

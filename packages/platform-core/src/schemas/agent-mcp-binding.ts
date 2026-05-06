@@ -79,10 +79,28 @@ export const HttpAgentMcpBindingSchema = z.object({
 
 export type HttpAgentMcpBinding = z.infer<typeof HttpAgentMcpBindingSchema>;
 
-/** Discriminated union of supported MCP transports at the agent level. */
+/** Catalog-ref binding — points at a ToolCatalogEntry that carries its
+ *  own transport (http or stdio) and optionally a Connection for auth.
+ *  Replaces both inline http and the stdio-only catalogId binding in the
+ *  long term; for PR A both old shapes (`type: 'stdio'`, `type: 'http'`)
+ *  remain accepted for read-compatibility. New writes should prefer this
+ *  shape. */
+export const CatalogRefAgentMcpBindingSchema = z.object({
+  type: z.literal('catalog'),
+  catalogId: z.string().min(1),
+  allowedTools: z.array(z.string()).min(1).optional(),
+}).strict();
+
+export type CatalogRefAgentMcpBinding = z.infer<typeof CatalogRefAgentMcpBindingSchema>;
+
+/** Discriminated union of supported MCP transports at the agent level.
+ *  `'catalog'` is the new canonical variant introduced for PR A; `'stdio'`
+ *  and `'http'` are kept for backward read-compatibility while the data
+ *  store still contains legacy bindings. */
 export const AgentMcpBindingSchema = z.discriminatedUnion('type', [
   StdioAgentMcpBindingSchema,
   HttpAgentMcpBindingSchema,
+  CatalogRefAgentMcpBindingSchema,
 ]);
 
 export type AgentMcpBinding = z.infer<typeof AgentMcpBindingSchema>;
@@ -107,14 +125,105 @@ export const StepMcpRestrictionSchema = z.record(z.string().min(1), StepMcpRestr
 
 export type StepMcpRestriction = z.infer<typeof StepMcpRestrictionSchema>;
 
-/** Admin-curated stdio MCP server definition, referenced by AgentMcpBinding.catalogId.
- *  Env values support {{SECRET:name}} template syntax. */
-export const ToolCatalogEntrySchema = z.object({
-  id: z.string().min(1),
-  command: z.string().min(1),
-  args: z.array(z.string()).optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  description: z.string().optional(),
+/** HTTP transport on a ToolCatalogEntry. Auth is supplied by the entry's
+ *  `connectionId` (resolved at consumer time), not inlined here. */
+export const HttpMcpExposureSchema = z.object({
+  type: z.literal('http'),
+  url: z.string().url(),
 }).strict();
 
+export type HttpMcpExposure = z.infer<typeof HttpMcpExposureSchema>;
+
+/** Stdio transport on a ToolCatalogEntry. `extraEnv` carries non-credential
+ *  config (workspace ids, regions, default flags); credentials should live
+ *  on a Connection referenced via `connectionId`. `extraEnv` continues to
+ *  support `{{SECRET:name}}` template interpolation for legacy compatibility,
+ *  but the convention is: credentials → Connection, non-creds → extraEnv. */
+export const StdioMcpExposureSchema = z.object({
+  type: z.literal('stdio'),
+  command: z.string().min(1),
+  args: z.array(z.string()).optional(),
+  extraEnv: z.record(z.string(), z.string()).optional(),
+}).strict();
+
+export type StdioMcpExposure = z.infer<typeof StdioMcpExposureSchema>;
+
+export const McpExposureSchema = z.discriminatedUnion('type', [
+  HttpMcpExposureSchema,
+  StdioMcpExposureSchema,
+]);
+
+export type McpExposure = z.infer<typeof McpExposureSchema>;
+
+/** Admin-curated MCP server definition, referenced by `AgentMcpBinding`
+ *  (via `catalogId`).
+ *
+ *  PR A keeps both shapes parseable so the same Firestore document store
+ *  serves legacy reads and new writes:
+ *
+ *    Legacy stdio shape (existing rows):
+ *      { id, command, args?, env?, description? }
+ *
+ *    New shape (preferred for writes; PR B will migrate legacy to this):
+ *      { id, name?, description?, connectionId?, mcp: HttpMcpExposure | StdioMcpExposure }
+ *
+ *  At least one of `command` (legacy) or `mcp` (new) must be present.
+ *  Resolvers should call `getCatalogEntryStdio` / `getCatalogEntryHttp`
+ *  helpers (this file) to read transport details without branching on
+ *  shape. */
+/** Bare object schema for ToolCatalogEntry — exposed so callers can apply
+ *  `.omit()` / `.partial()` (e.g. PATCH payloads). The exported
+ *  `ToolCatalogEntrySchema` is this shape with the cross-field refinement
+ *  attached, but `.refine()` returns ZodEffects which Zod refuses to
+ *  `.omit()`. Use this base when you need shape mutations and the
+ *  refinement when you need full validation. */
+export const ToolCatalogEntryBaseSchema = z.object({
+  id: z.string().min(1),
+  // Legacy stdio fields. Optional now so new entries can omit them in
+  // favour of `mcp`; existing rows that only carry these still parse.
+  command: z.string().min(1).optional(),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  // Shared metadata.
+  name: z.string().optional(),
+  description: z.string().optional(),
+  // New fields.
+  connectionId: z.string().min(1).optional(),
+  mcp: McpExposureSchema.optional(),
+}).strict();
+
+export const ToolCatalogEntrySchema = ToolCatalogEntryBaseSchema.refine(
+  (entry) => entry.command !== undefined || entry.mcp !== undefined,
+  {
+    message: 'tool catalog entry must have either `command` (legacy stdio) or `mcp` (new shape)',
+  },
+);
+
 export type ToolCatalogEntry = z.infer<typeof ToolCatalogEntrySchema>;
+
+/** Pull stdio launch fields from a catalog entry, regardless of whether
+ *  it uses the legacy top-level shape or the new `mcp.stdio` shape.
+ *  Returns null when the entry does not expose an stdio transport. */
+export function getCatalogEntryStdio(
+  entry: ToolCatalogEntry,
+): { command: string; args?: string[]; env?: Record<string, string> } | null {
+  if (entry.mcp !== undefined) {
+    if (entry.mcp.type !== 'stdio') return null;
+    return {
+      command: entry.mcp.command,
+      args: entry.mcp.args,
+      env: entry.mcp.extraEnv,
+    };
+  }
+  if (entry.command !== undefined) {
+    return { command: entry.command, args: entry.args, env: entry.env };
+  }
+  return null;
+}
+
+/** Pull http exposure URL from a catalog entry. Returns null when the
+ *  entry does not expose an http transport (legacy entries never do). */
+export function getCatalogEntryHttp(entry: ToolCatalogEntry): { url: string } | null {
+  if (entry.mcp?.type !== 'http') return null;
+  return { url: entry.mcp.url };
+}

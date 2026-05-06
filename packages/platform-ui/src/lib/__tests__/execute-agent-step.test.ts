@@ -16,6 +16,7 @@ import {
   buildAgentOutputEnvelope,
   buildWorkflowDefinition,
   InMemoryAgentOAuthTokenRepository,
+  InMemoryConnectionRepository,
   InMemoryOAuthProviderRepository,
 } from '@mediforce/platform-core/testing';
 
@@ -91,6 +92,7 @@ const mockToolCatalogRepo = {
 // binding are both present, which our non-OAuth tests don't exercise.
 const oauthProviderRepo = new InMemoryOAuthProviderRepository();
 const agentOAuthTokenRepo = new InMemoryAgentOAuthTokenRepository();
+const connectionRepo = new InMemoryConnectionRepository();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -106,6 +108,7 @@ vi.mock('@/lib/platform-services', () => ({
     toolCatalogRepo: mockToolCatalogRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    connectionRepo,
   }),
 }));
 

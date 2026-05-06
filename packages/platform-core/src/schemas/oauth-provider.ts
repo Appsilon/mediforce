@@ -49,6 +49,17 @@ export const OAuthProviderConfigSchema = z.object({
   resourceUrl: z.string().url().optional(),
   /** Optional icon URL (shown in provider dropdown). */
   iconUrl: z.string().url().optional(),
+  /** Canonical env var aliases for tokens issued via this provider. When a
+   *  Connection backed by this provider is consumed by a script step, the
+   *  resolved access token is also exported under each name in this list
+   *  (e.g. `['GITHUB_TOKEN']`) — but only when the step references exactly
+   *  one Connection per provider, so the alias is unambiguous. Two
+   *  github-backed Connections referenced together fail step validation
+   *  rather than silently picking one. Always set in addition to the
+   *  unconditional `CONN_<ID>_TOKEN`. */
+  envAlias: z.array(z.string().min(1).regex(/^[A-Z][A-Z0-9_]*$/, {
+    message: 'envAlias entries must be POSIX env names (uppercase + digits + underscores)',
+  })).optional(),
   /** ISO timestamp of creation. */
   createdAt: z.string().datetime(),
   /** ISO timestamp of last update. */

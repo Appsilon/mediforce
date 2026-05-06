@@ -7,18 +7,22 @@
 
 import { getPlatformServices } from './platform-services';
 import {
+  resolveConnectionEnv,
   resolveMcpForStep,
   resolveOAuthToken,
   OAuthTokenUnavailableError,
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
 } from '@mediforce/agent-runtime';
-import type {
-  AgentOAuthTokenRepository,
-  OAuthProviderRepository,
-  ResolvedMcpConfig,
-  WorkflowDefinition,
-  WorkflowStep,
+import {
+  connectionTokenEnvName,
+  getValidToken,
+  type AgentOAuthTokenRepository,
+  type ConnectionRepository,
+  type OAuthProviderRepository,
+  type ResolvedMcpConfig,
+  type WorkflowDefinition,
+  type WorkflowStep,
 } from '@mediforce/platform-core';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { resolveAgentIdentity } from './resolve-agent-identity';
@@ -57,6 +61,7 @@ export async function executeAgentStep(
     toolCatalogRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    connectionRepo,
   } = getPlatformServices();
 
   const instance = await instanceRepo.getById(instanceId);
@@ -136,7 +141,35 @@ export async function executeAgentStep(
         resolvedMcpConfig,
         oauthProviderRepo,
         agentOAuthTokenRepo,
+        connectionRepo,
       })
+    : undefined;
+
+  // Pre-resolve Connection-backed env additions for stdio MCP servers
+  // whose catalog entry carries a `connectionId`. Each entry becomes
+  // `{ CONN_<NORMALIZED_ID>_TOKEN: <fresh access token> }` ready for the
+  // writer to merge into the stdio entry's env. Same Firestore-decoupling
+  // story as oauthTokens — runtime stays clean.
+  const stdioConnectionEnvByServer = resolvedMcpConfig !== undefined
+    ? await loadStdioConnectionEnv({
+        namespace: workflowDefinition.namespace,
+        resolvedMcpConfig,
+        connectionRepo,
+        oauthProviderRepo,
+      })
+    : undefined;
+
+  // Pre-resolve env injection for `step.connections` — token + envAlias
+  // bundle ready for the script-step plugin (and, in PR B+, any other
+  // executor that opts into Connection-backed env). Skipped when the step
+  // declares no connections to keep the code path inert for the existing
+  // workflows.
+  const stepConnectionIds = workflowStep.connections ?? [];
+  const resolvedConnectionEnv = stepConnectionIds.length > 0
+    ? (await resolveConnectionEnv(workflowDefinition.namespace, stepConnectionIds, {
+        connectionRepo,
+        oauthProviderRepo,
+      })).vars
     : undefined;
 
   // Resolve agent identity prompt (systemPrompt + skill file contents) from
@@ -167,6 +200,8 @@ export async function executeAgentStep(
       : {}),
     oauthTokens,
     agentIdentityPrompt,
+    resolvedConnectionEnv,
+    stdioConnectionEnvByServer,
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
       const result: Record<string, unknown> = {};
@@ -487,6 +522,10 @@ interface LoadOAuthTokensDeps {
   resolvedMcpConfig: ResolvedMcpConfig;
   oauthProviderRepo: OAuthProviderRepository;
   agentOAuthTokenRepo: AgentOAuthTokenRepository;
+  /** Required for resolving HTTP MCP servers that route auth through a
+   *  Connection (new catalog-ref bindings). Legacy http+oauth bindings
+   *  continue to read from `agentOAuthTokenRepo` keyed by serverName. */
+  connectionRepo: ConnectionRepository;
 }
 
 /** Load and lazy-refresh OAuth tokens for every HTTP binding in the
@@ -499,11 +538,41 @@ interface LoadOAuthTokensDeps {
 async function loadOAuthTokens(
   deps: LoadOAuthTokensDeps,
 ): Promise<Record<string, ResolvedOAuthBinding> | undefined> {
-  const { namespace, agentId, resolvedMcpConfig, oauthProviderRepo, agentOAuthTokenRepo } = deps;
+  const {
+    namespace,
+    agentId,
+    resolvedMcpConfig,
+    oauthProviderRepo,
+    agentOAuthTokenRepo,
+    connectionRepo,
+  } = deps;
   const result: Record<string, ResolvedOAuthBinding> = {};
 
   for (const [serverName, server] of Object.entries(resolvedMcpConfig.servers)) {
-    if (server.type !== 'http' || server.auth?.type !== 'oauth') continue;
+    if (server.type !== 'http') continue;
+
+    // Branch 1: new catalog-ref binding routed through a Connection. The
+    // resolver carries `connectionId` on the resolved server; auth is
+    // unset (Connection owns it). We synthesize the standard
+    // `Authorization: Bearer {token}` header for the writer downstream.
+    if (server.connectionId !== undefined) {
+      const valid = await getValidToken(namespace, server.connectionId, {
+        connectionRepo,
+        oauthProviderRepo,
+      });
+      result[serverName] = {
+        accessToken: valid.accessToken,
+        headerName: 'Authorization',
+        headerValueTemplate: 'Bearer {token}',
+      };
+      continue;
+    }
+
+    // Branch 2: legacy inline http+oauth binding. Token lives in
+    // agentOAuthTokenRepo keyed by (agentId, serverName); provider config
+    // supplies refresh credentials. Kept for back-compat read path while
+    // unmigrated agents still exist.
+    if (server.auth?.type !== 'oauth') continue;
     const auth = server.auth;
 
     const providerId = auth.provider;
@@ -532,6 +601,39 @@ async function loadOAuthTokens(
       accessToken: fresh.accessToken,
       headerName: auth.headerName,
       headerValueTemplate: auth.headerValueTemplate,
+    };
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+interface LoadStdioConnectionEnvDeps {
+  namespace: string;
+  resolvedMcpConfig: ResolvedMcpConfig;
+  connectionRepo: ConnectionRepository;
+  oauthProviderRepo: OAuthProviderRepository;
+}
+
+/** For each stdio MCP server in the resolved config that routes auth
+ *  through a Connection (`server.connectionId` set), call `getValidToken`
+ *  and produce the `{ CONN_<NORMALIZED_ID>_TOKEN: <token> }` env bundle
+ *  for the writer to merge into the stdio entry's env. Returns undefined
+ *  when no stdio servers carry a connectionId. */
+async function loadStdioConnectionEnv(
+  deps: LoadStdioConnectionEnvDeps,
+): Promise<Record<string, Record<string, string>> | undefined> {
+  const { namespace, resolvedMcpConfig, connectionRepo, oauthProviderRepo } = deps;
+  const result: Record<string, Record<string, string>> = {};
+
+  for (const [serverName, server] of Object.entries(resolvedMcpConfig.servers)) {
+    if (server.type !== 'stdio') continue;
+    if (server.connectionId === undefined) continue;
+    const valid = await getValidToken(namespace, server.connectionId, {
+      connectionRepo,
+      oauthProviderRepo,
+    });
+    result[serverName] = {
+      [connectionTokenEnvName(server.connectionId)]: valid.accessToken,
     };
   }
 
