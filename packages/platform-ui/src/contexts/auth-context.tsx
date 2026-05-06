@@ -205,8 +205,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Resolve mustChangePassword BEFORE clearing loading — layout reads
         // both flags to decide whether to redirect to /change-password.
-        // Clearing loading first would let layout render with the default
-        // mustChangePassword=false and skip the redirect (CI race condition).
+        // Clearing loading first lets layout render with the default
+        // mustChangePassword=false and skip the redirect.
         getDoc(doc(db, 'users', user.uid)).then((snap) => {
           if (snap.exists()) {
             setMustChangePassword(snap.data().mustChangePassword === true);
@@ -221,6 +221,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('[auth] ensurePersonalNamespace failed:', err);
           });
         }).catch((err) => {
+          // Fail-closed: if we cannot read mustChangePassword, assume it is true so
+          // the forced-reset gate is never silently bypassed by a rules rejection or
+          // transient network error.
           console.error('[auth] Failed to read user doc for mustChangePassword — failing closed:', err);
           setMustChangePassword(true);
           setLoading(false);
