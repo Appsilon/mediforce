@@ -116,6 +116,10 @@ vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretsForRuntime: vi.fn().mockResolvedValue({}),
 }));
 
+vi.mock('@/app/actions/namespace-secrets', () => ({
+  getNamespaceSecretsForRuntime: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock('@/lib/resolve-agent-identity', () => ({
   resolveAgentIdentity: vi.fn().mockResolvedValue({ prompt: undefined, warnings: [] }),
 }));

@@ -9,6 +9,7 @@ import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
 import { startWorkflowRun } from '@/app/actions/processes';
 import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
+import { getNamespaceSecretKeys } from '@/app/actions/namespace-secrets';
 import { useWorkflowSecretKeysContext } from '@/hooks/use-workflow-secret-keys';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,7 @@ export function StartRunButton({
   const [pendingVersion, setPendingVersion] = React.useState<number | undefined>(undefined);
   const secretKeysCtx = useWorkflowSecretKeysContext();
   const [localSecretKeys, setLocalSecretKeys] = React.useState<string[] | undefined>(undefined);
+  const [localNsSecretKeys, setLocalNsSecretKeys] = React.useState<string[]>([]);
   const [localSecretsLoading, setLocalSecretsLoading] = React.useState(true);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
@@ -89,13 +91,27 @@ export function StartRunButton({
     if (!handle || !workflowName || !uid) return;
     let cancelled = false;
     setLocalSecretsLoading(true);
-    getWorkflowSecretKeys(handle, workflowName, uid)
-      .then((keys) => { if (!cancelled) { setLocalSecretKeys(keys); setLocalSecretsLoading(false); } })
-      .catch(() => { if (!cancelled) { setLocalSecretKeys(undefined); setLocalSecretsLoading(false); } });
+    Promise.all([
+      getWorkflowSecretKeys(handle, workflowName, uid),
+      getNamespaceSecretKeys(handle, uid),
+    ])
+      .then(([wfKeys, nsKeys]) => {
+        if (cancelled) return;
+        setLocalSecretKeys(wfKeys);
+        setLocalNsSecretKeys(nsKeys);
+        setLocalSecretsLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLocalSecretKeys(undefined);
+        setLocalNsSecretKeys([]);
+        setLocalSecretsLoading(false);
+      });
     return () => { cancelled = true; };
   }, [hasContext, handle, workflowName, uid]);
 
   const secretKeys = hasContext ? secretKeysCtx.getKeys(workflowName) : localSecretKeys;
+  const namespaceSecretKeys = hasContext ? secretKeysCtx.namespaceKeys : localNsSecretKeys;
   const secretKeysLoading = hasContext ? secretKeysCtx.loading : localSecretsLoading;
 
   const warnings = React.useMemo(() => {
@@ -104,12 +120,13 @@ export function StartRunButton({
       dockerImages,
       dockerAvailable,
       secretKeys,
+      namespaceSecretKeys,
       openRouterCredits: openRouterCredits.isLoading ? undefined : {
         available: openRouterCredits.available,
         remaining: openRouterCredits.remaining,
       },
     });
-  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining]);
+  }, [effectiveDefinition, dockerImages, dockerAvailable, secretKeys, namespaceSecretKeys, openRouterCredits.isLoading, openRouterCredits.available, openRouterCredits.remaining]);
 
   const preflightLoading = dockerLoading || secretKeysLoading || openRouterCredits.isLoading;
   const hasWarnings = warnings.length > 0;

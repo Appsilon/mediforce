@@ -79,6 +79,15 @@ describe('SetSecretInputSchema', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it('accepts namespace-only (no workflow) for workspace-level secrets', () => {
+    const result = SetSecretInputSchema.safeParse({
+      namespace: 'ns',
+      key: 'K',
+      value: 'V',
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('ListSecretKeysInputSchema', () => {
@@ -90,9 +99,9 @@ describe('ListSecretKeysInputSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects missing workflow', () => {
+  it('accepts namespace-only (no workflow) for workspace-level secrets', () => {
     const result = ListSecretKeysInputSchema.safeParse({ namespace: 'ns' });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 });
 
@@ -124,6 +133,14 @@ describe('DeleteSecretInputSchema', () => {
       workflow: 'wf',
     });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts namespace-only (no workflow) for workspace-level secrets', () => {
+    const result = DeleteSecretInputSchema.safeParse({
+      namespace: 'ns',
+      key: 'K',
+    });
+    expect(result.success).toBe(true);
   });
 });
 

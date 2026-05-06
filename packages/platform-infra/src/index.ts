@@ -24,6 +24,7 @@ export type { MailgunConfig } from './email/mailgun-client.js';
 export { FirestoreAgentDefinitionRepository } from './firestore/agent-definition-repository.js';
 export { FirestoreNamespaceRepository } from './firestore/namespace-repository.js';
 export { FirestoreWorkflowSecretsRepository } from './firestore/workflow-secrets-repository.js';
+export { FirestoreNamespaceSecretsRepository } from './firestore/namespace-secrets-repository.js';
 export { FirestoreCoworkSessionRepository } from './firestore/cowork-session-repository.js';
 export { FirestoreCronTriggerStateRepository } from './firestore/cron-trigger-state-repository.js';
 export { FirestoreToolCatalogRepository } from './firestore/tool-catalog-repository.js';

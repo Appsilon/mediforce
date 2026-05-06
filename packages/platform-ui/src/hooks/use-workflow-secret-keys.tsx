@@ -2,10 +2,12 @@
 
 import * as React from 'react';
 import { getWorkflowSecretKeysBatch } from '@/app/actions/workflow-secrets';
+import { getNamespaceSecretKeys } from '@/app/actions/namespace-secrets';
 import { useAuth } from '@/contexts/auth-context';
 
 interface WorkflowSecretKeysContextValue {
   getKeys: (workflowName: string) => string[] | undefined;
+  namespaceKeys: string[];
   loading: boolean;
 }
 
@@ -22,6 +24,7 @@ export function WorkflowSecretKeysProvider({
 }) {
   const { firebaseUser } = useAuth();
   const [secretsByWorkflow, setSecretsByWorkflow] = React.useState<Map<string, string[]>>(new Map());
+  const [nsKeys, setNsKeys] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const uid = firebaseUser?.uid;
@@ -35,20 +38,25 @@ export function WorkflowSecretKeysProvider({
     let cancelled = false;
     setLoading(true);
 
-    getWorkflowSecretKeysBatch(handle, workflowNames, uid)
-      .then((result) => {
+    Promise.all([
+      getWorkflowSecretKeysBatch(handle, workflowNames, uid),
+      getNamespaceSecretKeys(handle, uid),
+    ])
+      .then(([workflowResult, namespaceResult]) => {
         if (cancelled) return;
         const map = new Map<string, string[]>();
-        for (const [name, keys] of Object.entries(result)) {
+        for (const [name, keys] of Object.entries(workflowResult)) {
           map.set(name, keys);
         }
         setSecretsByWorkflow(map);
+        setNsKeys(namespaceResult);
         setLoading(false);
       })
       .catch((err) => {
         if (cancelled) return;
         console.warn('[WorkflowSecretKeys] Failed to fetch secret keys:', err);
         setSecretsByWorkflow(new Map());
+        setNsKeys([]);
         setLoading(false);
       });
 
@@ -62,8 +70,8 @@ export function WorkflowSecretKeysProvider({
   );
 
   const value = React.useMemo(
-    () => ({ getKeys, loading }),
-    [getKeys, loading],
+    () => ({ getKeys, namespaceKeys: nsKeys, loading }),
+    [getKeys, nsKeys, loading],
   );
 
   return (

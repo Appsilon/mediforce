@@ -8,12 +8,13 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { getCallerNamespaces } from '../workflow-definitions/auth.js';
 
 /**
- * GET /api/workflow-secrets?namespace=x&workflow=y
+ * GET /api/workflow-secrets?namespace=x[&workflow=y]
  *
  * Returns secret key names only (never values).
+ * Without workflow: returns namespace-level secrets.
  */
 export async function GET(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo } = getPlatformServices();
+  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
   const callerNs = await getCallerNamespaces(request, namespaceRepo);
   if (callerNs instanceof NextResponse) return callerNs;
 
@@ -34,19 +35,22 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const keys = await secretsRepo.getSecretKeys(namespace, workflow);
+  const keys = workflow
+    ? await secretsRepo.getSecretKeys(namespace, workflow)
+    : await namespaceSecretsRepo.getSecretKeys(namespace);
   return NextResponse.json({ keys });
 }
 
 /**
- * PUT /api/workflow-secrets?namespace=x&workflow=y
+ * PUT /api/workflow-secrets?namespace=x[&workflow=y]
  *
  * Body: { "key": "SECRET_NAME", "value": "secret-value" }
  *
  * Upserts a single secret key atomically. Existing secrets are preserved.
+ * Without workflow: operates on namespace-level secrets.
  */
 export async function PUT(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo } = getPlatformServices();
+  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
   const callerNs = await getCallerNamespaces(request, namespaceRepo);
   if (callerNs instanceof NextResponse) return callerNs;
 
@@ -75,17 +79,22 @@ export async function PUT(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await secretsRepo.upsertSecret(namespace, workflow, key, value);
+  if (workflow) {
+    await secretsRepo.upsertSecret(namespace, workflow, key, value);
+  } else {
+    await namespaceSecretsRepo.upsertSecret(namespace, key, value);
+  }
   return NextResponse.json({ ok: true });
 }
 
 /**
- * DELETE /api/workflow-secrets?namespace=x&workflow=y&key=SECRET_NAME
+ * DELETE /api/workflow-secrets?namespace=x[&workflow=y]&key=SECRET_NAME
  *
  * Removes a single secret key atomically.
+ * Without workflow: operates on namespace-level secrets.
  */
 export async function DELETE(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo } = getPlatformServices();
+  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
   const callerNs = await getCallerNamespaces(request, namespaceRepo);
   if (callerNs instanceof NextResponse) return callerNs;
 
@@ -107,6 +116,10 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await secretsRepo.deleteSecret(namespace, workflow, key);
+  if (workflow) {
+    await secretsRepo.deleteSecret(namespace, workflow, key);
+  } else {
+    await namespaceSecretsRepo.deleteSecret(namespace, key);
+  }
   return NextResponse.json({ ok: true });
 }

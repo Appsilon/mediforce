@@ -20,6 +20,22 @@ Tests run with `fullyParallel: true`. This is safe because:
 
 When adding a new test that **changes state**, create a new dedicated entry in `seed-data.ts` with a unique ID. Document which test owns it with a comment. Never mutate an instance that read-only tests depend on.
 
+## Retry-Safe State Cleanup
+
+`auth-setup.ts` runs **once per CI invocation**, not once per test. Playwright retries (`retries: 2` on CI) re-run the failing test against the **same Firestore state** the previous attempt left behind. If a test creates or mutates state that survives in Firestore — and the assertion that catches the change comes after the mutation — every retry will see the post-mutation state and fail in a way that looks unrelated to the original cause.
+
+This is a fixture leak across retries. It surfaces as: first run fails for the real reason, retries time out on a setup precondition because the state is no longer pristine.
+
+**Rule:** any journey that writes to Firestore beyond what `auth-setup.ts` seeded must explicitly clean that state at the *start* of the test. Use the `deleteDocument` / `clearEmulators` helpers from `e2e/helpers/emulator.ts`. Do this even when the happy path of the test would clean up at the end — retries don't reach the end.
+
+Examples of state that needs explicit reset at test start:
+
+- OAuth tokens written by callback handlers (`agentOAuthTokens/*`)
+- Documents the test inserts via the UI (uploads, new agents, new bindings)
+- Anything else not present in `auth-setup.ts` seed
+
+Rule of thumb: if the test's first assertion would fail when run twice in a row against the same emulator, it has a fixture leak. Fix it with an explicit reset at the top, not by tightening selectors or bumping timeouts.
+
 ## Test Types
 
 | Type | Location | Purpose |
