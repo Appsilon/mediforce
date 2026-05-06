@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { signState, generateNonce, generatePkcePair } from '@mediforce/agent-runtime';
 import { getPlatformServices } from '@/lib/platform-services';
 import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
-import { getConfiguredAppBaseUrl } from '@/lib/app-base-url';
+import { buildOAuthCallbackUrl } from '@/lib/app-base-url';
 import {
   requireFirebaseUid,
   requireNamespaceFromQuery,
@@ -13,13 +13,6 @@ import {
 const StartBodySchema = z.object({
   serverName: z.string().min(1),
 });
-
-function buildCallbackUrl(request: Request, providerSlug: string): string {
-  // Origin comes from the configured base URL — request.url is wrong behind
-  // Docker/reverse proxy. See lib/app-base-url for the why.
-  const origin = getConfiguredAppBaseUrl() ?? new URL(request.url).origin;
-  return `${origin}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
-}
 
 function buildAuthorizeUrl(params: {
   base: string;
@@ -142,7 +135,7 @@ export async function POST(
     base: provider.authorizeUrl,
     clientId: provider.clientId,
     scopes: provider.scopes,
-    redirectUri: buildCallbackUrl(request, providerSlug),
+    redirectUri: buildOAuthCallbackUrl(request, providerSlug),
     state,
     codeChallenge: pkce.codeChallenge,
   });
