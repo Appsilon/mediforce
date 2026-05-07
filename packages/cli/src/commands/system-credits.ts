@@ -84,8 +84,8 @@ export async function systemCreditsCommand(input: CommandInput): Promise<number>
     }
 
     if (!data.available) {
-      input.output.stdout(data.error ?? 'OpenRouter credits not available.');
-      return 0;
+      input.output.stderr(data.error ?? 'OpenRouter credits not available.');
+      return 1;
     }
 
     input.output.stdout(`OpenRouter credits for namespace "${flags.namespace}":\n`);

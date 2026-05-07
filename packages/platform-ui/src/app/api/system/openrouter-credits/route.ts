@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import type { OpenRouterCreditsOutput } from '@mediforce/platform-api/contract';
+import { resolveCallerIdentity, callerCanAccess } from '@/lib/api-auth';
+import { OpenRouterCreditsInputSchema, type OpenRouterCreditsOutput } from '@mediforce/platform-api/contract';
 
 const EMPTY: OpenRouterCreditsOutput = { available: false, limit: 0, usage: 0, remaining: 0 };
 
@@ -22,26 +23,31 @@ async function fetchCredits(apiKey: string): Promise<OpenRouterCreditsOutput> {
   }
 }
 
-export async function GET(req: NextRequest): Promise<NextResponse<OpenRouterCreditsOutput>> {
-  const namespace = req.nextUrl.searchParams.get('namespace');
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const parsed = OpenRouterCreditsInputSchema.safeParse({
+    namespace: req.nextUrl.searchParams.get('namespace'),
+  });
+  if (!parsed.success) {
+    return NextResponse.json({ ...EMPTY, error: 'namespace query param is required' }, { status: 400 });
+  }
 
-  if (namespace) {
-    const { namespaceSecretsRepo } = getPlatformServices();
-    try {
-      const secrets = await namespaceSecretsRepo.getSecrets(namespace);
-      const apiKey = secrets['OPENROUTER_API_KEY'];
-      if (!apiKey) {
-        return NextResponse.json({ ...EMPTY, error: 'OPENROUTER_API_KEY not configured in workspace secrets' });
-      }
-      return NextResponse.json(await fetchCredits(apiKey));
-    } catch (err: unknown) {
-      return NextResponse.json({ ...EMPTY, error: err instanceof Error ? err.message : 'Failed to read namespace secrets' });
+  const { namespace } = parsed.data;
+  const { namespaceRepo, namespaceSecretsRepo } = getPlatformServices();
+
+  const caller = await resolveCallerIdentity(req, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
+  if (!callerCanAccess(caller, namespace)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  try {
+    const secrets = await namespaceSecretsRepo.getSecrets(namespace);
+    const apiKey = secrets['OPENROUTER_API_KEY'];
+    if (!apiKey) {
+      return NextResponse.json({ ...EMPTY, error: 'OPENROUTER_API_KEY not configured in workspace secrets' });
     }
+    return NextResponse.json(await fetchCredits(apiKey));
+  } catch (err: unknown) {
+    return NextResponse.json({ ...EMPTY, error: err instanceof Error ? err.message : 'Failed to read namespace secrets' });
   }
-
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ ...EMPTY, error: 'OPENROUTER_API_KEY not configured' });
-  }
-  return NextResponse.json(await fetchCredits(apiKey));
 }
