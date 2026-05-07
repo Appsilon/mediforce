@@ -113,8 +113,12 @@ export async function getOpenRouterCredits(
       return { available: false, limit: 0, usage: 0, remaining: 0, error: `OpenRouter returned ${res.status}` };
     }
 
-    const { data } = await res.json() as { data: { limit: number; usage: number; limit_remaining: number } };
-    return { available: true, limit: data.limit, usage: data.usage, remaining: data.limit_remaining };
+    const body = await res.json() as { data?: { limit?: number; usage?: number; limit_remaining?: number } };
+    const data = body?.data;
+    if (!data || typeof data.limit_remaining !== 'number') {
+      return { available: false, limit: 0, usage: 0, remaining: 0, error: 'Unexpected response shape from OpenRouter' };
+    }
+    return { available: true, limit: data.limit ?? 0, usage: data.usage ?? 0, remaining: data.limit_remaining };
   } catch (err: unknown) {
     return { available: false, limit: 0, usage: 0, remaining: 0, error: err instanceof Error ? err.message : 'Unknown error' };
   }

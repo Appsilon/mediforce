@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { apiFetch } from '@/lib/api-fetch';
-import type { OpenRouterCreditsResponse } from '@/app/api/system/openrouter-credits/route';
+import type { OpenRouterCreditsOutput } from '@mediforce/platform-api/contract';
 
 export interface OpenRouterCreditsState {
   available: boolean;
@@ -25,13 +26,8 @@ const OpenRouterCreditsContext = createContext<OpenRouterCreditsState>({
   refresh: () => {},
 });
 
-/**
- * Lazy provider — does NOT fetch on mount. Call `useOpenRouterCredits()`
- * from a component that needs it; the first consumer triggers the fetch.
- * Subsequent consumers share the cached result. Auto-refreshes every 2min
- * once activated.
- */
 export function OpenRouterCreditsProvider({ children }: { children: ReactNode }) {
+  const handle = useHandleFromPath();
   const [available, setAvailable] = useState(false);
   const [remaining, setRemaining] = useState(0);
   const [limit, setLimit] = useState(0);
@@ -42,10 +38,11 @@ export function OpenRouterCreditsProvider({ children }: { children: ReactNode })
   const cancelledRef = useRef(false);
 
   const fetchCredits = useCallback(async () => {
+    if (!handle) return;
     try {
-      const res = await apiFetch('/api/system/openrouter-credits');
+      const res = await apiFetch(`/api/system/openrouter-credits?namespace=${encodeURIComponent(handle)}`);
       if (!res.ok || cancelledRef.current) return;
-      const data = await res.json() as OpenRouterCreditsResponse;
+      const data = await res.json() as OpenRouterCreditsOutput;
       if (cancelledRef.current) return;
       setAvailable(data.available);
       setRemaining(data.remaining);
@@ -59,15 +56,15 @@ export function OpenRouterCreditsProvider({ children }: { children: ReactNode })
         setError('Failed to fetch credits');
       }
     }
-  }, []);
+  }, [handle]);
 
   useEffect(() => {
-    if (!activated) return;
+    if (!activated || !handle) return;
     cancelledRef.current = false;
     fetchCredits();
     const interval = setInterval(fetchCredits, REFRESH_INTERVAL_MS);
     return () => { cancelledRef.current = true; clearInterval(interval); };
-  }, [activated, fetchCredits]);
+  }, [activated, handle, fetchCredits]);
 
   const activate = useCallback(() => setActivated(true), []);
 
@@ -92,10 +89,6 @@ export function OpenRouterCreditsProvider({ children }: { children: ReactNode })
 
 const ActivateContext = createContext<() => void>(() => {});
 
-/**
- * Returns OpenRouter credits state. Lazily triggers the first fetch —
- * no network call until a component actually uses this hook.
- */
 export function useOpenRouterCredits(): OpenRouterCreditsState {
   const activate = useContext(ActivateContext);
   useEffect(() => { activate(); }, [activate]);
