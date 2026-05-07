@@ -91,7 +91,7 @@ export function RunResultsPanel({ stepExecutions }: RunResultsPanelProps) {
               <span>{formatDuration(output.duration_ms)}</span>
             </div>
           )}
-          {output.estimatedCostUsd !== null && output.estimatedCostUsd !== undefined && (
+          {output.estimatedCostUsd != null && (
             <div className="flex items-center gap-1.5">
               <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-muted-foreground">Cost:</span>

@@ -207,8 +207,8 @@ export async function executeAgentStep(
             duration_ms: envelope.duration_ms ?? null,
             gitMetadata: envelope.gitMetadata ?? null,
             deliverableFile: (envelope.deliverableFile as string | undefined) ?? null,
-            tokenUsage: envelope.tokenUsage ?? null,
-            estimatedCostUsd: await estimateCost(envelope, modelRegistryRepo),
+            ...(envelope.tokenUsage ? { tokenUsage: envelope.tokenUsage } : {}),
+            ...(await estimateCostField(envelope, modelRegistryRepo)),
           }
         : null,
     });
@@ -545,12 +545,15 @@ async function loadOAuthTokens(
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-async function estimateCost(
+async function estimateCostField(
   envelope: { model: string | null; tokenUsage?: { inputTokens: number; outputTokens: number } },
   modelRegistryRepo: { getById(id: string): Promise<{ pricing: { input: number; output: number } } | null> },
-): Promise<number | null> {
-  if (!envelope.tokenUsage || !envelope.model) return null;
+): Promise<{ estimatedCostUsd: number } | Record<string, never>> {
+  if (!envelope.tokenUsage || !envelope.model) return {};
   const entry = await modelRegistryRepo.getById(envelope.model);
-  if (!entry) return null;
-  return calculateEstimatedCost(envelope.tokenUsage, entry.pricing);
+  if (!entry) {
+    console.warn(`[cost] model "${envelope.model}" not found in registry — cost unavailable`);
+    return {};
+  }
+  return { estimatedCostUsd: calculateEstimatedCost(envelope.tokenUsage, entry.pricing) };
 }

@@ -307,7 +307,7 @@ function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepEx
             <span>{formatDuration(agentOutput.duration_ms)}</span>
           </div>
         )}
-        {agentOutput.estimatedCostUsd !== null && agentOutput.estimatedCostUsd !== undefined && (
+        {agentOutput.estimatedCostUsd != null && (
           <div className="flex items-center gap-1.5">
             <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">Cost:</span>
