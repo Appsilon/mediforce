@@ -28,7 +28,7 @@ function valuesFromEntry(entry: ToolCatalogEntry | null): CatalogFormValues {
   }
   return {
     id: entry.id,
-    command: entry.command,
+    command: entry.command ?? '',
     args: (entry.args ?? []).map((value) => ({ value })),
     env: Object.entries(entry.env ?? {}).map(([key, value]) => ({ key, value })),
     description: entry.description ?? '',

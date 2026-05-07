@@ -3,7 +3,7 @@ import { verifyState, type OAuthStatePayload } from '@mediforce/agent-runtime';
 import type { AgentOAuthToken, OAuthProviderConfig } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { getOAuthStateSecret } from '@/lib/oauth-state-secret';
-import { buildOAuthCallbackUrl, publicOrigin } from '@/lib/app-base-url';
+import { getConfiguredAppBaseUrl } from '@/lib/app-base-url';
 
 /** Platform-owned callback for the OAuth authorization-code flow. Provider
  *  redirects here after consent. No user session (external origin), so the
@@ -28,9 +28,22 @@ interface ProviderUserInfo {
   accountLogin: string;
 }
 
+// Public origin for absolute URLs we emit — see lib/app-base-url for why we
+// don't trust request.url. Falls back to request.url.origin only on local
+// dev where APP_BASE_URL / NEXT_PUBLIC_APP_URL are unset.
+function publicOrigin(request: Request): string {
+  return getConfiguredAppBaseUrl() ?? new URL(request.url).origin;
+}
+
+function buildSelfCallbackUrl(request: Request, providerSlug: string): string {
+  return `${publicOrigin(request)}/api/oauth/${encodeURIComponent(providerSlug)}/callback`;
+}
+
 function redirectSuccess(request: Request, state: OAuthStatePayload): NextResponse {
   const origin = publicOrigin(request);
-  const destination = `${origin}/${encodeURIComponent(state.namespace)}/agents/definitions/${encodeURIComponent(state.agentId)}?connected=${encodeURIComponent(state.serverName)}`;
+  const destination = state.connectionId !== undefined
+    ? `${origin}/${encodeURIComponent(state.namespace)}/admin/connections/${encodeURIComponent(state.connectionId)}?connected=true`
+    : `${origin}/${encodeURIComponent(state.namespace)}/agents/definitions/${encodeURIComponent(state.agentId ?? '')}?connected=${encodeURIComponent(state.serverName ?? '')}`;
   return NextResponse.redirect(destination, 302);
 }
 
@@ -40,10 +53,12 @@ function redirectError(
   state: OAuthStatePayload | null,
 ): NextResponse {
   const origin = publicOrigin(request);
-  const destination =
-    state !== null
-      ? `${origin}/${encodeURIComponent(state.namespace)}/agents/definitions/${encodeURIComponent(state.agentId)}?oauthError=${encodeURIComponent(reason)}`
-      : `${origin}/?oauthError=${encodeURIComponent(reason)}`;
+  if (state === null) {
+    return NextResponse.redirect(`${origin}/?oauthError=${encodeURIComponent(reason)}`, 302);
+  }
+  const destination = state.connectionId !== undefined
+    ? `${origin}/${encodeURIComponent(state.namespace)}/admin/connections/${encodeURIComponent(state.connectionId)}?oauthError=${encodeURIComponent(reason)}`
+    : `${origin}/${encodeURIComponent(state.namespace)}/agents/definitions/${encodeURIComponent(state.agentId ?? '')}?oauthError=${encodeURIComponent(reason)}`;
   return NextResponse.redirect(destination, 302);
 }
 
@@ -181,7 +196,7 @@ export async function GET(
   const exchange = await exchangeCode({
     provider,
     code,
-    redirectUri: buildOAuthCallbackUrl(request, providerSlug),
+    redirectUri: buildSelfCallbackUrl(request, providerSlug),
     codeVerifier: state.codeVerifier,
   });
   if (exchange === null) {
@@ -205,29 +220,54 @@ export async function GET(
       : undefined;
   const scope = typeof exchange.scope === 'string' ? exchange.scope : provider.scopes.join(' ');
 
-  const userInfo = await fetchUserInfo(provider, accessToken, state.serverName);
+  const userInfoLabel = state.serverName ?? state.connectionId ?? 'oauth';
+  const userInfo = await fetchUserInfo(provider, accessToken, userInfoLabel);
   if (userInfo === null) {
     return redirectError(request, 'userinfo-fetch-failed', state);
   }
 
-  const token: AgentOAuthToken = {
-    provider: state.providerId,
-    accessToken,
-    ...(refreshToken !== undefined ? { refreshToken } : {}),
-    ...(expiresAt !== undefined ? { expiresAt } : {}),
-    scope,
-    providerUserId: userInfo.providerUserId,
-    accountLogin: userInfo.accountLogin,
-    connectedAt: Date.now(),
-    connectedBy: state.connectedBy,
-  };
+  // Dispatch on target: connection-flow writes to Connection.auth via
+  // setTokens (transactional); legacy agent-flow writes to the per-binding
+  // agentOAuthTokenRepo. The state.* discriminator is enforced by
+  // verifyState — exactly one of (agentId+serverName) or connectionId is
+  // set.
+  if (state.connectionId !== undefined) {
+    try {
+      await services.connectionRepo.setTokens(state.namespace, state.connectionId, {
+        accessToken,
+        ...(refreshToken !== undefined ? { refreshToken } : {}),
+        ...(expiresAt !== undefined ? { expiresAt } : {}),
+        scope,
+        providerUserId: userInfo.providerUserId,
+        accountLogin: userInfo.accountLogin,
+        connectedBy: state.connectedBy,
+      });
+    } catch {
+      return redirectError(request, 'connection-write-failed', state);
+    }
+  } else {
+    if (state.agentId === undefined || state.serverName === undefined) {
+      return redirectError(request, 'invalid-state-target', state);
+    }
+    const token: AgentOAuthToken = {
+      provider: state.providerId,
+      accessToken,
+      ...(refreshToken !== undefined ? { refreshToken } : {}),
+      ...(expiresAt !== undefined ? { expiresAt } : {}),
+      scope,
+      providerUserId: userInfo.providerUserId,
+      accountLogin: userInfo.accountLogin,
+      connectedAt: Date.now(),
+      connectedBy: state.connectedBy,
+    };
 
-  await services.agentOAuthTokenRepo.put(
-    state.namespace,
-    state.agentId,
-    state.serverName,
-    token,
-  );
+    await services.agentOAuthTokenRepo.put(
+      state.namespace,
+      state.agentId,
+      state.serverName,
+      token,
+    );
+  }
 
   return redirectSuccess(request, state);
 }

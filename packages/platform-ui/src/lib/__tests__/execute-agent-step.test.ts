@@ -16,6 +16,7 @@ import {
   buildAgentOutputEnvelope,
   buildWorkflowDefinition,
   InMemoryAgentOAuthTokenRepository,
+  InMemoryConnectionRepository,
   InMemoryOAuthProviderRepository,
 } from '@mediforce/platform-core/testing';
 
@@ -91,6 +92,7 @@ const mockToolCatalogRepo = {
 // binding are both present, which our non-OAuth tests don't exercise.
 const oauthProviderRepo = new InMemoryOAuthProviderRepository();
 const agentOAuthTokenRepo = new InMemoryAgentOAuthTokenRepository();
+const connectionRepo = new InMemoryConnectionRepository();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -106,6 +108,7 @@ vi.mock('@/lib/platform-services', () => ({
     toolCatalogRepo: mockToolCatalogRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    connectionRepo,
   }),
 }));
 
@@ -114,10 +117,6 @@ vi.mock('@/lib/platform-services', () => ({
 // map — template resolution covers secret presence separately.
 vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretsForRuntime: vi.fn().mockResolvedValue({}),
-}));
-
-vi.mock('@/app/actions/namespace-secrets', () => ({
-  getNamespaceSecretsForRuntime: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('@/lib/resolve-agent-identity', () => ({

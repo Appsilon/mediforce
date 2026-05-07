@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
+import { ToolCatalogEntryBaseSchema, ToolCatalogEntrySchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveNamespaceFromQuery } from '../helpers';
 
 /** Partial-update payload: id cannot be renamed — bindings reference it. */
-const ToolCatalogEntryPatchSchema = ToolCatalogEntrySchema.omit({ id: true }).partial().strict();
+const ToolCatalogEntryPatchSchema = ToolCatalogEntryBaseSchema.omit({ id: true }).partial().strict();
 
 export async function GET(
   request: Request,
@@ -49,7 +49,20 @@ export async function PATCH(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const entry = await services.toolCatalogRepo.upsert(namespace, { ...existing, ...parsed.data, id });
+  // The base schema's `.omit().partial()` form drops the cross-field
+  // refinement that requires either `command` (legacy) or `mcp` (new) to
+  // be present. Re-validate the merged entry against the refined schema
+  // so a PATCH that explicitly clears both is rejected before persisting.
+  const merged = { ...existing, ...parsed.data, id };
+  const refined = ToolCatalogEntrySchema.safeParse(merged);
+  if (!refined.success) {
+    return NextResponse.json(
+      { error: 'Patched entry failed validation', issues: refined.error.issues },
+      { status: 400 },
+    );
+  }
+
+  const entry = await services.toolCatalogRepo.upsert(namespace, refined.data);
   return NextResponse.json({ entry });
 }
 

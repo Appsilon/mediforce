@@ -58,7 +58,7 @@ export async function resolveMcpForStep(
   const bindings = agent.mcpServers ?? {};
   const catalogIds = new Set<string>();
   for (const binding of Object.values(bindings)) {
-    if (binding.type === 'stdio') {
+    if (binding.type === 'stdio' || binding.type === 'catalog') {
       catalogIds.add(binding.catalogId);
     }
   }

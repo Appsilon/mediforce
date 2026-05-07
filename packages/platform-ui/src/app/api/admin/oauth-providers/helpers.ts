@@ -28,6 +28,29 @@ export async function requireAdminForNamespace(
   request: Request,
   namespaceRepo: FirestoreNamespaceRepository,
 ): Promise<string | NextResponse> {
+  const ctx = await requireAdminContextForNamespace(request, namespaceRepo);
+  if (ctx instanceof NextResponse) return ctx;
+  return ctx.namespace;
+}
+
+/** Authenticated admin context for a namespace.
+ *
+ *  `namespace` — handle from `?namespace=` (validated to exist).
+ *  `callerUid` — Firebase uid when the caller authed with a Bearer token;
+ *  `null` when the caller authed via `PLATFORM_ADMIN_API_KEY` (no uid).
+ *
+ *  Use this when downstream code needs a verified uid for audit fields
+ *  (e.g. `connectedBy`); use `requireAdminForNamespace` when the namespace
+ *  alone is enough. */
+export interface AdminNamespaceContext {
+  namespace: string;
+  callerUid: string | null;
+}
+
+export async function requireAdminContextForNamespace(
+  request: Request,
+  namespaceRepo: FirestoreNamespaceRepository,
+): Promise<AdminNamespaceContext | NextResponse> {
   const handle = new URL(request.url).searchParams.get('namespace');
   if (handle === null || handle.length === 0) {
     return NextResponse.json(
@@ -51,7 +74,7 @@ export async function requireAdminForNamespace(
     && providedKey !== null
     && providedKey === adminKey
   ) {
-    return handle;
+    return { namespace: handle, callerUid: null };
   }
 
   const authHeader = request.headers.get('Authorization') ?? '';
@@ -80,7 +103,7 @@ export async function requireAdminForNamespace(
       { status: 403 },
     );
   }
-  return handle;
+  return { namespace: handle, callerUid };
 }
 
 /** Strip `clientSecret` from a provider record before it leaves the API

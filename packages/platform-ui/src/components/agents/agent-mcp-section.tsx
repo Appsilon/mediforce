@@ -250,11 +250,14 @@ function BindingRow({
   onEdit: () => void;
   onRemove: () => void;
 }) {
-  const transportLabel = binding.type === 'stdio' ? 'stdio' : 'HTTP';
+  const transportLabel =
+    binding.type === 'stdio' ? 'stdio' : binding.type === 'http' ? 'HTTP' : 'catalog';
   const detail =
     binding.type === 'stdio'
       ? `catalogId: ${binding.catalogId}`
-      : truncateUrl(binding.url);
+      : binding.type === 'http'
+        ? truncateUrl(binding.url)
+        : `catalogId: ${binding.catalogId}`;
   const allowedCount = binding.allowedTools?.length ?? 0;
   const oauthProvider =
     binding.type === 'http' && binding.auth?.type === 'oauth' ? binding.auth.provider : null;

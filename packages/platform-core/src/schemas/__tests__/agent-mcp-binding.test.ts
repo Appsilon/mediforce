@@ -1,12 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
   AgentMcpBindingSchema,
+  CatalogRefAgentMcpBindingSchema,
   HttpAgentMcpBindingSchema,
   HttpAuthConfigSchema,
   HttpHeadersAuthSchema,
   HttpOAuthAuthSchema,
+  HttpMcpExposureSchema,
+  StdioMcpExposureSchema,
+  McpExposureSchema,
   StepMcpRestrictionSchema,
   ToolCatalogEntrySchema,
+  getCatalogEntryStdio,
+  getCatalogEntryHttp,
 } from '../agent-mcp-binding.js';
 import { AgentDefinitionSchema } from '../agent-definition.js';
 import { WorkflowDefinitionSchema } from '../workflow-definition.js';
@@ -328,7 +334,7 @@ describe('HttpHeadersAuthSchema + HttpOAuthAuthSchema (sub-schema exports)', () 
 });
 
 describe('ToolCatalogEntrySchema', () => {
-  it('parses a minimal catalog entry', () => {
+  it('parses a minimal legacy catalog entry', () => {
     const result = ToolCatalogEntrySchema.safeParse({
       id: 'cdisc-library',
       command: 'npx',
@@ -336,10 +342,11 @@ describe('ToolCatalogEntrySchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.args).toBeUndefined();
+      expect(result.data.mcp).toBeUndefined();
     }
   });
 
-  it('parses a full catalog entry', () => {
+  it('parses a full legacy catalog entry', () => {
     const result = ToolCatalogEntrySchema.safeParse({
       id: 'postgres-readonly',
       command: 'npx',
@@ -350,20 +357,198 @@ describe('ToolCatalogEntrySchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects empty id', () => {
+  it('parses a new-shape http catalog entry', () => {
     const result = ToolCatalogEntrySchema.safeParse({
-      id: '',
+      id: 'github-mcp',
+      name: 'GitHub MCP',
+      description: 'Hosted GitHub MCP server',
+      connectionId: 'github-mediforce',
+      mcp: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.mcp?.type).toBe('http');
+      expect(result.data.connectionId).toBe('github-mediforce');
+    }
+  });
+
+  it('parses a new-shape stdio catalog entry with extraEnv', () => {
+    const result = ToolCatalogEntrySchema.safeParse({
+      id: 'tealflow-mcp',
+      name: 'TealFlow',
+      mcp: {
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y', '@tealflow/mcp'],
+        extraEnv: { TEALFLOW_REGION: 'eu' },
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects entry missing both command and mcp', () => {
+    const result = ToolCatalogEntrySchema.safeParse({ id: 'orphan' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty id', () => {
+    expect(
+      ToolCatalogEntrySchema.safeParse({ id: '', command: 'npx' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects empty command (legacy shape)', () => {
+    expect(
+      ToolCatalogEntrySchema.safeParse({ id: 'cdisc', command: '' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects new-shape entry with empty mcp.url', () => {
+    expect(
+      ToolCatalogEntrySchema.safeParse({
+        id: 'broken',
+        mcp: { type: 'http', url: '' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects rogue top-level fields (strict)', () => {
+    expect(
+      ToolCatalogEntrySchema.safeParse({
+        id: 'gh',
+        command: 'npx',
+        rogue: 'field',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('McpExposureSchema', () => {
+  it('parses http exposure', () => {
+    expect(
+      McpExposureSchema.safeParse({ type: 'http', url: 'https://x.test' }).success,
+    ).toBe(true);
+  });
+
+  it('parses stdio exposure with extraEnv', () => {
+    expect(
+      McpExposureSchema.safeParse({
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y'],
+        extraEnv: { K: 'v' },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('HttpMcpExposureSchema rejects rogue fields', () => {
+    expect(
+      HttpMcpExposureSchema.safeParse({
+        type: 'http',
+        url: 'https://x.test',
+        command: 'npx',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('StdioMcpExposureSchema rejects url field', () => {
+    expect(
+      StdioMcpExposureSchema.safeParse({
+        type: 'stdio',
+        command: 'npx',
+        url: 'https://x',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('getCatalogEntryStdio / getCatalogEntryHttp', () => {
+  it('returns legacy stdio fields for legacy entries', () => {
+    const entry = ToolCatalogEntrySchema.parse({
+      id: 'pg',
       command: 'npx',
+      args: ['-y'],
+      env: { PGURL: '{{SECRET:p}}' },
+    });
+    expect(getCatalogEntryStdio(entry)).toEqual({
+      command: 'npx',
+      args: ['-y'],
+      env: { PGURL: '{{SECRET:p}}' },
+    });
+    expect(getCatalogEntryHttp(entry)).toBeNull();
+  });
+
+  it('returns mcp.stdio fields for new-shape stdio entries', () => {
+    const entry = ToolCatalogEntrySchema.parse({
+      id: 'tf',
+      mcp: {
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y'],
+        extraEnv: { K: 'v' },
+      },
+    });
+    expect(getCatalogEntryStdio(entry)).toEqual({
+      command: 'npx',
+      args: ['-y'],
+      env: { K: 'v' },
+    });
+    expect(getCatalogEntryHttp(entry)).toBeNull();
+  });
+
+  it('returns http url for new-shape http entries', () => {
+    const entry = ToolCatalogEntrySchema.parse({
+      id: 'gh',
+      mcp: { type: 'http', url: 'https://api.x/' },
+    });
+    expect(getCatalogEntryHttp(entry)).toEqual({ url: 'https://api.x/' });
+    expect(getCatalogEntryStdio(entry)).toBeNull();
+  });
+});
+
+describe('CatalogRefAgentMcpBindingSchema', () => {
+  it('parses a minimal catalog-ref binding', () => {
+    const result = AgentMcpBindingSchema.safeParse({
+      type: 'catalog',
+      catalogId: 'github-mcp',
+    });
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'catalog') {
+      expect(result.data.catalogId).toBe('github-mcp');
+    }
+  });
+
+  it('parses a catalog-ref binding with allowedTools', () => {
+    const result = CatalogRefAgentMcpBindingSchema.safeParse({
+      type: 'catalog',
+      catalogId: 'github-mcp',
+      allowedTools: ['search_code'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects catalog-ref binding with rogue url field', () => {
+    const result = CatalogRefAgentMcpBindingSchema.safeParse({
+      type: 'catalog',
+      catalogId: 'gh',
+      url: 'https://x',
     });
     expect(result.success).toBe(false);
   });
 
-  it('rejects empty command', () => {
-    const result = ToolCatalogEntrySchema.safeParse({
-      id: 'cdisc',
-      command: '',
-    });
-    expect(result.success).toBe(false);
+  it('legacy stdio + http variants still parse alongside catalog variant', () => {
+    expect(
+      AgentMcpBindingSchema.safeParse({
+        type: 'stdio',
+        catalogId: 'pg',
+      }).success,
+    ).toBe(true);
+    expect(
+      AgentMcpBindingSchema.safeParse({
+        type: 'http',
+        url: 'https://x.test',
+      }).success,
+    ).toBe(true);
   });
 });
 

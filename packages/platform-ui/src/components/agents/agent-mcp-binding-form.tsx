@@ -87,7 +87,9 @@ export function AgentMcpBindingForm({
   const isEdit = existing !== null;
   const [name, setName] = useState(existing?.name ?? '');
   const [nameError, setNameError] = useState<string | null>(null);
-  const [transport, setTransport] = useState<'stdio' | 'http'>(existing?.binding.type ?? 'stdio');
+  const [transport, setTransport] = useState<'stdio' | 'http'>(
+    existing?.binding.type === 'http' ? 'http' : 'stdio',
+  );
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   function validateName(value: string): string | null {

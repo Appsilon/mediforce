@@ -97,6 +97,20 @@ export interface WorkflowAgentContext {
    *  Populated by platform-ui's executeAgentStep (downloads from Storage).
    *  Injected into buildPrompt() after the workflow preamble. */
   agentIdentityPrompt?: string;
+  /** Pre-resolved env vars for `step.connections` — `CONN_<ID>_TOKEN` per
+   *  Connection plus provider `envAlias` entries (`GITHUB_TOKEN` etc.)
+   *  when unambiguous. Populated by `resolveConnectionEnv` before plugin
+   *  invocation so the runtime stays decoupled from Firestore. Plugins
+   *  merge this into their own env map at spawn time. */
+  resolvedConnectionEnv?: Record<string, string>;
+  /** Pre-resolved Connection-backed env additions for stdio MCP servers,
+   *  keyed by server name (matches `resolvedMcpConfig.servers`). Each
+   *  entry is the env-var bundle to merge into that server's `extraEnv`
+   *  before mcp-config.json is written — typically a single
+   *  `CONN_<NORMALIZED_ID>_TOKEN` from the Connection that the stdio
+   *  catalog entry references. Populated by executeAgentStep alongside
+   *  `oauthTokens` so the writer never reaches back into Firestore. */
+  stdioConnectionEnvByServer?: Record<string, Record<string, string>>;
 }
 
 // EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp

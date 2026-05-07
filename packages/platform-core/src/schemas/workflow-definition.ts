@@ -187,6 +187,16 @@ export const WorkflowStepSchema = z.object({
    *  (matching AgentDefinition.mcpServers). Can only disable servers or
    *  deny specific tools — the shape has no allow/broaden field. */
   mcpRestrictions: StepMcpRestrictionSchema.optional(),
+  /** Connection ids resolved at spawn time and exported into the step's
+   *  process env. Each connection id `foo-bar` is exported as
+   *  `CONN_FOO_BAR_TOKEN`; OAuth provider `envAlias` entries are also
+   *  exported when unambiguous within the step (e.g. `GITHUB_TOKEN` for a
+   *  step with exactly one github-backed Connection). Step config is
+   *  rejected at validation time when two referenced Connections share an
+   *  `envAlias` entry — alias collisions surface as explicit errors, not
+   *  silent picks. Currently consumed by script-step runtime; agent-step
+   *  Connections continue to flow through `agentId.mcpServers` bindings. */
+  connections: z.array(z.string().min(1)).optional(),
 });
 
 /**

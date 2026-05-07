@@ -7,11 +7,13 @@ import type { AgentOAuthToken, OAuthProviderConfig } from '@mediforce/platform-c
 
 const mockProviderGet = vi.fn();
 const mockTokenPut = vi.fn();
+const mockConnectionSetTokens = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     oauthProviderRepo: { get: mockProviderGet },
     agentOAuthTokenRepo: { put: mockTokenPut },
+    connectionRepo: { setTokens: mockConnectionSetTokens },
   }),
 }));
 
@@ -452,5 +454,72 @@ describe('GET /api/oauth/:provider/callback', () => {
     const location = res.headers.get('Location') ?? '';
     expect(location).toContain('oauthError=userinfo-fetch-failed');
     expect(mockTokenPut).not.toHaveBeenCalled();
+  });
+
+  describe('connection-target flow', () => {
+    it('[DATA] writes tokens onto Connection.auth and redirects to /admin/connections/:id', async () => {
+      const state = await signState(
+        {
+          namespace: 'appsilon',
+          connectionId: 'github-mediforce',
+          providerId: 'github',
+          connectedBy: 'uid-1',
+          ts: Date.now(),
+          nonce: generateNonce(),
+        },
+        PLATFORM_SECRET,
+      );
+      mockProviderGet.mockResolvedValue(providerConfig);
+      mockConnectionSetTokens.mockResolvedValue({});
+      fetchMock.mockResolvedValueOnce(tokenExchangeResponse());
+      fetchMock.mockResolvedValueOnce(userInfoResponse());
+
+      const res = await GET(
+        makeCallbackRequest('github', { code: 'auth-code', state }),
+        { params: makeParams('github') },
+      );
+
+      expect(res.status).toBe(302);
+      const location = res.headers.get('Location') ?? '';
+      expect(location).toContain('/admin/connections/github-mediforce');
+      expect(location).toContain('connected=true');
+
+      expect(mockConnectionSetTokens).toHaveBeenCalledTimes(1);
+      const [ns, id, tokens] = mockConnectionSetTokens.mock.calls[0];
+      expect(ns).toBe('appsilon');
+      expect(id).toBe('github-mediforce');
+      expect(tokens.accessToken).toBe('gho_accesstoken');
+      expect(tokens.refreshToken).toBe('refresh123');
+      expect(tokens.accountLogin).toBe('testuser');
+      // Did NOT touch the legacy agent-keyed token store.
+      expect(mockTokenPut).not.toHaveBeenCalled();
+    });
+
+    it('[ERROR] connection write failure → connection-write-failed redirect', async () => {
+      const state = await signState(
+        {
+          namespace: 'appsilon',
+          connectionId: 'github-mediforce',
+          providerId: 'github',
+          connectedBy: 'uid-1',
+          ts: Date.now(),
+          nonce: generateNonce(),
+        },
+        PLATFORM_SECRET,
+      );
+      mockProviderGet.mockResolvedValue(providerConfig);
+      mockConnectionSetTokens.mockRejectedValue(new Error('boom'));
+      fetchMock.mockResolvedValueOnce(tokenExchangeResponse());
+      fetchMock.mockResolvedValueOnce(userInfoResponse());
+
+      const res = await GET(
+        makeCallbackRequest('github', { code: 'auth-code', state }),
+        { params: makeParams('github') },
+      );
+      expect(res.status).toBe(302);
+      const location = res.headers.get('Location') ?? '';
+      expect(location).toContain('oauthError=connection-write-failed');
+      expect(mockTokenPut).not.toHaveBeenCalled();
+    });
   });
 });

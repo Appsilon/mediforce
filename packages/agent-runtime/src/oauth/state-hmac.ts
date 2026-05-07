@@ -49,8 +49,15 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 export interface OAuthStatePayload {
   namespace: string;
-  agentId: string;
-  serverName: string;
+  /** Legacy target — agent + serverName tuple. Token lands in
+   *  `agentOAuthTokenRepo` keyed by `(agentId, serverName)`.
+   *  Either this pair OR `connectionId` must be set; never both. */
+  agentId?: string;
+  serverName?: string;
+  /** New target — Connection id. Token lands on `Connection.auth` via
+   *  `connectionRepo.setTokens`. Either this OR (agentId + serverName)
+   *  must be set; never both. */
+  connectionId?: string;
   providerId: string;
   /** Firebase uid of the user who initiated the flow. Callback has no
    *  session, so we carry this through the state to attribute audit fields. */
@@ -118,8 +125,6 @@ export async function verifyState(
     const asRecord = parsed as Record<string, unknown>;
     if (
       typeof asRecord.namespace !== 'string' ||
-      typeof asRecord.agentId !== 'string' ||
-      typeof asRecord.serverName !== 'string' ||
       typeof asRecord.providerId !== 'string' ||
       typeof asRecord.connectedBy !== 'string' ||
       typeof asRecord.ts !== 'number' ||
@@ -127,14 +132,25 @@ export async function verifyState(
     ) {
       return null;
     }
+    // Target discriminator: either (agentId + serverName) OR connectionId.
+    // Reject states that carry neither, both, or only half of the agent
+    // tuple — ambiguous targets are caught at verify time so the callback
+    // never has to guess.
+    const hasAgentTarget =
+      typeof asRecord.agentId === 'string' && typeof asRecord.serverName === 'string';
+    const hasConnectionTarget = typeof asRecord.connectionId === 'string';
+    if (hasAgentTarget === hasConnectionTarget) return null;
+    if (typeof asRecord.agentId === 'string' && typeof asRecord.serverName !== 'string') return null;
+    if (typeof asRecord.serverName === 'string' && typeof asRecord.agentId !== 'string') return null;
     payload = {
       namespace: asRecord.namespace,
-      agentId: asRecord.agentId,
-      serverName: asRecord.serverName,
       providerId: asRecord.providerId,
       connectedBy: asRecord.connectedBy,
       ts: asRecord.ts,
       nonce: asRecord.nonce,
+      ...(typeof asRecord.agentId === 'string' ? { agentId: asRecord.agentId } : {}),
+      ...(typeof asRecord.serverName === 'string' ? { serverName: asRecord.serverName } : {}),
+      ...(typeof asRecord.connectionId === 'string' ? { connectionId: asRecord.connectionId } : {}),
       ...(typeof asRecord.codeVerifier === 'string' ? { codeVerifier: asRecord.codeVerifier } : {}),
     };
   } catch {

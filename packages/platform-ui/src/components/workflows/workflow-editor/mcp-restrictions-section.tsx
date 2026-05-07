@@ -76,7 +76,7 @@ export function McpRestrictionsSection({ agentId, restrictions, onChange }: McpR
               <ServerRow
                 key={name}
                 name={name}
-                transport={binding.type}
+                transport={binding.type === 'http' ? 'http' : 'stdio'}
                 disabled={disabled}
                 denyTools={denyTools}
                 onToggleDisable={(next) => updateEntry(name, { disable: next })}
