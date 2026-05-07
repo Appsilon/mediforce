@@ -541,6 +541,7 @@ export default function ProfilePage() {
   const { namespace, loading, error } = useNamespace(handle ?? '');
   const currentRole = useCurrentUserRole(handle ?? '', firebaseUser?.uid);
   const canEdit = currentRole === 'owner' || currentRole === 'admin';
+  const userProfiles = useUserProfiles();
 
   if (loading) {
     return (
@@ -583,7 +584,10 @@ export default function ProfilePage() {
               </div>
             );
           }
-          const avatarSrc = namespace.avatarUrl ?? firebaseUser?.photoURL ?? undefined;
+          const linkedUserPhoto = namespace.linkedUserId !== undefined
+            ? userProfiles.get(namespace.linkedUserId)?.photoURL
+            : undefined;
+          const avatarSrc = namespace.avatarUrl ?? linkedUserPhoto ?? undefined;
           return avatarSrc !== undefined && avatarSrc !== '' ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
