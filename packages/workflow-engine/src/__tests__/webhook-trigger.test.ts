@@ -17,6 +17,7 @@ const webhookDef: WorkflowDefinition = {
   name: 'webhook-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'process', name: 'Process', type: 'creation', executor: 'human' },

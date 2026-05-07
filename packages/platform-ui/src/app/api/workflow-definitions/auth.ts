@@ -1,1 +1,1 @@
-export { getCallerNamespaces } from '@/lib/api-auth.js';
+export { resolveCallerIdentity, callerCanAccess, requireNamespaceAccess, filterByNamespace } from '@/lib/api-auth.js';

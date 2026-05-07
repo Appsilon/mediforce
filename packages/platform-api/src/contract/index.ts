@@ -42,6 +42,10 @@ export {
   type DockerDiskInfo,
   type DockerInfoResponse,
   type RemoveImageOutput,
+  OpenRouterCreditsInputSchema,
+  OpenRouterCreditsOutputSchema,
+  type OpenRouterCreditsInput,
+  type OpenRouterCreditsOutput,
 } from './system.js';
 
 export {

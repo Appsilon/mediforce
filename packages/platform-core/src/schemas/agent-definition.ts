@@ -23,6 +23,7 @@ export const AgentDefinitionSchema = z.object({
    *  name → AgentMcpBinding. Step-level restrictions can only narrow
    *  (disable servers or deny tools) — they cannot broaden. */
   mcpServers: AgentMcpBindingMapSchema.optional(),
+  namespace: z.string().min(1).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

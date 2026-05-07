@@ -11,7 +11,8 @@ import { useMyTasks } from '@/hooks/use-tasks';
 import { RunsTable } from '@/components/processes/runs-table';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { setProcessArchived, transferWorkflowNamespace, setWorkflowVisibility } from '@/app/actions/definitions';
+import { setProcessArchived, transferWorkflowNamespace } from '@/app/actions/definitions';
+import { apiFetch } from '@/lib/api-fetch';
 import { VersionLabel } from '@/components/ui/version-label';
 import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
 import { formatCron } from '@/lib/format-cron';
@@ -57,7 +58,7 @@ export default function ProcessDefinitionPage() {
   const [transferring, setTransferring] = React.useState(false);
   const [togglingVisibility, setTogglingVisibility] = React.useState(false);
   const [namespaceOverride, setNamespaceOverride] = React.useState<string | null>(null);
-  const [visibilityOverride, setVisibilityOverride] = React.useState<string | null>(null);
+  const [visibilityOverride, setVisibilityOverride] = React.useState<'public' | 'private' | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -72,7 +73,7 @@ export default function ProcessDefinitionPage() {
   }, [menuOpen]);
 
   const latest = versions[0] ?? null;
-  const currentVisibility = visibilityOverride ?? latest?.visibility ?? 'public';
+  const currentVisibility = visibilityOverride ?? latest?.visibility ?? 'private';
   const isPrivate = currentVisibility === 'private';
   const hasManualTrigger = latest?.triggers?.some(
     (trigger: { type: string }) => trigger.type === 'manual',
@@ -105,7 +106,7 @@ export default function ProcessDefinitionPage() {
           <div>
             <div className="flex items-center gap-2">
               {isPrivate && (
-                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
+                <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
                   Private
                 </span>
               )}
@@ -199,10 +200,20 @@ export default function ProcessDefinitionPage() {
                     const newVisibility = isPrivate ? 'public' : 'private';
                     setMenuOpen(false);
                     setTogglingVisibility(true);
-                    const result = await setWorkflowVisibility(decodedName, newVisibility);
-                    setTogglingVisibility(false);
-                    if (result.success) {
-                      setVisibilityOverride(newVisibility);
+                    try {
+                      const res = await apiFetch(`/api/workflow-definitions/${encodeURIComponent(decodedName)}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ visibility: newVisibility }),
+                      });
+                      if (res.ok) {
+                        setVisibilityOverride(newVisibility);
+                      } else {
+                        const body = await res.json().catch(() => null);
+                        alert(body?.error ?? 'Failed to update visibility');
+                      }
+                    } finally {
+                      setTogglingVisibility(false);
                     }
                   }}
                   disabled={togglingVisibility}

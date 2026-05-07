@@ -206,6 +206,21 @@ export class FirestoreProcessRepository implements ProcessRepository {
     await docRef.update({ archived });
   }
 
+  async setWorkflowVisibility(name: string, visibility: 'public' | 'private'): Promise<void> {
+    const snapshot = await this.db
+      .collection(this.workflowDefinitionsCollection)
+      .where('name', '==', name)
+      .get();
+    if (snapshot.empty) {
+      throw new Error(`Workflow '${name}' not found`);
+    }
+    const batch = this.db.batch();
+    for (const d of snapshot.docs) {
+      batch.update(d.ref, { visibility });
+    }
+    await batch.commit();
+  }
+
   async setWorkflowDeleted(name: string, deleted: boolean): Promise<void> {
     const workflowSnapshot = await this.db
       .collection(this.workflowDefinitionsCollection)

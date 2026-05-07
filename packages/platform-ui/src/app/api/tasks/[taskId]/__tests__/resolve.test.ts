@@ -29,10 +29,15 @@ vi.mock('@/lib/platform-services', () => ({
   getAppBaseUrl: () => 'http://localhost:3000',
 }));
 
-vi.mock('@/lib/api-auth', () => ({
-  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
-  requireNamespaceAccess: () => null,
-}));
+const mockResolveCallerIdentity = vi.fn();
+
+vi.mock('@/lib/api-auth', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-auth')>('@/lib/api-auth');
+  return {
+    ...actual,
+    resolveCallerIdentity: (...args: unknown[]) => mockResolveCallerIdentity(...args),
+  };
+});
 
 vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response()));
 
@@ -82,6 +87,7 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
     mockInstanceGetById.mockResolvedValue(pausedInstance);
     mockInstanceUpdate.mockResolvedValue(undefined);
     mockAdvanceStep.mockResolvedValue(advancedInstance);
@@ -262,6 +268,23 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
     const json = await res.json();
     expect(json.error).toContain('running');
   });
+
+  it('[AUTH] returns 403 when user is not a member of the instance namespace', async () => {
+    mockResolveCallerIdentity.mockReturnValue({
+      kind: 'user',
+      uid: 'outsider',
+      namespaces: new Set(['other-ns']),
+    });
+    mockGetById.mockResolvedValue(claimedVerdictTask);
+    mockInstanceGetById.mockResolvedValue(pausedInstance);
+
+    const res = await POST(
+      makeRequest('task-1', { verdict: 'approve' }),
+      { params: makeParams('task-1') },
+    );
+
+    expect(res.status).toBe(403);
+  });
 });
 
 // ---- Selection review resolution ----
@@ -290,6 +313,7 @@ describe('POST /api/tasks/:taskId/resolve — selection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
     mockInstanceGetById.mockResolvedValue(pausedInstance);
     mockInstanceUpdate.mockResolvedValue(undefined);
     mockAdvanceStep.mockResolvedValue(advancedInstance);
@@ -402,6 +426,7 @@ describe('POST /api/tasks/:taskId/resolve — file-upload', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
     mockInstanceGetById.mockResolvedValue(pausedInstance);
     mockInstanceUpdate.mockResolvedValue(undefined);
     mockAdvanceStep.mockResolvedValue(advancedInstance);

@@ -226,7 +226,8 @@ export function validateOutputSchema(
     }
   }
 
-  if (Object.keys(data).length === 0 || (Object.keys(data).length === 1 && 'raw' in data && data.raw === '')) {
+  if (Object.keys(data).length === 0
+    || (Object.keys(data).length === 1 && 'raw' in data && (data.raw === '' || data.raw == null))) {
     return 'output is empty';
   }
 

@@ -15,6 +15,7 @@ const cursorDef: WorkflowDefinition = {
   name: 'sftp-monitor',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'scan', name: 'Scan SFTP', type: 'creation', executor: 'agent' },
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -29,6 +30,7 @@ const plainDef: WorkflowDefinition = {
   name: 'plain-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'a', name: 'A', type: 'creation', executor: 'agent' },
     { id: 'b', name: 'B', type: 'terminal', executor: 'human' },
@@ -42,6 +44,7 @@ const multiDef: WorkflowDefinition = {
   name: 'multi-carry',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 's1', name: 'S1', type: 'creation', executor: 'agent' },
     { id: 's2', name: 'S2', type: 'creation', executor: 'agent' },

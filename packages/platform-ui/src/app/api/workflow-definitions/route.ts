@@ -31,10 +31,11 @@ export async function GET(request: Request): Promise<NextResponse> {
   const filtered = caller.kind === 'apiKey'
     ? result
     : result.filter((item) => {
-        const ns = item.definition?.namespace;
+        if (!item.definition) return false;
+        const ns = item.definition.namespace;
         if (typeof ns !== 'string') return false;
         if (caller.namespaces.has(ns)) return true;
-        return item.definition?.visibility !== 'private';
+        return item.definition.visibility === 'public';
       });
 
   return NextResponse.json({ definitions: filtered });

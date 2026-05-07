@@ -22,9 +22,6 @@ vi.mock('@/lib/platform-services', () => ({
       getById: mockInstanceGetById,
       update: mockInstanceUpdate,
       addStepExecution: mockInstanceAddStepExecution,
-      // Iteration tracking reads prior executions for the current step on
-      // this instance. Default to empty list — individual tests can override
-      // via `mockInstanceGetStepExecutions.mockResolvedValueOnce(...)`.
       getStepExecutions: vi.fn().mockResolvedValue([]),
     },
     processRepo: {
@@ -37,8 +34,19 @@ vi.mock('@/lib/platform-services', () => ({
       create: mockHumanTaskCreate,
       getByInstanceId: mockHumanTaskGetByInstanceId,
     },
+    namespaceRepo: {},
   }),
 }));
+
+const mockResolveCallerIdentity = vi.fn();
+
+vi.mock('@/lib/api-auth', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-auth')>('@/lib/api-auth');
+  return {
+    ...actual,
+    resolveCallerIdentity: (...args: unknown[]) => mockResolveCallerIdentity(...args),
+  };
+});
 
 // Mock executeAgentStep — the unified agent step executor
 const mockExecuteAgentStep = vi.fn();
@@ -89,6 +97,7 @@ const workflowDefinition = {
 describe('POST /api/processes/[instanceId]/run', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
     mockHumanTaskGetByInstanceId.mockResolvedValue([]);
   });
 
@@ -103,6 +112,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
           // First two calls: instance at first step, running
           return Promise.resolve({
             id: 'inst-1',
+            namespace: 'test-ns',
             definitionName: 'community-digest',
             definitionVersion: '1',
             status: 'running',
@@ -115,6 +125,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
         // After agent step executes: instance moved to human-review and paused
         return Promise.resolve({
           id: 'inst-1',
+          namespace: 'test-ns',
           definitionName: 'community-digest',
           definitionVersion: '1',
           status: 'paused',
@@ -147,6 +158,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       // Simulate: agent step runs but instance stays at same step (the old bug)
       mockInstanceGetById.mockResolvedValue({
         id: 'inst-1',
+        namespace: 'test-ns',
         definitionName: 'community-digest',
         definitionVersion: '1',
         status: 'running',
@@ -191,6 +203,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       mockInstanceGetById.mockImplementation(() =>
         Promise.resolve({
           id: 'inst-1',
+          namespace: 'test-ns',
           definitionName: 'community-digest',
           definitionVersion: '1',
           status: 'running',
@@ -243,20 +256,20 @@ describe('POST /api/processes/[instanceId]/run', () => {
         // Simulate step progression
         if (agentCallCount === 0) {
           return Promise.resolve({
-            id: 'inst-1', definitionName: 'community-digest', definitionVersion: '1',
+            id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
             status: 'running', currentStepId: 'step-1', configName: undefined, variables: {}, triggerPayload: {},
           });
         }
         if (agentCallCount === 1) {
           return Promise.resolve({
-            id: 'inst-1', definitionName: 'community-digest', definitionVersion: '1',
+            id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
             status: 'running', currentStepId: 'step-2', configName: undefined,
             variables: { 'step-1': { result: 'ok' } }, triggerPayload: {},
           });
         }
         // After step-2: paused at human-review
         return Promise.resolve({
-          id: 'inst-1', definitionName: 'community-digest', definitionVersion: '1',
+          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
           status: 'paused', currentStepId: 'human-review', configName: undefined,
           variables: { 'step-1': { result: 'ok' }, 'step-2': { result: 'ok' } }, triggerPayload: {},
         });
@@ -292,7 +305,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       };
 
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', definitionName: 'community-digest', definitionVersion: '1',
+        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
         status: 'running', currentStepId: 'done', configName: undefined, variables: {}, triggerPayload: {},
       });
       mockGetWorkflowDefinition.mockResolvedValue(terminalFirstWorkflow);
@@ -306,7 +319,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
 
     it('[ERROR] unknown step ID fails the instance', async () => {
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', definitionName: 'community-digest', definitionVersion: '1',
+        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
         status: 'running', currentStepId: 'nonexistent-step', configName: undefined, variables: {}, triggerPayload: {},
       });
       mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
@@ -329,7 +342,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
       };
 
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', definitionName: 'community-digest', definitionVersion: '1',
+        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
         status: 'running', currentStepId: 'gather-data', configName: undefined, variables: {}, triggerPayload: {},
       });
       mockGetWorkflowDefinition.mockResolvedValue(badWorkflow);
@@ -344,7 +357,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
 
     it('[DATA] duplicate guard: skips if pending task already exists for step', async () => {
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', definitionName: 'community-digest', definitionVersion: '1',
+        id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
         status: 'running', currentStepId: 'gather-data', configName: undefined, variables: {}, triggerPayload: {},
       });
       mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
@@ -375,12 +388,34 @@ describe('POST /api/processes/[instanceId]/run', () => {
 
     it('[ERROR] returns 409 when instance is not running', async () => {
       mockInstanceGetById.mockResolvedValue({
-        id: 'inst-1', status: 'completed', configName: 'default',
+        id: 'inst-1', namespace: 'test-ns', status: 'completed', configName: 'default',
       });
 
       const res = await POST(makeRequest(), { params: makeParams('inst-1') });
 
       expect(res.status).toBe(409);
+    });
+
+    it('[AUTH] returns 403 when user is not a member of the instance namespace', async () => {
+      mockResolveCallerIdentity.mockReturnValue({
+        kind: 'user',
+        uid: 'outsider',
+        namespaces: new Set(['other-ns']),
+      });
+      mockInstanceGetById.mockResolvedValue({
+        id: 'inst-1',
+        namespace: 'test-ns',
+        definitionName: 'community-digest',
+        definitionVersion: '1',
+        status: 'running',
+        currentStepId: 'gather-data',
+        variables: {},
+        triggerPayload: {},
+      });
+
+      const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+
+      expect(res.status).toBe(403);
     });
   });
 });

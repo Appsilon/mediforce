@@ -11,10 +11,15 @@ vi.mock('@/lib/platform-services', () => ({
   }),
 }));
 
-vi.mock('@/lib/api-auth', () => ({
-  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
-  requireNamespaceAccess: () => null,
-}));
+const mockResolveCallerIdentity = vi.fn();
+
+vi.mock('@/lib/api-auth', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-auth')>('@/lib/api-auth');
+  return {
+    ...actual,
+    resolveCallerIdentity: (...args: unknown[]) => mockResolveCallerIdentity(...args),
+  };
+});
 
 import { GET } from '../route';
 
@@ -30,6 +35,7 @@ describe('GET /api/processes/[instanceId]/audit', () => {
     mockGetByProcess.mockReset();
     mockGetById.mockReset();
     mockGetById.mockResolvedValue({ id: 'inst-001', namespace: 'test-ns' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
   });
 
   it('[DATA] returns audit events for a process instance', async () => {
@@ -77,5 +83,18 @@ describe('GET /api/processes/[instanceId]/audit', () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Firestore unavailable');
+  });
+
+  it('[AUTH] returns 403 when user is not a member of the instance namespace', async () => {
+    mockResolveCallerIdentity.mockReturnValue({
+      kind: 'user',
+      uid: 'outsider',
+      namespaces: new Set(['other-ns']),
+    });
+    const { req, params } = makeRequest('inst-001');
+
+    const res = await GET(req, { params });
+
+    expect(res.status).toBe(403);
   });
 });

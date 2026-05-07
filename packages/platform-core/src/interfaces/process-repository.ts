@@ -39,6 +39,7 @@ export interface ProcessRepository {
   setProcessArchived(name: string, archived: boolean): Promise<void>;
   setVersionArchived(name: string, version: number, archived: boolean): Promise<void>;
 
+  setWorkflowVisibility(name: string, visibility: 'public' | 'private'): Promise<void>;
   setWorkflowDeleted(name: string, deleted: boolean): Promise<void>;
   isWorkflowNameDeleted(name: string): Promise<boolean>;
   countInstancesByDefinitionName(name: string): Promise<number>;

@@ -14,6 +14,7 @@ const definition: WorkflowDefinition = {
   name: 'execution-summaries-api',
   version: 1,
   namespace: 'examples',
+  visibility: 'private',
   steps: [
     {
       id: 'echo',

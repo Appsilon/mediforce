@@ -17,6 +17,7 @@ import { useProcessInstances } from '@/hooks/use-process-instances';
 import { useMyTasks } from '@/hooks/use-tasks';
 import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus } from '@/components/processes/process-card';
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
+import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-credits-indicator';
 import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
 import { cn } from '@/lib/utils';
 import { NamespaceSchema } from '@mediforce/platform-core';
@@ -453,6 +454,7 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
   return (
     <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
     <div className="flex flex-col gap-4">
+      <OpenRouterCreditsIndicator handle={handle} />
       <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />
 
       <div className="flex items-center justify-between">

@@ -19,6 +19,7 @@ const coworkDef: WorkflowDefinition = {
   name: 'cowork-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'intake', name: 'Intake', type: 'creation', executor: 'human' },
     {
@@ -47,6 +48,7 @@ const coworkFirstDef: WorkflowDefinition = {
   name: 'cowork-first',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     {
       id: 'brainstorm',

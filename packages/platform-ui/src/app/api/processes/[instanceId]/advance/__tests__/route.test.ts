@@ -30,10 +30,15 @@ vi.mock('@/lib/platform-services', () => ({
   }),
 }));
 
-vi.mock('@/lib/api-auth', () => ({
-  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
-  requireNamespaceAccess: () => null,
-}));
+const mockResolveCallerIdentity = vi.fn();
+
+vi.mock('@/lib/api-auth', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-auth')>('@/lib/api-auth');
+  return {
+    ...actual,
+    resolveCallerIdentity: (...args: unknown[]) => mockResolveCallerIdentity(...args),
+  };
+});
 
 vi.mock('@/lib/execute-agent-step', () => ({
   executeAgentStep: vi.fn().mockResolvedValue({
@@ -52,6 +57,7 @@ const mockExecuteAgentStep = vi.mocked(executeAgentStep);
 describe('advance route', () => {
   beforeEach(() => {
     mockExecuteAgentStep.mockClear();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
   });
 
   it('[AUTH] POST calls executeAgentStep with 4 args (no autonomyLevel)', async () => {
@@ -107,5 +113,30 @@ describe('advance route', () => {
     // None of the args should be 'L4' or any autonomy level
     const args = mockExecuteAgentStep.mock.calls[0];
     expect(args).not.toContain('L4');
+  });
+
+  it('[AUTH] returns 403 when user is not a member of the instance namespace', async () => {
+    mockResolveCallerIdentity.mockReturnValue({
+      kind: 'user',
+      uid: 'outsider',
+      namespaces: new Set(['other-ns']),
+    });
+
+    const req = new Request('http://localhost/api/processes/inst-001/advance', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': 'test-key',
+      },
+      body: JSON.stringify({
+        stepId: 'compliance-check',
+        appContext: { studyId: 'S1' },
+        triggeredBy: 'user-1',
+      }),
+    });
+
+    const res = await POST(req, { params: Promise.resolve({ instanceId: 'inst-001' }) });
+
+    expect(res.status).toBe(403);
   });
 });

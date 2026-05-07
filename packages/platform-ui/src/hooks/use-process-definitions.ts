@@ -102,7 +102,7 @@ export function useProcessDefinitions() {
         url: latestDoc.url,
         archived: latestDoc.archived,
         namespace: latestDoc.namespace,
-        visibility: (latestDoc as Record<string, unknown>).visibility as string | undefined,
+        visibility: latestDoc.visibility,
       };
     });
   }, [allDocs, latestDocs]);

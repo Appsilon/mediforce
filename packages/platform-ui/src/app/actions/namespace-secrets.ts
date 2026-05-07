@@ -82,3 +82,40 @@ export async function getNamespaceSecretsForRuntime(
 ): Promise<Record<string, string>> {
   return getRepo().getSecrets(namespace);
 }
+
+export interface NamespaceOpenRouterCredits {
+  available: boolean;
+  limit: number;
+  usage: number;
+  remaining: number;
+  error?: string;
+}
+
+export async function getOpenRouterCredits(
+  namespace: string,
+  userId: string,
+): Promise<NamespaceOpenRouterCredits> {
+  await requireNamespaceMember(namespace, userId);
+
+  const secrets = await getRepo().getSecrets(namespace);
+  const apiKey = secrets['OPENROUTER_API_KEY'];
+  if (!apiKey) {
+    return { available: false, limit: 0, usage: 0, remaining: 0, error: 'OPENROUTER_API_KEY not configured in workspace secrets' };
+  }
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/auth/key', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      next: { revalidate: 60 },
+    });
+
+    if (!res.ok) {
+      return { available: false, limit: 0, usage: 0, remaining: 0, error: `OpenRouter returned ${res.status}` };
+    }
+
+    const { data } = await res.json() as { data: { limit: number; usage: number; limit_remaining: number } };
+    return { available: true, limit: data.limit, usage: data.usage, remaining: data.limit_remaining };
+  } catch (err: unknown) {
+    return { available: false, limit: 0, usage: 0, remaining: 0, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}

@@ -17,6 +17,7 @@ const simpleDefinition: WorkflowDefinition = {
   name: 'rbac-test-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'human', allowedRoles: ['approver'] },
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
@@ -30,6 +31,7 @@ const noRolesDefinition: WorkflowDefinition = {
   name: 'rbac-no-roles',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'human' },
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },

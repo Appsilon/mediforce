@@ -16,6 +16,7 @@ const linearDef: WorkflowDefinition = {
   name: 'linear-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'process', name: 'Process', type: 'creation', executor: 'human' },
@@ -32,6 +33,7 @@ const cronOnlyDef: WorkflowDefinition = {
   name: 'cron-only-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'start', name: 'Start', type: 'creation', executor: 'agent' },
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },

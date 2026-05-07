@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function LoginPage() {
-  const { signInWithGoogle, signInWithEmail, sendPasswordReset, firebaseUser, loading, emailAuthEnabled, googleAuthEnabled, pendingGoogleLink } = useAuth();
+  const { signInWithGoogle, signInWithEmail, sendPasswordReset, firebaseUser, loading, mustChangePassword, emailAuthEnabled, googleAuthEnabled, pendingGoogleLink } = useAuth();
   const router = useRouter();
 
   const [mode, setMode] = React.useState<'signin' | 'forgot'>('signin');
@@ -18,9 +18,9 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     if (!loading && firebaseUser) {
-      router.replace('/workspace-selection');
+      router.replace(mustChangePassword ? '/change-password' : '/workspace-selection');
     }
-  }, [loading, firebaseUser, router]);
+  }, [loading, firebaseUser, mustChangePassword, router]);
 
   function friendlyAuthError(err: unknown): string {
     const code = (err !== null && typeof err === 'object' && 'code' in err)

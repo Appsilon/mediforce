@@ -35,6 +35,7 @@ const agentProcessDef: WorkflowDefinition = {
   name: 'agent-process',
   version: 1,
   namespace: 'test',
+  visibility: 'private',
   steps: [
     { id: 'agent-step', name: 'Agent Step', type: 'creation', executor: 'agent' },
     { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },

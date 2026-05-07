@@ -97,21 +97,50 @@ export class FirestoreNamespaceRepository {
   }
 
   async getUserNamespaces(uid: string): Promise<Namespace[]> {
-    const memberSnapshot = await this.db
-      .collectionGroup(this.membersSubcollection)
-      .where('uid', '==', uid)
-      .get();
+    // Primary path: read organizations array from user doc (single doc read,
+    // no collectionGroup index needed). Falls back to collectionGroup query
+    // if user doc doesn't exist or has no organizations field.
+    const userDoc = await this.db.collection('users').doc(uid).get();
+    if (userDoc.exists) {
+      const orgs = userDoc.data()?.organizations;
+      if (Array.isArray(orgs) && orgs.length > 0) {
+        const namespaces = await Promise.all(
+          orgs.map(async (handle: string) => {
+            const nsDoc = await this.db.collection(this.namespacesCollection).doc(handle).get();
+            if (!nsDoc.exists) return null;
+            return NamespaceSchema.parse(nsDoc.data());
+          }),
+        );
+        return namespaces.filter((ns): ns is Namespace => ns !== null);
+      }
+    }
 
-    const namespaces = await Promise.all(
-      memberSnapshot.docs.map(async (memberDoc) => {
-        const namespaceRef = memberDoc.ref.parent.parent;
-        if (namespaceRef === null) return null;
-        const namespaceSnapshot = await namespaceRef.get();
-        if (!namespaceSnapshot.exists) return null;
-        return NamespaceSchema.parse(namespaceSnapshot.data());
-      }),
-    );
+    // Fallback: collectionGroup query (requires single-field index on
+    // members.uid with COLLECTION_GROUP scope).
+    try {
+      const memberSnapshot = await this.db
+        .collectionGroup(this.membersSubcollection)
+        .where('uid', '==', uid)
+        .get();
 
-    return namespaces.filter((ns): ns is Namespace => ns !== null);
+      const namespaces = await Promise.all(
+        memberSnapshot.docs.map(async (memberDoc) => {
+          const namespaceRef = memberDoc.ref.parent.parent;
+          if (namespaceRef === null) return null;
+          const namespaceSnapshot = await namespaceRef.get();
+          if (!namespaceSnapshot.exists) return null;
+          return NamespaceSchema.parse(namespaceSnapshot.data());
+        }),
+      );
+
+      return namespaces.filter((ns): ns is Namespace => ns !== null);
+    } catch (err: unknown) {
+      const grpcErr = err as { code?: number };
+      if (grpcErr.code === 9) {
+        console.warn('[namespace-repository] collectionGroup("members") index missing — falling back to empty org list for uid:', uid);
+        return [];
+      }
+      throw err;
+    }
   }
 }

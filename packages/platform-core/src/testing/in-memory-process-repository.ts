@@ -108,6 +108,17 @@ export class InMemoryProcessRepository implements ProcessRepository {
     this.workflowDefinitions.set(key, { ...def, archived });
   }
 
+  async setWorkflowVisibility(name: string, visibility: 'public' | 'private'): Promise<void> {
+    let found = false;
+    for (const [key, def] of this.workflowDefinitions) {
+      if (def.name === name) {
+        this.workflowDefinitions.set(key, { ...def, visibility });
+        found = true;
+      }
+    }
+    if (!found) throw new Error(`Workflow '${name}' not found`);
+  }
+
   async setWorkflowDeleted(_name: string, _deleted: boolean): Promise<void> {
     // No-op in test double
   }

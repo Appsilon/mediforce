@@ -5,18 +5,12 @@ import {
   DeleteSecretInputSchema,
 } from '@mediforce/platform-api/contract';
 import { getPlatformServices } from '@/lib/platform-services';
-import { getCallerNamespaces } from '../workflow-definitions/auth.js';
+import { resolveCallerIdentity, callerCanAccess } from '@/lib/api-auth';
 
-/**
- * GET /api/workflow-secrets?namespace=x[&workflow=y]
- *
- * Returns secret key names only (never values).
- * Without workflow: returns namespace-level secrets.
- */
 export async function GET(request: Request): Promise<NextResponse> {
   const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
-  const callerNs = await getCallerNamespaces(request, namespaceRepo);
-  if (callerNs instanceof NextResponse) return callerNs;
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
 
   const url = new URL(request.url);
   const parsed = ListSecretKeysInputSchema.safeParse({
@@ -31,7 +25,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const { namespace, workflow } = parsed.data;
-  if (callerNs !== null && !callerNs.has(namespace)) {
+  if (!callerCanAccess(caller, namespace)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -41,18 +35,10 @@ export async function GET(request: Request): Promise<NextResponse> {
   return NextResponse.json({ keys });
 }
 
-/**
- * PUT /api/workflow-secrets?namespace=x[&workflow=y]
- *
- * Body: { "key": "SECRET_NAME", "value": "secret-value" }
- *
- * Upserts a single secret key atomically. Existing secrets are preserved.
- * Without workflow: operates on namespace-level secrets.
- */
 export async function PUT(request: Request): Promise<NextResponse> {
   const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
-  const callerNs = await getCallerNamespaces(request, namespaceRepo);
-  if (callerNs instanceof NextResponse) return callerNs;
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
 
   const url = new URL(request.url);
   let body: unknown;
@@ -75,7 +61,7 @@ export async function PUT(request: Request): Promise<NextResponse> {
   }
 
   const { namespace, workflow, key, value } = parsed.data;
-  if (callerNs !== null && !callerNs.has(namespace)) {
+  if (!callerCanAccess(caller, namespace)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -87,16 +73,10 @@ export async function PUT(request: Request): Promise<NextResponse> {
   return NextResponse.json({ ok: true });
 }
 
-/**
- * DELETE /api/workflow-secrets?namespace=x[&workflow=y]&key=SECRET_NAME
- *
- * Removes a single secret key atomically.
- * Without workflow: operates on namespace-level secrets.
- */
 export async function DELETE(request: Request): Promise<NextResponse> {
   const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
-  const callerNs = await getCallerNamespaces(request, namespaceRepo);
-  if (callerNs instanceof NextResponse) return callerNs;
+  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  if (caller instanceof NextResponse) return caller;
 
   const url = new URL(request.url);
   const parsed = DeleteSecretInputSchema.safeParse({
@@ -112,7 +92,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   }
 
   const { namespace, workflow, key } = parsed.data;
-  if (callerNs !== null && !callerNs.has(namespace)) {
+  if (!callerCanAccess(caller, namespace)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

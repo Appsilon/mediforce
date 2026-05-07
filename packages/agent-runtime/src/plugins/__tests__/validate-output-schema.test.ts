@@ -48,4 +48,19 @@ describe('validateOutputSchema', () => {
     expect(validateOutputSchema({ raw: '[]' }, schema))
       .toBe('expected object, got array');
   });
+
+  it('returns error when raw is null', () => {
+    expect(validateOutputSchema({ raw: null } as Record<string, unknown>, schema))
+      .toBe('output is empty');
+  });
+
+  it('returns error when raw is undefined', () => {
+    expect(validateOutputSchema({ raw: undefined } as Record<string, unknown>, schema))
+      .toBe('output is empty');
+  });
+
+  it('returns error when raw is a primitive JSON value', () => {
+    expect(validateOutputSchema({ raw: '42' }, schema))
+      .toBe('output is not valid JSON');
+  });
 });
