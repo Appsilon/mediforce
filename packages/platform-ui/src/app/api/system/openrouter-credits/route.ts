@@ -16,8 +16,12 @@ async function fetchCredits(apiKey: string): Promise<OpenRouterCreditsOutput> {
       return { ...EMPTY, error: `OpenRouter returned ${res.status}` };
     }
 
-    const { data } = await res.json() as { data: { limit: number; usage: number; limit_remaining: number } };
-    return { available: true, limit: data.limit, usage: data.usage, remaining: data.limit_remaining };
+    const body = await res.json() as { data?: { limit?: number; usage?: number; limit_remaining?: number } };
+    const data = body?.data;
+    if (!data || typeof data.limit_remaining !== 'number') {
+      return { ...EMPTY, error: 'Unexpected response shape from OpenRouter' };
+    }
+    return { available: true, limit: data.limit ?? 0, usage: data.usage ?? 0, remaining: data.limit_remaining };
   } catch (err: unknown) {
     return { ...EMPTY, error: err instanceof Error ? err.message : 'Unknown error' };
   }
@@ -37,7 +41,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const caller = await resolveCallerIdentity(req, namespaceRepo);
   if (caller instanceof NextResponse) return caller;
   if (!callerCanAccess(caller, namespace)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ ...EMPTY, error: 'Forbidden' }, { status: 403 });
   }
 
   try {
