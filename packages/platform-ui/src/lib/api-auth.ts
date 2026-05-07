@@ -47,10 +47,11 @@ export function requireNamespaceAccess(
   caller: CallerIdentity,
   namespace: string | undefined,
 ): NextResponse | null {
+  if (caller.kind === 'apiKey') return null;
   if (!namespace) {
     return NextResponse.json({ error: 'Resource has no namespace' }, { status: 403 });
   }
-  if (callerCanAccess(caller, namespace)) return null;
+  if (caller.namespaces.has(namespace)) return null;
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 }
 

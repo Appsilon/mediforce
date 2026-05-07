@@ -29,10 +29,15 @@ vi.mock('@/lib/platform-services', () => ({
   getAppBaseUrl: () => 'http://localhost:3000',
 }));
 
-vi.mock('@/lib/api-auth', () => ({
-  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
-  requireNamespaceAccess: () => null,
-}));
+const mockResolveCallerIdentity = vi.fn();
+
+vi.mock('@/lib/api-auth', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-auth')>('@/lib/api-auth');
+  return {
+    ...actual,
+    resolveCallerIdentity: (...args: unknown[]) => mockResolveCallerIdentity(...args),
+  };
+});
 
 // Suppress fire-and-forget fetch in complete route
 vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response()));
@@ -77,6 +82,7 @@ const claimedTask = {
 
 const pausedInstance = {
   id: 'inst-1',
+  namespace: 'test-ns',
   status: 'paused',
   currentStepId: 'generate-adam',
 };
@@ -86,10 +92,12 @@ const pausedInstance = {
 describe('GET /api/tasks/:taskId', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
   });
 
   it('[DATA] returns task by id', async () => {
     mockGetById.mockResolvedValue(pendingTask);
+    mockInstanceGetById.mockResolvedValue({ id: 'inst-1', namespace: 'test-ns', status: 'paused' });
 
     const req = new NextRequest('http://localhost/api/tasks/task-1');
     const res = await GET(req, { params: makeParams('task-1') });
@@ -108,6 +116,21 @@ describe('GET /api/tasks/:taskId', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('[AUTH] returns 403 when user is not a member of the instance namespace', async () => {
+    mockResolveCallerIdentity.mockReturnValue({
+      kind: 'user',
+      uid: 'outsider',
+      namespaces: new Set(['other-ns']),
+    });
+    mockGetById.mockResolvedValue(pendingTask);
+    mockInstanceGetById.mockResolvedValue({ id: 'inst-1', namespace: 'test-ns', status: 'paused' });
+
+    const req = new NextRequest('http://localhost/api/tasks/task-1');
+    const res = await GET(req, { params: makeParams('task-1') });
+
+    expect(res.status).toBe(403);
+  });
 });
 
 // ---- POST /api/tasks/:taskId/claim ----
@@ -115,6 +138,7 @@ describe('GET /api/tasks/:taskId', () => {
 describe('POST /api/tasks/:taskId/claim', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
   });
 
   it('[DATA] claims a pending task', async () => {
@@ -169,6 +193,7 @@ describe('POST /api/tasks/:taskId/claim', () => {
 describe('POST /api/tasks/:taskId/complete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
     mockInstanceGetById.mockResolvedValue(pausedInstance);
     mockInstanceUpdate.mockResolvedValue(undefined);
     mockAdvanceStep.mockResolvedValue({ id: 'inst-1', status: 'running', currentStepId: 'generate-tlg' });

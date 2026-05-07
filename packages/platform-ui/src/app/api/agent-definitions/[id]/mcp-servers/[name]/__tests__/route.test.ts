@@ -14,10 +14,15 @@ vi.mock('@/lib/platform-services', () => ({
   }),
 }));
 
-vi.mock('@/lib/api-auth', () => ({
-  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
-  requireNamespaceAccess: () => null,
-}));
+const mockResolveCallerIdentity = vi.fn();
+
+vi.mock('@/lib/api-auth', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-auth')>('@/lib/api-auth');
+  return {
+    ...actual,
+    resolveCallerIdentity: (...args: unknown[]) => mockResolveCallerIdentity(...args),
+  };
+});
 
 import { PUT, DELETE } from '../route';
 
@@ -73,7 +78,10 @@ const httpBinding = { type: 'http', url: 'https://mcp.example.com/server' };
 // ---- PUT ----
 
 describe('PUT /api/agent-definitions/:id/mcp-servers/:name', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+  });
 
   it('[DATA] creates a new stdio binding', async () => {
     mockAgentGetById.mockResolvedValue(coworkAgent);
@@ -168,6 +176,23 @@ describe('PUT /api/agent-definitions/:id/mcp-servers/:name', () => {
     expect(res.status).toBe(404);
   });
 
+  it('[AUTH] returns 403 when user is not a member of the agent namespace', async () => {
+    mockResolveCallerIdentity.mockReturnValue({
+      kind: 'user',
+      uid: 'outsider',
+      namespaces: new Set(['other-ns']),
+    });
+    mockAgentGetById.mockResolvedValue({ ...coworkAgent, namespace: 'test-ns' });
+
+    const res = await PUT(
+      makePutRequest('tealflow-cowork-chat', 'new', stdioBinding),
+      { params: makeParams('tealflow-cowork-chat', 'new') },
+    );
+
+    expect(res.status).toBe(403);
+    expect(mockAgentUpdate).not.toHaveBeenCalled();
+  });
+
   it('[DATA] creates a binding on a plugin agent (gate removed — J1)', async () => {
     // Plugin agents (e.g. claude-code-agent, opencode-agent) can carry MCP
     // bindings. Schema + writeMcpConfig are kind-agnostic; the old API-level
@@ -195,7 +220,10 @@ describe('PUT /api/agent-definitions/:id/mcp-servers/:name', () => {
 // ---- DELETE ----
 
 describe('DELETE /api/agent-definitions/:id/mcp-servers/:name', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+  });
 
   it('[DATA] removes an existing binding', async () => {
     mockAgentGetById.mockResolvedValue(coworkAgent);

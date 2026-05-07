@@ -12,10 +12,15 @@ vi.mock('@/lib/platform-services', () => ({
   }),
 }));
 
-vi.mock('@/lib/api-auth', () => ({
-  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
-  requireNamespaceAccess: () => null,
-}));
+const mockResolveCallerIdentity = vi.fn();
+
+vi.mock('@/lib/api-auth', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-auth')>('@/lib/api-auth');
+  return {
+    ...actual,
+    resolveCallerIdentity: (...args: unknown[]) => mockResolveCallerIdentity(...args),
+  };
+});
 
 import { GET } from '../route';
 
@@ -41,7 +46,10 @@ const coworkAgent = {
 };
 
 describe('GET /api/agent-definitions/:id/mcp-servers', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+  });
 
   it('[DATA] returns mcpServers for a cowork agent', async () => {
     mockAgentGetById.mockResolvedValue(coworkAgent);
@@ -72,5 +80,19 @@ describe('GET /api/agent-definitions/:id/mcp-servers', () => {
     const res = await GET(req, { params: makeParams('unknown') });
 
     expect(res.status).toBe(404);
+  });
+
+  it('[AUTH] returns 403 when user is not a member of the agent namespace', async () => {
+    mockResolveCallerIdentity.mockReturnValue({
+      kind: 'user',
+      uid: 'outsider',
+      namespaces: new Set(['other-ns']),
+    });
+    mockAgentGetById.mockResolvedValue({ ...coworkAgent, namespace: 'test-ns' });
+
+    const req = new NextRequest('http://localhost/api/agent-definitions/tealflow-cowork-chat/mcp-servers');
+    const res = await GET(req, { params: makeParams('tealflow-cowork-chat') });
+
+    expect(res.status).toBe(403);
   });
 });

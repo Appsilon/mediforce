@@ -54,6 +54,11 @@ describe('validateOutputSchema', () => {
       .toBe('output is empty');
   });
 
+  it('returns error when raw is undefined', () => {
+    expect(validateOutputSchema({ raw: undefined } as Record<string, unknown>, schema))
+      .toBe('output is empty');
+  });
+
   it('returns error when raw is a primitive JSON value', () => {
     expect(validateOutputSchema({ raw: '42' }, schema))
       .toBe('output is not valid JSON');

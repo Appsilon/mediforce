@@ -58,7 +58,7 @@ export default function ProcessDefinitionPage() {
   const [transferring, setTransferring] = React.useState(false);
   const [togglingVisibility, setTogglingVisibility] = React.useState(false);
   const [namespaceOverride, setNamespaceOverride] = React.useState<string | null>(null);
-  const [visibilityOverride, setVisibilityOverride] = React.useState<string | null>(null);
+  const [visibilityOverride, setVisibilityOverride] = React.useState<'public' | 'private' | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -106,7 +106,7 @@ export default function ProcessDefinitionPage() {
           <div>
             <div className="flex items-center gap-2">
               {isPrivate && (
-                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
+                <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
                   Private
                 </span>
               )}
@@ -208,6 +208,9 @@ export default function ProcessDefinitionPage() {
                       });
                       if (res.ok) {
                         setVisibilityOverride(newVisibility);
+                      } else {
+                        const body = await res.json().catch(() => null);
+                        alert(body?.error ?? 'Failed to update visibility');
                       }
                     } finally {
                       setTogglingVisibility(false);
