@@ -28,6 +28,7 @@ import { runStartCommand } from './commands/run-start.js';
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility.js';
 import { systemStatusCommand, systemImagesCommand, systemDiskCommand, systemRmiCommand } from './commands/system-status.js';
+import { systemCreditsCommand } from './commands/system-credits.js';
 import { agentListCommand } from './commands/agent-list.js';
 import { agentGetCommand } from './commands/agent-get.js';
 import { modelListCommand } from './commands/model-list.js';
@@ -67,6 +68,7 @@ Commands:
   system images                                      List Docker images on host
   system rmi <imageId>                               Remove a Docker image
   system disk                                        Docker disk usage breakdown
+  system credits --namespace <ns>                    OpenRouter credit balance
 
 Common flags:
   --base-url <url>   API base URL (default: http://localhost:9003,
@@ -141,6 +143,7 @@ Subcommands:
   images     List Docker images on the host
   rmi <id>   Remove a Docker image by ID or name:tag
   disk       Docker disk usage breakdown
+  credits    OpenRouter credit balance for a workspace
 
 Run \`mediforce system <subcommand> --help\` for subcommand-specific flags.
 `;
@@ -254,6 +257,9 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'system' && subcommand === 'disk') {
     return systemDiskCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'system' && subcommand === 'credits') {
+    return systemCreditsCommand({ argv: rest, env: input.env, output });
   }
 
   output.stderr(`Unknown command: ${[command, subcommand].filter(Boolean).join(' ')}`);

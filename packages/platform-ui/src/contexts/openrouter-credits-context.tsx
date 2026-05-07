@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { apiFetch } from '@/lib/api-fetch';
-import type { OpenRouterCreditsResponse } from '@/app/api/system/openrouter-credits/route';
+import type { OpenRouterCreditsOutput } from '@mediforce/platform-api/contract';
 
 export interface OpenRouterCreditsState {
   available: boolean;
@@ -45,7 +45,7 @@ export function OpenRouterCreditsProvider({ children }: { children: ReactNode })
     try {
       const res = await apiFetch('/api/system/openrouter-credits');
       if (!res.ok || cancelledRef.current) return;
-      const data = await res.json() as OpenRouterCreditsResponse;
+      const data = await res.json() as OpenRouterCreditsOutput;
       if (cancelledRef.current) return;
       setAvailable(data.available);
       setRemaining(data.remaining);

@@ -20,6 +20,8 @@ import {
   SetVisibilityOutputSchema,
   DockerInfoResponseSchema,
   RemoveImageOutputSchema,
+  OpenRouterCreditsInputSchema,
+  OpenRouterCreditsOutputSchema,
   ListAgentsOutputSchema,
   GetAgentInputSchema,
   GetAgentOutputSchema,
@@ -51,6 +53,8 @@ import {
   type ListRunsOutput,
   type DockerInfoResponse,
   type RemoveImageOutput,
+  type OpenRouterCreditsInput,
+  type OpenRouterCreditsOutput,
   type ListAgentsOutput,
   type GetAgentInput,
   type GetAgentOutput,
@@ -169,6 +173,7 @@ export class Mediforce {
   readonly system: {
     dockerInfo: () => Promise<DockerInfoResponse>;
     removeImage: (imageId: string) => Promise<RemoveImageOutput>;
+    credits: (input: OpenRouterCreditsInput) => Promise<OpenRouterCreditsOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -422,6 +427,13 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.system.removeImage');
         return RemoveImageOutputSchema.parse(body);
+      },
+      credits: async (input: OpenRouterCreditsInput) => {
+        const validated = OpenRouterCreditsInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/system/openrouter-credits${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.system.credits');
+        return OpenRouterCreditsOutputSchema.parse(body);
       },
     };
   }
