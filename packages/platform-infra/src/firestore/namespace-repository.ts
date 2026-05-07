@@ -97,10 +97,23 @@ export class FirestoreNamespaceRepository {
   }
 
   async getUserNamespaces(uid: string): Promise<Namespace[]> {
-    const memberSnapshot = await this.db
-      .collectionGroup(this.membersSubcollection)
-      .where('uid', '==', uid)
-      .get();
+    let memberSnapshot;
+    try {
+      memberSnapshot = await this.db
+        .collectionGroup(this.membersSubcollection)
+        .where('uid', '==', uid)
+        .get();
+    } catch (err: unknown) {
+      const grpcErr = err as { code?: number; details?: string; message?: string };
+      if (grpcErr.code === 9) {
+        console.error(
+          '[namespace-repository] collectionGroup("members") query failed — likely missing index.',
+          'Details:', grpcErr.details || grpcErr.message || '(none)',
+          'Full error:', err,
+        );
+      }
+      throw err;
+    }
 
     const namespaces = await Promise.all(
       memberSnapshot.docs.map(async (memberDoc) => {
