@@ -56,8 +56,11 @@ self-test → self-review → report.
    `pnpm test` before reporting done. For UI / handler changes, prefer a fast
    API journey test (`packages/platform-ui/src/test/*-journey.test.ts`). Use
    `/e2e-test` (Playwright + emulators) only when the change is genuinely
-   UI-only — delegate to a background subagent. If you can't run a check the
-   change requires, say so. Do NOT claim success.
+   UI-only — delegate to a background subagent. If a check fails for
+   environment reasons (remote / emulator / proxy / weird state), check
+   `docs/knowledge-base/wiki/gotchas/` or run `/knowledge-base` before
+   debugging from scratch. If you can't run a check the change requires,
+   say so. Do NOT claim success.
 
 6. **Self code review — MUST run before reporting done.**
    (a) `git diff origin/main...HEAD` and read every line.
