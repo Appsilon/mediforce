@@ -108,9 +108,10 @@ workflow-definition `skillsDir` — paths hardcoded, don't move).
 ```bash
 # Dev
 pnpm dev                                # platform-ui on :9003
-pnpm dev:local                          # + local agent execution
-pnpm dev:redis && pnpm dev:worker       # BullMQ queue mode (Docker + Redis)
-pnpm emulators                          # Firebase Auth :9099 + Firestore :8080
+pnpm dev:local                          # + local agent execution (claude on PATH)
+pnpm dev:test                           # platform-ui :9007 + emulators + MOCK_AGENT
+pnpm dev:redis                          # Redis :6379 — separate terminal
+pnpm dev:worker                         # BullMQ worker — separate terminal (queue mode)
 
 # Test
 pnpm typecheck
@@ -118,7 +119,7 @@ pnpm test:affected                      # <1s, changed files only
 pnpm test                               # full unit + integration (~9s)
 npx vitest run path/to/file.test.ts     # single file
 
-# E2E (delegate to a background subagent)
+# E2E (delegate to a background subagent; bootstrap also starts emulators)
 python3 packages/platform-ui/scripts/bootstrap_e2e.py
 cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth
 
