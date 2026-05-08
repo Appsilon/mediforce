@@ -1,7 +1,22 @@
 import { NextResponse } from 'next/server';
 import { UpdateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { resolveCallerIdentity, requireNamespaceAccess, type CallerIdentity } from '@/lib/api-auth';
+
+function canRead(caller: CallerIdentity, agent: { namespace?: string; visibility: string }): NextResponse | null {
+  if (caller.kind === 'apiKey') return null;
+  if (agent.visibility === 'public') return null;
+  if (typeof agent.namespace === 'string' && caller.namespaces.has(agent.namespace)) return null;
+  return NextResponse.json({ error: 'Not found' }, { status: 404 });
+}
+
+function canMutate(caller: CallerIdentity, agent: { namespace?: string }): NextResponse | null {
+  if (caller.kind === 'apiKey') return null;
+  if (typeof agent.namespace !== 'string') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  return requireNamespaceAccess(caller, agent.namespace);
+}
 
 export async function GET(
   request: Request,
@@ -18,10 +33,8 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  if (agent.visibility !== 'public') {
-    const denied = agent.namespace ? requireNamespaceAccess(caller, agent.namespace) : null;
-    if (denied) return denied;
-  }
+  const denied = canRead(caller, agent);
+  if (denied) return denied;
 
   return NextResponse.json({ agent });
 }
@@ -41,7 +54,7 @@ export async function PUT(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const denied = agent.namespace ? requireNamespaceAccess(caller, agent.namespace) : null;
+  const denied = canMutate(caller, agent);
   if (denied) return denied;
 
   const body = await request.json();
@@ -65,7 +78,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const denied = agent.namespace ? requireNamespaceAccess(caller, agent.namespace) : null;
+  const denied = canMutate(caller, agent);
   if (denied) return denied;
 
   await agentDefinitionRepo.delete(id);

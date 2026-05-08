@@ -264,14 +264,24 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           {/* 4. Visibility */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Visibility</label>
-            <select
-              value={visibility}
-              onChange={(e) => setVisibility(e.target.value as 'public' | 'private')}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="private">Private</option>
-              <option value="public">Public</option>
-            </select>
+            <div className="flex gap-2">
+              {(['private', 'public'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setVisibility(v)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm transition-colors',
+                    visibility === v
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'hover:border-primary/50',
+                  )}
+                >
+                  {v === 'private' ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  {v === 'private' ? 'Private' : 'Public'}
+                </button>
+              ))}
+            </div>
             <p className="text-xs text-muted-foreground">
               {visibility === 'private'
                 ? 'Only members of this namespace can see this agent.'
