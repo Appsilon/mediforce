@@ -119,8 +119,12 @@ export async function runListCommand(input: CommandInput): Promise<number> {
     for (const run of result.runs) {
       const icon = STATUS_ICONS[run.status] ?? '?';
       const age = formatAge(run.createdAt);
+      const isTerminal = run.status === 'completed' || run.status === 'failed';
+      const costLabel = run.totalCostUsd != null
+        ? `  $${run.totalCostUsd.toFixed(4)}${isTerminal ? '' : '+'}`
+        : '';
       input.output.stdout(
-        `${icon} ${run.status.padEnd(10)} ${run.runId}  ${run.definitionName} v${run.definitionVersion}  ${age}`,
+        `${icon} ${run.status.padEnd(10)} ${run.runId}  ${run.definitionName} v${run.definitionVersion}${costLabel}  ${age}`,
       );
       if (run.currentStepId !== null) {
         input.output.stdout(`  step: ${run.currentStepId}`);

@@ -12,6 +12,7 @@ import { routes } from '@/lib/routes';
 import { archiveProcessRun, bulkCancelProcessRuns, bulkArchiveProcessRuns } from '@/app/actions/processes';
 import type { BulkOperationResult } from '@/app/actions/processes';
 import { getWorkflowStatus } from '@/lib/workflow-status';
+import { formatCostUsd } from '@/lib/format';
 import { useToast } from '@/components/command-palette/toast-provider';
 
 interface RunsTableProps {
@@ -144,6 +145,7 @@ export function RunsTable({
     'Status',
     'Started by',
     'Current Step',
+    'Cost',
     'Started',
     '', // per-row archive
     '', // view link
@@ -291,6 +293,9 @@ export function RunsTable({
                       </span>
                     )
                   ) : <span className="text-muted-foreground">—</span>}
+                </td>
+                <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
+                  {run.totalCostUsd != null ? `${formatCostUsd(run.totalCostUsd)}${run.status !== 'completed' && run.status !== 'failed' ? '+' : ''}` : '—'}
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}

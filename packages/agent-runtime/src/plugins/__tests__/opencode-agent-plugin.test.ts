@@ -201,6 +201,28 @@ describe('OpenCodeAgentPlugin', () => {
       const result = plugin.parseAgentOutput('');
       expect(result).toBe('');
     });
+
+    it('[DATA] accumulates token usage from step_finish events', () => {
+      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
+      const stdout = [
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 1000, output: 500 }, cost: 0.01 } }),
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 2000, output: 800 }, cost: 0.02 } }),
+        openCodeJsonOutput(agentResponse),
+      ].join('\n');
+
+      const result = plugin.parseAgentOutput(stdout);
+      const parsed = JSON.parse(result);
+      expect(parsed.usage).toEqual({ input_tokens: 3000, output_tokens: 1300 });
+    });
+
+    it('[DATA] omits usage when no step_finish events have tokens', () => {
+      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
+      const stdout = openCodeJsonOutput(agentResponse);
+
+      const result = plugin.parseAgentOutput(stdout);
+      const parsed = JSON.parse(result);
+      expect(parsed.usage).toBeUndefined();
+    });
   });
 
   describe('prepareOutputDir', () => {

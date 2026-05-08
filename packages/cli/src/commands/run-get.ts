@@ -104,6 +104,10 @@ export async function runGetCommand(input: CommandInput): Promise<number> {
         `  url:           ${config.baseUrl}/${result.definitionNamespace}/workflows/${encodeURIComponent(result.definitionName)}/runs/${result.runId}`,
       );
     }
+    if (result.totalCostUsd != null) {
+      const isTerminal = result.status === 'completed' || result.status === 'failed';
+      input.output.stdout(`  cost:          $${result.totalCostUsd.toFixed(4)}${isTerminal ? '' : '+'}`);
+    }
     if (result.finalOutput !== null && result.finalOutput !== undefined) {
       input.output.stdout(`  finalOutput:   ${JSON.stringify(result.finalOutput)}`);
     }

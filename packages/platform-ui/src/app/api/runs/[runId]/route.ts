@@ -74,5 +74,6 @@ export async function GET(
     finalOutput,
     definitionName: instance.definitionName,
     definitionNamespace,
+    ...(instance.totalCostUsd != null ? { totalCostUsd: instance.totalCostUsd } : {}),
   });
 }

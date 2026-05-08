@@ -13,6 +13,11 @@ export const GitMetadataSchema = z.object({
   repoUrl: z.string(),
 });
 
+export const TokenUsageSchema = z.object({
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+});
+
 export const AgentOutputEnvelopeSchema = z.object({
   confidence: z.number().min(0).max(1),
   confidence_rationale: z.string().optional(),
@@ -25,8 +30,10 @@ export const AgentOutputEnvelopeSchema = z.object({
   gitMetadata: GitMetadataSchema.nullable().optional(), // container execution git output
   presentation: z.string().nullable().optional(), // optional HTML view for human reviewers
   deliverableFile: z.string().nullable().optional(), // persisted deliverable file path
+  tokenUsage: TokenUsageSchema.optional(),
 });
 
 export type Annotation = z.infer<typeof AnnotationSchema>;
 export type GitMetadata = z.infer<typeof GitMetadataSchema>;
+export type TokenUsage = z.infer<typeof TokenUsageSchema>;
 export type AgentOutputEnvelope = z.infer<typeof AgentOutputEnvelopeSchema>;

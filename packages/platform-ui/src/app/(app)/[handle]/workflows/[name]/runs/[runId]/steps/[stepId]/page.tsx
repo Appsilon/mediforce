@@ -4,12 +4,12 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowLeft, CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, ExternalLink, FileText, GitBranch, Gauge, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, ExternalLink, FileText, GitBranch, Gauge, ChevronDown, ChevronRight, MessageSquare, DollarSign } from 'lucide-react';
 import type { StepExecution, Step, AgentEvent } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
-import { formatDuration, formatStepName } from '@/lib/format';
+import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
 
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
@@ -305,6 +305,20 @@ function AgentMetadataSection({ agentOutput }: { agentOutput: NonNullable<StepEx
           <div className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
             <span>{formatDuration(agentOutput.duration_ms)}</span>
+          </div>
+        )}
+        {agentOutput.estimatedCostUsd != null && (
+          <div className="flex items-center gap-1.5">
+            <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">Cost:</span>
+            <span className="font-medium">{formatCostUsd(agentOutput.estimatedCostUsd)}</span>
+          </div>
+        )}
+        {agentOutput.tokenUsage && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span>{agentOutput.tokenUsage.inputTokens.toLocaleString()} in</span>
+            <span>/</span>
+            <span>{agentOutput.tokenUsage.outputTokens.toLocaleString()} out</span>
           </div>
         )}
       </div>

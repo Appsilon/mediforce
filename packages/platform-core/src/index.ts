@@ -29,6 +29,7 @@ export {
   AnnotationSchema,
   AgentOutputEnvelopeSchema,
   GitMetadataSchema,
+  TokenUsageSchema,
   AgentEventSchema,
   AgentRunStatusSchema,
   AgentRunSchema,
@@ -113,6 +114,7 @@ export type {
   Annotation,
   AgentOutputEnvelope,
   GitMetadata,
+  TokenUsage,
   AgentEvent,
   AgentRunStatus,
   AgentRun,
@@ -306,3 +308,4 @@ export type { HandoffTypeRegistration } from './collaboration/index.js';
 // Utils (zero-dep helpers shared across runtime + worker)
 export { createLineStreamReader } from './utils/line-stream.js';
 export type { LineStreamReader } from './utils/line-stream.js';
+export { calculateEstimatedCost } from './utils/cost.js';

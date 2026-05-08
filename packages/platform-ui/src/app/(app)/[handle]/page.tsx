@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, updateDoc } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
@@ -151,6 +151,7 @@ function formatDate(iso: string): string {
 const ROLE_LABELS: Record<string, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' };
 
 function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member: MemberPreview; resolvedName: string; resolvedAvatar: string | undefined }) {
+  const [imgError, setImgError] = useState(false);
   const parts = resolvedName.split(' ');
   const initials = parts.length >= 2
     ? `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
@@ -159,11 +160,13 @@ function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member:
   return (
     <Tooltip.Root delayDuration={200}>
       <Tooltip.Trigger asChild>
-        {resolvedAvatar !== undefined ? (
+        {resolvedAvatar !== undefined && !imgError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={resolvedAvatar}
             alt={resolvedName}
+            referrerPolicy="no-referrer"
+            onError={() => setImgError(true)}
             className="h-7 w-7 rounded-full border-2 border-background object-cover cursor-pointer"
           />
         ) : (
@@ -507,7 +510,7 @@ function WorkflowCatalog({ handle, namespace, isMember }: { handle: string; name
   }, [visibleDefinitions, instancesByDefinition]);
 
   return (
-    <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
+    <WorkflowSecretKeysProvider handle={isMember ? handle : ''} workflowNames={isMember ? workflowNames : []}>
     <div className="flex flex-col gap-4">
       {isMember && <OpenRouterCreditsIndicator handle={handle} />}
       {isMember && <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />}
@@ -604,6 +607,8 @@ export default function ProfilePage() {
   const currentRole = useCurrentUserRole(handle ?? '', firebaseUser?.uid);
   const canEdit = currentRole === 'owner' || currentRole === 'admin';
   const isMember = currentRole !== null;
+  const userProfiles = useUserProfiles();
+  const [profileImgError, setProfileImgError] = useState(false);
 
   if (loading) {
     return (
@@ -646,12 +651,17 @@ export default function ProfilePage() {
               </div>
             );
           }
-          const avatarSrc = namespace.avatarUrl ?? firebaseUser?.photoURL ?? undefined;
-          return avatarSrc !== undefined && avatarSrc !== '' ? (
+          const linkedUserPhoto = namespace.linkedUserId !== undefined
+            ? userProfiles.get(namespace.linkedUserId)?.photoURL
+            : undefined;
+          const avatarSrc = namespace.avatarUrl ?? linkedUserPhoto ?? undefined;
+          return avatarSrc !== undefined && avatarSrc !== '' && !profileImgError ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={avatarSrc}
               alt={namespace.displayName}
+              referrerPolicy="no-referrer"
+              onError={() => setProfileImgError(true)}
               className="h-14 w-14 rounded-full object-cover shrink-0"
             />
           ) : (

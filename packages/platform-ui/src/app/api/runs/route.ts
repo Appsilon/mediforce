@@ -44,6 +44,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       createdAt: inst.createdAt,
       updatedAt: inst.updatedAt,
       createdBy: inst.createdBy,
+      ...(inst.totalCostUsd != null ? { totalCostUsd: inst.totalCostUsd } : {}),
     }));
 
     return NextResponse.json({ runs });

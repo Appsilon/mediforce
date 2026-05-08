@@ -206,12 +206,14 @@ export function ProcessCard({
               <span>No runs</span>
             )}
           </div>
-          <StartRunButton
-            workflowName={definition.name}
-            showVersionPicker
-            hasManualTrigger={definition.hasManualTrigger}
-            archived={definition.archived === true}
-          />
+          {isMember && (
+            <StartRunButton
+              workflowName={definition.name}
+              showVersionPicker
+              hasManualTrigger={definition.hasManualTrigger}
+              archived={definition.archived === true}
+            />
+          )}
         </div>
         )}
 
