@@ -208,6 +208,21 @@ export type {
 } from './schemas/agent-definition.js';
 export type { AgentDefinitionRepository } from './repositories/agent-definition-repository.js';
 
+// Skill registry schema + repository interface
+export {
+  SkillRegistrySchema,
+  CreateSkillRegistryInputSchema,
+  UpdateSkillRegistryInputSchema,
+  AgentSkillRefSchema,
+} from './schemas/skill-registry.js';
+export type {
+  SkillRegistry,
+  CreateSkillRegistryInput,
+  UpdateSkillRegistryInput,
+  AgentSkillRef,
+} from './schemas/skill-registry.js';
+export type { SkillRegistryRepository } from './repositories/skill-registry-repository.js';
+
 // Model registry schema + repository interface
 export {
   ModelRegistryEntrySchema,

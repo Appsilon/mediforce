@@ -421,6 +421,7 @@ describe('AgentDefinitionSchema with mcpServers', () => {
     inputDescription: 'document',
     outputDescription: 'extracted data',
     skillFileNames: [],
+    skills: [],
     createdAt: '2026-04-22T00:00:00.000Z',
     updatedAt: '2026-04-22T00:00:00.000Z',
   };

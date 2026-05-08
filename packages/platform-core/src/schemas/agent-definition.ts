@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AgentMcpBindingMapSchema } from './agent-mcp-binding.js';
+import { AgentSkillRefSchema } from './skill-registry.js';
 
 export const AgentVisibilitySchema = z.enum(['public', 'private']);
 export type AgentVisibility = z.infer<typeof AgentVisibilitySchema>;
@@ -21,7 +22,14 @@ export const AgentDefinitionSchema = z.object({
   systemPrompt: z.string(),
   inputDescription: z.string(),
   outputDescription: z.string(),
-  skillFileNames: z.array(z.string()),
+  /** @deprecated Replaced by `skills`. Retained until the Phase 4
+   *  migration retires it. New writes from API/CLI should use `skills`. */
+  skillFileNames: z.array(z.string()).default([]),
+  /** Registry-first skill bindings: each entry resolves to a folder under
+   *  `<registry.repo>/<registry.skillsDir>/<name>/` containing SKILL.md
+   *  + references/ + scripts. Assembled into a per-run plugin tree by the
+   *  agent runtime. */
+  skills: z.array(AgentSkillRefSchema).default([]),
   /** Canonical MCP server configuration for this agent. Map of server
    *  name → AgentMcpBinding. Step-level restrictions can only narrow
    *  (disable servers or deny tools) — they cannot broaden. */

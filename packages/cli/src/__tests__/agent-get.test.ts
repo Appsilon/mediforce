@@ -18,6 +18,7 @@ const FAKE_AGENT = {
   inputDescription: 'Rule ID',
   outputDescription: 'Rule changes',
   skillFileNames: ['skill.md', 'patterns.md'],
+  skills: [],
   createdAt: '2026-05-01T00:00:00Z',
   updatedAt: '2026-05-01T00:00:00Z',
 };

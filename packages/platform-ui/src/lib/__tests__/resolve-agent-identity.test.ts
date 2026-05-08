@@ -28,6 +28,7 @@ function makeAgent(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
     inputDescription: '',
     outputDescription: '',
     skillFileNames: [],
+    skills: [],
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
     ...overrides,
@@ -87,6 +88,7 @@ describe('resolveAgentIdentity', () => {
     const repo = makeRepo(makeAgent({
       systemPrompt: 'You author CDISC rules.',
       skillFileNames: ['skills/rules.md'],
+      skills: [],
     }));
     const result = await resolveAgentIdentity('agent-1', repo);
     expect(result.prompt).toContain('## Agent Identity');
@@ -104,6 +106,7 @@ describe('resolveAgentIdentity', () => {
       .mockResolvedValueOnce([{ size: 50 }]);
     const repo = makeRepo(makeAgent({
       skillFileNames: ['skills/good.md', 'skills/missing.md'],
+      skills: [],
     }));
     const result = await resolveAgentIdentity('agent-1', repo);
     expect(result.prompt).toContain('Good skill');

@@ -1063,6 +1063,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
       skillFileNames: [],
+      skills: [],
       createdAt: twoDaysAgo,
       updatedAt: twoDaysAgo,
     },
@@ -1078,6 +1079,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
       skillFileNames: [],
+      skills: [],
       mcpServers: {
         filesystem: { type: 'stdio', catalogId: 'filesystem' },
       },
@@ -1100,6 +1102,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
       skillFileNames: [],
+      skills: [],
       mcpServers: {
         'github-mcp': {
           type: 'http',

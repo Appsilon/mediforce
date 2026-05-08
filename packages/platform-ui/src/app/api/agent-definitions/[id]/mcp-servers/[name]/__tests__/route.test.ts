@@ -58,6 +58,7 @@ const coworkAgent = {
   inputDescription: '',
   outputDescription: '',
   skillFileNames: [],
+  skills: [],
   mcpServers: {
     existing: { type: 'stdio' as const, catalogId: 'existing-mcp' },
   },

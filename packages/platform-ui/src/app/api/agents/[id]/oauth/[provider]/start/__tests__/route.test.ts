@@ -84,6 +84,7 @@ function makeAgentWithOAuthBinding(
     inputDescription: '',
     outputDescription: '',
     skillFileNames: [],
+    skills: [],
     mcpServers: {
       [serverName]: {
         type: 'http',
