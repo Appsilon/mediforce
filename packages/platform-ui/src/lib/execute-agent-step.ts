@@ -129,48 +129,20 @@ export async function executeAgentStep(
     namespace: workflowDefinition.namespace,
   })) ?? undefined;
 
-  // Load and (lazily) refresh OAuth tokens for every HTTP binding that
-  // requested OAuth auth. Done here, not in the runtime, so the runtime
-  // stays decoupled from Firestore — queued-docker-spawn can serialize
-  // the context over BullMQ once this is populated. Refresh failures
-  // bubble up with actionable errors ("Reconnect via UI").
-  const oauthTokens = workflowStep.agentId !== undefined && resolvedMcpConfig !== undefined
-    ? await loadOAuthTokens({
-        namespace: workflowDefinition.namespace,
-        agentId: workflowStep.agentId,
-        resolvedMcpConfig,
-        oauthProviderRepo,
-        agentOAuthTokenRepo,
-        connectionRepo,
-      })
-    : undefined;
-
-  // Pre-resolve Connection-backed env additions for stdio MCP servers
-  // whose catalog entry carries a `connectionId`. Each entry becomes
-  // `{ CONN_<NORMALIZED_ID>_TOKEN: <fresh access token> }` ready for the
-  // writer to merge into the stdio entry's env. Same Firestore-decoupling
-  // story as oauthTokens — runtime stays clean.
-  const stdioConnectionEnvByServer = resolvedMcpConfig !== undefined
-    ? await loadStdioConnectionEnv({
-        namespace: workflowDefinition.namespace,
-        resolvedMcpConfig,
-        connectionRepo,
-        oauthProviderRepo,
-      })
-    : undefined;
-
-  // Pre-resolve env injection for `step.connections` — token + envAlias
-  // bundle ready for the script-step plugin (and, in PR B+, any other
-  // executor that opts into Connection-backed env). Skipped when the step
-  // declares no connections to keep the code path inert for the existing
-  // workflows.
-  const stepConnectionIds = workflowStep.connections ?? [];
-  const resolvedConnectionEnv = stepConnectionIds.length > 0
-    ? (await resolveConnectionEnv(workflowDefinition.namespace, stepConnectionIds, {
-        connectionRepo,
-        oauthProviderRepo,
-      })).vars
-    : undefined;
+  // Pre-load every credential the runtime might need before plugin spawn:
+  //   - oauthTokens: HTTP MCP servers' Bearer headers (legacy + Connection)
+  //   - stdioConnectionEnvByServer: CONN_<ID>_TOKEN env for stdio MCP servers
+  //   - resolvedConnectionEnv: CONN_<ID>_TOKEN + provider aliases for step.connections
+  // Done here so the runtime stays decoupled from Firestore — queued-docker-spawn
+  // serializes the resolved context over BullMQ. Refresh/missing-token failures
+  // bubble up with actionable "Reconnect via UI" errors.
+  const { oauthTokens, stdioConnectionEnvByServer, resolvedConnectionEnv } =
+    await resolveConnectionRuntime(workflowStep, resolvedMcpConfig, {
+      namespace: workflowDefinition.namespace,
+      connectionRepo,
+      oauthProviderRepo,
+      agentOAuthTokenRepo,
+    });
 
   // Resolve agent identity prompt (systemPrompt + skill file contents) from
   // the AgentDefinition. Returns undefined when step has no agentId or agent
@@ -638,4 +610,64 @@ async function loadStdioConnectionEnv(
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
+}
+
+interface ResolveConnectionRuntimeDeps {
+  namespace: string;
+  connectionRepo: ConnectionRepository;
+  oauthProviderRepo: OAuthProviderRepository;
+  agentOAuthTokenRepo: AgentOAuthTokenRepository;
+}
+
+interface ResolvedConnectionRuntime {
+  oauthTokens: Record<string, ResolvedOAuthBinding> | undefined;
+  stdioConnectionEnvByServer: Record<string, Record<string, string>> | undefined;
+  resolvedConnectionEnv: Record<string, string> | undefined;
+}
+
+/** Bundle every Connection-derived runtime context piece — HTTP Bearer
+ *  headers, stdio CONN_<ID>_TOKEN env additions, and step.connections env
+ *  exports — in one call. Each branch is independently inert: an agent
+ *  with no MCP returns no tokens; a step with no `connections` returns
+ *  no env. Errors propagate so callers see the real "missing token" /
+ *  "alias collision" diagnostic. */
+async function resolveConnectionRuntime(
+  workflowStep: WorkflowStep,
+  resolvedMcpConfig: ResolvedMcpConfig | undefined,
+  deps: ResolveConnectionRuntimeDeps,
+): Promise<ResolvedConnectionRuntime> {
+  const { namespace, connectionRepo, oauthProviderRepo, agentOAuthTokenRepo } = deps;
+
+  const oauthTokens =
+    workflowStep.agentId !== undefined && resolvedMcpConfig !== undefined
+      ? await loadOAuthTokens({
+          namespace,
+          agentId: workflowStep.agentId,
+          resolvedMcpConfig,
+          oauthProviderRepo,
+          agentOAuthTokenRepo,
+          connectionRepo,
+        })
+      : undefined;
+
+  const stdioConnectionEnvByServer =
+    resolvedMcpConfig !== undefined
+      ? await loadStdioConnectionEnv({
+          namespace,
+          resolvedMcpConfig,
+          connectionRepo,
+          oauthProviderRepo,
+        })
+      : undefined;
+
+  const stepConnectionIds = workflowStep.connections ?? [];
+  const resolvedConnectionEnv =
+    stepConnectionIds.length > 0
+      ? (await resolveConnectionEnv(namespace, stepConnectionIds, {
+          connectionRepo,
+          oauthProviderRepo,
+        })).vars
+      : undefined;
+
+  return { oauthTokens, stdioConnectionEnvByServer, resolvedConnectionEnv };
 }

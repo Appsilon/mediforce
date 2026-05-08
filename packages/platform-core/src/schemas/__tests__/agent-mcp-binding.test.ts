@@ -386,30 +386,13 @@ describe('ToolCatalogEntrySchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects entry missing both command and mcp', () => {
-    const result = ToolCatalogEntrySchema.safeParse({ id: 'orphan' });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects empty id', () => {
-    expect(
-      ToolCatalogEntrySchema.safeParse({ id: '', command: 'npx' }).success,
-    ).toBe(false);
-  });
-
-  it('rejects empty command (legacy shape)', () => {
-    expect(
-      ToolCatalogEntrySchema.safeParse({ id: 'cdisc', command: '' }).success,
-    ).toBe(false);
-  });
-
-  it('rejects new-shape entry with empty mcp.url', () => {
-    expect(
-      ToolCatalogEntrySchema.safeParse({
-        id: 'broken',
-        mcp: { type: 'http', url: '' },
-      }).success,
-    ).toBe(false);
+  it.each<[string, Record<string, unknown>]>([
+    ['missing both command and mcp', { id: 'orphan' }],
+    ['empty id', { id: '', command: 'npx' }],
+    ['empty command (legacy shape)', { id: 'cdisc', command: '' }],
+    ['empty mcp.url (new shape)', { id: 'broken', mcp: { type: 'http', url: '' } }],
+  ])('rejects entry %s', (_label, input) => {
+    expect(ToolCatalogEntrySchema.safeParse(input).success).toBe(false);
   });
 
   it('rejects rogue top-level fields (strict)', () => {

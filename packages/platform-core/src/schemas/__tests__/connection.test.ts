@@ -39,46 +39,14 @@ describe('ConnectionAuthSchema', () => {
       expect(result.success).toBe(true);
     });
 
-    it('rejects oauth auth without providerId', () => {
-      expect(
-        ConnectionOAuthAuthSchema.safeParse({ type: 'oauth' }).success,
-      ).toBe(false);
-    });
-
-    it('rejects oauth auth with empty providerId', () => {
-      expect(
-        ConnectionOAuthAuthSchema.safeParse({ type: 'oauth', providerId: '' }).success,
-      ).toBe(false);
-    });
-
-    it('rejects oauth auth with empty accessToken', () => {
-      expect(
-        ConnectionOAuthAuthSchema.safeParse({
-          type: 'oauth',
-          providerId: 'github',
-          accessToken: '',
-        }).success,
-      ).toBe(false);
-    });
-
-    it('rejects oauth auth with non-positive expiresAt', () => {
-      expect(
-        ConnectionOAuthAuthSchema.safeParse({
-          type: 'oauth',
-          providerId: 'github',
-          expiresAt: 0,
-        }).success,
-      ).toBe(false);
-    });
-
-    it('rejects oauth auth with rogue fields (strict)', () => {
-      expect(
-        ConnectionOAuthAuthSchema.safeParse({
-          type: 'oauth',
-          providerId: 'github',
-          headers: { Authorization: 'Bearer x' },
-        }).success,
-      ).toBe(false);
+    it.each<[string, Record<string, unknown>]>([
+      ['without providerId', { type: 'oauth' }],
+      ['with empty providerId', { type: 'oauth', providerId: '' }],
+      ['with empty accessToken', { type: 'oauth', providerId: 'github', accessToken: '' }],
+      ['with non-positive expiresAt', { type: 'oauth', providerId: 'github', expiresAt: 0 }],
+      ['with rogue field (strict)', { type: 'oauth', providerId: 'github', headers: { Authorization: 'Bearer x' } }],
+    ])('rejects oauth auth %s', (_label, input) => {
+      expect(ConnectionOAuthAuthSchema.safeParse(input).success).toBe(false);
     });
   });
 
@@ -121,22 +89,12 @@ describe('ConnectionAuthSchema', () => {
   });
 
   describe('discriminator', () => {
-    it('rejects auth without type field', () => {
-      expect(
-        ConnectionAuthSchema.safeParse({ providerId: 'github' }).success,
-      ).toBe(false);
-    });
-
-    it('rejects auth with unknown type', () => {
-      expect(
-        ConnectionAuthSchema.safeParse({ type: 'static', secretRef: 'x' }).success,
-      ).toBe(false);
-    });
-
-    it('rejects type=none (subsumed by absence of connectionId)', () => {
-      expect(
-        ConnectionAuthSchema.safeParse({ type: 'none' }).success,
-      ).toBe(false);
+    it.each<[string, Record<string, unknown>]>([
+      ['without type field', { providerId: 'github' }],
+      ['with unknown type', { type: 'static', secretRef: 'x' }],
+      ['with type=none (subsumed by absence of connectionId)', { type: 'none' }],
+    ])('rejects auth %s', (_label, input) => {
+      expect(ConnectionAuthSchema.safeParse(input).success).toBe(false);
     });
   });
 });
@@ -163,36 +121,20 @@ describe('ConnectionSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects empty id', () => {
-    expect(ConnectionSchema.safeParse({ ...baseOauth, id: '' }).success).toBe(false);
-  });
-
-  it('rejects id with uppercase characters', () => {
-    expect(
-      ConnectionSchema.safeParse({ ...baseOauth, id: 'GitHubMediforce' }).success,
-    ).toBe(false);
-  });
-
-  it('rejects id starting with a digit', () => {
-    expect(
-      ConnectionSchema.safeParse({ ...baseOauth, id: '1github' }).success,
-    ).toBe(false);
-  });
-
-  it('rejects id with underscores (force hyphen-separated for env normalization)', () => {
-    expect(
-      ConnectionSchema.safeParse({ ...baseOauth, id: 'github_mediforce' }).success,
-    ).toBe(false);
+  it.each<[string, Partial<typeof baseOauth>]>([
+    ['empty id', { id: '' }],
+    ['id with uppercase', { id: 'GitHubMediforce' }],
+    ['id starting with digit', { id: '1github' }],
+    ['id with underscores (force hyphens for env normalization)', { id: 'github_mediforce' }],
+    ['empty name', { name: '' }],
+  ])('rejects %s', (_label, override) => {
+    expect(ConnectionSchema.safeParse({ ...baseOauth, ...override }).success).toBe(false);
   });
 
   it('accepts hyphenated multi-word id', () => {
     expect(
       ConnectionSchema.safeParse({ ...baseOauth, id: 'github-mediforce-readonly' }).success,
     ).toBe(true);
-  });
-
-  it('rejects empty name', () => {
-    expect(ConnectionSchema.safeParse({ ...baseOauth, name: '' }).success).toBe(false);
   });
 
   it('rejects rogue top-level fields (strict)', () => {
