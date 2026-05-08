@@ -1068,6 +1068,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'mcp-test-agent': {
       kind: 'plugin',
+      namespace: 'test',
       runtimeId: 'script-container',
       name: 'MCP Test Agent',
       iconName: 'Terminal',
@@ -1089,6 +1090,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // straight to "Connect" without first editing the agent.
     'oauth-test-agent': {
       kind: 'plugin',
+      namespace: 'test',
       runtimeId: 'claude-code-agent',
       name: 'OAuth Test Agent',
       iconName: 'Bot',
