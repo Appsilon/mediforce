@@ -162,6 +162,9 @@ export function ProcessDetail({
     return end - start;
   }, [instance.createdAt, instance.updatedAt]);
 
+  // Computed from step executions (source of truth on detail page).
+  // List views use the denormalized instance.totalCostUsd instead —
+  // the two can briefly diverge after retries until the next step completes.
   const totalCostUsd = React.useMemo(() => {
     if (!stepExecutions || stepExecutions.length === 0) return null;
     let total = 0;

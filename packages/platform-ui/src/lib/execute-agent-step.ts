@@ -232,6 +232,9 @@ export async function executeAgentStep(
 
   // Persist output to instance.variables so subsequent steps can read it.
   // Also accumulate totalCostUsd on the instance for list views.
+  // Note: read-then-increment is not atomic, but steps execute sequentially
+  // per instance (auto-runner loop is serial). If parallel branches are
+  // added, switch to Firestore FieldValue.increment().
   const agentOutput = envelope?.result ?? null;
   const stepCost = costResult.estimatedCostUsd;
   if (agentOutput !== null || stepCost !== undefined) {

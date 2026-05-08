@@ -920,6 +920,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         }
       }
 
+      if (tokenUsage) {
+        agentLog('cost.tokensExtracted', 'token usage captured', {
+          stepId, instanceId, inputTokens: tokenUsage.inputTokens, outputTokens: tokenUsage.outputTokens,
+        });
+      }
+
       // Strip envelope-level fields from result to avoid duplication in UI
       const { confidence: _c, confidence_rationale: _cr, tokenUsage: _tu, ...cleanResult } = parsedResult;
 
