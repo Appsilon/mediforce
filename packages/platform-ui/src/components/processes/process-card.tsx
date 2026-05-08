@@ -95,6 +95,7 @@ export function ProcessCard({
   steps,
   handle,
   activeTaskByInstance,
+  isMember = true,
 }: {
   definition: DefinitionGroup;
   instances: ProcessInstance[];
@@ -102,6 +103,7 @@ export function ProcessCard({
   steps?: string[];
   handle: string;
   activeTaskByInstance: Map<string, string>;
+  isMember?: boolean;
 }) {
   const filteredInstances = useMemo(() => {
     return instances.filter((instance) => {
@@ -203,12 +205,14 @@ export function ProcessCard({
               <span>No runs</span>
             )}
           </div>
-          <StartRunButton
-            workflowName={definition.name}
-            showVersionPicker
-            hasManualTrigger={definition.hasManualTrigger}
-            archived={definition.archived === true}
-          />
+          {isMember && (
+            <StartRunButton
+              workflowName={definition.name}
+              showVersionPicker
+              hasManualTrigger={definition.hasManualTrigger}
+              archived={definition.archived === true}
+            />
+          )}
         </div>
 
         {/* Runs preview — compact list only */}
