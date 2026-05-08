@@ -31,6 +31,11 @@ export {
   SetVisibilityOutputSchema,
   type SetVisibilityInput,
   type SetVisibilityOutput,
+  CopyWorkflowInputSchema,
+  CopyWorkflowOutputSchema,
+  type CopyWorkflowInput,
+  type CopyWorkflowOutput,
+  type CopyWorkflowOptions,
 } from './workflows.js';
 
 export {

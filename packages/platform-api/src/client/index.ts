@@ -18,6 +18,8 @@ import {
   ArchiveAllOutputSchema,
   SetVisibilityInputSchema,
   SetVisibilityOutputSchema,
+  CopyWorkflowInputSchema,
+  CopyWorkflowOutputSchema,
   DockerInfoResponseSchema,
   RemoveImageOutputSchema,
   OpenRouterCreditsInputSchema,
@@ -50,6 +52,9 @@ import {
   type ArchiveAllOutput,
   type SetVisibilityInput,
   type SetVisibilityOutput,
+  type CopyWorkflowInput,
+  type CopyWorkflowOutput,
+  type CopyWorkflowOptions,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -155,6 +160,7 @@ export class Mediforce {
     archiveVersion: (input: ArchiveVersionInput) => Promise<ArchiveVersionOutput>;
     archiveAll: (input: ArchiveAllInput) => Promise<ArchiveAllOutput>;
     setVisibility: (input: SetVisibilityInput) => Promise<SetVisibilityOutput>;
+    copy: (input: CopyWorkflowInput, options: CopyWorkflowOptions) => Promise<CopyWorkflowOutput>;
   };
 
   readonly runs: {
@@ -310,6 +316,23 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.setVisibility');
         return SetVisibilityOutputSchema.parse(body);
+      },
+      copy: async (input, options) => {
+        const validated = CopyWorkflowInputSchema.parse(input);
+        const qs = toSearchParams({ targetNamespace: options.targetNamespace });
+        const reqBody: Record<string, unknown> = {};
+        if (validated.version !== undefined) reqBody.version = validated.version;
+        if (validated.targetName !== undefined) reqBody.targetName = validated.targetName;
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/copy${qs}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(reqBody),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.copy');
+        return CopyWorkflowOutputSchema.parse(body);
       },
     };
 
