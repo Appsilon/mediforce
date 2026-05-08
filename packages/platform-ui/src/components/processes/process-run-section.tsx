@@ -224,7 +224,7 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
       )}
       {instance.totalCostUsd != null && (
         <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 text-right">
-          {formatCostUsd(instance.totalCostUsd)}
+          {formatCostUsd(instance.totalCostUsd)}{instance.status !== 'completed' && instance.status !== 'failed' ? '+' : ''}
         </span>
       )}
       <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 w-[48px] text-right" title={fullTimeAgo}>

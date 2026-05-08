@@ -295,7 +295,7 @@ export function RunsTable({
                   ) : <span className="text-muted-foreground">—</span>}
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
-                  {run.totalCostUsd != null ? formatCostUsd(run.totalCostUsd) : '—'}
+                  {run.totalCostUsd != null ? `${formatCostUsd(run.totalCostUsd)}${run.status !== 'completed' && run.status !== 'failed' ? '+' : ''}` : '—'}
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}
