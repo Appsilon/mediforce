@@ -114,13 +114,15 @@ export class FirestoreProcessRepository implements ProcessRepository {
         continue;
       }
       const definition = parsed.data;
-      const existing = grouped.get(definition.name) ?? [];
+      const groupKey = `${definition.namespace}:${definition.name}`;
+      const existing = grouped.get(groupKey) ?? [];
       existing.push(definition);
-      grouped.set(definition.name, existing);
+      grouped.set(groupKey, existing);
     }
 
     const definitions = await Promise.all(
-      Array.from(grouped.entries()).map(async ([name, versions]) => {
+      Array.from(grouped.entries()).map(async ([_groupKey, versions]) => {
+        const name = versions[0].name;
         const latestVersion = Math.max(...versions.map((v) => v.version));
         const defaultVersion = await this.getDefaultWorkflowVersion(name);
         return { name, versions, latestVersion, defaultVersion };
