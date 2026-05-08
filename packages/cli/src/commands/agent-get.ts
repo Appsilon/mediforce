@@ -88,7 +88,9 @@ export async function agentGetCommand(input: CommandInput): Promise<number> {
     if (agent.runtimeId !== undefined) {
       input.output.stdout(`  runtimeId:     ${agent.runtimeId}`);
     }
-    input.output.stdout(`  visibility:    ${agent.visibility}`);
+    if (agent.visibility !== undefined) {
+      input.output.stdout(`  visibility:    ${agent.visibility}`);
+    }
     if (agent.namespace !== undefined) {
       input.output.stdout(`  namespace:     ${agent.namespace}`);
     }

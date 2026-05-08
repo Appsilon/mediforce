@@ -16,6 +16,9 @@ Delete an agent definition by ID.
 Positional:
   <id>                 Agent definition ID
 
+Required flags:
+  --force              Confirm deletion (required)
+
 Optional flags:
   --base-url <url>     API base URL (default: http://localhost:9003)
   --json               Emit JSON instead of human-readable output
@@ -23,6 +26,7 @@ Optional flags:
 `;
 
 const OPTIONS = {
+  force: { type: 'boolean' },
   'base-url': { type: 'string' },
   json: { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
@@ -31,6 +35,7 @@ const OPTIONS = {
 export async function agentDeleteCommand(input: CommandInput): Promise<number> {
   let positionals: string[];
   let flags: {
+    force?: boolean;
     'base-url'?: string;
     json?: boolean;
     help?: boolean;
@@ -74,6 +79,18 @@ export async function agentDeleteCommand(input: CommandInput): Promise<number> {
 
   const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
   try {
+    if (flags.force !== true) {
+      const { agent } = await mediforce.agents.get({ id });
+      input.output.stderr(`About to delete agent ${agent.id}:`);
+      input.output.stderr(`  name:    ${agent.name}`);
+      input.output.stderr(`  model:   ${agent.foundationModel}`);
+      if (agent.namespace !== undefined) {
+        input.output.stderr(`  ns:      ${agent.namespace}`);
+      }
+      input.output.stderr('');
+      printError(input.output, { error: 'Pass --force to confirm deletion' }, jsonMode);
+      return 1;
+    }
     const result = await mediforce.agents.delete({ id });
     if (jsonMode) {
       printJson(input.output, result);
