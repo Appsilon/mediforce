@@ -225,6 +225,8 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     const lines = rawStdout.trim().split('\n');
     const textParts: string[] = [];
     const errors: string[] = [];
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -233,12 +235,17 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       try {
         const event = JSON.parse(trimmed) as {
           type?: string;
-          part?: { type?: string; text?: string };
+          part?: { type?: string; text?: string; cost?: number; tokens?: { input?: number; output?: number } };
           error?: { name?: string; data?: { message?: string } };
         };
 
         if (event.type === 'text' && typeof event.part?.text === 'string') {
           textParts.push(event.part.text);
+        }
+
+        if (event.type === 'step_finish' && event.part?.tokens) {
+          totalInputTokens += event.part.tokens.input ?? 0;
+          totalOutputTokens += event.part.tokens.output ?? 0;
         }
 
         if (event.type === 'error' && event.error?.data?.message) {
@@ -253,6 +260,10 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       return '';
     }
 
+    const usage = (totalInputTokens > 0 || totalOutputTokens > 0)
+      ? { input_tokens: totalInputTokens, output_tokens: totalOutputTokens }
+      : undefined;
+
     // Find the contract JSON in text parts (scan from last to first).
     // The contract is: {"output_file": "...", "summary": "..."}
     // The model may wrap it in narration text, so extract just the JSON object.
@@ -262,17 +273,17 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         // Extract the JSON object from the text (model may add preamble/postamble)
         const jsonMatch = part.match(/\{[^{}]*"output_file"[^{}]*\}/);
         const contractJson = jsonMatch ? jsonMatch[0] : part;
-        return JSON.stringify({ result: contractJson });
+        return JSON.stringify({ result: contractJson, ...(usage ? { usage } : {}) });
       }
     }
 
     // Fallback: use the last text part (most likely the final response)
     if (textParts.length > 0) {
-      return JSON.stringify({ result: textParts[textParts.length - 1] });
+      return JSON.stringify({ result: textParts[textParts.length - 1], ...(usage ? { usage } : {}) });
     }
 
     // Only errors
-    return JSON.stringify({ result: errors.map((e) => `[OpenCode error] ${e}`).join('\n') });
+    return JSON.stringify({ result: errors.map((e) => `[OpenCode error] ${e}`).join('\n'), ...(usage ? { usage } : {}) });
   }
 
   protected override async prepareOutputDir(outputDir: string): Promise<void> {

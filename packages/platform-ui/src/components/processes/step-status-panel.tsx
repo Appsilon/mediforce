@@ -9,7 +9,7 @@ import { AutonomyBadge } from '../agents/autonomy-badge';
 import { RetryStepButton } from './retry-step-button';
 import { cn } from '@/lib/utils';
 import { getWorkflowStatus } from '@/lib/workflow-status';
-import { formatDuration } from '@/lib/format';
+import { formatDuration, formatCostUsd } from '@/lib/format';
 import { useUserDisplayNames } from '@/hooks/use-users';
 
 const SYSTEM_ACTOR_IDS = new Set(['auto-runner', 'api-user', 'system']);
@@ -479,6 +479,14 @@ export function StepStatusPanel({
                         <span className="text-xs text-muted-foreground">
                           {formatDuration(new Date(latestExec.completedAt).getTime() - new Date(latestExec.startedAt).getTime())}
                         </span>
+                        {latestExec.agentOutput?.estimatedCostUsd != null && (
+                          <>
+                            <span className="text-muted-foreground/40">·</span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatCostUsd(latestExec.agentOutput.estimatedCostUsd)}
+                            </span>
+                          </>
+                        )}
                       </>
                     )}
                     <span className="text-muted-foreground/40">·</span>

@@ -184,6 +184,44 @@ describe('ClaudeCodeAgentPlugin', () => {
     });
   });
 
+  describe('parseAgentOutput', () => {
+    it('[DATA] extracts last result event from stream-json', () => {
+      const resultEvent = JSON.stringify({
+        type: 'result', subtype: 'success',
+        result: JSON.stringify({ output_file: '/output/result.json' }),
+        usage: { input_tokens: 5000, output_tokens: 1200 },
+      });
+      const stdout = [
+        JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'working...' }] } }),
+        resultEvent,
+      ].join('\n');
+
+      const result = plugin.parseAgentOutput(stdout);
+      const parsed = JSON.parse(result);
+      expect(parsed.type).toBe('result');
+      expect(parsed.usage).toEqual({ input_tokens: 5000, output_tokens: 1200 });
+    });
+
+    it('[DATA] preserves usage field for token extraction', () => {
+      const resultEvent = JSON.stringify({
+        type: 'result', subtype: 'success',
+        result: 'plain text response',
+        usage: { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 30 },
+      });
+
+      const result = plugin.parseAgentOutput(resultEvent);
+      const parsed = JSON.parse(result);
+      expect(parsed.usage.input_tokens).toBe(100);
+      expect(parsed.usage.output_tokens).toBe(50);
+    });
+
+    it('[DATA] returns empty for non-result events only', () => {
+      const stdout = JSON.stringify({ type: 'assistant', message: { content: [] } });
+      const result = plugin.parseAgentOutput(stdout);
+      expect(result).toBe('');
+    });
+  });
+
   describe('run', () => {
     it('[DATA] emits status event before spawning CLI', async () => {
       const context = buildMockContext();

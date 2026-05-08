@@ -5,6 +5,7 @@ import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv } from '@mediforce/agent-runtime';
 import { validateActionSecrets } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
+import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
 import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '@/lib/loop-guard';
 
 interface RunProcessBody {
@@ -69,10 +70,11 @@ export async function POST(
     // Pre-flight: validate all env templates are resolvable before executing anything.
     // The decrypted bag is also reused below as the `secrets` source for action
     // interpolation (`${secrets.NAME}` in http urls/headers/body).
-    const workflowSecrets = await getWorkflowSecretsForRuntime(
-      workflowDefinition.namespace,
-      workflowDefinition.name,
-    );
+    const [namespaceSecrets, perWorkflowSecrets] = await Promise.all([
+      getNamespaceSecretsForRuntime(workflowDefinition.namespace),
+      getWorkflowSecretsForRuntime(workflowDefinition.namespace, workflowDefinition.name),
+    ]);
+    const workflowSecrets = { ...namespaceSecrets, ...perWorkflowSecrets };
     {
       const missingEnv = validateWorkflowEnv(workflowDefinition, workflowSecrets);
       const missingActionSecrets = validateActionSecrets(

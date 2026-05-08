@@ -894,8 +894,40 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         ? parsedResult.confidence_rationale
         : undefined;
 
+      let tokenUsage: { inputTokens: number; outputTokens: number } | undefined;
+
+      // First: check if agent reported tokenUsage in its result
+      if (parsedResult.tokenUsage !== null
+        && typeof parsedResult.tokenUsage === 'object'
+        && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
+        && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
+        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number };
+      }
+
+      // Second: check stream event for CLI-reported usage (e.g. Claude Code stream-json result event)
+      // parseAgentOutput() returns a single JSON object for the final result event.
+      if (!tokenUsage) {
+        try {
+          const rawEvent = JSON.parse(spawnResult.cliOutput) as Record<string, unknown>;
+          const usage = rawEvent.usage as Record<string, number> | undefined;
+          if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
+            tokenUsage = { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens };
+          }
+        } catch {
+          agentLog('cost.tokenExtraction', 'could not extract token usage from CLI output', {
+            stepId, instanceId, cliOutputLength: spawnResult.cliOutput.length,
+          });
+        }
+      }
+
+      if (tokenUsage) {
+        agentLog('cost.tokensExtracted', 'token usage captured', {
+          stepId, instanceId, inputTokens: tokenUsage.inputTokens, outputTokens: tokenUsage.outputTokens,
+        });
+      }
+
       // Strip envelope-level fields from result to avoid duplication in UI
-      const { confidence: _c, confidence_rationale: _cr, ...cleanResult } = parsedResult;
+      const { confidence: _c, confidence_rationale: _cr, tokenUsage: _tu, ...cleanResult } = parsedResult;
 
       // Persist any deliverable file from the output dir before it gets cleaned up
       const deliverableFile = await this.persistDeliverableFile(
@@ -928,6 +960,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           ...(spawnResult.gitMetadata ? { gitMetadata: spawnResult.gitMetadata } : {}),
           ...(spawnResult.presentation ? { presentation: spawnResult.presentation } : {}),
           ...(deliverableFile ? { deliverableFile } : {}),
+          ...(tokenUsage ? { tokenUsage } : {}),
         },
         timestamp: new Date().toISOString(),
       });

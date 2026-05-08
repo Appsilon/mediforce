@@ -13,12 +13,13 @@ import {
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
 } from '@mediforce/agent-runtime';
-import type {
-  AgentOAuthTokenRepository,
-  OAuthProviderRepository,
-  ResolvedMcpConfig,
-  WorkflowDefinition,
-  WorkflowStep,
+import {
+  calculateEstimatedCost,
+  type AgentOAuthTokenRepository,
+  type OAuthProviderRepository,
+  type ResolvedMcpConfig,
+  type WorkflowDefinition,
+  type WorkflowStep,
 } from '@mediforce/platform-core';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
@@ -58,6 +59,7 @@ export async function executeAgentStep(
     toolCatalogRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    modelRegistryRepo,
   } = getPlatformServices();
 
   const instance = await instanceRepo.getById(instanceId);
@@ -186,6 +188,7 @@ export async function executeAgentStep(
 
   // Persist agent output to step execution
   const envelope = runResult.envelope;
+  const costResult = envelope ? await estimateCostField(envelope, modelRegistryRepo) : {};
   if (stepExecutionId) {
     const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
     // L3 + escalated (non-error) routes to human review below, so the execution
@@ -205,6 +208,8 @@ export async function executeAgentStep(
             duration_ms: envelope.duration_ms ?? null,
             gitMetadata: envelope.gitMetadata ?? null,
             deliverableFile: (envelope.deliverableFile as string | undefined) ?? null,
+            ...(envelope.tokenUsage ? { tokenUsage: envelope.tokenUsage } : {}),
+            ...costResult,
           }
         : null,
     });
@@ -225,16 +230,26 @@ export async function executeAgentStep(
     }
   }
 
-  // Persist output to instance.variables so subsequent steps can read it
+  // Persist output to instance.variables so subsequent steps can read it.
+  // Also accumulate totalCostUsd on the instance for list views.
+  // Note: read-then-increment is not atomic, but steps execute sequentially
+  // per instance (auto-runner loop is serial). If parallel branches are
+  // added, switch to Firestore FieldValue.increment().
   const agentOutput = envelope?.result ?? null;
-  if (agentOutput !== null) {
+  const stepCost = costResult.estimatedCostUsd;
+  if (agentOutput !== null || stepCost !== undefined) {
     const freshInstance = await instanceRepo.getById(instanceId);
     if (freshInstance) {
       await instanceRepo.update(instanceId, {
-        variables: {
-          ...freshInstance.variables,
-          [stepId]: agentOutput,
-        },
+        ...(agentOutput !== null ? {
+          variables: {
+            ...freshInstance.variables,
+            [stepId]: agentOutput,
+          },
+        } : {}),
+        ...(stepCost !== undefined ? {
+          totalCostUsd: (freshInstance.totalCostUsd ?? 0) + stepCost,
+        } : {}),
       });
     }
   }
@@ -539,4 +554,17 @@ async function loadOAuthTokens(
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
+}
+
+async function estimateCostField(
+  envelope: { model: string | null; tokenUsage?: { inputTokens: number; outputTokens: number } },
+  modelRegistryRepo: { getById(id: string): Promise<{ pricing: { input: number; output: number } } | null> },
+): Promise<{ estimatedCostUsd: number } | Record<string, never>> {
+  if (!envelope.tokenUsage || !envelope.model) return {};
+  const entry = await modelRegistryRepo.getById(envelope.model);
+  if (!entry) {
+    console.warn(`[cost] model "${envelope.model}" not found in registry — cost unavailable`);
+    return {};
+  }
+  return { estimatedCostUsd: calculateEstimatedCost(envelope.tokenUsage, entry.pricing) };
 }
