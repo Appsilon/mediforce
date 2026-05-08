@@ -21,7 +21,7 @@ import { formatStepName } from '@/components/tasks/task-utils';
 import { MissingEnvBanner } from './missing-env-banner';
 import { AgentEscalatedBanner } from './agent-escalated-banner';
 import { PreviousRunBanner } from './previous-run-banner';
-import { formatDuration } from '@/lib/format';
+import { formatDuration, formatCostUsd } from '@/lib/format';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 
 type AuditEventWithId = AuditEvent & { id: string };
@@ -162,6 +162,21 @@ export function ProcessDetail({
     return end - start;
   }, [instance.createdAt, instance.updatedAt]);
 
+  const totalCostUsd = React.useMemo(() => {
+    if (!stepExecutions || stepExecutions.length === 0) return null;
+    let total = 0;
+    let hasCost = false;
+    for (const exec of stepExecutions) {
+      if (exec.agentOutput?.estimatedCostUsd != null) {
+        total += exec.agentOutput.estimatedCostUsd;
+        hasCost = true;
+      }
+    }
+    return hasCost ? total : null;
+  }, [stepExecutions]);
+
+  const isTerminal = instance.status === 'completed' || instance.status === 'failed';
+
   // Scroll audit log to bottom when events change
   const auditScrollRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -246,6 +261,9 @@ export function ProcessDetail({
             <span>Created: <span className="text-foreground">{format(new Date(instance.createdAt), 'MMM d, yyyy HH:mm')}</span></span>
             {wfStatus.displayStatus !== 'in_progress' && (
               <span>Duration: <span className="text-foreground">{formatDuration(runDurationMs)}</span></span>
+            )}
+            {totalCostUsd != null && (
+              <span>Cost: <span className={isTerminal ? 'text-foreground' : 'text-amber-600 dark:text-amber-400'}>{formatCostUsd(totalCostUsd)}{isTerminal ? '' : '+'}</span></span>
             )}
             {instance.status === 'completed' && (
               <Link
