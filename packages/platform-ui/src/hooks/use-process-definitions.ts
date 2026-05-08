@@ -42,17 +42,22 @@ function compareSemver(a: string, b: string): number {
   return 0;
 }
 
+function groupKey(doc: WorkflowDefinitionDoc): string {
+  return `${doc.namespace ?? ''}:${doc.name}`;
+}
+
 function getLatestByName(docs: WorkflowDefinitionDoc[]): Map<string, WorkflowDefinitionDoc> {
-  const byName = new Map<string, WorkflowDefinitionDoc[]>();
+  const byKey = new Map<string, WorkflowDefinitionDoc[]>();
   for (const doc of docs) {
-    const existing = byName.get(doc.name) ?? [];
+    const key = groupKey(doc);
+    const existing = byKey.get(key) ?? [];
     existing.push(doc);
-    byName.set(doc.name, existing);
+    byKey.set(key, existing);
   }
   const result = new Map<string, WorkflowDefinitionDoc>();
-  for (const [name, group] of byName) {
+  for (const [key, group] of byKey) {
     const latest = [...group].sort((a, b) => compareSemver(String(b.version), String(a.version)))[0];
-    if (latest) result.set(name, latest);
+    if (latest) result.set(key, latest);
   }
   return result;
 }
@@ -72,9 +77,10 @@ export function useProcessDefinitions() {
   const latestDocs = useMemo(() => getLatestByName(allDocs), [allDocs]);
 
   const definitions = useMemo((): DefinitionGroup[] => {
-    const byName = new Map<string, DefinitionVersion[]>();
+    const byKey = new Map<string, DefinitionVersion[]>();
     for (const def of allDocs) {
-      const entry = byName.get(def.name) ?? [];
+      const key = groupKey(def);
+      const entry = byKey.get(key) ?? [];
       entry.push({
         version: String(def.version),
         stepCount: def.steps.length,
@@ -82,12 +88,13 @@ export function useProcessDefinitions() {
         title: def.title,
         description: def.description,
       });
-      byName.set(def.name, entry);
+      byKey.set(key, entry);
     }
 
-    return Array.from(byName.entries()).map(([name, versions]) => {
+    return Array.from(byKey.entries()).map(([key, versions]) => {
       const sorted = [...versions].sort((a, b) => compareSemver(b.version, a.version));
-      const latestDoc = latestDocs.get(name)!;
+      const latestDoc = latestDocs.get(key)!;
+      const name = latestDoc.name;
       const latest = sorted[0];
       const hasManualTrigger = latestDoc.triggers.some((trigger) => trigger.type === 'manual');
       return {
@@ -109,9 +116,9 @@ export function useProcessDefinitions() {
 
   const stepsByDefinition = useMemo((): Map<string, string[]> => {
     const result = new Map<string, string[]>();
-    for (const [name, doc] of latestDocs) {
+    for (const [_key, doc] of latestDocs) {
       result.set(
-        name,
+        doc.name,
         doc.steps.filter((step) => step.type !== 'terminal').map((step) => step.id),
       );
     }
