@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { AgentMcpBindingMapSchema } from './agent-mcp-binding.js';
 
+export const AgentVisibilitySchema = z.enum(['public', 'private']);
+export type AgentVisibility = z.infer<typeof AgentVisibilitySchema>;
+
 export const AgentDefinitionSchema = z.object({
   id: z.string(),
   /** Discriminates runtime dispatch. 'plugin' routes to PluginRegistry
@@ -24,6 +27,7 @@ export const AgentDefinitionSchema = z.object({
    *  (disable servers or deny tools) — they cannot broaden. */
   mcpServers: AgentMcpBindingMapSchema.optional(),
   namespace: z.string().min(1).optional(),
+  visibility: AgentVisibilitySchema.default('private'),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

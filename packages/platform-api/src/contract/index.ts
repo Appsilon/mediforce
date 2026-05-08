@@ -52,9 +52,19 @@ export {
   ListAgentsOutputSchema,
   GetAgentInputSchema,
   GetAgentOutputSchema,
+  DeleteAgentInputSchema,
+  DeleteAgentOutputSchema,
+  UpdateAgentInputSchema,
+  UpdateAgentBodySchema,
+  UpdateAgentOutputSchema,
   type ListAgentsOutput,
   type GetAgentInput,
   type GetAgentOutput,
+  type DeleteAgentInput,
+  type DeleteAgentOutput,
+  type UpdateAgentInput,
+  type UpdateAgentBody,
+  type UpdateAgentOutput,
 } from './agents.js';
 
 export {

@@ -8,7 +8,7 @@ import {
   ArrowLeft,
   Bot, Cpu, Terminal, BarChart3, Brain, Zap,
   Shield, Code, Database, Globe, Sparkles, Settings,
-  Check, Upload, X, ChevronDown,
+  Check, Upload, X, ChevronDown, Eye, EyeOff,
 } from 'lucide-react';
 import { ref, uploadBytes } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
@@ -70,6 +70,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [newSkillFiles, setNewSkillFiles] = useState<File[]>([]);
   const [skillsDragOver, setSkillsDragOver] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [saving, setSaving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,6 +97,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         setSelectedModelId(def.foundationModel);
         setExistingSkillPaths(def.skillFileNames);
         setPrompt(def.systemPrompt);
+        setVisibility(def.visibility ?? 'private');
       })
       .finally(() => setLoadingDef(false));
   }, [id]);
@@ -170,6 +172,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         foundationModel: selectedModelId,
         systemPrompt: prompt,
         skillFileNames: [...existingSkillPaths, ...uploadedPaths],
+        visibility,
       };
       await apiFetch(`/api/agent-definitions/${id}`, {
         method: 'PUT',
@@ -258,7 +261,35 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
             />
           </div>
 
-          {/* 4. Input / Output descriptions */}
+          {/* 4. Visibility */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Visibility</label>
+            <div className="flex gap-2">
+              {(['private', 'public'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setVisibility(v)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm transition-colors',
+                    visibility === v
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'hover:border-primary/50',
+                  )}
+                >
+                  {v === 'private' ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  {v === 'private' ? 'Private' : 'Public'}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {visibility === 'private'
+                ? 'Only members of this namespace can see this agent.'
+                : 'This agent is visible to everyone.'}
+            </p>
+          </div>
+
+          {/* 5. Input / Output descriptions */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Input</label>
