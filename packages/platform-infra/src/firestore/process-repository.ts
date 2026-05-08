@@ -45,10 +45,18 @@ export class FirestoreProcessRepository implements ProcessRepository {
     name: string,
     version: number,
   ): Promise<WorkflowDefinition | null> {
-    const snapshot = await this.db
+    let snapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
       .doc(`${namespace}:${name}:${version}`)
       .get();
+
+    // Fallback: pre-migration doc ID format ({name}:{version})
+    if (!snapshot.exists) {
+      snapshot = await this.db
+        .collection(this.workflowDefinitionsCollection)
+        .doc(`${name}:${version}`)
+        .get();
+    }
 
     if (!snapshot.exists) return null;
 
@@ -198,9 +206,15 @@ export class FirestoreProcessRepository implements ProcessRepository {
   }
 
   async setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void> {
-    const docId = `${namespace}:${name}:${version}`;
-    const docRef = this.db.collection(this.workflowDefinitionsCollection).doc(docId);
-    const snap = await docRef.get();
+    let docId = `${namespace}:${name}:${version}`;
+    let docRef = this.db.collection(this.workflowDefinitionsCollection).doc(docId);
+    let snap = await docRef.get();
+    // Fallback: pre-migration doc ID format
+    if (!snap.exists) {
+      docId = `${name}:${version}`;
+      docRef = this.db.collection(this.workflowDefinitionsCollection).doc(docId);
+      snap = await docRef.get();
+    }
     if (!snap.exists) {
       throw new WorkflowDefinitionVersionNotFoundError(name, version);
     }
