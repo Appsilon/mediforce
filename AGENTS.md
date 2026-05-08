@@ -103,6 +103,29 @@ Two tiers: `skills/` (dev-time slash commands, indexed in `skills/_registry.yml`
 and `apps/*/plugins/*/skills/` (runtime, loaded by `agent-runtime` via
 workflow-definition `skillsDir` — paths hardcoded, don't move).
 
+## Quick reference
+
+```bash
+# Dev
+pnpm dev                                # platform-ui on :9003
+pnpm dev:local                          # + local agent execution
+pnpm dev:redis && pnpm dev:worker       # BullMQ queue mode (Docker + Redis)
+pnpm emulators                          # Firebase Auth :9099 + Firestore :8080
+
+# Test
+pnpm typecheck
+pnpm test:affected                      # <1s, changed files only
+pnpm test                               # full unit + integration (~9s)
+npx vitest run path/to/file.test.ts     # single file
+
+# E2E (delegate to a background subagent)
+python3 packages/platform-ui/scripts/bootstrap_e2e.py
+cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth
+
+# CLI
+pnpm exec mediforce --help
+```
+
 ## Reminder — re-read at the top of every task
 
 1. Simplify before coding.
@@ -112,4 +135,4 @@ workflow-definition `skillsDir` — paths hardcoded, don't move).
 5. Ask, don't sneak, when a capability is missing.
 6. Delegate to subagents when it parallelises. Not as ceremony.
 
-See `README.md` for env setup, dev commands, and emulator bootstrap.
+See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).
