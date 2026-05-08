@@ -1052,6 +1052,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   const agentDefinitions: Record<string, Record<string, unknown>> = {
     'claude-code-agent': {
       kind: 'plugin',
+      visibility: 'public',
       runtimeId: 'claude-code-agent',
       name: 'Claude Code Agent',
       iconName: 'Bot',

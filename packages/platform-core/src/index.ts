@@ -196,11 +196,13 @@ export type {
 // Agent definition schema + repository interface
 export {
   AgentDefinitionSchema,
+  AgentVisibilitySchema,
   CreateAgentDefinitionInputSchema,
   UpdateAgentDefinitionInputSchema,
 } from './schemas/agent-definition.js';
 export type {
   AgentDefinition,
+  AgentVisibility,
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
 } from './schemas/agent-definition.js';

@@ -1,6 +1,7 @@
 {
   "claude-code-agent": {
     "kind": "plugin",
+    "visibility": "public",
     "runtimeId": "claude-code-agent",
     "name": "Claude Code Agent",
     "iconName": "Bot",
@@ -13,6 +14,7 @@
   },
   "opencode-agent": {
     "kind": "plugin",
+    "visibility": "public",
     "runtimeId": "opencode-agent",
     "name": "OpenCode Agent",
     "iconName": "Cpu",
@@ -25,6 +27,7 @@
   },
   "script-container": {
     "kind": "plugin",
+    "visibility": "public",
     "runtimeId": "script-container",
     "name": "Script Container",
     "iconName": "Terminal",
@@ -37,6 +40,7 @@
   },
   "tealflow-cowork-chat": {
     "kind": "cowork",
+    "visibility": "public",
     "runtimeId": "chat",
     "name": "Tealflow Cowork Chat",
     "iconName": "MessageCircle",

@@ -25,6 +25,11 @@ import {
   ListAgentsOutputSchema,
   GetAgentInputSchema,
   GetAgentOutputSchema,
+  DeleteAgentInputSchema,
+  DeleteAgentOutputSchema,
+  UpdateAgentInputSchema,
+  UpdateAgentBodySchema,
+  UpdateAgentOutputSchema,
   SetSecretInputSchema,
   SetSecretOutputSchema,
   ListSecretKeysInputSchema,
@@ -58,6 +63,11 @@ import {
   type ListAgentsOutput,
   type GetAgentInput,
   type GetAgentOutput,
+  type DeleteAgentInput,
+  type DeleteAgentOutput,
+  type UpdateAgentInput,
+  type UpdateAgentBody,
+  type UpdateAgentOutput,
   type SetSecretInput,
   type SetSecretOutput,
   type ListSecretKeysInput,
@@ -156,6 +166,8 @@ export class Mediforce {
   readonly agents: {
     list: () => Promise<ListAgentsOutput>;
     get: (input: GetAgentInput) => Promise<GetAgentOutput>;
+    delete: (input: DeleteAgentInput) => Promise<DeleteAgentOutput>;
+    update: (input: UpdateAgentInput, body: UpdateAgentBody) => Promise<UpdateAgentOutput>;
   };
 
   readonly models: {
@@ -314,6 +326,29 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agents.get');
         return GetAgentOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteAgentInputSchema.parse(input);
+        const res = await this.request(
+          `/api/agent-definitions/${encodeURIComponent(validated.id)}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.delete');
+        return DeleteAgentOutputSchema.parse(body);
+      },
+      update: async (input, updateBody) => {
+        const validatedInput = UpdateAgentInputSchema.parse(input);
+        const validatedBody = UpdateAgentBodySchema.parse(updateBody);
+        const res = await this.request(
+          `/api/agent-definitions/${encodeURIComponent(validatedInput.id)}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(validatedBody),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.update');
+        return UpdateAgentOutputSchema.parse(body);
       },
     };
 

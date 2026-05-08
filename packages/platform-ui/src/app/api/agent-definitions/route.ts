@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { CreateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, filterByNamespace, requireNamespaceAccess } from '@/lib/api-auth';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 export async function GET(request: Request): Promise<NextResponse> {
   const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
@@ -10,7 +10,12 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (caller instanceof NextResponse) return caller;
 
   const agents = await agentDefinitionRepo.list();
-  const filtered = filterByNamespace(caller, agents);
+  const filtered = caller.kind === 'apiKey'
+    ? agents
+    : agents.filter((agent) => {
+        if (agent.visibility === 'public') return true;
+        return typeof agent.namespace === 'string' && caller.namespaces.has(agent.namespace);
+      });
   return NextResponse.json({ agents: filtered });
 }
 

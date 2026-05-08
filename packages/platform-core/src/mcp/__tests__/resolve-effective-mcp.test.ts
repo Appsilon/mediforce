@@ -32,6 +32,7 @@ function makeAgent(mcpServers?: AgentMcpBindingMap): AgentDefinition {
     outputDescription: '',
     skillFileNames: [],
     mcpServers,
+    visibility: 'private',
     createdAt: '2026-04-22T00:00:00.000Z',
     updatedAt: '2026-04-22T00:00:00.000Z',
   };

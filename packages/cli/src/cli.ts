@@ -31,6 +31,8 @@ import { systemStatusCommand, systemImagesCommand, systemDiskCommand, systemRmiC
 import { systemCreditsCommand } from './commands/system-credits.js';
 import { agentListCommand } from './commands/agent-list.js';
 import { agentGetCommand } from './commands/agent-get.js';
+import { agentDeleteCommand } from './commands/agent-delete.js';
+import { agentSetVisibilityCommand } from './commands/agent-set-visibility.js';
 import { modelListCommand } from './commands/model-list.js';
 import { modelGetCommand } from './commands/model-get.js';
 import { modelSyncCommand } from './commands/model-sync.js';
@@ -55,6 +57,8 @@ Commands:
   workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
   agent list                                         List agent definitions
   agent get <id>                                     Fetch an agent definition
+  agent delete <id>                                  Delete an agent definition
+  agent set-visibility <id> --visibility <v>         Set agent visibility (public|private)
   model list                                         List models in registry
   model get <id>                                     Fetch a model from registry
   model sync                                         Sync models from OpenRouter
@@ -100,8 +104,10 @@ Run \`mediforce workflow <subcommand> --help\` for subcommand-specific flags.
 const AGENT_HELP = `Usage: mediforce agent <subcommand> [options]
 
 Subcommands:
-  list                List agent definitions
-  get <id>            Fetch an agent definition
+  list                                      List agent definitions
+  get <id>                                  Fetch an agent definition
+  delete <id>                               Delete an agent definition
+  set-visibility <id> --visibility <v>      Set agent visibility
 
 Run \`mediforce agent <subcommand> --help\` for subcommand-specific flags.
 `;
@@ -218,6 +224,12 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'agent' && subcommand === 'get') {
     return agentGetCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'agent' && subcommand === 'delete') {
+    return agentDeleteCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'agent' && subcommand === 'set-visibility') {
+    return agentSetVisibilityCommand({ argv: rest, env: input.env, output });
   }
   if (command === 'model' && subcommand === 'list') {
     return modelListCommand({ argv: rest, env: input.env, output });
