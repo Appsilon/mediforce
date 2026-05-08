@@ -25,10 +25,9 @@ export interface ApiDefinitionItem {
 
 export function mapApiToDefinitionGroups(
   items: ApiDefinitionItem[],
-  handle: string,
 ): DefinitionGroup[] {
   return items
-    .filter((item) => item.definition !== null && item.definition.namespace === handle)
+    .filter((item) => item.definition !== null)
     .map((item) => {
       const def = item.definition!;
       return {
@@ -73,14 +72,14 @@ export function useWorkflowDefinitionsApi(handle: string): {
     let cancelled = false;
     setLoading(true);
 
-    apiFetch('/api/workflow-definitions')
+    apiFetch(`/api/workflow-definitions?namespace=${encodeURIComponent(handle)}`)
       .then((res) => {
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         return res.json();
       })
       .then((data: { definitions: ApiDefinitionItem[] }) => {
         if (cancelled) return;
-        setDefinitions(mapApiToDefinitionGroups(data.definitions, handle));
+        setDefinitions(mapApiToDefinitionGroups(data.definitions));
         setError(null);
       })
       .catch((err: unknown) => {
@@ -98,7 +97,7 @@ export function useWorkflowDefinitionsApi(handle: string): {
   return { definitions, loading, error };
 }
 
-export function useWorkflowDefinitionApi(name: string): {
+export function useWorkflowDefinitionApi(namespace: string, name: string): {
   definition: ApiDefinitionItem['definition'];
   loading: boolean;
   error: Error | null;
@@ -108,7 +107,7 @@ export function useWorkflowDefinitionApi(name: string): {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!name) {
+    if (!name || !namespace) {
       setDefinition(null);
       setLoading(false);
       return;
@@ -117,7 +116,7 @@ export function useWorkflowDefinitionApi(name: string): {
     let cancelled = false;
     setLoading(true);
 
-    apiFetch(`/api/workflow-definitions/${encodeURIComponent(name)}`)
+    apiFetch(`/api/workflow-definitions/${encodeURIComponent(name)}?namespace=${encodeURIComponent(namespace)}`)
       .then((res) => {
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         return res.json();
@@ -137,7 +136,7 @@ export function useWorkflowDefinitionApi(name: string): {
       });
 
     return () => { cancelled = true; };
-  }, [name]);
+  }, [namespace, name]);
 
   return { definition, loading, error };
 }

@@ -45,11 +45,10 @@ export default function RunsPage() {
     );
   }
 
-  return <RunsPageContent />;
+  return <RunsPageContent handle={handle} />;
 }
 
-function RunsPageContent() {
-  const { handle } = useParams<{ handle: string }>();
+function RunsPageContent({ handle }: { handle: string }) {
   const searchParams = useSearchParams();
   const workflowFilter = searchParams.get('workflow');
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);

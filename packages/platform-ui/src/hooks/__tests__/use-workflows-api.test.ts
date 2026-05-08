@@ -24,7 +24,7 @@ describe('mapApiToDefinitionGroups', () => {
       },
     }];
 
-    const result = mapApiToDefinitionGroups(items, 'acme');
+    const result = mapApiToDefinitionGroups(items);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
@@ -49,7 +49,7 @@ describe('mapApiToDefinitionGroups', () => {
     });
   });
 
-  it('filters by namespace handle', () => {
+  it('maps multiple items', () => {
     const items: ApiDefinitionItem[] = [
       {
         name: 'wf-a',
@@ -72,14 +72,13 @@ describe('mapApiToDefinitionGroups', () => {
           version: 1,
           steps: [],
           triggers: [],
-          namespace: 'ns-b',
+          namespace: 'ns-a',
         },
       },
     ];
 
-    const result = mapApiToDefinitionGroups(items, 'ns-a');
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('wf-a');
+    const result = mapApiToDefinitionGroups(items);
+    expect(result).toHaveLength(2);
   });
 
   it('skips items with null definition', () => {
@@ -90,7 +89,7 @@ describe('mapApiToDefinitionGroups', () => {
       definition: null,
     }];
 
-    const result = mapApiToDefinitionGroups(items, 'any');
+    const result = mapApiToDefinitionGroups(items);
     expect(result).toHaveLength(0);
   });
 
@@ -108,7 +107,7 @@ describe('mapApiToDefinitionGroups', () => {
       },
     }];
 
-    const result = mapApiToDefinitionGroups(items, 'ns');
+    const result = mapApiToDefinitionGroups(items);
     expect(result[0].hasManualTrigger).toBe(false);
   });
 });

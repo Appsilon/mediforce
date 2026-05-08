@@ -47,7 +47,7 @@ export default function ProcessDefinitionPage() {
 
 function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: string }) {
   const decodedName = decodeURIComponent(name);
-  const { definition, loading, error } = useWorkflowDefinitionApi(decodedName);
+  const { definition, loading, error } = useWorkflowDefinitionApi(handle, decodedName);
 
   if (loading) {
     return (
@@ -72,11 +72,6 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
     <div className="flex flex-1 flex-col gap-0">
       <div className="border-b px-6 py-4">
         <div>
-          {definition.visibility === 'private' && (
-            <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
-              Private
-            </span>
-          )}
           {definition.description && (
             <p className="text-sm text-muted-foreground mt-0.5">{definition.description}</p>
           )}
@@ -99,8 +94,8 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
               <Layers className="h-3 w-3" />
               {definition.steps.length} steps
             </span>
-            <RepoLink definition={definition as Record<string, unknown>} />
-            <AppLink definition={definition as Record<string, unknown>} />
+            <RepoLink definition={definition} />
+            <AppLink definition={definition} />
           </div>
         </div>
       </div>
@@ -235,8 +230,8 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                   )}
                 </span>
               ))}
-              <RepoLink definition={latest as Record<string, unknown>} />
-              <AppLink definition={latest as Record<string, unknown>} />
+              <RepoLink definition={latest} />
+              <AppLink definition={latest} />
             </div>
           </div>
 
@@ -497,9 +492,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   );
 }
 
-function RepoLink({ definition }: { definition: Record<string, unknown> | null }) {
+function RepoLink({ definition }: { definition: { repo?: { url: string; branch?: string; directory?: string } } | null }) {
   if (!definition?.repo) return null;
-  const repo = definition.repo as { url: string; branch?: string; directory?: string };
+  const repo = definition.repo;
   let href = repo.url;
   if (repo.branch) {
     href += `/tree/${repo.branch}`;
@@ -519,11 +514,11 @@ function RepoLink({ definition }: { definition: Record<string, unknown> | null }
   );
 }
 
-function AppLink({ definition }: { definition: Record<string, unknown> | null }) {
+function AppLink({ definition }: { definition: { url?: string } | null }) {
   if (!definition?.url) return null;
   return (
     <a
-      href={definition.url as string}
+      href={definition.url}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex items-center gap-1 hover:text-foreground transition-colors"

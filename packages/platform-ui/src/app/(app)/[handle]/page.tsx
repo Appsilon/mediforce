@@ -450,7 +450,7 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
     [definitions],
   );
 
-  const emptyInstances = useMemo(() => new Map<string, string>(), []);
+  const emptyTaskMap = useMemo(() => new Map<string, string>(), []);
 
   return (
     <div className="flex flex-col gap-4">
@@ -478,7 +478,7 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
               instances={[]}
               showCompleted={true}
               handle={handle}
-              activeTaskByInstance={emptyInstances}
+              activeTaskByInstance={emptyTaskMap}
               isMember={false}
             />
           ))}
