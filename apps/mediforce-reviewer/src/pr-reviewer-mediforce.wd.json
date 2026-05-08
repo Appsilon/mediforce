@@ -2,7 +2,7 @@
   "name": "pr-reviewer-mediforce",
   "namespace": "appsilon",
   "title": "PR Reviewer — Mediforce",
-  "description": "Pick an open PR (not draft, no human comments yet) on Appsilon/mediforce, run the code-review skill on the diff, and post the review as a single comment on the PR. Runs every 15 minutes; manual trigger also available.",
+  "description": "Pick an open PR (not draft, no human comments yet) on Appsilon/mediforce, run the code-review skill on the diff, and post the review as a single comment on the PR. Runs every 20 minutes; manual trigger also available.",
   "preamble": "## Context\nThis workflow audits open PRs on the Appsilon/mediforce repository. Steps 1 and 3 use a GitHub-MCP-bound agent (user-to-server OAuth, scoped to the user's installation) to fetch and post on the PR. Step 2 is sandboxed (no GitHub access) and runs the `code-review` skill on the inline diff carried over from step 1.",
   "env": {
     "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
@@ -10,7 +10,7 @@
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
   },
   "triggers": [
-    { "name": "poll-prs", "type": "cron", "schedule": "*/15 * * * *" },
+    { "name": "poll-prs", "type": "cron", "schedule": "*/20 * * * *" },
     { "name": "manual", "type": "manual" }
   ],
   "steps": [
@@ -26,7 +26,7 @@
       "agent": {
         "image": "mediforce-golden-image:latest",
         "model": "haiku",
-        "timeoutMinutes": 5,
+        "timeoutMinutes": 4,
         "prompt": "## Task\n\nUse your GitHub MCP tools to list open pull requests on `Appsilon/mediforce`. Find the FIRST PR that meets ALL of these criteria:\n- `state` is `open`\n- not a draft (`draft == false`)\n- has no **human** issue comments, review comments, or reviews yet — i.e. the PR has not yet received feedback from a person\n\n## Filtering: ignore generic bots, count everything else\n\nA PR is eligible only when it has zero comments / reviews from non-bot authors. \"Generic bot\" — and only those — are ignored. Match when EITHER:\n- `user.type == \"Bot\"` (authoritative signal — GitHub labels App-backed accounts this way)\n- `user.login` contains the literal substring `[bot]` (with the square brackets — e.g. `vercel[bot]`, `github-actions[bot]`, `dependabot[bot]`). Real GitHub usernames cannot contain `[` or `]`, so a literal-bracket suffix is unambiguous. Do NOT match user accounts that merely end in `bot` without brackets (e.g. `turbot`, `roboto` — those are humans).\n\nEverything else — including this workflow's own previous review (which appears authored by the OAuth-connected user, since we run under their user-to-server token) — counts as a non-bot comment and disqualifies the PR.\n\nNet effect: any PR receives at most one review from this workflow; once the review lands, the next cron tick sees a non-bot comment on the PR and skips it. Same logic also keeps us out of PRs that humans have already started reviewing.\n\n## Output\n\nIf no eligible PR exists:\n```json\n{\"found\": false}\n```\n\nOtherwise fetch the diff (use `get_pull_request_diff` or equivalent) and output:\n```json\n{\n  \"found\": true,\n  \"pr_number\": <number>,\n  \"title\": <string>,\n  \"html_url\": <string>,\n  \"diff\": <unified diff text — keep as a JSON string with newlines preserved>\n}\n```\n\nWrite the JSON object to `${output_dir}/result.json` — that is your only deliverable. Do not call any tools beyond the GitHub MCP toolset, and do not produce a chat-style summary."
       }
     },
@@ -50,7 +50,7 @@
         "skill": "code-review",
         "skillsDir": "skills",
         "model": "sonnet",
-        "timeoutMinutes": 15,
+        "timeoutMinutes": 10,
         "prompt": "## Inputs\n\nThe pull request being reviewed is described under `## Previous Step Outputs` → `find-pr`. Fields available:\n- `pr_number`, `title`, `html_url`\n- `diff`: the unified diff to review\n\nThe `code-review` skill text above explains the review structure and rubric.\n\n## Output\n\nApply the skill to the diff. Produce a single JSON object with one field:\n```json\n{ \"review_comment\": <markdown string> }\n```\nwhere `review_comment` is the formatted review ready to be posted as a single GitHub PR comment.\n\n**Required header.** The first line of `review_comment` must be exactly:\n\n```\n> 🤖 Automated review by **Mediforce Code Review Agent** — flag false positives so we can tune the prompt.\n```\n\nFollowed by a blank line, then the actual review (Summary / Findings / Verdict from the skill rubric). The header is a Markdown blockquote so GitHub renders it visually distinct from the review body. Keep it on a single line — concise, no extra paragraphs.\n\nWrite the JSON to `${output_dir}/result.json`. Do not call any external tools — work only from the diff already provided in the prompt."
       }
     },
@@ -66,7 +66,7 @@
       "agent": {
         "image": "mediforce-golden-image:latest",
         "model": "haiku",
-        "timeoutMinutes": 5,
+        "timeoutMinutes": 4,
         "prompt": "## Task\n\nUse your GitHub MCP tools to post a single comment on the pull request identified in step `find-pr`.\n\n- Repo: `Appsilon/mediforce`\n- PR number: from `## Previous Step Outputs` → `find-pr.pr_number`\n- Comment body: from `## Previous Step Outputs` → `review.review_comment`\n\nCall `add_issue_comment` (or the equivalent MCP tool) with `owner=\"Appsilon\"`, `repo=\"mediforce\"`, `issue_number=<pr_number>`, `body=<review_comment>`.\n\nAfter the comment is posted, write `{\"posted\": true, \"comment_url\": <url returned by MCP>}` to `${output_dir}/result.json`. No additional commentary."
       }
     },
