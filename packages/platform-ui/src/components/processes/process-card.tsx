@@ -95,6 +95,7 @@ export function ProcessCard({
   steps,
   handle,
   activeTaskByInstance,
+  isMember = true,
 }: {
   definition: DefinitionGroup;
   instances: ProcessInstance[];
@@ -102,6 +103,7 @@ export function ProcessCard({
   steps?: string[];
   handle: string;
   activeTaskByInstance: Map<string, string>;
+  isMember?: boolean;
 }) {
   const filteredInstances = useMemo(() => {
     return instances.filter((instance) => {
@@ -188,6 +190,7 @@ export function ProcessCard({
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
         </Link>
+        {isMember && (
         <div className="flex items-center justify-between px-4 pb-3">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {totalCount > 0 ? (
@@ -210,9 +213,10 @@ export function ProcessCard({
             archived={definition.archived === true}
           />
         </div>
+        )}
 
         {/* Runs preview — compact list only */}
-        {previewInstances.length > 0 && (
+        {isMember && previewInstances.length > 0 && (
         <div className="border-t">
 
           <div>

@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { collection, doc, getDoc, getDocs, query, orderBy, limit, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, updateDoc } from 'firebase/firestore';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
@@ -33,6 +33,7 @@ type MemberPreview = {
   avatarUrl?: string;
   role: string;
   joinedAt: string;
+  handle?: string;
 };
 
 const MAX_AVATAR_MEMBERS = 20;
@@ -48,9 +49,9 @@ function useWorkspaceMembers(handle: string, enabled: boolean) {
     const previewQuery = query(membersRef, orderBy('joinedAt', 'asc'), limit(MAX_AVATAR_MEMBERS));
 
     Promise.all([getDocs(previewQuery), getDocs(membersRef)])
-      .then(([previewSnapshot, fullSnapshot]) => {
+      .then(async ([previewSnapshot, fullSnapshot]) => {
         const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
-        const previews = previewSnapshot.docs
+        const previews: MemberPreview[] = previewSnapshot.docs
           .map((docSnap) => {
             const data = docSnap.data();
             return {
@@ -62,6 +63,29 @@ function useWorkspaceMembers(handle: string, enabled: boolean) {
             };
           })
           .sort((a, b) => (roleOrder[a.role] ?? 3) - (roleOrder[b.role] ?? 3));
+
+        // Resolve member uid -> personal namespace handle
+        const memberUids = previews.map((m) => m.uid);
+        if (memberUids.length > 0) {
+          try {
+            const namespacesRef = collection(db, 'namespaces');
+            const personalQuery = query(namespacesRef, where('linkedUserId', 'in', memberUids));
+            const personalSnapshot = await getDocs(personalQuery);
+            const uidToHandle = new Map<string, string>();
+            for (const nsDoc of personalSnapshot.docs) {
+              const nsData = nsDoc.data();
+              if (typeof nsData.linkedUserId === 'string') {
+                uidToHandle.set(nsData.linkedUserId, nsDoc.id);
+              }
+            }
+            for (const member of previews) {
+              member.handle = uidToHandle.get(member.uid);
+            }
+          } catch {
+            // handle resolution is best-effort
+          }
+        }
+
         setMembers(previews);
         setTotalCount(fullSnapshot.size);
       })
@@ -166,7 +190,7 @@ function MemberTooltipAvatar({ member, resolvedName, resolvedAvatar }: { member:
   );
 }
 
-function MemberAvatars({ namespace }: { namespace: Namespace }) {
+function MemberAvatars({ namespace, isMember }: { namespace: Namespace; isMember: boolean }) {
   const { members, totalCount } = useWorkspaceMembers(
     namespace.handle,
     namespace.type === 'organization',
@@ -184,27 +208,58 @@ function MemberAvatars({ namespace }: { namespace: Namespace }) {
     return member.avatarUrl ?? userProfiles.get(member.uid)?.photoURL;
   }
 
+  const memberCountText = `${totalCount} ${totalCount === 1 ? 'member' : 'members'}`;
+
+  if (isMember) {
+    return (
+      <div className="mt-3 flex items-center gap-4 flex-wrap">
+        <Link
+          href={`/${namespace.handle}/settings`}
+          className="group inline-flex items-center gap-2.5"
+        >
+          {members.length > 0 && (
+            <Tooltip.Provider>
+              <div className="flex -space-x-2" onClick={(e) => e.stopPropagation()}>
+                {members.map((member, index) => (
+                  <div key={member.uid} className="relative" style={{ zIndex: members.length - index }}>
+                    <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
+                  </div>
+                ))}
+              </div>
+            </Tooltip.Provider>
+          )}
+          <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+            {memberCountText}
+          </span>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-3 flex items-center gap-4 flex-wrap">
-      <Link
-        href={`/${namespace.handle}/settings`}
-        className="group inline-flex items-center gap-2.5"
-      >
+      <div className="inline-flex items-center gap-2.5">
         {members.length > 0 && (
           <Tooltip.Provider>
-            <div className="flex -space-x-2" onClick={(e) => e.stopPropagation()}>
+            <div className="flex -space-x-2">
               {members.map((member, index) => (
                 <div key={member.uid} className="relative" style={{ zIndex: members.length - index }}>
-                  <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
+                  {member.handle !== undefined ? (
+                    <Link href={`/${member.handle}`}>
+                      <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
+                    </Link>
+                  ) : (
+                    <MemberTooltipAvatar member={member} resolvedName={resolveName(member)} resolvedAvatar={resolveAvatar(member)} />
+                  )}
                 </div>
               ))}
             </div>
           </Tooltip.Provider>
         )}
-        <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-          {totalCount} {totalCount === 1 ? 'member' : 'members'}
+        <span className="text-sm text-muted-foreground">
+          {memberCountText}
         </span>
-      </Link>
+      </div>
     </div>
   );
 }
@@ -399,7 +454,7 @@ function UserWorkspaces({ namespace }: { namespace: Namespace }) {
 // Workflow catalog section
 // ---------------------------------------------------------------------------
 
-function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Namespace }) {
+function WorkflowCatalog({ handle, namespace, isMember }: { handle: string; namespace: Namespace; isMember: boolean }) {
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [showArchived, setShowArchived] = React.useState(false);
 
@@ -454,11 +509,12 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
   return (
     <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
     <div className="flex flex-col gap-4">
-      <OpenRouterCreditsIndicator handle={handle} />
-      <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />
+      {isMember && <OpenRouterCreditsIndicator handle={handle} />}
+      {isMember && <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />}
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Workflows</h2>
+        {isMember && (
         <div className="flex items-center gap-2">
           <DisplayPopover
             showCompleted={showCompleted}
@@ -478,6 +534,7 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
             New Workflow
           </Link>
         </div>
+        )}
       </div>
 
       {loading ? (
@@ -488,11 +545,14 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
             <GitBranch className="h-7 w-7 text-muted-foreground" />
           </div>
           <div>
-            <p className="font-medium">No workflows defined yet</p>
+            <p className="font-medium">{isMember ? 'No workflows defined yet' : 'No public workflows yet'}</p>
+            {isMember && (
             <p className="text-sm text-muted-foreground mt-1">
               Create your first workflow to start orchestrating agents and humans.
             </p>
+            )}
           </div>
+          {isMember && (
           <Link
             href={`/${handle}/workflows/new`}
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
@@ -500,6 +560,7 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
             <Plus className="h-3.5 w-3.5" />
             New Workflow
           </Link>
+          )}
         </div>
       ) : sortedDefinitions.length === 0 ? (
         <div className="text-center py-16 text-sm text-muted-foreground">
@@ -519,6 +580,7 @@ function WorkflowCatalog({ handle, namespace }: { handle: string; namespace: Nam
               steps={stepsByDefinition.get(definition.name)}
               handle={handle}
               activeTaskByInstance={activeTaskByInstance}
+              isMember={isMember}
             />
           ))}
         </div>
@@ -541,6 +603,7 @@ export default function ProfilePage() {
   const { namespace, loading, error } = useNamespace(handle ?? '');
   const currentRole = useCurrentUserRole(handle ?? '', firebaseUser?.uid);
   const canEdit = currentRole === 'owner' || currentRole === 'admin';
+  const isMember = currentRole !== null;
 
   if (loading) {
     return (
@@ -609,6 +672,7 @@ export default function ProfilePage() {
             >
               {namespace.type === 'organization' ? 'Workspace' : 'Personal'}
             </span>
+            {isMember && (
             <Link
               href={`/${namespace.handle}/settings`}
               className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -616,20 +680,21 @@ export default function ProfilePage() {
               <Settings className="h-3.5 w-3.5" />
               <span>Settings</span>
             </Link>
+            )}
           </div>
 
           <p className="text-sm text-muted-foreground mt-0.5">@{namespace.handle}</p>
 
           <InlineEditableBio namespace={namespace} canEdit={canEdit} />
 
-          <MemberAvatars namespace={namespace} />
+          <MemberAvatars namespace={namespace} isMember={isMember} />
         </div>
       </div>
 
       <UserWorkspaces namespace={namespace} />
 
       {/* Workflow catalog */}
-      <WorkflowCatalog handle={handle ?? ''} namespace={namespace} />
+      <WorkflowCatalog handle={handle ?? ''} namespace={namespace} isMember={isMember} />
     </div>
   );
 }
