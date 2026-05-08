@@ -61,6 +61,10 @@ vi.mock('@/app/actions/workflow-secrets', () => ({
   getWorkflowSecretsForRuntime: vi.fn().mockResolvedValue({}),
 }));
 
+vi.mock('@/app/actions/namespace-secrets', () => ({
+  getNamespaceSecretsForRuntime: vi.fn().mockResolvedValue({}),
+}));
+
 import { POST } from '../route';
 
 // ---- Helpers ----
