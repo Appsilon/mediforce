@@ -41,6 +41,14 @@ export async function GET(
     );
   }
 
+  const namespaceParam = request.nextUrl.searchParams.get('namespace');
+  if (namespaceParam !== null && definition.namespace !== namespaceParam) {
+    return NextResponse.json(
+      { error: `Workflow '${name}' not found` },
+      { status: 404 },
+    );
+  }
+
   if (!callerCanAccess(caller, definition.namespace)) {
     if (definition.visibility !== 'public') {
       return NextResponse.json(

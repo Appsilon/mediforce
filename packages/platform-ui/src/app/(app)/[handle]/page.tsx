@@ -9,11 +9,12 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { Pencil, Check, X, Settings, GitBranch, Plus } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { db } from '@/lib/firebase';
-import { useAuth } from '@/contexts/auth-context';
+import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useUserProfiles } from '@/hooks/use-users';
 import { useProcessDefinitions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
+import { useWorkflowDefinitionsApi } from '@/hooks/use-workflows-api';
 import { useMyTasks } from '@/hooks/use-tasks';
 import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus } from '@/components/processes/process-card';
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
@@ -96,29 +97,6 @@ function useWorkspaceMembers(handle: string, enabled: boolean) {
   }, [handle, enabled]);
 
   return { members, totalCount };
-}
-
-function useCurrentUserRole(handle: string, uid: string | undefined): string | null {
-  const [role, setRole] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!handle || uid === undefined) {
-      setRole(null);
-      return;
-    }
-    getDoc(doc(db, 'namespaces', handle, 'members', uid))
-      .then((snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          setRole(typeof data.role === 'string' ? data.role : null);
-        } else {
-          setRole(null);
-        }
-      })
-      .catch(() => setRole(null));
-  }, [handle, uid]);
-
-  return role;
 }
 
 // ---------------------------------------------------------------------------
@@ -457,7 +435,60 @@ function UserWorkspaces({ namespace }: { namespace: Namespace }) {
 // Workflow catalog section
 // ---------------------------------------------------------------------------
 
-function WorkflowCatalog({ handle, namespace, isMember }: { handle: string; namespace: Namespace; isMember: boolean }) {
+function WorkflowCatalog({ handle, isMember }: { handle: string; isMember: boolean }) {
+  if (isMember) {
+    return <WorkflowCatalogMember handle={handle} />;
+  }
+  return <WorkflowCatalogPublic handle={handle} />;
+}
+
+function WorkflowCatalogPublic({ handle }: { handle: string }) {
+  const { definitions, loading } = useWorkflowDefinitionsApi(handle);
+
+  const sorted = useMemo(
+    () => [...definitions].filter((d) => d.archived !== true).sort((a, b) => a.name.localeCompare(b.name)),
+    [definitions],
+  );
+
+  const emptyTaskMap = useMemo(() => new Map<string, string>(), []);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Workflows</h2>
+      </div>
+
+      {loading ? (
+        <WorkflowCatalogSkeletons />
+      ) : sorted.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-4 text-center py-16">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <GitBranch className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-medium">No public workflows yet</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {sorted.map((definition) => (
+            <ProcessCard
+              key={definition.name}
+              definition={definition}
+              instances={[]}
+              showCompleted={true}
+              handle={handle}
+              activeTaskByInstance={emptyTaskMap}
+              isMember={false}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WorkflowCatalogMember({ handle }: { handle: string }) {
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [showArchived, setShowArchived] = React.useState(false);
 
@@ -510,14 +541,13 @@ function WorkflowCatalog({ handle, namespace, isMember }: { handle: string; name
   }, [visibleDefinitions, instancesByDefinition]);
 
   return (
-    <WorkflowSecretKeysProvider handle={isMember ? handle : ''} workflowNames={isMember ? workflowNames : []}>
+    <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
     <div className="flex flex-col gap-4">
-      {isMember && <OpenRouterCreditsIndicator handle={handle} />}
-      {isMember && <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />}
+      <OpenRouterCreditsIndicator handle={handle} />
+      <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Workflows</h2>
-        {isMember && (
         <div className="flex items-center gap-2">
           <DisplayPopover
             showCompleted={showCompleted}
@@ -537,7 +567,6 @@ function WorkflowCatalog({ handle, namespace, isMember }: { handle: string; name
             New Workflow
           </Link>
         </div>
-        )}
       </div>
 
       {loading ? (
@@ -548,14 +577,11 @@ function WorkflowCatalog({ handle, namespace, isMember }: { handle: string; name
             <GitBranch className="h-7 w-7 text-muted-foreground" />
           </div>
           <div>
-            <p className="font-medium">{isMember ? 'No workflows defined yet' : 'No public workflows yet'}</p>
-            {isMember && (
+            <p className="font-medium">No workflows defined yet</p>
             <p className="text-sm text-muted-foreground mt-1">
               Create your first workflow to start orchestrating agents and humans.
             </p>
-            )}
           </div>
-          {isMember && (
           <Link
             href={`/${handle}/workflows/new`}
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
@@ -563,7 +589,6 @@ function WorkflowCatalog({ handle, namespace, isMember }: { handle: string; name
             <Plus className="h-3.5 w-3.5" />
             New Workflow
           </Link>
-          )}
         </div>
       ) : sortedDefinitions.length === 0 ? (
         <div className="text-center py-16 text-sm text-muted-foreground">
@@ -583,7 +608,7 @@ function WorkflowCatalog({ handle, namespace, isMember }: { handle: string; name
               steps={stepsByDefinition.get(definition.name)}
               handle={handle}
               activeTaskByInstance={activeTaskByInstance}
-              isMember={isMember}
+              isMember={true}
             />
           ))}
         </div>
@@ -602,15 +627,13 @@ export default function ProfilePage() {
   const rawHandle = params.handle;
   const handle = Array.isArray(rawHandle) ? rawHandle[0] : rawHandle;
 
-  const { firebaseUser } = useAuth();
   const { namespace, loading, error } = useNamespace(handle ?? '');
-  const currentRole = useCurrentUserRole(handle ?? '', firebaseUser?.uid);
-  const canEdit = currentRole === 'owner' || currentRole === 'admin';
+  const { role: currentRole, canAdmin: canEdit, loading: roleLoading } = useNamespaceRole(handle ?? '');
   const isMember = currentRole !== null;
   const userProfiles = useUserProfiles();
   const [profileImgError, setProfileImgError] = useState(false);
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
@@ -704,7 +727,7 @@ export default function ProfilePage() {
       <UserWorkspaces namespace={namespace} />
 
       {/* Workflow catalog */}
-      <WorkflowCatalog handle={handle ?? ''} namespace={namespace} isMember={isMember} />
+      <WorkflowCatalog handle={handle ?? ''} isMember={isMember} />
     </div>
   );
 }

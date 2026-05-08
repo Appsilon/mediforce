@@ -1,16 +1,54 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Archive } from 'lucide-react';
+import { Archive, Lock } from 'lucide-react';
 import { useProcessInstances } from '@/hooks/use-process-instances';
 import { useMyTasks } from '@/hooks/use-tasks';
+import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { RunsTable } from '@/components/processes/runs-table';
 import { formatStepName } from '@/components/tasks/task-utils';
 import { cn } from '@/lib/utils';
 
 export default function RunsPage() {
   const { handle } = useParams<{ handle: string }>();
+  const { role, loading: roleLoading } = useNamespaceRole(handle);
+
+  if (roleLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
+      </div>
+    );
+  }
+
+  if (role === null) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+          <Lock className="h-7 w-7 text-muted-foreground" />
+        </div>
+        <div className="text-center">
+          <p className="font-medium">Runs are only visible to workspace members</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Join this workspace to see workflow runs.
+          </p>
+        </div>
+        <Link
+          href={`/${handle}`}
+          className="text-sm text-primary hover:underline"
+        >
+          Back to profile
+        </Link>
+      </div>
+    );
+  }
+
+  return <RunsPageContent handle={handle} />;
+}
+
+function RunsPageContent({ handle }: { handle: string }) {
   const searchParams = useSearchParams();
   const workflowFilter = searchParams.get('workflow');
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);

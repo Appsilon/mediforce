@@ -19,11 +19,91 @@ import { formatCron } from '@/lib/format-cron';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
+import { useNamespaceRole } from '@/hooks/use-namespace-role';
+import { useWorkflowDefinitionApi } from '@/hooks/use-workflows-api';
 import { WorkflowSecretsEditor } from '@/components/workflows/workflow-secrets-editor';
 
 
 export default function ProcessDefinitionPage() {
   const { name, handle } = useParams<{ name: string; handle: string }>();
+  const { role, loading: roleLoading } = useNamespaceRole(handle);
+
+  if (roleLoading) {
+    return (
+      <div className="p-6 space-y-4 animate-pulse">
+        <div className="h-4 w-20 rounded bg-muted" />
+        <div className="h-7 w-48 rounded bg-muted" />
+        <div className="h-48 rounded bg-muted" />
+      </div>
+    );
+  }
+
+  if (role === null) {
+    return <ProcessDefinitionPagePublic name={name} handle={handle} />;
+  }
+
+  return <ProcessDefinitionPageMember name={name} handle={handle} />;
+}
+
+function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: string }) {
+  const decodedName = decodeURIComponent(name);
+  const { definition, loading, error } = useWorkflowDefinitionApi(handle, decodedName);
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-4 animate-pulse">
+        <div className="h-4 w-20 rounded bg-muted" />
+        <div className="h-7 w-48 rounded bg-muted" />
+        <div className="h-48 rounded bg-muted" />
+      </div>
+    );
+  }
+
+  if (error !== null || definition === null) {
+    return (
+      <div className="p-6 text-center text-sm text-muted-foreground">
+        Workflow &ldquo;{decodedName}&rdquo; not found.{' '}
+        <Link href={`/${handle}`} className="underline">Back to catalog</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 flex-col gap-0">
+      <div className="border-b px-6 py-4">
+        <div>
+          {definition.description && (
+            <p className="text-sm text-muted-foreground mt-0.5">{definition.description}</p>
+          )}
+          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+            {definition.namespace && (
+              <>
+                <span className="flex items-center gap-1">
+                  Owned by{' '}
+                  <Link
+                    href={`/${definition.namespace}`}
+                    className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-500/20 transition-colors"
+                  >
+                    @{definition.namespace}
+                  </Link>
+                </span>
+                <span className="text-border">&middot;</span>
+              </>
+            )}
+            <span className="flex items-center gap-1">
+              <Layers className="h-3 w-3" />
+              {definition.steps.length} steps
+            </span>
+            <RepoLink definition={definition} />
+            <AppLink definition={definition} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const decodedName = decodeURIComponent(name);
@@ -150,8 +230,8 @@ export default function ProcessDefinitionPage() {
                   )}
                 </span>
               ))}
-              <RepoLink definition={latest as Record<string, unknown>} />
-              <AppLink definition={latest as Record<string, unknown>} />
+              <RepoLink definition={latest} />
+              <AppLink definition={latest} />
             </div>
           </div>
 
@@ -412,9 +492,9 @@ export default function ProcessDefinitionPage() {
   );
 }
 
-function RepoLink({ definition }: { definition: Record<string, unknown> | null }) {
+function RepoLink({ definition }: { definition: { repo?: { url: string; branch?: string; directory?: string } } | null }) {
   if (!definition?.repo) return null;
-  const repo = definition.repo as { url: string; branch?: string; directory?: string };
+  const repo = definition.repo;
   let href = repo.url;
   if (repo.branch) {
     href += `/tree/${repo.branch}`;
@@ -434,11 +514,11 @@ function RepoLink({ definition }: { definition: Record<string, unknown> | null }
   );
 }
 
-function AppLink({ definition }: { definition: Record<string, unknown> | null }) {
+function AppLink({ definition }: { definition: { url?: string } | null }) {
   if (!definition?.url) return null;
   return (
     <a
-      href={definition.url as string}
+      href={definition.url}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex items-center gap-1 hover:text-foreground transition-colors"

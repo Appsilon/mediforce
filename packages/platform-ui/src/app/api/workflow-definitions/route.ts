@@ -16,6 +16,9 @@ export async function GET(request: Request): Promise<NextResponse> {
   const caller = await resolveCallerIdentity(request, namespaceRepo);
   if (caller instanceof NextResponse) return caller;
 
+  const url = new URL(request.url);
+  const namespaceFilter = url.searchParams.get('namespace');
+
   const { definitions } = await processRepo.listWorkflowDefinitions(false);
 
   const result = definitions.map((group) => {
@@ -38,7 +41,11 @@ export async function GET(request: Request): Promise<NextResponse> {
         return item.definition.visibility === 'public';
       });
 
-  return NextResponse.json({ definitions: filtered });
+  const namespaced = namespaceFilter !== null
+    ? filtered.filter((item) => item.definition?.namespace === namespaceFilter)
+    : filtered;
+
+  return NextResponse.json({ definitions: namespaced });
 }
 
 /**
