@@ -1,0 +1,114 @@
+import { describe, it, expect } from 'vitest';
+import { mapApiToDefinitionGroups, type ApiDefinitionItem } from '../use-workflows-api';
+
+describe('mapApiToDefinitionGroups', () => {
+  it('maps API response to DefinitionGroup shape', () => {
+    const items: ApiDefinitionItem[] = [{
+      name: 'test-workflow',
+      latestVersion: 2,
+      defaultVersion: 1,
+      definition: {
+        name: 'test-workflow',
+        version: 2,
+        steps: [
+          { id: 'start', type: 'start' },
+          { id: 'process', type: 'agent' },
+          { id: 'end', type: 'terminal' },
+        ],
+        triggers: [{ type: 'manual', name: 'default' }],
+        title: 'Test Workflow',
+        description: 'A test',
+        namespace: 'acme',
+        visibility: 'public',
+        repo: { url: 'https://github.com/example/repo' },
+      },
+    }];
+
+    const result = mapApiToDefinitionGroups(items, 'acme');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      name: 'test-workflow',
+      title: 'Test Workflow',
+      description: 'A test',
+      latestVersion: '2',
+      versions: [{
+        version: '2',
+        stepCount: 3,
+        triggerCount: 1,
+        title: 'Test Workflow',
+        description: 'A test',
+      }],
+      stepCount: 3,
+      hasManualTrigger: true,
+      repo: { url: 'https://github.com/example/repo' },
+      url: undefined,
+      archived: undefined,
+      namespace: 'acme',
+      visibility: 'public',
+    });
+  });
+
+  it('filters by namespace handle', () => {
+    const items: ApiDefinitionItem[] = [
+      {
+        name: 'wf-a',
+        latestVersion: 1,
+        defaultVersion: 1,
+        definition: {
+          name: 'wf-a',
+          version: 1,
+          steps: [],
+          triggers: [],
+          namespace: 'ns-a',
+        },
+      },
+      {
+        name: 'wf-b',
+        latestVersion: 1,
+        defaultVersion: 1,
+        definition: {
+          name: 'wf-b',
+          version: 1,
+          steps: [],
+          triggers: [],
+          namespace: 'ns-b',
+        },
+      },
+    ];
+
+    const result = mapApiToDefinitionGroups(items, 'ns-a');
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('wf-a');
+  });
+
+  it('skips items with null definition', () => {
+    const items: ApiDefinitionItem[] = [{
+      name: 'broken',
+      latestVersion: 1,
+      defaultVersion: 1,
+      definition: null,
+    }];
+
+    const result = mapApiToDefinitionGroups(items, 'any');
+    expect(result).toHaveLength(0);
+  });
+
+  it('detects no manual trigger', () => {
+    const items: ApiDefinitionItem[] = [{
+      name: 'cron-only',
+      latestVersion: 1,
+      defaultVersion: 1,
+      definition: {
+        name: 'cron-only',
+        version: 1,
+        steps: [{ id: 's1', type: 'start' }],
+        triggers: [{ type: 'cron', name: 'nightly' }],
+        namespace: 'ns',
+      },
+    }];
+
+    const result = mapApiToDefinitionGroups(items, 'ns');
+    expect(result[0].hasManualTrigger).toBe(false);
+  });
+});
