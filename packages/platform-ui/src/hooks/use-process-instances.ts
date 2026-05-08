@@ -13,20 +13,20 @@ export function useProcessInstances(
   statusFilter: ProcessStatusFilter = 'all',
   definitionName?: string,
   showArchived = false,
+  namespace?: string,
 ) {
   const constraints = useMemo(() => {
     const c = [];
     if (definitionName) {
-      // When filtering by definitionName, skip orderBy to avoid requiring a
-      // composite Firestore index. Results are sorted client-side below.
       c.push(where('definitionName', '==', definitionName));
+      if (namespace) c.push(where('namespace', '==', namespace));
       if (statusFilter !== 'all') c.push(where('status', '==', statusFilter));
     } else {
       if (statusFilter !== 'all') c.push(where('status', '==', statusFilter));
       c.push(orderBy('createdAt', 'desc'));
     }
     return c;
-  }, [statusFilter, definitionName]);
+  }, [statusFilter, definitionName, namespace]);
 
   const result = useCollection<ProcessInstance>('processInstances', constraints);
 
