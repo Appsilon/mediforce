@@ -8,6 +8,7 @@ import type { ProcessInstance } from '@mediforce/platform-core';
 import { StatusDot } from '@/components/ui/status-dot';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
+import { formatCostUsd } from '@/lib/format';
 
 function toHumanLabel(identifier: string): string {
   return identifier
@@ -220,6 +221,11 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
             </span>
           )}
         </>
+      )}
+      {instance.totalCostUsd != null && (
+        <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 text-right">
+          {formatCostUsd(instance.totalCostUsd)}
+        </span>
       )}
       <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 w-[48px] text-right" title={fullTimeAgo}>
         {timeAgo}

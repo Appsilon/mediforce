@@ -188,6 +188,7 @@ export async function executeAgentStep(
 
   // Persist agent output to step execution
   const envelope = runResult.envelope;
+  const costResult = envelope ? await estimateCostField(envelope, modelRegistryRepo) : {};
   if (stepExecutionId) {
     const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
     // L3 + escalated (non-error) routes to human review below, so the execution
@@ -208,7 +209,7 @@ export async function executeAgentStep(
             gitMetadata: envelope.gitMetadata ?? null,
             deliverableFile: (envelope.deliverableFile as string | undefined) ?? null,
             ...(envelope.tokenUsage ? { tokenUsage: envelope.tokenUsage } : {}),
-            ...(await estimateCostField(envelope, modelRegistryRepo)),
+            ...costResult,
           }
         : null,
     });
@@ -229,16 +230,23 @@ export async function executeAgentStep(
     }
   }
 
-  // Persist output to instance.variables so subsequent steps can read it
+  // Persist output to instance.variables so subsequent steps can read it.
+  // Also accumulate totalCostUsd on the instance for list views.
   const agentOutput = envelope?.result ?? null;
-  if (agentOutput !== null) {
+  const stepCost = costResult.estimatedCostUsd;
+  if (agentOutput !== null || stepCost !== undefined) {
     const freshInstance = await instanceRepo.getById(instanceId);
     if (freshInstance) {
       await instanceRepo.update(instanceId, {
-        variables: {
-          ...freshInstance.variables,
-          [stepId]: agentOutput,
-        },
+        ...(agentOutput !== null ? {
+          variables: {
+            ...freshInstance.variables,
+            [stepId]: agentOutput,
+          },
+        } : {}),
+        ...(stepCost !== undefined ? {
+          totalCostUsd: (freshInstance.totalCostUsd ?? 0) + stepCost,
+        } : {}),
       });
     }
   }
