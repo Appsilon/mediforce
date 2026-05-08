@@ -17,6 +17,8 @@ packages/
   platform-ui/      Next.js 15 App Router (dev :9003, e2e :9007)
   workflow-engine/  Engine, transitions, expression DSL
   agent-runtime/    PluginRegistry, AgentRunner, Docker spawn
+  container-worker/ BullMQ worker (activated by REDIS_URL)
+  example-agent/    Reference plugin implementation
   cli/              `mediforce` CLI (server-to-server)
 apps/  per-domain apps   docs/  strategy, vision, architecture
 ```
