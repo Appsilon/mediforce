@@ -26,6 +26,7 @@ export const GetRunOutputSchema = z.object({
    *  Nullable when the definition has been deleted; optional for older
    *  servers that don't include the field. */
   definitionNamespace: z.string().min(1).nullable().optional(),
+  totalCostUsd: z.number().optional(),
 });
 
 export type GetRunInput = z.infer<typeof GetRunInputSchema>;
@@ -75,6 +76,7 @@ export const ListRunsOutputSchema = z.object({
       createdAt: z.string().datetime(),
       updatedAt: z.string().datetime(),
       createdBy: z.string().min(1),
+      totalCostUsd: z.number().optional(),
     }),
   ),
 });
