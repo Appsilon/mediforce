@@ -146,7 +146,7 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
             setCopying(true);
             setCopyError('');
             try {
-              const qs = new URLSearchParams({ targetNamespace: copyTarget });
+              const qs = new URLSearchParams({ targetNamespace: copyTarget, namespace: handle });
               const body: Record<string, unknown> = {};
               if (copyName !== decodedName) body.targetName = copyName;
               const res = await apiFetch(
@@ -373,7 +373,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     setMenuOpen(false);
                     setTogglingVisibility(true);
                     try {
-                      const res = await apiFetch(`/api/workflow-definitions/${encodeURIComponent(decodedName)}`, {
+                      const res = await apiFetch(`/api/workflow-definitions/${encodeURIComponent(decodedName)}?namespace=${encodeURIComponent(handle)}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ visibility: newVisibility }),
@@ -559,7 +559,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
             setCopying(true);
             setCopyError('');
             try {
-              const qs = new URLSearchParams({ targetNamespace: copyTarget });
+              const qs = new URLSearchParams({ targetNamespace: copyTarget, namespace: handle });
               const body: Record<string, unknown> = {};
               if (copyName !== decodedName) body.targetName = copyName;
               if (copyVersion !== null) body.version = copyVersion;

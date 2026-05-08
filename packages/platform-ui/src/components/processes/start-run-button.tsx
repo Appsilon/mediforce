@@ -155,6 +155,7 @@ export function StartRunButton({
     const payload = hasTriggerInput ? buildPayload() : undefined;
 
     const result = await startWorkflowRun({
+      namespace: handle,
       definitionName: workflowName,
       definitionVersion: targetVersion,
       triggeredBy: firebaseUser.uid,

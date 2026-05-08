@@ -76,7 +76,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
     const json = await res.json();
     expect(json.success).toBe(true);
     expect(json.name).toBe('my-workflow');
-    expect(json.version).toBe(1);
+    expect(json.version).toBe(1); // namespace-scoped, always starts at 1
     expect(json.copiedFrom).toEqual({
       namespace: 'source-ns',
       name: 'my-workflow',
@@ -101,6 +101,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
     expect(res.status).toBe(201);
     const json = await res.json();
     expect(json.name).toBe('renamed-wf');
+    expect(json.version).toBe(1);
   });
 
   it('copies at specific version', async () => {
@@ -108,7 +109,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
       params: Promise.resolve({ name: 'my-workflow' }),
     });
     expect(res.status).toBe(201);
-    expect(mockGetWorkflowDefinition).toHaveBeenCalledWith('my-workflow', 2);
+    expect(mockGetWorkflowDefinition).toHaveBeenCalledWith('target-ns', 'my-workflow', 2);
   });
 
   it('returns 409 when name exists in target namespace', async () => {

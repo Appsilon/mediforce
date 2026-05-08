@@ -229,6 +229,7 @@ describe('daily-weather: fetch → reshape → push×2 → terminal', () => {
     // declared in the workflow alongside cron so e2e + ad-hoc human runs
     // share the same engine path.
     const triggerResult = await services.manualTrigger.fireWorkflow({
+      namespace: 'examples',
       definitionName: 'daily-weather',
       definitionVersion: 1,
       triggerName: 'test',

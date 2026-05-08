@@ -132,7 +132,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                     onClick={async (e) => {
                       e.preventDefault();
                       if (canSetDefault) {
-                        await setDefaultWorkflowVersion(workflowName, def.version);
+                        await setDefaultWorkflowVersion(def.namespace, workflowName, def.version);
                         refreshDefault();
                       }
                     }}
@@ -152,7 +152,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                   onClick={async (e) => {
                     e.preventDefault();
                     setArchivingVersion(def.version);
-                    const result = await setVersionArchived(workflowName, def.version, !isArchived);
+                    const result = await setVersionArchived(def.namespace, workflowName, def.version, !isArchived);
                     setArchivingVersion(null);
                     if (!result.success) {
                       alert(`Failed to ${isArchived ? 'unarchive' : 'archive'} v${def.version}: ${result.error}`);

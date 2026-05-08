@@ -33,7 +33,11 @@ export async function GET(
     }
   }
 
-  const definition = await processRepo.getWorkflowDefinition(name, version);
+  // Namespace comes from query param; when absent, fall back to a query-based lookup.
+  const namespaceParam = request.nextUrl.searchParams.get('namespace');
+  const lookupNamespace = namespaceParam ?? '';
+
+  const definition = await processRepo.getWorkflowDefinition(lookupNamespace, name, version);
   if (definition === null) {
     return NextResponse.json(
       { error: `Workflow '${name}' not found` },
@@ -41,7 +45,6 @@ export async function GET(
     );
   }
 
-  const namespaceParam = request.nextUrl.searchParams.get('namespace');
   if (namespaceParam !== null && definition.namespace !== namespaceParam) {
     return NextResponse.json(
       { error: `Workflow '${name}' not found` },
@@ -71,11 +74,12 @@ export async function PATCH(
   const caller = await resolveCallerIdentity(request, namespaceRepo);
   if (caller instanceof NextResponse) return caller;
 
+  const patchNamespace = request.nextUrl.searchParams.get('namespace') ?? '';
   const latestVersion = await processRepo.getLatestWorkflowVersion(name);
   if (latestVersion === 0) {
     return NextResponse.json({ error: `Workflow '${name}' not found` }, { status: 404 });
   }
-  const definition = await processRepo.getWorkflowDefinition(name, latestVersion);
+  const definition = await processRepo.getWorkflowDefinition(patchNamespace, name, latestVersion);
   const denied = requireNamespaceAccess(caller, definition?.namespace);
   if (denied) return denied;
 

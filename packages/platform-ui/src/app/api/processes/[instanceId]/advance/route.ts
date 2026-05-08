@@ -34,7 +34,7 @@ export async function POST(
     const latestVersion = isNaN(versionNum)
       ? await processRepo.getLatestWorkflowVersion(instance.definitionName)
       : versionNum;
-    const definition = await processRepo.getWorkflowDefinition(instance.definitionName, latestVersion);
+    const definition = await processRepo.getWorkflowDefinition(instance.namespace ?? '', instance.definitionName, latestVersion);
     if (!definition) {
       return NextResponse.json({ error: 'Definition not found' }, { status: 404 });
     }

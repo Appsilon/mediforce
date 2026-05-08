@@ -100,7 +100,7 @@ export default function WorkflowDefinitionVersionPage() {
 
     if (result.success) {
       if (setAsDefault) {
-        await setDefaultWorkflowVersion(definition.name, result.version);
+        await setDefaultWorkflowVersion(definition.namespace, definition.name, result.version);
       }
       setSaveState({ status: 'saved', version: result.version });
       redirectTimerRef.current = setTimeout(() => {

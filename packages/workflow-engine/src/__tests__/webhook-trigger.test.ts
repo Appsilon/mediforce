@@ -71,6 +71,7 @@ describe('WebhookTrigger', () => {
     overrides: Partial<WorkflowTriggerContext> = {},
   ): WorkflowTriggerContext {
     return {
+      namespace: 'test',
       definitionName: 'webhook-process',
       definitionVersion: 1,
       triggerName: 'incoming-webhook',

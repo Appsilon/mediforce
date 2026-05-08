@@ -19,12 +19,12 @@ describe('InMemoryProcessRepository', () => {
       const definition = buildWorkflowDefinition({ name: 'drug-approval', version: 1 });
       await repo.saveWorkflowDefinition(definition);
 
-      const result = await repo.getWorkflowDefinition('drug-approval', 1);
+      const result = await repo.getWorkflowDefinition('test', 'drug-approval', 1);
       expect(result).toEqual(definition);
     });
 
     it('[DATA] getWorkflowDefinition returns null for non-existent', async () => {
-      const result = await repo.getWorkflowDefinition('nonexistent', 1);
+      const result = await repo.getWorkflowDefinition('test', 'nonexistent', 1);
       expect(result).toBeNull();
     });
 
@@ -35,8 +35,8 @@ describe('InMemoryProcessRepository', () => {
       await repo.saveWorkflowDefinition(v1);
       await repo.saveWorkflowDefinition(v2);
 
-      const resultV1 = await repo.getWorkflowDefinition('drug-approval', 1);
-      const resultV2 = await repo.getWorkflowDefinition('drug-approval', 2);
+      const resultV1 = await repo.getWorkflowDefinition('test', 'drug-approval', 1);
+      const resultV2 = await repo.getWorkflowDefinition('test', 'drug-approval', 2);
 
       expect(resultV1?.version).toBe(1);
       expect(resultV2?.version).toBe(2);
@@ -161,19 +161,19 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
       .mockResolvedValueOnce({ exists: true, data: () => definition }); // getWorkflowDefinition fetch
 
     await repo.saveWorkflowDefinition(definition);
-    const result = await repo.getWorkflowDefinition('drug-approval', 1);
+    const result = await repo.getWorkflowDefinition('test', 'drug-approval', 1);
 
     expect(result).toEqual(definition);
     expect(mockSet).toHaveBeenCalledOnce();
     expect(mockCollection).toHaveBeenCalledWith('workflowDefinitions');
-    expect(mockDoc).toHaveBeenCalledWith('drug-approval:1');
+    expect(mockDoc).toHaveBeenCalledWith('test:drug-approval:1');
   });
 
   it('[DATA] getWorkflowDefinition returns null for non-existent', async () => {
     const repo = createFirestoreRepo();
     mockGet.mockResolvedValue({ exists: false });
 
-    const result = await repo.getWorkflowDefinition('nonexistent', 1);
+    const result = await repo.getWorkflowDefinition('test', 'nonexistent', 1);
     expect(result).toBeNull();
   });
 
@@ -302,7 +302,7 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
     expect(version).toBe(0);
   });
 
-  it('[DATA] saveWorkflowDefinition uses {name}:{version} document key', async () => {
+  it('[DATA] saveWorkflowDefinition uses {namespace}:{name}:{version} document key', async () => {
     const repo = createFirestoreRepo();
     mockGet.mockResolvedValue({ exists: false });
 
@@ -310,6 +310,6 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
     await repo.saveWorkflowDefinition(definition);
 
     expect(mockCollection).toHaveBeenCalledWith('workflowDefinitions');
-    expect(mockDoc).toHaveBeenCalledWith('my-workflow:42');
+    expect(mockDoc).toHaveBeenCalledWith('test:my-workflow:42');
   });
 });

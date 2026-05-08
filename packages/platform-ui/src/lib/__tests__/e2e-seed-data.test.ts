@@ -14,7 +14,7 @@ describe('E2E seed workflow definitions', () => {
 
   it('keeps Supply Chain Review human-review as a plain human step', () => {
     const seedData = buildSeedData('test-user-id');
-    const supplyChainReview = seedData.workflowDefinitions['Supply Chain Review:1'];
+    const supplyChainReview = seedData.workflowDefinitions['test:Supply Chain Review:1'];
     const result = WorkflowDefinitionSchema.parse(supplyChainReview);
 
     const humanReview = result.steps.find((step) => step.id === 'human-review');

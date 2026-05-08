@@ -30,7 +30,7 @@ export class WorkflowDefinitionVersionNotFoundError extends Error {
 
 /**
  * Firestore implementation of the ProcessRepository interface.
- * Uses composite keys ({name}:{version}) as document IDs.
+ * Uses composite keys ({namespace}:{name}:{version}) as document IDs.
  *
  * Enforces workflow definition version immutability: saving a version that already
  * exists throws WorkflowDefinitionVersionAlreadyExistsError rather than overwriting.
@@ -41,12 +41,13 @@ export class FirestoreProcessRepository implements ProcessRepository {
   constructor(private readonly db: Firestore) {}
 
   async getWorkflowDefinition(
+    namespace: string,
     name: string,
     version: number,
   ): Promise<WorkflowDefinition | null> {
     const snapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
-      .doc(`${name}:${version}`)
+      .doc(`${namespace}:${name}:${version}`)
       .get();
 
     if (!snapshot.exists) return null;
@@ -65,7 +66,7 @@ export class FirestoreProcessRepository implements ProcessRepository {
   async saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void> {
     const docRef = this.db
       .collection(this.workflowDefinitionsCollection)
-      .doc(`${definition.name}:${definition.version}`);
+      .doc(`${definition.namespace}:${definition.name}:${definition.version}`);
 
     const existing = await docRef.get();
     if (existing.exists) {
@@ -196,8 +197,8 @@ export class FirestoreProcessRepository implements ProcessRepository {
     }
   }
 
-  async setVersionArchived(name: string, version: number, archived: boolean): Promise<void> {
-    const docId = `${name}:${version}`;
+  async setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void> {
+    const docId = `${namespace}:${name}:${version}`;
     const docRef = this.db.collection(this.workflowDefinitionsCollection).doc(docId);
     const snap = await docRef.get();
     if (!snap.exists) {

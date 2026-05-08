@@ -42,7 +42,7 @@ export type WebhookRouteResult =
  *
  * Namespace scoping at the version-lookup level prevents tenant A from
  * accidentally surfacing tenant B's workflow when both registered the same
- * `name` (the underlying storage is keyed by `name:version` globally).
+ * `name` (the underlying storage is keyed by `namespace:name:version`).
  *
  * The router is framework-agnostic — Next.js, queue worker, websocket bridge
  * can all forward into it. Engine work (createInstance + startInstance) is
@@ -71,6 +71,7 @@ export class WebhookRouter {
     }
 
     const definition = await this.processRepository.getWorkflowDefinition(
+      input.namespace,
       input.workflowName,
       version,
     );
@@ -109,6 +110,7 @@ export class WebhookRouter {
 
     const triggeredBy = input.triggeredBy ?? 'webhook';
     const instance = await this.engine.createInstance(
+      definition.namespace,
       definition.name,
       definition.version,
       triggeredBy,

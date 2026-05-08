@@ -68,6 +68,7 @@ describe('ManualTrigger', () => {
     overrides: Partial<WorkflowTriggerContext> = {},
   ): WorkflowTriggerContext {
     return {
+      namespace: 'test',
       definitionName: 'linear-process',
       definitionVersion: 1,
       triggerName: 'Start Process',

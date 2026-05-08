@@ -101,13 +101,14 @@ export async function saveWorkflowDefinition(
 export type SetDefaultVersionResult = { success: true } | { success: false; error: string };
 
 export async function setDefaultWorkflowVersion(
+  namespace: string,
   name: string,
   version: number,
 ): Promise<SetDefaultVersionResult> {
   const { processRepo } = getPlatformServices();
   try {
     // Verify version exists
-    const def = await processRepo.getWorkflowDefinition(name, version);
+    const def = await processRepo.getWorkflowDefinition(namespace, name, version);
     if (!def) {
       return { success: false, error: `Version ${version} not found` };
     }
@@ -138,13 +139,14 @@ export async function setProcessArchived(
 }
 
 export async function setVersionArchived(
+  namespace: string,
   name: string,
   version: number,
   archived: boolean,
 ): Promise<ArchiveResult> {
   const { processRepo } = getPlatformServices();
   try {
-    await processRepo.setVersionArchived(name, version, archived);
+    await processRepo.setVersionArchived(namespace, name, version, archived);
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };

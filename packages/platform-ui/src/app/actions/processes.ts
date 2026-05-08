@@ -5,6 +5,7 @@ import type { WorkflowTriggerContext } from '@mediforce/workflow-engine';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 
 interface StartWorkflowRunInput {
+  namespace: string;
   definitionName: string;
   definitionVersion: number;
   triggeredBy: string;
@@ -20,6 +21,7 @@ export async function startWorkflowRun(
     const payload = input.payload ?? {};
 
     const context: WorkflowTriggerContext = {
+      namespace: input.namespace,
       definitionName: input.definitionName,
       definitionVersion: input.definitionVersion,
       triggerName: 'start',

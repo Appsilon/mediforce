@@ -16,7 +16,7 @@ export interface ProcessRepository {
   // WorkflowDefinition methods (unified schema)
   // ---------------------------------------------------------------------------
 
-  getWorkflowDefinition(name: string, version: number): Promise<WorkflowDefinition | null>;
+  getWorkflowDefinition(namespace: string, name: string, version: number): Promise<WorkflowDefinition | null>;
   saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void>;
   /** List all workflow definitions, grouped by name.
    *  @param includeArchived When false, archived documents are filtered out
@@ -37,7 +37,7 @@ export interface ProcessRepository {
   setDefaultWorkflowVersion(name: string, version: number): Promise<void>;
 
   setProcessArchived(name: string, archived: boolean): Promise<void>;
-  setVersionArchived(name: string, version: number, archived: boolean): Promise<void>;
+  setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void>;
 
   setWorkflowVisibility(name: string, visibility: 'public' | 'private'): Promise<void>;
   setWorkflowDeleted(name: string, deleted: boolean): Promise<void>;

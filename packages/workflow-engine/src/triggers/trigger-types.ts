@@ -3,6 +3,7 @@
  * All config is embedded in the WorkflowDefinition — no configName/configVersion needed.
  */
 export interface WorkflowTriggerContext {
+  namespace: string;          // tenant namespace — used for namespace-scoped doc ID lookups
   definitionName: string;
   definitionVersion: number;  // WorkflowDefinition uses numeric versions
   triggerName: string;        // matches Trigger.name from WorkflowDefinition

@@ -81,7 +81,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       auditRepo,
       rbacService,
     );
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'rbac-test-process',
       1,
       'system',
@@ -101,7 +101,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
       auditRepo,
       // rbacService intentionally omitted
     );
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'rbac-test-process',
       1,
       'system',
@@ -137,7 +137,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
 
     // Use definition without allowedRoles
     const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo, rbacService);
-    const instance = await engine.createInstance('rbac-no-roles', 1, 'system', 'manual');
+    const instance = await engine.createInstance('test', 'rbac-no-roles', 1, 'system', 'manual');
     await engine.startInstance(instance.id);
 
     const result = await engine.advanceStep(instance.id, {}, actor);
@@ -247,7 +247,7 @@ describe('WorkflowEngine — RBAC enforcement', () => {
 
     // Use definition without allowedRoles
     const engine = new WorkflowEngine(processRepo, instanceRepo, auditRepo, rbacService);
-    const instance = await engine.createInstance('rbac-no-roles', 1, 'system', 'manual');
+    const instance = await engine.createInstance('test', 'rbac-no-roles', 1, 'system', 'manual');
     await engine.startInstance(instance.id);
 
     const result = await engine.advanceStep(instance.id, {}, actor);

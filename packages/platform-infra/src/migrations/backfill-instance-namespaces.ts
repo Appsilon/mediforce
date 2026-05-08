@@ -41,7 +41,8 @@ export async function backfillInstanceNamespaces(
       if (latestVersion === 0) {
         namespaceCache.set(defName, null);
       } else {
-        const def = await processRepo.getWorkflowDefinition(defName, latestVersion);
+        // Legacy migration: try empty namespace first (old doc IDs), then query-based
+        const def = await processRepo.getWorkflowDefinition('', defName, latestVersion);
         namespaceCache.set(defName, def?.namespace ?? null);
       }
     }

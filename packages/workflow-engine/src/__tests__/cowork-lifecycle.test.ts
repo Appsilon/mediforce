@@ -95,7 +95,7 @@ beforeEach(async () => {
 describe('Cowork lifecycle: route → simulate session → finalize → complete', () => {
   it('routes to cowork step, then completes when artifact is provided', async () => {
     // 1. Create and start instance
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'cowork-designer-test',
       1,
       'user-001',
@@ -173,7 +173,7 @@ describe('Cowork lifecycle: route → simulate session → finalize → complete
   });
 
   it('preserves step context in instance variables after cowork finalize', async () => {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'cowork-designer-test',
       1,
       'user-001',

@@ -35,12 +35,13 @@ export async function POST(
   const caller = await resolveCallerIdentity(request, namespaceRepo);
   if (caller instanceof NextResponse) return caller;
 
-  const definition = await processRepo.getWorkflowDefinition(name, version);
+  const versionArchiveNamespace = request.nextUrl.searchParams.get('namespace') ?? '';
+  const definition = await processRepo.getWorkflowDefinition(versionArchiveNamespace, name, version);
   const denied = requireNamespaceAccess(caller, definition?.namespace);
   if (denied) return denied;
 
   try {
-    await processRepo.setVersionArchived(name, version, archived);
+    await processRepo.setVersionArchived(versionArchiveNamespace, name, version, archived);
     return NextResponse.json({ success: true, name, version, archived });
   } catch (err) {
     if (err instanceof WorkflowDefinitionVersionNotFoundError) {

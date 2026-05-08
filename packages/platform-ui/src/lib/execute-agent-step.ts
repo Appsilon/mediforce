@@ -69,6 +69,7 @@ export async function executeAgentStep(
 
   // Load the full WorkflowDefinition for WorkflowAgentContext
   const workflowDefinition: WorkflowDefinition | null = await processRepo.getWorkflowDefinition(
+    instance.namespace ?? '',
     instance.definitionName,
     Number(instance.definitionVersion),
   );

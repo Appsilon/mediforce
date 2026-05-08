@@ -92,6 +92,7 @@ test.describe('Previous run outputs — API E2E', () => {
       const triggerRes = await request.post('/api/processes', {
         headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
         data: {
+          namespace: TEST_ORG_HANDLE,
           definitionName: wdName,
           triggeredBy: 'e2e-test',
           triggerName: 'Start',
@@ -162,6 +163,7 @@ test.describe('Previous run outputs — API E2E', () => {
     const run2Trigger = await request.post('/api/processes', {
       headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
       data: {
+        namespace: TEST_ORG_HANDLE,
         definitionName: wdName,
         triggeredBy: 'e2e-test',
         triggerName: 'Start',
@@ -208,6 +210,7 @@ test.describe('Previous run outputs — API E2E', () => {
     const run3Trigger = await request.post('/api/processes', {
       headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
       data: {
+        namespace: TEST_ORG_HANDLE,
         definitionName: wdName,
         triggeredBy: 'e2e-test',
         triggerName: 'Start',

@@ -7,28 +7,28 @@ import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
 
 /**
  * In-memory implementation of ProcessRepository for testing.
- * Uses Maps with composite keys ({name}:{version}) matching Firestore document IDs.
+ * Uses Maps with composite keys ({namespace}:{name}:{version}) matching Firestore document IDs.
  * Reusable by any package that needs test doubles for process operations.
  */
 export class InMemoryProcessRepository implements ProcessRepository {
   private workflowDefinitions = new Map<string, WorkflowDefinition>();
   private workflowDefaults = new Map<string, number>();
 
-  private compositeKey(name: string, version: string): string {
-    return `${name}:${version}`;
+  private compositeKey(namespace: string, name: string, version: string): string {
+    return `${namespace}:${name}:${version}`;
   }
 
   // ---------------------------------------------------------------------------
   // WorkflowDefinition methods (unified schema)
   // ---------------------------------------------------------------------------
 
-  async getWorkflowDefinition(name: string, version: number): Promise<WorkflowDefinition | null> {
-    return this.workflowDefinitions.get(this.compositeKey(name, String(version))) ?? null;
+  async getWorkflowDefinition(namespace: string, name: string, version: number): Promise<WorkflowDefinition | null> {
+    return this.workflowDefinitions.get(this.compositeKey(namespace, name, String(version))) ?? null;
   }
 
   async saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void> {
     this.workflowDefinitions.set(
-      this.compositeKey(definition.name, String(definition.version)),
+      this.compositeKey(definition.namespace, definition.name, String(definition.version)),
       definition,
     );
   }
@@ -97,8 +97,8 @@ export class InMemoryProcessRepository implements ProcessRepository {
     }
   }
 
-  async setVersionArchived(name: string, version: number, archived: boolean): Promise<void> {
-    const key = this.compositeKey(name, String(version));
+  async setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void> {
+    const key = this.compositeKey(namespace, name, String(version));
     const def = this.workflowDefinitions.get(key);
     if (!def) {
       const err = new Error(`Workflow definition "${name}" version ${version} not found`);

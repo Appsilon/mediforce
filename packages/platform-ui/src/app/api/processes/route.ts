@@ -4,6 +4,7 @@ import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 interface StartWorkflowBody {
+  namespace?: string;
   definitionName: string;
   definitionVersion?: number;
   version?: string | number;
@@ -42,7 +43,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const payload: Record<string, unknown> =
       (rawPayload as Record<string, unknown>) ?? {};
 
-    const definition = await processRepo.getWorkflowDefinition(body.definitionName, version);
+    // The caller must provide namespace to look up the definition by doc ID.
+    // Falls back to empty string which will 404 if the definition doesn't exist.
+    const requestNamespace = body.namespace ?? '';
+
+    const definition = await processRepo.getWorkflowDefinition(requestNamespace, body.definitionName, version);
     if (!definition) {
       return NextResponse.json(
         { error: `Workflow definition '${body.definitionName}' v${version} not found` },
@@ -63,6 +68,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const result = await manualTrigger.fireWorkflow({
+      namespace: definition.namespace,
       definitionName: body.definitionName,
       definitionVersion: version,
       triggerName: body.triggerName ?? 'manual',

@@ -51,7 +51,7 @@ export async function GET(
     // Load workflow definition
     const versionNum = parseInt(instance.definitionVersion, 10);
     const definition = !isNaN(versionNum)
-      ? await processRepo.getWorkflowDefinition(instance.definitionName, versionNum)
+      ? await processRepo.getWorkflowDefinition(instance.namespace ?? '', instance.definitionName, versionNum)
       : null;
 
     if (!definition) {

@@ -30,6 +30,7 @@ export class ManualTrigger {
    */
   async fireWorkflow(context: WorkflowTriggerContext): Promise<TriggerResult> {
     const definition = await this.processRepository.getWorkflowDefinition(
+      context.namespace,
       context.definitionName,
       context.definitionVersion,
     );
@@ -49,6 +50,7 @@ export class ManualTrigger {
     }
 
     const instance = await this.engine.createInstance(
+      context.namespace,
       context.definitionName,
       context.definitionVersion,
       context.triggeredBy,

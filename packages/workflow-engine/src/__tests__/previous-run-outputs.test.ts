@@ -84,7 +84,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
     version: number,
     stepOutputs: Array<Record<string, unknown>>,
   ): Promise<string> {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       defName,
       version,
       'user-1',
@@ -100,7 +100,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
 
   describe('first run (no predecessor)', () => {
     it('WD without inputForNextRun: previousRun is undefined', async () => {
-      const instance = await engine.createInstance(
+      const instance = await engine.createInstance('test',
         'plain-process',
         1,
         'user-1',
@@ -112,7 +112,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
     });
 
     it('WD with inputForNextRun, no prior runs: previousRun is empty object', async () => {
-      const instance = await engine.createInstance(
+      const instance = await engine.createInstance('test',
         'sftp-monitor',
         1,
         'user-1',
@@ -130,7 +130,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
         { cursor: '2026-04-20T10:00:00Z' }, // scan output; routes into terminal `done` auto-completing
       ]);
 
-      const second = await engine.createInstance(
+      const second = await engine.createInstance('test',
         'sftp-monitor',
         1,
         'user-1',
@@ -147,7 +147,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
         { hash: 'abc123', other: 'ignored' },
       ]);
 
-      const second = await engine.createInstance(
+      const second = await engine.createInstance('test',
         'multi-carry',
         1,
         'user-1',
@@ -165,7 +165,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
         { somethingElse: true }, // no `hash`
       ]);
 
-      const second = await engine.createInstance(
+      const second = await engine.createInstance('test',
         'multi-carry',
         1,
         'user-1',
@@ -183,7 +183,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
       const firstId = await completeRun('sftp-monitor', 1, [{ cursor: 1 }]);
 
       // Second run: created, started, but aborted (becomes failed)
-      const failing = await engine.createInstance(
+      const failing = await engine.createInstance('test',
         'sftp-monitor',
         1,
         'user-1',
@@ -194,7 +194,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
       await engine.abortInstance(failing.id, actor);
 
       // Third run should inherit from the first (skipping the failed second)
-      const third = await engine.createInstance(
+      const third = await engine.createInstance('test',
         'sftp-monitor',
         1,
         'user-1',
@@ -206,7 +206,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
     });
 
     it('when only failed runs exist, previousRun is empty', async () => {
-      const failing = await engine.createInstance(
+      const failing = await engine.createInstance('test',
         'sftp-monitor',
         1,
         'user-1',
@@ -216,7 +216,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
       await engine.startInstance(failing.id);
       await engine.abortInstance(failing.id, actor);
 
-      const next = await engine.createInstance(
+      const next = await engine.createInstance('test',
         'sftp-monitor',
         1,
         'user-1',
@@ -238,7 +238,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
       };
 
       await expect(
-        engine.createInstance('sftp-monitor', 1, 'user-1', 'manual', {}),
+        engine.createInstance('test', 'sftp-monitor', 1, 'user-1', 'manual', {}),
       ).rejects.toThrow(repoError);
     });
   });
@@ -250,7 +250,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
       await new Promise((r) => setTimeout(r, 5));
       const secondId = await completeRun('sftp-monitor', 1, [{ cursor: 2 }]);
 
-      const third = await engine.createInstance(
+      const third = await engine.createInstance('test',
         'sftp-monitor',
         1,
         'user-1',
@@ -273,7 +273,7 @@ describe('Previous run outputs (inputForNextRun)', () => {
       const v2Def: WorkflowDefinition = { ...cursorDef, version: 2 };
       await processRepo.saveWorkflowDefinition(v2Def);
 
-      const v2Instance = await engine.createInstance(
+      const v2Instance = await engine.createInstance('test',
         'sftp-monitor',
         2,
         'user-1',

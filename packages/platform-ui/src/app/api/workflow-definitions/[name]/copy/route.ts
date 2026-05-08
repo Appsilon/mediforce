@@ -49,7 +49,9 @@ export async function POST(
     );
   }
 
-  const source = await processRepo.getWorkflowDefinition(sourceName, sourceVersion);
+  // Source namespace: try caller's namespace from query, fall back to targetNamespace
+  const sourceNamespace = request.nextUrl.searchParams.get('namespace') ?? targetNamespace;
+  const source = await processRepo.getWorkflowDefinition(sourceNamespace, sourceName, sourceVersion);
   if (source === null) {
     return NextResponse.json(
       { error: `Workflow '${sourceName}' version ${sourceVersion} not found` },
@@ -85,11 +87,14 @@ export async function POST(
     version: source.version,
   };
 
+  // Doc IDs are namespace-scoped ({namespace}:{name}:{version}), so start at version 1
+  const nextVersion = 1;
+
   const copy = {
     ...source,
     name: copyName,
     namespace: targetNamespace,
-    version: 1,
+    version: nextVersion,
     visibility: 'private' as const,
     copiedFrom,
     createdAt: new Date().toISOString(),
@@ -100,7 +105,7 @@ export async function POST(
   await processRepo.saveWorkflowDefinition(copy);
 
   return NextResponse.json(
-    { success: true, name: copyName, version: 1, copiedFrom },
+    { success: true, name: copyName, version: nextVersion, copiedFrom },
     { status: 201 },
   );
 }
