@@ -9,10 +9,14 @@ import { getApp } from 'firebase/app';
 
 type WorkflowDefinitionDoc = WorkflowDefinition & { id: string };
 
-export function useWorkflowDefinitions(name: string) {
+export function useWorkflowDefinitions(name: string, namespace?: string) {
   const constraints = useMemo(
-    () => [where('name', '==', name)],
-    [name],
+    () => {
+      const c = [where('name', '==', name)];
+      if (namespace) c.push(where('namespace', '==', namespace));
+      return c;
+    },
+    [name, namespace],
   );
 
   const { data: wfData, loading, error: wfError } = useCollection<WorkflowDefinitionDoc>(

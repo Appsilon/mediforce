@@ -37,7 +37,7 @@ export function StartRunButton({
   const router = useRouter();
   const handle = useHandleFromPath();
   const { firebaseUser } = useAuth();
-  const { definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowDefinitions(workflowName);
+  const { definitions, effectiveVersion: hookEffectiveVersion } = useWorkflowDefinitions(workflowName, handle);
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
   const openRouterCredits = useOpenRouterCredits();
   const [starting, setStarting] = React.useState(false);

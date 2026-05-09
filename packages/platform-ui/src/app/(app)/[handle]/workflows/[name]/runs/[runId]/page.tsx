@@ -29,7 +29,7 @@ export default function RunDetailPage() {
   const { data: auditEvents, loading: auditLoading, error: auditError } = useAuditEvents(runId ?? null);
 
   // Load workflow definitions to get steps for the StepStatusPanel
-  const { definitions: workflowVersions } = useWorkflowDefinitions(decodedName);
+  const { definitions: workflowVersions } = useWorkflowDefinitions(decodedName, handle);
 
   const definitionSteps = useMemo(
     () => resolveDefinitionSteps(instance, workflowVersions),

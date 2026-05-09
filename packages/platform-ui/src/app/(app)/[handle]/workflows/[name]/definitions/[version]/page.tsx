@@ -28,7 +28,7 @@ export default function WorkflowDefinitionVersionPage() {
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
-  const { definitions, loading } = useWorkflowDefinitions(decodedName);
+  const { definitions, loading } = useWorkflowDefinitions(decodedName, handle);
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
   const [editedDescription, setEditedDescription] = useState('');
