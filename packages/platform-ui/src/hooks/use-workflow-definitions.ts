@@ -20,23 +20,11 @@ export function useWorkflowDefinitions(name: string, namespace: string) {
     constraints,
   );
 
-  console.log('[useWorkflowDefinitions] raw', {
-    name, namespace, loading,
-    rawCount: wfData.length,
-    rawNamespaces: [...new Set(wfData.map((d) => d.namespace))],
-    rawVersions: wfData.map((d) => `${d.namespace}:v${d.version}`),
-  });
-
   const definitions = useMemo(() => {
     return wfData
       .filter((d) => !d.deleted && d.namespace === namespace)
       .sort((a, b) => b.version - a.version);
   }, [wfData, namespace]);
-
-  console.log('[useWorkflowDefinitions] filtered', {
-    filteredCount: definitions.length,
-    filteredVersions: definitions.map((d) => d.version),
-  });
 
   const latestVersion = definitions[0]?.version ?? 0;
 
@@ -62,7 +50,6 @@ export function useWorkflowDefinitions(name: string, namespace: string) {
   useEffect(() => { refreshDefault(); }, [refreshDefault]);
 
   const effectiveVersion = defaultVersion ?? latestVersion;
-  console.log('[useWorkflowDefinitions] resolved', { latestVersion, defaultVersion, effectiveVersion });
 
   return { definitions, latestVersion, defaultVersion, effectiveVersion, loading, error: wfError, refreshDefault };
 }
