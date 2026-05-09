@@ -20,38 +20,49 @@ export function useWorkflowDefinitions(name: string, namespace: string) {
     constraints,
   );
 
+  console.log('[useWorkflowDefinitions] raw', {
+    name, namespace, loading,
+    rawCount: wfData.length,
+    rawNamespaces: [...new Set(wfData.map((d) => d.namespace))],
+    rawVersions: wfData.map((d) => `${d.namespace}:v${d.version}`),
+  });
+
   const definitions = useMemo(() => {
     return wfData
       .filter((d) => !d.deleted && d.namespace === namespace)
       .sort((a, b) => b.version - a.version);
   }, [wfData, namespace]);
 
+  console.log('[useWorkflowDefinitions] filtered', {
+    filteredCount: definitions.length,
+    filteredVersions: definitions.map((d) => d.version),
+  });
+
   const latestVersion = definitions[0]?.version ?? 0;
 
-  // Default version from workflowMeta/{name}
   const [defaultVersion, setDefaultVersionState] = useState<number | null>(null);
 
   const refreshDefault = useCallback(async () => {
-    if (!name) return;
+    if (!name || !namespace) return;
     try {
       const db = getFirestore(getApp());
-      const metaRef = doc(db, 'workflowMeta', name);
+      const metaRef = doc(db, 'workflowMeta', `${namespace}:${name}`);
       const snap = await getDoc(metaRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        setDefaultVersionState(typeof data.defaultVersion === 'number' ? data.defaultVersion : null);
-      } else {
+      if (!snap.exists()) {
         setDefaultVersionState(null);
+        return;
       }
+      const data = snap.data();
+      setDefaultVersionState(typeof data?.defaultVersion === 'number' ? data.defaultVersion : null);
     } catch {
       setDefaultVersionState(null);
     }
-  }, [name]);
+  }, [name, namespace]);
 
   useEffect(() => { refreshDefault(); }, [refreshDefault]);
 
-  // Effective version for running: default if set, otherwise latest
   const effectiveVersion = defaultVersion ?? latestVersion;
+  console.log('[useWorkflowDefinitions] resolved', { latestVersion, defaultVersion, effectiveVersion });
 
   return { definitions, latestVersion, defaultVersion, effectiveVersion, loading, error: wfError, refreshDefault };
 }
