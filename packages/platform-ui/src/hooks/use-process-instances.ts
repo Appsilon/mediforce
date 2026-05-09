@@ -17,18 +17,22 @@ export function useProcessInstances(
 ) {
   const constraints = useMemo(() => {
     const c = [];
+    if (namespace) c.push(where('namespace', '==', namespace));
     if (definitionName) {
       c.push(where('definitionName', '==', definitionName));
-      if (namespace) c.push(where('namespace', '==', namespace));
       if (statusFilter !== 'all') c.push(where('status', '==', statusFilter));
     } else {
       if (statusFilter !== 'all') c.push(where('status', '==', statusFilter));
-      c.push(orderBy('createdAt', 'desc'));
+      if (!namespace) c.push(orderBy('createdAt', 'desc'));
     }
     return c;
   }, [statusFilter, definitionName, namespace]);
 
+  console.log('[useProcessInstances]', { definitionName, namespace, statusFilter, constraintCount: constraints.length });
+
   const result = useCollection<ProcessInstance>('processInstances', constraints);
+
+  console.log('[useProcessInstances] raw result:', result.data.length, 'instances, namespaces:', [...new Set(result.data.map((i) => i.namespace ?? 'NULL'))]);
 
   const data = useMemo(() => {
     const filtered = result.data
