@@ -128,10 +128,10 @@ export function useProcessDefinitions() {
   return { definitions, stepsByDefinition, latestDocs, loading, error };
 }
 
-export function useProcessDefinitionVersions(name: string) {
+export function useProcessDefinitionVersions(name: string, namespace: string) {
   const workflowConstraints = useMemo(
-    () => [where('name', '==', name), orderBy('version', 'asc')],
-    [name],
+    () => [where('name', '==', name), where('namespace', '==', namespace)],
+    [name, namespace],
   );
   const { data: workflowData, loading } = useCollection<WorkflowDefinitionDoc>(
     'workflowDefinitions',

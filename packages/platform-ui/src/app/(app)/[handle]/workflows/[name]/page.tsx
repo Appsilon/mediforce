@@ -184,7 +184,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [activeTab, setActiveTab] = React.useState(initialTab);
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
 
-  const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName);
+  const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName, handle);
   const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns, handle);
   const { data: activeTasks } = useMyTasks(null);
 
