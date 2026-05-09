@@ -17,28 +17,28 @@ export function useProcessInstances(
 ) {
   const constraints = useMemo(() => {
     const c = [];
-    if (namespace) c.push(where('namespace', '==', namespace));
     if (definitionName) {
       c.push(where('definitionName', '==', definitionName));
       if (statusFilter !== 'all') c.push(where('status', '==', statusFilter));
     } else {
       if (statusFilter !== 'all') c.push(where('status', '==', statusFilter));
-      if (!namespace) c.push(orderBy('createdAt', 'desc'));
+      c.push(orderBy('createdAt', 'desc'));
     }
     return c;
-  }, [statusFilter, definitionName, namespace]);
+  }, [statusFilter, definitionName]);
 
   const result = useCollection<ProcessInstance>('processInstances', constraints);
 
   const data = useMemo(() => {
     const filtered = result.data
       .filter((instance) => !instance.deleted)
-      .filter((instance) => showArchived || instance.archived !== true);
+      .filter((instance) => showArchived || instance.archived !== true)
+      .filter((instance) => !namespace || instance.namespace === namespace);
     if (!definitionName) return filtered;
     return [...filtered].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
-  }, [result.data, definitionName, showArchived]);
+  }, [result.data, definitionName, showArchived, namespace]);
 
   return { ...result, data };
 }

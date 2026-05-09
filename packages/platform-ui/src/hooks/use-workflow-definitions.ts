@@ -11,8 +11,8 @@ type WorkflowDefinitionDoc = WorkflowDefinition & { id: string };
 
 export function useWorkflowDefinitions(name: string, namespace: string) {
   const constraints = useMemo(
-    () => [where('name', '==', name), where('namespace', '==', namespace)],
-    [name, namespace],
+    () => [where('name', '==', name)],
+    [name],
   );
 
   const { data: wfData, loading, error: wfError } = useCollection<WorkflowDefinitionDoc>(
@@ -22,9 +22,9 @@ export function useWorkflowDefinitions(name: string, namespace: string) {
 
   const definitions = useMemo(() => {
     return wfData
-      .filter((d) => !d.deleted)
+      .filter((d) => !d.deleted && d.namespace === namespace)
       .sort((a, b) => b.version - a.version);
-  }, [wfData]);
+  }, [wfData, namespace]);
 
   const latestVersion = definitions[0]?.version ?? 0;
 

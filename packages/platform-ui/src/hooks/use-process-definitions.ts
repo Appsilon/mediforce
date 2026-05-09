@@ -130,8 +130,8 @@ export function useProcessDefinitions() {
 
 export function useProcessDefinitionVersions(name: string, namespace: string) {
   const workflowConstraints = useMemo(
-    () => [where('name', '==', name), where('namespace', '==', namespace)],
-    [name, namespace],
+    () => [where('name', '==', name)],
+    [name],
   );
   const { data: workflowData, loading } = useCollection<WorkflowDefinitionDoc>(
     'workflowDefinitions',
@@ -139,9 +139,9 @@ export function useProcessDefinitionVersions(name: string, namespace: string) {
   );
 
   const sorted = useMemo(() => {
-    const filtered = workflowData.filter((doc) => !doc.deleted);
+    const filtered = workflowData.filter((doc) => !doc.deleted && doc.namespace === namespace);
     return [...filtered].sort((a, b) => compareSemver(String(b.version), String(a.version)));
-  }, [workflowData]);
+  }, [workflowData, namespace]);
 
   return { versions: sorted, loading, error: null };
 }
