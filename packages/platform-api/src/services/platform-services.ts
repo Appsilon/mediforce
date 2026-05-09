@@ -5,6 +5,7 @@ import {
   FirestoreAgentRunRepository,
   FirestoreHumanTaskRepository,
   FirestoreAgentDefinitionRepository,
+  FirestoreSkillRegistryRepository,
   FirestoreCoworkSessionRepository,
   FirestoreCronTriggerStateRepository,
   FirestoreToolCatalogRepository,
@@ -65,6 +66,7 @@ export interface PlatformServices {
   auditRepo: FirestoreAuditRepository;
   humanTaskRepo: FirestoreHumanTaskRepository;
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
+  skillRegistryRepo: FirestoreSkillRegistryRepository;
   coworkSessionRepo: FirestoreCoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
   toolCatalogRepo: FirestoreToolCatalogRepository;
@@ -91,6 +93,7 @@ export function getPlatformServices(): PlatformServices {
   const agentRunRepo = new FirestoreAgentRunRepository(db);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
+  const skillRegistryRepo = new FirestoreSkillRegistryRepository(db);
   const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);
   const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
   const toolCatalogRepo = new FirestoreToolCatalogRepository(db);
@@ -201,6 +204,7 @@ export function getPlatformServices(): PlatformServices {
     auditRepo,
     humanTaskRepo,
     agentDefinitionRepo,
+    skillRegistryRepo,
     coworkSessionRepo,
     cronTriggerStateRepo,
     toolCatalogRepo,

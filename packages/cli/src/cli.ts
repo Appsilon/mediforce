@@ -33,6 +33,12 @@ import { agentListCommand } from './commands/agent-list.js';
 import { agentGetCommand } from './commands/agent-get.js';
 import { agentDeleteCommand } from './commands/agent-delete.js';
 import { agentSetVisibilityCommand } from './commands/agent-set-visibility.js';
+import { agentUpdateCommand } from './commands/agent-update.js';
+import { skillRegistryListCommand } from './commands/skill-registry-list.js';
+import { skillRegistryCreateCommand } from './commands/skill-registry-create.js';
+import { skillRegistryGetCommand } from './commands/skill-registry-get.js';
+import { skillRegistryUpdateCommand } from './commands/skill-registry-update.js';
+import { skillRegistryDeleteCommand } from './commands/skill-registry-delete.js';
 import { modelListCommand } from './commands/model-list.js';
 import { modelGetCommand } from './commands/model-get.js';
 import { modelSyncCommand } from './commands/model-sync.js';
@@ -57,8 +63,14 @@ Commands:
   workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
   agent list                                         List agent definitions
   agent get <id>                                     Fetch an agent definition
+  agent update <id> --skill <registryId>:<name>      Update an agent's skill bindings
   agent delete <id>                                  Delete an agent definition
   agent set-visibility <id> --visibility <v>         Set agent visibility (public|private)
+  skill-registry list                                List skill registries
+  skill-registry get <id>                            Fetch a skill registry
+  skill-registry create --name <n> --repo <url> ...  Create a skill registry
+  skill-registry update <id> [field flags]           Update a skill registry
+  skill-registry delete <id>                         Delete a skill registry
   model list                                         List models in registry
   model get <id>                                     Fetch a model from registry
   model sync                                         Sync models from OpenRouter
@@ -106,10 +118,25 @@ const AGENT_HELP = `Usage: mediforce agent <subcommand> [options]
 Subcommands:
   list                                      List agent definitions
   get <id>                                  Fetch an agent definition
+  update <id> --skill <registryId>:<name>   Update an agent's skill bindings
   delete <id>                               Delete an agent definition
   set-visibility <id> --visibility <v>      Set agent visibility
 
 Run \`mediforce agent <subcommand> --help\` for subcommand-specific flags.
+`;
+
+const SKILL_REGISTRY_HELP = `Usage: mediforce skill-registry <subcommand> [options]
+
+Subcommands:
+  list                                                List skill registries
+  get <id>                                            Fetch a skill registry
+  create --name <n> --repo <url> --commit <sha>       Create a skill registry
+         --skills-dir <dir> [--namespace <ns>]
+  update <id> [--name|--repo|--commit|--skills-dir|--namespace]
+                                                      Update a skill registry
+  delete <id>                                         Delete a skill registry
+
+Run \`mediforce skill-registry <subcommand> --help\` for subcommand-specific flags.
 `;
 
 const MODEL_HELP = `Usage: mediforce model <subcommand> [options]
@@ -203,6 +230,12 @@ export async function runCli(input: RunCliInput): Promise<number> {
     output.stderr(SYSTEM_HELP);
     return 2;
   }
+  if (command === 'skill-registry' && subcommand === undefined) {
+    output.stderr('mediforce skill-registry: missing subcommand');
+    output.stderr('');
+    output.stderr(SKILL_REGISTRY_HELP);
+    return 2;
+  }
 
   if (command === 'workflow' && subcommand === 'register') {
     return workflowRegisterCommand({ argv: rest, env: input.env, output });
@@ -230,6 +263,24 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'agent' && subcommand === 'set-visibility') {
     return agentSetVisibilityCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'agent' && subcommand === 'update') {
+    return agentUpdateCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'skill-registry' && subcommand === 'list') {
+    return skillRegistryListCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'skill-registry' && subcommand === 'get') {
+    return skillRegistryGetCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'skill-registry' && subcommand === 'create') {
+    return skillRegistryCreateCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'skill-registry' && subcommand === 'update') {
+    return skillRegistryUpdateCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'skill-registry' && subcommand === 'delete') {
+    return skillRegistryDeleteCommand({ argv: rest, env: input.env, output });
   }
   if (command === 'model' && subcommand === 'list') {
     return modelListCommand({ argv: rest, env: input.env, output });

@@ -22,6 +22,7 @@ export { WebhookNotificationService } from './notifications/webhook-notification
 export { createMailgunSender } from './email/mailgun-client.js';
 export type { MailgunConfig } from './email/mailgun-client.js';
 export { FirestoreAgentDefinitionRepository } from './firestore/agent-definition-repository.js';
+export { FirestoreSkillRegistryRepository } from './firestore/skill-registry-repository.js';
 export { FirestoreNamespaceRepository } from './firestore/namespace-repository.js';
 export { FirestoreWorkflowSecretsRepository } from './firestore/workflow-secrets-repository.js';
 export { FirestoreNamespaceSecretsRepository } from './firestore/namespace-secrets-repository.js';

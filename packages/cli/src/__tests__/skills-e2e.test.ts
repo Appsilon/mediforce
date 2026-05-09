@@ -84,6 +84,8 @@ describe('mediforce skill-registry — Phase 0 RED, target Phase 1', () => {
           name: 'SDTM skills',
           repo: { url: 'file:///tmp/repo', commit: 'b'.repeat(40) },
           skillsDir: 'skills',
+          createdAt: '2026-05-08T00:00:00Z',
+          updatedAt: '2026-05-08T00:00:00Z',
         },
       }, 201);
     });
@@ -122,7 +124,28 @@ describe('mediforce agent update --skill — Phase 0 RED, target Phase 1', () =>
       const u = String(url);
       if (u.includes('/api/agent-definitions/agent-1') && init?.method === 'PATCH') {
         patchBody = JSON.parse(init.body as string) as Record<string, unknown>;
-        return jsonResponse({ agent: { id: 'agent-1' } });
+        return jsonResponse({
+          agent: {
+            id: 'agent-1',
+            kind: 'plugin',
+            runtimeId: 'claude-code-agent',
+            name: 'Test agent',
+            iconName: 'Bot',
+            description: '',
+            foundationModel: 'anthropic/claude-sonnet-4',
+            systemPrompt: '',
+            inputDescription: '',
+            outputDescription: '',
+            skillFileNames: [],
+            skills: [
+              { registryId: 'reg-a', name: 'sdtmig-reference' },
+              { registryId: 'reg-b', name: 'style-guide' },
+            ],
+            visibility: 'private',
+            createdAt: '2026-05-08T00:00:00Z',
+            updatedAt: '2026-05-08T00:00:00Z',
+          },
+        });
       }
       return jsonResponse({}, 404);
     });

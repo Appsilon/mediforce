@@ -1,3 +1,14 @@
+import { z } from 'zod';
+import {
+  SkillRegistrySchema,
+  CreateSkillRegistryInputSchema,
+  UpdateSkillRegistryInputSchema,
+  AgentSkillRefSchema,
+  type SkillRegistry,
+  type CreateSkillRegistryInput,
+  type UpdateSkillRegistryInput,
+  type AgentSkillRef,
+} from '@mediforce/platform-core';
 import {
   ListTasksInputSchema,
   ListTasksOutputSchema,
@@ -168,6 +179,23 @@ export class Mediforce {
     get: (input: GetAgentInput) => Promise<GetAgentOutput>;
     delete: (input: DeleteAgentInput) => Promise<DeleteAgentOutput>;
     update: (input: UpdateAgentInput, body: UpdateAgentBody) => Promise<UpdateAgentOutput>;
+    updateSkills: (
+      input: UpdateAgentInput,
+      body: { skills: AgentSkillRef[] },
+    ) => Promise<UpdateAgentOutput>;
+  };
+
+  readonly skillRegistries: {
+    list: () => Promise<{ skillRegistries: SkillRegistry[] }>;
+    get: (input: { id: string }) => Promise<{ skillRegistry: SkillRegistry }>;
+    create: (
+      body: CreateSkillRegistryInput,
+    ) => Promise<{ skillRegistry: SkillRegistry }>;
+    update: (
+      input: { id: string },
+      body: UpdateSkillRegistryInput,
+    ) => Promise<{ skillRegistry: SkillRegistry }>;
+    delete: (input: { id: string }) => Promise<{ success: true }>;
   };
 
   readonly models: {
@@ -350,6 +378,69 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.agents.update');
         return UpdateAgentOutputSchema.parse(body);
       },
+      updateSkills: async (input, skillsBody) => {
+        const validatedInput = UpdateAgentInputSchema.parse(input);
+        const validatedBody = UpdateAgentSkillsBodySchema.parse(skillsBody);
+        const res = await this.request(
+          `/api/agent-definitions/${encodeURIComponent(validatedInput.id)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(validatedBody),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.updateSkills');
+        return UpdateAgentOutputSchema.parse(body);
+      },
+    };
+
+    this.skillRegistries = {
+      list: async () => {
+        const res = await this.request('/api/skill-registries');
+        const body = await parseJsonOrThrow(res, 'mediforce.skillRegistries.list');
+        return ListSkillRegistriesOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = SkillRegistryIdInputSchema.parse(input);
+        const res = await this.request(
+          `/api/skill-registries/${encodeURIComponent(validated.id)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.skillRegistries.get');
+        return GetSkillRegistryOutputSchema.parse(body);
+      },
+      create: async (createBody) => {
+        const validatedBody = CreateSkillRegistryInputSchema.parse(createBody);
+        const res = await this.request('/api/skill-registries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validatedBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.skillRegistries.create');
+        return CreateSkillRegistryOutputSchema.parse(body);
+      },
+      update: async (input, updateBody) => {
+        const validatedInput = SkillRegistryIdInputSchema.parse(input);
+        const validatedBody = UpdateSkillRegistryInputSchema.parse(updateBody);
+        const res = await this.request(
+          `/api/skill-registries/${encodeURIComponent(validatedInput.id)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(validatedBody),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.skillRegistries.update');
+        return UpdateSkillRegistryOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = SkillRegistryIdInputSchema.parse(input);
+        const res = await this.request(
+          `/api/skill-registries/${encodeURIComponent(validated.id)}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.skillRegistries.delete');
+        return DeleteSkillRegistryOutputSchema.parse(body);
+      },
     };
 
     this.models = {
@@ -495,6 +586,19 @@ export class Mediforce {
     return {};
   }
 }
+
+const SkillRegistryIdInputSchema = z.object({ id: z.string().min(1) });
+const ListSkillRegistriesOutputSchema = z.object({
+  skillRegistries: z.array(SkillRegistrySchema),
+});
+const GetSkillRegistryOutputSchema = z.object({ skillRegistry: SkillRegistrySchema });
+const CreateSkillRegistryOutputSchema = z.object({ skillRegistry: SkillRegistrySchema });
+const UpdateSkillRegistryOutputSchema = z.object({ skillRegistry: SkillRegistrySchema });
+const DeleteSkillRegistryOutputSchema = z.object({ success: z.literal(true) });
+
+const UpdateAgentSkillsBodySchema = z.object({
+  skills: z.array(AgentSkillRefSchema),
+});
 
 function toSearchParams(
   input: Record<string, string | readonly string[] | undefined>,
