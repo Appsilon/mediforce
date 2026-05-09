@@ -21,9 +21,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const caller = await resolveCallerIdentity(req, namespaceRepo);
     if (caller instanceof NextResponse) return caller;
 
+    const requestNamespace = body.namespace ?? '';
     let version = body.definitionVersion ?? (body.version ? Number(body.version) : undefined);
     if (!version) {
-      version = await processRepo.getLatestWorkflowVersion(body.definitionName);
+      version = requestNamespace
+        ? await processRepo.getLatestWorkflowVersionInNamespace(body.definitionName, requestNamespace)
+        : await processRepo.getLatestWorkflowVersion(body.definitionName);
       if (version === 0) {
         return NextResponse.json(
           { error: `No workflow definition found for '${body.definitionName}'` },
@@ -42,10 +45,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
     const payload: Record<string, unknown> =
       (rawPayload as Record<string, unknown>) ?? {};
-
-    // The caller must provide namespace to look up the definition by doc ID.
-    // Falls back to empty string which will 404 if the definition doesn't exist.
-    const requestNamespace = body.namespace ?? '';
 
     const definition = await processRepo.getWorkflowDefinition(requestNamespace, body.definitionName, version);
     if (!definition) {
