@@ -28,11 +28,7 @@ export function useProcessInstances(
     return c;
   }, [statusFilter, definitionName, namespace]);
 
-  console.log('[useProcessInstances]', { definitionName, namespace, statusFilter, constraintCount: constraints.length });
-
   const result = useCollection<ProcessInstance>('processInstances', constraints);
-
-  console.log('[useProcessInstances] raw result:', result.data.length, 'instances, namespaces:', [...new Set(result.data.map((i) => i.namespace ?? 'NULL'))]);
 
   const data = useMemo(() => {
     const filtered = result.data
