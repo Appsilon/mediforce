@@ -22,17 +22,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (caller instanceof NextResponse) return caller;
 
     const requestNamespace = body.namespace ?? '';
-    let version = body.definitionVersion ?? (body.version ? Number(body.version) : undefined);
+    let version: number | undefined = body.definitionVersion ?? (body.version ? Number(body.version) : undefined);
     if (!version) {
-      version = requestNamespace
-        ? await processRepo.getLatestWorkflowVersionInNamespace(body.definitionName, requestNamespace)
-        : await processRepo.getLatestWorkflowVersion(body.definitionName);
-      if (version === 0) {
+      const resolved = await processRepo.getLatestWorkflowVersion(body.definitionName, requestNamespace);
+      if (resolved === 0) {
         return NextResponse.json(
           { error: `No workflow definition found for '${body.definitionName}'` },
           { status: 404 },
         );
       }
+      version = resolved;
     }
 
     const rawPayload = body.payload;

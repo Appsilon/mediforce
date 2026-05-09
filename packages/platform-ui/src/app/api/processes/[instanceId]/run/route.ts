@@ -56,7 +56,7 @@ export async function POST(
       ? await processRepo.getWorkflowDefinition(runNamespace, initialInstance.definitionName, versionNum)
       : null;
     if (!workflowDefinition) {
-      const latestVersion = await processRepo.getLatestWorkflowVersion(initialInstance.definitionName);
+      const latestVersion = await processRepo.getLatestWorkflowVersion(initialInstance.definitionName, initialInstance.namespace ?? '');
       if (latestVersion > 0) {
         workflowDefinition = await processRepo.getWorkflowDefinition(runNamespace, initialInstance.definitionName, latestVersion);
       }

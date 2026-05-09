@@ -25,14 +25,7 @@ export interface ProcessRepository {
    *  them avoids spamming logs with safeParse failures on legacy data
    *  that nobody intends to fix. */
   listWorkflowDefinitions(includeArchived: boolean): Promise<WorkflowDefinitionListResult>;
-  getLatestWorkflowVersion(name: string): Promise<number>;
-  /**
-   * Returns the highest version of `name` whose definition belongs to
-   * `namespace`, or 0 if none. The webhook router calls this to avoid
-   * picking up a version from another tenant when two namespaces share a
-   * workflow name.
-   */
-  getLatestWorkflowVersionInNamespace(name: string, namespace: string): Promise<number>;
+  getLatestWorkflowVersion(name: string, namespace: string): Promise<number>;
   getDefaultWorkflowVersion(name: string): Promise<number | null>;
   setDefaultWorkflowVersion(name: string, version: number): Promise<void>;
 

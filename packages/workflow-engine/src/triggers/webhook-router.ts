@@ -59,7 +59,7 @@ export class WebhookRouter {
       return { status: 400, error: 'namespace and workflowName are required' };
     }
 
-    const version = await this.processRepository.getLatestWorkflowVersionInNamespace(
+    const version = await this.processRepository.getLatestWorkflowVersion(
       input.workflowName,
       input.namespace,
     );

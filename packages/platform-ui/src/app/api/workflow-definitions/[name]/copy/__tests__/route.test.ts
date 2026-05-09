@@ -15,7 +15,6 @@ const sourceDefinition: WorkflowDefinition = {
 
 const mockGetWorkflowDefinition = vi.fn();
 const mockGetLatestWorkflowVersion = vi.fn();
-const mockGetLatestWorkflowVersionInNamespace = vi.fn();
 const mockSaveWorkflowDefinition = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
@@ -23,7 +22,6 @@ vi.mock('@/lib/platform-services', () => ({
     processRepo: {
       getWorkflowDefinition: mockGetWorkflowDefinition,
       getLatestWorkflowVersion: mockGetLatestWorkflowVersion,
-      getLatestWorkflowVersionInNamespace: mockGetLatestWorkflowVersionInNamespace,
       saveWorkflowDefinition: mockSaveWorkflowDefinition,
     },
     namespaceRepo: {},
@@ -48,9 +46,12 @@ vi.mock('@/lib/api-auth', () => ({
 
 import { POST } from '../route';
 
-function makeRequest(name: string, targetNamespace: string, body?: Record<string, unknown>): NextRequest {
+function makeRequest(name: string, targetNamespace: string, body?: Record<string, unknown>, sourceNamespace?: string): NextRequest {
   const url = new URL(`http://localhost/api/workflow-definitions/${encodeURIComponent(name)}/copy`);
   url.searchParams.set('targetNamespace', targetNamespace);
+  if (sourceNamespace !== undefined) {
+    url.searchParams.set('namespace', sourceNamespace);
+  }
   return new NextRequest(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -62,14 +63,16 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCallerIdentity = { kind: 'apiKey' };
-    mockGetLatestWorkflowVersion.mockResolvedValue(3);
-    mockGetLatestWorkflowVersionInNamespace.mockResolvedValue(0);
+    // First call: source version lookup; Second call: target exists check
+    mockGetLatestWorkflowVersion.mockImplementation((_name: string, namespace: string) =>
+      namespace === 'target-ns' ? Promise.resolve(0) : Promise.resolve(3),
+    );
     mockGetWorkflowDefinition.mockResolvedValue(sourceDefinition);
     mockSaveWorkflowDefinition.mockResolvedValue(undefined);
   });
 
   it('copies a public workflow — 201', async () => {
-    const res = await POST(makeRequest('my-workflow', 'target-ns'), {
+    const res = await POST(makeRequest('my-workflow', 'target-ns', undefined, 'source-ns'), {
       params: Promise.resolve({ name: 'my-workflow' }),
     });
     expect(res.status).toBe(201);
@@ -95,7 +98,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
   });
 
   it('copies with custom targetName — 201', async () => {
-    const res = await POST(makeRequest('my-workflow', 'target-ns', { targetName: 'renamed-wf' }), {
+    const res = await POST(makeRequest('my-workflow', 'target-ns', { targetName: 'renamed-wf' }, 'source-ns'), {
       params: Promise.resolve({ name: 'my-workflow' }),
     });
     expect(res.status).toBe(201);
@@ -105,17 +108,19 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
   });
 
   it('copies at specific version', async () => {
-    const res = await POST(makeRequest('my-workflow', 'target-ns', { version: 2 }), {
+    const res = await POST(makeRequest('my-workflow', 'target-ns', { version: 2 }, 'source-ns'), {
       params: Promise.resolve({ name: 'my-workflow' }),
     });
     expect(res.status).toBe(201);
-    expect(mockGetWorkflowDefinition).toHaveBeenCalledWith('target-ns', 'my-workflow', 2);
+    expect(mockGetWorkflowDefinition).toHaveBeenCalledWith('source-ns', 'my-workflow', 2);
   });
 
   it('returns 409 when name exists in target namespace', async () => {
-    mockGetLatestWorkflowVersionInNamespace.mockResolvedValue(2);
+    mockGetLatestWorkflowVersion.mockImplementation((_name: string, namespace: string) =>
+      namespace === 'target-ns' ? Promise.resolve(2) : Promise.resolve(3),
+    );
 
-    const res = await POST(makeRequest('my-workflow', 'target-ns'), {
+    const res = await POST(makeRequest('my-workflow', 'target-ns', undefined, 'source-ns'), {
       params: Promise.resolve({ name: 'my-workflow' }),
     });
     expect(res.status).toBe(409);
@@ -136,7 +141,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
     mockCallerIdentity = { kind: 'user', namespaces: new Set(['target-ns']) };
     mockGetWorkflowDefinition.mockResolvedValue({ ...sourceDefinition, visibility: 'private' });
 
-    const res = await POST(makeRequest('my-workflow', 'target-ns'), {
+    const res = await POST(makeRequest('my-workflow', 'target-ns', undefined, 'source-ns'), {
       params: Promise.resolve({ name: 'my-workflow' }),
     });
     expect(res.status).toBe(404);
@@ -146,7 +151,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
     mockCallerIdentity = { kind: 'user', namespaces: new Set(['source-ns', 'target-ns']) };
     mockGetWorkflowDefinition.mockResolvedValue({ ...sourceDefinition, visibility: 'private' });
 
-    const res = await POST(makeRequest('my-workflow', 'target-ns'), {
+    const res = await POST(makeRequest('my-workflow', 'target-ns', undefined, 'source-ns'), {
       params: Promise.resolve({ name: 'my-workflow' }),
     });
     expect(res.status).toBe(201);
@@ -172,7 +177,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
   });
 
   it('copied workflow is always private regardless of source', async () => {
-    const res = await POST(makeRequest('my-workflow', 'target-ns'), {
+    const res = await POST(makeRequest('my-workflow', 'target-ns', undefined, 'source-ns'), {
       params: Promise.resolve({ name: 'my-workflow' }),
     });
     expect(res.status).toBe(201);

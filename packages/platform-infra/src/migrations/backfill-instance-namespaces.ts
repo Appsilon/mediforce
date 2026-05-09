@@ -37,7 +37,7 @@ export async function backfillInstanceNamespaces(
     const defName = data.definitionName as string;
 
     if (!namespaceCache.has(defName)) {
-      const latestVersion = await processRepo.getLatestWorkflowVersion(defName);
+      const latestVersion = await processRepo.getLatestWorkflowVersion(defName, '');
       if (latestVersion === 0) {
         namespaceCache.set(defName, null);
       } else {

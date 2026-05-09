@@ -9,6 +9,7 @@ export async function GET(
 ): Promise<NextResponse> {
   const { name } = await params;
   const versionParam = request.nextUrl.searchParams.get('version');
+  const namespaceParam = request.nextUrl.searchParams.get('namespace');
 
   const { processRepo, namespaceRepo } = getPlatformServices();
   const caller = await resolveCallerIdentity(request, namespaceRepo);
@@ -24,7 +25,7 @@ export async function GET(
       );
     }
   } else {
-    version = await processRepo.getLatestWorkflowVersion(name);
+    version = await processRepo.getLatestWorkflowVersion(name, namespaceParam ?? '');
     if (version === 0) {
       return NextResponse.json(
         { error: `Workflow '${name}' not found` },
@@ -33,8 +34,6 @@ export async function GET(
     }
   }
 
-  // Namespace comes from query param; when absent, fall back to a query-based lookup.
-  const namespaceParam = request.nextUrl.searchParams.get('namespace');
   const lookupNamespace = namespaceParam ?? '';
 
   const definition = await processRepo.getWorkflowDefinition(lookupNamespace, name, version);
@@ -75,7 +74,7 @@ export async function PATCH(
   if (caller instanceof NextResponse) return caller;
 
   const patchNamespace = request.nextUrl.searchParams.get('namespace') ?? '';
-  const latestVersion = await processRepo.getLatestWorkflowVersion(name);
+  const latestVersion = await processRepo.getLatestWorkflowVersion(name, patchNamespace);
   if (latestVersion === 0) {
     return NextResponse.json({ error: `Workflow '${name}' not found` }, { status: 404 });
   }

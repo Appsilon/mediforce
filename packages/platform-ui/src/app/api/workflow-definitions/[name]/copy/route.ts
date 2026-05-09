@@ -39,8 +39,9 @@ export async function POST(
     );
   }
 
+  const sourceNamespace = request.nextUrl.searchParams.get('namespace') ?? targetNamespace;
   const sourceVersion = parsed.data.version
-    ?? await processRepo.getLatestWorkflowVersion(sourceName);
+    ?? await processRepo.getLatestWorkflowVersion(sourceName, sourceNamespace);
 
   if (sourceVersion === 0) {
     return NextResponse.json(
@@ -49,8 +50,6 @@ export async function POST(
     );
   }
 
-  // Source namespace: try caller's namespace from query, fall back to targetNamespace
-  const sourceNamespace = request.nextUrl.searchParams.get('namespace') ?? targetNamespace;
   const source = await processRepo.getWorkflowDefinition(sourceNamespace, sourceName, sourceVersion);
   if (source === null) {
     return NextResponse.json(
@@ -70,7 +69,7 @@ export async function POST(
 
   const copyName = parsed.data.targetName ?? sourceName;
 
-  const existingVersion = await processRepo.getLatestWorkflowVersionInNamespace(
+  const existingVersion = await processRepo.getLatestWorkflowVersion(
     copyName,
     targetNamespace,
   );

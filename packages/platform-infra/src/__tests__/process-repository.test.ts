@@ -47,12 +47,12 @@ describe('InMemoryProcessRepository', () => {
       await repo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'test', version: 1 }));
       await repo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'test', version: 3 }));
 
-      const version = await repo.getLatestWorkflowVersion('test');
+      const version = await repo.getLatestWorkflowVersion('test', 'test');
       expect(version).toBe(3);
     });
 
     it('[DATA] getLatestWorkflowVersion returns 0 when no definitions', async () => {
-      const version = await repo.getLatestWorkflowVersion('nonexistent');
+      const version = await repo.getLatestWorkflowVersion('nonexistent', 'test');
       expect(version).toBe(0);
     });
 
@@ -290,7 +290,7 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
       ],
     });
 
-    const version = await repo.getLatestWorkflowVersion('drug-approval');
+    const version = await repo.getLatestWorkflowVersion('drug-approval', 'test');
     expect(version).toBe(3);
   });
 
@@ -298,7 +298,7 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
     const repo = createFirestoreRepo();
     mockGet.mockResolvedValue({ docs: [], empty: true });
 
-    const version = await repo.getLatestWorkflowVersion('nonexistent');
+    const version = await repo.getLatestWorkflowVersion('nonexistent', 'test');
     expect(version).toBe(0);
   });
 

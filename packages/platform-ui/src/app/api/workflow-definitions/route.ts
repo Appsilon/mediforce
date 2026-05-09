@@ -94,7 +94,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const { processRepo } = getPlatformServices();
 
   try {
-    const latestVersion = await processRepo.getLatestWorkflowVersion(parsed.data.name);
+    const latestVersion = await processRepo.getLatestWorkflowVersion(parsed.data.name, namespace);
     const nextVersion = latestVersion + 1;
 
     const definition = {

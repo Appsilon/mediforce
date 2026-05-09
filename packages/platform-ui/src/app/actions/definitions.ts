@@ -75,7 +75,7 @@ export async function saveWorkflowDefinition(
       };
     }
 
-    const latestVersion = await processRepo.getLatestWorkflowVersion(parsed.data.name);
+    const latestVersion = await processRepo.getLatestWorkflowVersion(parsed.data.name, parsed.data.namespace);
     const nextVersion = latestVersion + 1;
 
     const definition: WorkflowDefinition = {

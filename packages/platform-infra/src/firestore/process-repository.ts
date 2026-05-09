@@ -150,30 +150,7 @@ export class FirestoreProcessRepository implements ProcessRepository {
       .set({ defaultVersion: version }, { merge: true });
   }
 
-  async getLatestWorkflowVersion(name: string): Promise<number> {
-    const snapshot = await this.db
-      .collection(this.workflowDefinitionsCollection)
-      .where('name', '==', name)
-      .get();
-
-    if (snapshot.empty) {
-      return 0;
-    }
-
-    let latestVersion = 0;
-    for (const docSnap of snapshot.docs) {
-      const rawVersion = docSnap.data().version;
-      if (typeof rawVersion === 'number' && rawVersion > latestVersion) {
-        latestVersion = rawVersion;
-      }
-    }
-    return latestVersion;
-  }
-
-  async getLatestWorkflowVersionInNamespace(
-    name: string,
-    namespace: string,
-  ): Promise<number> {
+  async getLatestWorkflowVersion(name: string, namespace: string): Promise<number> {
     const snapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
       .where('name', '==', name)
