@@ -15,7 +15,7 @@ interface DefinitionsListProps {
 
 export function DefinitionsList({ workflowName }: DefinitionsListProps) {
   const handle = useHandleFromPath();
-  const { definitions, latestVersion, defaultVersion, loading, refreshDefault } = useWorkflowDefinitions(workflowName);
+  const { definitions, latestVersion, defaultVersion, loading, refreshDefault } = useWorkflowDefinitions(workflowName, handle);
   const [showArchived, setShowArchived] = React.useState(false);
   const [archivingVersion, setArchivingVersion] = React.useState<number | null>(null);
 

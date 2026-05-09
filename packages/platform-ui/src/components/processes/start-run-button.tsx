@@ -154,6 +154,7 @@ export function StartRunButton({
 
     const payload = hasTriggerInput ? buildPayload() : undefined;
 
+    console.log('[StartRunButton]', { handle, workflowName, targetVersion, effectiveVersion, hookEffectiveVersion, definitionCount: definitions.length });
     const result = await startWorkflowRun({
       namespace: handle,
       definitionName: workflowName,
