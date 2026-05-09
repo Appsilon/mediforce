@@ -341,7 +341,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     const willArchive = !latest?.archived;
                     setMenuOpen(false);
                     setArchiving(true);
-                    await setProcessArchived(decodedName, willArchive);
+                    await setProcessArchived(decodedName, handle, willArchive);
                     setArchiving(false);
                     if (willArchive) {
                       router.push(`/${handle}`);
@@ -534,6 +534,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
       <DeleteWorkflowDialog
         workflowName={decodedName}
+        namespace={handle}
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onDeleted={() => router.push(`/${handle}`)}

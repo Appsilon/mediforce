@@ -37,7 +37,7 @@ export async function POST(
   if (denied) return denied;
 
   try {
-    await processRepo.setProcessArchived(name, archived);
+    await processRepo.setProcessArchived(name, archiveNamespace, archived);
     return NextResponse.json({ success: true, name, archived });
   } catch (err) {
     return NextResponse.json(

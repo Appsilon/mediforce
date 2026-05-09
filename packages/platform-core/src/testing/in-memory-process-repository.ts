@@ -54,12 +54,12 @@ export class InMemoryProcessRepository implements ProcessRepository {
     return { definitions };
   }
 
-  async getDefaultWorkflowVersion(name: string): Promise<number | null> {
-    return this.workflowDefaults.get(name) ?? null;
+  async getDefaultWorkflowVersion(name: string, namespace: string): Promise<number | null> {
+    return this.workflowDefaults.get(`${namespace}:${name}`) ?? null;
   }
 
-  async setDefaultWorkflowVersion(name: string, version: number): Promise<void> {
-    this.workflowDefaults.set(name, version);
+  async setDefaultWorkflowVersion(name: string, namespace: string, version: number): Promise<void> {
+    this.workflowDefaults.set(`${namespace}:${name}`, version);
   }
 
   async getLatestWorkflowVersion(name: string, namespace: string): Promise<number> {
@@ -76,9 +76,9 @@ export class InMemoryProcessRepository implements ProcessRepository {
     return latest;
   }
 
-  async setProcessArchived(name: string, archived: boolean): Promise<void> {
+  async setProcessArchived(name: string, namespace: string, archived: boolean): Promise<void> {
     for (const [key, def] of this.workflowDefinitions) {
-      if (def.name === name) {
+      if (def.name === name && def.namespace === namespace) {
         this.workflowDefinitions.set(key, { ...def, archived });
       }
     }
@@ -95,10 +95,10 @@ export class InMemoryProcessRepository implements ProcessRepository {
     this.workflowDefinitions.set(key, { ...def, archived });
   }
 
-  async setWorkflowVisibility(name: string, visibility: 'public' | 'private'): Promise<void> {
+  async setWorkflowVisibility(name: string, namespace: string, visibility: 'public' | 'private'): Promise<void> {
     let found = false;
     for (const [key, def] of this.workflowDefinitions) {
-      if (def.name === name) {
+      if (def.name === name && def.namespace === namespace) {
         this.workflowDefinitions.set(key, { ...def, visibility });
         found = true;
       }
@@ -106,15 +106,15 @@ export class InMemoryProcessRepository implements ProcessRepository {
     if (!found) throw new Error(`Workflow '${name}' not found`);
   }
 
-  async setWorkflowDeleted(_name: string, _deleted: boolean): Promise<void> {
+  async setWorkflowDeleted(_name: string, _namespace: string, _deleted: boolean): Promise<void> {
     // No-op in test double
   }
 
-  async isWorkflowNameDeleted(_name: string): Promise<boolean> {
+  async isWorkflowNameDeleted(_name: string, _namespace: string): Promise<boolean> {
     return false;
   }
 
-  async countInstancesByDefinitionName(_name: string): Promise<number> {
+  async countInstancesByDefinitionName(_name: string, _namespace: string): Promise<number> {
     return 0;
   }
 

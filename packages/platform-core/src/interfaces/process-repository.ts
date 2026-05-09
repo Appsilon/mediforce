@@ -26,14 +26,14 @@ export interface ProcessRepository {
    *  that nobody intends to fix. */
   listWorkflowDefinitions(includeArchived: boolean): Promise<WorkflowDefinitionListResult>;
   getLatestWorkflowVersion(name: string, namespace: string): Promise<number>;
-  getDefaultWorkflowVersion(name: string): Promise<number | null>;
-  setDefaultWorkflowVersion(name: string, version: number): Promise<void>;
+  getDefaultWorkflowVersion(name: string, namespace: string): Promise<number | null>;
+  setDefaultWorkflowVersion(name: string, namespace: string, version: number): Promise<void>;
 
-  setProcessArchived(name: string, archived: boolean): Promise<void>;
+  setProcessArchived(name: string, namespace: string, archived: boolean): Promise<void>;
   setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void>;
 
-  setWorkflowVisibility(name: string, visibility: 'public' | 'private'): Promise<void>;
-  setWorkflowDeleted(name: string, deleted: boolean): Promise<void>;
-  isWorkflowNameDeleted(name: string): Promise<boolean>;
-  countInstancesByDefinitionName(name: string): Promise<number>;
+  setWorkflowVisibility(name: string, namespace: string, visibility: 'public' | 'private'): Promise<void>;
+  setWorkflowDeleted(name: string, namespace: string, deleted: boolean): Promise<void>;
+  isWorkflowNameDeleted(name: string, namespace: string): Promise<boolean>;
+  countInstancesByDefinitionName(name: string, namespace: string): Promise<number>;
 }

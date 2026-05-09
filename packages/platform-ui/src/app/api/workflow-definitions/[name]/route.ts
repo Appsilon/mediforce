@@ -97,7 +97,7 @@ export async function PATCH(
     );
   }
 
-  await processRepo.setWorkflowVisibility(name, parsed.data);
+  await processRepo.setWorkflowVisibility(name, definition?.namespace ?? '', parsed.data);
 
   return NextResponse.json({ success: true, name, visibility: parsed.data });
 }
