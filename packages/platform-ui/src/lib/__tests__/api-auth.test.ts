@@ -3,9 +3,12 @@ import { NextResponse } from 'next/server';
 
 const mockVerifyIdToken = vi.fn();
 const mockGetNamespacesByUser = vi.fn();
+const mockGetByKeyHash = vi.fn();
+const mockTouchLastUsed = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
+  hashApiKey: (key: string) => `hash_${key}`,
 }));
 
 import {
@@ -20,6 +23,11 @@ const fakeNamespaceRepo = {
   getNamespacesByUser: mockGetNamespacesByUser,
 } as never;
 
+const fakeApiKeyRepo = {
+  getByKeyHash: mockGetByKeyHash,
+  touchLastUsed: mockTouchLastUsed,
+} as never;
+
 function makeRequest(headers: Record<string, string>): Request {
   return new Request('http://localhost/api/test', { headers });
 }
@@ -27,13 +35,15 @@ function makeRequest(headers: Record<string, string>): Request {
 describe('resolveCallerIdentity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTouchLastUsed.mockResolvedValue(undefined);
     process.env.PLATFORM_API_KEY = 'test-api-key';
   });
 
-  it('returns apiKey identity for valid API key', async () => {
+  it('returns apiKey identity for valid global API key', async () => {
     const result = await resolveCallerIdentity(
       makeRequest({ 'X-Api-Key': 'test-api-key' }),
       fakeNamespaceRepo,
+      fakeApiKeyRepo,
     );
     expect(result).toEqual({ kind: 'apiKey' });
   });
@@ -42,6 +52,7 @@ describe('resolveCallerIdentity', () => {
     const result = await resolveCallerIdentity(
       makeRequest({}),
       fakeNamespaceRepo,
+      fakeApiKeyRepo,
     );
     expect(result).toBeInstanceOf(NextResponse);
     expect((result as NextResponse).status).toBe(401);
@@ -52,6 +63,7 @@ describe('resolveCallerIdentity', () => {
     const result = await resolveCallerIdentity(
       makeRequest({ Authorization: 'Bearer bad-token' }),
       fakeNamespaceRepo,
+      fakeApiKeyRepo,
     );
     expect(result).toBeInstanceOf(NextResponse);
     expect((result as NextResponse).status).toBe(401);
@@ -67,6 +79,7 @@ describe('resolveCallerIdentity', () => {
     const result = await resolveCallerIdentity(
       makeRequest({ Authorization: 'Bearer valid-token' }),
       fakeNamespaceRepo,
+      fakeApiKeyRepo,
     );
 
     expect(result).toEqual({
@@ -80,9 +93,84 @@ describe('resolveCallerIdentity', () => {
     const result = await resolveCallerIdentity(
       makeRequest({ 'X-Api-Key': 'wrong-key' }),
       fakeNamespaceRepo,
+      fakeApiKeyRepo,
     );
     expect(result).toBeInstanceOf(NextResponse);
     expect((result as NextResponse).status).toBe(401);
+  });
+
+  it('resolves mf_ key to user identity', async () => {
+    mockGetByKeyHash.mockResolvedValue({
+      id: 'key-1',
+      userId: 'uid-42',
+      keyHash: 'hash_mf_valid',
+      keyPrefix: 'mf_valid',
+      label: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    mockGetNamespacesByUser.mockResolvedValue([{ handle: 'my-ns' }]);
+
+    const result = await resolveCallerIdentity(
+      makeRequest({ 'X-Api-Key': 'mf_valid' }),
+      fakeNamespaceRepo,
+      fakeApiKeyRepo,
+    );
+
+    expect(result).toEqual({
+      kind: 'user',
+      uid: 'uid-42',
+      namespaces: new Set(['my-ns']),
+    });
+    expect(mockGetByKeyHash).toHaveBeenCalledWith('hash_mf_valid');
+  });
+
+  it('returns 401 for invalid mf_ key', async () => {
+    mockGetByKeyHash.mockResolvedValue(null);
+
+    const result = await resolveCallerIdentity(
+      makeRequest({ 'X-Api-Key': 'mf_nonexistent' }),
+      fakeNamespaceRepo,
+      fakeApiKeyRepo,
+    );
+
+    expect(result).toBeInstanceOf(NextResponse);
+    expect((result as NextResponse).status).toBe(401);
+    const body = await (result as NextResponse).json();
+    expect(body.error).toMatch(/Invalid or revoked/);
+  });
+
+  it('returns 401 for revoked mf_ key', async () => {
+    mockGetByKeyHash.mockResolvedValue({
+      id: 'key-2',
+      userId: 'uid-42',
+      keyHash: 'hash_mf_revoked',
+      keyPrefix: 'mf_revoke',
+      label: 'old',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:00.000Z',
+    });
+
+    const result = await resolveCallerIdentity(
+      makeRequest({ 'X-Api-Key': 'mf_revoked' }),
+      fakeNamespaceRepo,
+      fakeApiKeyRepo,
+    );
+
+    expect(result).toBeInstanceOf(NextResponse);
+    expect((result as NextResponse).status).toBe(401);
+    const body = await (result as NextResponse).json();
+    expect(body.error).toMatch(/Invalid or revoked/);
+  });
+
+  it('global key takes priority over mf_ prefix', async () => {
+    process.env.PLATFORM_API_KEY = 'mf_global_key';
+    const result = await resolveCallerIdentity(
+      makeRequest({ 'X-Api-Key': 'mf_global_key' }),
+      fakeNamespaceRepo,
+      fakeApiKeyRepo,
+    );
+    expect(result).toEqual({ kind: 'apiKey' });
+    expect(mockGetByKeyHash).not.toHaveBeenCalled();
   });
 });
 

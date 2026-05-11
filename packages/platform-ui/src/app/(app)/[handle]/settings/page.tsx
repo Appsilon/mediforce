@@ -33,6 +33,7 @@ import { NamespaceMemberSchema } from '@mediforce/platform-core';
 import type { NamespaceMember } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { NamespaceSecretsEditor } from '@/components/namespace/namespace-secrets-editor';
+import { ApiKeysManager } from '@/components/namespace/api-keys-manager';
 
 type NamespaceMemberWithId = NamespaceMember & { id: string };
 
@@ -878,7 +879,17 @@ export default function WorkspaceConfigPage() {
           </div>
         )}
 
-        {/* ── Section 5: Administration ──────────────────────────────────── */}
+        {/* ── Section 5: API Keys ────────────────────────────────────────── */}
+        {firebaseUser?.uid && (
+          <div className="mb-10 space-y-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">API Keys</h2>
+            <div className="rounded-lg border bg-card px-4 py-5">
+              <ApiKeysManager />
+            </div>
+          </div>
+        )}
+
+        {/* ── Section 6: Administration ──────────────────────────────────── */}
         {canEditProfile && (
           <div className="mb-10 space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Administration</h2>

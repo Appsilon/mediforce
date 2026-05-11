@@ -17,9 +17,9 @@ export async function POST(
     const { instanceId } = await params;
     const body = await req.json() as AdvanceStepBody;
 
-    const { instanceRepo, processRepo, namespaceRepo } = getPlatformServices();
+    const { instanceRepo, processRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    const caller = await resolveCallerIdentity(req, namespaceRepo, apiKeyRepo);
     if (caller instanceof NextResponse) return caller;
 
     const instance = await instanceRepo.getById(instanceId);

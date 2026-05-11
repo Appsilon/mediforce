@@ -18,9 +18,9 @@ export async function POST(
     const body = (await req.json()) as { userId?: string };
     const userId = body.userId ?? 'api-user';
 
-    const { humanTaskRepo, instanceRepo, auditRepo, namespaceRepo } = getPlatformServices();
+    const { humanTaskRepo, instanceRepo, auditRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    const caller = await resolveCallerIdentity(req, namespaceRepo, apiKeyRepo);
     if (caller instanceof NextResponse) return caller;
 
     const task = await humanTaskRepo.getById(taskId);

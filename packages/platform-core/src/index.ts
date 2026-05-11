@@ -84,6 +84,8 @@ export {
   StepMcpRestrictionSchema,
   StepMcpRestrictionEntrySchema,
   ToolCatalogEntrySchema,
+  ApiKeySchema,
+  CreateApiKeyInputSchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -166,6 +168,8 @@ export type {
   StepMcpRestriction,
   StepMcpRestrictionEntry,
   ToolCatalogEntry,
+  ApiKey,
+  CreateApiKeyInput,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)

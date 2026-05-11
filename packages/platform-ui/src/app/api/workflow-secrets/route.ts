@@ -8,8 +8,8 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, callerCanAccess } from '@/lib/api-auth';
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const { namespaceRepo, secretsRepo, namespaceSecretsRepo, apiKeyRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const url = new URL(request.url);
@@ -36,8 +36,8 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function PUT(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const { namespaceRepo, secretsRepo, namespaceSecretsRepo, apiKeyRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const url = new URL(request.url);
@@ -74,8 +74,8 @@ export async function PUT(request: Request): Promise<NextResponse> {
 }
 
 export async function DELETE(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const { namespaceRepo, secretsRepo, namespaceSecretsRepo, apiKeyRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const url = new URL(request.url);

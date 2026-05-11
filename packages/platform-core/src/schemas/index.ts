@@ -230,6 +230,13 @@ export {
 } from './cron-trigger-state.js';
 
 export {
+  ApiKeySchema,
+  CreateApiKeyInputSchema,
+  type ApiKey,
+  type CreateApiKeyInput,
+} from './api-key.js';
+
+export {
   ModelRegistryEntrySchema,
   ModelRegistryMetaSchema,
   CreateModelRegistryEntryInputSchema,

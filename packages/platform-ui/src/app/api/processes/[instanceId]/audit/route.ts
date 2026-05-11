@@ -8,9 +8,9 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     const { instanceId } = await params;
-    const { auditRepo, instanceRepo, namespaceRepo } = getPlatformServices();
+    const { auditRepo, instanceRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    const caller = await resolveCallerIdentity(req, namespaceRepo, apiKeyRepo);
     if (caller instanceof NextResponse) return caller;
 
     const instance = await instanceRepo.getById(instanceId);

@@ -134,6 +134,49 @@ export type ClientConfig =
   | (BaseClientConfig & { bearerToken: () => Promise<string | null>; apiKey?: never; fetch?: never })
   | (BaseClientConfig & { fetch: typeof fetch; apiKey?: never; bearerToken?: never });
 
+export interface WhoamiOutput {
+  kind: 'apiKey' | 'user';
+  uid?: string;
+  namespaces: string[];
+}
+
+export interface NamespaceInfo {
+  handle: string;
+  type: string;
+  displayName: string;
+}
+
+export interface ListNamespacesOutput {
+  namespaces: NamespaceInfo[];
+}
+
+export interface ApiKeyEntry {
+  id: string;
+  label: string;
+  keyPrefix: string;
+  userId: string;
+  createdAt: string;
+  lastUsedAt?: string;
+  revokedAt?: string;
+}
+
+export interface ListApiKeysOutput {
+  keys: ApiKeyEntry[];
+}
+
+export interface CreateApiKeyOutput {
+  id: string;
+  userId: string;
+  label: string;
+  keyPrefix: string;
+  createdAt: string;
+  plaintext: string;
+}
+
+export interface RevokeApiKeyOutput {
+  ok: true;
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -148,6 +191,12 @@ export class ApiError extends Error {
 export class Mediforce {
   readonly tasks: {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
+  };
+
+  readonly apiKeys: {
+    list: (input?: { userId?: string }) => Promise<ListApiKeysOutput>;
+    create: (input: { label: string; userId?: string }) => Promise<CreateApiKeyOutput>;
+    revoke: (input: { keyId: string; userId?: string }) => Promise<RevokeApiKeyOutput>;
   };
 
   readonly workflows: {
@@ -186,6 +235,11 @@ export class Mediforce {
     set: (input: SetSecretInput) => Promise<SetSecretOutput>;
     list: (input: ListSecretKeysInput) => Promise<ListSecretKeysOutput>;
     delete: (input: DeleteSecretInput) => Promise<DeleteSecretOutput>;
+  };
+
+  readonly me: {
+    whoami: () => Promise<WhoamiOutput>;
+    namespaces: () => Promise<ListNamespacesOutput>;
   };
 
   readonly system: {
@@ -228,6 +282,27 @@ export class Mediforce {
         );
       }
     }
+
+    this.apiKeys = {
+      list: async (input) => {
+        const qs = input?.userId ? toSearchParams({ userId: input.userId }) : '';
+        const res = await this.request(`/api/api-keys${qs}`);
+        return parseJsonOrThrow(res, 'mediforce.apiKeys.list') as Promise<ListApiKeysOutput>;
+      },
+      create: async (input) => {
+        const res = await this.request('/api/api-keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        });
+        return parseJsonOrThrow(res, 'mediforce.apiKeys.create') as Promise<CreateApiKeyOutput>;
+      },
+      revoke: async (input) => {
+        const qs = input.userId ? toSearchParams({ userId: input.userId }) : '';
+        const res = await this.request(`/api/api-keys/${input.keyId}${qs}`, { method: 'DELETE' });
+        return parseJsonOrThrow(res, 'mediforce.apiKeys.revoke') as Promise<RevokeApiKeyOutput>;
+      },
+    };
 
     this.tasks = {
       list: async (input) => {
@@ -469,6 +544,17 @@ export class Mediforce {
         const res = await this.request(`/api/workflow-secrets${qs}`, { method: 'DELETE' });
         const body = await parseJsonOrThrow(res, 'mediforce.secrets.delete');
         return DeleteSecretOutputSchema.parse(body);
+      },
+    };
+
+    this.me = {
+      whoami: async () => {
+        const res = await this.request('/api/me');
+        return parseJsonOrThrow(res, 'mediforce.me.whoami') as Promise<WhoamiOutput>;
+      },
+      namespaces: async () => {
+        const res = await this.request('/api/me/namespaces');
+        return parseJsonOrThrow(res, 'mediforce.me.namespaces') as Promise<ListNamespacesOutput>;
       },
     };
 

@@ -19,9 +19,9 @@ export async function POST(
 ): Promise<NextResponse> {
   try {
     const { taskId } = await params;
-    const { humanTaskRepo, instanceRepo, namespaceRepo } = getPlatformServices();
+    const { humanTaskRepo, instanceRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    const caller = await resolveCallerIdentity(req, namespaceRepo, apiKeyRepo);
     if (caller instanceof NextResponse) return caller;
 
     const task = await humanTaskRepo.getById(taskId);

@@ -8,9 +8,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; name: string }> },
 ): Promise<NextResponse> {
   const { id, name } = await params;
-  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
+  const { agentDefinitionRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const body = await request.json().catch(() => null);
@@ -44,9 +44,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; name: string }> },
 ): Promise<NextResponse> {
   const { id, name } = await params;
-  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
+  const { agentDefinitionRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const agent = await agentDefinitionRepo.getById(id);

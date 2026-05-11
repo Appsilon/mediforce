@@ -7,8 +7,8 @@ function normalizeImage(ref: string): string {
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const { processRepo, namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const { processRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const url = new URL(request.url);
