@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { getAdminAuth } from '@mediforce/platform-infra';
 import type { FirestoreNamespaceRepository, FirestoreApiKeyRepository } from '@mediforce/platform-infra';
 import { hashApiKey } from '@mediforce/platform-infra';
@@ -22,7 +23,9 @@ export async function resolveCallerIdentity(
     console.error('[api-auth] PLATFORM_API_KEY must not start with mf_ — collides with per-user key prefix');
   }
 
-  if (apiKeyHeader && expectedKey && apiKeyHeader === expectedKey) {
+  if (apiKeyHeader && expectedKey
+    && apiKeyHeader.length === expectedKey.length
+    && timingSafeEqual(Buffer.from(apiKeyHeader), Buffer.from(expectedKey))) {
     return { kind: 'apiKey' };
   }
 
