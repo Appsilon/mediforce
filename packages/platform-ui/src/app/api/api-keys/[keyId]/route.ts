@@ -12,6 +12,7 @@ export async function DELETE(
 
   const { keyId } = await params;
 
+  // See resolveTargetUser in ../route.ts for rationale on global key + userId.
   let ownerUid: string;
   if (caller.kind === 'apiKey') {
     const url = new URL(request.url);

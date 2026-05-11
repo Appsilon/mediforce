@@ -12,6 +12,10 @@ const CreateBodySchema = z.object({
   userId: z.string().min(1).optional(),
 });
 
+// Deliberate: global PLATFORM_API_KEY can target any userId. This solves the
+// bootstrap problem (admin creates first personal key for a user headless).
+// Global key already has unrestricted access to all namespaces/data — managing
+// personal keys does not expand the security surface.
 function resolveTargetUser(
   caller: { kind: 'apiKey' } | { kind: 'user'; uid: string },
   requestedUserId: string | undefined,
