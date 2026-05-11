@@ -41,6 +41,9 @@ import { secretSetCommand } from './commands/secret-set.js';
 import { secretListCommand } from './commands/secret-list.js';
 import { secretDeleteCommand } from './commands/secret-delete.js';
 import { whoamiCommand } from './commands/whoami.js';
+import { apiKeyCreateCommand } from './commands/api-key-create.js';
+import { apiKeyListCommand } from './commands/api-key-list.js';
+import { apiKeyRevokeCommand } from './commands/api-key-revoke.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -72,6 +75,9 @@ Commands:
   run start --workflow <name>                        Start a new run (manual trigger)
   run get <runId>                                    Fetch a single run's status
   whoami                                              Show current identity and namespaces
+  api-key create --label <name> [--user <uid>]       Create a personal API key
+  api-key list [--user <uid>]                        List API keys
+  api-key revoke <keyId> [--user <uid>]              Revoke an API key
   system status                                      Docker infrastructure status
   system images                                      List Docker images on host
   system rmi <imageId>                               Remove a Docker image
@@ -172,6 +178,32 @@ export async function runCli(input: RunCliInput): Promise<number> {
 
   if (command === 'whoami') {
     return whoamiCommand({ argv: subcommand ? [subcommand, ...rest] : rest, env: input.env, output });
+  }
+
+  const API_KEY_HELP = `Usage: mediforce api-key <subcommand> [options]
+
+Subcommands:
+  create --label <name> [--user <uid>]   Create a personal API key
+  list [--user <uid>]                    List API keys
+  revoke <keyId> [--user <uid>]          Revoke an API key
+
+Run \`mediforce api-key <subcommand> --help\` for subcommand-specific flags.
+`;
+
+  if (command === 'api-key' && subcommand === undefined) {
+    output.stderr('mediforce api-key: missing subcommand');
+    output.stderr('');
+    output.stderr(API_KEY_HELP);
+    return 2;
+  }
+  if (command === 'api-key' && subcommand === 'create') {
+    return apiKeyCreateCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'api-key' && subcommand === 'list') {
+    return apiKeyListCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'api-key' && subcommand === 'revoke') {
+    return apiKeyRevokeCommand({ argv: rest, env: input.env, output });
   }
 
   // Namespace-only invocation (no subcommand): print the namespaced HELP and

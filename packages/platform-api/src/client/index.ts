@@ -150,6 +150,33 @@ export interface ListNamespacesOutput {
   namespaces: NamespaceInfo[];
 }
 
+export interface ApiKeyEntry {
+  id: string;
+  label: string;
+  keyPrefix: string;
+  userId: string;
+  createdAt: string;
+  lastUsedAt?: string;
+  revokedAt?: string;
+}
+
+export interface ListApiKeysOutput {
+  keys: ApiKeyEntry[];
+}
+
+export interface CreateApiKeyOutput {
+  id: string;
+  userId: string;
+  label: string;
+  keyPrefix: string;
+  createdAt: string;
+  plaintext: string;
+}
+
+export interface RevokeApiKeyOutput {
+  ok: true;
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -164,6 +191,12 @@ export class ApiError extends Error {
 export class Mediforce {
   readonly tasks: {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
+  };
+
+  readonly apiKeys: {
+    list: (input?: { userId?: string }) => Promise<ListApiKeysOutput>;
+    create: (input: { label: string; userId?: string }) => Promise<CreateApiKeyOutput>;
+    revoke: (input: { keyId: string; userId?: string }) => Promise<RevokeApiKeyOutput>;
   };
 
   readonly workflows: {
@@ -249,6 +282,27 @@ export class Mediforce {
         );
       }
     }
+
+    this.apiKeys = {
+      list: async (input) => {
+        const qs = input?.userId ? toSearchParams({ userId: input.userId }) : '';
+        const res = await this.request(`/api/api-keys${qs}`);
+        return parseJsonOrThrow(res, 'mediforce.apiKeys.list') as Promise<ListApiKeysOutput>;
+      },
+      create: async (input) => {
+        const res = await this.request('/api/api-keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        });
+        return parseJsonOrThrow(res, 'mediforce.apiKeys.create') as Promise<CreateApiKeyOutput>;
+      },
+      revoke: async (input) => {
+        const qs = input.userId ? toSearchParams({ userId: input.userId }) : '';
+        const res = await this.request(`/api/api-keys/${input.keyId}${qs}`, { method: 'DELETE' });
+        return parseJsonOrThrow(res, 'mediforce.apiKeys.revoke') as Promise<RevokeApiKeyOutput>;
+      },
+    };
 
     this.tasks = {
       list: async (input) => {
