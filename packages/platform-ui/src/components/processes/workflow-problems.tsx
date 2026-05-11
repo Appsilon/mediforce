@@ -1,9 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { AlertTriangle, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { useDockerImages } from '@/hooks/use-docker-images';
+import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useWorkflowSecretKeysContext } from '@/hooks/use-workflow-secret-keys';
 import { runPreflightChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { cn } from '@/lib/utils';
@@ -23,6 +25,7 @@ interface WorkflowProblemsProps {
 
 export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProblemsProps) {
   const { images: dockerImages, isAvailable: dockerAvailable, isLoading: dockerLoading } = useDockerImages();
+  const { canAdmin } = useNamespaceRole(handle);
   const secretKeysCtx = useWorkflowSecretKeysContext();
   const [showAll, setShowAll] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
@@ -126,6 +129,14 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
               <span className="text-muted-foreground">
                 {' — '}{warning.message}
               </span>
+              {canAdmin && warning.category === 'missing-image' && (
+                <Link
+                  href={`/${handle}/admin/infrastructure`}
+                  className="ml-1.5 text-xs text-amber-700 underline hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
+                >
+                  View images
+                </Link>
+              )}
             </li>
           );
         })}

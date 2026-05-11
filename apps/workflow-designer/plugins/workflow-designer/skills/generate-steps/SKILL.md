@@ -89,6 +89,16 @@ steps:                # Required. At least one step.
     # OMIT these fields — they are added by the execution proposal step:
     # executor, autonomyLevel, plugin, agent, review, env, allowedRoles, stepParams
 
+triggerInput:         # Optional. Typed fields the user fills in when starting a run.
+  - name: string      # Required. Field name (unique across all triggerInput fields).
+    type: string|number|boolean|date|select|multiselect|textarea  # Default: string
+    required: true|false  # Default: false
+    description: string   # Optional but recommended.
+    default: value        # Optional default value.
+    options:              # Required when type is select or multiselect.
+      - "option-1"
+      - "option-2"
+
 transitions:          # Required. Edges connecting steps.
   - from: step-id
     to: step-id
@@ -148,6 +158,8 @@ when: 'else'
 9. **Step IDs** should be kebab-case and descriptive (e.g., "extract-data", not "step-1")
 10. **Triggers** — always include at least a `manual` trigger. Add `cron` or `webhook` if the user's description implies scheduled or event-driven execution.
 11. **Do NOT include executor, agent, plugin, env, or autonomyLevel** — those are assigned in the execution proposal step
+12. **triggerInput vs step params** — use `triggerInput` when the data is needed up-front before the workflow starts (study ID, environment, config flags). Use `params` on the first step when the data is part of the first step's creative work (describe an idea, write a brief). Rule of thumb: if the user must provide it to even begin, it is `triggerInput`; if it is the first step's output, it is `params`.
+13. **triggerInput field names must be unique** — no duplicates within the `triggerInput` array. The server rejects definitions with duplicate names.
 
 ## Step Type Guide
 
@@ -430,6 +442,66 @@ transitions:
   - from: publish
     to: done
 ```
+
+### 7. Trigger input (typed fields at run start)
+
+Use `triggerInput` when the workflow needs configuration before it begins — IDs, environment selectors, flags. The user fills these in at "Start Run" time (UI form or CLI `--input`).
+
+```yaml
+name: site-data-export
+version: 1
+description: Export clinical site data for a given study and environment
+
+triggerInput:
+  - name: studyId
+    type: string
+    required: true
+    description: Study identifier (e.g. NCT02453282)
+  - name: environment
+    type: select
+    required: true
+    description: Target environment for the export
+    options:
+      - staging
+      - production
+  - name: dryRun
+    type: boolean
+    required: false
+    description: Preview export without writing files
+    default: false
+
+triggers:
+  - name: manual
+    type: manual
+
+steps:
+  - id: fetch-sites
+    name: Fetch Sites
+    type: creation
+  - id: export-data
+    name: Export Data
+    type: creation
+  - id: review-export
+    name: Review Export
+    type: review
+    verdicts:
+      approve:
+        target: done
+      revise:
+        target: export-data
+  - id: done
+    name: Done
+    type: terminal
+
+transitions:
+  - from: fetch-sites
+    to: export-data
+  - from: export-data
+    to: review-export
+  # No transitions from review-export — verdicts handle it
+```
+
+Note: `triggerInput` values are available to steps via `variables.studyId`, `variables.environment`, etc. The first step does NOT need `params` for these — they are already in the workflow context.
 
 ## Real Examples
 

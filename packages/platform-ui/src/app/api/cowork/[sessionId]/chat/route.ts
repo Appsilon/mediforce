@@ -3,6 +3,8 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { buildMessages, buildToolsArray, buildMcpSystemPromptSection } from '@/lib/cowork/build-messages';
 import { callOpenRouter } from '@/lib/cowork/openrouter';
+import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
+import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { McpClientManager } from '@mediforce/mcp-client';
 import type { McpToolDefinition } from '@mediforce/mcp-client';
 
@@ -38,8 +40,8 @@ export async function POST(
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
 
-  const nsInstance = await instanceRepo.getById(session.processInstanceId);
-  const denied = requireNamespaceAccess(caller, nsInstance?.namespace);
+  const instance = await instanceRepo.getById(session.processInstanceId);
+  const denied = requireNamespaceAccess(caller, instance?.namespace);
   if (denied) return denied;
 
   if (session.status !== 'active') {
@@ -56,12 +58,28 @@ export async function POST(
     return NextResponse.json({ error: 'message string required' }, { status: 400 });
   }
 
-  // Load step context from process instance variables
-  let stepContext: Record<string, unknown> | undefined;
-  const instance = await instanceRepo.getById(session.processInstanceId);
-  if (instance) {
-    stepContext = instance.variables as Record<string, unknown>;
+  const namespace = instance?.namespace;
+  const workflowName = instance?.definitionName;
+
+  if (!namespace || !workflowName) {
+    return NextResponse.json({ error: 'Cannot resolve workspace for this session' }, { status: 400 });
   }
+
+  const [nsSecrets, wfSecrets] = await Promise.all([
+    getNamespaceSecretsForRuntime(namespace),
+    getWorkflowSecretsForRuntime(namespace, workflowName),
+  ]);
+  const secrets = { ...nsSecrets, ...wfSecrets };
+  const openRouterKey = secrets['OPENROUTER_API_KEY'];
+
+  if (!openRouterKey) {
+    return NextResponse.json(
+      { error: 'OPENROUTER_API_KEY not configured in workspace secrets' },
+      { status: 400 },
+    );
+  }
+
+  const stepContext = instance.variables as Record<string, unknown> | undefined;
 
   // Connect to MCP servers BEFORE persisting the human turn so that a connection
   // failure does not leave an orphan user message with no agent reply in Firestore.
@@ -116,7 +134,7 @@ export async function POST(
 
     // Tool execution loop
     for (let iteration = 0; iteration < MAX_TOOL_LOOP_ITERATIONS; iteration++) {
-      const response = await callOpenRouter(model, messages, tools);
+      const response = await callOpenRouter(model, messages, tools, openRouterKey);
 
       agentText = response.content;
 

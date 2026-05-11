@@ -2,6 +2,8 @@
 
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 import type { ConversationTurn } from '@mediforce/platform-core';
+import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
+import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 
 // ---------------------------------------------------------------------------
 // sendMessage — streams model response, returns final result
@@ -237,7 +239,7 @@ export async function synthesizeArtifact(
   transcript: string,
   comment?: string,
 ): Promise<SynthesizeArtifactResult> {
-  const { coworkSessionRepo } = getPlatformServices();
+  const { coworkSessionRepo, instanceRepo } = getPlatformServices();
 
   const session = await coworkSessionRepo.getById(sessionId);
   if (!session) {
@@ -248,12 +250,21 @@ export async function synthesizeArtifact(
     return { success: false, error: `Cannot synthesize for a ${session.status} session` };
   }
 
-  const model = session.voiceConfig?.synthesisModel ?? 'anthropic/claude-sonnet-4';
-
-  const openRouterApiKey = process.env.OPENROUTER_API_KEY ?? process.env.DOCKER_OPENROUTER_API_KEY;
-  if (!openRouterApiKey) {
-    return { success: false, error: 'OPENROUTER_API_KEY is not configured' };
+  const instance = await instanceRepo.getById(session.processInstanceId);
+  if (!instance?.namespace || !instance.definitionName) {
+    return { success: false, error: 'Cannot resolve workspace for this session' };
   }
+
+  const [nsSecrets, wfSecrets] = await Promise.all([
+    getNamespaceSecretsForRuntime(instance.namespace),
+    getWorkflowSecretsForRuntime(instance.namespace, instance.definitionName),
+  ]);
+  const openRouterApiKey = { ...nsSecrets, ...wfSecrets }['OPENROUTER_API_KEY'];
+  if (!openRouterApiKey) {
+    return { success: false, error: 'OPENROUTER_API_KEY not configured in workspace secrets' };
+  }
+
+  const model = session.voiceConfig?.synthesisModel ?? 'anthropic/claude-sonnet-4';
 
   const schemaBlock = session.outputSchema
     ? `\n\nTarget JSON schema:\n${JSON.stringify(session.outputSchema, null, 2)}`

@@ -345,6 +345,7 @@ export class Mediforce {
       get: async (input) => {
         const validated = GetWorkflowInputSchema.parse(input);
         const qs = toSearchParams({
+          namespace: validated.namespace,
           version: validated.version !== undefined ? String(validated.version) : undefined,
         });
         const res = await this.request(

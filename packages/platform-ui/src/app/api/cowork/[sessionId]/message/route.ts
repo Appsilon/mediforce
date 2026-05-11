@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { buildMessages, ARTIFACT_TOOL } from '@/lib/cowork/build-messages';
+import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
+import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 
 /**
  * POST /api/cowork/:sessionId/message
@@ -34,8 +36,8 @@ export async function POST(
     });
   }
 
-  const nsInstance = await instanceRepo.getById(session.processInstanceId);
-  const denied = requireNamespaceAccess(caller, nsInstance?.namespace);
+  const instance = await instanceRepo.getById(session.processInstanceId);
+  const denied = requireNamespaceAccess(caller, instance?.namespace);
   if (denied) return denied;
 
   if (session.status !== 'active') {
@@ -55,12 +57,31 @@ export async function POST(
     });
   }
 
-  // Load step context from process instance variables (previous step output)
-  let stepContext: Record<string, unknown> | undefined;
-  const instance = await instanceRepo.getById(session.processInstanceId);
-  if (instance) {
-    stepContext = instance.variables as Record<string, unknown>;
+  const namespace = instance?.namespace;
+  const workflowName = instance?.definitionName;
+
+  if (!namespace || !workflowName) {
+    return new Response(JSON.stringify({ error: 'Cannot resolve workspace for this session' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
+
+  const [nsSecrets, wfSecrets] = await Promise.all([
+    getNamespaceSecretsForRuntime(namespace),
+    getWorkflowSecretsForRuntime(namespace, workflowName),
+  ]);
+  const secrets = { ...nsSecrets, ...wfSecrets };
+  const openRouterKey = secrets['OPENROUTER_API_KEY'];
+
+  if (!openRouterKey) {
+    return new Response(
+      JSON.stringify({ error: 'OPENROUTER_API_KEY not configured in workspace secrets' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const stepContext = instance.variables as Record<string, unknown> | undefined;
 
   // Save human turn immediately
   const humanTurnId = crypto.randomUUID();
@@ -95,7 +116,7 @@ export async function POST(
           {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${process.env.OPENROUTER_API_KEY ?? process.env.DOCKER_OPENROUTER_API_KEY ?? ''}`,
+              Authorization: `Bearer ${openRouterKey}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
