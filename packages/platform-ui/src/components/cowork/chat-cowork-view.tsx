@@ -132,6 +132,14 @@ export function ChatCoworkView({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-resize textarea to fit content (max 8 lines)
+  React.useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
+
   const scrollToBottom = React.useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
@@ -272,7 +280,7 @@ export function ChatCoworkView({
               placeholder={finalized ? 'Session finalized' : 'Type a message... (Enter to send, Shift+Enter for newline)'}
               rows={1}
               className={cn(
-                'flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm',
+                'flex-1 resize-none overflow-y-auto max-h-[200px] rounded-md border bg-background px-3 py-2 text-sm',
                 'focus:outline-none focus:ring-2 focus:ring-ring',
                 'disabled:cursor-not-allowed disabled:opacity-50',
               )}
