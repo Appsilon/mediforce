@@ -78,6 +78,7 @@ For each proposal, take the parsed structure and add execution config to every s
   "version": 1,
   "description": "string",
   "roles": ["string"],
+  "triggerInput": [ /* copied from structure if present */ ],
   "steps": [ /* WorkflowStep[] */ ],
   "transitions": [ /* copied from structure */ ],
   "triggers": [ /* copied from structure */ ]
@@ -205,8 +206,8 @@ If you do NOT follow this contract, the platform will receive an empty result.
 ```
 9. For `claude-code-agent` steps, include `agent.model` (use `"sonnet"`)
 10. Each proposal needs a distinct `label` and `description` explaining the trade-offs
-11. **Preserve all structural fields** from the original YAML — `params`, `verdicts`, `selection`, `description`, `metadata`, etc. must be copied as-is into every proposal
-12. **transitions and triggers** are copied verbatim from the structure into every proposal
+11. **Preserve all structural fields** from the original YAML — `params`, `verdicts`, `selection`, `description`, `metadata`, `triggerInput`, etc. must be copied as-is into every proposal
+12. **transitions, triggers, and triggerInput** are copied verbatim from the structure into every proposal
 13. Tailor proposals to the user's stated preferences when available
 
 ### Output Shape
