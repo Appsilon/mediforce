@@ -214,7 +214,6 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [copyVersion, setCopyVersion] = React.useState<number | null>(null);
   const [copying, setCopying] = React.useState(false);
   const [copyError, setCopyError] = React.useState('');
-  const [namespaceOverride, setNamespaceOverride] = React.useState<string | null>(null);
   const [visibilityOverride, setVisibilityOverride] = React.useState<'public' | 'private' | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -277,15 +276,15 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
               <p className="text-sm text-muted-foreground mt-0.5">{latest.description}</p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              {(namespaceOverride ?? latest?.namespace) && (
+              {(latest?.namespace) && (
                 <>
                   <span className="flex items-center gap-1">
                     Owned by{' '}
                     <Link
-                      href={`/${namespaceOverride ?? latest?.namespace}`}
+                      href={`/${latest?.namespace}`}
                       className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-500/20 transition-colors"
                     >
-                      @{namespaceOverride ?? latest?.namespace}
+                      @{latest?.namespace}
                     </Link>
                   </span>
                   <span className="text-border">·</span>
@@ -628,9 +627,8 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                   const result = await transferWorkflowNamespace(decodedName, transferTarget);
                   setTransferring(false);
                   if (result.success) {
-                    setNamespaceOverride(transferTarget);
                     setTransferOpen(false);
-                    setTransferTarget('');
+                    router.push(`/${transferTarget}/workflows/${encodeURIComponent(decodedName)}`);
                   }
                 }}
                 disabled={!transferTarget || transferring}
