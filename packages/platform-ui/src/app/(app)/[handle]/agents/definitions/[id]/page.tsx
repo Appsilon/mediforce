@@ -8,15 +8,14 @@ import {
   ArrowLeft,
   Bot, Cpu, Terminal, BarChart3, Brain, Zap,
   Shield, Code, Database, Globe, Sparkles, Settings,
-  Check, Upload, X, ChevronDown, Eye, EyeOff,
+  AlertTriangle, Check, Plus, X, ChevronDown, Eye, EyeOff,
 } from 'lucide-react';
-import { ref, uploadBytes } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
 import { apiFetch } from '@/lib/api-fetch';
 import { FOUNDATION_MODELS } from '@/lib/agent-models';
+import { listSkillRegistries } from '@/lib/skill-registries-client';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
-import type { AgentDefinition } from '@mediforce/platform-core';
+import type { AgentDefinition, AgentSkillRef, SkillRegistry } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 
 const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
@@ -66,14 +65,16 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [outputDescription, setOutputDescription] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const [existingSkillPaths, setExistingSkillPaths] = useState<string[]>([]);
-  const [newSkillFiles, setNewSkillFiles] = useState<File[]>([]);
-  const [skillsDragOver, setSkillsDragOver] = useState(false);
+  const [legacySkillFileNames, setLegacySkillFileNames] = useState<string[]>([]);
+  const [skillRows, setSkillRows] = useState<AgentSkillRef[]>([]);
+  const [registries, setRegistries] = useState<SkillRegistry[]>([]);
+  const [registriesError, setRegistriesError] = useState<string | null>(null);
+  const [skillRowErrors, setSkillRowErrors] = useState<string[]>([]);
   const [prompt, setPrompt] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,74 +96,62 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         setInputDescription(def.inputDescription);
         setOutputDescription(def.outputDescription);
         setSelectedModelId(def.foundationModel);
-        setExistingSkillPaths(def.skillFileNames);
+        setLegacySkillFileNames(def.skillFileNames);
+        setSkillRows(def.skills);
         setPrompt(def.systemPrompt);
         setVisibility(def.visibility ?? 'private');
       })
       .finally(() => setLoadingDef(false));
   }, [id]);
 
+  useEffect(() => {
+    listSkillRegistries()
+      .then((all) => {
+        setRegistries(all.filter((registry) => registry.namespace === handle));
+      })
+      .catch((err: unknown) => {
+        setRegistriesError(err instanceof Error ? err.message : 'Failed to load skill registries.');
+      });
+  }, [handle]);
+
   const activeModel = FOUNDATION_MODELS.find((m) => m.id === selectedModelId);
   const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
 
-  const MAX_SKILL_FILES = 10;
-  const MAX_SKILL_FILE_BYTES = 100 * 1024;
-  const [skillFileErrors, setSkillFileErrors] = useState<string[]>([]);
+  const showLegacySkillWarning = legacySkillFileNames.length > 0 && skillRows.length === 0;
 
-  function addSkillFiles(incoming: FileList | File[]) {
-    const files = Array.from(incoming);
+  function addSkillRow() {
+    setSkillRows((prev) => [...prev, { registryId: '', name: '' }]);
+  }
+
+  function updateSkillRow(index: number, patch: Partial<AgentSkillRef>) {
+    setSkillRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  function removeSkillRow(index: number) {
+    setSkillRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function validateSkillRows(): string[] {
     const errors: string[] = [];
-    const totalAfter = existingSkillPaths.length + newSkillFiles.length + files.length;
-    if (totalAfter > MAX_SKILL_FILES) {
-      errors.push(`Maximum ${MAX_SKILL_FILES} skill files allowed.`);
-      setSkillFileErrors(errors);
-      return;
-    }
-    const accepted: File[] = [];
-    for (const file of files) {
-      if (file.size > MAX_SKILL_FILE_BYTES) {
-        errors.push(`"${file.name}" exceeds 100 KB — split into smaller files or reduce content.`);
-      } else {
-        accepted.push(file);
+    skillRows.forEach((row, i) => {
+      if (row.registryId.trim() === '') {
+        errors.push(`Skill ${i + 1}: select a registry.`);
       }
-    }
-    setSkillFileErrors(errors);
-    if (accepted.length > 0) {
-      setNewSkillFiles((prev) => [...prev, ...accepted]);
-    }
-  }
-
-  function handleSkillDrop(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setSkillsDragOver(false);
-    if (event.dataTransfer.files.length > 0) addSkillFiles(event.dataTransfer.files);
-  }
-
-  function removeSkillEntry(index: number) {
-    if (index < existingSkillPaths.length) {
-      setExistingSkillPaths((prev) => prev.filter((_, i) => i !== index));
-    } else {
-      const newIdx = index - existingSkillPaths.length;
-      setNewSkillFiles((prev) => prev.filter((_, i) => i !== newIdx));
-    }
+      if (row.name.trim() === '') {
+        errors.push(`Skill ${i + 1}: enter a skill name.`);
+      }
+    });
+    return errors;
   }
 
   async function handleSave() {
+    setSaveError(null);
+    const errors = validateSkillRows();
+    setSkillRowErrors(errors);
+    if (errors.length > 0) return;
+
     setSaving(true);
     try {
-      let uploadedPaths: string[] = [];
-      if (newSkillFiles.length > 0) {
-        uploadedPaths = await Promise.all(
-          newSkillFiles.map(async (file) => {
-            const storagePath = `agentSkills/${id}/${file.name}`;
-            await uploadBytes(ref(storage, storagePath), file, {
-              contentType: file.type || 'application/octet-stream',
-            });
-            return storagePath;
-          }),
-        );
-      }
-
       const payload = {
         name: name.trim(),
         iconName: selectedIcon,
@@ -171,15 +160,24 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         outputDescription,
         foundationModel: selectedModelId,
         systemPrompt: prompt,
-        skillFileNames: [...existingSkillPaths, ...uploadedPaths],
+        skills: skillRows.map((row) => ({
+          registryId: row.registryId.trim(),
+          name: row.name.trim(),
+        })),
         visibility,
       };
-      await apiFetch(`/api/agent-definitions/${id}`, {
-        method: 'PUT',
+      const res = await apiFetch(`/api/agent-definitions/${id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Save failed with status ${res.status}`);
+      }
       router.push(`/${handle}/agents`);
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed.');
     } finally {
       setSaving(false);
     }
@@ -363,71 +361,91 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
             </div>
           </div>
 
-          {/* 5. Skills file upload */}
+          {/* 5. Skills — registry-backed */}
           <div className="space-y-2">
             <div>
               <label className="text-sm font-medium">Skills</label>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Upload skill definition files (.yaml, .json, .md) that extend agent capabilities.
+                Bind skills from workspace skill registries. Each row picks a registry and names a skill folder
+                within it.
               </p>
             </div>
 
-            <div
-              onDrop={handleSkillDrop}
-              onDragOver={(e) => { e.preventDefault(); setSkillsDragOver(true); }}
-              onDragLeave={() => setSkillsDragOver(false)}
-              onClick={() => fileInputRef.current?.click()}
-              className={cn(
-                'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 cursor-pointer transition-colors',
-                skillsDragOver
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/25 hover:border-primary/50',
-              )}
-            >
-              <Upload className="h-6 w-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Drop files here or click to browse</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".yaml,.yml,.json,.md,.txt,.csv"
-                onChange={(e) => {
-                  if (e.target.files) { addSkillFiles(e.target.files); e.target.value = ''; }
-                }}
-                className="hidden"
-              />
-            </div>
-
-            {skillFileErrors.length > 0 && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
-                {skillFileErrors.map((err, i) => (
-                  <p key={i} className="text-xs text-destructive">{err}</p>
-                ))}
+            {showLegacySkillWarning && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <p className="flex items-center gap-2 font-medium text-amber-700 dark:text-amber-300">
+                  <AlertTriangle className="h-4 w-4" />
+                  Legacy file-upload skills detected
+                </p>
+                <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/80">
+                  This agent still uses the legacy file-upload skills. Run the migration script before binding new
+                  Registry skills.
+                </p>
               </div>
             )}
 
-            {(existingSkillPaths.length > 0 || newSkillFiles.length > 0) && (
-              <ul className="space-y-1.5">
-                {[
-                  ...existingSkillPaths.map((p) => p.split('/').pop() ?? p),
-                  ...newSkillFiles.map((f) => f.name),
-                ].map((displayName, index) => (
-                  <li
-                    key={`${displayName}-${index}`}
-                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                  >
-                    <span className="truncate text-foreground/80">{displayName}</span>
+            {registriesError !== null && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                {registriesError}
+              </div>
+            )}
+
+            {skillRows.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No skills bound yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {skillRows.map((row, index) => (
+                  <li key={index} className="flex items-center gap-2">
+                    <select
+                      value={row.registryId}
+                      onChange={(e) => updateSkillRow(index, { registryId: e.target.value })}
+                      className="w-1/2 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      aria-label={`Skill ${index + 1} registry`}
+                    >
+                      <option value="">Select registry…</option>
+                      {registries.map((registry) => (
+                        <option key={registry.id} value={registry.id}>
+                          {registry.name}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={row.name}
+                      onChange={(e) => updateSkillRow(index, { name: e.target.value })}
+                      placeholder="skill-folder-name"
+                      aria-label={`Skill ${index + 1} name`}
+                      className="flex-1 rounded-md border bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      autoComplete="off"
+                    />
                     <button
                       type="button"
-                      onClick={() => removeSkillEntry(index)}
-                      className="ml-2 shrink-0 rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      aria-label={`Remove ${displayName}`}
+                      onClick={() => removeSkillRow(index)}
+                      className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      aria-label={`Remove skill ${index + 1}`}
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-4 w-4" />
                     </button>
                   </li>
                 ))}
               </ul>
+            )}
+
+            <button
+              type="button"
+              onClick={addSkillRow}
+              className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add skill
+            </button>
+
+            {skillRowErrors.length > 0 && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                {skillRowErrors.map((err, i) => (
+                  <p key={i} className="text-xs text-destructive">{err}</p>
+                ))}
+              </div>
             )}
           </div>
 
@@ -448,6 +466,11 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
 
           {/* 7. Save */}
           <div className="flex flex-col items-start gap-1.5 pt-2 pb-6">
+            {saveError !== null && (
+              <div className="w-full rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {saveError}
+              </div>
+            )}
             <button
               type="button"
               onClick={handleSave}
