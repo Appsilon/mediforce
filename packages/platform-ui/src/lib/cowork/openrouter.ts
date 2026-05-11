@@ -25,9 +25,8 @@ export async function callOpenRouter(
   model: string,
   messages: ChatMessage[],
   tools: Array<{ type: string; function: Record<string, unknown> }>,
+  apiKey: string,
 ): Promise<OpenRouterResponse> {
-  const apiKey = process.env.OPENROUTER_API_KEY ?? process.env.DOCKER_OPENROUTER_API_KEY ?? '';
-
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
