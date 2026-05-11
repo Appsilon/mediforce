@@ -146,16 +146,12 @@ export async function executeAgentStep(
       })
     : undefined;
 
-  // Resolve agent identity prompt (systemPrompt + skill file contents) from
-  // the AgentDefinition. Returns undefined when step has no agentId or agent
-  // has no systemPrompt/skills. Warnings logged for visibility.
+  // Resolve agent identity prompt (systemPrompt) from the AgentDefinition.
+  // Returns undefined when step has no agentId or agent has no systemPrompt.
   let agentIdentityPrompt: string | undefined;
   if (workflowStep.agentId !== undefined) {
     const identity = await resolveAgentIdentity(workflowStep.agentId, agentDefinitionRepo);
     agentIdentityPrompt = identity.prompt;
-    for (const w of identity.warnings) {
-      console.warn(`[agent-identity] step=${stepId} skill="${w.path}": ${w.reason}`);
-    }
   }
 
   // Resolve registry-bound skills into a per-run plugin directory.

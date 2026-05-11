@@ -8,7 +8,7 @@ import {
   ArrowLeft,
   Bot, Cpu, Terminal, BarChart3, Brain, Zap,
   Shield, Code, Database, Globe, Sparkles, Settings,
-  AlertTriangle, Check, Plus, X, ChevronDown, Eye, EyeOff,
+  Check, Plus, X, ChevronDown, Eye, EyeOff,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { FOUNDATION_MODELS } from '@/lib/agent-models';
@@ -65,7 +65,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [outputDescription, setOutputDescription] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const [legacySkillFileNames, setLegacySkillFileNames] = useState<string[]>([]);
   const [skillRows, setSkillRows] = useState<AgentSkillRef[]>([]);
   const [registries, setRegistries] = useState<SkillRegistry[]>([]);
   const [registriesError, setRegistriesError] = useState<string | null>(null);
@@ -96,7 +95,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         setInputDescription(def.inputDescription);
         setOutputDescription(def.outputDescription);
         setSelectedModelId(def.foundationModel);
-        setLegacySkillFileNames(def.skillFileNames);
         setSkillRows(def.skills);
         setPrompt(def.systemPrompt);
         setVisibility(def.visibility ?? 'private');
@@ -116,8 +114,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
 
   const activeModel = FOUNDATION_MODELS.find((m) => m.id === selectedModelId);
   const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
-
-  const showLegacySkillWarning = legacySkillFileNames.length > 0 && skillRows.length === 0;
 
   function addSkillRow() {
     setSkillRows((prev) => [...prev, { registryId: '', name: '' }]);
@@ -370,19 +366,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
                 within it.
               </p>
             </div>
-
-            {showLegacySkillWarning && (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-                <p className="flex items-center gap-2 font-medium text-amber-700 dark:text-amber-300">
-                  <AlertTriangle className="h-4 w-4" />
-                  Legacy file-upload skills detected
-                </p>
-                <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/80">
-                  This agent still uses the legacy file-upload skills. Run the migration script before binding new
-                  Registry skills.
-                </p>
-              </div>
-            )}
 
             {registriesError !== null && (
               <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">

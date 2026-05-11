@@ -30,7 +30,6 @@ function makeAgent(mcpServers?: AgentMcpBindingMap): AgentDefinition {
     systemPrompt: '',
     inputDescription: '',
     outputDescription: '',
-    skillFileNames: [],
     skills: [],
     mcpServers,
     visibility: 'private',

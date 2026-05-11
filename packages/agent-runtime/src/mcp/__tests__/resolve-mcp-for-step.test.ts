@@ -105,7 +105,6 @@ describe('resolveMcpForStep', () => {
       systemPrompt: '',
       inputDescription: '',
       outputDescription: '',
-      skillFileNames: [],
       skills: [],
       visibility: 'private',
     });
@@ -136,7 +135,6 @@ describe('resolveMcpForStep', () => {
       systemPrompt: '',
       inputDescription: '',
       outputDescription: '',
-      skillFileNames: [],
       skills: [],
       mcpServers: {
         tealflow: { type: 'stdio', catalogId: 'tealflow-mcp' },
@@ -169,7 +167,6 @@ describe('resolveMcpForStep', () => {
       systemPrompt: '',
       inputDescription: '',
       outputDescription: '',
-      skillFileNames: [],
       skills: [],
       mcpServers: {
         tealflow: { type: 'stdio', catalogId: 'never-seeded' },
@@ -200,7 +197,6 @@ describe('resolveMcpForStep', () => {
       systemPrompt: '',
       inputDescription: '',
       outputDescription: '',
-      skillFileNames: [],
       skills: [],
       mcpServers: {
         github: {
@@ -243,7 +239,6 @@ describe('resolveMcpForStep', () => {
       systemPrompt: '',
       inputDescription: '',
       outputDescription: '',
-      skillFileNames: [],
       skills: [],
       mcpServers: {
         webmcp: { type: 'http', url: 'https://mcp.example.com/v1' },

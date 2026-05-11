@@ -22,9 +22,6 @@ export const AgentDefinitionSchema = z.object({
   systemPrompt: z.string(),
   inputDescription: z.string(),
   outputDescription: z.string(),
-  /** @deprecated Replaced by `skills`. Retained until the Phase 4
-   *  migration retires it. New writes from API/CLI should use `skills`. */
-  skillFileNames: z.array(z.string()).default([]),
   /** Registry-first skill bindings: each entry resolves to a folder under
    *  `<registry.repo>/<registry.skillsDir>/<name>/` containing SKILL.md
    *  + references/ + scripts. Assembled into a per-run plugin tree by the

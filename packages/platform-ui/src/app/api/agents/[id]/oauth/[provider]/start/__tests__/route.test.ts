@@ -83,7 +83,6 @@ function makeAgentWithOAuthBinding(
     systemPrompt: '',
     inputDescription: '',
     outputDescription: '',
-    skillFileNames: [],
     skills: [],
     mcpServers: {
       [serverName]: {

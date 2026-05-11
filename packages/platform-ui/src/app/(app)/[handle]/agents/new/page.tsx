@@ -8,10 +8,8 @@ import {
   ArrowLeft,
   Bot, Cpu, Terminal, BarChart3, Brain, Zap,
   Shield, Code, Database, Globe, Sparkles, Settings,
-  Check, Upload, X, ChevronDown,
+  Check, ChevronDown,
 } from 'lucide-react';
-import { ref, uploadBytes } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
 import { apiFetch } from '@/lib/api-fetch';
 import { FOUNDATION_MODELS } from '@/lib/agent-models';
 import { cn } from '@/lib/utils';
@@ -45,45 +43,17 @@ export default function NewAgentPage() {
   const [outputDescription, setOutputDescription] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const [skillFiles, setSkillFiles] = useState<File[]>([]);
-  const [skillsDragOver, setSkillsDragOver] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const activeModel = FOUNDATION_MODELS.find((m) => m.id === selectedModelId);
   const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
 
-  function addSkillFiles(incoming: FileList | File[]) {
-    const files = Array.from(incoming);
-    setSkillFiles((prev) => [...prev, ...files]);
-  }
-
-  function handleSkillDrop(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setSkillsDragOver(false);
-    if (event.dataTransfer.files.length > 0) addSkillFiles(event.dataTransfer.files);
-  }
-
   async function handleSave() {
     setSaving(true);
     try {
-      let skillFileNames: string[] = [];
-      if (skillFiles.length > 0) {
-        const batchId = crypto.randomUUID();
-        skillFileNames = await Promise.all(
-          skillFiles.map(async (file) => {
-            const storagePath = `agentSkills/new_${batchId}/${file.name}`;
-            await uploadBytes(ref(storage, storagePath), file, {
-              contentType: file.type || 'application/octet-stream',
-            });
-            return storagePath;
-          }),
-        );
-      }
-
       const payload = {
         name: name.trim(),
         iconName: selectedIcon,
@@ -92,7 +62,6 @@ export default function NewAgentPage() {
         outputDescription,
         foundationModel: selectedModelId,
         systemPrompt: prompt,
-        skillFileNames,
       };
       await apiFetch('/api/agent-definitions', {
         method: 'POST',
@@ -246,63 +215,6 @@ export default function NewAgentPage() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* 5. Skills file upload */}
-        <div className="space-y-2">
-          <div>
-            <label className="text-sm font-medium">Skills</label>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Upload skill definition files (.yaml, .json, .md) that extend agent capabilities.
-            </p>
-          </div>
-
-          <div
-            onDrop={handleSkillDrop}
-            onDragOver={(e) => { e.preventDefault(); setSkillsDragOver(true); }}
-            onDragLeave={() => setSkillsDragOver(false)}
-            onClick={() => fileInputRef.current?.click()}
-            className={cn(
-              'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 cursor-pointer transition-colors',
-              skillsDragOver
-                ? 'border-primary bg-primary/5'
-                : 'border-muted-foreground/25 hover:border-primary/50',
-            )}
-          >
-            <Upload className="h-6 w-6 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Drop files here or click to browse</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".yaml,.yml,.json,.md,.txt"
-              onChange={(e) => {
-                if (e.target.files) { addSkillFiles(e.target.files); e.target.value = ''; }
-              }}
-              className="hidden"
-            />
-          </div>
-
-          {skillFiles.length > 0 && (
-            <ul className="space-y-1.5">
-              {skillFiles.map((file, index) => (
-                <li
-                  key={`${file.name}-${index}`}
-                  className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                >
-                  <span className="truncate text-foreground/80">{file.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => setSkillFiles((prev) => prev.filter((_, i) => i !== index))}
-                    className="ml-2 shrink-0 rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    aria-label={`Remove ${file.name}`}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
 
         {/* 6. System prompt */}

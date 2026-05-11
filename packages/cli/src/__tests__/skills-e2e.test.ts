@@ -136,7 +136,6 @@ describe('mediforce agent update --skill — Phase 0 RED, target Phase 1', () =>
             systemPrompt: '',
             inputDescription: '',
             outputDescription: '',
-            skillFileNames: [],
             skills: [
               { registryId: 'reg-a', name: 'sdtmig-reference' },
               { registryId: 'reg-b', name: 'style-guide' },

@@ -17,8 +17,10 @@ const FAKE_AGENT = {
   systemPrompt: 'You author rules.',
   inputDescription: 'Rule ID',
   outputDescription: 'Rule changes',
-  skillFileNames: ['skill.md', 'patterns.md'],
-  skills: [],
+  skills: [
+    { registryId: 'reg-1', name: 'sdtmig-reference' },
+    { registryId: 'reg-2', name: 'style-guide' },
+  ],
   createdAt: '2026-05-01T00:00:00Z',
   updatedAt: '2026-05-01T00:00:00Z',
 };
@@ -68,13 +70,13 @@ describe('agent get command', () => {
     expect(text).toMatch(/model:\s+anthropic\/claude-sonnet-4/);
     expect(text).toMatch(/kind:\s+plugin/);
     expect(text).toMatch(/runtimeId:\s+claude-code-agent/);
-    expect(text).toMatch(/skills:\s+skill\.md, patterns\.md/);
+    expect(text).toMatch(/skills:\s+reg-1:sdtmig-reference, reg-2:style-guide/);
   });
 
   it('omits runtimeId and skills lines when absent/empty', async () => {
-    const { runtimeId: _, skillFileNames: __, ...noOptionals } = FAKE_AGENT;
+    const { runtimeId: _, skills: __, ...noOptionals } = FAKE_AGENT;
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ agent: { ...noOptionals, skillFileNames: [] } }),
+      jsonResponse({ agent: { ...noOptionals, skills: [] } }),
     );
     const output = captureOutput();
     const code = await agentGetCommand({

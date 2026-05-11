@@ -105,7 +105,6 @@ const COWORK_AGENT: AgentDefinition = {
   systemPrompt: '',
   inputDescription: '',
   outputDescription: '',
-  skillFileNames: [],
   skills: [],
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',

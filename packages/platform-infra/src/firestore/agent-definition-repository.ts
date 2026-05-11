@@ -22,7 +22,7 @@ function toAgentDefinition(id: string, data: Record<string, unknown>): AgentDefi
     runtimeId,
     inputDescription: data.inputDescription ?? '',
     outputDescription: data.outputDescription ?? '',
-    skillFileNames: data.skillFileNames ?? [],
+    skills: data.skills ?? [],
     createdAt:
       data.createdAt instanceof Timestamp
         ? data.createdAt.toDate().toISOString()
