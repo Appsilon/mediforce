@@ -38,10 +38,6 @@ export class FirestoreApiKeyRepository {
     return true;
   }
 
-  async delete(keyId: string): Promise<void> {
-    await this.col().doc(keyId).delete();
-  }
-
   async touchLastUsed(keyId: string): Promise<void> {
     await this.col().doc(keyId).update({ lastUsedAt: new Date().toISOString() });
   }

@@ -13,7 +13,7 @@ const lastUsedCache = new Map<string, number>();
 export async function resolveCallerIdentity(
   request: Request,
   namespaceRepo: FirestoreNamespaceRepository,
-  apiKeyRepo?: FirestoreApiKeyRepository,
+  apiKeyRepo: FirestoreApiKeyRepository,
 ): Promise<CallerIdentity | NextResponse> {
   const apiKeyHeader = request.headers.get('X-Api-Key');
   const expectedKey = process.env.PLATFORM_API_KEY;
@@ -22,19 +22,20 @@ export async function resolveCallerIdentity(
     return { kind: 'apiKey' };
   }
 
-  if (apiKeyHeader && apiKeyRepo && apiKeyHeader.startsWith('mf_')) {
+  if (apiKeyHeader && apiKeyHeader.startsWith('mf_')) {
     const keyHash = hashApiKey(apiKeyHeader);
     const storedKey = await apiKeyRepo.getByKeyHash(keyHash);
-    if (storedKey && !storedKey.revokedAt) {
-      const now = Date.now();
-      const lastTouch = lastUsedCache.get(storedKey.id) ?? 0;
-      if (now - lastTouch > LAST_USED_DEBOUNCE_MS) {
-        lastUsedCache.set(storedKey.id, now);
-        void apiKeyRepo.touchLastUsed(storedKey.id).catch(() => {});
-      }
-      const namespaces = await namespaceRepo.getNamespacesByUser(storedKey.userId);
-      return { kind: 'user', uid: storedKey.userId, namespaces: new Set(namespaces.map((ns) => ns.handle)) };
+    if (!storedKey || storedKey.revokedAt) {
+      return NextResponse.json({ error: 'Invalid or revoked API key' }, { status: 401 });
     }
+    const now = Date.now();
+    const lastTouch = lastUsedCache.get(storedKey.id) ?? 0;
+    if (now - lastTouch > LAST_USED_DEBOUNCE_MS) {
+      lastUsedCache.set(storedKey.id, now);
+      void apiKeyRepo.touchLastUsed(storedKey.id).catch(() => {});
+    }
+    const namespaces = await namespaceRepo.getNamespacesByUser(storedKey.userId);
+    return { kind: 'user', uid: storedKey.userId, namespaces: new Set(namespaces.map((ns) => ns.handle)) };
   }
 
   const authHeader = request.headers.get('Authorization') ?? '';
