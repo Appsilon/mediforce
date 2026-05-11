@@ -18,6 +18,10 @@ export async function resolveCallerIdentity(
   const apiKeyHeader = request.headers.get('X-Api-Key');
   const expectedKey = process.env.PLATFORM_API_KEY;
 
+  if (expectedKey?.startsWith('mf_')) {
+    console.error('[api-auth] PLATFORM_API_KEY must not start with mf_ — collides with per-user key prefix');
+  }
+
   if (apiKeyHeader && expectedKey && apiKeyHeader === expectedKey) {
     return { kind: 'apiKey' };
   }

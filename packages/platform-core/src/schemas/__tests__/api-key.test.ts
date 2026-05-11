@@ -45,6 +45,15 @@ describe('ApiKeySchema', () => {
   it('rejects invalid UUID for id', () => {
     expect(ApiKeySchema.safeParse({ ...valid, id: 'not-a-uuid' }).success).toBe(false);
   });
+
+  it('rejects keyHash that is not 64-char hex', () => {
+    expect(ApiKeySchema.safeParse({ ...valid, keyHash: 'short' }).success).toBe(false);
+    expect(ApiKeySchema.safeParse({ ...valid, keyHash: 'g'.repeat(64) }).success).toBe(false);
+  });
+
+  it('rejects keyPrefix without mf_ prefix', () => {
+    expect(ApiKeySchema.safeParse({ ...valid, keyPrefix: 'sk_a1B2c3D4' }).success).toBe(false);
+  });
 });
 
 describe('CreateApiKeyInputSchema', () => {

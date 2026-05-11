@@ -1,26 +1,31 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { CreateApiKeyInputSchema } from '@mediforce/platform-core';
+import { z } from 'zod';
 import { generateApiKey } from '@mediforce/platform-infra';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity } from '@/lib/api-auth';
 
 const MAX_ACTIVE_KEYS = 10;
 
+const CreateBodySchema = z.object({
+  label: z.string().min(1).max(128),
+  userId: z.string().min(1).optional(),
+});
+
 function resolveTargetUser(
   caller: { kind: 'apiKey' } | { kind: 'user'; uid: string },
-  queryUserId: string | null,
+  requestedUserId: string | undefined,
 ): { userId: string } | NextResponse {
   if (caller.kind === 'user') {
-    return { userId: queryUserId ?? caller.uid };
+    return { userId: caller.uid };
   }
-  if (!queryUserId) {
+  if (!requestedUserId) {
     return NextResponse.json(
-      { error: 'Global API key requires ?userId=<uid> parameter' },
+      { error: 'Global API key requires userId parameter' },
       { status: 400 },
     );
   }
-  return { userId: queryUserId };
+  return { userId: requestedUserId };
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -29,7 +34,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (caller instanceof NextResponse) return caller;
 
   const url = new URL(request.url);
-  const target = resolveTargetUser(caller, url.searchParams.get('userId'));
+  const queryUserId = url.searchParams.get('userId') ?? undefined;
+  const target = resolveTargetUser(caller, queryUserId);
   if (target instanceof NextResponse) return target;
 
   const keys = await apiKeyRepo.listByUser(target.userId);
@@ -47,19 +53,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const parsed = CreateApiKeyInputSchema.safeParse(body);
+  const parsed = CreateBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues.map((i) => i.message).join('; ') },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const targetUserId = (body as Record<string, unknown>).userId as string | undefined;
-  const target = resolveTargetUser(caller, targetUserId ?? null);
+  const target = resolveTargetUser(caller, parsed.data.userId);
   if (target instanceof NextResponse) return target;
 
   const existing = await apiKeyRepo.listByUser(target.userId);

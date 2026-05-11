@@ -11,26 +11,25 @@ export async function DELETE(
   if (caller instanceof NextResponse) return caller;
 
   const { keyId } = await params;
-  const url = new URL(request.url);
-  const queryUserId = url.searchParams.get('userId');
 
+  let ownerUid: string;
   if (caller.kind === 'apiKey') {
+    const url = new URL(request.url);
+    const queryUserId = url.searchParams.get('userId');
     if (!queryUserId) {
       return NextResponse.json(
         { error: 'Global API key requires ?userId=<uid> parameter' },
         { status: 400 },
       );
     }
-    const keys = await apiKeyRepo.listByUser(queryUserId);
-    if (!keys.some((k) => k.id === keyId)) {
-      return NextResponse.json({ error: 'API key not found' }, { status: 404 });
-    }
+    ownerUid = queryUserId;
   } else {
-    const ownerUid = queryUserId ?? caller.uid;
-    const keys = await apiKeyRepo.listByUser(ownerUid);
-    if (!keys.some((k) => k.id === keyId)) {
-      return NextResponse.json({ error: 'API key not found' }, { status: 404 });
-    }
+    ownerUid = caller.uid;
+  }
+
+  const keys = await apiKeyRepo.listByUser(ownerUid);
+  if (!keys.some((k) => k.id === keyId)) {
+    return NextResponse.json({ error: 'API key not found' }, { status: 404 });
   }
 
   const revoked = await apiKeyRepo.revoke(keyId);
