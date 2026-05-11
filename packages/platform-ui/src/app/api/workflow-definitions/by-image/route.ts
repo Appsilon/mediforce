@@ -21,6 +21,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const needle = normalizeImage(imageParam);
+  // Full scan — Firestore can't query nested steps[].agent.image. Denormalize to a top-level dockerImages[] field when scale demands it.
   const { definitions } = await processRepo.listWorkflowDefinitions(false);
 
   const workflows: Array<{
