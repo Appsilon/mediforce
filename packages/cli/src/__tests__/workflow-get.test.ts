@@ -35,7 +35,7 @@ describe('workflow get command', () => {
   it('exits 2 when <name> is missing', async () => {
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS],
+      argv: [...BASE_ARGS, '--namespace', 'ns'],
       env: BASE_ENV,
       output,
     });
@@ -43,10 +43,21 @@ describe('workflow get command', () => {
     expect(output.stderrLines.join('\n')).toMatch(/<name> is required/);
   });
 
+  it('exits 2 when --namespace is missing', async () => {
+    const output = captureOutput();
+    const code = await workflowGetCommand({
+      argv: [...BASE_ARGS, 'my-wf'],
+      env: BASE_ENV,
+      output,
+    });
+    expect(code).toBe(2);
+    expect(output.stderrLines.join('\n')).toMatch(/--namespace is required/);
+  });
+
   it('exits 2 for invalid --version (non-integer)', async () => {
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS, 'my-wf', '--version', 'abc'],
+      argv: [...BASE_ARGS, 'my-wf', '--namespace', 'ns', '--version', 'abc'],
       env: BASE_ENV,
       output,
     });
@@ -57,7 +68,7 @@ describe('workflow get command', () => {
   it('exits 2 for invalid --version (zero)', async () => {
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS, 'my-wf', '--version', '0'],
+      argv: [...BASE_ARGS, 'my-wf', '--namespace', 'ns', '--version', '0'],
       env: BASE_ENV,
       output,
     });
@@ -68,7 +79,7 @@ describe('workflow get command', () => {
   it('exits 2 for invalid --version (negative)', async () => {
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS, 'my-wf', '--version', '-1'],
+      argv: [...BASE_ARGS, 'my-wf', '--namespace', 'ns', '--version', '-1'],
       env: BASE_ENV,
       output,
     });
@@ -84,13 +95,13 @@ describe('workflow get command', () => {
     );
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS, 'my-wf', '--json'],
+      argv: [...BASE_ARGS, 'my-wf', '--namespace', 'test', '--json'],
       env: BASE_ENV,
       output,
     });
     expect(code).toBe(0);
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-      'http://localhost:1234/api/workflow-definitions/my-wf',
+      'http://localhost:1234/api/workflow-definitions/my-wf?namespace=test',
     );
     const parsed: unknown = JSON.parse(output.stdoutLines.join('\n'));
     expect(parsed).toMatchObject({ name: 'my-wf', version: 2 });
@@ -103,7 +114,7 @@ describe('workflow get command', () => {
     );
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS, 'wf-json', '--json'],
+      argv: [...BASE_ARGS, 'wf-json', '--namespace', 'test', '--json'],
       env: BASE_ENV,
       output,
     });
@@ -123,7 +134,7 @@ describe('workflow get command', () => {
     );
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS, 'mediforce-fullstack'],
+      argv: [...BASE_ARGS, 'mediforce-fullstack', '--namespace', 'appsilon'],
       env: BASE_ENV,
       output,
     });
@@ -144,7 +155,7 @@ describe('workflow get command', () => {
     );
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS, 'tpl-wf', '--template', '--json'],
+      argv: [...BASE_ARGS, 'tpl-wf', '--namespace', 'ns1', '--template', '--json'],
       env: BASE_ENV,
       output,
     });
@@ -168,7 +179,7 @@ describe('workflow get command', () => {
     );
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS, 'file-wf', '--output', tmpFile],
+      argv: [...BASE_ARGS, 'file-wf', '--namespace', 'test', '--output', tmpFile],
       env: BASE_ENV,
       output,
     });
@@ -185,7 +196,7 @@ describe('workflow get command', () => {
     );
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS, 'missing-wf'],
+      argv: [...BASE_ARGS, 'missing-wf', '--namespace', 'ns'],
       env: BASE_ENV,
       output,
     });
@@ -196,7 +207,7 @@ describe('workflow get command', () => {
   it('exits 2 when API key is missing', async () => {
     const output = captureOutput();
     const code = await workflowGetCommand({
-      argv: [...BASE_ARGS, 'my-wf'],
+      argv: [...BASE_ARGS, 'my-wf', '--namespace', 'ns'],
       env: {},
       output,
     });
