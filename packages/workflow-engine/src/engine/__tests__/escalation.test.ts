@@ -105,7 +105,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
    * to simulate what FallbackHandler does before WorkflowEngine.advanceStep is called.
    */
   async function createRunningInstance(engine: WorkflowEngine): Promise<string> {
-    const instance = await engine.createInstance(
+    const instance = await engine.createInstance('test',
       'agent-process',
       1,
       'system',
@@ -353,7 +353,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     );
 
     // agentProcessDef has notifications: [{ event: 'agent_escalation', roles: ['reviewer'] }]
-    const instance = await engine.createInstance('agent-process', 1, 'system', 'manual');
+    const instance = await engine.createInstance('test', 'agent-process', 1, 'system', 'manual');
     await engine.startInstance(instance.id);
 
     await engine.advanceStep(instance.id, {}, actor, undefined, escalatedResult);
@@ -453,7 +453,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
       userDirectoryService,
     );
 
-    const instance = await engine.createInstance('no-notif-process', 1, 'system', 'manual');
+    const instance = await engine.createInstance('test', 'no-notif-process', 1, 'system', 'manual');
     await engine.startInstance(instance.id);
 
     await engine.advanceStep(

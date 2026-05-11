@@ -4,6 +4,7 @@ import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 interface StartWorkflowBody {
+  namespace?: string;
   definitionName: string;
   definitionVersion?: number;
   version?: string | number;
@@ -20,15 +21,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const caller = await resolveCallerIdentity(req, namespaceRepo);
     if (caller instanceof NextResponse) return caller;
 
-    let version = body.definitionVersion ?? (body.version ? Number(body.version) : undefined);
+    const requestNamespace = body.namespace ?? '';
+    let version: number | undefined = body.definitionVersion ?? (body.version ? Number(body.version) : undefined);
     if (!version) {
-      version = await processRepo.getLatestWorkflowVersion(body.definitionName);
-      if (version === 0) {
+      const resolved = await processRepo.getLatestWorkflowVersion(body.definitionName, requestNamespace);
+      if (resolved === 0) {
         return NextResponse.json(
           { error: `No workflow definition found for '${body.definitionName}'` },
           { status: 404 },
         );
       }
+      version = resolved;
     }
 
     const rawPayload = body.payload;
@@ -42,7 +45,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const payload: Record<string, unknown> =
       (rawPayload as Record<string, unknown>) ?? {};
 
-    const definition = await processRepo.getWorkflowDefinition(body.definitionName, version);
+    const definition = await processRepo.getWorkflowDefinition(requestNamespace, body.definitionName, version);
     if (!definition) {
       return NextResponse.json(
         { error: `Workflow definition '${body.definitionName}' v${version} not found` },
@@ -63,6 +66,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const result = await manualTrigger.fireWorkflow({
+      namespace: definition.namespace,
       definitionName: body.definitionName,
       definitionVersion: version,
       triggerName: body.triggerName ?? 'manual',

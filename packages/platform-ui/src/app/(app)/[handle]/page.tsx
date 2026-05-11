@@ -493,7 +493,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
   const [showArchived, setShowArchived] = React.useState(false);
 
   const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions();
-  const { data: allInstances, loading: instancesLoading } = useProcessInstances('all');
+  const { data: allInstances, loading: instancesLoading } = useProcessInstances('all', undefined, false, handle);
   const { data: activeTasks } = useMyTasks(null);
 
   const loading = defsLoading || instancesLoading;

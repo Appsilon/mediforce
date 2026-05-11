@@ -71,13 +71,14 @@ export class WorkflowEngine {
    * Create a new process instance. Loads WorkflowDefinition to get roles.
    */
   async createInstance(
+    namespace: string,
     definitionName: string,
     version: number,
     triggeredBy: string,
     triggerType: 'manual' | 'webhook' | 'cron',
     payload?: Record<string, unknown>,
   ): Promise<ProcessInstance> {
-    const definition = await this.processRepository.getWorkflowDefinition(definitionName, version);
+    const definition = await this.processRepository.getWorkflowDefinition(namespace, definitionName, version);
     if (!definition) {
       throw new Error(
         `Workflow definition '${definitionName}' version '${version}' not found`,
@@ -711,9 +712,11 @@ export class WorkflowEngine {
   private async loadDefinitionUnified(
     instance: ProcessInstance,
   ): Promise<WorkflowDefinition> {
+    const ns = instance.namespace ?? '';
     const versionNum = parseInt(instance.definitionVersion, 10);
     if (!isNaN(versionNum)) {
       const wd = await this.processRepository.getWorkflowDefinition(
+        ns,
         instance.definitionName,
         versionNum,
       );
@@ -721,9 +724,9 @@ export class WorkflowEngine {
     }
 
     // Fallback: latest version by name (handles legacy instances with string versions like "1.0.0")
-    const latestVersion = await this.processRepository.getLatestWorkflowVersion(instance.definitionName);
+    const latestVersion = await this.processRepository.getLatestWorkflowVersion(instance.definitionName, instance.namespace ?? '');
     if (latestVersion > 0) {
-      const wd = await this.processRepository.getWorkflowDefinition(instance.definitionName, latestVersion);
+      const wd = await this.processRepository.getWorkflowDefinition(ns, instance.definitionName, latestVersion);
       if (wd) return wd;
     }
 

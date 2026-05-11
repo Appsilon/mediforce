@@ -8,6 +8,7 @@ import { deleteWorkflow, getWorkflowRunCount } from '@/app/actions/definitions';
 
 interface DeleteWorkflowDialogProps {
   workflowName: string;
+  namespace: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDeleted: () => void;
@@ -19,7 +20,7 @@ type DialogState =
   | { step: 'deleting' }
   | { step: 'error'; message: string; runCount: number };
 
-export function DeleteWorkflowDialog({ workflowName, open, onOpenChange, onDeleted }: DeleteWorkflowDialogProps) {
+export function DeleteWorkflowDialog({ workflowName, namespace, open, onOpenChange, onDeleted }: DeleteWorkflowDialogProps) {
   const [state, setState] = React.useState<DialogState>({ step: 'loading' });
   const [nameInput, setNameInput] = React.useState('');
   const [runCountInput, setRunCountInput] = React.useState('');
@@ -35,7 +36,7 @@ export function DeleteWorkflowDialog({ workflowName, open, onOpenChange, onDelet
     setState({ step: 'loading' });
     setNameInput('');
     setRunCountInput('');
-    getWorkflowRunCount(workflowName)
+    getWorkflowRunCount(workflowName, namespace)
       .then((count) => setState({ step: 'confirm', runCount: count }))
       .catch(() => setState({ step: 'error', message: 'Failed to load run count.', runCount: 0 }));
   }, [open, workflowName]);
@@ -48,7 +49,7 @@ export function DeleteWorkflowDialog({ workflowName, open, onOpenChange, onDelet
   async function handleDelete() {
     if (!canConfirm) return;
     setState({ step: 'deleting' });
-    const result = await deleteWorkflow(workflowName, runCount);
+    const result = await deleteWorkflow(workflowName, namespace, runCount);
     if (result.success) {
       onOpenChange(false);
       onDeleted();

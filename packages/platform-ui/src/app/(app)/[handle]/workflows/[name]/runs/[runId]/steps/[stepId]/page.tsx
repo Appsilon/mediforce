@@ -42,7 +42,7 @@ export default function StepDetailPage() {
     'agentEvents',
   );
 
-  const { versions } = useProcessDefinitionVersions(decodedName);
+  const { versions } = useProcessDefinitionVersions(decodedName, handle);
 
   const definition = useMemo(() => {
     if (!instance || versions.length === 0) return null;

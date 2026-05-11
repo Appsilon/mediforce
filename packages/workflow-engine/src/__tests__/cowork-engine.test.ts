@@ -106,7 +106,7 @@ beforeEach(async () => {
 
 describe('Cowork executor: advanceStep routes to cowork step', () => {
   it('advances to a cowork step (session creation is auto-runner responsibility)', async () => {
-    const instance = await engine.createInstance('cowork-process', 1, 'user-001', 'manual');
+    const instance = await engine.createInstance('test', 'cowork-process', 1, 'user-001', 'manual');
     await engine.startInstance(instance.id);
 
     // Advance past intake → lands on cowork step
@@ -121,7 +121,7 @@ describe('Cowork executor: advanceStep routes to cowork step', () => {
   });
 
   it('cowork step accepts output and advances to next step', async () => {
-    const instance = await engine.createInstance('cowork-process', 1, 'user-001', 'manual');
+    const instance = await engine.createInstance('test', 'cowork-process', 1, 'user-001', 'manual');
     await engine.startInstance(instance.id);
 
     // Advance to cowork step

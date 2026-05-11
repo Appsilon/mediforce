@@ -10,6 +10,7 @@ export class CronTrigger {
    */
   async fireWorkflow(context: WorkflowTriggerContext): Promise<TriggerResult> {
     const instance = await this.engine.createInstance(
+      context.namespace,
       context.definitionName,
       context.definitionVersion,
       context.triggeredBy,

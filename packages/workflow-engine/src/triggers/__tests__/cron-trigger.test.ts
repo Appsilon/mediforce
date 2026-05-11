@@ -15,6 +15,7 @@ describe('CronTrigger', () => {
     const trigger = new CronTrigger(engine);
 
     const result = await trigger.fireWorkflow({
+      namespace: 'test',
       definitionName: 'community-digest',
       definitionVersion: 1,
       triggerName: 'weekly-cron',
@@ -25,6 +26,7 @@ describe('CronTrigger', () => {
     expect(result).toEqual({ instanceId: 'inst-123', status: 'created' });
 
     expect(engine.createInstance).toHaveBeenCalledWith(
+      'test',
       'community-digest',
       1,
       'cron-heartbeat',

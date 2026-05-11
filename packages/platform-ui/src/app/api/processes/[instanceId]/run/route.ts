@@ -51,13 +51,14 @@ export async function POST(
 
     // Load WorkflowDefinition — try exact version, fall back to latest
     const versionNum = parseInt(initialInstance.definitionVersion, 10);
+    const runNamespace = initialInstance.namespace ?? '';
     let workflowDefinition = !isNaN(versionNum)
-      ? await processRepo.getWorkflowDefinition(initialInstance.definitionName, versionNum)
+      ? await processRepo.getWorkflowDefinition(runNamespace, initialInstance.definitionName, versionNum)
       : null;
     if (!workflowDefinition) {
-      const latestVersion = await processRepo.getLatestWorkflowVersion(initialInstance.definitionName);
+      const latestVersion = await processRepo.getLatestWorkflowVersion(initialInstance.definitionName, initialInstance.namespace ?? '');
       if (latestVersion > 0) {
-        workflowDefinition = await processRepo.getWorkflowDefinition(initialInstance.definitionName, latestVersion);
+        workflowDefinition = await processRepo.getWorkflowDefinition(runNamespace, initialInstance.definitionName, latestVersion);
       }
     }
     if (!workflowDefinition) {

@@ -27,6 +27,7 @@ import { runListCommand } from './commands/run-list.js';
 import { runStartCommand } from './commands/run-start.js';
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility.js';
+import { workflowCopyCommand } from './commands/workflow-copy.js';
 import { systemStatusCommand, systemImagesCommand, systemDiskCommand, systemRmiCommand } from './commands/system-status.js';
 import { systemCreditsCommand } from './commands/system-credits.js';
 import { agentListCommand } from './commands/agent-list.js';
@@ -54,6 +55,7 @@ Commands:
   workflow list                                      List registered workflow definitions
   workflow get <name>                                Fetch a workflow definition
   workflow set-visibility <name> --visibility <v>    Set workflow visibility (public|private)
+  workflow copy <name> --target-namespace <ns>       Copy workflow to another namespace
   workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
   agent list                                         List agent definitions
   agent get <id>                                     Fetch an agent definition
@@ -96,6 +98,7 @@ Subcommands:
   list                                      List registered workflow definitions
   get <name>                                Fetch a workflow definition
   set-visibility <name> --visibility <v>    Set workflow visibility (public|private)
+  copy <name> --target-namespace <ns>        Copy workflow to another namespace
   archive <name> --version <n>|--all        Archive/unarchive workflow versions
 
 Run \`mediforce workflow <subcommand> --help\` for subcommand-specific flags.
@@ -218,6 +221,9 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'workflow' && subcommand === 'set-visibility') {
     return workflowSetVisibilityCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'workflow' && subcommand === 'copy') {
+    return workflowCopyCommand({ argv: rest, env: input.env, output });
   }
   if (command === 'agent' && subcommand === 'list') {
     return agentListCommand({ argv: rest, env: input.env, output });

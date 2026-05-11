@@ -7,28 +7,28 @@ import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
 
 /**
  * In-memory implementation of ProcessRepository for testing.
- * Uses Maps with composite keys ({name}:{version}) matching Firestore document IDs.
+ * Uses Maps with composite keys ({namespace}:{name}:{version}) matching Firestore document IDs.
  * Reusable by any package that needs test doubles for process operations.
  */
 export class InMemoryProcessRepository implements ProcessRepository {
   private workflowDefinitions = new Map<string, WorkflowDefinition>();
   private workflowDefaults = new Map<string, number>();
 
-  private compositeKey(name: string, version: string): string {
-    return `${name}:${version}`;
+  private compositeKey(namespace: string, name: string, version: string): string {
+    return `${namespace}:${name}:${version}`;
   }
 
   // ---------------------------------------------------------------------------
   // WorkflowDefinition methods (unified schema)
   // ---------------------------------------------------------------------------
 
-  async getWorkflowDefinition(name: string, version: number): Promise<WorkflowDefinition | null> {
-    return this.workflowDefinitions.get(this.compositeKey(name, String(version))) ?? null;
+  async getWorkflowDefinition(namespace: string, name: string, version: number): Promise<WorkflowDefinition | null> {
+    return this.workflowDefinitions.get(this.compositeKey(namespace, name, String(version))) ?? null;
   }
 
   async saveWorkflowDefinition(definition: WorkflowDefinition): Promise<void> {
     this.workflowDefinitions.set(
-      this.compositeKey(definition.name, String(definition.version)),
+      this.compositeKey(definition.namespace, definition.name, String(definition.version)),
       definition,
     );
   }
@@ -54,28 +54,15 @@ export class InMemoryProcessRepository implements ProcessRepository {
     return { definitions };
   }
 
-  async getDefaultWorkflowVersion(name: string): Promise<number | null> {
-    return this.workflowDefaults.get(name) ?? null;
+  async getDefaultWorkflowVersion(name: string, namespace: string): Promise<number | null> {
+    return this.workflowDefaults.get(`${namespace}:${name}`) ?? null;
   }
 
-  async setDefaultWorkflowVersion(name: string, version: number): Promise<void> {
-    this.workflowDefaults.set(name, version);
+  async setDefaultWorkflowVersion(name: string, namespace: string, version: number): Promise<void> {
+    this.workflowDefaults.set(`${namespace}:${name}`, version);
   }
 
-  async getLatestWorkflowVersion(name: string): Promise<number> {
-    let latest = 0;
-    for (const definition of this.workflowDefinitions.values()) {
-      if (definition.name === name && definition.version > latest) {
-        latest = definition.version;
-      }
-    }
-    return latest;
-  }
-
-  async getLatestWorkflowVersionInNamespace(
-    name: string,
-    namespace: string,
-  ): Promise<number> {
+  async getLatestWorkflowVersion(name: string, namespace: string): Promise<number> {
     let latest = 0;
     for (const definition of this.workflowDefinitions.values()) {
       if (
@@ -89,16 +76,16 @@ export class InMemoryProcessRepository implements ProcessRepository {
     return latest;
   }
 
-  async setProcessArchived(name: string, archived: boolean): Promise<void> {
+  async setProcessArchived(name: string, namespace: string, archived: boolean): Promise<void> {
     for (const [key, def] of this.workflowDefinitions) {
-      if (def.name === name) {
+      if (def.name === name && def.namespace === namespace) {
         this.workflowDefinitions.set(key, { ...def, archived });
       }
     }
   }
 
-  async setVersionArchived(name: string, version: number, archived: boolean): Promise<void> {
-    const key = this.compositeKey(name, String(version));
+  async setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void> {
+    const key = this.compositeKey(namespace, name, String(version));
     const def = this.workflowDefinitions.get(key);
     if (!def) {
       const err = new Error(`Workflow definition "${name}" version ${version} not found`);
@@ -108,10 +95,10 @@ export class InMemoryProcessRepository implements ProcessRepository {
     this.workflowDefinitions.set(key, { ...def, archived });
   }
 
-  async setWorkflowVisibility(name: string, visibility: 'public' | 'private'): Promise<void> {
+  async setWorkflowVisibility(name: string, namespace: string, visibility: 'public' | 'private'): Promise<void> {
     let found = false;
     for (const [key, def] of this.workflowDefinitions) {
-      if (def.name === name) {
+      if (def.name === name && def.namespace === namespace) {
         this.workflowDefinitions.set(key, { ...def, visibility });
         found = true;
       }
@@ -119,15 +106,15 @@ export class InMemoryProcessRepository implements ProcessRepository {
     if (!found) throw new Error(`Workflow '${name}' not found`);
   }
 
-  async setWorkflowDeleted(_name: string, _deleted: boolean): Promise<void> {
+  async setWorkflowDeleted(_name: string, _namespace: string, _deleted: boolean): Promise<void> {
     // No-op in test double
   }
 
-  async isWorkflowNameDeleted(_name: string): Promise<boolean> {
+  async isWorkflowNameDeleted(_name: string, _namespace: string): Promise<boolean> {
     return false;
   }
 
-  async countInstancesByDefinitionName(_name: string): Promise<number> {
+  async countInstancesByDefinitionName(_name: string, _namespace: string): Promise<number> {
     return 0;
   }
 

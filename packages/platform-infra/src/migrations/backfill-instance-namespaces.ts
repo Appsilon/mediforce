@@ -37,11 +37,12 @@ export async function backfillInstanceNamespaces(
     const defName = data.definitionName as string;
 
     if (!namespaceCache.has(defName)) {
-      const latestVersion = await processRepo.getLatestWorkflowVersion(defName);
+      const latestVersion = await processRepo.getLatestWorkflowVersion(defName, '');
       if (latestVersion === 0) {
         namespaceCache.set(defName, null);
       } else {
-        const def = await processRepo.getWorkflowDefinition(defName, latestVersion);
+        // Legacy migration: try empty namespace first (old doc IDs), then query-based
+        const def = await processRepo.getWorkflowDefinition('', defName, latestVersion);
         namespaceCache.set(defName, def?.namespace ?? null);
       }
     }

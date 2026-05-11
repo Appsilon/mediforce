@@ -37,6 +37,7 @@ export class WebhookTrigger {
     }
 
     const instance = await this.engine.createInstance(
+      context.namespace,
       context.definitionName,
       context.definitionVersion,
       context.triggeredBy,

@@ -9,7 +9,7 @@ import { getApp } from 'firebase/app';
 
 type WorkflowDefinitionDoc = WorkflowDefinition & { id: string };
 
-export function useWorkflowDefinitions(name: string) {
+export function useWorkflowDefinitions(name: string, namespace: string) {
   const constraints = useMemo(
     () => [where('name', '==', name)],
     [name],
@@ -22,35 +22,33 @@ export function useWorkflowDefinitions(name: string) {
 
   const definitions = useMemo(() => {
     return wfData
-      .filter((d) => !d.deleted)
+      .filter((d) => !d.deleted && d.namespace === namespace)
       .sort((a, b) => b.version - a.version);
-  }, [wfData]);
+  }, [wfData, namespace]);
 
   const latestVersion = definitions[0]?.version ?? 0;
 
-  // Default version from workflowMeta/{name}
   const [defaultVersion, setDefaultVersionState] = useState<number | null>(null);
 
   const refreshDefault = useCallback(async () => {
-    if (!name) return;
+    if (!name || !namespace) return;
     try {
       const db = getFirestore(getApp());
-      const metaRef = doc(db, 'workflowMeta', name);
+      const metaRef = doc(db, 'workflowMeta', `${namespace}:${name}`);
       const snap = await getDoc(metaRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        setDefaultVersionState(typeof data.defaultVersion === 'number' ? data.defaultVersion : null);
-      } else {
+      if (!snap.exists()) {
         setDefaultVersionState(null);
+        return;
       }
+      const data = snap.data();
+      setDefaultVersionState(typeof data?.defaultVersion === 'number' ? data.defaultVersion : null);
     } catch {
       setDefaultVersionState(null);
     }
-  }, [name]);
+  }, [name, namespace]);
 
   useEffect(() => { refreshDefault(); }, [refreshDefault]);
 
-  // Effective version for running: default if set, otherwise latest
   const effectiveVersion = defaultVersion ?? latestVersion;
 
   return { definitions, latestVersion, defaultVersion, effectiveVersion, loading, error: wfError, refreshDefault };

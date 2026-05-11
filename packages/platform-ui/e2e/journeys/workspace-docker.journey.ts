@@ -140,7 +140,7 @@ test.describe('Docker-backed workspace E2E', () => {
     // 2. Trigger a run.
     const triggerRes = await request.post('/api/processes', {
       headers: AUTH,
-      data: { definitionName: wdName, triggeredBy: 'e2e-docker-test' },
+      data: { namespace: TEST_ORG_HANDLE, definitionName: wdName, triggeredBy: 'e2e-docker-test' },
     });
     expect(triggerRes.status(), await triggerRes.text()).toBe(201);
     const { instanceId } = (await triggerRes.json()) as { instanceId: string };

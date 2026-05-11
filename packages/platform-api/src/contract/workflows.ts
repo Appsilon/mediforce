@@ -104,6 +104,30 @@ export const SetVisibilityOutputSchema = z.object({
 export type SetVisibilityInput = z.infer<typeof SetVisibilityInputSchema>;
 export type SetVisibilityOutput = z.infer<typeof SetVisibilityOutputSchema>;
 
+export const CopyWorkflowInputSchema = z.object({
+  name: z.string().min(1),
+  version: z.number().int().positive().optional(),
+  targetName: z.string().min(1).optional(),
+});
+
+export const CopyWorkflowOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string().min(1),
+  version: z.number().int().positive(),
+  copiedFrom: z.object({
+    namespace: z.string().min(1),
+    name: z.string().min(1),
+    version: z.number().int().positive(),
+  }),
+});
+
+export type CopyWorkflowInput = z.infer<typeof CopyWorkflowInputSchema>;
+export type CopyWorkflowOutput = z.infer<typeof CopyWorkflowOutputSchema>;
+
+export interface CopyWorkflowOptions {
+  targetNamespace: string;
+}
+
 /**
  * Options for `mediforce.workflows.register()`. Namespace is a required
  * query parameter on the wire — modeled here as a separate options arg

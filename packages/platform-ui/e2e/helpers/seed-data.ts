@@ -121,6 +121,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   const processInstances: Record<string, Record<string, unknown>> = {
     'proc-running-1': {
       id: 'proc-running-1',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -140,6 +141,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // Dedicated instance for cancel-run test — isolated so cancelling doesn't affect other tests
     'proc-cancel-target': {
       id: 'proc-cancel-target',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -158,6 +160,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'proc-paused-1': {
       id: 'proc-paused-1',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -176,6 +179,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'proc-completed-1': {
       id: 'proc-completed-1',
+      namespace: 'test',
       definitionName: 'Data Quality Review',
       definitionVersion: '2.1.0',
       configName: 'all-human',
@@ -194,6 +198,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'proc-failed-1': {
       id: 'proc-failed-1',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -213,6 +218,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // Pre-seeded cancelled run — used by status-badges test to verify Cancelled badge
     'proc-cancelled-1': {
       id: 'proc-cancelled-1',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -231,6 +237,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'proc-completed-2': {
       id: 'proc-completed-2',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -249,6 +256,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'proc-human-waiting': {
       id: 'proc-human-waiting',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -269,6 +277,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // task does not pollute the proc-human-waiting used by workflow-status-badges.
     'proc-review-target': {
       id: 'proc-review-target',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1.0.0',
       configName: 'all-human',
@@ -288,6 +297,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // New-style run — uses WorkflowDefinition (no configName/configVersion)
     'proc-workflow-run-1': {
       id: 'proc-workflow-run-1',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1',
       status: 'running',
@@ -304,6 +314,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     'proc-upload-waiting': {
       id: 'proc-upload-waiting',
+      namespace: 'test',
       definitionName: 'Protocol to TFL',
       definitionVersion: '0.1.0',
       configName: 'default',
@@ -325,6 +336,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // button are all visible without triggering any actual retry.
     'proc-step-failure': {
       id: 'proc-step-failure',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1',
       status: 'paused',
@@ -346,6 +358,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // with waiting_for_human. No plugin or Docker involved.
     'proc-retry-test': {
       id: 'proc-retry-test',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1',
       status: 'paused',
@@ -364,6 +377,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     // cancelling does not pollute the retry journey.
     'proc-agent-escalated-cancel': {
       id: 'proc-agent-escalated-cancel',
+      namespace: 'test',
       definitionName: 'Supply Chain Review',
       definitionVersion: '1',
       status: 'paused',
@@ -886,7 +900,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     //   summarize       adds report/summary.md
     //
     // You can `git log`, `git diff`, and inspect the per-step artifacts.
-    'Sales CSV Report:1': {
+    'test:Sales CSV Report:1': {
       name: 'Sales CSV Report',
       namespace: 'test',
       version: 1,
@@ -954,7 +968,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       triggers: [{ type: 'manual', name: 'start' }],
       createdAt: twoDaysAgo,
     },
-    'Supply Chain Review:1': {
+    'test:Supply Chain Review:1': {
       name: 'Supply Chain Review',
       namespace: 'test',
       version: 1,
@@ -982,7 +996,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       triggers: [{ type: 'manual', name: 'start-review-cycle' }],
       createdAt: twoDaysAgo,
     },
-    'Data Quality Review:2': {
+    'test:Data Quality Review:2': {
       name: 'Data Quality Review',
       namespace: 'test',
       version: 2,
@@ -1139,7 +1153,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
 
   // Minimal workflow with one agent step referencing `mcp-test-agent`, used
   // only by step-mcp-restrictions.journey.ts.
-  workflowDefinitions['MCP Restrictions Test:1'] = {
+  workflowDefinitions['test:MCP Restrictions Test:1'] = {
     name: 'MCP Restrictions Test',
     namespace: 'test',
     version: 1,
@@ -1228,6 +1242,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   // Process instance paused for cowork
   processInstances['proc-cowork-paused'] = {
     id: 'proc-cowork-paused',
+    namespace: 'test',
     definitionName: 'Workflow Designer',
     definitionVersion: '1',
     status: 'paused',
@@ -1244,7 +1259,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   // Workflow definition with a cowork step
-  workflowDefinitions['Workflow Designer:1'] = {
+  workflowDefinitions['test:Workflow Designer:1'] = {
     name: 'Workflow Designer',
     namespace: 'test',
     version: 1,
@@ -1279,7 +1294,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
-  workflowDefinitions['Diagram Branch Accordion:1'] = {
+  workflowDefinitions['test:Diagram Branch Accordion:1'] = {
     name: 'Diagram Branch Accordion',
     namespace: 'test',
     version: 1,
@@ -1302,7 +1317,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
-  workflowDefinitions['Diagram Back Edge:1'] = {
+  workflowDefinitions['test:Diagram Back Edge:1'] = {
     name: 'Diagram Back Edge',
     namespace: 'test',
     version: 1,
@@ -1328,7 +1343,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
-  workflowDefinitions['Trigger Input Test:1'] = {
+  workflowDefinitions['test:Trigger Input Test:1'] = {
     name: 'Trigger Input Test',
     namespace: 'test',
     version: 1,

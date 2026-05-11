@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, Eye, EyeOff, Copy } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
@@ -13,6 +13,7 @@ import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { setProcessArchived, transferWorkflowNamespace } from '@/app/actions/definitions';
 import { apiFetch } from '@/lib/api-fetch';
+import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { VersionLabel } from '@/components/ui/version-label';
 import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
 import { formatCron } from '@/lib/format-cron';
@@ -47,7 +48,16 @@ export default function ProcessDefinitionPage() {
 
 function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: string }) {
   const decodedName = decodeURIComponent(name);
+  const router = useRouter();
   const { definition, loading, error } = useWorkflowDefinitionApi(handle, decodedName);
+  const { firebaseUser } = useAuth();
+  const { namespaces } = useAllUserNamespaces(firebaseUser?.uid);
+
+  const [copyOpen, setCopyOpen] = React.useState(false);
+  const [copyTarget, setCopyTarget] = React.useState('');
+  const [copyName, setCopyName] = React.useState('');
+  const [copying, setCopying] = React.useState(false);
+  const [copyError, setCopyError] = React.useState('');
 
   if (loading) {
     return (
@@ -71,34 +81,95 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
   return (
     <div className="flex flex-1 flex-col gap-0">
       <div className="border-b px-6 py-4">
-        <div>
-          {definition.description && (
-            <p className="text-sm text-muted-foreground mt-0.5">{definition.description}</p>
-          )}
-          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-            {definition.namespace && (
-              <>
-                <span className="flex items-center gap-1">
-                  Owned by{' '}
-                  <Link
-                    href={`/${definition.namespace}`}
-                    className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-500/20 transition-colors"
-                  >
-                    @{definition.namespace}
-                  </Link>
-                </span>
-                <span className="text-border">&middot;</span>
-              </>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            {definition.description && (
+              <p className="text-sm text-muted-foreground mt-0.5">{definition.description}</p>
             )}
-            <span className="flex items-center gap-1">
-              <Layers className="h-3 w-3" />
-              {definition.steps.length} steps
-            </span>
-            <RepoLink definition={definition} />
-            <AppLink definition={definition} />
+            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              {definition.namespace && (
+                <>
+                  <span className="flex items-center gap-1">
+                    Owned by{' '}
+                    <Link
+                      href={`/${definition.namespace}`}
+                      className="rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-500/20 transition-colors"
+                    >
+                      @{definition.namespace}
+                    </Link>
+                  </span>
+                  <span className="text-border">&middot;</span>
+                </>
+              )}
+              <span className="flex items-center gap-1">
+                <Layers className="h-3 w-3" />
+                {definition.steps.length} steps
+              </span>
+              <RepoLink definition={definition} />
+              <AppLink definition={definition} />
+            </div>
           </div>
+
+          {namespaces.length > 0 && (
+            <button
+              onClick={() => {
+                setCopyName(decodedName);
+                setCopyError('');
+                setCopyOpen(true);
+              }}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors',
+                'hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Copy to...
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Copy to namespace dialog */}
+      {copyOpen && (
+        <CopyWorkflowDialog
+          decodedName={decodedName}
+          namespaces={namespaces}
+          copyTarget={copyTarget}
+          setCopyTarget={(v) => { setCopyTarget(v); setCopyError(''); }}
+          copyName={copyName}
+          setCopyName={(v) => { setCopyName(v); setCopyError(''); }}
+          copyError={copyError}
+          copying={copying}
+          onCancel={() => { setCopyOpen(false); setCopyTarget(''); setCopyName(''); setCopyError(''); }}
+          onCopy={async () => {
+            if (!copyTarget || !copyName.trim()) return;
+            setCopying(true);
+            setCopyError('');
+            try {
+              const qs = new URLSearchParams({ targetNamespace: copyTarget, namespace: handle });
+              const body: Record<string, unknown> = {};
+              if (copyName !== decodedName) body.targetName = copyName;
+              const res = await apiFetch(
+                `/api/workflow-definitions/${encodeURIComponent(decodedName)}/copy?${qs}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body),
+                },
+              );
+              if (res.ok) {
+                setCopyOpen(false);
+                router.push(`/${copyTarget}/workflows/${encodeURIComponent(copyName)}`);
+              } else {
+                const data = await res.json().catch(() => null);
+                setCopyError(data?.error ?? 'Copy failed');
+              }
+            } finally {
+              setCopying(false);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -113,8 +184,8 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [activeTab, setActiveTab] = React.useState(initialTab);
   const [showArchivedRuns, setShowArchivedRuns] = React.useState(false);
 
-  const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName);
-  const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns);
+  const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName, handle);
+  const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns, handle);
   const { data: activeTasks } = useMyTasks(null);
 
   const activeTaskByInstance = React.useMemo(() => {
@@ -137,6 +208,12 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [transferTarget, setTransferTarget] = React.useState('');
   const [transferring, setTransferring] = React.useState(false);
   const [togglingVisibility, setTogglingVisibility] = React.useState(false);
+  const [copyOpen, setCopyOpen] = React.useState(false);
+  const [copyTarget, setCopyTarget] = React.useState('');
+  const [copyName, setCopyName] = React.useState('');
+  const [copyVersion, setCopyVersion] = React.useState<number | null>(null);
+  const [copying, setCopying] = React.useState(false);
+  const [copyError, setCopyError] = React.useState('');
   const [namespaceOverride, setNamespaceOverride] = React.useState<string | null>(null);
   const [visibilityOverride, setVisibilityOverride] = React.useState<'public' | 'private' | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
@@ -214,6 +291,21 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                   <span className="text-border">·</span>
                 </>
               )}
+              {(latest as WorkflowDefinition | null)?.copiedFrom && (
+                <>
+                  <span className="flex items-center gap-1">
+                    <Copy className="h-3 w-3" />
+                    Copied from{' '}
+                    <Link
+                      href={`/${(latest as WorkflowDefinition).copiedFrom!.namespace}/workflows/${encodeURIComponent((latest as WorkflowDefinition).copiedFrom!.name)}`}
+                      className="rounded-full bg-purple-500/10 px-1.5 py-0.5 text-[11px] font-medium text-purple-600 hover:bg-purple-500/20 transition-colors"
+                    >
+                      @{(latest as WorkflowDefinition).copiedFrom!.namespace}/{(latest as WorkflowDefinition).copiedFrom!.name} v{(latest as WorkflowDefinition).copiedFrom!.version}
+                    </Link>
+                  </span>
+                  <span className="text-border">·</span>
+                </>
+              )}
               {latest && <VersionLabel version={latest.version} title={latest.title} />}
               <span className="flex items-center gap-1">
                 <Layers className="h-3 w-3" />
@@ -249,7 +341,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     const willArchive = !latest?.archived;
                     setMenuOpen(false);
                     setArchiving(true);
-                    await setProcessArchived(decodedName, willArchive);
+                    await setProcessArchived(decodedName, handle, willArchive);
                     setArchiving(false);
                     if (willArchive) {
                       router.push(`/${handle}`);
@@ -281,7 +373,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     setMenuOpen(false);
                     setTogglingVisibility(true);
                     try {
-                      const res = await apiFetch(`/api/workflow-definitions/${encodeURIComponent(decodedName)}`, {
+                      const res = await apiFetch(`/api/workflow-definitions/${encodeURIComponent(decodedName)}?namespace=${encodeURIComponent(handle)}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ visibility: newVisibility }),
@@ -322,6 +414,23 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 >
                   <ArrowRightLeft className="h-3.5 w-3.5" />
                   Transfer
+                </button>
+
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setCopyName(decodedName);
+                    setCopyVersion(null);
+                    setCopyError('');
+                    setCopyOpen(true);
+                  }}
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors',
+                    'hover:bg-accent hover:text-accent-foreground',
+                  )}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy to...
                 </button>
 
                 <div className="my-1 border-t" />
@@ -425,10 +534,59 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
       <DeleteWorkflowDialog
         workflowName={decodedName}
+        namespace={handle}
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onDeleted={() => router.push(`/${handle}`)}
       />
+
+      {/* Copy to namespace dialog */}
+      {copyOpen && (
+        <CopyWorkflowDialog
+          decodedName={decodedName}
+          namespaces={namespaces}
+          copyTarget={copyTarget}
+          setCopyTarget={(v) => { setCopyTarget(v); setCopyError(''); }}
+          copyName={copyName}
+          setCopyName={(v) => { setCopyName(v); setCopyError(''); }}
+          copyError={copyError}
+          copying={copying}
+          versions={versions}
+          copyVersion={copyVersion}
+          setCopyVersion={setCopyVersion}
+          onCancel={() => { setCopyOpen(false); setCopyTarget(''); setCopyName(''); setCopyError(''); }}
+          onCopy={async () => {
+            if (!copyTarget || !copyName.trim()) return;
+            setCopying(true);
+            setCopyError('');
+            try {
+              const qs = new URLSearchParams({ targetNamespace: copyTarget, namespace: handle });
+              const body: Record<string, unknown> = {};
+              if (copyName !== decodedName) body.targetName = copyName;
+              if (copyVersion !== null) body.version = copyVersion;
+              const res = await apiFetch(
+                `/api/workflow-definitions/${encodeURIComponent(decodedName)}/copy?${qs}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body),
+                },
+              );
+              if (res.ok) {
+                setCopyOpen(false);
+                setCopyTarget('');
+                setCopyName('');
+                router.push(`/${copyTarget}/workflows/${encodeURIComponent(copyName)}`);
+              } else {
+                const data = await res.json().catch(() => null);
+                setCopyError(data?.error ?? 'Copy failed');
+              }
+            } finally {
+              setCopying(false);
+            }
+          }}
+        />
+      )}
 
       {/* Transfer namespace dialog */}
       {transferOpen && (
@@ -526,5 +684,115 @@ function AppLink({ definition }: { definition: { url?: string } | null }) {
       <ExternalLink className="h-3 w-3" />
       App
     </a>
+  );
+}
+
+function CopyWorkflowDialog({
+  decodedName,
+  namespaces,
+  copyTarget,
+  setCopyTarget,
+  copyName,
+  setCopyName,
+  copyError,
+  copying,
+  versions,
+  copyVersion,
+  setCopyVersion,
+  onCancel,
+  onCopy,
+}: {
+  decodedName: string;
+  namespaces: { handle: string; displayName?: string | null }[];
+  copyTarget: string;
+  setCopyTarget: (v: string) => void;
+  copyName: string;
+  setCopyName: (v: string) => void;
+  copyError: string;
+  copying: boolean;
+  versions?: { version: number; title?: string }[];
+  copyVersion?: number | null;
+  setCopyVersion?: (v: number | null) => void;
+  onCancel: () => void;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-sm rounded-lg border bg-popover p-6 shadow-lg">
+        <h3 className="text-base font-semibold mb-1">Copy to namespace</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Copy <span className="font-mono">{decodedName}</span> to another namespace.
+        </p>
+        <label className="block text-sm font-medium mb-1">Target namespace</label>
+        <select
+          value={copyTarget}
+          onChange={(e) => setCopyTarget(e.target.value)}
+          className={cn(
+            'w-full rounded-md border bg-background px-3 py-1.5 text-sm outline-none mb-3',
+            'focus:ring-1 focus:ring-ring focus:border-ring',
+          )}
+        >
+          <option value="">Select namespace...</option>
+          {namespaces.map((ns) => (
+            <option key={ns.handle} value={ns.handle}>
+              {ns.displayName ?? ns.handle} (@{ns.handle})
+            </option>
+          ))}
+        </select>
+        <label className="block text-sm font-medium mb-1">Workflow name</label>
+        <input
+          type="text"
+          value={copyName}
+          onChange={(e) => setCopyName(e.target.value)}
+          className={cn(
+            'w-full rounded-md border bg-background px-3 py-1.5 text-sm outline-none mb-3',
+            'focus:ring-1 focus:ring-ring focus:border-ring',
+            copyError && 'border-destructive',
+          )}
+        />
+        {copyError && (
+          <p className="text-xs text-destructive mb-3">{copyError}</p>
+        )}
+        {versions && versions.length > 0 && setCopyVersion && (
+          <>
+            <label className="block text-sm font-medium mb-1">Version</label>
+            <select
+              value={copyVersion ?? ''}
+              onChange={(e) => setCopyVersion(e.target.value ? Number(e.target.value) : null)}
+              className={cn(
+                'w-full rounded-md border bg-background px-3 py-1.5 text-sm outline-none mb-4',
+                'focus:ring-1 focus:ring-ring focus:border-ring',
+              )}
+            >
+              <option value="">Latest</option>
+              {versions.map((v) => (
+                <option key={v.version} value={v.version}>
+                  v{v.version}{v.title ? ` — ${v.title}` : ''}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="rounded-md px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onCopy}
+            disabled={!copyTarget || !copyName.trim() || copying}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              'bg-primary text-primary-foreground hover:bg-primary/90',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+            )}
+          >
+            {copying ? 'Copying...' : 'Copy'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

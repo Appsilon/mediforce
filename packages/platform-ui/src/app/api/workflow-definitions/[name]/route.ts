@@ -9,6 +9,7 @@ export async function GET(
 ): Promise<NextResponse> {
   const { name } = await params;
   const versionParam = request.nextUrl.searchParams.get('version');
+  const namespaceParam = request.nextUrl.searchParams.get('namespace');
 
   const { processRepo, namespaceRepo } = getPlatformServices();
   const caller = await resolveCallerIdentity(request, namespaceRepo);
@@ -24,7 +25,7 @@ export async function GET(
       );
     }
   } else {
-    version = await processRepo.getLatestWorkflowVersion(name);
+    version = await processRepo.getLatestWorkflowVersion(name, namespaceParam ?? '');
     if (version === 0) {
       return NextResponse.json(
         { error: `Workflow '${name}' not found` },
@@ -33,7 +34,9 @@ export async function GET(
     }
   }
 
-  const definition = await processRepo.getWorkflowDefinition(name, version);
+  const lookupNamespace = namespaceParam ?? '';
+
+  const definition = await processRepo.getWorkflowDefinition(lookupNamespace, name, version);
   if (definition === null) {
     return NextResponse.json(
       { error: `Workflow '${name}' not found` },
@@ -41,7 +44,6 @@ export async function GET(
     );
   }
 
-  const namespaceParam = request.nextUrl.searchParams.get('namespace');
   if (namespaceParam !== null && definition.namespace !== namespaceParam) {
     return NextResponse.json(
       { error: `Workflow '${name}' not found` },
@@ -71,11 +73,12 @@ export async function PATCH(
   const caller = await resolveCallerIdentity(request, namespaceRepo);
   if (caller instanceof NextResponse) return caller;
 
-  const latestVersion = await processRepo.getLatestWorkflowVersion(name);
+  const patchNamespace = request.nextUrl.searchParams.get('namespace') ?? '';
+  const latestVersion = await processRepo.getLatestWorkflowVersion(name, patchNamespace);
   if (latestVersion === 0) {
     return NextResponse.json({ error: `Workflow '${name}' not found` }, { status: 404 });
   }
-  const definition = await processRepo.getWorkflowDefinition(name, latestVersion);
+  const definition = await processRepo.getWorkflowDefinition(patchNamespace, name, latestVersion);
   const denied = requireNamespaceAccess(caller, definition?.namespace);
   if (denied) return denied;
 
@@ -94,7 +97,7 @@ export async function PATCH(
     );
   }
 
-  await processRepo.setWorkflowVisibility(name, parsed.data);
+  await processRepo.setWorkflowVisibility(name, definition?.namespace ?? '', parsed.data);
 
   return NextResponse.json({ success: true, name, visibility: parsed.data });
 }

@@ -60,6 +60,7 @@ export async function GET(
   const versionNumber = Number(instance.definitionVersion);
   if (Number.isInteger(versionNumber) && versionNumber > 0) {
     const definition = await processRepo.getWorkflowDefinition(
+      instance.namespace ?? '',
       instance.definitionName,
       versionNumber,
     );

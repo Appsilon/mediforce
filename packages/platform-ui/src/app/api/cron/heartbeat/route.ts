@@ -86,6 +86,7 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
 
         // Fire the cron trigger to create and start an instance
         const result = await cronTrigger.fireWorkflow({
+          namespace: def.namespace,
           definitionName: def.name,
           definitionVersion: def.version,
           triggerName: trigger.name,

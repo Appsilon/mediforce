@@ -23,7 +23,7 @@ export default function RunReportPage() {
   );
   const { data: auditEvents } = useAuditEvents(runId ?? null);
 
-  const { definitions: workflowVersions } = useWorkflowDefinitions(decodedName);
+  const { definitions: workflowVersions } = useWorkflowDefinitions(decodedName, handle);
 
   const definitionSteps = useMemo(
     () => resolveDefinitionSteps(instance, workflowVersions),

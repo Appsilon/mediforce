@@ -27,16 +27,17 @@ export async function POST(
   const caller = await resolveCallerIdentity(request, namespaceRepo);
   if (caller instanceof NextResponse) return caller;
 
-  const latestVersion = await processRepo.getLatestWorkflowVersion(name);
+  const archiveNamespace = request.nextUrl.searchParams.get('namespace') ?? '';
+  const latestVersion = await processRepo.getLatestWorkflowVersion(name, archiveNamespace);
   if (latestVersion === 0) {
     return NextResponse.json({ error: `Workflow '${name}' not found` }, { status: 404 });
   }
-  const definition = await processRepo.getWorkflowDefinition(name, latestVersion);
+  const definition = await processRepo.getWorkflowDefinition(archiveNamespace, name, latestVersion);
   const denied = requireNamespaceAccess(caller, definition?.namespace);
   if (denied) return denied;
 
   try {
-    await processRepo.setProcessArchived(name, archived);
+    await processRepo.setProcessArchived(name, archiveNamespace, archived);
     return NextResponse.json({ success: true, name, archived });
   } catch (err) {
     return NextResponse.json(

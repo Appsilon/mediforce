@@ -28,7 +28,7 @@ export default function WorkflowDefinitionVersionPage() {
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
-  const { definitions, loading } = useWorkflowDefinitions(decodedName);
+  const { definitions, loading } = useWorkflowDefinitions(decodedName, handle);
   const definition = definitions.find((def) => def.version === versionNumber) ?? null;
 
   const [editedDescription, setEditedDescription] = useState('');
@@ -100,7 +100,7 @@ export default function WorkflowDefinitionVersionPage() {
 
     if (result.success) {
       if (setAsDefault) {
-        await setDefaultWorkflowVersion(definition.name, result.version);
+        await setDefaultWorkflowVersion(definition.namespace, definition.name, result.version);
       }
       setSaveState({ status: 'saved', version: result.version });
       redirectTimerRef.current = setTimeout(() => {

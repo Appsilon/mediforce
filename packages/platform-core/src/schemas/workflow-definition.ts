@@ -395,6 +395,11 @@ export const WorkflowDefinitionBaseSchema = z.object({
   transitions: z.array(TransitionSchema),
   triggers: z.array(TriggerSchema).min(1),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  copiedFrom: z.object({
+    namespace: z.string().min(1),
+    name: z.string().min(1),
+    version: z.number().int().positive(),
+  }).optional(),
   archived: z.boolean().optional(),
   deleted: z.boolean().optional(),
   createdAt: z.string().datetime().optional(),
