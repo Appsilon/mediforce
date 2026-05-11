@@ -40,6 +40,7 @@ import { modelSyncCommand } from './commands/model-sync.js';
 import { secretSetCommand } from './commands/secret-set.js';
 import { secretListCommand } from './commands/secret-list.js';
 import { secretDeleteCommand } from './commands/secret-delete.js';
+import { whoamiCommand } from './commands/whoami.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -70,6 +71,7 @@ Commands:
   run list                                           List recent runs
   run start --workflow <name>                        Start a new run (manual trigger)
   run get <runId>                                    Fetch a single run's status
+  whoami                                              Show current identity and namespaces
   system status                                      Docker infrastructure status
   system images                                      List Docker images on host
   system rmi <imageId>                               Remove a Docker image
@@ -167,6 +169,10 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
 
   const [command, subcommand, ...rest] = args;
+
+  if (command === 'whoami') {
+    return whoamiCommand({ argv: subcommand ? [subcommand, ...rest] : rest, env: input.env, output });
+  }
 
   // Namespace-only invocation (no subcommand): print the namespaced HELP and
   // exit 2 instead of the generic `Unknown command: workflow undefined`.

@@ -134,6 +134,22 @@ export type ClientConfig =
   | (BaseClientConfig & { bearerToken: () => Promise<string | null>; apiKey?: never; fetch?: never })
   | (BaseClientConfig & { fetch: typeof fetch; apiKey?: never; bearerToken?: never });
 
+export interface WhoamiOutput {
+  kind: 'apiKey' | 'user';
+  uid?: string;
+  namespaces: string[];
+}
+
+export interface NamespaceInfo {
+  handle: string;
+  type: string;
+  displayName: string;
+}
+
+export interface ListNamespacesOutput {
+  namespaces: NamespaceInfo[];
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -186,6 +202,11 @@ export class Mediforce {
     set: (input: SetSecretInput) => Promise<SetSecretOutput>;
     list: (input: ListSecretKeysInput) => Promise<ListSecretKeysOutput>;
     delete: (input: DeleteSecretInput) => Promise<DeleteSecretOutput>;
+  };
+
+  readonly me: {
+    whoami: () => Promise<WhoamiOutput>;
+    namespaces: () => Promise<ListNamespacesOutput>;
   };
 
   readonly system: {
@@ -468,6 +489,17 @@ export class Mediforce {
         const res = await this.request(`/api/workflow-secrets${qs}`, { method: 'DELETE' });
         const body = await parseJsonOrThrow(res, 'mediforce.secrets.delete');
         return DeleteSecretOutputSchema.parse(body);
+      },
+    };
+
+    this.me = {
+      whoami: async () => {
+        const res = await this.request('/api/me');
+        return parseJsonOrThrow(res, 'mediforce.me.whoami') as Promise<WhoamiOutput>;
+      },
+      namespaces: async () => {
+        const res = await this.request('/api/me/namespaces');
+        return parseJsonOrThrow(res, 'mediforce.me.namespaces') as Promise<ListNamespacesOutput>;
       },
     };
 
