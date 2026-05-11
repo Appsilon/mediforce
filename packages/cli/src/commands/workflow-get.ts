@@ -10,13 +10,16 @@ interface CommandInput {
   output: OutputSink;
 }
 
-const HELP = `Usage: mediforce workflow get <name> [options]
+const HELP = `Usage: mediforce workflow get <name> --namespace <ns> [options]
 
 Fetch a workflow definition by name. Outputs the full definition JSON,
 suitable for editing and re-registering with \`workflow register\`.
 
 Positional:
   <name>               Workflow definition name
+
+Required flags:
+  --namespace <ns>     Namespace that owns the workflow
 
 Optional flags:
   --version <n>        Specific version (default: latest)
@@ -28,6 +31,7 @@ Optional flags:
 `;
 
 const GET_OPTIONS = {
+  namespace: { type: 'string' },
   version: { type: 'string' },
   output: { type: 'string' },
   template: { type: 'boolean' },
@@ -39,6 +43,7 @@ const GET_OPTIONS = {
 export async function workflowGetCommand(input: CommandInput): Promise<number> {
   let positionals: string[];
   let flags: {
+    namespace?: string;
     version?: string;
     output?: string;
     template?: boolean;
@@ -75,6 +80,12 @@ export async function workflowGetCommand(input: CommandInput): Promise<number> {
     return 2;
   }
 
+  const namespace = flags.namespace;
+  if (typeof namespace !== 'string' || namespace.length === 0) {
+    printError(input.output, { error: '--namespace is required' }, jsonMode);
+    return 2;
+  }
+
   const version =
     flags.version !== undefined ? Number(flags.version) : undefined;
   if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
@@ -92,7 +103,7 @@ export async function workflowGetCommand(input: CommandInput): Promise<number> {
 
   const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
   try {
-    const result = await mediforce.workflows.get({ name, version });
+    const result = await mediforce.workflows.get({ name, namespace, version });
     let output: unknown = result.definition;
 
     if (flags.template === true) {

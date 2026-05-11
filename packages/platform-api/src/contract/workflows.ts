@@ -46,6 +46,7 @@ export const ListWorkflowsOutputSchema = z.object({
 
 export const GetWorkflowInputSchema = z.object({
   name: z.string().min(1),
+  namespace: z.string().min(1),
   version: z.number().int().positive().optional(),
 });
 

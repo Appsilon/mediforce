@@ -1,14 +1,22 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown, Trash2 } from 'lucide-react';
+import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown, Trash2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { cn } from '@/lib/utils';
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
+
+interface WorkflowImageMatch {
+  name: string;
+  namespace: string;
+  title: string | undefined;
+  version: number;
+  steps: string[];
+}
 
 type SortField = 'repository' | 'size' | 'created';
 type SortDir = 'asc' | 'desc';
@@ -185,32 +193,12 @@ export default function AdminInfrastructurePage() {
                   </thead>
                   <tbody>
                     {sortedImages.map((img, idx) => (
-                      <tr key={`${img.id}-${idx}`} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-2 font-mono text-xs">{img.repository}</td>
-                        <td className="px-4 py-2">
-                          <span className={cn(
-                            'inline-block rounded-full px-2 py-0.5 text-[10px] font-medium',
-                            img.tag === 'latest'
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : 'bg-muted text-muted-foreground',
-                          )}>
-                            {img.tag}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{img.id}</td>
-                        <td className="px-4 py-2 text-right text-xs">{humanSize(img.size)}</td>
-                        <td className="px-4 py-2 text-right text-xs text-muted-foreground">{img.created}</td>
-                        <td className="px-4 py-2 text-center">
-                          <button
-                            onClick={() => handleDeleteImage(img.id)}
-                            disabled={deletingId === img.id}
-                            className="text-muted-foreground hover:text-red-500 disabled:opacity-30 transition-colors"
-                            title={`Delete ${img.repository}:${img.tag}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </td>
-                      </tr>
+                      <ImageRow
+                        key={`${img.id}-${idx}`}
+                        img={img}
+                        deleting={deletingId === img.id}
+                        onDelete={() => handleDeleteImage(img.id)}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -269,5 +257,122 @@ function DiskCard({ icon, title, count, active, size }: {
         </p>
       )}
     </div>
+  );
+}
+
+function ImageRow({ img, deleting, onDelete }: {
+  img: DockerImageInfo;
+  deleting: boolean;
+  onDelete: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [workflows, setWorkflows] = useState<WorkflowImageMatch[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWorkflows = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const imageRef = `${img.repository}:${img.tag}`;
+      const res = await apiFetch(
+        `/api/workflow-definitions/by-image?image=${encodeURIComponent(imageRef)}`,
+      );
+      if (!res.ok) {
+        setError(`Failed to load (${res.status})`);
+        return;
+      }
+      const data = await res.json();
+      setWorkflows(data.workflows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  }, [img.repository, img.tag]);
+
+  function toggle() {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && workflows === null && !loading) {
+      fetchWorkflows();
+    }
+  }
+
+  return (
+    <>
+      <tr className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+        <td className="px-4 py-2 font-mono text-xs">
+          <button
+            onClick={toggle}
+            className="inline-flex items-center gap-1 hover:text-foreground transition-colors text-left"
+          >
+            {expanded
+              ? <ChevronDown className="h-3 w-3 shrink-0" />
+              : <ChevronRight className="h-3 w-3 shrink-0" />}
+            {img.repository}
+          </button>
+        </td>
+        <td className="px-4 py-2">
+          <span className={cn(
+            'inline-block rounded-full px-2 py-0.5 text-[10px] font-medium',
+            img.tag === 'latest'
+              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+              : 'bg-muted text-muted-foreground',
+          )}>
+            {img.tag}
+          </span>
+        </td>
+        <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{img.id}</td>
+        <td className="px-4 py-2 text-right text-xs">{humanSize(img.size)}</td>
+        <td className="px-4 py-2 text-right text-xs text-muted-foreground">{img.created}</td>
+        <td className="px-4 py-2 text-center">
+          <button
+            onClick={onDelete}
+            disabled={deleting}
+            className="text-muted-foreground hover:text-red-500 disabled:opacity-30 transition-colors"
+            title={`Delete ${img.repository}:${img.tag}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="border-b last:border-0">
+          <td colSpan={6} className="px-4 py-3 bg-muted/20">
+            {loading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading workflows...
+              </div>
+            )}
+            {error && (
+              <p className="text-xs text-red-500">{error}</p>
+            )}
+            {workflows !== null && !loading && (
+              workflows.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No workflows use this image.</p>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">
+                    Used by {workflows.length} workflow{workflows.length !== 1 ? 's' : ''}
+                  </p>
+                  {workflows.map((wf) => (
+                    <div key={`${wf.namespace}:${wf.name}`} className="flex items-center gap-2 text-xs">
+                      <span className="font-mono">{wf.namespace}/{wf.name}</span>
+                      {wf.title && <span className="text-muted-foreground">— {wf.title}</span>}
+                      <span className="text-muted-foreground">v{wf.version}</span>
+                      <span className="text-muted-foreground">
+                        ({wf.steps.length} step{wf.steps.length !== 1 ? 's' : ''})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }

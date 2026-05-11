@@ -53,7 +53,7 @@ const HELP = `Usage: mediforce <command> [options]
 Commands:
   workflow register --file <path> --namespace <ns>   Register a workflow definition
   workflow list                                      List registered workflow definitions
-  workflow get <name>                                Fetch a workflow definition
+  workflow get <name> --namespace <ns>               Fetch a workflow definition
   workflow set-visibility <name> --visibility <v>    Set workflow visibility (public|private)
   workflow copy <name> --target-namespace <ns>       Copy workflow to another namespace
   workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
