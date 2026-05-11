@@ -4,9 +4,9 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
+  const { agentDefinitionRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const agents = await agentDefinitionRepo.list();
@@ -20,9 +20,9 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
+  const { agentDefinitionRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const body = await request.json();

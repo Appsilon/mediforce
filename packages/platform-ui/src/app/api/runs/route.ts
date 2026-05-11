@@ -22,8 +22,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const { workflow, status, limit } = parseResult.data;
 
   try {
-    const { instanceRepo, namespaceRepo } = getPlatformServices();
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    const { instanceRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
+    const caller = await resolveCallerIdentity(req, namespaceRepo, apiKeyRepo);
     if (caller instanceof NextResponse) return caller;
 
     const instances = await instanceRepo.list({

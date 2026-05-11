@@ -7,9 +7,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
-  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
+  const { agentDefinitionRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const agent = await agentDefinitionRepo.getById(id);

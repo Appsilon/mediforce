@@ -31,8 +31,8 @@ export async function POST(
     );
   }
 
-  const { processRepo, namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const { processRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const versionArchiveNamespace = request.nextUrl.searchParams.get('namespace') ?? '';

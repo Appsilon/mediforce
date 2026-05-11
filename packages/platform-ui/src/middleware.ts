@@ -41,7 +41,9 @@ function isOriginAllowed(origin: string): boolean {
 function hasValidApiKey(req: NextRequest): boolean {
   const provided = req.headers.get('X-Api-Key');
   const expected = process.env.PLATFORM_API_KEY;
-  return Boolean(provided) && Boolean(expected) && provided === expected;
+  const isGlobalKey = Boolean(provided) && Boolean(expected) && provided === expected;
+  const isPerUserKey = Boolean(provided) && provided!.startsWith('mf_') && provided!.length >= 40;
+  return isGlobalKey || isPerUserKey;
 }
 
 function extractBearer(req: NextRequest): string | null {

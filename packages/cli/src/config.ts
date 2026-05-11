@@ -31,7 +31,7 @@ export function resolveApiKey(env: Record<string, string | undefined>): string {
     return fromPlatform;
   }
   throw new Error(
-    'mediforce: missing API key. Set MEDIFORCE_API_KEY (or PLATFORM_API_KEY).',
+    'mediforce: missing API key. Set MEDIFORCE_API_KEY to your personal API key (create one in Settings > API Keys).',
   );
 }
 

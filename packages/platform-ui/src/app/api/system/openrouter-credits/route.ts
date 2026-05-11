@@ -36,9 +36,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const { namespace } = parsed.data;
-  const { namespaceRepo, namespaceSecretsRepo } = getPlatformServices();
+  const { namespaceRepo, namespaceSecretsRepo, apiKeyRepo } = getPlatformServices();
 
-  const caller = await resolveCallerIdentity(req, namespaceRepo);
+  const caller = await resolveCallerIdentity(req, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
   if (!callerCanAccess(caller, namespace)) {
     return NextResponse.json({ ...EMPTY, error: 'Forbidden' }, { status: 403 });

@@ -31,10 +31,10 @@ export async function POST(
 
     const comment = body.comment ?? '';
 
-    const { humanTaskRepo, instanceRepo, auditRepo, engine, namespaceRepo } =
+    const { humanTaskRepo, instanceRepo, auditRepo, engine, namespaceRepo, apiKeyRepo } =
       getPlatformServices();
 
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    const caller = await resolveCallerIdentity(req, namespaceRepo, apiKeyRepo);
     if (caller instanceof NextResponse) return caller;
 
     // 1. Load and validate task

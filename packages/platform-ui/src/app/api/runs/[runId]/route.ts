@@ -23,9 +23,9 @@ export async function GET(
   { params }: { params: Promise<{ runId: string }> },
 ): Promise<NextResponse> {
   const { runId } = await params;
-  const { instanceRepo, processRepo, namespaceRepo } = getPlatformServices();
+  const { instanceRepo, processRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-  const caller = await resolveCallerIdentity(req, namespaceRepo);
+  const caller = await resolveCallerIdentity(req, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const instance = await instanceRepo.getById(runId);

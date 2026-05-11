@@ -11,8 +11,8 @@ export async function GET(
   const versionParam = request.nextUrl.searchParams.get('version');
   const namespaceParam = request.nextUrl.searchParams.get('namespace');
 
-  const { processRepo, namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const { processRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   let version: number;
@@ -69,8 +69,8 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const { name } = await params;
 
-  const { processRepo, namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const { processRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const patchNamespace = request.nextUrl.searchParams.get('namespace') ?? '';

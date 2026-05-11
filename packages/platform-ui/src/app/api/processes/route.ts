@@ -16,9 +16,9 @@ interface StartWorkflowBody {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body = (await req.json()) as StartWorkflowBody;
-    const { manualTrigger, processRepo, namespaceRepo } = getPlatformServices();
+    const { manualTrigger, processRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
+    const caller = await resolveCallerIdentity(req, namespaceRepo, apiKeyRepo);
     if (caller instanceof NextResponse) return caller;
 
     const requestNamespace = body.namespace ?? '';
@@ -65,12 +65,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    const triggeredBy = caller.kind === 'user' ? caller.uid : body.triggeredBy;
+
     const result = await manualTrigger.fireWorkflow({
       namespace: definition.namespace,
       definitionName: body.definitionName,
       definitionVersion: version,
       triggerName: body.triggerName ?? 'manual',
-      triggeredBy: body.triggeredBy,
+      triggeredBy,
       payload,
     });
 
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       },
       body: JSON.stringify({
         appContext: payload,
-        triggeredBy: body.triggeredBy,
+        triggeredBy,
       }),
     }).catch((err) => {
       console.error(`[auto-runner] Failed to trigger run for ${result.instanceId}:`, err);

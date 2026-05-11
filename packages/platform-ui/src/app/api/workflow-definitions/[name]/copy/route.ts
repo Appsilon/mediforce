@@ -9,8 +9,8 @@ export async function POST(
 ): Promise<NextResponse> {
   const { name: sourceName } = await params;
 
-  const { processRepo, namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const { processRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const targetNamespace = request.nextUrl.searchParams.get('targetNamespace');

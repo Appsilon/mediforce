@@ -12,8 +12,8 @@ import { resolveCallerIdentity, requireNamespaceAccess, callerCanAccess } from '
  * the Workflow Designer edit flow.
  */
 export async function GET(request: Request): Promise<NextResponse> {
-  const { processRepo, namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const { processRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const url = new URL(request.url);
@@ -59,8 +59,8 @@ export async function GET(request: Request): Promise<NextResponse> {
  * It overrides any `namespace` field in the request body.
  */
 export async function POST(request: Request): Promise<NextResponse> {
-  const { namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
+  const { namespaceRepo, apiKeyRepo } = getPlatformServices();
+  const caller = await resolveCallerIdentity(request, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   const url = new URL(request.url);

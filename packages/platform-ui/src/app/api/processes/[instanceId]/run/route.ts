@@ -18,9 +18,9 @@ export async function POST(
   { params }: { params: Promise<{ instanceId: string }> },
 ): Promise<NextResponse> {
   const { instanceId } = await params;
-  const { instanceRepo, processRepo, auditRepo, namespaceRepo } = getPlatformServices();
+  const { instanceRepo, processRepo, auditRepo, namespaceRepo, apiKeyRepo } = getPlatformServices();
 
-  const caller = await resolveCallerIdentity(req, namespaceRepo);
+  const caller = await resolveCallerIdentity(req, namespaceRepo, apiKeyRepo);
   if (caller instanceof NextResponse) return caller;
 
   let stepsExecuted = 0;

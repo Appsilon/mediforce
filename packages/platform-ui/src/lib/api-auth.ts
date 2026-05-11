@@ -1,24 +1,40 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth } from '@mediforce/platform-infra';
-import type { FirestoreNamespaceRepository } from '@mediforce/platform-infra';
+import type { FirestoreNamespaceRepository, FirestoreApiKeyRepository } from '@mediforce/platform-infra';
+import { hashApiKey } from '@mediforce/platform-infra';
 
 export type CallerIdentity =
   | { kind: 'apiKey' }
   | { kind: 'user'; uid: string; namespaces: Set<string> };
 
-/**
- * Resolve caller identity from request headers.
- * API-key callers get unrestricted access. Firebase-token callers get their
- * namespace membership set. Returns NextResponse 401 on auth failure.
- */
+const LAST_USED_DEBOUNCE_MS = 60 * 60 * 1000; // 1 hour
+const lastUsedCache = new Map<string, number>();
+
 export async function resolveCallerIdentity(
   request: Request,
   namespaceRepo: FirestoreNamespaceRepository,
+  apiKeyRepo?: FirestoreApiKeyRepository,
 ): Promise<CallerIdentity | NextResponse> {
-  const apiKey = request.headers.get('X-Api-Key');
+  const apiKeyHeader = request.headers.get('X-Api-Key');
   const expectedKey = process.env.PLATFORM_API_KEY;
-  if (apiKey && expectedKey && apiKey === expectedKey) {
+
+  if (apiKeyHeader && expectedKey && apiKeyHeader === expectedKey) {
     return { kind: 'apiKey' };
+  }
+
+  if (apiKeyHeader && apiKeyRepo && apiKeyHeader.startsWith('mf_')) {
+    const keyHash = hashApiKey(apiKeyHeader);
+    const storedKey = await apiKeyRepo.getByKeyHash(keyHash);
+    if (storedKey && !storedKey.revokedAt) {
+      const now = Date.now();
+      const lastTouch = lastUsedCache.get(storedKey.id) ?? 0;
+      if (now - lastTouch > LAST_USED_DEBOUNCE_MS) {
+        lastUsedCache.set(storedKey.id, now);
+        void apiKeyRepo.touchLastUsed(storedKey.id).catch(() => {});
+      }
+      const namespaces = await namespaceRepo.getNamespacesByUser(storedKey.userId);
+      return { kind: 'user', uid: storedKey.userId, namespaces: new Set(namespaces.map((ns) => ns.handle)) };
+    }
   }
 
   const authHeader = request.headers.get('Authorization') ?? '';
