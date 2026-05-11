@@ -10,18 +10,19 @@ interface CommandInput {
   output: OutputSink;
 }
 
-const HELP = `Usage: mediforce agent update <id> [options]
+const HELP = `Usage: mediforce agent skill add <id> --skill <registryId>:<name> [options]
 
-Update an agent definition. Currently supports replacing the agent's skill
-bindings via repeatable --skill flags.
+Bind one or more skills to an agent. Repeats: pass --skill multiple times.
+Existing bindings on the agent are preserved; duplicates (same registryId +
+name) are ignored. Mirrors \`git remote add\` semantics — additive, not
+replace.
 
 Positional:
   <id>                 Agent definition ID
 
-Repeatable flags:
+Required flags:
   --skill <ref>        Skill binding in the form <registryId>:<name>.
-                       Pass multiple --skill flags to bind multiple skills.
-                       The full set replaces the agent's existing bindings.
+                       Repeatable.
 
 Optional flags:
   --base-url <url>     API base URL (default: http://localhost:9003)
@@ -29,7 +30,7 @@ Optional flags:
   --help, -h           Show this help text
 `;
 
-const UPDATE_OPTIONS = {
+const OPTIONS = {
   skill: { type: 'string', multiple: true },
   'base-url': { type: 'string' },
   json: { type: 'boolean' },
@@ -45,7 +46,11 @@ function parseSkillRef(raw: string): AgentSkillRef | null {
   return { registryId, name };
 }
 
-export async function agentUpdateCommand(input: CommandInput): Promise<number> {
+function sameRef(a: AgentSkillRef, b: AgentSkillRef): boolean {
+  return a.registryId === b.registryId && a.name === b.name;
+}
+
+export async function agentSkillAddCommand(input: CommandInput): Promise<number> {
   let positionals: string[];
   let flags: {
     skill?: string[];
@@ -56,14 +61,14 @@ export async function agentUpdateCommand(input: CommandInput): Promise<number> {
   try {
     const parsed = parseArgs({
       args: input.argv,
-      options: UPDATE_OPTIONS,
+      options: OPTIONS,
       strict: true,
       allowPositionals: true,
     });
     positionals = parsed.positionals;
     flags = parsed.values;
   } catch (err) {
-    input.output.stderr(`mediforce agent update: ${String(err)}`);
+    input.output.stderr(`mediforce agent skill add: ${String(err)}`);
     input.output.stderr('');
     input.output.stderr(HELP);
     return 2;
@@ -91,7 +96,7 @@ export async function agentUpdateCommand(input: CommandInput): Promise<number> {
     return 2;
   }
 
-  const skills: AgentSkillRef[] = [];
+  const toAdd: AgentSkillRef[] = [];
   for (const raw of rawSkills) {
     const parsed = parseSkillRef(raw);
     if (parsed === null) {
@@ -102,7 +107,7 @@ export async function agentUpdateCommand(input: CommandInput): Promise<number> {
       );
       return 2;
     }
-    skills.push(parsed);
+    toAdd.push(parsed);
   }
 
   let config;
@@ -115,11 +120,19 @@ export async function agentUpdateCommand(input: CommandInput): Promise<number> {
 
   const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
   try {
-    const result = await mediforce.agents.updateSkills({ id }, { skills });
+    const existing = await mediforce.agents.get({ id });
+    const current: AgentSkillRef[] = existing.agent.skills ?? [];
+    const merged: AgentSkillRef[] = [...current];
+    for (const ref of toAdd) {
+      if (!merged.some((r) => sameRef(r, ref))) merged.push(ref);
+    }
+    const result = await mediforce.agents.updateSkills({ id }, { skills: merged });
     if (jsonMode) {
       printJson(input.output, result);
     } else {
-      input.output.stdout(`Updated agent ${id} with ${String(skills.length)} skill(s)`);
+      input.output.stdout(
+        `Added ${String(toAdd.length)} skill(s) to agent ${id} (total: ${String(merged.length)})`,
+      );
     }
     return 0;
   } catch (err) {

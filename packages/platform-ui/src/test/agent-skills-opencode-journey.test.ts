@@ -117,6 +117,7 @@ describe('Agent Skills journey — OpenCode (Phase 0 RED, target Phase 1–2)', 
     const regA = await (await registriesRoute.POST!(
       jsonRequest('POST', '/api/skill-registries', {
         name: 'SDTM',
+        namespace: 'appsilon',
         repo: { url: 'file:///tmp/sdtm', commit: 'a'.repeat(40) },
         skillsDir: 'skills',
       }),
@@ -124,6 +125,7 @@ describe('Agent Skills journey — OpenCode (Phase 0 RED, target Phase 1–2)', 
     const regB = await (await registriesRoute.POST!(
       jsonRequest('POST', '/api/skill-registries', {
         name: 'Style',
+        namespace: 'appsilon',
         repo: { url: 'file:///tmp/style', commit: 'b'.repeat(40) },
         skillsDir: 'skills',
       }),

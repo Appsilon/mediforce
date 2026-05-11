@@ -22,8 +22,8 @@ interface SkillRegistryCreateModule {
   skillRegistryCreateCommand: CliCommand;
 }
 
-interface AgentUpdateModule {
-  agentUpdateCommand: CliCommand;
+interface AgentSkillAddModule {
+  agentSkillAddCommand: CliCommand;
 }
 
 async function loadDynamic<T>(specifier: string): Promise<T> {
@@ -45,6 +45,7 @@ describe('mediforce skill-registry — Phase 0 RED, target Phase 1', () => {
           {
             id: 'reg-1',
             name: 'SDTM skills',
+            namespace: 'appsilon',
             repo: { url: 'file:///tmp/repo', commit: 'a'.repeat(40) },
             skillsDir: 'skills',
             createdAt: '2026-05-01T00:00:00Z',
@@ -82,6 +83,7 @@ describe('mediforce skill-registry — Phase 0 RED, target Phase 1', () => {
         skillRegistry: {
           id: 'reg-new',
           name: 'SDTM skills',
+          namespace: 'appsilon',
           repo: { url: 'file:///tmp/repo', commit: 'b'.repeat(40) },
           skillsDir: 'skills',
           createdAt: '2026-05-08T00:00:00Z',
@@ -94,6 +96,7 @@ describe('mediforce skill-registry — Phase 0 RED, target Phase 1', () => {
     const code = await mod.skillRegistryCreateCommand({
       argv: [
         '--name', 'SDTM skills',
+        '--namespace', 'appsilon',
         '--repo', 'file:///tmp/repo',
         '--commit', 'b'.repeat(40),
         '--skills-dir', 'skills',
@@ -114,10 +117,26 @@ describe('mediforce skill-registry — Phase 0 RED, target Phase 1', () => {
   });
 });
 
-describe('mediforce agent update --skill — Phase 0 RED, target Phase 1', () => {
-  it('PATCHes /api/agent-definitions/[id] with the new skills array', async () => {
-    const mod = await loadDynamic<AgentUpdateModule>('../commands/agent-update.js');
-    expect(typeof mod.agentUpdateCommand).toBe('function');
+describe('mediforce agent skill add — additive (git remote add pattern)', () => {
+  it('GETs existing agent, merges new skills, PATCHes the union', async () => {
+    const mod = await loadDynamic<AgentSkillAddModule>('../commands/agent-skill-add.js');
+    expect(typeof mod.agentSkillAddCommand).toBe('function');
+
+    const baseAgent = {
+      id: 'agent-1',
+      kind: 'plugin',
+      runtimeId: 'claude-code-agent',
+      name: 'Test agent',
+      iconName: 'Bot',
+      description: '',
+      foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: '',
+      inputDescription: '',
+      outputDescription: '',
+      visibility: 'private',
+      createdAt: '2026-05-08T00:00:00Z',
+      updatedAt: '2026-05-08T00:00:00Z',
+    };
 
     let patchBody: Record<string, unknown> | null = null;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
@@ -126,23 +145,20 @@ describe('mediforce agent update --skill — Phase 0 RED, target Phase 1', () =>
         patchBody = JSON.parse(init.body as string) as Record<string, unknown>;
         return jsonResponse({
           agent: {
-            id: 'agent-1',
-            kind: 'plugin',
-            runtimeId: 'claude-code-agent',
-            name: 'Test agent',
-            iconName: 'Bot',
-            description: '',
-            foundationModel: 'anthropic/claude-sonnet-4',
-            systemPrompt: '',
-            inputDescription: '',
-            outputDescription: '',
+            ...baseAgent,
             skills: [
+              { registryId: 'reg-existing', name: 'already-bound' },
               { registryId: 'reg-a', name: 'sdtmig-reference' },
               { registryId: 'reg-b', name: 'style-guide' },
             ],
-            visibility: 'private',
-            createdAt: '2026-05-08T00:00:00Z',
-            updatedAt: '2026-05-08T00:00:00Z',
+          },
+        });
+      }
+      if (u.includes('/api/agent-definitions/agent-1')) {
+        return jsonResponse({
+          agent: {
+            ...baseAgent,
+            skills: [{ registryId: 'reg-existing', name: 'already-bound' }],
           },
         });
       }
@@ -150,7 +166,7 @@ describe('mediforce agent update --skill — Phase 0 RED, target Phase 1', () =>
     });
 
     const output = captureOutput();
-    const code = await mod.agentUpdateCommand({
+    const code = await mod.agentSkillAddCommand({
       argv: [
         'agent-1',
         '--skill', 'reg-a:sdtmig-reference',
@@ -164,6 +180,7 @@ describe('mediforce agent update --skill — Phase 0 RED, target Phase 1', () =>
     expect(patchBody).not.toBeNull();
     const skills = (patchBody as unknown as { skills?: Array<{ registryId: string; name: string }> }).skills;
     expect(skills).toEqual([
+      { registryId: 'reg-existing', name: 'already-bound' },
       { registryId: 'reg-a', name: 'sdtmig-reference' },
       { registryId: 'reg-b', name: 'style-guide' },
     ]);

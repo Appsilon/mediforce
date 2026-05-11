@@ -3,17 +3,14 @@ import { UpdateSkillRegistryInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess, type CallerIdentity } from '@/lib/api-auth';
 
-function canRead(caller: CallerIdentity, registry: { namespace?: string }): NextResponse | null {
+function canRead(caller: CallerIdentity, registry: { namespace: string }): NextResponse | null {
   if (caller.kind === 'apiKey') return null;
-  if (typeof registry.namespace === 'string' && caller.namespaces.has(registry.namespace)) return null;
+  if (caller.namespaces.has(registry.namespace)) return null;
   return NextResponse.json({ error: 'Not found' }, { status: 404 });
 }
 
-function canMutate(caller: CallerIdentity, registry: { namespace?: string }): NextResponse | null {
+function canMutate(caller: CallerIdentity, registry: { namespace: string }): NextResponse | null {
   if (caller.kind === 'apiKey') return null;
-  if (typeof registry.namespace !== 'string') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
   return requireNamespaceAccess(caller, registry.namespace);
 }
 

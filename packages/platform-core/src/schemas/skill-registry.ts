@@ -35,8 +35,10 @@ export const SkillRegistrySchema = z.object({
    *  `fetchSkillsCache` / `resolveAgentSkills` `join()`s from path
    *  traversal attempts via a Registry record. */
   skillsDir: RelativePathSchema,
-  /** Workspace scoping; mirrors AgentDefinition.namespace. */
-  namespace: z.string().min(1).optional(),
+  /** Workspace scoping. Required — registries are always owned by a
+   *  workspace. Sharing across workspaces is a deferred follow-up
+   *  (per agent-skills.md §4). */
+  namespace: z.string().min(1),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

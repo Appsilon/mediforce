@@ -127,6 +127,7 @@ describe('Agent Skills journey — Claude Code (Phase 0 RED, target Phase 1–2)
     const createA = await registriesRoute.POST!(
       jsonRequest('POST', '/api/skill-registries', {
         name: 'SDTM skills',
+        namespace: 'appsilon',
         repo: { url: 'file:///tmp/repo-a', commit: 'a'.repeat(40) },
         skillsDir: 'skills',
       }),
@@ -139,6 +140,7 @@ describe('Agent Skills journey — Claude Code (Phase 0 RED, target Phase 1–2)
     const createB = await registriesRoute.POST!(
       jsonRequest('POST', '/api/skill-registries', {
         name: 'Style',
+        namespace: 'appsilon',
         repo: { url: 'file:///tmp/repo-b', commit: 'b'.repeat(40) },
         skillsDir: 'skills',
       }),

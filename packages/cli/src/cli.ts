@@ -33,7 +33,8 @@ import { agentListCommand } from './commands/agent-list.js';
 import { agentGetCommand } from './commands/agent-get.js';
 import { agentDeleteCommand } from './commands/agent-delete.js';
 import { agentSetVisibilityCommand } from './commands/agent-set-visibility.js';
-import { agentUpdateCommand } from './commands/agent-update.js';
+import { agentSkillAddCommand } from './commands/agent-skill-add.js';
+import { agentSkillRemoveCommand } from './commands/agent-skill-remove.js';
 import { skillRegistryListCommand } from './commands/skill-registry-list.js';
 import { skillRegistryCreateCommand } from './commands/skill-registry-create.js';
 import { skillRegistryGetCommand } from './commands/skill-registry-get.js';
@@ -63,7 +64,8 @@ Commands:
   workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
   agent list                                         List agent definitions
   agent get <id>                                     Fetch an agent definition
-  agent update <id> --skill <registryId>:<name>      Update an agent's skill bindings
+  agent skill add <id> --skill <registryId>:<name>   Bind one or more skills to an agent
+  agent skill remove <id> --skill <registryId>:<name>  Unbind one or more skills from an agent
   agent delete <id>                                  Delete an agent definition
   agent set-visibility <id> --visibility <v>         Set agent visibility (public|private)
   skill-registry list                                List skill registries
@@ -118,7 +120,8 @@ const AGENT_HELP = `Usage: mediforce agent <subcommand> [options]
 Subcommands:
   list                                      List agent definitions
   get <id>                                  Fetch an agent definition
-  update <id> --skill <registryId>:<name>   Update an agent's skill bindings
+  skill add <id> --skill <registryId>:<name>  Bind one or more skills to an agent (additive)
+  skill remove <id> --skill <registryId>:<name>  Unbind one or more skills from an agent
   delete <id>                               Delete an agent definition
   set-visibility <id> --visibility <v>      Set agent visibility
 
@@ -130,8 +133,8 @@ const SKILL_REGISTRY_HELP = `Usage: mediforce skill-registry <subcommand> [optio
 Subcommands:
   list                                                List skill registries
   get <id>                                            Fetch a skill registry
-  create --name <n> --repo <url> --commit <sha>       Create a skill registry
-         --skills-dir <dir> [--namespace <ns>]
+  create --name <n> --namespace <ns> --repo <url>     Create a skill registry
+         --commit <sha> --skills-dir <dir>
   update <id> [--name|--repo|--commit|--skills-dir|--namespace]
                                                       Update a skill registry
   delete <id>                                         Delete a skill registry
@@ -264,8 +267,18 @@ export async function runCli(input: RunCliInput): Promise<number> {
   if (command === 'agent' && subcommand === 'set-visibility') {
     return agentSetVisibilityCommand({ argv: rest, env: input.env, output });
   }
-  if (command === 'agent' && subcommand === 'update') {
-    return agentUpdateCommand({ argv: rest, env: input.env, output });
+  if (command === 'agent' && subcommand === 'skill') {
+    const [skillVerb, ...skillRest] = rest;
+    if (skillVerb === 'add') {
+      return agentSkillAddCommand({ argv: skillRest, env: input.env, output });
+    }
+    if (skillVerb === 'remove') {
+      return agentSkillRemoveCommand({ argv: skillRest, env: input.env, output });
+    }
+    output.stderr('mediforce agent skill: missing or unknown verb (expected: add | remove)');
+    output.stderr('');
+    output.stderr(AGENT_HELP);
+    return 2;
   }
   if (command === 'skill-registry' && subcommand === 'list') {
     return skillRegistryListCommand({ argv: rest, env: input.env, output });

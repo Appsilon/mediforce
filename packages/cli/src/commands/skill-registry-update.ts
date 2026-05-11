@@ -102,13 +102,23 @@ export async function skillRegistryUpdateCommand(input: CommandInput): Promise<n
     updateBody.skillsDir = flags['skills-dir'];
   }
   if (typeof flags.namespace === 'string' && flags.namespace.length > 0) {
-    updateBody.namespace = flags.namespace;
+    printError(
+      input.output,
+      {
+        error:
+          '--namespace is not patchable. Namespace transfers would let a caller relocate a ' +
+          'registry into a workspace they do not control. Recreate the registry under the new ' +
+          'namespace instead.',
+      },
+      jsonMode,
+    );
+    return 2;
   }
 
   if (Object.keys(updateBody).length === 0) {
     printError(
       input.output,
-      { error: 'at least one field flag must be provided (--name, --repo+--commit, --skills-dir, --namespace)' },
+      { error: 'at least one field flag must be provided (--name, --repo+--commit, --skills-dir)' },
       jsonMode,
     );
     return 2;
