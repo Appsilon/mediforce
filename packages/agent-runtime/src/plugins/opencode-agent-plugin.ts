@@ -22,6 +22,7 @@ const DEFAULT_MODEL = 'deepseek/deepseek-chat';
  */
 export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
   readonly agentName = 'OpenCode';
+  protected override readonly emitsAvailableSkillsBlock = true;
 
   readonly metadata: PluginCapabilityMetadata = {
     name: 'OpenCode Agent',

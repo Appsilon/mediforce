@@ -97,6 +97,15 @@ export interface WorkflowAgentContext {
    *  Populated by platform-ui's executeAgentStep (downloads from Storage).
    *  Injected into buildPrompt() after the workflow preamble. */
   agentIdentityPrompt?: string;
+  /** Per-run plugin directory assembled from `AgentDefinition.skills` by
+   *  resolveAgentSkills. Contains `.claude-plugin/plugin.json` + `skills/`
+   *  subtree. Claude Code mounts it via `--plugin-dir`; OpenCode reads
+   *  `/plugin/skills/<name>/SKILL.md` from the bind mount. When set,
+   *  overrides the workflow-level `step.agent.skillsDir` resolution for
+   *  the spawn-options `pluginDir`. Runtimes without native plugin-dir
+   *  discovery (OpenCode) scan the directory at prompt-build time to
+   *  emit a `## Available Skills` index. */
+  agentPluginDir?: string;
 }
 
 // EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp

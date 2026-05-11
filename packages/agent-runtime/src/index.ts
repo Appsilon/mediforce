@@ -23,6 +23,15 @@ export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin.js';
 export { MockClaudeCodeAgentPlugin } from './plugins/mock-claude-code-agent-plugin.js';
 export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin.js';
 export { ScriptContainerPlugin } from './plugins/script-container-plugin.js';
+export { resolveAgentSkills } from './plugins/resolve-agent-skills.js';
+export type {
+  ResolvedAgentSkills,
+  ResolvedAgentSkill,
+  SkillRegistryRef,
+} from './plugins/resolve-agent-skills.js';
+export { buildAvailableSkillsBlock } from './plugins/build-available-skills-block.js';
+export type { AvailableSkill } from './plugins/build-available-skills-block.js';
+export { fetchSkillsCache } from './plugins/fetch-skills-cache.js';
 export type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from './plugins/docker-spawn-strategy.js';
 
 // Runner

@@ -181,7 +181,7 @@ describe('Agent Skills journey — Claude Code (Phase 0 RED, target Phase 1–2)
     // pluginDir + parsed skill descriptions. Today this module does not
     // exist; the dynamic import throws.
     const assembler = await loadDynamic<AssemblerModule>(
-      '@mediforce/platform-ui/lib/resolve-agent-plugin-dir',
+      '@/lib/resolve-agent-plugin-dir',
     );
     expect(typeof assembler.resolveAgentPluginDir).toBe('function');
   });

@@ -24,6 +24,7 @@ import {
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
 import { resolveAgentIdentity } from './resolve-agent-identity';
+import { resolveAgentPluginDir } from './resolve-agent-plugin-dir';
 
 export interface WorkflowAgentStepResult {
   instanceId: string;
@@ -56,6 +57,7 @@ export async function executeAgentStep(
     humanTaskRepo,
     llmClient,
     agentDefinitionRepo,
+    skillRegistryRepo,
     toolCatalogRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
@@ -156,6 +158,22 @@ export async function executeAgentStep(
     }
   }
 
+  // Resolve registry-bound skills into a per-run plugin directory.
+  // Claude Code mounts it via --plugin-dir; OpenCode reads files from
+  // /plugin/skills/<name>/ and the runtime scans the dir at prompt time
+  // to render its `## Available Skills` index. Empty when the agent has
+  // no skills configured.
+  let agentPluginDir: string | undefined;
+  if (workflowStep.agentId !== undefined) {
+    const resolved = await resolveAgentPluginDir(workflowStep.agentId, {
+      agentDefinitionRepo,
+      skillRegistryRepo,
+    });
+    if (resolved !== null) {
+      agentPluginDir = resolved.pluginDir;
+    }
+  }
+
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
     processInstanceId: instanceId,
@@ -172,6 +190,7 @@ export async function executeAgentStep(
       : {}),
     oauthTokens,
     agentIdentityPrompt,
+    agentPluginDir,
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
       const result: Record<string, unknown> = {};

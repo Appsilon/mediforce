@@ -149,10 +149,10 @@ describe('Agent Skills journey — OpenCode (Phase 0 RED, target Phase 1–2)', 
     expect(agentRes.status).toBe(201);
 
     const assembler = await loadDynamic<AssemblerModule>(
-      '@mediforce/platform-ui/lib/resolve-agent-plugin-dir',
+      '@/lib/resolve-agent-plugin-dir',
     );
     const indexer = await loadDynamic<PromptIndexModule>(
-      '@mediforce/agent-runtime/build-available-skills-block',
+      '@mediforce/agent-runtime',
     );
     expect(typeof assembler.resolveAgentPluginDir).toBe('function');
     expect(typeof indexer.buildAvailableSkillsBlock).toBe('function');

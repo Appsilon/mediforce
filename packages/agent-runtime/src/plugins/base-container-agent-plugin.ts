@@ -8,6 +8,7 @@ import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, Mc
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, type ContainerPluginInit } from './container-plugin.js';
+import { buildAvailableSkillsBlock } from './build-available-skills-block.js';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token.js';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
@@ -45,6 +46,51 @@ const MONOREPO_ROOT = process.env.MEDIFORCE_ROOT ?? resolve(__dirname_base, '../
 function resolveProjectPath(relativePath: string): string {
   if (isAbsolute(relativePath)) return relativePath;
   return resolve(MONOREPO_ROOT, relativePath);
+}
+
+const FRONTMATTER_DESCRIPTION_RE = /^description:\s*(.+?)\s*$/m;
+
+/**
+ * Walk `<agentPluginDir>/skills/<name>/SKILL.md`, parse each frontmatter
+ * description, and return the list in directory order. Used by buildPrompt
+ * to render the OpenCode `## Available Skills` index without requiring the
+ * caller to thread parsed metadata through context. Missing files / unparseable
+ * frontmatter degrade to empty descriptions rather than hard-erroring — the
+ * skill is still mounted on disk and reachable via bash.
+ */
+async function readPluginDirSkills(
+  agentPluginDir: string,
+): Promise<Array<{ name: string; description: string }>> {
+  const skillsRoot = join(agentPluginDir, 'skills');
+  let names: string[];
+  try {
+    names = await readdir(skillsRoot);
+  } catch {
+    return [];
+  }
+  names.sort();
+  const skills: Array<{ name: string; description: string }> = [];
+  for (const name of names) {
+    const skillMdPath = join(skillsRoot, name, 'SKILL.md');
+    let raw: string;
+    try {
+      raw = await readFile(skillMdPath, 'utf-8');
+    } catch {
+      // No SKILL.md: skip — directory is not a skill folder.
+      continue;
+    }
+    let description = '';
+    if (raw.startsWith('---')) {
+      const end = raw.indexOf('\n---', 3);
+      if (end !== -1) {
+        const block = raw.slice(3, end);
+        const match = block.match(FRONTMATTER_DESCRIPTION_RE);
+        if (match !== null) description = match[1].trim();
+      }
+    }
+    skills.push({ name, description });
+  }
+  return skills;
 }
 
 /** Structured logger for agent runtime. Writes to stderr (captured by Docker). */
@@ -275,6 +321,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
   /** Human-readable agent name for log/status messages (e.g. "Claude Code", "OpenCode"). */
   abstract readonly agentName: string;
+
+  /** When true, buildPrompt emits a `## Available Skills` block listing each
+   *  resolved AgentDefinition skill with its frontmatter description. Set
+   *  for runtimes that lack native plugin-dir discovery (OpenCode); left
+   *  false for runtimes that consume `--plugin-dir` directly (Claude
+   *  Code) so the prompt does not duplicate native skill resolution. */
+  protected readonly emitsAvailableSkillsBlock: boolean = false;
 
   /** Return plugin-internal env vars needed by the container (e.g. config paths).
    *  NOT for API keys — those come from the step config's `env` field.
@@ -616,10 +669,21 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         );
       }
 
-      if (!stepAgent.skill && !stepAgent.prompt) {
+      // step.agent.skill / step.agent.prompt is the legacy single-skill
+      // contract. Agents bound through AgentDefinition.skills feed
+      // instructions via the assembled `agentPluginDir` (Claude Code native
+      // discovery + OpenCode "Available Skills" prompt index), so we skip
+      // the legacy check when the context carries a pluginDir or
+      // agentIdentityPrompt.
+      const hasRegistrySkills =
+        typeof context.agentPluginDir === 'string' && context.agentPluginDir.length > 0;
+      const hasAgentIdentity =
+        typeof context.agentIdentityPrompt === 'string' && context.agentIdentityPrompt.length > 0;
+      if (!stepAgent.skill && !stepAgent.prompt && !hasRegistrySkills && !hasAgentIdentity) {
         throw new Error(
           `Neither skill nor prompt configured in step.agent for step '${context.stepId}'. ` +
-          `${this.agentName} plugin requires at least one of step.agent.skill or step.agent.prompt.`,
+          `${this.agentName} plugin requires at least one of step.agent.skill, step.agent.prompt, ` +
+          `agent.skills (Registry-bound), or AgentDefinition.systemPrompt.`,
         );
       }
 
@@ -797,11 +861,20 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
 
       // Plugin directory — host path to the Claude Code plugin that owns this skill.
-      // Convention: `skillsDir` points at `<plugin-root>/skills`; the plugin root
-      // (which holds `.claude-plugin/plugin.json`) is its parent directory.
-      // Agents that support `--plugin-dir` (Claude Code) pass this along so native
-      // skill resolution (SKILL.md + references/) works without workspace pollution.
-      if (this.agentConfig.skillsDir) {
+      // Resolution order:
+      //   1. WorkflowAgentContext.agentPluginDir — per-run tree assembled by
+      //      resolveAgentSkills from AgentDefinition.skills (Registry-first).
+      //   2. step.agent.skillsDir — workflow-level skills folder; the plugin
+      //      root is its parent (holds `.claude-plugin/plugin.json`).
+      // Claude Code mounts this via `--plugin-dir` for native SKILL.md
+      // discovery; OpenCode just gets it as a bind mount and reads files
+      // directly via bash.
+      const ctxPluginDir = isWorkflowAgentContext(this.context)
+        ? this.context.agentPluginDir
+        : undefined;
+      if (typeof ctxPluginDir === 'string' && ctxPluginDir.length > 0) {
+        options.pluginDir = ctxPluginDir;
+      } else if (this.agentConfig.skillsDir) {
         const resolvedSkillsDir = this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath);
         options.pluginDir = dirname(resolvedSkillsDir);
       }
@@ -1095,6 +1168,24 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // 0b. Agent identity + skills from AgentDefinition (resolved by platform-ui)
     if (isWorkflowAgentContext(this.context) && this.context.agentIdentityPrompt) {
       parts.push(this.context.agentIdentityPrompt);
+    }
+
+    // 0c. Available Skills index — emitted only by runtimes that do not have
+    //  native plugin-dir support (OpenCode). Claude Code reads SKILL.md
+    //  frontmatter via `--plugin-dir` and does not need the prompt-side
+    //  index. Skills are discovered by scanning `<agentPluginDir>/skills/*/`
+    //  for SKILL.md files; the frontmatter description (if any) is
+    //  surfaced inline. The block points the agent at /plugin/skills/<name>/
+    //  where files are bind-mounted.
+    if (
+      this.emitsAvailableSkillsBlock &&
+      isWorkflowAgentContext(this.context) &&
+      typeof this.context.agentPluginDir === 'string' &&
+      this.context.agentPluginDir.length > 0
+    ) {
+      const skills = await readPluginDirSkills(this.context.agentPluginDir);
+      const block = buildAvailableSkillsBlock(skills);
+      if (block.length > 0) parts.push(block);
     }
 
     // 1. Skill prompt from SKILL.md (step-level override — takes precedence over agent skills)
