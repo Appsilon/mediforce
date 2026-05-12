@@ -41,6 +41,41 @@ describe('VerdictSchema', () => {
       expect(result.data.target).toBe('complete');
     }
   });
+
+  it('accepts label/intent/requiresComment as optional overrides', () => {
+    const result = VerdictSchema.safeParse({
+      target: 'complete',
+      label: 'Accept delivery',
+      intent: 'success',
+      requiresComment: false,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.label).toBe('Accept delivery');
+      expect(result.data.intent).toBe('success');
+      expect(result.data.requiresComment).toBe(false);
+    }
+  });
+
+  it('omits optional fields by default', () => {
+    const result = VerdictSchema.safeParse({ target: 'complete' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.label).toBeUndefined();
+      expect(result.data.intent).toBeUndefined();
+      expect(result.data.requiresComment).toBeUndefined();
+    }
+  });
+
+  it('rejects an unknown intent', () => {
+    const result = VerdictSchema.safeParse({ target: 'complete', intent: 'info' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty label string', () => {
+    const result = VerdictSchema.safeParse({ target: 'complete', label: '' });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('StepSchema', () => {
