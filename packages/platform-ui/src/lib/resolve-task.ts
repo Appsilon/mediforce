@@ -1,4 +1,10 @@
-import type { HumanTask } from '@mediforce/platform-core';
+import type {
+  HumanTask,
+  ProcessInstanceRepository,
+  ProcessRepository,
+  WorkflowStep,
+} from '@mediforce/platform-core';
+import { isVerdictAllowed } from '@mediforce/platform-core';
 import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
 
 // ── Result types ─────────────────────────────────────────────────────────────
@@ -41,7 +47,7 @@ export async function resolveTask(
   body: Record<string, unknown>,
   userId?: string,
 ): Promise<ResolveResult> {
-  const { humanTaskRepo, instanceRepo, auditRepo, engine } =
+  const { humanTaskRepo, instanceRepo, processRepo, auditRepo, engine } =
     getPlatformServices();
 
   // ── 1. Load task ────────────────────────────────────────────────────────
@@ -80,9 +86,29 @@ export async function resolveTask(
     }
   } else {
     const verdict = body.verdict;
-    if (verdict !== 'approve' && verdict !== 'revise') {
+    if (typeof verdict !== 'string') {
+      return { error: 'verdict must be a string', httpStatus: 400 };
+    }
+    // Look up step config to validate the verdict key. L3 agent review tasks
+    // (creationReason agent_review_l3) are created without copying verdicts
+    // onto the task — fall back to the legacy approve/revise allowlist for
+    // those, and for any other task where the step has no explicit verdicts
+    // (back-compat for tasks created before this field existed).
+    const stepDef = await loadStepDefinition(
+      resolvedTask.processInstanceId,
+      resolvedTask.stepId,
+      instanceRepo,
+      processRepo,
+    );
+    const allowed = stepDef?.verdicts
+      ? isVerdictAllowed(stepDef.verdicts, verdict)
+      : verdict === 'approve' || verdict === 'revise';
+    if (!allowed) {
+      const allowedKeys = stepDef?.verdicts
+        ? Object.keys(stepDef.verdicts).join(', ')
+        : 'approve, revise';
       return {
-        error: 'verdict must be "approve" or "revise"',
+        error: `verdict '${verdict}' not allowed for step '${resolvedTask.stepId}' — must be one of: ${allowedKeys}`,
         httpStatus: 400,
       };
     }
@@ -336,6 +362,35 @@ export async function resolveTask(
 }
 
 // ── Validation helpers ───────────────────────────────────────────────────────
+
+/**
+ * Resolve a workflow step definition for the given instance+stepId. Mirrors
+ * the engine's `loadDefinitionUnified` fallback (exact version then latest
+ * by name) so legacy instances with non-numeric versions still resolve.
+ * Returns null when the definition or step cannot be found — callers fall
+ * back to the legacy approve/revise allowlist in that case.
+ */
+async function loadStepDefinition(
+  processInstanceId: string,
+  stepId: string,
+  instanceRepo: ProcessInstanceRepository,
+  processRepo: ProcessRepository,
+): Promise<WorkflowStep | null> {
+  const instance = await instanceRepo.getById(processInstanceId);
+  if (!instance) return null;
+  const ns = instance.namespace ?? '';
+  const versionNum = parseInt(instance.definitionVersion, 10);
+  let definition = !isNaN(versionNum)
+    ? await processRepo.getWorkflowDefinition(ns, instance.definitionName, versionNum)
+    : null;
+  if (!definition) {
+    const latest = await processRepo.getLatestWorkflowVersion(instance.definitionName, ns);
+    if (latest > 0) {
+      definition = await processRepo.getWorkflowDefinition(ns, instance.definitionName, latest);
+    }
+  }
+  return definition?.steps.find((s) => s.id === stepId) ?? null;
+}
 
 interface Attachment {
   name: string;

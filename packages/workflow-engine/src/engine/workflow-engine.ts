@@ -16,8 +16,8 @@ import type {
   WorkflowDefinition,
   WorkflowStep,
 } from '@mediforce/platform-core';
-import type { Selection } from '@mediforce/platform-core';
-import { RbacService, RbacError, normalizeSelection } from '@mediforce/platform-core';
+import type { Selection, TaskVerdict } from '@mediforce/platform-core';
+import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts } from '@mediforce/platform-core';
 import { validateStepGraph } from '../graph/graph-validator.js';
 import { StepExecutor, type StepActor } from './step-executor.js';
 import { RoutingError, InvalidTransitionError } from './errors.js';
@@ -279,6 +279,13 @@ export class WorkflowEngine {
             }
           }
 
+          // L3 agent review tasks are created in execute-agent-step, not here;
+          // this branch only fires for executor === 'human'. Verdicts are
+          // copied onto the task so the form renders without re-reading the WD.
+          const verdictsField: { verdicts?: Record<string, TaskVerdict> } = {};
+          const resolvedVerdicts = buildTaskVerdicts(nextStep.verdicts);
+          if (resolvedVerdicts) verdictsField.verdicts = resolvedVerdicts;
+
           const task: HumanTask = {
             id: crypto.randomUUID(),
             processInstanceId: instanceId,
@@ -295,6 +302,7 @@ export class WorkflowEngine {
             ...(nextStep.ui ? { ui: nextStep.ui } : {}),
             ...(nextStep.params?.length ? { params: nextStep.params } : {}),
             ...selectionFields,
+            ...verdictsField,
           };
           await this.humanTaskRepository.create(task);
 
