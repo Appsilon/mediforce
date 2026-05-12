@@ -10,6 +10,25 @@
  */
 
 /**
+ * Hard cap for the iframe's reported content height, in pixels.
+ *
+ * The parent grows the iframe to fit content (see `IframeResizeMessage`).
+ * Without a cap, agent HTML that uses viewport-relative sizing (Tailwind
+ * `min-h-screen`, raw `100vh`, etc.) creates a feedback loop: the iframe is
+ * its own viewport, so `100vh` resolves to the current iframe height —
+ * growing the iframe enlarges `100vh`, which enlarges `body.scrollHeight`,
+ * which re-fires `ResizeObserver`, which grows the iframe again. The cap
+ * stops that runaway: beyond this height, the iframe gets its own scrollbar.
+ */
+export const MAX_IFRAME_HEIGHT = 2400;
+
+/** Clamp a reported iframe height to the safe range. */
+export function clampIframeHeight(height: number): number {
+  if (!Number.isFinite(height) || height <= 0) return 0;
+  return Math.min(height, MAX_IFRAME_HEIGHT);
+}
+
+/**
  * Build a self-contained HTML document for a sandboxed iframe.
  *
  * The document:
@@ -21,6 +40,9 @@
  *   - Listens for `{ type: 'theme', dark }` messages from the parent and
  *     toggles the `dark` class on `<html>` to keep the iframe in step with
  *     the host theme.
+ *   - Neutralises Tailwind's viewport-relative height classes so agent HTML
+ *     written with `h-screen` / `min-h-screen` does not chase the iframe
+ *     viewport in a resize feedback loop (see `MAX_IFRAME_HEIGHT`).
  */
 export function buildSrcdoc(
   presentation: string,
@@ -54,6 +76,11 @@ body {
 .dark body {
   background: var(--color-surface-dark);
   color: var(--color-text-dark);
+}
+.h-screen, .min-h-screen, .max-h-screen {
+  height: auto;
+  min-height: 0;
+  max-height: none;
 }
 </style>
 <script>window.__data__ = ${safeData};</script>

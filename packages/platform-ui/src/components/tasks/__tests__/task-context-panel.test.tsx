@@ -250,6 +250,59 @@ describe('TaskContextPanel', () => {
     });
   });
 
+  it('caps iframe height at MAX_IFRAME_HEIGHT when iframe reports a runaway-large value', async () => {
+    const execution = buildExecution({
+      output: { presentation: '<div>runaway</div>' },
+    });
+    setSubcollection([execution]);
+
+    render(
+      <TaskContextPanel
+        processInstanceId="inst-1"
+        stepId="human-review"
+      />,
+    );
+    await expandPanel();
+
+    const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+    expect(iframe).not.toBeNull();
+
+    await act(async () => {
+      const event = new MessageEvent('message', {
+        data: { type: 'resize', height: 99999 },
+        source: iframe.contentWindow,
+      });
+      window.dispatchEvent(event);
+    });
+
+    await waitFor(() => {
+      const px = parseInt(iframe.style.height, 10);
+      expect(px).toBeLessThanOrEqual(2400);
+      expect(px).toBeGreaterThan(0);
+    });
+  });
+
+  it('iframe srcdoc neutralises Tailwind viewport-height classes to avoid feedback growth', async () => {
+    const execution = buildExecution({
+      output: { presentation: '<div class="min-h-screen">vh content</div>' },
+    });
+    setSubcollection([execution]);
+
+    render(
+      <TaskContextPanel
+        processInstanceId="inst-1"
+        stepId="human-review"
+      />,
+    );
+    await expandPanel();
+
+    const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+    expect(iframe).not.toBeNull();
+    const srcdoc = iframe.getAttribute('srcdoc')!;
+    expect(srcdoc).toMatch(/\.min-h-screen[\s\S]*min-height:\s*0/);
+    expect(srcdoc).toMatch(/\.h-screen[\s\S]*height:\s*auto/);
+  });
+
   it('posts a theme message to the iframe contentWindow when the parent theme changes', async () => {
     const execution = buildExecution({
       output: { presentation: '<div>theme-test</div>' },
