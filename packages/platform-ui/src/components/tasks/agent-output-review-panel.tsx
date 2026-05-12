@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes';
 import { AlertTriangle, Bot, Code, ExternalLink, FileText, Gauge, GitBranch, Loader2, MonitorPlay } from 'lucide-react';
 import type { AgentOutputData } from './task-utils';
 import { formatStepName } from './task-utils';
-import { buildSrcdoc, isIframeResizeMessage } from './iframe-helpers';
+import { buildSrcdoc, clampIframeHeight, isIframeResizeMessage } from './iframe-helpers';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 
@@ -50,7 +50,10 @@ export function AgentOutputReviewPanel({
         iframeRef.current &&
         event.source === iframeRef.current.contentWindow
       ) {
-        setIframeHeight(event.data.height);
+        setIframeHeight((prev) => {
+          const next = clampIframeHeight(event.data.height);
+          return next > 0 ? next : prev;
+        });
       }
     };
     window.addEventListener('message', handler);

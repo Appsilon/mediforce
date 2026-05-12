@@ -9,7 +9,7 @@ import type { StepExecution } from '@mediforce/platform-core';
 import { useSubcollection } from '@/hooks/use-process-instances';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
-import { buildSrcdoc, isIframeResizeMessage } from './iframe-helpers';
+import { buildSrcdoc, clampIframeHeight, isIframeResizeMessage } from './iframe-helpers';
 
 interface TaskContextPanelProps {
   processInstanceId: string;
@@ -251,7 +251,10 @@ function ReportPane({ html, loading, error, result }: ReportPaneProps) {
         iframeRef.current &&
         event.source === iframeRef.current.contentWindow
       ) {
-        setIframeHeight(event.data.height);
+        setIframeHeight((prev) => {
+          const next = clampIframeHeight(event.data.height);
+          return next > 0 ? next : prev;
+        });
       }
     };
     window.addEventListener('message', handler);
