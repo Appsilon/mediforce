@@ -58,9 +58,6 @@ export function VerdictForm({
   const [error, setError] = React.useState<string | null>(null);
 
   const trimmedComment = comment.trim();
-  const blockedLabels = resolved
-    .filter((cfg) => cfg.requiresComment && !trimmedComment)
-    .map((cfg) => cfg.label);
 
   async function handleSubmit(cfg: TaskVerdict) {
     if (cfg.requiresComment && !trimmedComment) return;
@@ -114,29 +111,32 @@ export function VerdictForm({
         <p className="text-sm text-destructive">{error}</p>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         {resolved.map((cfg) => {
           const blocked = cfg.requiresComment && !trimmedComment;
           const isSubmittingThis = submitting === cfg.key;
           const isDisabled = disabled || submitting !== null || blocked;
           return (
-            <button
-              key={cfg.key}
-              type="button"
-              onClick={() => handleSubmit(cfg)}
-              disabled={isDisabled}
-              title={blocked ? `${cfg.label} requires a comment` : undefined}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                intentSubmitClasses(cfg.intent),
-                isDisabled && 'opacity-50 cursor-not-allowed',
+            <div key={cfg.key} className="flex flex-col items-start gap-1">
+              <button
+                type="button"
+                onClick={() => handleSubmit(cfg)}
+                disabled={isDisabled}
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                  intentSubmitClasses(cfg.intent),
+                  isDisabled && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                {isSubmittingThis
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <IntentIcon intent={cfg.intent} className="h-4 w-4" />}
+                {cfg.label}
+              </button>
+              {blocked && (
+                <span className="text-xs text-muted-foreground/70 pl-1">Comment required</span>
               )}
-            >
-              {isSubmittingThis
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : <IntentIcon intent={cfg.intent} className="h-4 w-4" />}
-              {cfg.label}
-            </button>
+            </div>
           );
         })}
       </div>
@@ -144,12 +144,6 @@ export function VerdictForm({
       {disabled && (
         <p className="text-xs text-muted-foreground">
           Review the step output before submitting a verdict.
-        </p>
-      )}
-
-      {!disabled && blockedLabels.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Add a comment to enable: {blockedLabels.join(', ')}.
         </p>
       )}
     </div>
