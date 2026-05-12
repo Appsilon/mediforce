@@ -90,11 +90,11 @@ export async function resolveTask(
     // before this field existed.
     const taskVerdicts = resolvedTask.verdicts;
     const allowed = taskVerdicts
-      ? verdict in taskVerdicts
+      ? taskVerdicts.some((v) => v.key === verdict)
       : verdict === 'approve' || verdict === 'revise';
     if (!allowed) {
       const allowedKeys = taskVerdicts
-        ? Object.keys(taskVerdicts).join(', ')
+        ? taskVerdicts.map((v) => v.key).join(', ')
         : 'approve, revise';
       return {
         error: `verdict '${verdict}' not allowed for step '${resolvedTask.stepId}' — must be one of: ${allowedKeys}`,

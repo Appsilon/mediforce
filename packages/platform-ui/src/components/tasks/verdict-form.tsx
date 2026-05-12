@@ -16,9 +16,10 @@ interface VerdictFormProps {
   taskId: string;
   disabled: boolean; // True when no content to review
   remainingTaskCount?: number;
-  /** Resolved verdict descriptors copied from the WD step. When absent, the
-   *  form falls back to the legacy approve/revise UI for older tasks. */
-  verdicts?: Record<string, TaskVerdict>;
+  /** Resolved verdict descriptors copied from the WD step in WD insertion
+   *  order. When absent, the form falls back to the legacy approve/revise UI
+   *  for older tasks. */
+  verdicts?: TaskVerdict[];
   onCompleted?: () => void;
 }
 
@@ -30,10 +31,10 @@ interface SubmittedData {
   timestamp: string;
 }
 
-const LEGACY_VERDICTS: Record<string, TaskVerdict> = {
-  approve: { label: 'Approve', intent: 'success', requiresComment: false },
-  revise: { label: 'Request changes', intent: 'warning', requiresComment: true },
-};
+const LEGACY_VERDICTS: TaskVerdict[] = [
+  { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+  { key: 'revise', label: 'Request changes', intent: 'warning', requiresComment: true },
+];
 
 /**
  * Verdict experience styled like GitHub PR review. Renders N buttons from
@@ -49,7 +50,7 @@ export function VerdictForm({
   onCompleted,
 }: VerdictFormProps) {
   const { firebaseUser } = useAuth();
-  const resolved = verdicts ?? LEGACY_VERDICTS;
+  const resolved = verdicts && verdicts.length > 0 ? verdicts : LEGACY_VERDICTS;
   const [comment, setComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState<string | null>(null);
   const [submitted, setSubmitted] = React.useState(false);
@@ -58,19 +59,19 @@ export function VerdictForm({
 
   const trimmedComment = comment.trim();
 
-  async function handleSubmit(key: string, cfg: TaskVerdict) {
+  async function handleSubmit(cfg: TaskVerdict) {
     if (cfg.requiresComment && !trimmedComment) return;
     if (submitting) return;
 
-    setSubmitting(key);
+    setSubmitting(cfg.key);
     setError(null);
 
     const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-    const result = await completeTask(taskId, key, trimmedComment, undefined, idToken);
+    const result = await completeTask(taskId, cfg.key, trimmedComment, undefined, idToken);
 
     if (result.success) {
       setSubmittedData({
-        verdict: key,
+        verdict: cfg.key,
         intent: cfg.intent,
         label: cfg.label,
         comment: trimmedComment,
@@ -111,15 +112,15 @@ export function VerdictForm({
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {Object.entries(resolved).map(([key, cfg]) => {
+        {resolved.map((cfg) => {
           const blocked = cfg.requiresComment && !trimmedComment;
-          const isSubmittingThis = submitting === key;
+          const isSubmittingThis = submitting === cfg.key;
           const isDisabled = disabled || submitting !== null || blocked;
           return (
             <button
-              key={key}
+              key={cfg.key}
               type="button"
-              onClick={() => handleSubmit(key, cfg)}
+              onClick={() => handleSubmit(cfg)}
               disabled={isDisabled}
               title={blocked ? `${cfg.label} requires a comment` : undefined}
               className={cn(
@@ -314,7 +315,7 @@ export function VerdictConfirmationReadOnly({
   remainingTaskCount,
 }: {
   completionData: Record<string, unknown>;
-  verdicts?: Record<string, TaskVerdict>;
+  verdicts?: TaskVerdict[];
   remainingTaskCount?: number;
 }) {
   const verdict = completionData.verdict as string | undefined;
@@ -329,11 +330,9 @@ export function VerdictConfirmationReadOnly({
     );
   }
 
-  const cfg = verdicts?.[verdict] ?? LEGACY_VERDICTS[verdict] ?? {
-    label: verdict,
-    intent: 'neutral' as Intent,
-    requiresComment: false,
-  };
+  const cfg = verdicts?.find((v) => v.key === verdict)
+    ?? LEGACY_VERDICTS.find((v) => v.key === verdict)
+    ?? { key: verdict, label: verdict, intent: 'neutral' as Intent, requiresComment: false };
 
   return (
     <VerdictConfirmation

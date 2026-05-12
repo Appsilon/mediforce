@@ -282,7 +282,7 @@ export class WorkflowEngine {
           // L3 agent review tasks are created in execute-agent-step, not here;
           // this branch only fires for executor === 'human'. Verdicts are
           // copied onto the task so the form renders without re-reading the WD.
-          const verdictsField: { verdicts?: Record<string, TaskVerdict> } = {};
+          const verdictsField: { verdicts?: TaskVerdict[] } = {};
           const resolvedVerdicts = buildTaskVerdicts(nextStep.verdicts);
           if (resolvedVerdicts) verdictsField.verdicts = resolvedVerdicts;
 

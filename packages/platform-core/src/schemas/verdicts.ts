@@ -20,27 +20,27 @@ export function defaultRequiresComment(key: string): boolean {
   return key === 'revise';
 }
 
-/** Resolved verdict descriptor for HumanTask (no target — server-side only). */
+/** Resolved verdict descriptor for HumanTask. Carries its own key so the
+ *  array shape preserves WD insertion order through Firestore + React. */
 export interface TaskVerdict {
+  key: string;
   label: string;
   intent: 'success' | 'danger' | 'warning' | 'neutral';
   requiresComment: boolean;
 }
 
-/** Build the verdicts payload attached to a HumanTask: strip target, fill defaults. */
+/** Build the verdicts payload attached to a HumanTask: strip target, fill defaults.
+ *  Returned as an ordered array (NOT a Record) so button order matches the WD. */
 export function buildTaskVerdicts(
   stepVerdicts: Record<string, Verdict> | undefined,
-): Record<string, TaskVerdict> | undefined {
+): TaskVerdict[] | undefined {
   if (!stepVerdicts || Object.keys(stepVerdicts).length === 0) return undefined;
-  const out: Record<string, TaskVerdict> = {};
-  for (const [key, cfg] of Object.entries(stepVerdicts)) {
-    out[key] = {
-      label: cfg.label ?? defaultVerdictLabel(key),
-      intent: cfg.intent ?? defaultVerdictIntent(key),
-      requiresComment: cfg.requiresComment ?? defaultRequiresComment(key),
-    };
-  }
-  return out;
+  return Object.entries(stepVerdicts).map(([key, cfg]) => ({
+    key,
+    label: cfg.label ?? defaultVerdictLabel(key),
+    intent: cfg.intent ?? defaultVerdictIntent(key),
+    requiresComment: cfg.requiresComment ?? defaultRequiresComment(key),
+  }));
 }
 
 /** Used by resolve-task to validate submitted verdict against step config. */

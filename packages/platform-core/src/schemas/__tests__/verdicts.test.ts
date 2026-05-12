@@ -64,24 +64,20 @@ describe('buildTaskVerdicts', () => {
     expect(buildTaskVerdicts({})).toBeUndefined();
   });
 
-  it('fills defaults from the verdict key when fields are omitted', () => {
+  it('returns an ordered array preserving WD insertion order', () => {
     const out = buildTaskVerdicts({
       approve: { target: 'done' },
       revise: { target: 'scan' },
     });
-    expect(out).toEqual({
-      approve: { label: 'Approve', intent: 'success', requiresComment: false },
-      revise: { label: 'Request changes', intent: 'warning', requiresComment: true },
-    });
+    expect(out).toEqual([
+      { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+      { key: 'revise', label: 'Request changes', intent: 'warning', requiresComment: true },
+    ]);
   });
 
   it('respects explicit overrides on label/intent/requiresComment', () => {
     const out = buildTaskVerdicts({
-      accept: {
-        target: 'accept-delivery',
-        label: 'Accept delivery',
-        intent: 'success',
-      },
+      accept: { target: 'accept-delivery', label: 'Accept delivery', intent: 'success' },
       reject_and_notify: {
         target: 'draft-rejection-note',
         label: 'Reject — notify CRO',
@@ -89,19 +85,15 @@ describe('buildTaskVerdicts', () => {
         requiresComment: true,
       },
     });
-    expect(out).toEqual({
-      accept: { label: 'Accept delivery', intent: 'success', requiresComment: false },
-      reject_and_notify: {
-        label: 'Reject — notify CRO',
-        intent: 'danger',
-        requiresComment: true,
-      },
-    });
+    expect(out).toEqual([
+      { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
+      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: true },
+    ]);
   });
 
   it('does not include the target field in the output', () => {
     const out = buildTaskVerdicts({ approve: { target: 'done' } });
-    expect(out?.approve).not.toHaveProperty('target');
+    expect(out?.[0]).not.toHaveProperty('target');
   });
 });
 
