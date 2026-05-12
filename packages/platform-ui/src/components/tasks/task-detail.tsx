@@ -380,6 +380,7 @@ export function TaskDetail({
             taskId={task.id}
             disabled={false}
             remainingTaskCount={remainingTaskCount}
+            verdicts={task.verdicts}
           />
         )}
 
@@ -402,6 +403,7 @@ export function TaskDetail({
         {isCompleted && task.completionData && !isFileUploadTask && !isSelectionTask && !isParamsTask && (
           <VerdictConfirmationReadOnly
             completionData={task.completionData}
+            verdicts={task.verdicts}
             remainingTaskCount={remainingTaskCount}
           />
         )}
