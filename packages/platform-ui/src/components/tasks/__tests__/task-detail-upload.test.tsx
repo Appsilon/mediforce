@@ -113,7 +113,7 @@ describe('TaskDetail — selection task rendering', () => {
     render(<TaskDetail task={task} />);
 
     expect(screen.getByRole('button', { name: /approve selected/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /request revisions/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /request changes/i })).toBeInTheDocument();
   });
 
   it('[RENDER] does not show verdict form when selection task is active', () => {

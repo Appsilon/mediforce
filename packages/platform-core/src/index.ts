@@ -84,6 +84,10 @@ export {
   StepMcpRestrictionSchema,
   StepMcpRestrictionEntrySchema,
   ToolCatalogEntrySchema,
+  buildTaskVerdicts,
+  defaultVerdictIntent,
+  defaultVerdictLabel,
+  defaultRequiresComment,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -166,6 +170,7 @@ export type {
   StepMcpRestriction,
   StepMcpRestrictionEntry,
   ToolCatalogEntry,
+  TaskVerdict,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)

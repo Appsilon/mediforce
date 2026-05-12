@@ -32,7 +32,10 @@ export function isResolveError(result: ResolveResult): result is ResolveError {
  * audit → resume process → advance step → trigger auto-runner.
  *
  * Body shapes:
- * - Verdict:     { verdict: "approve"|"revise", comment?: string }
+ * - Verdict:     { verdict: string, comment?: string, selectedIndex?: number }
+ *                  `verdict` is validated against the per-task allowlist
+ *                  copied onto `task.verdicts` at creation; tasks without
+ *                  that field fall back to the legacy approve/revise pair.
  * - Params:      { paramValues: Record<string, unknown> }
  * - File upload: { attachments: Attachment[] }
  */
@@ -80,11 +83,39 @@ export async function resolveTask(
     }
   } else {
     const verdict = body.verdict;
-    if (verdict !== 'approve' && verdict !== 'revise') {
+    if (typeof verdict !== 'string') {
+      return { error: 'verdict must be a string', httpStatus: 400 };
+    }
+    // Validate against the verdict descriptors the engine copied onto the task
+    // at creation time. Fall back to the legacy approve/revise allowlist when
+    // the task has no verdicts field — that covers L3 agent review tasks
+    // (created in execute-agent-step without verdicts) and any task created
+    // before this field existed.
+    const taskVerdicts = resolvedTask.verdicts;
+    const descriptor = taskVerdicts?.find((v) => v.key === verdict);
+    const allowed = taskVerdicts
+      ? descriptor !== undefined
+      : verdict === 'approve' || verdict === 'revise';
+    if (!allowed) {
+      const allowedKeys = taskVerdicts
+        ? taskVerdicts.map((v) => v.key).join(', ')
+        : 'approve, revise';
       return {
-        error: 'verdict must be "approve" or "revise"',
+        error: `verdict '${verdict}' not allowed for step '${resolvedTask.stepId}' — must be one of: ${allowedKeys}`,
         httpStatus: 400,
       };
+    }
+    // Enforce requiresComment server-side too. The UI gates the button, but
+    // a direct API caller could otherwise bypass the constraint and submit
+    // an empty 'reject' on a step that demands a reason.
+    if (descriptor?.requiresComment) {
+      const submittedComment = typeof body.comment === 'string' ? body.comment.trim() : '';
+      if (submittedComment.length === 0) {
+        return {
+          error: `verdict '${verdict}' requires a non-empty comment`,
+          httpStatus: 400,
+        };
+      }
     }
   }
 

@@ -158,7 +158,7 @@ export async function completeParamsTask(
 // --------------------------------------------------------------------------
 export async function completeTask(
   taskId: string,
-  verdict: 'approve' | 'revise',
+  verdict: string,
   comment: string,
   selectedIndex?: number,
   idToken: string = '',

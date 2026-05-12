@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
+import { WorkflowDefinitionSchema, buildTaskVerdicts } from '@mediforce/platform-core';
 
 describe('landing-zone-CDISCPILOT01.wd.json', () => {
   const appDir = resolve(import.meta.dirname, '../..');
@@ -26,14 +26,13 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     expect(result.data.namespace).toBe('appsilon');
   });
 
-  it('has a cron trigger', () => {
+  it('has a manual trigger and no cron trigger', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
 
-    const cronTrigger = result.data.triggers.find((t) => t.type === 'cron');
-    expect(cronTrigger).toBeDefined();
-    expect(cronTrigger?.schedule).toBeDefined();
+    expect(result.data.triggers.find((t) => t.type === 'manual')).toBeDefined();
+    expect(result.data.triggers.find((t) => t.type === 'cron')).toBeUndefined();
   });
 
   it('declares inputForNextRun for SFTP listing carry-over', () => {
@@ -211,7 +210,7 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     expect(transitions).toContainEqual({ from: 'new-rules-branch', to: 'rejected-with-note' });
   });
 
-  it('human-review verdicts unchanged (approve/revise routes preserved)', () => {
+  it('human-review exposes three verdicts (accept / reject_and_notify / ask_agent_to_revise)', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
@@ -219,8 +218,41 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     const humanReview = result.data.steps.find((step) => step.id === 'human-review');
     expect(humanReview).toBeDefined();
     expect(humanReview?.verdicts).toEqual({
-      approve: { target: 'accept-delivery' },
-      revise: { target: 'draft-rejection-note' },
+      accept: {
+        target: 'accept-delivery',
+        label: 'Accept delivery',
+        intent: 'success',
+      },
+      reject_and_notify: {
+        target: 'draft-rejection-note',
+        label: 'Reject — notify CRO',
+        intent: 'danger',
+      },
+      ask_agent_to_revise: {
+        target: 'interpret-validation',
+        label: 'Ask agent to make changes',
+        intent: 'warning',
+        requiresComment: true,
+      },
     });
+  });
+
+  it('round-trips WD verdicts through buildTaskVerdicts into the descriptor array reviewers see', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const humanReview = result.data.steps.find((step) => step.id === 'human-review');
+    expect(humanReview).toBeDefined();
+    const descriptors = buildTaskVerdicts(humanReview!.verdicts);
+
+    // Order, labels, intents and the per-verdict requiresComment must
+    // survive parse + descriptor build. This is what the engine writes
+    // onto the HumanTask and what VerdictForm renders.
+    expect(descriptors).toEqual([
+      { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
+      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
+      { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+    ]);
   });
 });

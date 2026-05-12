@@ -207,6 +207,44 @@ describe('WorkflowEngine', () => {
     expect(result.status).toBe('completed');
   });
 
+  it('submitReviewVerdict routes a non-first verdict to its declared target (N-way)', async () => {
+    // reviewDef declares: approve → approved, revise → draft, reject → rejected.
+    // 'reject' is the third declared verdict; routing must follow the verdicts
+    // map, NOT the order in which transitions are listed. Without this case,
+    // a bug that just takes the first matching transition would pass the
+    // 'approve' happy-path test.
+    const instance = await engine.createInstance('test',
+      'review-process',
+      1,
+      'user-1',
+      'manual',
+      {},
+    );
+    await engine.startInstance(instance.id);
+    await engine.advanceStep(instance.id, {}, actor);
+
+    const verdict = makeReviewVerdict('reject');
+    const result = await engine.submitReviewVerdict(
+      instance.id,
+      'review',
+      verdict,
+      actor,
+    );
+
+    expect(result.status).toBe('completed');
+    // currentStepId is cleared on completion. Read the terminal-reached
+    // audit event to verify the routing target. 'rejected' has to win
+    // over the first-declared 'approve → approved' verdict, proving the
+    // engine routes via step.verdicts[verdict].target, not first match.
+    const completedEvent = auditRepo
+      .getAll()
+      .find((e) => e.action === 'instance.completed');
+    expect(completedEvent).toBeDefined();
+    const terminalStepId =
+      (completedEvent!.inputSnapshot as { terminalStepId?: string } | undefined)?.terminalStepId;
+    expect(terminalStepId).toBe('rejected');
+  });
+
   it('submitReviewVerdict when maxIterations exceeded: pauses instance with reason max_iterations_exceeded', async () => {
     const instance = await engine.createInstance('test',
       'review-process',
@@ -562,6 +600,74 @@ describe('WorkflowEngine', () => {
           { id: 'user-1', role: 'operator' },
         ),
       ).rejects.toThrow('Firestore unavailable');
+    });
+
+    it('copies the next step verdicts onto the HumanTask as an ordered descriptor array', async () => {
+      const humanTaskRepo = new InMemoryHumanTaskRepository();
+      const engineWithHumanTasks = new WorkflowEngine(
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        undefined,
+        undefined,
+        undefined,
+        humanTaskRepo,
+      );
+
+      const defWithVerdicts = {
+        name: 'linear-process-verdicts',
+        version: 1,
+        namespace: 'test',
+        visibility: 'private' as const,
+        steps: [
+          { id: 'start', name: 'Start', type: 'creation' as const, executor: 'agent' as const },
+          {
+            id: 'review',
+            name: 'Review',
+            type: 'review' as const,
+            executor: 'human' as const,
+            verdicts: {
+              accept: { target: 'done', label: 'Accept delivery', intent: 'success' as const },
+              reject_and_notify: { target: 'done', label: 'Reject — notify CRO', intent: 'danger' as const },
+              ask_agent_to_revise: {
+                target: 'done',
+                label: 'Ask agent to make changes',
+                intent: 'warning' as const,
+                requiresComment: true,
+              },
+            },
+          },
+          { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+        ],
+        transitions: [
+          { from: 'start', to: 'review' },
+        ],
+        triggers: [{ type: 'manual' as const, name: 'Start' }],
+      };
+      await processRepo.saveWorkflowDefinition(defWithVerdicts);
+
+      const instance = await engineWithHumanTasks.createInstance('test',
+        'linear-process-verdicts',
+        1,
+        'user-1',
+        'manual',
+        {},
+      );
+      await engineWithHumanTasks.startInstance(instance.id);
+      await engineWithHumanTasks.advanceStep(
+        instance.id,
+        {},
+        { id: 'user-1', role: 'operator' },
+      );
+
+      const tasks = humanTaskRepo.getAll();
+      expect(tasks).toHaveLength(1);
+      // Array shape — order matches WD insertion order.
+      expect(tasks[0].verdicts).toEqual([
+        { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
+        { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
+        { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+      ]);
     });
 
     it('sets assignedRole from WorkflowDefinition step allowedRoles', async () => {

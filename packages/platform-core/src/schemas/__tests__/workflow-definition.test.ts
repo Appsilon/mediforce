@@ -90,11 +90,13 @@ describe('WorkflowDefinitionSchema — verdicts', () => {
     ],
   };
 
-  it('accepts a review step with approve + revise verdicts', () => {
+  it('accepts a human review step with approve + revise verdicts', () => {
     expect(() => WorkflowDefinitionSchema.parse(wdWithReview)).not.toThrow();
   });
 
-  it('rejects a review step using a verdict key outside the allowlist', () => {
+  it('accepts a human review step with N custom verdict keys (no autonomyLevel)', () => {
+    // Allowlist applies to L3 only — human review steps can carry any verdict
+    // key, with label/intent/requiresComment overrides.
     const wd = {
       ...wdWithReview,
       steps: wdWithReview.steps.map((step) =>
@@ -102,8 +104,59 @@ describe('WorkflowDefinitionSchema — verdicts', () => {
           ? {
               ...step,
               verdicts: {
+                accept: { target: 'done', label: 'Accept', intent: 'success' as const },
+                reject: {
+                  target: 'scan',
+                  label: 'Reject',
+                  intent: 'danger' as const,
+                  requiresComment: true,
+                },
+                ask_changes: {
+                  target: 'scan',
+                  label: 'Ask for changes',
+                  intent: 'warning' as const,
+                  requiresComment: true,
+                },
+              },
+            }
+          : step,
+      ),
+    };
+    expect(() => WorkflowDefinitionSchema.parse(wd)).not.toThrow();
+  });
+
+  it('accepts an L3 agent step with approve + revise verdicts', () => {
+    const wd = {
+      ...wdWithReview,
+      steps: wdWithReview.steps.map((step) =>
+        step.id === 'review'
+          ? {
+              ...step,
+              executor: 'agent' as const,
+              autonomyLevel: 'L3' as const,
+              verdicts: {
+                approve: { target: 'done' },
+                revise: { target: 'review' },
+              },
+            }
+          : step,
+      ),
+    };
+    expect(() => WorkflowDefinitionSchema.parse(wd)).not.toThrow();
+  });
+
+  it('rejects an L3 agent step using a verdict key outside the L3 allowlist', () => {
+    const wd = {
+      ...wdWithReview,
+      steps: wdWithReview.steps.map((step) =>
+        step.id === 'review'
+          ? {
+              ...step,
+              executor: 'agent' as const,
+              autonomyLevel: 'L3' as const,
+              verdicts: {
                 accept: { target: 'done' },
-                reject: { target: 'scan' },
+                retry: { target: 'review' },
               },
             }
           : step,
@@ -113,8 +166,8 @@ describe('WorkflowDefinitionSchema — verdicts', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       const messages = result.error.issues.map((issue) => issue.message);
-      expect(messages.some((m) => /verdict key 'accept'.*not allowed/.test(m))).toBe(true);
-      expect(messages.some((m) => /verdict key 'reject'.*not allowed/.test(m))).toBe(true);
+      expect(messages.some((m) => /verdict key 'accept'.*L3 step.*not allowed/.test(m))).toBe(true);
+      expect(messages.some((m) => /verdict key 'retry'.*L3 step.*not allowed/.test(m))).toBe(true);
     }
   });
 
@@ -144,9 +197,9 @@ describe('WorkflowDefinitionSchema — verdicts', () => {
     }
   });
 
-  it('does not enforce the allowlist on non-review steps that carry verdicts', () => {
-    // A `decision` step type can keep custom verdict keys — only `review`
-    // is bound to the built-in form's hardcoded {approve, revise}.
+  it('does not enforce the L3 allowlist on non-L3 steps', () => {
+    // A `decision` step or any non-L3 step can keep custom verdict keys —
+    // the L3 revision loop is the only constraint.
     const wd = {
       ...wdWithReview,
       steps: wdWithReview.steps.map((step) =>

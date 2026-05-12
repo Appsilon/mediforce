@@ -43,7 +43,7 @@ self-test → self-review → report.
    it covers. NEVER curl REST when the CLI does it. If the needed command is
    missing, add it in the same task. Auth: `MEDIFORCE_API_KEY` from shell.
    Base URL: `MEDIFORCE_BASE_URL` (default localhost; staging =
-   `https://staging.mediforce.app`). NEVER hit production.
+   `https://staging.mediforce.ai`). NEVER hit production.
 
 4. **REST fallback**, only when no CLI command exists:
    - Browser (`"use client"`): `mediforce.<domain>.<method>()` from

@@ -150,7 +150,7 @@ export function SelectionForm({
           )}
         >
           <MessageSquare className="h-4 w-4" />
-          Request revisions
+          Request changes
         </button>
       </div>
 
@@ -158,7 +158,7 @@ export function SelectionForm({
       {mode === 'revise' && (
         <div className="space-y-3 rounded-lg border p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Request revisions</span>
+            <span className="text-sm font-medium">Request changes</span>
             <button
               onClick={() => { setMode(null); setComment(''); setError(null); }}
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"

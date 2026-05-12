@@ -36,16 +36,22 @@ test.describe('Task Review Journey', () => {
     await expect(page.getByText(/pending/i)).toBeVisible();
     await showCaption(page, 'Human review task — status: pending');
 
-    await click(page, page.getByText(/previous step output/i));
+    // Previous Step Output panel is open by default; Summary tab is the
+    // default selection. Just confirm the user can see review context.
     await expect(page.getByRole('tab', { name: /summary/i })).toBeVisible();
     await showCaption(page, 'Reviewing previous step output');
 
-    await click(page, page.getByRole('button', { name: /approve/i }));
-    await expect(page.getByRole('button', { name: /submit review/i })).toBeVisible({ timeout: 5_000 });
-    await showCaption(page, 'Two-step approval: Approve → Submit review');
+    // Lock the single-click invariant before clicking: no Submit button
+    // exists in the form. If a future regression reinstated a two-step
+    // flow, this assertion would fail before the click below.
+    await expect(page.getByRole('button', { name: /submit review/i })).toHaveCount(0);
 
-    await click(page, page.getByRole('button', { name: /submit review/i }));
+    // Single-click verdict flow (GitHub-style): the Approve button submits
+    // immediately, no secondary Submit step.
+    await click(page, page.getByRole('button', { name: /^Approve$/ }));
     await expect(page.getByRole('link', { name: /view next task/i })).toBeVisible({ timeout: 15_000 });
+    // Lock: confirmation appeared without a second click anywhere.
+    await expect(page.getByRole('button', { name: /submit review/i })).toHaveCount(0);
     await showCaption(page, 'Task approved — next task available', 3500);
 
     // Status badge updates via onSnapshot listener — no need to navigate back

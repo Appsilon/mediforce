@@ -51,8 +51,20 @@ function setSubcollection(executions: StepExecutionRecord[], loading = false): v
 }
 
 async function expandPanel(): Promise<void> {
+  // Panel opens by default; this helper now only clicks the trigger if
+  // some prior change collapsed it. Idempotent so existing tests keep
+  // working without each having to know the default state.
   const trigger = screen.getByRole('button', { name: /previous step output/i });
-  await userEvent.setup().click(trigger);
+  if (trigger.getAttribute('aria-expanded') === 'false' || trigger.getAttribute('data-state') === 'closed') {
+    await userEvent.setup().click(trigger);
+  }
+}
+
+// Summary is the default selected tab. Iframe-related tests need the Report
+// tab active; this helper switches to it.
+async function activateReportTab(): Promise<void> {
+  const reportTrigger = screen.getByRole('tab', { name: /report/i });
+  await userEvent.setup().click(reportTrigger);
 }
 
 describe('TaskContextPanel', () => {
@@ -62,7 +74,7 @@ describe('TaskContextPanel', () => {
     mockUseTheme.mockReturnValue({ resolvedTheme: 'light', setTheme: vi.fn() });
   });
 
-  it('renders Report tab as default when previous step output has inline presentation', async () => {
+  it('renders Summary tab as default with Report tab available when inline presentation is present', async () => {
     const execution = buildExecution({
       output: {
         summary: 'OK',
@@ -79,10 +91,14 @@ describe('TaskContextPanel', () => {
     );
     await expandPanel();
 
-    // Report tab present and selected by default
+    // Summary selected by default; Report tab present but inactive.
+    const summaryTrigger = screen.getByRole('tab', { name: /summary/i });
     const reportTrigger = screen.getByRole('tab', { name: /report/i });
-    expect(reportTrigger.getAttribute('data-state')).toBe('active');
+    expect(summaryTrigger.getAttribute('data-state')).toBe('active');
+    expect(reportTrigger.getAttribute('data-state')).toBe('inactive');
 
+    // Switching to Report tab reveals the inline iframe.
+    await activateReportTab();
     const iframe = document.querySelector('iframe');
     expect(iframe).not.toBeNull();
     const srcdoc = iframe!.getAttribute('srcdoc')!;
@@ -112,6 +128,7 @@ describe('TaskContextPanel', () => {
       />,
     );
     await expandPanel();
+    await activateReportTab();
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledTimes(1);
@@ -174,6 +191,7 @@ describe('TaskContextPanel', () => {
       />,
     );
     await expandPanel();
+    await activateReportTab();
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledTimes(1);
@@ -211,6 +229,7 @@ describe('TaskContextPanel', () => {
       />,
     );
     await expandPanel();
+    await activateReportTab();
 
     const iframe = document.querySelector('iframe');
     expect(iframe).not.toBeNull();
@@ -232,6 +251,7 @@ describe('TaskContextPanel', () => {
       />,
     );
     await expandPanel();
+    await activateReportTab();
 
     const iframe = document.querySelector('iframe') as HTMLIFrameElement;
     expect(iframe).not.toBeNull();
@@ -264,6 +284,7 @@ describe('TaskContextPanel', () => {
       />,
     );
     await expandPanel();
+    await activateReportTab();
 
     const iframe = document.querySelector('iframe') as HTMLIFrameElement;
     expect(iframe).not.toBeNull();
@@ -296,6 +317,7 @@ describe('TaskContextPanel', () => {
       />,
     );
     await expandPanel();
+    await activateReportTab();
 
     const iframe = document.querySelector('iframe') as HTMLIFrameElement;
     expect(iframe).not.toBeNull();
@@ -332,6 +354,7 @@ describe('TaskContextPanel', () => {
       />,
     );
     await expandPanel();
+    await activateReportTab();
 
     const iframe = document.querySelector('iframe') as HTMLIFrameElement;
     expect(iframe).not.toBeNull();
@@ -377,6 +400,7 @@ describe('TaskContextPanel', () => {
       />,
     );
     await expandPanel();
+    await activateReportTab();
 
     const iframe = document.querySelector('iframe') as HTMLIFrameElement;
     expect(iframe).not.toBeNull();
@@ -406,6 +430,7 @@ describe('TaskContextPanel', () => {
       />,
     );
     await expandPanel();
+    await activateReportTab();
 
     const iframe = document.querySelector('iframe') as HTMLIFrameElement;
     expect(iframe).not.toBeNull();
