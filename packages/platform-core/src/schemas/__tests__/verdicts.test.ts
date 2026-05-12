@@ -4,7 +4,6 @@ import {
   defaultRequiresComment,
   defaultVerdictIntent,
   defaultVerdictLabel,
-  isVerdictAllowed,
 } from '../verdicts.js';
 
 describe('defaultVerdictLabel', () => {
@@ -97,16 +96,3 @@ describe('buildTaskVerdicts', () => {
   });
 });
 
-describe('isVerdictAllowed', () => {
-  it('returns true when the verdict key is in the step config', () => {
-    expect(isVerdictAllowed({ approve: { target: 'done' } }, 'approve')).toBe(true);
-  });
-
-  it('returns false when the verdict key is missing', () => {
-    expect(isVerdictAllowed({ approve: { target: 'done' } }, 'revise')).toBe(false);
-  });
-
-  it('returns false when stepVerdicts is undefined', () => {
-    expect(isVerdictAllowed(undefined, 'approve')).toBe(false);
-  });
-});

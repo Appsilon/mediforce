@@ -32,7 +32,10 @@ export function isResolveError(result: ResolveResult): result is ResolveError {
  * audit → resume process → advance step → trigger auto-runner.
  *
  * Body shapes:
- * - Verdict:     { verdict: "approve"|"revise", comment?: string }
+ * - Verdict:     { verdict: string, comment?: string, selectedIndex?: number }
+ *                  `verdict` is validated against the per-task allowlist
+ *                  copied onto `task.verdicts` at creation; tasks without
+ *                  that field fall back to the legacy approve/revise pair.
  * - Params:      { paramValues: Record<string, unknown> }
  * - File upload: { attachments: Attachment[] }
  */

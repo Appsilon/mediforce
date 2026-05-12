@@ -124,7 +124,7 @@ export function VerdictForm({
                 disabled={isDisabled}
                 className={cn(
                   'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                  intentSubmitClasses(cfg.intent),
+                  INTENT_STYLES[cfg.intent].submit,
                   isDisabled && 'opacity-50 cursor-not-allowed',
                 )}
               >
@@ -152,108 +152,58 @@ export function VerdictForm({
 
 // --- Intent helpers ------------------------------------------------------
 
+type IntentStyles = {
+  Icon: typeof CheckCircle;
+  submit: string;
+  card: string;
+  iconColor: string;
+  text: string;
+  blockquote: string;
+  timestamp: string;
+};
+
+const INTENT_STYLES: Record<Intent, IntentStyles> = {
+  success: {
+    Icon: CheckCircle,
+    submit: 'bg-green-600 text-white hover:bg-green-700',
+    card: 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800',
+    iconColor: 'text-green-600 dark:text-green-400',
+    text: 'text-green-800 dark:text-green-300',
+    blockquote: 'border-green-300 text-green-700 dark:border-green-700 dark:text-green-300',
+    timestamp: 'text-green-600/70 dark:text-green-400/70',
+  },
+  danger: {
+    Icon: XCircle,
+    submit: 'bg-red-600 text-white hover:bg-red-700',
+    card: 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800',
+    iconColor: 'text-red-600 dark:text-red-400',
+    text: 'text-red-800 dark:text-red-300',
+    blockquote: 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-300',
+    timestamp: 'text-red-600/70 dark:text-red-400/70',
+  },
+  warning: {
+    Icon: MessageSquare,
+    submit: 'bg-amber-600 text-white hover:bg-amber-700',
+    card: 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    text: 'text-amber-800 dark:text-amber-300',
+    blockquote: 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300',
+    timestamp: 'text-amber-600/70 dark:text-amber-400/70',
+  },
+  neutral: {
+    Icon: Circle,
+    submit: 'bg-slate-600 text-white hover:bg-slate-700',
+    card: 'bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800',
+    iconColor: 'text-slate-600 dark:text-slate-400',
+    text: 'text-slate-800 dark:text-slate-300',
+    blockquote: 'border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-300',
+    timestamp: 'text-slate-600/70 dark:text-slate-400/70',
+  },
+};
+
 function IntentIcon({ intent, className }: { intent: Intent; className?: string }) {
-  switch (intent) {
-    case 'success':
-      return <CheckCircle className={className} />;
-    case 'danger':
-      return <XCircle className={className} />;
-    case 'warning':
-      return <MessageSquare className={className} />;
-    case 'neutral':
-    default:
-      return <Circle className={className} />;
-  }
-}
-
-function intentSubmitClasses(intent: Intent): string {
-  switch (intent) {
-    case 'success':
-      return 'bg-green-600 text-white hover:bg-green-700';
-    case 'danger':
-      return 'bg-red-600 text-white hover:bg-red-700';
-    case 'warning':
-      return 'bg-amber-600 text-white hover:bg-amber-700';
-    case 'neutral':
-    default:
-      return 'bg-slate-600 text-white hover:bg-slate-700';
-  }
-}
-
-function intentCardClasses(intent: Intent): string {
-  switch (intent) {
-    case 'success':
-      return 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800';
-    case 'danger':
-      return 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800';
-    case 'warning':
-      return 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800';
-    case 'neutral':
-    default:
-      return 'bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800';
-  }
-}
-
-function intentIconColorClasses(intent: Intent): string {
-  switch (intent) {
-    case 'success':
-      return 'text-green-600 dark:text-green-400';
-    case 'danger':
-      return 'text-red-600 dark:text-red-400';
-    case 'warning':
-      return 'text-amber-600 dark:text-amber-400';
-    case 'neutral':
-    default:
-      return 'text-slate-600 dark:text-slate-400';
-  }
-}
-
-function intentTextClasses(intent: Intent): string {
-  switch (intent) {
-    case 'success':
-      return 'text-green-800 dark:text-green-300';
-    case 'danger':
-      return 'text-red-800 dark:text-red-300';
-    case 'warning':
-      return 'text-amber-800 dark:text-amber-300';
-    case 'neutral':
-    default:
-      return 'text-slate-800 dark:text-slate-300';
-  }
-}
-
-function intentBlockquoteClasses(intent: Intent): string {
-  switch (intent) {
-    case 'success':
-      return 'border-green-300 text-green-700 dark:border-green-700 dark:text-green-300';
-    case 'danger':
-      return 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-300';
-    case 'warning':
-      return 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300';
-    case 'neutral':
-    default:
-      return 'border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-300';
-  }
-}
-
-function intentTimestampClasses(intent: Intent): string {
-  switch (intent) {
-    case 'success':
-      return 'text-green-600/70 dark:text-green-400/70';
-    case 'danger':
-      return 'text-red-600/70 dark:text-red-400/70';
-    case 'warning':
-      return 'text-amber-600/70 dark:text-amber-400/70';
-    case 'neutral':
-    default:
-      return 'text-slate-600/70 dark:text-slate-400/70';
-  }
-}
-
-function confirmationHeadline(verdict: string, label: string): string {
-  if (verdict === 'approve') return 'You approved this review';
-  if (verdict === 'revise') return 'You requested revisions';
-  return `Submitted: ${label}`;
+  const { Icon } = INTENT_STYLES[intent];
+  return <Icon className={className} />;
 }
 
 // --- Post-submission inline confirmation ---------------------------------
@@ -266,24 +216,25 @@ function VerdictConfirmation({
   remainingTaskCount?: number;
 }) {
   const handle = useHandleFromPath();
+  const styles = INTENT_STYLES[data.intent];
 
   return (
     <div className="space-y-4">
-      <div className={cn('rounded-lg border p-4', intentCardClasses(data.intent))}>
+      <div className={cn('rounded-lg border p-4', styles.card)}>
         <div className="flex items-center gap-2">
-          <IntentIcon intent={data.intent} className={cn('h-5 w-5', intentIconColorClasses(data.intent))} />
-          <span className={cn('font-medium text-sm', intentTextClasses(data.intent))}>
-            {confirmationHeadline(data.verdict, data.label)}
+          <IntentIcon intent={data.intent} className={cn('h-5 w-5', styles.iconColor)} />
+          <span className={cn('font-medium text-sm', styles.text)}>
+            Submitted: {data.label}
           </span>
         </div>
 
         {data.comment && (
-          <blockquote className={cn('mt-3 border-l-2 pl-3 text-sm', intentBlockquoteClasses(data.intent))}>
+          <blockquote className={cn('mt-3 border-l-2 pl-3 text-sm', styles.blockquote)}>
             {data.comment}
           </blockquote>
         )}
 
-        <p className={cn('mt-2 text-xs', intentTimestampClasses(data.intent))}>
+        <p className={cn('mt-2 text-xs', styles.timestamp)}>
           {format(new Date(data.timestamp), 'MMM d, yyyy HH:mm')}
         </p>
       </div>

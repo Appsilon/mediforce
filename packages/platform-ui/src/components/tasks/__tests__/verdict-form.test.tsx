@@ -12,9 +12,9 @@ vi.mock('@/contexts/auth-context', () => ({
   useAuth: () => ({ firebaseUser: { getIdToken: () => Promise.resolve('test-token') } }),
 }));
 
-vi.mock('@/hooks/use-handle-from-path', () => ({
-  useHandleFromPath: () => 'test-ns',
-}));
+// Note: useHandleFromPath is only called from the post-submit confirmation
+// (VerdictConfirmation). These tests assert pre-submit behaviour; no mock
+// needed.
 
 import { VerdictForm } from '../verdict-form';
 

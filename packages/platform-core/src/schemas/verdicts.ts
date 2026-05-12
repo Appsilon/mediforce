@@ -43,11 +43,3 @@ export function buildTaskVerdicts(
   }));
 }
 
-/** Used by resolve-task to validate submitted verdict against step config. */
-export function isVerdictAllowed(
-  stepVerdicts: Record<string, { target: string }> | undefined,
-  verdictKey: string,
-): boolean {
-  if (!stepVerdicts) return false;
-  return verdictKey in stepVerdicts;
-}

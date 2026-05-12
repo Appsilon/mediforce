@@ -307,7 +307,7 @@ function validateInputForNextRun(
  * literal 'revise' verdict. Allowing custom verdicts on L3 steps would
  * silently break the loop. Lifting this is tracked in #391.
  */
-const L3_VERDICT_KEYS = ['approve', 'revise'] as const;
+const L3_VERDICT_KEYS = ['approve', 'revise'] as const; // see #391 — lift this allowlist when isL3Revise generalises to a per-verdict loopBack flag
 
 function validateVerdicts(
   wd: {

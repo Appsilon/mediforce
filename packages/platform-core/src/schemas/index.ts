@@ -23,7 +23,6 @@ export {
   defaultVerdictIntent,
   defaultVerdictLabel,
   defaultRequiresComment,
-  isVerdictAllowed,
   type TaskVerdict,
 } from './verdicts.js';
 

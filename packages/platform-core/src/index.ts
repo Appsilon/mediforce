@@ -88,7 +88,6 @@ export {
   defaultVerdictIntent,
   defaultVerdictLabel,
   defaultRequiresComment,
-  isVerdictAllowed,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
