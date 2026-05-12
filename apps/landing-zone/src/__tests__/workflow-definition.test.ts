@@ -211,7 +211,7 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     expect(transitions).toContainEqual({ from: 'new-rules-branch', to: 'rejected-with-note' });
   });
 
-  it('human-review verdicts unchanged (approve/revise routes preserved)', () => {
+  it('human-review exposes three verdicts (accept / reject_and_notify / ask_agent_to_revise)', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
@@ -219,8 +219,23 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     const humanReview = result.data.steps.find((step) => step.id === 'human-review');
     expect(humanReview).toBeDefined();
     expect(humanReview?.verdicts).toEqual({
-      approve: { target: 'accept-delivery' },
-      revise: { target: 'draft-rejection-note' },
+      accept: {
+        target: 'accept-delivery',
+        label: 'Accept delivery',
+        intent: 'success',
+      },
+      reject_and_notify: {
+        target: 'draft-rejection-note',
+        label: 'Reject — notify CRO',
+        intent: 'danger',
+        requiresComment: true,
+      },
+      ask_agent_to_revise: {
+        target: 'interpret-validation',
+        label: 'Ask agent to make changes',
+        intent: 'warning',
+        requiresComment: true,
+      },
     });
   });
 });
