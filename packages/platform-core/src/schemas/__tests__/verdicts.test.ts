@@ -12,8 +12,8 @@ describe('defaultVerdictLabel', () => {
     expect(defaultVerdictLabel('approve')).toBe('Approve');
   });
 
-  it('returns "Request revisions" for revise', () => {
-    expect(defaultVerdictLabel('revise')).toBe('Request revisions');
+  it('returns "Request changes" for revise', () => {
+    expect(defaultVerdictLabel('revise')).toBe('Request changes');
   });
 
   it('humanizes snake_case keys', () => {
@@ -71,7 +71,7 @@ describe('buildTaskVerdicts', () => {
     });
     expect(out).toEqual({
       approve: { label: 'Approve', intent: 'success', requiresComment: false },
-      revise: { label: 'Request revisions', intent: 'warning', requiresComment: true },
+      revise: { label: 'Request changes', intent: 'warning', requiresComment: true },
     });
   });
 

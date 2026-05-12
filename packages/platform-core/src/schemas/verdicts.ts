@@ -3,7 +3,7 @@ import type { Verdict } from './process-definition.js';
 /** Default UI label for a verdict key. Server-side fallback so UI stays dumb. */
 export function defaultVerdictLabel(key: string): string {
   if (key === 'approve') return 'Approve';
-  if (key === 'revise') return 'Request revisions';
+  if (key === 'revise') return 'Request changes';
   return key
     .split(/[_-]/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))

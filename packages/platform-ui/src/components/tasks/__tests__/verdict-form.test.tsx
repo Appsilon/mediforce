@@ -27,7 +27,7 @@ describe('VerdictForm (single-click GitHub flow)', () => {
   it('renders the legacy two-button UI when verdicts prop is undefined', () => {
     render(<VerdictForm taskId="t1" disabled={false} />);
     expect(screen.getByRole('button', { name: /^Approve$/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Request revisions/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Request changes/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Reject/ })).not.toBeInTheDocument();
   });
 

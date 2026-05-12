@@ -32,7 +32,7 @@ interface SubmittedData {
 
 const LEGACY_VERDICTS: Record<string, TaskVerdict> = {
   approve: { label: 'Approve', intent: 'success', requiresComment: false },
-  revise: { label: 'Request revisions', intent: 'warning', requiresComment: true },
+  revise: { label: 'Request changes', intent: 'warning', requiresComment: true },
 };
 
 /**
