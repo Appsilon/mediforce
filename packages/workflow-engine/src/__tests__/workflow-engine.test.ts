@@ -564,6 +564,74 @@ describe('WorkflowEngine', () => {
       ).rejects.toThrow('Firestore unavailable');
     });
 
+    it('copies the next step verdicts onto the HumanTask as an ordered descriptor array', async () => {
+      const humanTaskRepo = new InMemoryHumanTaskRepository();
+      const engineWithHumanTasks = new WorkflowEngine(
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        undefined,
+        undefined,
+        undefined,
+        humanTaskRepo,
+      );
+
+      const defWithVerdicts = {
+        name: 'linear-process-verdicts',
+        version: 1,
+        namespace: 'test',
+        visibility: 'private' as const,
+        steps: [
+          { id: 'start', name: 'Start', type: 'creation' as const, executor: 'agent' as const },
+          {
+            id: 'review',
+            name: 'Review',
+            type: 'review' as const,
+            executor: 'human' as const,
+            verdicts: {
+              accept: { target: 'done', label: 'Accept delivery', intent: 'success' as const },
+              reject_and_notify: { target: 'done', label: 'Reject — notify CRO', intent: 'danger' as const },
+              ask_agent_to_revise: {
+                target: 'done',
+                label: 'Ask agent to make changes',
+                intent: 'warning' as const,
+                requiresComment: true,
+              },
+            },
+          },
+          { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+        ],
+        transitions: [
+          { from: 'start', to: 'review' },
+        ],
+        triggers: [{ type: 'manual' as const, name: 'Start' }],
+      };
+      await processRepo.saveWorkflowDefinition(defWithVerdicts);
+
+      const instance = await engineWithHumanTasks.createInstance('test',
+        'linear-process-verdicts',
+        1,
+        'user-1',
+        'manual',
+        {},
+      );
+      await engineWithHumanTasks.startInstance(instance.id);
+      await engineWithHumanTasks.advanceStep(
+        instance.id,
+        {},
+        { id: 'user-1', role: 'operator' },
+      );
+
+      const tasks = humanTaskRepo.getAll();
+      expect(tasks).toHaveLength(1);
+      // Array shape — order matches WD insertion order.
+      expect(tasks[0].verdicts).toEqual([
+        { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
+        { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
+        { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+      ]);
+    });
+
     it('sets assignedRole from WorkflowDefinition step allowedRoles', async () => {
       const humanTaskRepo = new InMemoryHumanTaskRepository();
       const engineWithHumanTasks = new WorkflowEngine(
