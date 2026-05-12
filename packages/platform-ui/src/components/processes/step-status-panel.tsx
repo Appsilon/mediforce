@@ -3,12 +3,13 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { CheckCircle2, Clock, XCircle, Circle, Pause, User, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Circle, Pause, User, UserCheck, Bot, Cog, ChevronDown, ChevronRight, FileText, FileCode } from 'lucide-react';
 import type { ProcessInstance, StepExecution, Step } from '@mediforce/platform-core';
 import { AutonomyBadge } from '../agents/autonomy-badge';
 import { RetryStepButton } from './retry-step-button';
 import { cn } from '@/lib/utils';
 import { getWorkflowStatus } from '@/lib/workflow-status';
+import { getEffectiveStatus, type EffectiveStatus } from './step-status';
 import { formatDuration, formatCostUsd } from '@/lib/format';
 import { useUserDisplayNames } from '@/hooks/use-users';
 
@@ -52,50 +53,6 @@ interface StepStatusPanelProps {
   stepDetailBaseHref?: string;
 }
 
-type EffectiveStatus = 'pending' | 'running' | 'completed' | 'failed' | 'waiting';
-
-function getEffectiveStatus(
-  step: Step,
-  instance: ProcessInstance,
-  stepExecutions: StepExecution[],
-): EffectiveStatus {
-  // Find the latest execution for this step (by startedAt if multiple)
-  const execs = stepExecutions
-    .filter((e) => e.stepId === step.id)
-    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-
-  const exec = execs[0];
-
-  if (exec) {
-    if (exec.status === 'running' || exec.status === 'pending') {
-      // If instance is paused on this step, show 'waiting' instead of 'running'
-      // (e.g. L3 agent step paused for human review — execution record stays 'running')
-      if (
-        instance.currentStepId === step.id
-        && getWorkflowStatus(instance).displayStatus === 'waiting_for_human'
-      ) {
-        return 'waiting';
-      }
-      return 'running';
-    }
-    if (exec.status === 'completed') return 'completed';
-    if (exec.status === 'escalated' || exec.status === 'paused') return 'waiting';
-    if (exec.status === 'failed') return 'failed';
-  }
-
-  // No execution record yet — derive from instance state
-  if (instance.currentStepId === step.id) {
-    if (getWorkflowStatus(instance).displayStatus === 'waiting_for_human') {
-      return 'waiting';
-    }
-    if (instance.status === 'running') {
-      return 'running';
-    }
-  }
-
-  return 'pending';
-}
-
 function StatusIcon({ status }: { status: EffectiveStatus }) {
   switch (status) {
     case 'completed':
@@ -106,6 +63,8 @@ function StatusIcon({ status }: { status: EffectiveStatus }) {
       return <XCircle className="h-4 w-4 text-red-500 shrink-0" />;
     case 'waiting':
       return <Pause className="h-4 w-4 text-amber-500 shrink-0" />;
+    case 'awaiting_approval':
+      return <UserCheck className="h-4 w-4 text-amber-500 shrink-0" />;
     case 'pending':
     default:
       return <Circle className="h-4 w-4 text-muted-foreground shrink-0" />;
@@ -118,6 +77,7 @@ function StatusLabel({ status }: { status: EffectiveStatus }) {
     running: 'text-blue-700 dark:text-blue-300',
     failed: 'text-red-700 dark:text-red-300',
     waiting: 'text-amber-700 dark:text-amber-300',
+    awaiting_approval: 'text-amber-700 dark:text-amber-300',
     pending: 'text-muted-foreground',
   };
   const labels: Record<EffectiveStatus, string> = {
@@ -125,6 +85,7 @@ function StatusLabel({ status }: { status: EffectiveStatus }) {
     running: 'Running',
     failed: 'Failed',
     waiting: 'Waiting',
+    awaiting_approval: 'Awaiting approval',
     pending: 'Pending',
   };
   return (
@@ -345,6 +306,7 @@ function getLeftBorderClass(status: EffectiveStatus): string {
     case 'running':
       return 'border-l-4 border-blue-500';
     case 'waiting':
+    case 'awaiting_approval':
       return 'border-l-4 border-amber-500';
     default:
       return 'border-l-4 border-transparent';
