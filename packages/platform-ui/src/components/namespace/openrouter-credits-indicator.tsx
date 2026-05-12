@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { getOpenRouterCredits, type NamespaceOpenRouterCredits } from '@/app/actions/namespace-secrets';
 import { cn } from '@/lib/utils';
 
-const STORAGE_KEY = 'mediforce:hide-credits';
+const STORAGE_KEY = 'mediforce:show-credits';
 const LOW_CREDITS_THRESHOLD = 5;
 
 interface OpenRouterCreditsIndicatorProps {
@@ -17,10 +17,10 @@ export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicato
   const { firebaseUser } = useAuth();
   const [credits, setCredits] = React.useState<NamespaceOpenRouterCredits | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [hidden, setHidden] = React.useState(false);
+  const [hidden, setHidden] = React.useState(true);
 
   React.useEffect(() => {
-    setHidden(localStorage.getItem(STORAGE_KEY) === '1');
+    setHidden(localStorage.getItem(STORAGE_KEY) !== '1');
   }, []);
 
   React.useEffect(() => {
@@ -44,9 +44,9 @@ export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicato
     const next = !hidden;
     setHidden(next);
     if (next) {
-      localStorage.setItem(STORAGE_KEY, '1');
-    } else {
       localStorage.removeItem(STORAGE_KEY);
+    } else {
+      localStorage.setItem(STORAGE_KEY, '1');
     }
   }
 
