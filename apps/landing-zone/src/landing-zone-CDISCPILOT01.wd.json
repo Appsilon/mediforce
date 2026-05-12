@@ -28,7 +28,6 @@
     "DATA_MANAGER_EMAIL": "{{DATA_MANAGER_EMAIL_CDISCPILOT01}}"
   },
   "triggers": [
-    { "name": "poll-sftp", "type": "cron", "schedule": "*/15 * * * *" },
     { "name": "manual", "type": "manual" }
   ],
   "inputForNextRun": [
