@@ -23,6 +23,7 @@ vi.mock('next-themes', () => ({
 }));
 
 import { TaskContextPanel } from '../task-context-panel';
+import { MAX_IFRAME_HEIGHT } from '../iframe-helpers';
 
 type StepExecutionRecord = StepExecution & { id: string };
 
@@ -277,9 +278,90 @@ describe('TaskContextPanel', () => {
 
     await waitFor(() => {
       const px = parseInt(iframe.style.height, 10);
-      expect(px).toBeLessThanOrEqual(2400);
+      expect(px).toBeLessThanOrEqual(MAX_IFRAME_HEIGHT);
       expect(px).toBeGreaterThan(0);
     });
+  });
+
+  it('holds iframe height steady when iframe posts a runaway sequence of growing heights', async () => {
+    const execution = buildExecution({
+      output: { presentation: '<div>loop</div>' },
+    });
+    setSubcollection([execution]);
+
+    render(
+      <TaskContextPanel
+        processInstanceId="inst-1"
+        stepId="human-review"
+      />,
+    );
+    await expandPanel();
+
+    const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+    expect(iframe).not.toBeNull();
+
+    // Simulate the ResizeObserver feedback loop: each "tick" reports a larger
+    // height than the previous one, mimicking 100vh chasing the iframe size.
+    for (const height of [1000, 2000, 4000, 8000, 16000, 32000]) {
+      await act(async () => {
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            data: { type: 'resize', height },
+            source: iframe.contentWindow,
+          }),
+        );
+      });
+    }
+
+    await waitFor(() => {
+      const px = parseInt(iframe.style.height, 10);
+      expect(px).toBe(MAX_IFRAME_HEIGHT);
+    });
+  });
+
+  it('keeps previous iframe height when iframe reports an invalid value', async () => {
+    const execution = buildExecution({
+      output: { presentation: '<div>invalid</div>' },
+    });
+    setSubcollection([execution]);
+
+    render(
+      <TaskContextPanel
+        processInstanceId="inst-1"
+        stepId="human-review"
+      />,
+    );
+    await expandPanel();
+
+    const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+    expect(iframe).not.toBeNull();
+
+    // First, a valid height sets the panel to 800px.
+    await act(async () => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { type: 'resize', height: 800 },
+          source: iframe.contentWindow,
+        }),
+      );
+    });
+    await waitFor(() => {
+      expect(parseInt(iframe.style.height, 10)).toBe(800);
+    });
+
+    // Then, an invalid height (0 / NaN) MUST NOT collapse the iframe.
+    for (const bad of [0, -1, Number.NaN]) {
+      await act(async () => {
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            data: { type: 'resize', height: bad },
+            source: iframe.contentWindow,
+          }),
+        );
+      });
+    }
+
+    expect(parseInt(iframe.style.height, 10)).toBe(800);
   });
 
   it('iframe srcdoc neutralises Tailwind viewport-height classes to avoid feedback growth', async () => {
@@ -299,8 +381,14 @@ describe('TaskContextPanel', () => {
     const iframe = document.querySelector('iframe') as HTMLIFrameElement;
     expect(iframe).not.toBeNull();
     const srcdoc = iframe.getAttribute('srcdoc')!;
-    expect(srcdoc).toMatch(/\.min-h-screen[\s\S]*min-height:\s*0/);
-    expect(srcdoc).toMatch(/\.h-screen[\s\S]*height:\s*auto/);
+    // !important is load-bearing: without it, Tailwind's CDN-generated
+    // .h-screen utility ties on specificity and may win the cascade by being
+    // injected later. Assert each override uses !important so the neutralise
+    // claim holds at runtime, not just in the source string.
+    expect(srcdoc).toMatch(/\.h-screen[\s\S]*?,\s*\.min-h-screen[\s\S]*?,\s*\.max-h-screen/);
+    expect(srcdoc).toMatch(/height:\s*auto\s*!important/);
+    expect(srcdoc).toMatch(/min-height:\s*0\s*!important/);
+    expect(srcdoc).toMatch(/max-height:\s*none\s*!important/);
   });
 
   it('posts a theme message to the iframe contentWindow when the parent theme changes', async () => {

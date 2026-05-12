@@ -50,7 +50,10 @@ export function AgentOutputReviewPanel({
         iframeRef.current &&
         event.source === iframeRef.current.contentWindow
       ) {
-        setIframeHeight(clampIframeHeight(event.data.height));
+        setIframeHeight((prev) => {
+          const next = clampIframeHeight(event.data.height);
+          return next > 0 ? next : prev;
+        });
       }
     };
     window.addEventListener('message', handler);
