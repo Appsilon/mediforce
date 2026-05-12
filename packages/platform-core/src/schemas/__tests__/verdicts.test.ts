@@ -94,5 +94,12 @@ describe('buildTaskVerdicts', () => {
     const out = buildTaskVerdicts({ approve: { target: 'done' } });
     expect(out?.[0]).not.toHaveProperty('target');
   });
+
+  it('defaults a custom (non approve/revise) key with only target to neutral intent + no comment required', () => {
+    const out = buildTaskVerdicts({ escalate: { target: 'oncall' } });
+    expect(out).toEqual([
+      { key: 'escalate', label: 'Escalate', intent: 'neutral', requiresComment: false },
+    ]);
+  });
 });
 

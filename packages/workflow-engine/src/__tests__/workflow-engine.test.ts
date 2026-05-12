@@ -207,6 +207,44 @@ describe('WorkflowEngine', () => {
     expect(result.status).toBe('completed');
   });
 
+  it('submitReviewVerdict routes a non-first verdict to its declared target (N-way)', async () => {
+    // reviewDef declares: approve → approved, revise → draft, reject → rejected.
+    // 'reject' is the third declared verdict; routing must follow the verdicts
+    // map, NOT the order in which transitions are listed. Without this case,
+    // a bug that just takes the first matching transition would pass the
+    // 'approve' happy-path test.
+    const instance = await engine.createInstance('test',
+      'review-process',
+      1,
+      'user-1',
+      'manual',
+      {},
+    );
+    await engine.startInstance(instance.id);
+    await engine.advanceStep(instance.id, {}, actor);
+
+    const verdict = makeReviewVerdict('reject');
+    const result = await engine.submitReviewVerdict(
+      instance.id,
+      'review',
+      verdict,
+      actor,
+    );
+
+    expect(result.status).toBe('completed');
+    // currentStepId is cleared on completion. Read the terminal-reached
+    // audit event to verify the routing target. 'rejected' has to win
+    // over the first-declared 'approve → approved' verdict, proving the
+    // engine routes via step.verdicts[verdict].target, not first match.
+    const completedEvent = auditRepo
+      .getAll()
+      .find((e) => e.action === 'instance.completed');
+    expect(completedEvent).toBeDefined();
+    const terminalStepId =
+      (completedEvent!.inputSnapshot as { terminalStepId?: string } | undefined)?.terminalStepId;
+    expect(terminalStepId).toBe('rejected');
+  });
+
   it('submitReviewVerdict when maxIterations exceeded: pauses instance with reason max_iterations_exceeded', async () => {
     const instance = await engine.createInstance('test',
       'review-process',

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
+import { WorkflowDefinitionSchema, buildTaskVerdicts } from '@mediforce/platform-core';
 
 describe('landing-zone-CDISCPILOT01.wd.json', () => {
   const appDir = resolve(import.meta.dirname, '../..');
@@ -235,5 +235,24 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
         requiresComment: true,
       },
     });
+  });
+
+  it('round-trips WD verdicts through buildTaskVerdicts into the descriptor array reviewers see', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const humanReview = result.data.steps.find((step) => step.id === 'human-review');
+    expect(humanReview).toBeDefined();
+    const descriptors = buildTaskVerdicts(humanReview!.verdicts);
+
+    // Order, labels, intents and the per-verdict requiresComment must
+    // survive parse + descriptor build. This is what the engine writes
+    // onto the HumanTask and what VerdictForm renders.
+    expect(descriptors).toEqual([
+      { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
+      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
+      { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+    ]);
   });
 });

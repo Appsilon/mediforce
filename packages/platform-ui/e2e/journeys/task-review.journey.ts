@@ -41,10 +41,17 @@ test.describe('Task Review Journey', () => {
     await expect(page.getByRole('tab', { name: /summary/i })).toBeVisible();
     await showCaption(page, 'Reviewing previous step output');
 
+    // Lock the single-click invariant before clicking: no Submit button
+    // exists in the form. If a future regression reinstated a two-step
+    // flow, this assertion would fail before the click below.
+    await expect(page.getByRole('button', { name: /submit review/i })).toHaveCount(0);
+
     // Single-click verdict flow (GitHub-style): the Approve button submits
     // immediately, no secondary Submit step.
     await click(page, page.getByRole('button', { name: /^Approve$/ }));
     await expect(page.getByRole('link', { name: /view next task/i })).toBeVisible({ timeout: 15_000 });
+    // Lock: confirmation appeared without a second click anywhere.
+    await expect(page.getByRole('button', { name: /submit review/i })).toHaveCount(0);
     await showCaption(page, 'Task approved — next task available', 3500);
 
     // Status badge updates via onSnapshot listener — no need to navigate back

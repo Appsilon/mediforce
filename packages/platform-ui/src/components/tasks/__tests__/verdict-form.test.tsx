@@ -12,11 +12,13 @@ vi.mock('@/contexts/auth-context', () => ({
   useAuth: () => ({ firebaseUser: { getIdToken: () => Promise.resolve('test-token') } }),
 }));
 
-// Note: useHandleFromPath is only called from the post-submit confirmation
-// (VerdictConfirmation). These tests assert pre-submit behaviour; no mock
-// needed.
+// useHandleFromPath is called by the post-submit confirmation view; mocked
+// here so the read-only confirmation tests below can render a stable Link.
+vi.mock('@/hooks/use-handle-from-path', () => ({
+  useHandleFromPath: () => 'test-ns',
+}));
 
-import { VerdictForm } from '../verdict-form';
+import { VerdictForm, VerdictConfirmationReadOnly } from '../verdict-form';
 
 describe('VerdictForm (single-click GitHub flow)', () => {
   beforeEach(() => {
@@ -92,5 +94,61 @@ describe('VerdictForm (single-click GitHub flow)', () => {
 
     await waitFor(() => expect(mockCompleteTask).toHaveBeenCalledTimes(1));
     expect(mockCompleteTask).toHaveBeenCalledWith('t1', 'approve', 'looks good', undefined, 'test-token');
+  });
+});
+
+describe('VerdictConfirmationReadOnly', () => {
+  it('renders label + comment from task.verdicts when present', () => {
+    const verdicts: TaskVerdict[] = [
+      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: true },
+    ];
+    render(
+      <VerdictConfirmationReadOnly
+        completionData={{
+          verdict: 'reject_and_notify',
+          comment: 'tables missing',
+          completedAt: '2026-05-12T10:00:00.000Z',
+        }}
+        verdicts={verdicts}
+      />,
+    );
+    expect(screen.getByText(/Submitted: Reject — notify CRO/)).toBeInTheDocument();
+    expect(screen.getByText('tables missing')).toBeInTheDocument();
+  });
+
+  it('falls back to LEGACY_VERDICTS mapping for a revise verdict on a task without verdicts', () => {
+    render(
+      <VerdictConfirmationReadOnly
+        completionData={{
+          verdict: 'revise',
+          comment: 'needs rework',
+          completedAt: '2026-05-12T10:00:00.000Z',
+        }}
+      />,
+    );
+    expect(screen.getByText(/Submitted: Request changes/)).toBeInTheDocument();
+    expect(screen.getByText('needs rework')).toBeInTheDocument();
+  });
+
+  it('falls back to a neutral label = key for an unknown verdict with no descriptors', () => {
+    render(
+      <VerdictConfirmationReadOnly
+        completionData={{
+          verdict: 'escalate',
+          comment: '',
+          completedAt: '2026-05-12T10:00:00.000Z',
+        }}
+      />,
+    );
+    expect(screen.getByText(/Submitted: escalate/)).toBeInTheDocument();
+  });
+
+  it('renders the "no verdict data available" notice when completionData has no verdict', () => {
+    render(
+      <VerdictConfirmationReadOnly
+        completionData={{ comment: 'orphan', completedAt: '2026-05-12T10:00:00.000Z' }}
+      />,
+    );
+    expect(screen.getByText(/Task completed\. No verdict data available\./)).toBeInTheDocument();
   });
 });

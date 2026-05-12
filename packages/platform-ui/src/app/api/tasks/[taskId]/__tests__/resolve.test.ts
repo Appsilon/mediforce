@@ -239,6 +239,49 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
     expect(json.error).toMatch(/accept, reject_and_notify/);
   });
 
+  it('[DATA] accepts a requiresComment verdict when a non-empty comment is supplied', async () => {
+    mockGetById.mockResolvedValue({
+      ...claimedVerdictTask,
+      verdicts: [
+        { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+      ],
+    });
+    mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(advancedInstance);
+
+    const res = await POST(
+      makeRequest('task-1', { verdict: 'ask_agent_to_revise', comment: 'add unit count' }),
+      { params: makeParams('task-1') },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockComplete).toHaveBeenCalled();
+  });
+
+  it('[ERROR] enforces requiresComment server-side — rejects empty comment with 400', async () => {
+    // The UI gates the button, but a direct API caller could otherwise
+    // bypass requiresComment by curling the endpoint with no comment. The
+    // server reads the descriptor on task.verdicts and enforces.
+    mockGetById.mockResolvedValue({
+      ...claimedVerdictTask,
+      verdicts: [
+        { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+      ],
+    });
+
+    const res = await POST(
+      makeRequest('task-1', { verdict: 'ask_agent_to_revise', comment: '   ' }),
+      { params: makeParams('task-1') },
+    );
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toMatch(/requires a non-empty comment/);
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+
   it('[DATA] falls back to approve/revise allowlist when task has no verdicts field', async () => {
     // Pre-N-way tasks have no verdicts field. Both approve and revise must
     // still resolve cleanly so legacy in-flight tasks keep working.

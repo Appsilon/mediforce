@@ -92,8 +92,9 @@ export async function resolveTask(
     // (created in execute-agent-step without verdicts) and any task created
     // before this field existed.
     const taskVerdicts = resolvedTask.verdicts;
+    const descriptor = taskVerdicts?.find((v) => v.key === verdict);
     const allowed = taskVerdicts
-      ? taskVerdicts.some((v) => v.key === verdict)
+      ? descriptor !== undefined
       : verdict === 'approve' || verdict === 'revise';
     if (!allowed) {
       const allowedKeys = taskVerdicts
@@ -103,6 +104,18 @@ export async function resolveTask(
         error: `verdict '${verdict}' not allowed for step '${resolvedTask.stepId}' — must be one of: ${allowedKeys}`,
         httpStatus: 400,
       };
+    }
+    // Enforce requiresComment server-side too. The UI gates the button, but
+    // a direct API caller could otherwise bypass the constraint and submit
+    // an empty 'reject' on a step that demands a reason.
+    if (descriptor?.requiresComment) {
+      const submittedComment = typeof body.comment === 'string' ? body.comment.trim() : '';
+      if (submittedComment.length === 0) {
+        return {
+          error: `verdict '${verdict}' requires a non-empty comment`,
+          httpStatus: 400,
+        };
+      }
     }
   }
 
