@@ -114,8 +114,7 @@
         "reject_and_notify": {
           "target": "draft-rejection-note",
           "label": "Reject — notify CRO",
-          "intent": "danger",
-          "requiresComment": true
+          "intent": "danger"
         },
         "ask_agent_to_revise": {
           "target": "interpret-validation",

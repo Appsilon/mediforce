@@ -227,7 +227,6 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
         target: 'draft-rejection-note',
         label: 'Reject — notify CRO',
         intent: 'danger',
-        requiresComment: true,
       },
       ask_agent_to_revise: {
         target: 'interpret-validation',

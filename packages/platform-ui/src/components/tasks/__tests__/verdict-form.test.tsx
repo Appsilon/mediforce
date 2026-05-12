@@ -18,7 +18,7 @@ vi.mock('@/hooks/use-handle-from-path', () => ({
 
 import { VerdictForm } from '../verdict-form';
 
-describe('VerdictForm', () => {
+describe('VerdictForm (single-click GitHub flow)', () => {
   beforeEach(() => {
     mockCompleteTask.mockReset();
     mockCompleteTask.mockResolvedValue({ success: true });
@@ -34,7 +34,7 @@ describe('VerdictForm', () => {
   it('renders one button per resolved verdict descriptor', () => {
     const verdicts: Record<string, TaskVerdict> = {
       accept: { label: 'Accept delivery', intent: 'success', requiresComment: false },
-      reject_and_notify: { label: 'Reject — notify CRO', intent: 'danger', requiresComment: true },
+      reject_and_notify: { label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
       ask_agent_to_revise: { label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
     };
 
@@ -45,54 +45,49 @@ describe('VerdictForm', () => {
     expect(screen.getByRole('button', { name: /Ask agent to make changes/ })).toBeInTheDocument();
   });
 
-  it('submits the verdict key (not the label) to completeTask', async () => {
+  it('fires completeTask immediately on a single button click (no Submit step)', async () => {
     const verdicts: Record<string, TaskVerdict> = {
       accept: { label: 'Accept delivery', intent: 'success', requiresComment: false },
-      reject_and_notify: { label: 'Reject — notify CRO', intent: 'danger', requiresComment: true },
+      reject_and_notify: { label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
     };
     const user = userEvent.setup();
 
     render(<VerdictForm taskId="t1" disabled={false} verdicts={verdicts} />);
     await user.click(screen.getByRole('button', { name: /Accept delivery/ }));
-    await user.click(screen.getByRole('button', { name: /Submit review/ }));
 
     await waitFor(() => expect(mockCompleteTask).toHaveBeenCalledTimes(1));
     expect(mockCompleteTask).toHaveBeenCalledWith('t1', 'accept', '', undefined, 'test-token');
   });
 
-  it('blocks submit when requiresComment is true and the comment is empty', async () => {
+  it('disables a requiresComment verdict button until a comment is typed', async () => {
     const verdicts: Record<string, TaskVerdict> = {
       reject: { label: 'Reject', intent: 'danger', requiresComment: true },
     };
     const user = userEvent.setup();
 
     render(<VerdictForm taskId="t1" disabled={false} verdicts={verdicts} />);
-    await user.click(screen.getByRole('button', { name: /^Reject$/ }));
-    const submit = screen.getByRole('button', { name: /Submit review/ });
-    expect(submit).toBeDisabled();
+    const rejectBtn = screen.getByRole('button', { name: /^Reject$/ });
+    expect(rejectBtn).toBeDisabled();
 
-    // Add a comment and the button enables; submit fires.
     await user.type(screen.getByRole('textbox'), 'broken manifest');
-    expect(submit).not.toBeDisabled();
-    await user.click(submit);
+    expect(rejectBtn).not.toBeDisabled();
 
+    await user.click(rejectBtn);
     await waitFor(() => expect(mockCompleteTask).toHaveBeenCalledTimes(1));
     expect(mockCompleteTask).toHaveBeenCalledWith('t1', 'reject', 'broken manifest', undefined, 'test-token');
   });
 
-  it('allows submit without a comment when requiresComment is false', async () => {
+  it('passes the typed comment with a non-required verdict when present', async () => {
     const verdicts: Record<string, TaskVerdict> = {
       approve: { label: 'Approve', intent: 'success', requiresComment: false },
     };
     const user = userEvent.setup();
 
     render(<VerdictForm taskId="t1" disabled={false} verdicts={verdicts} />);
+    await user.type(screen.getByRole('textbox'), 'looks good');
     await user.click(screen.getByRole('button', { name: /Approve/ }));
-    const submit = screen.getByRole('button', { name: /Submit review/ });
-    expect(submit).not.toBeDisabled();
-    await user.click(submit);
 
     await waitFor(() => expect(mockCompleteTask).toHaveBeenCalledTimes(1));
-    expect(mockCompleteTask).toHaveBeenCalledWith('t1', 'approve', '', undefined, 'test-token');
+    expect(mockCompleteTask).toHaveBeenCalledWith('t1', 'approve', 'looks good', undefined, 'test-token');
   });
 });

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { CheckCircle, MessageSquare, X, Loader2, XCircle, Circle } from 'lucide-react';
+import { CheckCircle, MessageSquare, Loader2, XCircle, Circle } from 'lucide-react';
 import type { TaskVerdict } from '@mediforce/platform-core';
 import { completeTask } from '@/app/actions/tasks';
 import { useAuth } from '@/contexts/auth-context';
@@ -50,41 +50,38 @@ export function VerdictForm({
 }: VerdictFormProps) {
   const { firebaseUser } = useAuth();
   const resolved = verdicts ?? LEGACY_VERDICTS;
-  const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
   const [comment, setComment] = React.useState('');
-  const [submitting, setSubmitting] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState<string | null>(null);
   const [submitted, setSubmitted] = React.useState(false);
   const [submittedData, setSubmittedData] = React.useState<SubmittedData | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
-  const selectedCfg = selectedKey ? resolved[selectedKey] : null;
-  const commentMissing = !!selectedCfg?.requiresComment && !comment.trim();
+  const trimmedComment = comment.trim();
 
-  async function handleSubmit() {
-    if (!selectedKey || !selectedCfg) return;
-    if (commentMissing) return;
+  async function handleSubmit(key: string, cfg: TaskVerdict) {
+    if (cfg.requiresComment && !trimmedComment) return;
+    if (submitting) return;
 
-    setSubmitting(true);
+    setSubmitting(key);
     setError(null);
 
     const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-    const result = await completeTask(taskId, selectedKey, comment.trim(), undefined, idToken);
+    const result = await completeTask(taskId, key, trimmedComment, undefined, idToken);
 
     if (result.success) {
       setSubmittedData({
-        verdict: selectedKey,
-        intent: selectedCfg.intent,
-        label: selectedCfg.label,
-        comment: comment.trim(),
+        verdict: key,
+        intent: cfg.intent,
+        label: cfg.label,
+        comment: trimmedComment,
         timestamp: new Date().toISOString(),
       });
       setSubmitted(true);
       onCompleted?.();
     } else {
       setError(result.error ?? 'Failed to submit verdict');
+      setSubmitting(null);
     }
-
-    setSubmitting(false);
   }
 
   if (submitted && submittedData) {
@@ -92,80 +89,58 @@ export function VerdictForm({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Add a comment (optional)..."
+        rows={3}
+        disabled={disabled || submitting !== null}
+        aria-label="Review comment"
+        className={cn(
+          'w-full rounded-md border bg-background px-3 py-2 text-sm',
+          'placeholder:text-muted-foreground',
+          'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
+          'resize-y min-h-[72px]',
+          (disabled || submitting !== null) && 'opacity-50 cursor-not-allowed',
+        )}
+      />
+
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
-        {Object.entries(resolved).map(([key, cfg]) => (
-          <button
-            key={key}
-            onClick={() => { setSelectedKey(key); setError(null); }}
-            disabled={disabled || submitting}
-            className={cn(
-              'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
-              intentButtonClasses(cfg.intent, selectedKey === key),
-              (disabled || submitting) && 'opacity-50 cursor-not-allowed',
-            )}
-          >
-            <IntentIcon intent={cfg.intent} className="h-4 w-4" />
-            {cfg.label}
-          </button>
-        ))}
+        {Object.entries(resolved).map(([key, cfg]) => {
+          const blocked = cfg.requiresComment && !trimmedComment;
+          const isSubmittingThis = submitting === key;
+          const isDisabled = disabled || submitting !== null || blocked;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => handleSubmit(key, cfg)}
+              disabled={isDisabled}
+              title={blocked ? `${cfg.label} requires a comment` : undefined}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                intentSubmitClasses(cfg.intent),
+                isDisabled && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              {isSubmittingThis
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <IntentIcon intent={cfg.intent} className="h-4 w-4" />}
+              {cfg.label}
+            </button>
+          );
+        })}
       </div>
 
       {disabled && (
         <p className="text-xs text-muted-foreground">
           Review the step output before submitting a verdict.
         </p>
-      )}
-
-      {selectedKey && selectedCfg && !disabled && (
-        <div className="space-y-3 rounded-lg border p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">{selectedCfg.label}</span>
-            <button
-              onClick={() => { setSelectedKey(null); setComment(''); setError(null); }}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-3 w-3" />
-              Cancel
-            </button>
-          </div>
-
-          <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder={
-              selectedCfg.requiresComment
-                ? 'Describe the reason — required'
-                : 'Optional: add a comment...'
-            }
-            rows={3}
-            className={cn(
-              'w-full rounded-md border bg-background px-3 py-2 text-sm',
-              'placeholder:text-muted-foreground',
-              'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
-              'resize-y min-h-[72px]',
-            )}
-          />
-
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || commentMissing}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                intentSubmitClasses(selectedCfg.intent),
-                (submitting || commentMissing) && 'opacity-50 cursor-not-allowed',
-              )}
-            >
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {submitting ? 'Submitting...' : 'Submit review'}
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );
@@ -184,28 +159,6 @@ function IntentIcon({ intent, className }: { intent: Intent; className?: string 
     case 'neutral':
     default:
       return <Circle className={className} />;
-  }
-}
-
-function intentButtonClasses(intent: Intent, selected: boolean): string {
-  switch (intent) {
-    case 'success':
-      return selected
-        ? 'bg-green-600 text-white ring-2 ring-green-600/30'
-        : 'bg-green-600 text-white hover:bg-green-700';
-    case 'danger':
-      return selected
-        ? 'bg-red-600 text-white ring-2 ring-red-600/30'
-        : 'bg-red-600 text-white hover:bg-red-700';
-    case 'warning':
-      return selected
-        ? 'border border-amber-500 text-amber-700 bg-amber-50 ring-2 ring-amber-500/30 dark:bg-amber-900/20 dark:text-amber-300'
-        : 'border border-amber-500 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-900/20';
-    case 'neutral':
-    default:
-      return selected
-        ? 'border border-slate-500 text-slate-700 bg-slate-50 ring-2 ring-slate-500/30 dark:bg-slate-800/40 dark:text-slate-200'
-        : 'border border-slate-500 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/40';
   }
 }
 
