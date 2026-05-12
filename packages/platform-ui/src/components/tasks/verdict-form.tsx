@@ -58,6 +58,9 @@ export function VerdictForm({
   const [error, setError] = React.useState<string | null>(null);
 
   const trimmedComment = comment.trim();
+  const blockedLabels = resolved
+    .filter((cfg) => cfg.requiresComment && !trimmedComment)
+    .map((cfg) => cfg.label);
 
   async function handleSubmit(cfg: TaskVerdict) {
     if (cfg.requiresComment && !trimmedComment) return;
@@ -141,6 +144,12 @@ export function VerdictForm({
       {disabled && (
         <p className="text-xs text-muted-foreground">
           Review the step output before submitting a verdict.
+        </p>
+      )}
+
+      {!disabled && blockedLabels.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Add a comment to enable: {blockedLabels.join(', ')}.
         </p>
       )}
     </div>

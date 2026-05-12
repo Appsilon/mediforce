@@ -82,7 +82,7 @@ export function TaskContextPanel({
   const isObject = typeof output === 'object' && output !== null;
 
   return (
-    <Collapsible.Root defaultOpen={false}>
+    <Collapsible.Root defaultOpen={true}>
       <div className="rounded-lg border">
         <Collapsible.Trigger className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -173,14 +173,13 @@ function PreviousStepOutputTabs({
 
   const presentationHtml = inlinePresentation ?? fetchedReport;
   const showReportTab = reportMode !== null;
-  const defaultTab = showReportTab ? 'report' : 'summary';
 
   return (
-    <Tabs.Root defaultValue={defaultTab}>
+    <Tabs.Root defaultValue="summary">
       <Tabs.List className="flex gap-1 border-b px-4">
         {[
-          ...(showReportTab ? [{ value: 'report', label: 'Report', icon: MonitorPlay }] : []),
           { value: 'summary', label: 'Summary', icon: FileText },
+          ...(showReportTab ? [{ value: 'report', label: 'Report', icon: MonitorPlay }] : []),
           { value: 'full', label: 'Full Output', icon: Code },
         ].map(({ value, label, icon: Icon }) => (
           <Tabs.Trigger
