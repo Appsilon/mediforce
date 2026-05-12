@@ -27,6 +27,11 @@ export const HumanTaskSchema = z.object({
   creationReason: CreationReasonSchema.optional(),  // why this task was created
   selection: SelectionSchema.optional(),  // copied from step definition — enables "pick one" review mode
   options: z.array(z.record(z.string(), z.unknown())).optional(),  // options from previous step output
+  verdicts: z.record(z.string(), z.object({
+    label: z.string(),
+    intent: z.enum(['success', 'danger', 'warning', 'neutral']),
+    requiresComment: z.boolean(),
+  })).optional(),  // resolved verdict descriptors copied from the WD step (target stripped, defaults filled)
   deleted: z.boolean().optional(),
 });
 

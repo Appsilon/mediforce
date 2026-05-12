@@ -19,6 +19,15 @@ export {
 } from './process-definition.js';
 
 export {
+  buildTaskVerdicts,
+  defaultVerdictIntent,
+  defaultVerdictLabel,
+  defaultRequiresComment,
+  isVerdictAllowed,
+  type TaskVerdict,
+} from './verdicts.js';
+
+export {
   ReviewConstraintsSchema,
   AgentConfigSchema,
   StepConfigSchema,

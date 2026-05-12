@@ -303,20 +303,17 @@ function validateInputForNextRun(
 }
 
 /**
- * Verdict-key allowlist for review-type steps. Mirrors the hardcoded set
- * accepted by the built-in human-task forms in
- * `packages/platform-ui/src/components/tasks/{verdict,selection}-form.tsx`.
- * Adding a third option here without expanding the form would let a WD
- * register cleanly and then dead-end at run time with "Unknown verdict X
- * on review step Y" — the exact failure mode this validation prevents.
+ * L3 agent revision loop in `resolve-task.ts` (isL3Revise) keys off the
+ * literal 'revise' verdict. Allowing custom verdicts on L3 steps would
+ * silently break the loop. Lifting this is tracked in #391.
  */
-const ALLOWED_REVIEW_VERDICT_KEYS = ['approve', 'revise'] as const;
+const L3_VERDICT_KEYS = ['approve', 'revise'] as const;
 
 function validateVerdicts(
   wd: {
     steps: Array<{
       id: string;
-      type?: string;
+      autonomyLevel?: string;
       verdicts?: Record<string, { target: string }> | undefined;
     }>;
   },
@@ -326,13 +323,13 @@ function validateVerdicts(
   wd.steps.forEach((step, i) => {
     if (!step.verdicts) return;
     const keys = Object.keys(step.verdicts);
-    if (step.type === 'review') {
+    if (step.autonomyLevel === 'L3') {
       for (const key of keys) {
-        if (!ALLOWED_REVIEW_VERDICT_KEYS.includes(key as 'approve' | 'revise')) {
+        if (!L3_VERDICT_KEYS.includes(key as 'approve' | 'revise')) {
           ctx.addIssue({
             code: 'custom',
             path: ['steps', i, 'verdicts', key],
-            message: `verdict key '${key}' on review step '${step.id}' is not allowed — must be one of: ${ALLOWED_REVIEW_VERDICT_KEYS.join(', ')}`,
+            message: `verdict key '${key}' on L3 step '${step.id}' not allowed — L3 revision loop requires one of: ${L3_VERDICT_KEYS.join(', ')}`,
           });
         }
       }
@@ -455,6 +452,7 @@ export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit({
 }).superRefine((wd, ctx) => {
   validateInputForNextRun(wd, ctx);
   validateExecutorAndTriggers(wd, ctx);
+  validateVerdicts(wd, ctx);
   validateTriggerInput(wd, ctx);
 });
 
