@@ -86,13 +86,13 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      # firebase-tools is in platform-ui devDependencies, so the global
-      # `npm install -g firebase-tools` step is gone — the pnpm install
-      # above already brought it in via the workspace cache.
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
       - name: Start Firebase Emulators
         working-directory: packages/platform-ui
         run: |
-          pnpm exec firebase emulators:start --project demo-mediforce --only auth,firestore --config firebase.ci.json &
+          firebase emulators:start --project demo-mediforce --only auth,firestore --config firebase.ci.json &
           # No fixed `sleep` — curl --retry handles readiness. Each retry
           # waits up to 2s, so the loop exits as soon as the port answers.
           curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
