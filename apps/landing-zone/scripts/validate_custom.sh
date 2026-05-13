@@ -41,6 +41,71 @@ emit_fallback() {
 JSON
 }
 
+# Soft-skip envelope used when the study has no custom validation files in
+# the workspace. The CDISC CORE engine (validate-script) already ran and
+# emitted a classification — propagate it forward instead of overriding to
+# chaos. The note tells the interpret-validation step that layer-2 was
+# absent so it can render a small annotation.
+#
+# Reads /output/input.json (validate-script's flattened output) to lift
+# classification + classificationReason + summary unchanged. If that file
+# is missing or unparseable falls back to scriptStatus="ok" with no
+# classification field — the downstream agent will then read steps['validate-script']
+# directly per its skill instructions.
+emit_skipped() {
+  reason="$1"
+  classification=""
+  classification_reason=""
+  summary=""
+  script_failed_flag=""
+
+  if [ -f /output/input.json ] && command -v jq >/dev/null 2>&1; then
+    classification=$(jq -r '.classification // empty' /output/input.json 2>/dev/null)
+    classification_reason=$(jq -r '.classificationReason // empty' /output/input.json 2>/dev/null)
+    summary=$(jq -r '.summary // empty' /output/input.json 2>/dev/null)
+    script_failed_flag=$(jq -r '.scriptFailedFlag // empty' /output/input.json 2>/dev/null)
+  fi
+
+  # Build JSON with optional classification fields. Empty string -> omit field
+  # by using printf + jq -n where available; fall back to a static structure.
+  if command -v jq >/dev/null 2>&1; then
+    jq -n \
+      --arg cls "$classification" \
+      --arg clsReason "$classification_reason" \
+      --arg sum "$summary" \
+      --arg sff "$script_failed_flag" \
+      --arg reason "$reason" \
+      '{
+        scriptStatus: "ok",
+        customValidation: "skipped",
+        customValidationReason: $reason,
+        rulesPassed: 0,
+        rulesFailed: 0,
+        rulesError: 0,
+        results: [],
+        source: "validate_custom.sh skipped"
+      }
+      + (if $cls != "" then { classification: $cls } else {} end)
+      + (if $clsReason != "" then { classificationReason: $clsReason } else {} end)
+      + (if $sum != "" then { summary: $sum } else {} end)
+      + (if $sff != "" then { scriptFailedFlag: ($sff == "true") } else {} end)
+      ' > "$OUTPUT"
+  else
+    cat > "$OUTPUT" <<JSON
+{
+  "scriptStatus": "ok",
+  "customValidation": "skipped",
+  "customValidationReason": "$reason",
+  "rulesPassed": 0,
+  "rulesFailed": 0,
+  "rulesError": 0,
+  "results": [],
+  "source": "validate_custom.sh skipped"
+}
+JSON
+  fi
+}
+
 DELIVERY=$(ls -d /workspace/incoming/d-*/ 2>/dev/null | sort | tail -1)
 if [ -z "$DELIVERY" ]; then
   echo "validate_custom: no delivery directory under /workspace/incoming/" >&2
@@ -60,16 +125,16 @@ dump_workspace_state() {
 }
 
 if [ ! -f "/workspace/validate_custom.R" ]; then
-  echo "validate_custom: /workspace/validate_custom.R missing — study repo not bootstrapped?" >&2
+  echo "validate_custom: /workspace/validate_custom.R missing — soft-skipping layer-2 validation" >&2
   dump_workspace_state
-  emit_fallback "failed" "chaos" "validate-custom: study script /workspace/validate_custom.R not found in workspace — see step logs for workspace contents"
+  emit_skipped "no study-specific validation script in workspace (validate_custom.R missing)"
   exit 0
 fi
 
 if [ ! -f "$RULES" ]; then
-  echo "validate_custom: rules file $RULES missing — study repo not bootstrapped?" >&2
+  echo "validate_custom: rules file $RULES missing — soft-skipping layer-2 validation" >&2
   dump_workspace_state
-  emit_fallback "failed" "chaos" "validate-custom: rules file $RULES not found in workspace — see step logs for workspace contents"
+  emit_skipped "no study-specific validation rules in workspace ($RULES missing)"
   exit 0
 fi
 
