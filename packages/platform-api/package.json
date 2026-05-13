@@ -32,6 +32,20 @@
         "default": "./dist/services/index.js"
       }
     },
+    "./errors": {
+      "import": {
+        "@mediforce/source": "./src/errors.ts",
+        "types": "./dist/errors.d.ts",
+        "default": "./dist/errors.js"
+      }
+    },
+    "./auth": {
+      "import": {
+        "@mediforce/source": "./src/auth.ts",
+        "types": "./dist/auth.d.ts",
+        "default": "./dist/auth.js"
+      }
+    },
     "./client": {
       "import": {
         "@mediforce/source": "./src/client/index.ts",
