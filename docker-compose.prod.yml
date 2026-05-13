@@ -66,6 +66,13 @@ services:
       # a last resort, which is wrong behind Docker/reverse proxies.
       - APP_BASE_URL=${APP_BASE_URL:-${NEXT_PUBLIC_APP_URL:-}}
       - MEDIFORCE_ROOT=/repo
+      # Per-run worktrees + bare repos live here. Path must be identical
+      # in-container and on the host so `docker run -v <wt>:/workspace` from
+      # the host docker daemon (used by container-worker via docker.sock)
+      # resolves to the same files the orchestrator wrote. The host
+      # directory must exist before first launch:
+      #   sudo mkdir -p /var/lib/mediforce
+      - MEDIFORCE_DATA_DIR=/var/lib/mediforce
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
       - MAILGUN_FROM_EMAIL=${MAILGUN_FROM_EMAIL}
@@ -75,6 +82,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-sa.json
     volumes:
       - /tmp:/tmp
+      - /var/lib/mediforce:/var/lib/mediforce
       - .:/repo:ro
       - ./secrets/firebase-admin-sa.json:/run/secrets/firebase-sa.json:ro
     depends_on:
