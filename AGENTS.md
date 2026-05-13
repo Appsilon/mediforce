@@ -35,9 +35,9 @@ self-test → self-review → report.
    abstractions, scope. KISS. The simplest change that solves the actual
    problem wins.
 
-2. **Test first (RED → GREEN).** Write a failing unit or API journey test
-   before implementation. Skip ONLY for trivial edits (typo, comment,
-   single-line config) and say so.
+2. **Test first (RED → GREEN).** Write a failing test at the right level
+   (see "Testing pyramid" below) before implementation. Skip ONLY for
+   trivial edits (typo, comment, single-line config) and say so.
 
 3. **Dogfood the CLI.** You MUST use `pnpm exec mediforce` for any operation
    it covers. NEVER curl REST when the CLI does it. If the needed command is
@@ -53,14 +53,14 @@ self-test → self-review → report.
      `fetch(url, { headers: { 'X-Api-Key': ... } })`.
 
 5. **Self-test.** `pnpm typecheck` + `pnpm test:affected` after every edit;
-   `pnpm test` before reporting done. For UI / handler changes, prefer a fast
-   API journey test (`packages/platform-ui/src/test/*-journey.test.ts`). Use
-   `/e2e-test` (Playwright + emulators) only when the change is genuinely
-   UI-only — delegate to a background subagent. If a check fails for
-   environment reasons (remote / emulator / proxy / weird state), check
-   `docs/knowledge-base/wiki/gotchas/` or run `/knowledge-base` before
-   debugging from scratch. If you can't run a check the change requires,
-   say so. Do NOT claim success.
+   `pnpm test` before reporting done. Pick the lowest test level that
+   gives real signal — see "Testing pyramid". Use `/e2e-test`
+   (Playwright UI) only when the change is genuinely UI-only and lives
+   in the browser — delegate to a background subagent. If a check fails
+   for environment reasons (remote / emulator / proxy / weird state),
+   check `docs/knowledge-base/wiki/gotchas/` or run `/knowledge-base`
+   before debugging from scratch. If you can't run a check the change
+   requires, say so. Do NOT claim success.
 
 6. **Self code review — MUST run before reporting done.**
    (a) `git diff origin/main...HEAD` and read every line.
@@ -102,6 +102,56 @@ self-test → self-review → report.
 
 </development_rules>
 
+## Testing pyramid
+
+Five levels. **Every feature MUST be solidly covered at L3 (API E2E)** —
+that is the foundation, the proof it actually works against real
+Firestore + middleware + auth. L1/L2 cover logic. L4 is sparse, on top.
+L5 is opt-in.
+
+| L | Name             | Runner     | Location                                  | What runs real                                                | When to add |
+|---|------------------|------------|-------------------------------------------|---------------------------------------------------------------|-------------|
+| 1 | Unit             | vitest     | `src/**/__tests__/*.test.{ts,tsx}` (co-located) | Pure functions, no I/O                                  | Always for pure logic — fastest signal |
+| 2 | Integration      | vitest     | `packages/platform-ui/src/test/integration/*.test.ts` | Route handlers + engine + repos with in-memory fakes  | Multi-component logic; handler wiring with mocked services |
+| 3 | API E2E          | Playwright | `packages/platform-ui/e2e/api/`           | Real Next server + Firebase emulators, HTTP only (no browser) | **Every feature.** Proves real wiring: Firestore queries, middleware, auth, contract |
+| 4 | UI E2E           | Playwright | `packages/platform-ui/e2e/ui/`            | Real Next + emulators + browser; agent mocked (`MOCK_AGENT`)  | Main user paths only — sparse |
+| 5 | External / Tier 2 | vitest    | `packages/platform-ui/e2e/external/`      | Real LLM (OpenRouter) + real MCP subprocesses                 | Touching agent-runtime / MCP / LLM integration. Off CI, opt-in (`pnpm test:external`), costs cents per run |
+
+**UI E2E (L4) rules — read before writing one:**
+- A UI test is a **real multi-step user journey**. Click → fill → navigate →
+  assert outcome. NOT "is the button visible". Visibility/render assertions
+  belong in unit / integration tests against the component.
+- UI E2E proves the glue holds — pages, routing, client state, server
+  actions, real Firestore reads. It does NOT test engine behaviour or
+  edge cases — those belong at L2/L3.
+- Default answer to "should this be a UI test?" is **no**. Write L3
+  first. Add L4 only if the behaviour genuinely lives in the browser
+  (rendering, focus, keyboard, drag, client-side state machines).
+
+**API E2E (L3) rules:**
+- HTTP-only Playwright tests using the `request` fixture. No `page`.
+- Lives in the `api` Playwright project — runs with `workers=4`, no
+  browser launched.
+- Real Next server (`webServer` in `playwright.config.ts`), real
+  Firebase emulators, mocked agent (`MOCK_AGENT=true`).
+- Every new endpoint / handler ships with an L3 covering the journey
+  end-to-end through HTTP.
+
+**Integration (L2) rules:**
+- vitest in-process. Import route handlers directly
+  (`import * as route from '@/app/api/.../route'`), mock
+  `getPlatformServices()` with in-memory fakes.
+- Fast (ms). Covers logic + wiring of handlers/services, but NOT
+  Firestore queries, NOT real middleware. Don't claim "API works"
+  from L2 alone — add L3.
+
+**External / Tier 2 (L5) rules:**
+- Run when changing code that talks to real LLM providers or spawns
+  real MCP subprocesses.
+- Gated by `OPENROUTER_API_KEY`. Skips with diagnostic if missing.
+- NOT required for every PR. Run before merging changes to
+  `agent-runtime` / `mcp-client` / model-related code.
+
 ## Skills router
 
 Invoke before starting work when the task matches:
@@ -128,15 +178,20 @@ pnpm dev:test                           # platform-ui :9007 + emulators + MOCK_A
 pnpm dev:redis                          # Redis :6379 — separate terminal
 pnpm dev:worker                         # BullMQ worker — separate terminal (queue mode)
 
-# Test
+# Test — L1 unit + L2 integration (vitest)
 pnpm typecheck
 pnpm test:affected                      # <1s, changed files only
-pnpm test                               # full unit + integration (~9s)
+pnpm test                               # full L1 + L2 (~9s)
 npx vitest run path/to/file.test.ts     # single file
 
-# E2E (delegate to a background subagent; bootstrap also starts emulators)
+# Test — L3 API E2E + L4 UI E2E (Playwright; delegate to background subagent)
 python3 packages/platform-ui/scripts/bootstrap_e2e.py
-cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth
+cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth          # all e2e
+cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth --project=api  # L3 only
+cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth --project=authenticated  # L4 only
+
+# Test — L5 External / Tier 2 (real LLM, opt-in, costs cents)
+cd packages/platform-ui && OPENROUTER_API_KEY=... pnpm test:external
 
 # CLI
 pnpm exec mediforce --help
@@ -145,7 +200,9 @@ pnpm exec mediforce --help
 ## Reminder — re-read at the top of every task
 
 1. Simplify before coding.
-2. Test first (RED → GREEN). Cheap unit / API journey, not E2E.
+2. Test first (RED → GREEN) at the lowest level with real signal.
+   API E2E (L3) is the foundation for every feature. UI E2E (L4) is
+   sparse — real multi-step journeys only, never "is button visible".
 3. CLI > REST. `pnpm exec mediforce` first; add the command if missing.
 4. Self code review (`git diff` + `/code-review`) before reporting done.
 5. Ask, don't sneak, when a capability is missing.
