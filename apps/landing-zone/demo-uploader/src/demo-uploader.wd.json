@@ -1,0 +1,57 @@
+{
+  "name": "landing-zone-demo-uploader",
+  "namespace": "appsilon",
+  "title": "Landing Zone — Demo Uploader",
+  "description": "Pick a demo scenario from 8 verdict buttons; the seed step calls the demo-console's /seed endpoint to drop the files on the Hetzner SFTP. Dogfood — same workflow engine that runs the production Landing Zone.",
+  "env": {
+    "DEMO_CONSOLE_URL": "{{DEMO_CONSOLE_URL}}",
+    "DEMO_CONSOLE_API_KEY": "{{DEMO_CONSOLE_API_KEY}}"
+  },
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "steps": [
+    {
+      "id": "review-and-pick",
+      "name": "Pick a scenario",
+      "type": "review",
+      "executor": "human",
+      "description": "Pick one of the 8 demo scenarios. The seed step calls the demo-console to drop the chosen variant onto the demo SFTP.",
+      "verdicts": {
+        "smoke-clean":       { "target": "seed", "label": "Clean delivery — DM only",     "intent": "success" },
+        "full-clean":        { "target": "seed", "label": "Clean weekly delivery — full", "intent": "success" },
+        "smoke-broken":      { "target": "seed", "label": "Codifiable defects — DM only", "intent": "warning" },
+        "full-broken":       { "target": "seed", "label": "Full injection delivery",      "intent": "warning" },
+        "demo-3findings":    { "target": "seed", "label": "3 codifiable findings",        "intent": "warning" },
+        "chaos-encoding":    { "target": "seed", "label": "Encoding chaos",               "intent": "warning" },
+        "mess-inconsistent": { "target": "seed", "label": "Inconsistent SITEID values",   "intent": "warning" },
+        "missing-domain":    { "target": "seed", "label": "Missing AE.xpt",               "intent": "warning" },
+        "late-delivery":     { "target": "seed", "label": "Late delivery (14d)",          "intent": "warning" }
+      }
+    },
+    {
+      "id": "seed",
+      "name": "Seed SFTP",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "POST { scenario } to the demo-console's /seed endpoint. The console (running on the SFTP host) handles the actual file moves.",
+      "agent": {
+        "image": "mediforce-landing-zone:latest",
+        "command": "sh -c 'scenario=$(jq -r .verdict /output/input.json) && curl -fsS -X POST \"$DEMO_CONSOLE_URL/seed\" -H \"Content-Type: application/json\" -H \"X-Api-Key: $DEMO_CONSOLE_API_KEY\" -d \"{\\\"scenario\\\":\\\"$scenario\\\"}\"'"
+      }
+    },
+    {
+      "id": "done",
+      "name": "Delivered",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Demo seed complete. The production Landing Zone workflow will pick the files up on its next SFTP poll."
+    }
+  ],
+  "transitions": [
+    { "from": "review-and-pick", "to": "seed" },
+    { "from": "seed", "to": "done" }
+  ]
+}

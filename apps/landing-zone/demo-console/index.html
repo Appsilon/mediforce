@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Landing Zone — Demo Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Inter", "Segoe UI", sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, "Geist Mono", Menlo, monospace; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center">
+
+  <main class="w-[840px] bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/80 overflow-hidden">
+
+    <header class="h-14 px-5 flex items-center justify-between border-b border-slate-200/80">
+      <div class="flex items-center gap-3">
+        <div class="size-7 rounded-lg bg-teal-600 text-white font-semibold flex items-center justify-center text-sm">M</div>
+        <div class="leading-tight">
+          <div class="text-sm font-semibold text-slate-900">Landing Zone — Demo Console</div>
+          <div class="text-[11px] text-slate-500">Simulate CRO deliveries to the CDISCPILOT01 study contract</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-[11px] text-slate-500">
+        <span id="live-dot" class="size-1.5 rounded-full bg-slate-300"></span>
+        <span id="live-label">connecting…</span>
+      </div>
+    </header>
+
+    <div class="flex" style="min-height:460px">
+
+      <nav id="sidebar" class="w-[260px] border-r border-slate-200/80 py-2 px-2 overflow-y-auto">
+        <!-- tiles injected by JS -->
+      </nav>
+
+      <section id="detail" class="flex-1 p-6 flex flex-col">
+        <!-- detail injected by JS -->
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    // ----------- state -----------
+    const STORAGE_KEY = "lz-demo-api-key";
+    let apiKey = localStorage.getItem(STORAGE_KEY) || "";
+    let scenarios = [];
+    let selectedKey = null;
+    let lastUploadedKey = null;
+    let phase = "idle"; // idle | connecting | wiping | copying | done | error
+    let lastError = null;
+
+    // ----------- bootstrap -----------
+    function ensureApiKey() {
+      if (apiKey) return;
+      const v = window.prompt("Demo console API key:");
+      if (v) {
+        apiKey = v.trim();
+        localStorage.setItem(STORAGE_KEY, apiKey);
+      }
+    }
+
+    async function loadScenarios() {
+      const live = document.getElementById("live-label");
+      const dot = document.getElementById("live-dot");
+      try {
+        const r = await fetch("/scenarios");
+        const data = await r.json();
+        scenarios = data.scenarios;
+        selectedKey = scenarios[0].key;
+        live.textContent = "live";
+        dot.classList.remove("bg-slate-300");
+        dot.classList.add("bg-teal-500");
+      } catch (e) {
+        live.textContent = "offline";
+        dot.classList.remove("bg-slate-300");
+        dot.classList.add("bg-rose-500");
+      }
+      render();
+    }
+
+    // HTML-escape any server-supplied string before inserting into innerHTML.
+    function esc(s) {
+      const d = document.createElement("div");
+      d.textContent = s == null ? "" : String(s);
+      return d.innerHTML;
+    }
+
+    // ----------- render -----------
+    function render() {
+      renderSidebar();
+      renderDetail();
+    }
+
+    function renderSidebar() {
+      const root = document.getElementById("sidebar");
+      root.innerHTML = "";
+      for (const s of scenarios) {
+        const selected = s.key === selectedKey;
+        const tile = document.createElement("button");
+        tile.className = [
+          "w-full text-left px-3 py-2 rounded-xl flex items-start gap-2 relative",
+          selected
+            ? "bg-teal-50 ring-1 ring-teal-200 text-teal-900"
+            : "hover:bg-slate-100 text-slate-800",
+        ].join(" ");
+        tile.innerHTML = `
+          <span class="mt-0.5 size-2 rounded-full ${s.intent === "success" ? "bg-emerald-500" : "bg-amber-500"} shrink-0"></span>
+          <span class="min-w-0">
+            <span class="block text-[13px] font-semibold ${selected ? "text-teal-900" : "text-slate-900"} truncate">${esc(s.label)}</span>
+            <span class="block text-[11px] text-slate-500 truncate">${esc(s.hint)}</span>
+          </span>
+          ${s.key === lastUploadedKey ? '<span class="absolute right-3 top-3 size-1.5 rounded-full bg-teal-500"></span>' : ""}
+        `;
+        tile.onclick = () => { selectedKey = s.key; render(); };
+        root.appendChild(tile);
+      }
+    }
+
+    function renderDetail() {
+      const root = document.getElementById("detail");
+      const s = scenarios.find((x) => x.key === selectedKey);
+      if (!s) { root.innerHTML = ""; return; }
+      const filterLabel = s.only ? s.only.join(", ") : "all files in variant";
+      const errorBlock = phase === "error"
+        ? `<p class="text-xs text-rose-600 mt-2">${esc(lastError || "Upload failed.")}</p>`
+        : "";
+      const btnLabel = ({
+        idle: "Upload to SFTP →",
+        connecting: "Connecting…",
+        wiping: "Wiping /upload",
+        copying: "Copying files",
+        done: "Done ✓",
+        error: "Retry upload",
+      })[phase];
+      const btnClass = phase === "error"
+        ? "bg-rose-600 hover:bg-rose-700"
+        : phase === "done"
+          ? "bg-teal-700"
+          : "bg-teal-600 hover:bg-teal-700";
+      const disabled = ["connecting", "wiping", "copying"].includes(phase);
+      root.innerHTML = `
+        <h2 class="text-xl font-semibold text-slate-900">${esc(s.label)}</h2>
+        <p class="text-sm text-slate-700 mt-1">${esc(s.hint)}</p>
+        <dl class="mt-5 space-y-1 text-sm">
+          <div class="flex gap-3"><dt class="w-28 text-slate-500">Variant</dt><dd class="mono">${esc(s.variant)}</dd></div>
+          <div class="flex gap-3"><dt class="w-28 text-slate-500">Files</dt><dd class="mono">${esc(filterLabel)}</dd></div>
+          <div class="flex gap-3"><dt class="w-28 text-slate-500">Intent</dt>
+            <dd>${s.intent === "success"
+              ? '<span class="text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 rounded px-1.5 py-0.5 text-[11px]">happy path</span>'
+              : '<span class="text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded px-1.5 py-0.5 text-[11px]">failure mode</span>'}</dd></div>
+          ${s.late ? '<div class="flex gap-3"><dt class="w-28 text-slate-500">mtimes</dt><dd class="mono">backdated 14 days</dd></div>' : ""}
+        </dl>
+        <p class="text-[11px] text-slate-500 mt-5 italic">
+          Derived from CDISC SDTM 3.4 Pilot 3 — Xanomeline / Alzheimer.
+        </p>
+        ${errorBlock}
+        <div class="flex-1"></div>
+        <button id="upload-btn" ${disabled ? "disabled" : ""}
+          class="${btnClass} disabled:opacity-70 disabled:cursor-not-allowed mt-6 w-full py-3 rounded-lg text-white text-sm font-semibold transition-colors">
+          ${btnLabel}
+        </button>
+      `;
+      const btn = document.getElementById("upload-btn");
+      btn.onclick = onUpload;
+    }
+
+    // ----------- upload -----------
+    async function onUpload() {
+      ensureApiKey();
+      if (!apiKey) return;
+
+      lastError = null;
+      const realFetch = fetch("/seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
+        body: JSON.stringify({ scenario: selectedKey }),
+      });
+
+      // Theatre: drive the visible phases independently of the real call.
+      phase = "connecting"; render();
+      await sleep(450);
+      phase = "wiping"; render();
+      await sleep(500);
+      phase = "copying"; render();
+      await sleep(700);
+
+      try {
+        const r = await realFetch;
+        const text = await r.text();
+        let body = null;
+        try { body = JSON.parse(text); } catch { /* nope */ }
+        if (!r.ok) {
+          throw new Error(body?.detail || body?.error || text || `HTTP ${r.status}`);
+        }
+        phase = "done";
+        lastUploadedKey = selectedKey;
+      } catch (e) {
+        phase = "error";
+        lastError = e instanceof Error ? e.message : String(e);
+        if (lastError && lastError.toLowerCase().includes("invalid api key")) {
+          localStorage.removeItem(STORAGE_KEY);
+          apiKey = "";
+        }
+      }
+      render();
+      await sleep(1500);
+      if (phase === "done" || phase === "error") {
+        phase = "idle";
+        render();
+      }
+    }
+
+    function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+    // ----------- go -----------
+    ensureApiKey();
+    loadScenarios();
+  </script>
+</body>
+</html>
