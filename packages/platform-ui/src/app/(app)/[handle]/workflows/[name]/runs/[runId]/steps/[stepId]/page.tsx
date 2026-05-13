@@ -2,12 +2,17 @@
 
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
+import * as Collapsible from '@radix-ui/react-collapsible';
 import { format } from 'date-fns';
-import { ArrowLeft, CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, ExternalLink, FileText, GitBranch, Gauge, ChevronDown, ChevronRight, MessageSquare, DollarSign } from 'lucide-react';
-import type { StepExecution, Step, AgentEvent } from '@mediforce/platform-core';
+import { CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, ExternalLink, FileText, GitBranch, Gauge, ChevronDown, ChevronRight, MessageSquare, DollarSign } from 'lucide-react';
+import type { StepExecution, Step, AgentEvent, HumanTask } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
+import { useInstanceTasks } from '@/hooks/use-instance-tasks';
+import { useAgentRunsForStep } from '@/hooks/use-agent-runs';
+import { getAgentOutput, type AgentOutputData } from '@/components/tasks/task-utils';
+import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
+import { agentOutputFromEnvelope } from './agent-output-from-envelope';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
 
@@ -82,6 +87,33 @@ export default function StepDetailPage() {
       .find((e) => e.type === 'prompt') ?? null;
   }, [agentEvents, decodedStepId]);
 
+  // Locate the agent output for this step. Two sources, in order:
+  //   1. AgentRun envelope (always present for any agent step — L2/L3) —
+  //      this is the source of truth and carries `presentation` HTML.
+  //   2. HumanTask.completionData.agentOutput (only for L3 review steps) —
+  //      fallback for older runs where envelope wasn't queryable.
+  const { data: agentRuns } = useAgentRunsForStep(runId ?? null, decodedStepId || null);
+  const { tasks: instanceTasks } = useInstanceTasks(runId ?? undefined);
+  const agentOutput = useMemo((): AgentOutputData | null => {
+    const latestRun = agentRuns
+      .slice()
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+    if (latestRun?.envelope) {
+      return agentOutputFromEnvelope(latestRun.envelope);
+    }
+    const candidates = instanceTasks
+      .filter((task: HumanTask) => task.stepId === decodedStepId)
+      .sort(
+        (a: HumanTask, b: HumanTask) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    for (const task of candidates) {
+      const output = getAgentOutput(task);
+      if (output) return output;
+    }
+    return null;
+  }, [agentRuns, instanceTasks, decodedStepId]);
+
   const loading = instanceLoading || stepsLoading || eventsLoading;
 
   if (loading) {
@@ -102,9 +134,8 @@ export default function StepDetailPage() {
     );
   }
 
-  const backHref = `/${handle}/workflows/${encodeURIComponent(decodedName)}/runs/${runId}`;
   const stepName = definitionStep?.name ?? formatStepName(decodedStepId);
-  const isAgent = execution?.agentOutput !== undefined;
+  const hasAgentBadge = agentOutput !== null || execution?.agentOutput !== undefined;
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">
@@ -113,7 +144,7 @@ export default function StepDetailPage() {
         <div className="flex items-center gap-3">
           {execution && <StatusIcon status={execution.status} />}
           <h2 className="text-2xl font-headline font-semibold">{stepName}</h2>
-          {isAgent && (
+          {hasAgentBadge && (
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-900/30 px-2 py-0.5 text-xs text-violet-700 dark:text-violet-300">
               <Bot className="h-3 w-3" /> Agent
             </span>
@@ -141,16 +172,46 @@ export default function StepDetailPage() {
         )}
       </div>
 
-      {/* Two-column: Input | Output */}
-      {execution ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <InputColumn
-            execution={execution}
-            previousStepName={previousStepName}
-            promptEvent={promptEvent}
-          />
-          <OutputColumn execution={execution} />
+      {/* Agent output snapshot — the rich tabbed view (metrics, files, tabs)
+          shared with human reviewers. Becomes the primary content for any
+          agent step. */}
+      {agentOutput && runId && (
+        <div className="rounded-lg border bg-card">
+          <AgentOutputDisplay agentOutput={agentOutput} instanceId={runId} />
         </div>
+      )}
+
+      {/* Raw step IO. For agent steps this is debug info (the engine's view
+          of transitions/output) so we collapse it. For script/gate steps it
+          IS the main view, so render expanded. */}
+      {execution ? (
+        agentOutput ? (
+          <Collapsible.Root>
+            <Collapsible.Trigger className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors">
+              <ChevronDown className="h-3 w-3 transition-transform data-[state=closed]:-rotate-90" />
+              Step IO (debug)
+            </Collapsible.Trigger>
+            <Collapsible.Content className="mt-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <InputColumn
+                  execution={execution}
+                  previousStepName={previousStepName}
+                  promptEvent={promptEvent}
+                />
+                <OutputColumn execution={execution} />
+              </div>
+            </Collapsible.Content>
+          </Collapsible.Root>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <InputColumn
+              execution={execution}
+              previousStepName={previousStepName}
+              promptEvent={promptEvent}
+            />
+            <OutputColumn execution={execution} />
+          </div>
+        )
       ) : (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
           This step has not been executed yet.
@@ -345,26 +406,15 @@ function GitSection({ git }: { git: { commitSha: string; branch: string; changed
       <div className="flex items-center gap-4 text-sm">
         <span className="font-mono text-xs">{git.branch}</span>
         {browsable ? (
-          <>
-            <a
-              href={`${git.repoUrl}/commit/${git.commitSha}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
-            >
-              {git.commitSha.slice(0, 7)}
-              <ExternalLink className="h-3 w-3" />
-            </a>
-            <a
-              href={`${git.repoUrl}/compare/main...${git.branch}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-            >
-              View diff
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </>
+          <a
+            href={`${git.repoUrl}/commit/${git.commitSha}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
+          >
+            {git.commitSha.slice(0, 7)}
+            <ExternalLink className="h-3 w-3" />
+          </a>
         ) : (
           <span className="font-mono text-xs text-muted-foreground">
             {git.commitSha.slice(0, 7)}
