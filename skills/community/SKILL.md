@@ -4,7 +4,7 @@ description: Write short Discord updates for the MediForce community based on ro
 allowed-tools: Read, Write
 metadata:
   author: Appsilon
-  version: "1.0"
+  version: "1.2"
   domain: community
   complexity: basic
   tags: discord, community, communication
@@ -22,90 +22,111 @@ metadata:
 
 - **Required**: User's rough notes about recent work, progress, or decisions.
 
-## Context: About MediForce
+## Product context
 
-MediForce is an open-source platform for human-AI agent collaboration in pharma and regulated industries. Built by Appsilon (10+ years building data solutions for life sciences).
+Do NOT hardcode product context in this skill — it drifts. If you need background on what MediForce is or who the audience is, read `README.md` (project root) and skim `docs/` (especially `docs/architecture.md`, `docs/features/`). Pull only what's needed to make the update specific and accurate.
 
-**The problem:** Pharma companies have AI budgets and mandates but can't execute. Custom builds are expensive, compliance teams block unsanctioned AI (no audit trails, no accountability), and general-purpose AI tools don't fit regulated workflows. There's no standard for how humans and AI agents should collaborate in regulated processes.
-
-**What MediForce is:**
-- Infrastructure layer where AI agents work safely within legally compliant, auditable business processes
-- Each process step has a configurable autonomy level: Observer (agent watches), Advisor (agent suggests), Drafter (agent does work, human approves), Executor (agent acts autonomously)
-- Processes defined as code (TypeScript + Zod schemas) — version-controlled, AI-friendly, auditable
-- Container-per-step execution: each agent runs in an isolated Docker container, works on a git repo, outputs are committed and reviewable on GitHub
-- Full audit trail: every agent action, human decision, state transition recorded with commit SHAs
-- "Golden image" pattern: validated Docker images with pre-approved tools (R, Python, Claude CLI, pharma packages)
-
-**Who's in the community:**
-- Domain experts from clinical ops, pharmacovigilance, regulatory, supply chain
-- Developers interested in regulated systems and human-AI collaboration
-- Compliance professionals guiding GxP-readiness
-- People from pharma/biotech/CROs exploring AI adoption
-
-**Community touchpoints:**
-- Friday working sessions (3 PM CEST weekly) — open discussions and demos
-- Discord for async updates and discussion
-- GitHub repo: open issues, PRs, star
-
-We're building in public — no polished product launch, just working code and a clear vision. We want input from people who know these processes firsthand.
+In most cases you do NOT need to re-read context: the user's notes already name the concrete component (workflow, step, plugin, CLI command, dialog) and that's enough. Only fetch context when the notes are ambiguous about what was shipped.
 
 ## Procedure
 
 ### Step 1: Read the user's rough notes
 
-Read the provided notes carefully. Identify the key facts: what was done, what changed, what problem was encountered, what decision was made.
+Identify the key facts: what shipped / changed / broke, the specific component or PR, defaults or fallback behavior, any access info (URL, where credentials live).
 
-**Expected:** You understand the substance of the update — the specific component, feature, problem, or decision involved.
+**Expected:** You can name the exact thing in one phrase.
 
-**On failure:** Ask the user for clarification on what specifically happened or changed.
+**On failure:** Ask the user which component or PR they mean.
 
 ### Step 2: Write the short version
 
-Write a 2-4 sentence Discord post. Jump straight into what happened. End with a specific question or ask directed at the community.
+2-4 sentences. First sentence = **outcome**: what someone in the community can now do, or what pain just got removed. Second sentence (if needed) = **why it matters** in one breath. Mechanics (PR number, surface area, defaults) only if they actually inform — otherwise drop them.
 
-**Expected:** A concise post that an engineer would find worth reading. No filler, no marketing language.
+**Pick the opening verb to match the change.**
+- User-facing features → `Shipped` / `Just shipped` / `I created`.
+- Process / tooling / internal infra → lead with the **outcome itself**, not a "Shipped X" frame. Example: `We now have a weekly CHANGELOG…` reads as something the community gains; `Shipped a weekly CHANGELOG` reads as a release announcement, which is the wrong frame for plumbing.
+- Bugfixes → `Fixed`.
 
-**On failure:** Re-read the rules below and strip out any adjectives that sell or vague statements.
+If you can't say what a peer *gets* from the change, "Shipped" is a tell that you're announcing a release instead of communicating a benefit. Rewrite from the outcome.
+
+**Expected:** Reads like an engineer telling peers what landed.
+
+**On failure:** Strip selling adjectives and vague verbs. Replace "improved X" with what specifically changed.
 
 ### Step 3: Write the detailed version
 
-Write a 5-8 sentence Discord post. Cover the same content with more context — the why, the tradeoffs, the next steps. End with a specific question or ask.
+5-8 sentences. Still leads with outcome + why. Then adds the context a peer would actually want: defaults / fallback behavior, access info (URL, where credentials live), notable tradeoffs. Surface area (API / CLI / SDK / UI) goes in *only if* it changes what someone integrates with — otherwise it's noise. Optionally close with a question, but only if there's a real one — do NOT bolt one on.
 
-**Expected:** A substantive post that could spark a real discussion. Still sounds like an engineer talking to peers.
+**Expected:** Substantive post that could spark a real discussion or just informs cleanly.
 
-**On failure:** Check that you haven't inflated minor progress into a big announcement. If the update is small, the detailed version should still be short.
+**On failure:** If the update is small, the detailed version stays small. Don't pad.
 
 ### Step 4: Present both versions
 
-Present the short and detailed versions separated by `---`. Both should stand on their own.
+Output short first, then `---`, then detailed. Both stand alone.
 
-**Expected:** Two self-contained posts the user can copy-paste into Discord.
+## Rules for writing posts
 
-## Rules for Writing Posts
+- **Lead with outcome and why. This is the foundation.** Open with what the reader can now do that they couldn't before, or what problem this removes. Mechanics (which layers changed, which files, which dialog) come *after* the outcome — and only when they add signal. If the mechanics aren't load-bearing, cut them.
+  - Bad: "We refactored the workflow copy handler across API, CLI, and SDK."
+  - Good: "You can now copy any workflow into your own namespace and edit it freely — no fork, no upstream sync to maintain."
+- **Discord-safe links.** Bare `#NNN`, `PR #NNN`, `issue #NNN` do NOT auto-link on Discord (only GitHub renders them). Always write `[#NNN](https://github.com/Appsilon/mediforce/pull/NNN)` so the link works in Discord, Slack, blogs, and GitHub alike. Same for external URLs — use `[label](url)`, never bare URLs except for short standalone "Address:" lines.
+- **Actionable hook, not passive description.** Tell the reader what *they* can now do or should do, not just "this happens". `Every non-trivial PR drops a bullet` reads like magic; `Every non-trivial PR should add a bullet (we have a /add-release-notes skill for that)` invites the reader to participate and points them at the tool.
+- **Active voice + real ownership.** If a human is in the loop, name the actor. "PRs should add a bullet" beats "PRs drop a bullet" — the latter falsely implies automation that doesn't exist.
+- **No marketing language.** No "exciting", "thrilled", "game-changing", "revolutionary", "powerful". Zero adjectives that sell.
+- **Be specific.** Name the component, the PR, the dialog, the CLI command. Vague is worse than short.
+- **Keep it short.** 3-8 sentences. Discord, not a blog.
+- **Engineer-to-peers voice.** First person ("I shipped", "we shipped") is fine. Casual but substantive.
+- **Questions optional, not mandatory.** Plain ship announcements don't need a question. If you have a real one ("anyone want X next?", "would you use Y?"), ask it; otherwise skip.
+- **No hashtags. Emojis sparingly.** One inline emoji (✅, 🚢, 🧪) OK if natural.
+- **Small update → small post.** Don't inflate a one-line change into a paragraph.
+- **Don't re-explain MediForce.** Audience knows.
+- **Problems and tradeoffs are valid posts.** "We tried X, it didn't work because Y" invites help.
+- **Practical access info belongs in the post.** Address, port, "key in 1Password" — include them if relevant.
 
-- **No marketing language.** No "exciting", "thrilled", "game-changing", "revolutionary", "incredible". Zero adjectives that sell. State what was done, why it matters, what's next.
-- **Be specific.** Mention the actual thing: the component, the step, the problem solved. Vague is worse than short.
-- **Keep it short.** 3-8 sentences max. Discord posts are not blog posts.
-- **Sound like an engineer talking to peers**, not a company talking to customers. First person plural ("we") is fine. Casual but substantive.
-- **End with a real question or ask.** Not "what do you think?" but something specific that invites an answer worth reading. Examples: "Has anyone dealt with X in their org?", "Would Y be useful for your workflows?", "If you've tried Z, what broke?", "Anyone seen a better approach to X?"
-- **No hashtags, no emojis in headers.** One or two emojis inline are fine if natural, but don't decorate.
-- **If the update is small, the post should be small.** Don't inflate minor progress into a big announcement.
-- **Don't explain what MediForce is** in every post. The audience already knows. Jump straight into what happened or what you're thinking about.
-- **It's OK to share problems, not just wins.** "We tried X and it didn't work because Y" is a good post. It's honest and invites help.
-- **It's OK to think out loud.** "We're debating between X and Y, here's why it's not obvious..." is engaging and real.
+## Canonical examples
+
+These three posts are the reference style. New output should feel like these — direct, concrete, no fluff.
+
+> ℹ️ We shipped "Copy workflow to namespace" in PR #359 — full stack: API, CLI, SDK, and a UI dialog with a provenance badge ("Copied from @ns/workflow v3"). Copy creates an independent v1 clone, always private, no upstream sync.
+
+> Just shipped: now Human Task can have several custom defined decision options. Each has configurable label, intent (color), and target step. If these are not defined, workflows will use the default Accept/Revise buttons that we had so far.
+
+> I created a mini app for Landing Zone demos. It runs on the "FTP" server. You can choose a scenario and upload them to the delivery folder in one click. Then simply start a new Landing Zone run.
+> Address: http://204.168.165.57:8080/
+> Key (need to give it once, then it's stored in your browser): in 1Password
+
+### Patterns extracted from the examples
+
+- Opening matches the change type. User-facing feature → `Shipped` / `Just shipped` / `I created`. Process / tooling / internal infra → lead with the outcome (`We now have…`, `You can now…`). Bugfix → `Fixed`.
+- One-clause feature name in quotes or italics when ambiguous (`"Copy workflow to namespace"`).
+- Cite PRs as **clickable markdown links**: `[#359](https://github.com/Appsilon/mediforce/pull/359)`, never bare `PR #359`.
+- Enumerate the surface area when it spans layers: `API, CLI, SDK, and a UI dialog` — only if that matters to the reader.
+- Call out defaults / fallback in a separate sentence: "If these are not defined, workflows will use the default Accept/Revise buttons that we had so far."
+- For tools / mini-apps: include Address + auth hint (where key lives) on their own lines.
+- If the update introduces a process the reader participates in, add a one-clause **hook** pointing them at the tool: "(we have a `/add-release-notes` skill for that)".
+- No mandatory closing question. Hooks are not questions — they're invitations.
 
 ## Validation
 
-- The short version is 2-4 sentences.
-- The detailed version is 5-8 sentences.
-- Neither version contains marketing language or vague filler.
-- Both versions end with a specific, answerable question or ask.
-- Both versions can stand alone — no references to each other.
+- Short version is 2-4 sentences.
+- Detailed version is 5-8 sentences (smaller if the update is small).
+- Neither has marketing adjectives or vague filler.
+- Specific component / PR / dialog named.
+- Defaults / fallback behavior stated when relevant.
+- Access info (URL, credentials location) included for tools/demos.
 
-## Common Pitfalls
+## Common pitfalls
 
-- **Using marketing adjectives** — scan for "exciting", "thrilled", "game-changing", etc. and remove them.
-- **Being vague** — "we made progress on the platform" is worse than "we added container isolation for agent steps".
-- **Explaining MediForce from scratch** — the community already knows what MediForce is.
-- **Ending with "what do you think?"** — ask something specific that invites a real answer.
-- **Inflating small updates** — if you fixed a bug, say you fixed a bug. Don't make it a paragraph.
+- **Leading with mechanics instead of outcome.** "We changed the API, CLI, and SDK" tells the reader nothing they care about. Lead with what now works.
+- **Mechanics as filler.** Listing layers / files / handlers only because they exist. Include them only when they change what the reader does.
+- **Bare `#NNN` or `PR #NNN`.** Doesn't auto-link on Discord. Always wrap as `[#NNN](https://github.com/Appsilon/mediforce/pull/NNN)`.
+- **"Magic happens" passive voice** ("PRs drop a bullet", "the system writes a note") when a human actually does it. Name the actor and use *should*.
+- **`Shipped` on process/tooling changes.** Sounds like a release announcement for something that isn't a feature. Lead with the outcome (`We now have…`) instead.
+- **Description without a hook** when a process is involved. If the reader can participate (run a skill, file an issue, use a CLI), point them at it in one clause.
+- Marketing adjectives ("exciting", "thrilled", "powerful") — strip them.
+- Vague verbs ("improved", "enhanced") — name the change.
+- Forced closing question on a plain ship post — drop it.
+- Re-explaining MediForce — audience already knows.
+- Inflating a one-line fix into a paragraph.
+- Hardcoding product context that belongs in README — read README/docs at runtime instead.
