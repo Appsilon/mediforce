@@ -5,6 +5,7 @@ export interface UpdateRankingsDeps {
   modelRegistryRepo: ModelRegistryRepository;
 }
 
+/** @public-handler  Model registry is platform-wide; rankings are global state. */
 export async function updateRankings(
   input: UpdateRankingsInput,
   deps: UpdateRankingsDeps,

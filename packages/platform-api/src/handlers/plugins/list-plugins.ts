@@ -20,6 +20,9 @@ export interface ListPluginsDeps {
 /**
  * List every plugin registered with the running `PluginRegistry`.
  *
+ * @public-handler  Registry is platform-wide, not namespaced — every
+ * authenticated caller sees the same list.
+ *
  * The registry is a process-wide singleton populated at startup — it is not
  * namespaced and has no per-tenant view. Every authenticated caller sees the
  * same list, so the third `caller` argument is intentionally unused. It is

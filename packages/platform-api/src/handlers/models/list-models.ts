@@ -5,6 +5,11 @@ export interface ListModelsDeps {
   modelRegistryRepo: ModelRegistryRepository;
 }
 
+/**
+ * @public-handler  Model registry is platform-wide (LLM catalogue), not
+ * namespaced. Pre-dates the caller-threaded handler shape and is not retro-
+ * fitted because there's nothing to gate.
+ */
 export async function listModels(
   input: ListModelsInput | undefined,
   deps: ListModelsDeps,
