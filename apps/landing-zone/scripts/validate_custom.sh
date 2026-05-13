@@ -48,15 +48,28 @@ if [ -z "$DELIVERY" ]; then
   exit 0
 fi
 
+dump_workspace_state() {
+  echo "--- workspace contents ---" >&2
+  ls -la /workspace/ 2>&1 | head -40 >&2 || true
+  echo "--- git HEAD ---" >&2
+  git -C /workspace log --oneline -3 2>&1 >&2 || true
+  echo "--- git remote -v ---" >&2
+  git -C /workspace remote -v 2>&1 >&2 || true
+  echo "--- /workspace/templates ---" >&2
+  ls -la /workspace/templates/ 2>&1 | head -20 >&2 || true
+}
+
 if [ ! -f "/workspace/validate_custom.R" ]; then
   echo "validate_custom: /workspace/validate_custom.R missing — study repo not bootstrapped?" >&2
-  emit_fallback "failed" "chaos" "validate-custom: study script /workspace/validate_custom.R not found in workspace"
+  dump_workspace_state
+  emit_fallback "failed" "chaos" "validate-custom: study script /workspace/validate_custom.R not found in workspace — see step logs for workspace contents"
   exit 0
 fi
 
 if [ ! -f "$RULES" ]; then
   echo "validate_custom: rules file $RULES missing — study repo not bootstrapped?" >&2
-  emit_fallback "failed" "chaos" "validate-custom: rules file $RULES not found in workspace"
+  dump_workspace_state
+  emit_fallback "failed" "chaos" "validate-custom: rules file $RULES not found in workspace — see step logs for workspace contents"
   exit 0
 fi
 
