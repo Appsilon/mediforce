@@ -100,7 +100,8 @@ jobs:
       # Cache .next/ keyed by source hashes + build-time NEXT_PUBLIC_* env
       # vars baked into the bundle. Any change to source, config, lockfile,
       # or those env vars invalidates the cache. On a hit, the Build step is
-      # skipped and `next start` reuses the restored .next/BUILD_ID.
+      # skipped and `next start` reuses the restored .next/BUILD_ID — saves
+      # ~70s vs the cache miss path.
       - name: Cache .next build for E2E
         id: next-cache
         uses: actions/cache@v5
