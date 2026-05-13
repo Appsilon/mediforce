@@ -5,32 +5,16 @@ import { useMemo, useState } from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { format } from 'date-fns';
 import { CheckCircle2, Clock, XCircle, Circle, Pause, Bot, User, ExternalLink, FileText, GitBranch, Gauge, ChevronDown, ChevronRight, MessageSquare, DollarSign } from 'lucide-react';
-import { where } from 'firebase/firestore';
-import type { StepExecution, Step, AgentEvent, HumanTask, AgentRun } from '@mediforce/platform-core';
+import type { StepExecution, Step, AgentEvent, HumanTask } from '@mediforce/platform-core';
 import { useProcessInstance, useSubcollection } from '@/hooks/use-process-instances';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useInstanceTasks } from '@/hooks/use-instance-tasks';
-import { useCollection } from '@/hooks/use-collection';
+import { useAgentRunsForStep } from '@/hooks/use-agent-runs';
 import { getAgentOutput, type AgentOutputData } from '@/components/tasks/task-utils';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
+import { agentOutputFromEnvelope } from './agent-output-from-envelope';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
-
-function agentOutputFromEnvelope(envelope: NonNullable<AgentRun['envelope']>): AgentOutputData {
-  return {
-    confidence: envelope.confidence,
-    confidence_rationale: envelope.confidence_rationale ?? null,
-    reasoning: envelope.reasoning_summary,
-    result: envelope.result,
-    model: envelope.model,
-    duration_ms: envelope.duration_ms,
-    gitMetadata: envelope.gitMetadata ?? null,
-    presentation: envelope.presentation ?? null,
-    escalationReason: null,
-    estimatedCostUsd: null,
-    tokenUsage: envelope.tokenUsage ?? null,
-  };
-}
 
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
@@ -108,16 +92,7 @@ export default function StepDetailPage() {
   //      this is the source of truth and carries `presentation` HTML.
   //   2. HumanTask.completionData.agentOutput (only for L3 review steps) —
   //      fallback for older runs where envelope wasn't queryable.
-  const agentRunConstraints = useMemo(
-    () => (runId && decodedStepId
-      ? [where('processInstanceId', '==', runId), where('stepId', '==', decodedStepId)]
-      : []),
-    [runId, decodedStepId],
-  );
-  const { data: agentRuns } = useCollection<AgentRun>(
-    runId && decodedStepId ? 'agentRuns' : '',
-    agentRunConstraints,
-  );
+  const { data: agentRuns } = useAgentRunsForStep(runId ?? null, decodedStepId || null);
   const { tasks: instanceTasks } = useInstanceTasks(runId ?? undefined);
   const agentOutput = useMemo((): AgentOutputData | null => {
     const latestRun = agentRuns
@@ -160,7 +135,7 @@ export default function StepDetailPage() {
   }
 
   const stepName = definitionStep?.name ?? formatStepName(decodedStepId);
-  const isAgent = execution?.agentOutput !== undefined;
+  const hasAgentBadge = agentOutput !== null || execution?.agentOutput !== undefined;
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">
@@ -169,7 +144,7 @@ export default function StepDetailPage() {
         <div className="flex items-center gap-3">
           {execution && <StatusIcon status={execution.status} />}
           <h2 className="text-2xl font-headline font-semibold">{stepName}</h2>
-          {isAgent && (
+          {hasAgentBadge && (
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-900/30 px-2 py-0.5 text-xs text-violet-700 dark:text-violet-300">
               <Bot className="h-3 w-3" /> Agent
             </span>

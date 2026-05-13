@@ -2,10 +2,10 @@
 
 import * as React from 'react';
 import { useMemo } from 'react';
-import { orderBy, doc, onSnapshot } from 'firebase/firestore';
+import { orderBy, where, doc, onSnapshot } from 'firebase/firestore';
 import type { AgentRun, ProcessInstance } from '@mediforce/platform-core';
 import { db } from '@/lib/firebase';
-import { useCollection } from './use-collection';
+import { useCollection, type FirestoreState } from './use-collection';
 
 export function useAgentRuns() {
   // Always order by startedAt desc — most recent runs first
@@ -31,6 +31,28 @@ export function useProcessNameMap(): Map<string, string> {
     }
     return map;
   }, [instances]);
+}
+
+/**
+ * Subscribe to `agentRuns` filtered server-side by processInstanceId + stepId.
+ * Returns an empty result while either argument is missing.
+ *
+ * Two equality predicates on a single collection don't require a composite
+ * index — Firestore serves them by intersecting single-field indexes.
+ */
+export function useAgentRunsForStep(
+  processInstanceId: string | null,
+  stepId: string | null,
+): FirestoreState<AgentRun> {
+  const enabled = processInstanceId !== null && stepId !== null;
+  const constraints = useMemo(
+    () =>
+      enabled
+        ? [where('processInstanceId', '==', processInstanceId), where('stepId', '==', stepId)]
+        : [],
+    [enabled, processInstanceId, stepId],
+  );
+  return useCollection<AgentRun>(enabled ? 'agentRuns' : '', constraints);
 }
 
 export function useAgentRun(runId: string | null) {

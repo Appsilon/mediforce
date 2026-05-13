@@ -24,6 +24,11 @@ import { cn, isBrowsableRepoUrl } from '@/lib/utils';
 interface AgentOutputDisplayProps {
   agentOutput: AgentOutputData;
   instanceId: string;
+  /**
+   * Optional host-controlled signal fired when content availability changes
+   * (result metadata or fetched file content is ready). Safe to ignore when
+   * the host doesn't need to react to content availability.
+   */
   onContentLoaded?: (hasContent: boolean) => void;
 }
 
@@ -51,7 +56,11 @@ export function AgentOutputDisplay({
   instanceId,
   onContentLoaded,
 }: AgentOutputDisplayProps) {
-  const hasPresentation = typeof agentOutput.presentation === 'string' && agentOutput.presentation.length > 0;
+  const presentationHtml =
+    typeof agentOutput.presentation === 'string' && agentOutput.presentation.length > 0
+      ? agentOutput.presentation
+      : null;
+  const hasPresentation = presentationHtml !== null;
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = React.useState(300);
   const { resolvedTheme } = useTheme();
@@ -94,10 +103,15 @@ export function AgentOutputDisplay({
 
   React.useEffect(() => {
     if (!outputFilePath) return;
+    // Reset state so a previous file's content doesn't show during a new fetch.
+    setFileContent(null);
+    setFileError(null);
     setFileLoading(true);
+    let cancelled = false;
     apiFetch(`/api/agent-output-file?path=${encodeURIComponent(outputFilePath)}&instanceId=${encodeURIComponent(instanceId)}`)
       .then((res) => res.json() as Promise<{ content?: string; error?: string }>)
       .then((data) => {
+        if (cancelled) return;
         if (data.error && !data.content) {
           setFileError(data.error);
         } else if (data.content) {
@@ -105,9 +119,16 @@ export function AgentOutputDisplay({
         }
       })
       .catch((err: unknown) => {
+        if (cancelled) return;
         setFileError(err instanceof Error ? err.message : 'Failed to fetch file');
       })
-      .finally(() => setFileLoading(false));
+      .finally(() => {
+        if (cancelled) return;
+        setFileLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [outputFilePath, instanceId]);
 
   // Content is available if we have result metadata or file content
@@ -161,11 +182,11 @@ export function AgentOutputDisplay({
           ))}
         </Tabs.List>
 
-        {hasPresentation && (
+        {presentationHtml !== null && (
           <Tabs.Content value="presentation" className="p-4">
             <iframe
               ref={iframeRef}
-              srcDoc={buildSrcdoc(agentOutput.presentation!, agentOutput.result, isDark)}
+              srcDoc={buildSrcdoc(presentationHtml, agentOutput.result, isDark)}
               sandbox="allow-scripts"
               style={{ width: '100%', height: iframeHeight, border: 'none' }}
               title="Agent presentation"
@@ -346,6 +367,9 @@ export function MarkdownContent({ content }: { content: string }) {
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
   let index = 0;
+  // Monotonic React key — bumped on every push so two blocks ending at the
+  // same line index don't collide (e.g. paragraph then heading).
+  let keyCounter = 0;
 
   while (index < lines.length) {
     const line = lines[index];
@@ -356,7 +380,7 @@ export function MarkdownContent({ content }: { content: string }) {
       const level = headingMatch[1].length;
       const text = headingMatch[2];
       const Tag = `h${level}` as keyof React.JSX.IntrinsicElements;
-      elements.push(<Tag key={index}>{text}</Tag>);
+      elements.push(<Tag key={keyCounter++}>{text}</Tag>);
       index++;
       continue;
     }
@@ -368,7 +392,7 @@ export function MarkdownContent({ content }: { content: string }) {
         tableLines.push(lines[index]);
         index++;
       }
-      elements.push(<MarkdownTable key={index} lines={tableLines} />);
+      elements.push(<MarkdownTable key={keyCounter++} lines={tableLines} />);
       continue;
     }
 
@@ -380,7 +404,7 @@ export function MarkdownContent({ content }: { content: string }) {
         index++;
       }
       elements.push(
-        <ul key={index}>
+        <ul key={keyCounter++}>
           {listItems.map((item, itemIndex) => (
             <li key={itemIndex}><InlineMarkdown text={item} /></li>
           ))}
@@ -397,7 +421,7 @@ export function MarkdownContent({ content }: { content: string }) {
         index++;
       }
       elements.push(
-        <ol key={index}>
+        <ol key={keyCounter++}>
           {listItems.map((item, itemIndex) => (
             <li key={itemIndex}><InlineMarkdown text={item} /></li>
           ))}
@@ -408,7 +432,7 @@ export function MarkdownContent({ content }: { content: string }) {
 
     // Horizontal rule
     if (line.match(/^---+$/)) {
-      elements.push(<hr key={index} />);
+      elements.push(<hr key={keyCounter++} />);
       index++;
       continue;
     }
@@ -435,7 +459,7 @@ export function MarkdownContent({ content }: { content: string }) {
     }
     if (paraLines.length > 0) {
       elements.push(
-        <p key={index}>
+        <p key={keyCounter++}>
           {paraLines.map((line, lineIdx) => (
             <React.Fragment key={lineIdx}>
               {lineIdx > 0 && <br />}
@@ -544,7 +568,12 @@ function looksLikeMarkdown(value: string): boolean {
   );
 }
 
-function looksLikeYaml(value: string): boolean {
+/**
+ * True for strings that look like a structured code block — YAML (`---`,
+ * `- key:`) or JSON shape (`{` / `[`). Used to route values into a strict
+ * <pre> block so their structure is preserved.
+ */
+function looksLikeStructuredString(value: string): boolean {
   const trimmed = value.trim();
   if (trimmed.startsWith('---')) return true;
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) return true;
@@ -557,7 +586,7 @@ function classifyEntry(key: string, value: unknown): EntryKind {
     return 'object-array';
   }
   if (typeof value === 'string') {
-    if (YAML_KEY_PATTERN.test(key) || looksLikeYaml(value)) {
+    if (YAML_KEY_PATTERN.test(key) || looksLikeStructuredString(value)) {
       if (value.length > SHORT_STRING_CHAR_THRESHOLD || value.includes('\n')) return 'yaml';
     }
     if (MARKDOWN_KEY_PATTERN.test(key) && value.length > SHORT_STRING_CHAR_THRESHOLD) return 'markdown';

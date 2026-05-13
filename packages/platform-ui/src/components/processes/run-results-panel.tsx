@@ -91,7 +91,12 @@ function GithubMark({ className }: { className?: string }) {
   );
 }
 
-function parseGithubPrUrl(url: string): { org: string; repo: string; number: string } | null {
+/**
+ * Parse a GitHub Pull Request URL into its org / repo / number parts.
+ * Returns `null` for non-GitHub or malformed URLs. Accepts trailing path
+ * segments (e.g. `/files`), query strings, and fragments.
+ */
+export function parseGithubPrUrl(url: string): { org: string; repo: string; number: string } | null {
   const match = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:[/?#].*)?$/);
   if (!match) return null;
   return { org: match[1], repo: match[2], number: match[3] };
