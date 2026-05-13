@@ -1,7 +1,7 @@
 version: "1.0"
-generated: "2026-04-23"
+generated: "2026-05-13"
 standard: "agentskills.io/specification"
-total_skills: 7
+total_skills: 8
 
 # Runtime skills have their own per-app registries:
 #   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml
@@ -47,3 +47,8 @@ domains:
         complexity: basic
         language: multi
         description: Ingest, query, and lint the LLM-compiled wiki (Karpathy LLM Wiki pattern)
+      - id: add-release-notes
+        path: skills/add-release-notes/SKILL.md
+        complexity: basic
+        language: multi
+        description: Append a one-line entry for a merged PR to the current week's section in RELEASE_NOTES.md
