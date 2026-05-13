@@ -198,11 +198,54 @@ def variant_inconsistent_values(target: Path) -> None:
     write_xport(dm, dm_meta, dm_path)
 
 
+# ---------------------------------------------------------------------------
+# Variant 5: injection-demo — 3 codifiable findings for the propose-rules
+# demo. Subset of clean/ (DM + LB + AE + define.xml only) with mutations
+# that map cleanly onto the pointblank check vocabulary supported by the
+# study repo:
+#   - DM.SEX = 'X'                       → col_vals_in_set [M, F, U]
+#   - LB duplicate (USUBJID, LBSEQ)      → rows_distinct
+#   - AE.USUBJID = 'ORPHAN-99' (1 row)   → cross_domain_ref AE→DM
+#
+# Three findings, three different pointblank check types — gives the
+# propose-rules agent a diverse, well-scoped surface to codify. EX/VS
+# intentionally excluded so we keep validate-script under 5 min.
+# ---------------------------------------------------------------------------
+def variant_injection_demo(target: Path) -> None:
+    reset_dir(target)
+    for name in ["DM.xpt", "LB.xpt", "AE.xpt", "define.xml"]:
+        shutil.copy2(CLEAN / name, target / name)
+
+    # DM.SEX = 'X' — outside the CDISC SEX codelist {F, M, U, UNDIFFERENTIATED}.
+    dm_path = target / "DM.xpt"
+    dm, dm_meta = pyreadstat.read_xport(str(dm_path))
+    dm.loc[0, "SEX"] = "X"
+    write_xport(dm, dm_meta, dm_path)
+
+    # LB duplicate (USUBJID, LBSEQ) — set second row's pair to match the first.
+    lb_path = target / "LB.xpt"
+    lb, lb_meta = pyreadstat.read_xport(str(lb_path))
+    lb.loc[1, "USUBJID"] = lb.loc[0, "USUBJID"]
+    lb.loc[1, "LBSEQ"] = lb.loc[0, "LBSEQ"]
+    write_xport(lb, lb_meta, lb_path)
+
+    # AE.USUBJID — replace one row's subject id with a code that does not
+    # appear in DM. Reuses the existing USUBJID storage width by padding to
+    # whatever the column already holds.
+    ae_path = target / "AE.xpt"
+    ae, ae_meta = pyreadstat.read_xport(str(ae_path))
+    existing_width = max(len(str(value)) for value in ae["USUBJID"].astype(str))
+    orphan = "ORPHAN-99".ljust(existing_width)[:existing_width]
+    ae.loc[0, "USUBJID"] = orphan
+    write_xport(ae, ae_meta, ae_path)
+
+
 VARIANTS = [
     ("injection", variant_injection),
     ("mess-encoding", variant_encoding),
     ("mess-missing-domain", variant_missing_domain),
     ("mess-inconsistent-values", variant_inconsistent_values),
+    ("injection-demo", variant_injection_demo),
 ]
 
 
