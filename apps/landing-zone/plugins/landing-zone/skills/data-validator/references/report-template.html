@@ -1,0 +1,294 @@
+<!--
+  Landing Zone validation report template.
+
+  This file is the canonical visual contract for the validation report
+  rendered by the `data-validator` skill (interpret-validation step).
+
+  Owned by the study team. The skill loads this file from
+  /workspace/templates/report-template.html, fills marked slots, and
+  writes the result to /output/presentation.html.
+
+  Rules for slot filling (enforced by SKILL.md):
+    1. Replace only the contents between matching <!-- SLOT:name --> and
+       <!-- /SLOT:name --> markers.
+    2. Do NOT add new sections, reorder existing ones, or rewrite the
+       static prose between slots.
+    3. Slots ending in `_BLOCK` are wrapped in <template> tags so the
+       skill can hide entire blocks by removing them outright (used for
+       the failure-detail block when scriptFailedFlag = false).
+    4. If a slot is empty, leave the placeholder text in place.
+
+  Self-contained: Tailwind CDN + Google Fonts only. No relative URLs.
+  Safe for sandboxed iframe rendering. When embedded in the Mediforce
+  task UI the host iframe wrapper injects its own Tailwind runtime —
+  this CDN tag is a no-op there but keeps standalone-browser preview
+  working (the canonical author workflow).
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Validation report — <!-- SLOT:study_id -->STUDY_ID<!-- /SLOT:study_id --></title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html, body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+    .severity-critical { background-color: #dc2626; color: #ffffff; }
+    .severity-major    { background-color: #f59e0b; color: #ffffff; }
+    .severity-minor    { background-color: #fcd34d; color: #1f2937; }
+    .severity-warning  { background-color: #fde68a; color: #1f2937; }
+    .severity-unknown  { background-color: #f1f5f9; color: #64748b; }
+    .heat-0  { background-color: transparent; }
+    .heat-1  { background-color: #fef3c7; }
+    .heat-2  { background-color: #fcd34d; }
+    .heat-3  { background-color: #f87171; color: #ffffff; }
+    .badge   { display:inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+    .card    { background:#ffffff; border:1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+    .metric-num { font-variant-numeric: tabular-nums; }
+    .num-cell   { font-variant-numeric: tabular-nums; }
+    .msg-cell   { max-width: 38ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wordmark   { font-weight: 600; letter-spacing: 0.02em; color: #0f172a; }
+    .wordmark-dot { display:inline-block; width: 8px; height: 8px; border-radius: 9999px; background:#0d9488; margin-right: 8px; vertical-align: middle; }
+    @media (prefers-color-scheme: dark) {
+      .card { background:#0f1117; border-color:#2d2f36; box-shadow:none; }
+      .wordmark { color:#e2e4e9; }
+      .heat-1 { background-color:#3f2d10; color:#fcd34d; }
+      .heat-2 { background-color:#a16207; color:#fef3c7; }
+      .severity-minor, .severity-warning { color:#1f2937; }
+    }
+    html.dark .card { background:#0f1117; border-color:#2d2f36; box-shadow:none; }
+    html.dark .wordmark { color:#e2e4e9; }
+    html.dark .heat-1 { background-color:#3f2d10; color:#fcd34d; }
+    html.dark .heat-2 { background-color:#a16207; color:#fef3c7; }
+    @media print {
+      body { background:#ffffff !important; }
+      .card { box-shadow:none; break-inside: avoid; }
+      .severity-critical, .severity-major, .severity-minor, .severity-warning,
+      .heat-1, .heat-2, .heat-3,
+      section [class*="bg-emerald-"], section [class*="bg-sky-"],
+      section [class*="bg-amber-"], section [class*="bg-red-"],
+      section [class*="bg-zinc-"] {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      details { display: block; }
+      details > summary { display: none; }
+      footer { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+  <div class="max-w-5xl mx-auto px-6 py-8 space-y-6">
+
+    <!-- ============================================================
+         BRAND HEADER — small wordmark above the verdict so the report
+         identifies itself when printed or shared as a standalone file.
+         ============================================================ -->
+    <header class="flex items-center justify-between text-sm">
+      <div class="wordmark"><span class="wordmark-dot"></span>Mediforce Landing Zone — Validation report</div>
+      <div class="text-slate-500 dark:text-slate-400">Study <span class="font-medium text-slate-700 dark:text-slate-200"><!-- SLOT:header_study_id -->STUDY_ID<!-- /SLOT:header_study_id --></span></div>
+    </header>
+
+    <!-- ============================================================
+         STATUS BANNER — one of five canonical banners.
+         The skill replaces SLOT:status_banner with EXACTLY one of the
+         five banner blocks defined in SKILL.md (clean / minor-fix /
+         recovery / escalate / chaos). The skill MUST NOT invent copy.
+         ============================================================ -->
+    <section>
+      <!-- SLOT:status_banner -->
+      <div class="rounded-xl px-6 py-5 bg-slate-200 text-slate-900">
+        <div class="text-xs font-semibold uppercase tracking-wider opacity-80">Classification</div>
+        <div class="text-2xl font-semibold mt-1">Pending</div>
+        <p class="mt-2 text-sm opacity-90">Classification reason will appear here.</p>
+      </div>
+      <!-- /SLOT:status_banner -->
+    </section>
+
+    <!-- ============================================================
+         HEADER — study, delivery, timestamp, rules commit.
+         ============================================================ -->
+    <section class="card px-6 py-5">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+          <div class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Study</div>
+          <div class="font-medium mt-1"><!-- SLOT:study_id -->STUDY_ID<!-- /SLOT:study_id --></div>
+        </div>
+        <div>
+          <div class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Delivery</div>
+          <div class="font-medium mt-1 break-all"><!-- SLOT:delivery_id -->delivery-id<!-- /SLOT:delivery_id --></div>
+        </div>
+        <div>
+          <div class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Generated (UTC)</div>
+          <div class="font-medium mt-1 num-cell"><!-- SLOT:generated_at -->timestamp<!-- /SLOT:generated_at --></div>
+        </div>
+        <div>
+          <div class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Rules commit</div>
+          <div class="font-medium mt-1 font-mono text-sm"><!-- SLOT:rules_commit -->–<!-- /SLOT:rules_commit --></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         KEY METRICS ROW — total + per-severity counts. Datasets count
+         moved to the dataset-coverage line below so this row reads as
+         a single severity ladder.
+         ============================================================ -->
+    <section class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="card px-4 py-3">
+        <div class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Total findings</div>
+        <div class="text-2xl font-semibold metric-num mt-1"><!-- SLOT:total_findings -->0<!-- /SLOT:total_findings --></div>
+      </div>
+      <div class="card px-4 py-3">
+        <div class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Critical</div>
+        <div class="text-2xl font-semibold metric-num mt-1 text-red-600 dark:text-red-400"><!-- SLOT:count_critical -->0<!-- /SLOT:count_critical --></div>
+      </div>
+      <div class="card px-4 py-3">
+        <div class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Major</div>
+        <div class="text-2xl font-semibold metric-num mt-1 text-amber-600 dark:text-amber-400"><!-- SLOT:count_major -->0<!-- /SLOT:count_major --></div>
+      </div>
+      <div class="card px-4 py-3">
+        <div class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Minor</div>
+        <div class="text-2xl font-semibold metric-num mt-1 text-yellow-600 dark:text-yellow-400"><!-- SLOT:count_minor -->0<!-- /SLOT:count_minor --></div>
+      </div>
+      <div class="card px-4 py-3">
+        <div class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Warning</div>
+        <div class="text-2xl font-semibold metric-num mt-1 text-slate-600 dark:text-slate-300"><!-- SLOT:count_warning -->0<!-- /SLOT:count_warning --></div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         DATASET COVERAGE — one-line summary of expected vs delivered
+         SDTM domains. Filled by the skill from EXPECTED_DOMAINS and
+         the distinct dataset names in findings.json.
+         ============================================================ -->
+    <section class="card px-6 py-4 text-sm">
+      <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+        <div>
+          <span class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Datasets delivered</span>
+          <span class="ml-2 font-medium num-cell"><!-- SLOT:dataset_count -->0<!-- /SLOT:dataset_count --></span>
+        </div>
+        <div class="text-slate-600 dark:text-slate-300">
+          <!-- SLOT:dataset_coverage -->Coverage summary will appear here.<!-- /SLOT:dataset_coverage -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         CLASSIFICATION EXPLAINER — canonical copy, never varies.
+         The skill replaces SLOT:classification_explainer with EXACTLY
+         one of the five paragraphs defined in SKILL.md. Copy is fixed.
+         ============================================================ -->
+    <section class="card px-6 py-5">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">What this classification means</h2>
+      <div class="mt-3 text-slate-700 dark:text-slate-200 leading-relaxed">
+        <!-- SLOT:classification_explainer -->Explainer paragraph here.<!-- /SLOT:classification_explainer -->
+      </div>
+    </section>
+
+    <!-- ============================================================
+         DOMAIN × CATEGORY HEATMAP — rendered when findings exist.
+         The whole block is removed when there are no findings.
+         ============================================================ -->
+    <!-- BLOCK:heatmap -->
+    <section class="card px-6 py-5">
+      <div class="flex items-baseline justify-between">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Findings heatmap</h2>
+        <div class="text-xs text-slate-500 dark:text-slate-400">Counts by SDTM domain × rule category</div>
+      </div>
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full text-sm border-separate border-spacing-0">
+          <thead>
+            <tr class="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <th class="py-2 pr-3">Domain</th>
+              <th class="py-2 px-3">Structure</th>
+              <th class="py-2 px-3">Controlled Terminology</th>
+              <th class="py-2 px-3">Consistency</th>
+              <th class="py-2 px-3">FDA Business Rules</th>
+              <th class="py-2 px-3">PMDA</th>
+              <th class="py-2 px-3">Other</th>
+              <th class="py-2 pl-3 text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- SLOT:heatmap_rows -->
+            <tr><td class="py-2 pr-3 font-medium">No findings to plot.</td><td class="py-2 px-3 text-center num-cell heat-0"></td><td class="py-2 px-3 text-center num-cell heat-0"></td><td class="py-2 px-3 text-center num-cell heat-0"></td><td class="py-2 px-3 text-center num-cell heat-0"></td><td class="py-2 px-3 text-center num-cell heat-0"></td><td class="py-2 px-3 text-center num-cell heat-0"></td><td class="py-2 pl-3 text-right num-cell">0</td></tr>
+            <!-- /SLOT:heatmap_rows -->
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+        <span>Scale:</span>
+        <span class="inline-flex items-center gap-1"><span class="inline-block w-4 h-4 rounded heat-1"></span> 1–4</span>
+        <span class="inline-flex items-center gap-1"><span class="inline-block w-4 h-4 rounded heat-2"></span> 5–19</span>
+        <span class="inline-flex items-center gap-1"><span class="inline-block w-4 h-4 rounded heat-3"></span> 20+</span>
+      </div>
+    </section>
+    <!-- /BLOCK:heatmap -->
+
+    <!-- ============================================================
+         TOP FINDINGS TABLE — top 20 rules by issue count.
+         The whole block is removed when there are no findings.
+         ============================================================ -->
+    <!-- BLOCK:top_findings -->
+    <section class="card px-6 py-5">
+      <div class="flex items-baseline justify-between">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Top findings</h2>
+        <div class="text-xs text-slate-500 dark:text-slate-400">Sorted by issue count, top 20</div>
+      </div>
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+              <th class="py-2 pr-3 w-32">Rule</th>
+              <th class="py-2 px-3 w-20">Domain</th>
+              <th class="py-2 px-3 w-24">Severity</th>
+              <th class="py-2 px-3 text-right w-20">Issues</th>
+              <th class="py-2 pl-3">Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- SLOT:findings_rows -->
+            <tr class="border-b border-slate-100 dark:border-slate-800"><td class="py-2 pr-3 font-mono text-xs">—</td><td class="py-2 px-3 font-mono text-xs">—</td><td class="py-2 px-3"></td><td class="py-2 px-3 text-right num-cell">0</td><td class="py-2 pl-3 text-slate-600 dark:text-slate-300 msg-cell" title="">No findings.</td></tr>
+            <!-- /SLOT:findings_rows -->
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        <!-- SLOT:findings_overflow_note --><!-- /SLOT:findings_overflow_note -->
+      </div>
+    </section>
+    <!-- /BLOCK:top_findings -->
+
+    <!-- ============================================================
+         FAILURE DETAIL — only rendered when scriptFailedFlag = true.
+         Block is removed when the script ran successfully.
+         ============================================================ -->
+    <!-- BLOCK:failure_detail -->
+    <section class="card px-6 py-5 border border-red-300 dark:border-red-900">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">Script failure detail</h2>
+      <p class="mt-2 text-sm text-slate-700 dark:text-slate-200"><!-- SLOT:failure_error -->error<!-- /SLOT:failure_error --></p>
+      <details class="mt-3" open>
+        <summary class="cursor-pointer text-sm text-slate-600 dark:text-slate-300">Traceback</summary>
+        <pre class="mt-2 p-3 bg-slate-900 text-slate-100 text-xs rounded overflow-x-auto"><!-- SLOT:failure_traceback -->traceback<!-- /SLOT:failure_traceback --></pre>
+      </details>
+    </section>
+    <!-- /BLOCK:failure_detail -->
+
+    <!-- ============================================================
+         FOOTER — audit metadata. All fields stay even when their
+         block-sibling content was removed (footer is always rendered).
+         ============================================================ -->
+    <footer class="pt-4 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 flex flex-wrap gap-x-6 gap-y-1">
+      <span>Mediforce Landing Zone</span>
+      <span>Generated <span class="num-cell"><!-- SLOT:footer_timestamp -->–<!-- /SLOT:footer_timestamp --></span></span>
+      <span>Rules commit <span class="font-mono"><!-- SLOT:footer_rules_commit -->–<!-- /SLOT:footer_rules_commit --></span></span>
+      <span>Total findings <span class="num-cell"><!-- SLOT:footer_total_findings -->0<!-- /SLOT:footer_total_findings --></span></span>
+    </footer>
+
+  </div>
+</body>
+</html>

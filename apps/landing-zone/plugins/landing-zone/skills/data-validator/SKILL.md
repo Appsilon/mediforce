@@ -47,7 +47,7 @@ The container has three read paths:
 
 - **`/workspace/findings.json`** — the raw CORE engine output (full `Issue_Summary` + `Issue_Details` + `Conformance_Details`) persisted to the run worktree for audit. Always read this for the per-finding rows that drive the heatmap and top-findings list. If it disagrees with `/output/input.json`, prefer the workspace copy (it is the version that ended up in the run's git history).
 
-- **`/workspace/templates/report-template.html`** — the canonical HTML template owned by the study repository. The skill MUST load this file and fill its slots. If it is missing, see the edge case below.
+- **`references/report-template.html`** — the canonical HTML template owned by the study repository. The skill MUST load this file and fill its slots. If it is missing, see the edge case below.
 
 Do not assume the structure of an individual finding beyond the fields documented in `references/cdisc-categories.md`. The CORE engine emits arrays of objects; field names of interest typically include `rule_id` (or `core_id`), `dataset` (the domain), `severity`, `message`, and an issue count. Read defensively.
 
@@ -61,7 +61,7 @@ Read in this order:
 
 1. `/output/input.json` — required. Parse JSON. Fail loud if it does not parse.
 2. `/workspace/findings.json` — optional. Parse JSON; degrade gracefully on read or parse error (heatmap and findings table become empty blocks that get removed).
-3. `/workspace/templates/report-template.html` — required. Read the raw file as a string. See edge case below if missing.
+3. `references/report-template.html` — required. Read the raw file as a string. See edge case below if missing.
 
 ### Step 2 — Read the deterministic classification
 
@@ -236,7 +236,7 @@ In each banner block, `{{classificationReason}}` is the only string the skill su
 - **Do not** invent findings, severities, rule codes, or messages.
 - **Do not** modify `/workspace/findings.json` or any other workspace file.
 - **Do not** call external services, fetch URLs at render time, or embed scripts beyond what the template already loads.
-- **Do not** ship a different template path. The template lives at `/workspace/templates/report-template.html` and nowhere else.
+- **Do not** ship a different template path. The template lives at `references/report-template.html` and nowhere else.
 
 If you find yourself wanting to write a paragraph the template does not have a slot for, stop. The slot is missing on purpose. Open a follow-up issue against this repo or the study repo instead.
 
@@ -250,7 +250,7 @@ If you find yourself wanting to write a paragraph the template does not have a s
 
 - **`classification` missing from input** — fall back to `chaos`, render the chaos banner, and surface the missing-classification fact in the failure-detail section. Should never happen in production.
 - **`/workspace/findings.json` unreadable** — still render banner, header, key metrics (showing `0` where computation requires findings), and explainer. Remove `BLOCK:heatmap` and `BLOCK:top_findings`. Add a one-line note inside `BLOCK:failure_detail` describing the missing file.
-- **`/workspace/templates/report-template.html` missing** — write a minimal fallback HTML containing only the banner (using the canonical copy from this skill) plus a notice that the template was not found at `/workspace/templates/report-template.html`. Do not invent a layout. Still write `result.json` normally.
+- **`references/report-template.html` missing** — write a minimal fallback HTML containing only the banner (using the canonical copy from this skill) plus a notice that the template was not found at `references/report-template.html`. Do not invent a layout. Still write `result.json` normally.
 - **Raw findings array very large (>1000 rows)** — heatmap shows full counts; top-findings list truncates to 20 with the overflow note.
 - **`scriptStatus = ok` but `error` field is set** — render the failure-detail block alongside the heatmap. Banner is driven by classification, not the error field.
 - **No `deliveryId` in input** — fall back to the directory basename of `deliveryDir`. If neither, label `"unknown"`.
@@ -258,9 +258,7 @@ If you find yourself wanting to write a paragraph the template does not have a s
 ## Reference files
 
 - `references/cdisc-categories.md` — CDISC rule categories (Structure / Controlled Terminology / Consistency / FDA Business Rules / PMDA), severity levels, and the rule-code prefix conventions used to map findings into categories. Read this before building the heatmap. The same prefix mapping is applied internally by the Python router that assigned the classification.
+- `references/report-template.html` — the canonical HTML template with `<!-- SLOT:name -->` and `<!-- BLOCK:name -->` markers. The skill MUST load this file and fill its slots; never invent a layout.
+- `references/report-style.md` — editorial and visual contract (layout, palette, typography, tone, iframe constraints). Read this when modifying the template; do not regenerate copy from it at render time.
 
-## External contract
-
-The HTML template is **owned by the study repository**, not this skill. It lives at `templates/report-template.html` in the study repo (e.g. `Appsilon/mediforce-landing-zone-study-demo`) and is mounted into the agent at `/workspace/templates/report-template.html`. The study team controls layout and visual identity via PRs there; this skill controls the filling logic and the canonical copy.
-
-If the template's slot or block markers change, the change must be coordinated across the study repo and this skill.
+Template, style guide, and skill logic ship and version together — change them in the same commit when slot or block markers are added, renamed, or removed.
