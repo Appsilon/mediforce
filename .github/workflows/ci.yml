@@ -93,9 +93,44 @@ jobs:
         working-directory: packages/platform-ui
         run: |
           firebase emulators:start --project demo-mediforce --only auth,firestore --config firebase.ci.json &
-          sleep 10
-          curl --retry 5 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
-          curl --retry 5 --retry-delay 2 --retry-connrefused http://127.0.0.1:8080/
+          # No fixed `sleep` — curl --retry handles readiness. Each retry
+          # waits up to 2s, so the loop exits as soon as the port answers.
+          curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
+          curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:8080/
+
+      # Cache .next/ keyed by source hashes + build-time NEXT_PUBLIC_* env
+      # vars baked into the bundle. Any change to source, config, lockfile,
+      # workspace layout, or those env vars invalidates the cache. On a hit,
+      # the Build step is skipped and `next start` reuses the restored
+      # .next/BUILD_ID — saves ~70s vs the cache miss path on the typical PR.
+      #
+      # ⚠ The `-env-...` suffix is a LITERAL of the NEXT_PUBLIC_* values
+      # below. If you change any value in the "Build platform-ui for E2E"
+      # env block, bump the suffix here too (or bump the `v1` prefix to
+      # bust the whole cache). Otherwise a stale build will be served.
+      - name: Cache .next build for E2E
+        id: next-cache
+        uses: actions/cache@v5
+        with:
+          path: packages/platform-ui/.next
+          key: next-e2e-v1-${{ runner.os }}-${{ hashFiles('packages/*/src/**/*.ts', 'packages/*/src/**/*.tsx', 'packages/*/src/**/*.js', 'packages/*/src/**/*.jsx', 'packages/*/src/**/*.css', 'packages/platform-ui/public/**', 'packages/platform-ui/next.config.mjs', 'packages/*/tsconfig.json', 'tsconfig.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml') }}-env-fake-api-key-localhost-demo-mediforce-demo-mediforce.appspot.com-000000000000-1:000000000000:web:fake-true-http://localhost:9007
+
+      # Build once with NEXT_PUBLIC_* baked for emulators. Playwright's webServer
+      # then runs `next start` instead of `next dev`, skipping the JIT
+      # compile-on-request cost that dominated e2e wall-clock.
+      - name: Build platform-ui for E2E
+        if: steps.next-cache.outputs.cache-hit != 'true'
+        run: cd packages/platform-ui && pnpm build:e2e
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-mediforce.appspot.com
+          FIREBASE_PROJECT_ID: demo-mediforce
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
+          PLATFORM_API_KEY: ci-e2e-test-key
+          SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
 
       - name: Run E2E tests
         run: cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth

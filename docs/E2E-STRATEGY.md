@@ -41,7 +41,7 @@ Rule of thumb: if the test's first assertion would fail when run twice in a row 
 | Type | Location | Purpose |
 |------|----------|---------|
 | Smoke | `e2e/smoke.spec.ts` | Login page, auth redirect — no emulators needed |
-| Journey | `e2e/journeys/*.journey.ts` | Full feature flows with state verification |
+| Journey | `e2e/ui/*.journey.ts` | Full feature flows with state verification |
 
 ## File Organization
 
@@ -54,7 +54,7 @@ e2e/
     emulator.ts
     seed-data.ts
     recording.ts        # cursor, click, showStep, showResult, endRecording
-  journeys/
+  ui/
     task-review.journey.ts
     workflow-home.journey.ts
     run-detail.journey.ts

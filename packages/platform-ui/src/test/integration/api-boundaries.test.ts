@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
-const PLATFORM_UI_ROOT = resolve(__dirname, '..', '..');
+const PLATFORM_UI_ROOT = resolve(__dirname, '..', '..', '..');
 const MONOREPO_ROOT = resolve(PLATFORM_UI_ROOT, '..', '..');
 const UI_SRC = join(PLATFORM_UI_ROOT, 'src');
 const API_HANDLERS = join(

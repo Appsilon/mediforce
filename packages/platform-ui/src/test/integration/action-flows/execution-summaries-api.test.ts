@@ -39,14 +39,14 @@ import {
   parseWorkflowTemplate,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { createEchoServer } from '../../../scripts/test-echo-server/server.js';
+import { createEchoServer } from '../../../../../../scripts/test-echo-server/server.js';
 
 // ---- Wiring: in-memory services + handler glue -----------------------------
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = resolve(
   __dirname,
-  '../../../apps/examples/personal-automations/src/execution-summaries-api.wd.json',
+  '../../../../../../apps/examples/personal-automations/src/execution-summaries-api.wd.json',
 );
 
 const ECHO_PORT = 9098;

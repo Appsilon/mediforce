@@ -1,11 +1,11 @@
-// packages/platform-ui/src/test/middleware.test.ts
+// packages/platform-ui/src/test/integration/middleware.test.ts
 // RED phase: these tests describe the middleware auth contract for Step 0 of the MCP permissions refactor.
 // They will FAIL before middleware implementation.
 // After middleware.ts is updated to centralize auth, run again to confirm GREEN.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { middleware } from '../middleware';
+import { middleware } from '../../middleware';
 
 const EMULATOR_ISS = 'https://securetoken.google.com/demo-mediforce';
 const EMULATOR_AUD = 'demo-mediforce';

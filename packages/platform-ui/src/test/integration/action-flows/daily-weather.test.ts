@@ -47,7 +47,7 @@ import type { WorkflowDefinition } from '@mediforce/platform-core';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = resolve(
   __dirname,
-  '../../../apps/examples/personal-automations/src/daily-weather.wd.json',
+  '../../../../../../apps/examples/personal-automations/src/daily-weather.wd.json',
 );
 
 // ---- Canned third-party responses ------------------------------------------

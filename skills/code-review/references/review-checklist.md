@@ -39,7 +39,7 @@
 ## 6. Testing
 
 - [ ] New behavior has unit tests (colocated `__tests__/` or `*.test.ts`)
-- [ ] UI features have E2E journey tests in `packages/platform-ui/e2e/journeys/`
+- [ ] UI features have L4 UI E2E journey tests in `packages/platform-ui/e2e/ui/` (real multi-step flows, not "is button visible")
 - [ ] Tests cover happy path + key error paths
 - [ ] No flaky timing dependencies
 

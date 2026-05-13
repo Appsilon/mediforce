@@ -33,9 +33,9 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: [
-      'e2e/execution-summaries-api.e2e.ts',
-      'e2e/food-log-proxy.e2e.ts',
-      'e2e/daily-weather.e2e.ts',
+      'src/test/integration/action-flows/execution-summaries-api.test.ts',
+      'src/test/integration/action-flows/food-log-proxy.test.ts',
+      'src/test/integration/action-flows/daily-weather.test.ts',
     ],
     testTimeout: 30_000,
     hookTimeout: 15_000,

@@ -15,15 +15,15 @@ import { McpClientManager } from '@mediforce/mcp-client';
 
 // ---- Gating ---------------------------------------------------------
 //
-// Tier 2 tests spawn real MCP subprocesses and call a real LLM provider
-// (OpenRouter). They're slow, cost a fraction of a cent per run, and
-// depend on external availability — deliberately off the default CI
-// suite. Two conditions must hold to run:
-//   1. Vitest must load this file via vitest.config.e2e-api.ts (the
+// L5 External / Tier 2 tests spawn real MCP subprocesses and call a
+// real LLM provider (OpenRouter). They're slow, cost a fraction of a
+// cent per run, and depend on external availability — deliberately
+// off the default CI suite. Two conditions must hold to run:
+//   1. Vitest must load this file via vitest.config.external.ts (the
 //      default config excludes e2e/**).
 //   2. OPENROUTER_API_KEY must be set.
 // If (2) is missing, the suite skips with a clear diagnostic instead of
-// failing, so `pnpm test:mcp-real` without a key is a no-op.
+// failing, so `pnpm test:external` without a key is a no-op.
 
 const openrouterApiKey = process.env.OPENROUTER_API_KEY;
 const realLlmModel = process.env.TIER2_MODEL ?? 'anthropic/claude-haiku-4.5';
@@ -154,11 +154,11 @@ function makeStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
 // ---- Tests ----------------------------------------------------------
 //
 // Split into two suites so the cheap sanity (no-LLM) always runs under
-// `pnpm test:mcp-real`, catching regressions in the stdio transport,
+// `pnpm test:external`, catching regressions in the stdio transport,
 // echo-mcp script, or McpClientManager wiring without needing an LLM
 // API key. The LLM suite layers on top and is skipped without a key.
 
-describe('MCP stdio roundtrip — Tier 2 sanity (no LLM required)', () => {
+describe('MCP stdio roundtrip — L5 external sanity (no LLM required)', () => {
   let manager: McpClientManager | null = null;
 
   beforeAll(() => {

@@ -30,8 +30,20 @@ def last_commit_touching(base: str, pattern: str, *, exclude: str | None = None)
     last = None
     for idx, line in enumerate(commits):
         sha = line.split()[0]
+        # `--find-renames=100%` only detects renames when content is byte-identical
+        # (similarity score = 100%); any content change makes git emit the new path
+        # as Added (A) instead of Renamed (R). `--diff-filter=AM` then keeps Added
+        # and Modified, dropping pure-rename R entries. Net result: pure file moves
+        # (e.g., e2e/journeys/ -> e2e/ui/) don't force a GIF refresh, but a rename
+        # WITH any content tweak does.
         diff = subprocess.run(
-            ["git", "diff", "--name-only", f"{sha}~1", sha],
+            [
+                "git", "diff",
+                "--name-only",
+                "--find-renames=100%",
+                "--diff-filter=AM",
+                f"{sha}~1", sha,
+            ],
             capture_output=True, text=True,
         )
         if diff.returncode != 0:
@@ -53,7 +65,7 @@ def main() -> None:
     # fixture, not `page`, and their filenames opt out via suffix.
     last_journey = last_commit_touching(
         base,
-        r"e2e/journeys/",
+        r"e2e/ui/",
         exclude=r"(?:-api|-docker)\.journey\.ts$",
     )
     last_gif = last_commit_touching(base, r"docs/features/.*\.gif")

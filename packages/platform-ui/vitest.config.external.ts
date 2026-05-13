@@ -3,10 +3,11 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
 /**
- * Vitest config for Tier 2 API E2E tests — opt-in only, gated behind
- * `pnpm test:mcp-real`. These tests hit real external services (LLM
- * providers, spawned MCP subprocesses) and are excluded from the default
- * `pnpm test` suite used on CI.
+ * Vitest config for L5 External / Tier 2 tests — opt-in only, gated
+ * behind `pnpm test:external`. These tests hit real external services
+ * (LLM providers via OpenRouter, spawned MCP subprocesses) and are
+ * excluded from the default `pnpm test` suite used on CI. See the
+ * "Testing pyramid" section of AGENTS.md.
  */
 export default defineConfig({
   plugins: [react()],
@@ -27,7 +28,7 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
-    include: ['e2e/api/**/*.test.ts'],
+    include: ['e2e/external/**/*.test.ts'],
     testTimeout: 60_000,
     hookTimeout: 30_000,
   },

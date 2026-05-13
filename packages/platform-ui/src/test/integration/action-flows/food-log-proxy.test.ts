@@ -36,7 +36,7 @@ import {
   parseWorkflowTemplate,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { createEchoServer } from '../../../scripts/test-echo-server/server.js';
+import { createEchoServer } from '../../../../../../scripts/test-echo-server/server.js';
 
 // Distinct port from execution-summaries-api so the two e2e files don't
 // fight when run in the same vitest process (vitest.config.action-flows.ts
@@ -47,7 +47,7 @@ const ECHO_URL = `http://localhost:${ECHO_PORT}/anything`;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = resolve(
   __dirname,
-  '../../../apps/examples/personal-automations/src/food-log-proxy.wd.json',
+  '../../../../../../apps/examples/personal-automations/src/food-log-proxy.wd.json',
 );
 
 const services = (() => {

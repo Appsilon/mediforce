@@ -1,4 +1,4 @@
-// packages/platform-ui/src/test/api-auth-coverage.test.ts
+// packages/platform-ui/src/test/integration/api-auth-coverage.test.ts
 // RED phase: these tests describe the static structural contract for Step 0 of the MCP permissions refactor.
 // They will FAIL before middleware implementation and the follow-up cleanup commits.
 // After middleware.ts centralizes auth, redis-test is removed, and inline validateApiKey() calls
@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const PLATFORM_UI_ROOT = resolve(__dirname, '..', '..');
+const PLATFORM_UI_ROOT = resolve(__dirname, '..', '..', '..');
 const MIDDLEWARE_PATH = join(PLATFORM_UI_ROOT, 'src', 'middleware.ts');
 const API_ROOT = join(PLATFORM_UI_ROOT, 'src', 'app', 'api');
 

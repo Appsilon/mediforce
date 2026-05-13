@@ -29,9 +29,22 @@ projects.push({
 });
 
 if (useEmulators) {
+  // L3 API E2E — real Next + emulators over HTTP, no browser launched.
+  // Tests authenticate via X-Api-Key (no user session storageState).
+  // Future: bump workers via `--workers=4` once per-test data isolation
+  // is audited (currently single MEDIFORCE_DATA_DIR shared on the server).
+  projects.push({
+    name: 'api',
+    testDir: './e2e/api',
+    testMatch: '*.journey.ts',
+    dependencies: ['setup'],
+  });
+
+  // L4 UI E2E — real Next + emulators + Chromium. Sparse, main user
+  // journeys only. Mocked agent (MOCK_AGENT=true). See AGENTS.md.
   projects.push({
     name: 'authenticated',
-    testDir: './e2e/journeys',
+    testDir: './e2e/ui',
     testMatch: '*.journey.ts',
     dependencies: ['setup'],
     use: {
@@ -72,8 +85,18 @@ export default defineConfig({
     // `NEXT_PUBLIC_APP_URL` is explicit so `getAppBaseUrl` doesn't fall back to the
     // :3000 default before Next sets PORT — the auto-runner fire-and-forget to
     // `/api/processes/:id/run` needs the right host:port.
+    //
+    // Default = prebuilt server (`next start`) for CI parity and speed —
+    // `next dev`'s JIT compile-on-request dominated e2e wall-clock. Opt into
+    // `next dev` via `E2E_DEV_SERVER=true` for interactive iteration where
+    // hot-reload beats suite speed (headed / --ui / recording modes).
+    // CI pre-builds in a separate step; locally, `start:e2e` auto-builds the
+    // first time. `reuseExistingServer: true` connects to a server the build
+    // step already started.
     command: useEmulators
-      ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev --webpack -p ${testPort}`
+      ? process.env.E2E_DEV_SERVER === 'true'
+        ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev --webpack -p ${testPort}`
+        : `pnpm start:e2e`
       : 'pnpm dev',
     port: testPort,
     reuseExistingServer: true,

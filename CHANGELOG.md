@@ -22,6 +22,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ### Changed
 - Cowork is now per-workspace billed — the OpenRouter key is read from workspace secrets instead of a global env var; chat textarea auto-grows to fit input ([#378](https://github.com/Appsilon/mediforce/pull/378), [#381](https://github.com/Appsilon/mediforce/pull/381), [#382](https://github.com/Appsilon/mediforce/pull/382)).
 - Agent output is now consistent across surfaces — step detail and human-task panel share one `AgentOutputDisplay`, so L2 auto-runner steps (e.g. `interpret-validation`) finally show their HTML report without needing an L3 review ([#409](https://github.com/Appsilon/mediforce/pull/409)).
+- Tests now have a 5-level pyramid with API E2E as the explicit foundation — `e2e/api/` is a dedicated Playwright project running real Next + emulators over HTTP (no browser), separated from `e2e/ui/` (sparse multi-step user journeys only, not "is button visible"). Misleading legacy names cleaned up: `src/test/*.test.ts` → `src/test/integration/`, `e2e/api/` (tier-2 real-LLM) → `e2e/external/`, `e2e/journeys/` → `e2e/ui/` ([#413](https://github.com/Appsilon/mediforce/pull/413)).
 
 ### Fixed
 - Agent report iframe no longer blows up its host panel — height is capped and `vh` classes inside the report are neutralised ([#392](https://github.com/Appsilon/mediforce/pull/392)).

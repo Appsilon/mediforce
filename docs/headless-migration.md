@@ -228,8 +228,8 @@ Tests are the primary way we read and reason about this codebase. They have to b
 | 8 | **Engine** | Workflow orchestration loops (transitions, triggers, RBAC) | Vitest + in-memory repos | <1s | `packages/workflow-engine/src/__tests__/` |
 | 9 | **Plugin unit** | Individual agent plugin behaviour | Vitest | <1s | `packages/agent-runtime/src/plugins/__tests__/` |
 | 10 | **Auto-runner integration** | Orchestrator endpoint against Firestore emulator | Vitest + emulator | ~5s | `packages/platform-ui/src/app/api/__tests__/` |
-| 11 | **Structural guard** | Architectural invariants — imports, test presence, auth coverage | Vitest (file scan) | <200ms | `packages/platform-ui/src/test/api-boundaries.test.ts`, `api-auth-coverage.test.ts` |
-| 12 | **E2E journey** | User-visible flow through real browser | Playwright + emulator + Next.js dev | ~60s | `packages/platform-ui/e2e/journeys/*.journey.ts` |
+| 11 | **Structural guard** | Architectural invariants — imports, test presence, auth coverage | Vitest (file scan) | <200ms | `packages/platform-ui/src/test/integration/api-boundaries.test.ts`, `api-auth-coverage.test.ts` |
+| 12 | **E2E journey** | User-visible flow through real browser | Playwright + emulator + Next.js dev | ~60s | `packages/platform-ui/e2e/ui/*.journey.ts` |
 | 13 | **E2E smoke** | Unauthenticated pages (login, redirect) | Playwright (no emulator) | ~15s | `packages/platform-ui/e2e/smoke.spec.ts` |
 
 ### Mocking — where and how much

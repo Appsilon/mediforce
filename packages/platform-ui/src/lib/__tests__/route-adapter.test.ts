@@ -21,7 +21,7 @@ describe('createRouteAdapter', () => {
   // Auth is enforced globally by `src/middleware.ts` (X-Api-Key or Firebase
   // ID token) before any route handler runs. This adapter therefore does not
   // reimplement auth — it only covers input parsing, delegation, and error
-  // sanitisation. See `src/test/middleware.test.ts` for auth coverage.
+  // sanitisation. See `src/test/integration/middleware.test.ts` for auth coverage.
 
   it('returns 400 with the first Zod issue when input fails validation', async () => {
     const GET = createRouteAdapter(
