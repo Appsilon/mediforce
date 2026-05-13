@@ -99,6 +99,7 @@ The slots and their canonical sources:
 | Slot | Value |
 |------|-------|
 | `study_id` | `input.variables.STUDY_ID` or `STUDY_ID` env. Fall back to `"unknown"`. |
+| `header_study_id` | Same value as `study_id`. Mirrored into the brand header at the top of the report. |
 | `delivery_id` | Basename of `input.deliveryDir`. Fall back to `"unknown"`. |
 | `generated_at` | Current UTC time, ISO 8601 (`YYYY-MM-DDTHH:MM:SSZ`). |
 | `rules_commit` | First 7 chars of `input.variables.RULES_COMMIT` if present, else `"–"`. |
@@ -108,6 +109,7 @@ The slots and their canonical sources:
 | `count_minor` | Sum of `issues` for rows where severity = "Minor". |
 | `count_warning` | Sum of `issues` for rows where severity = "Warning". |
 | `dataset_count` | Distinct datasets in `Issue_Summary`. |
+| `dataset_coverage` | One-line plain-text summary comparing `EXPECTED_DOMAINS` (env, comma-separated) against the distinct datasets in `Issue_Summary`. Format: `Expected DM, AE, LB, EX, VS, MH, CM — delivered DM, AE, LB. Missing: EX, VS, MH, CM.` If `EXPECTED_DOMAINS` is unset, render `Expected domains not configured for this study.` HTML-escape the values. |
 | `status_banner` | EXACT HTML block from the canonical-copy table below — pick by `classification`. No edits. |
 | `classification_explainer` | EXACT paragraph from the canonical-copy table below — pick by `classification`. No edits. |
 | `heatmap_rows` | One `<tr>` per domain present, in alphabetical order. Cells with count = 0 use class `heat-0` (empty visible content). Cells 1–4 use `heat-1`, 5–19 `heat-2`, 20+ `heat-3`. |
