@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server';
 // `packages/platform-api/src/handlers/tasks/__tests__/list-tasks.test.ts`
 // (8 tests against `InMemoryHumanTaskRepository`, no mocks). Schema shapes
 // are covered by the contract test. The round-trip (client → adapter →
-// handler → repo) is covered by `src/test/api-integration.test.ts`.
+// handler → repo) is covered by `src/test/integration/api-integration.test.ts`.
 //
 // What remains here is one happy-path smoke that proves the Next.js route
 // file actually wires the schema, services factory, and handler together,

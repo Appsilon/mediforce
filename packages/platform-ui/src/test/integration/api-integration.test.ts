@@ -19,7 +19,7 @@ import {
 import { listTasks } from '@mediforce/platform-api/handlers';
 import { ListTasksInputSchema } from '@mediforce/platform-api/contract';
 import { Mediforce } from '@mediforce/platform-api/client';
-import { createRouteAdapter } from '../lib/route-adapter';
+import { createRouteAdapter } from '../../lib/route-adapter';
 
 function loopbackFetch(
   route: (req: NextRequest) => Promise<Response>,
