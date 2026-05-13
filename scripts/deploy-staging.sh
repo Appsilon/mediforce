@@ -10,6 +10,17 @@ echo "==> Pulling latest code"
 git fetch origin
 git checkout "$DEPLOY_SHA"
 
+echo "==> Ensuring /var/lib/mediforce exists on host"
+# Persistent path for the Mediforce data dir (worktrees + bare repos).
+# Bind-mounted into platform-ui at the same path so step containers
+# spawned via docker.sock from container-worker can find what the
+# orchestrator writes. Idempotent (mkdir -p). The deploy user lacks
+# sudo, so we use a rootful alpine container as a permission-elevation
+# trick — the docker daemon the deploy already has access to (deploy
+# is in the docker group) lets us write outside the user's home tree.
+docker run --rm -v /var/lib:/host/var/lib alpine:latest \
+  sh -c "mkdir -p /host/var/lib/mediforce && chmod 755 /host/var/lib/mediforce"
+
 # Only prune when the Docker data volume is actually filling up — unconditional
 # `builder prune -af` evicts the layer cache and forces every agent image to rebuild
 # from scratch on each deploy, which is the main cause of staging deploy timeouts.
