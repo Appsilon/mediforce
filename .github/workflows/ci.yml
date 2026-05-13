@@ -102,7 +102,7 @@ jobs:
       # vars baked into the bundle. Any change to source, config, lockfile,
       # workspace layout, or those env vars invalidates the cache. On a hit,
       # the Build step is skipped and `next start` reuses the restored
-      # .next/BUILD_ID — saves ~70s vs the cache miss path.
+      # .next/BUILD_ID — saves ~70s vs the cache miss path on the typical PR.
       #
       # ⚠ The `-env-...` suffix is a LITERAL of the NEXT_PUBLIC_* values
       # below. If you change any value in the "Build platform-ui for E2E"
