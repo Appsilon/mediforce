@@ -1,23 +1,25 @@
 import { NextResponse } from 'next/server';
 import { CreateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { listAgentDefinitions } from '@mediforce/platform-api/handlers';
+import { ListAgentDefinitionsInputSchema } from '@mediforce/platform-api/contract';
 
-export async function GET(request: Request): Promise<NextResponse> {
-  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
-
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const agents = await agentDefinitionRepo.list();
-  const filtered = caller.kind === 'apiKey'
-    ? agents
-    : agents.filter((agent) => {
-        if (agent.visibility === 'public') return true;
-        return typeof agent.namespace === 'string' && caller.namespaces.has(agent.namespace);
-      });
-  return NextResponse.json({ agents: filtered });
-}
+/**
+ * GET /api/agent-definitions
+ *
+ * List agent definitions visible to the caller. Visibility + namespace
+ * filtering is enforced inside the handler.
+ */
+export const GET = createRouteAdapter(
+  ListAgentDefinitionsInputSchema,
+  () => ({}),
+  (input, caller) => {
+    const { agentDefinitionRepo } = getPlatformServices();
+    return listAgentDefinitions(input, { agentDefinitionRepo }, caller);
+  },
+);
 
 export async function POST(request: Request): Promise<NextResponse> {
   const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();

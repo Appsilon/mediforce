@@ -2,52 +2,30 @@ import { NextResponse } from 'next/server';
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess, callerCanAccess } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { listWorkflowDefinitions } from '@mediforce/platform-api/handlers';
+import { ListWorkflowDefinitionsInputSchema } from '@mediforce/platform-api/contract';
 
 /**
  * GET /api/workflow-definitions
  *
- * List all registered workflow definitions. Returns each workflow's latest
- * version as a full WorkflowDefinition object, suitable for loading into
- * the Workflow Designer edit flow.
+ * List workflow definitions visible to the caller. Namespace + visibility
+ * gating, plus the optional `?namespace=` filter, are enforced inside the
+ * handler.
  */
-export async function GET(request: Request): Promise<NextResponse> {
-  const { processRepo, namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const url = new URL(request.url);
-  const namespaceFilter = url.searchParams.get('namespace');
-
-  const { definitions } = await processRepo.listWorkflowDefinitions(false);
-
-  const result = definitions.map((group) => {
-    const latest = group.versions.find((v) => v.version === group.latestVersion);
-    return {
-      namespace: group.namespace,
-      name: group.name,
-      latestVersion: group.latestVersion,
-      defaultVersion: group.defaultVersion,
-      definition: latest ?? null,
-    };
-  });
-
-  const filtered = caller.kind === 'apiKey'
-    ? result
-    : result.filter((item) => {
-        if (!item.definition) return false;
-        const ns = item.definition.namespace;
-        if (typeof ns !== 'string') return false;
-        if (caller.namespaces.has(ns)) return true;
-        return item.definition.visibility === 'public';
-      });
-
-  const namespaced = namespaceFilter !== null
-    ? filtered.filter((item) => item.definition?.namespace === namespaceFilter)
-    : filtered;
-
-  return NextResponse.json({ definitions: namespaced });
-}
+export const GET = createRouteAdapter(
+  ListWorkflowDefinitionsInputSchema,
+  (req) => {
+    const url = new URL(req.url);
+    const namespace = url.searchParams.get('namespace');
+    return namespace !== null ? { namespace } : {};
+  },
+  (input, caller) => {
+    const { processRepo } = getPlatformServices();
+    return listWorkflowDefinitions(input, { processRepo }, caller);
+  },
+);
 
 /**
  * POST /api/workflow-definitions?namespace=handle

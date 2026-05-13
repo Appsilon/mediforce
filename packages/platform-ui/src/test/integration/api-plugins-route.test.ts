@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 
-// Mock getPlatformServices before importing the route
 vi.mock('../../lib/platform-services.js', () => {
   const mockPlugins = new Map<string, { metadata?: PluginCapabilityMetadata }>();
   return {
@@ -13,10 +13,25 @@ vi.mock('../../lib/platform-services.js', () => {
             metadata: plugin.metadata,
           })),
       },
+      namespaceRepo: {},
     }),
     _mockPlugins: mockPlugins,
   };
 });
+
+vi.mock('../../lib/api-auth.js', async () => {
+  const actual = await vi.importActual<typeof import('../../lib/api-auth.js')>(
+    '../../lib/api-auth.js',
+  );
+  return {
+    ...actual,
+    resolveCallerIdentity: async () => ({ kind: 'apiKey' as const }),
+  };
+});
+
+function makeRequest(): NextRequest {
+  return new NextRequest('http://localhost/api/plugins');
+}
 
 describe('GET /api/plugins', () => {
   let mockPlugins: Map<string, { metadata?: PluginCapabilityMetadata }>;
@@ -29,7 +44,7 @@ describe('GET /api/plugins', () => {
 
   it('[DATA] returns 200 with plugins array', async () => {
     const { GET } = await import('../../app/api/plugins/route.js');
-    const response = await GET();
+    const response = await GET(makeRequest(), undefined);
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toHaveProperty('plugins');
@@ -47,7 +62,7 @@ describe('GET /api/plugins', () => {
     mockPlugins.set('sc/compliance-analyzer', { metadata: testMetadata });
 
     const { GET } = await import('../../app/api/plugins/route.js');
-    const response = await GET();
+    const response = await GET(makeRequest(), undefined);
     const body = await response.json();
 
     expect(body.plugins).toHaveLength(1);
@@ -60,7 +75,7 @@ describe('GET /api/plugins', () => {
     mockPlugins.set('basic-plugin', {});
 
     const { GET } = await import('../../app/api/plugins/route.js');
-    const response = await GET();
+    const response = await GET(makeRequest(), undefined);
     const body = await response.json();
 
     expect(body.plugins).toHaveLength(1);

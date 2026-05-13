@@ -38,7 +38,10 @@ describe('GET /api/processes/[instanceId]/audit', () => {
     mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
   });
 
-  it('[DATA] returns audit events for a process instance', async () => {
+  it('[DATA] returns audit events for a process instance wrapped in { events }', async () => {
+    // Post-migration response shape: { events: AuditEvent[] } instead of bare
+    // AuditEvent[]. Keeps the door open for pagination metadata without
+    // breaking the wrapper.
     const events = [
       { action: 'step.started', timestamp: '2026-03-12T10:00:00Z', processInstanceId: 'inst-001' },
       { action: 'step.completed', timestamp: '2026-03-12T10:01:00Z', processInstanceId: 'inst-001' },
@@ -50,7 +53,7 @@ describe('GET /api/processes/[instanceId]/audit', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual(events);
+    expect(body).toEqual({ events });
     expect(mockGetByProcess).toHaveBeenCalledWith('inst-001');
   });
 
@@ -62,7 +65,7 @@ describe('GET /api/processes/[instanceId]/audit', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual([]);
+    expect(body).toEqual({ events: [] });
   });
 
   it('[ERROR] returns 404 when instance not found', async () => {
@@ -74,7 +77,11 @@ describe('GET /api/processes/[instanceId]/audit', () => {
     expect(res.status).toBe(404);
   });
 
-  it('[ERROR] returns 500 when repository throws', async () => {
+  it('[ERROR] returns 500 with a generic message when repository throws', async () => {
+    // The route adapter sanitises unexpected errors to a generic message so
+    // backend details (Firestore stack traces, internal IDs) never leak to
+    // clients. The original error is logged server-side.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetByProcess.mockRejectedValue(new Error('Firestore unavailable'));
     const { req, params } = makeRequest('inst-001');
 
@@ -82,7 +89,8 @@ describe('GET /api/processes/[instanceId]/audit', () => {
 
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body.error).toBe('Firestore unavailable');
+    expect(body.error).toBe('Internal error');
+    consoleError.mockRestore();
   });
 
   it('[AUTH] returns 403 when user is not a member of the instance namespace', async () => {
