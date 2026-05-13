@@ -419,7 +419,11 @@ def main() -> int:
         copied_names: list[str] = []
 
         if args.variant:
-            source = sample_data / args.variant
+            # mess-late shares data with clean — only mtimes differ. Avoids
+            # duplicating ~60MB of XPT binaries in the repo. See
+            # inject_variants.py:13 for the rationale.
+            source_variant = "clean" if args.variant == "mess-late" else args.variant
+            source = sample_data / source_variant
             entries = collect_variant_entries(source)
             if args.only:
                 import fnmatch
@@ -451,22 +455,28 @@ def main() -> int:
                 file=sys.stderr,
             )
 
-        if args.variant == "mess-late" and copied_names:
-            timestamp = time.time() - (LATE_OFFSET_DAYS * 86400)
+        # Refresh mtimes after copy. shutil.copy2 (and SFTP put) preserves the
+        # source mtime, so a repeat seed of the same variant would look
+        # identical to sftp-poll's (filename, size, mtime) diff and skip the
+        # next run. Always touch to now; mess-late additionally backdates.
+        if copied_names:
+            if args.variant == "mess-late":
+                timestamp = time.time() - (LATE_OFFSET_DAYS * 86400)
+                label = f"backdated mtimes by {LATE_OFFSET_DAYS} days for mess-late variant"
+            else:
+                timestamp = time.time()
+                label = "refreshed mtimes to now"
             failures: list[str] = []
             for name in copied_names:
                 if not sink.set_mtime(name, timestamp):
                     failures.append(name)
             if failures:
                 print(
-                    f"seed_sftp: warning — could not backdate mtimes for: {', '.join(failures)}",
+                    f"seed_sftp: warning — could not update mtimes for: {', '.join(failures)}",
                     file=sys.stderr,
                 )
             else:
-                print(
-                    f"seed_sftp: backdated mtimes by {LATE_OFFSET_DAYS} days for mess-late variant",
-                    file=sys.stderr,
-                )
+                print(f"seed_sftp: {label}", file=sys.stderr)
 
         return 0
     finally:
