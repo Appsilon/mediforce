@@ -29,6 +29,19 @@ projects.push({
 });
 
 if (useEmulators) {
+  // L3 API E2E — real Next + emulators over HTTP, no browser launched.
+  // Tests authenticate via X-Api-Key (no user session storageState).
+  // Future: bump workers via `--workers=4` once per-test data isolation
+  // is audited (currently single MEDIFORCE_DATA_DIR shared on the server).
+  projects.push({
+    name: 'api',
+    testDir: './e2e/api',
+    testMatch: '*.journey.ts',
+    dependencies: ['setup'],
+  });
+
+  // L4 UI E2E — real Next + emulators + Chromium. Sparse, main user
+  // journeys only. Mocked agent (MOCK_AGENT=true). See AGENTS.md.
   projects.push({
     name: 'authenticated',
     testDir: './e2e/ui',
