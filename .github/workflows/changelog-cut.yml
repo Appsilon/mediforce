@@ -1,0 +1,78 @@
+name: Changelog weekly cut
+
+# Renames `## [Unreleased]` to `## [YYYY-MM-DD]` (previous Sunday) every Monday
+# 09:00 CET and inserts a fresh empty `## [Unreleased]` on top. Opens a PR.
+# Skips when [Unreleased] body is empty.
+
+on:
+  schedule:
+    # 09:00 CET = 08:00 UTC winter / 07:00 UTC summer.
+    # Use 08:00 UTC (matches winter; 10:00 CEST in summer — close enough).
+    - cron: "0 8 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute last Sunday (Europe/Warsaw)
+        id: date
+        run: |
+          export TZ=Europe/Warsaw
+          # Monday → Sunday is `today - 1 day`
+          SUNDAY=$(date -d 'yesterday' +%Y-%m-%d)
+          echo "sunday=$SUNDAY" >> "$GITHUB_OUTPUT"
+
+      - name: Cut [Unreleased] → dated section
+        id: cut
+        run: |
+          python3 .github/workflows/scripts/changelog_cut.py \
+            --file CHANGELOG.md \
+            --date "${{ steps.date.outputs.sunday }}"
+
+      - name: Skip if empty
+        if: steps.cut.outputs.changed != 'true'
+        run: echo "Unreleased was empty — nothing to cut."
+
+      - name: Open PR
+        if: steps.cut.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: changelog/cut-${{ steps.date.outputs.sunday }}
+          commit-message: "docs(changelog): cut week ending ${{ steps.date.outputs.sunday }}"
+          title: "docs(changelog): cut week ending ${{ steps.date.outputs.sunday }}"
+          body: |
+            Weekly changelog cut — automated.
+
+            Renames `## [Unreleased]` → `## [${{ steps.date.outputs.sunday }}]`
+            and seeds a fresh `## [Unreleased]` section on top.
+
+            ## Reviewer checklist
+
+            Before merging, scan the dated section for tone quality. Rewrite
+            any bullet that restates the commit title or describes a mechanic
+            instead of an effect.
+
+            - [ ] Each bullet states the **effect** of the change, not the
+                  mechanic. Test: would a year-later reader (with PR link
+                  removed) understand why it mattered?
+            - [ ] Bullets are in the right Keep-a-Changelog category
+                  (Added / Changed / Deprecated / Removed / Fixed / Security /
+                  Dependencies).
+            - [ ] No marketing words, no vague "improvements".
+            - [ ] PRs covering one feature are grouped (single bullet with
+                  multiple links, or nested list).
+            - [ ] Trivial PRs (typos, single-line config) are dropped from
+                  the cut.
+
+            Bullets added to `[Unreleased]` after this PR opens go into next
+            week's cut.
+          labels: changelog,automation

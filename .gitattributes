@@ -1,0 +1,3 @@
+# Append-only logs: take both sides on merge instead of flagging a conflict.
+# Order may interleave, but nothing is lost.
+CHANGELOG.md merge=union

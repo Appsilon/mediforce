@@ -55,6 +55,13 @@
 - [ ] No unbounded data fetches
 - [ ] Heavy operations are async/background where appropriate
 
+## 9. Changelog
+
+- [ ] Non-trivial change adds a bullet under `## [Unreleased]` in `CHANGELOG.md` (skip only for typos / single-line config / comment-only diffs; Renovate batches under `### Dependencies`).
+- [ ] Bullet states the **effect** of the change, not the mechanic. Rejected style: "Refactored X into shared component", "Updated Y handler". Accepted style: "Agent output now consistent across surfaces — L2 steps finally show HTML report". Test: would a year-later reader, with PR link removed, understand why the change mattered?
+- [ ] Placed in the right Keep-a-Changelog category (Added / Changed / Deprecated / Removed / Fixed / Security / Dependencies).
+- [ ] No edits to dated `## [YYYY-MM-DD]` sections — those are historical.
+
 ## Anti-Pattern Quick Scan
 
 ```bash
