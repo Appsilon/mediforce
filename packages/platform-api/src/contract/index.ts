@@ -1,8 +1,13 @@
 export {
   ListTasksInputSchema,
   ListTasksOutputSchema,
+  GetTaskInputSchema,
+  GetTaskOutputSchema,
+  ACTIONABLE_STATUSES,
   type ListTasksInput,
   type ListTasksOutput,
+  type GetTaskInput,
+  type GetTaskOutput,
 } from './tasks.js';
 
 export {
