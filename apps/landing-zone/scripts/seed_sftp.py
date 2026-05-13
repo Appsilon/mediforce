@@ -56,6 +56,7 @@ from urllib.parse import unquote, urlparse
 VARIANTS = (
     "clean",
     "injection",
+    "injection-demo",
     "mess-late",
     "mess-encoding",
     "mess-missing-domain",
@@ -107,6 +108,11 @@ SCENARIOS: dict[str, dict] = {
         "variant": "mess-late",
         "only": None,
         "doc": "clean delivery with mtimes backdated 14 days. Contract cadence-breach demo.",
+    },
+    "demo-3findings": {
+        "variant": "injection-demo",
+        "only": None,
+        "doc": "DM + LB + AE (+ define.xml) with 3 codifiable findings (SEX outside CT, LB rows_distinct, AE→DM orphan USUBJID). Drives propose-rules with 3 distinct check types.",
     },
 }
 
