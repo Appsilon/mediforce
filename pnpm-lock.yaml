@@ -138,7 +138,7 @@ importers:
         version: link:../platform-core
       bullmq:
         specifier: ^5.52.0
-        version: 5.74.1
+        version: 5.76.6
       zod:
         specifier: ^4.0.0
         version: 4.4.3
@@ -364,7 +364,7 @@ importers:
         version: 12.10.2(@types/react@19.2.14)(immer@11.1.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       bullmq:
         specifier: ^5.71.0
-        version: 5.74.1
+        version: 5.76.6
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2389,8 +2389,9 @@ packages:
   buffer-equal-constant-time@1.0.1:
     resolution: {integrity: sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==}
 
-  bullmq@5.74.1:
-    resolution: {integrity: sha512-GfJEos2zoOGM9xqkB7VZouwwFuejKFqm667cBcmbBekJXKqqXWk4QYP3Uy2pzgUwCbg1cR7GgGmGczM7fnhWSA==}
+  bullmq@5.76.6:
+    resolution: {integrity: sha512-vlmL3B3NVMRy6se3c7jPHn1Nhqxrg7+wlv1t3XAQFBYZNJDMLP0OO5x2AX5ca7DAuS1SU/C+VfYi+NHVoFK1QQ==}
+    engines: {node: '>=12.22.0'}
 
   bytes@3.1.2:
     resolution: {integrity: sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==}
@@ -3170,8 +3171,8 @@ packages:
     resolution: {integrity: sha512-P0efT1C9jIdVRefqjzOQ9Xml57zpOXnIuS+csaB4MdZbTdmGDLo8XhzBG1N7aO11gKDDkJvBLULeFTo46wwreA==}
     hasBin: true
 
-  msgpackr@1.11.5:
-    resolution: {integrity: sha512-UjkUHN0yqp9RWKy0Lplhh+wlpdt9oQBYgULZOiFhV3VclSF1JnSQWZ5r9gORQlNYaUKQoR8itv7g7z1xDDuACA==}
+  msgpackr@2.0.1:
+    resolution: {integrity: sha512-9J+tqTEsbHqY8YohazYgty7LgerFIWxvMLpUjqETSmjHojtJm2WnX2kK/2a1fLI7CO7ERP1YSEUXMucz4j+yBA==}
 
   nanoid@3.3.12:
     resolution: {integrity: sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ==}
@@ -5793,15 +5794,14 @@ snapshots:
 
   buffer-equal-constant-time@1.0.1: {}
 
-  bullmq@5.74.1:
+  bullmq@5.76.6:
     dependencies:
       cron-parser: 4.9.0
       ioredis: 5.10.1
-      msgpackr: 1.11.5
+      msgpackr: 2.0.1
       node-abort-controller: 3.1.1
       semver: 7.7.4
       tslib: 2.8.1
-      uuid: 11.1.0
     transitivePeerDependencies:
       - supports-color
 
@@ -6701,7 +6701,7 @@ snapshots:
       '@msgpackr-extract/msgpackr-extract-win32-x64': 3.0.3
     optional: true
 
-  msgpackr@1.11.5:
+  msgpackr@2.0.1:
     optionalDependencies:
       msgpackr-extract: 3.0.3
 
