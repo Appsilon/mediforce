@@ -53,7 +53,7 @@ def main() -> None:
     # fixture, not `page`, and their filenames opt out via suffix.
     last_journey = last_commit_touching(
         base,
-        r"e2e/journeys/",
+        r"e2e/ui/",
         exclude=r"(?:-api|-docker)\.journey\.ts$",
     )
     last_gif = last_commit_touching(base, r"docs/features/.*\.gif")

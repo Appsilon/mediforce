@@ -31,7 +31,7 @@ projects.push({
 if (useEmulators) {
   projects.push({
     name: 'authenticated',
-    testDir: './e2e/journeys',
+    testDir: './e2e/ui',
     testMatch: '*.journey.ts',
     dependencies: ['setup'],
     use: {

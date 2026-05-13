@@ -162,7 +162,7 @@ mcpServers: z.array(McpServerConfigSchema).optional(),
 - `packages/agent-runtime/src/plugins/__tests__/claude-code-agent-plugin.test.ts` — MCP status event, `--mcp-config` flag presence/absence
 - `packages/agent-runtime/src/plugins/__tests__/resolve-env.test.ts` — `resolveValue` secret resolution (literals, templates, fallbacks, errors)
 - `packages/agent-runtime/src/plugins/__tests__/mcp-config-integration.test.ts` — `writeMcpConfig` file output (structure, secret resolution, allowedTools, empty env)
-- `packages/platform-ui/e2e/journeys/tool-catalog.journey.ts` — E2E journey: browse catalog, search, view detail page
+- `packages/platform-ui/e2e/ui/tool-catalog.journey.ts` — E2E journey: browse catalog, search, view detail page
 
 ## UI Design
 
@@ -180,7 +180,7 @@ Categories: Development, Data Access, Communication, Clinical Data, Research.
 
 Seed catalog: GitHub, Filesystem, PostgreSQL, Slack, CDISC Library, Brave Search.
 
-E2E journey test: `e2e/journeys/tool-catalog.journey.ts` — GIF recording at `docs/features/tool-catalog.gif`.
+E2E journey test: `e2e/ui/tool-catalog.journey.ts` — GIF recording at `docs/features/tool-catalog.gif`.
 
 ### Tool Detail (`/[handle]/tools/[toolId]`)
 

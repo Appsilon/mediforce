@@ -34,7 +34,7 @@ Full strategy: `docs/E2E-STRATEGY.md`
 ### 1. Create the file
 
 ```
-packages/platform-ui/e2e/journeys/<feature-name>.journey.ts
+packages/platform-ui/e2e/ui/<feature-name>.journey.ts
 ```
 
 ### 2. Template
