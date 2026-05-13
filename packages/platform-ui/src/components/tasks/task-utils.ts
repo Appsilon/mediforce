@@ -73,6 +73,14 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
       ? escalationReason
       : null;
 
+  const rawTokenUsage = agentOutput.tokenUsage as Record<string, unknown> | undefined;
+  const tokenUsage: TokenUsageData | null =
+    rawTokenUsage &&
+    typeof rawTokenUsage.inputTokens === 'number' &&
+    typeof rawTokenUsage.outputTokens === 'number'
+      ? { inputTokens: rawTokenUsage.inputTokens, outputTokens: rawTokenUsage.outputTokens }
+      : null;
+
   return {
     confidence: typeof agentOutput.confidence === 'number' ? agentOutput.confidence : null,
     confidence_rationale: typeof agentOutput.confidence_rationale === 'string' ? agentOutput.confidence_rationale : null,
@@ -80,6 +88,8 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
     result: (agentOutput.result as Record<string, unknown> | null) ?? null,
     model: typeof agentOutput.model === 'string' ? agentOutput.model : null,
     duration_ms: typeof agentOutput.duration_ms === 'number' ? agentOutput.duration_ms : null,
+    estimatedCostUsd: typeof agentOutput.estimatedCostUsd === 'number' ? agentOutput.estimatedCostUsd : null,
+    tokenUsage,
     gitMetadata,
     presentation: typeof agentOutput.presentation === 'string' ? agentOutput.presentation : null,
     escalationReason: normalizedEscalation,
@@ -114,6 +124,11 @@ export interface GitMetadataData {
   repoUrl: string;
 }
 
+export interface TokenUsageData {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export type EscalationReason = 'low_confidence' | 'timeout' | 'error' | 'iterations_limit' | null;
 
 export interface AgentOutputData {
@@ -123,6 +138,8 @@ export interface AgentOutputData {
   result: Record<string, unknown> | null;
   model: string | null;
   duration_ms: number | null;
+  estimatedCostUsd: number | null;
+  tokenUsage: TokenUsageData | null;
   gitMetadata: GitMetadataData | null;
   presentation: string | null;
   escalationReason: EscalationReason;

@@ -11,6 +11,8 @@ function buildAgentOutput(overrides: Partial<AgentOutputData> = {}): AgentOutput
     result: null,
     model: null,
     duration_ms: null,
+    estimatedCostUsd: null,
+    tokenUsage: null,
     gitMetadata: null,
     presentation: null,
     escalationReason: null,
@@ -142,6 +144,130 @@ describe('AgentOutputReviewPanel', () => {
     render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
 
     expect(screen.getByText(/escalated: iterations limit reached/i)).toBeInTheDocument();
+  });
+
+  it('does not render a Git tab even when gitMetadata is present', () => {
+    const agentOutput = buildAgentOutput({
+      result: { verdict: 'approve' },
+      gitMetadata: {
+        commitSha: 'abcdef1234567890',
+        branch: 'agent/run-42',
+        changedFiles: ['file.ts'],
+        repoUrl: 'https://github.com/example/repo',
+      },
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
+
+    // No "Git" tab trigger
+    const tabs = screen.queryAllByRole('tab');
+    expect(tabs.find((tab) => tab.textContent === 'Git')).toBeUndefined();
+    // No compare link
+    const links = document.querySelectorAll('a');
+    for (const a of Array.from(links)) {
+      expect(a.getAttribute('href') ?? '').not.toContain('/compare/main...');
+    }
+  });
+
+  it('renders object-array entries before long-text entries in Extracted Data', () => {
+    const longYaml = ['line1', 'line2', 'line3', 'line4', 'line5'].join('\n');
+    const agentOutput = buildAgentOutput({
+      presentation: null,
+      result: {
+        proposed_rules_yaml: longYaml,
+        proposed_rules: [
+          { rule_id: 'R1', description: 'first' },
+          { rule_id: 'R2', description: 'second' },
+        ],
+      },
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
+
+    // The object-array header contains a "(2)" count suffix; the long-text
+    // header is the plain "Proposed Rules Yaml" label.
+    const yamlLabel = screen.getByText('Proposed Rules Yaml');
+    const rulesLabel = Array.from(document.querySelectorAll('dt'))
+      .find((node) => node.textContent?.startsWith('Proposed Rules ')) ?? null;
+    expect(rulesLabel).not.toBeNull();
+
+    expect(
+      rulesLabel!.compareDocumentPosition(yamlLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('renders cost and token usage when present (single metrics row)', () => {
+    const agentOutput = buildAgentOutput({
+      result: { ok: true },
+      confidence: 0.88,
+      model: 'haiku',
+      duration_ms: 78000,
+      estimatedCostUsd: 0.0123,
+      tokenUsage: { inputTokens: 59, outputTokens: 6297 },
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} instanceId="run-1" />);
+
+    expect(screen.getByText(/\$0\.012/)).toBeInTheDocument();
+    // Tokens shown as "in/out" with localized separators
+    expect(screen.getByText(/59/)).toBeInTheDocument();
+    expect(screen.getByText(/6,297/)).toBeInTheDocument();
+    // Confidence rendered exactly once now that the display owns the metrics row
+    const matches = screen.queryAllByText(/88%/);
+    expect(matches.length).toBe(1);
+  });
+
+  it('renders rule-card layout for object-array entries with id+message+severity', () => {
+    const agentOutput = buildAgentOutput({
+      result: {
+        proposed_rules: [
+          {
+            id: 'R-001',
+            domain: 'AE',
+            severity: 'critical',
+            message: 'Adverse event missing onset date',
+            variable: 'AESTDTC',
+            check: 'is_required',
+          },
+        ],
+      },
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} instanceId="run-1" />);
+
+    // The rule id should be visible
+    expect(screen.getByText('R-001')).toBeInTheDocument();
+    // Severity rendered as a pill (case-insensitive label "critical")
+    expect(screen.getByText('critical')).toBeInTheDocument();
+    // Message becomes primary content
+    expect(screen.getByText('Adverse event missing onset date')).toBeInTheDocument();
+  });
+
+  it('preserves YAML structure with strict-pre (no wrap collapse)', async () => {
+    const yaml = '- id: R-001\n  domain: AE\n  message: Missing date\n- id: R-002\n  domain: CM\n  message: Bad code';
+    const agentOutput = buildAgentOutput({
+      presentation: null,
+      result: { proposed_rules_yaml: yaml },
+    });
+
+    const { container } = render(
+      <AgentOutputReviewPanel agentOutput={agentOutput} instanceId="run-1" />,
+    );
+
+    // Open the collapsible trigger that summarises the YAML
+    const trigger = Array.from(container.querySelectorAll('button')).find(
+      (btn) => btn.textContent?.includes('lines'),
+    );
+    expect(trigger).toBeDefined();
+    trigger!.click();
+
+    // Wait a tick for Collapsible.Content to render
+    await Promise.resolve();
+
+    const pre = container.querySelector('pre');
+    expect(pre).not.toBeNull();
+    expect(pre!.className).toMatch(/whitespace-pre\b/);
+    expect(pre!.className).not.toMatch(/whitespace-pre-wrap/);
   });
 
   it('escapes closing script tags in result data', () => {
