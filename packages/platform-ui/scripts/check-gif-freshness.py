@@ -30,12 +30,20 @@ def last_commit_touching(base: str, pattern: str, *, exclude: str | None = None)
     last = None
     for idx, line in enumerate(commits):
         sha = line.split()[0]
-        # --diff-filter=AM excludes Renames and Deletions. A pure file move
-        # (e.g., e2e/journeys/ -> e2e/ui/) doesn't change behaviour and so
-        # shouldn't force a GIF refresh. If a rename also changed content,
-        # git still emits the new path as Modified above the rename threshold.
+        # `--find-renames=100%` only detects renames when content is byte-identical
+        # (similarity score = 100%); any content change makes git emit the new path
+        # as Added (A) instead of Renamed (R). `--diff-filter=AM` then keeps Added
+        # and Modified, dropping pure-rename R entries. Net result: pure file moves
+        # (e.g., e2e/journeys/ -> e2e/ui/) don't force a GIF refresh, but a rename
+        # WITH any content tweak does.
         diff = subprocess.run(
-            ["git", "diff", "--name-only", "--diff-filter=AM", f"{sha}~1", sha],
+            [
+                "git", "diff",
+                "--name-only",
+                "--find-renames=100%",
+                "--diff-filter=AM",
+                f"{sha}~1", sha,
+            ],
             capture_output=True, text=True,
         )
         if diff.returncode != 0:

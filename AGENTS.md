@@ -130,8 +130,9 @@ L5 is opt-in.
 
 **API E2E (L3) rules:**
 - HTTP-only Playwright tests using the `request` fixture. No `page`.
-- Lives in the `api` Playwright project — runs with `workers=4`, no
-  browser launched.
+- Lives in the `api` Playwright project — no browser launched. Runs
+  serial today; bumping workers > 1 is gated on per-test data isolation
+  audit (single `MEDIFORCE_DATA_DIR` shared on the server).
 - Real Next server (`webServer` in `playwright.config.ts`), real
   Firebase emulators, mocked agent (`MOCK_AGENT=true`).
 - Every new endpoint / handler ships with an L3 covering the journey
@@ -186,7 +187,7 @@ npx vitest run path/to/file.test.ts     # single file
 
 # Test — L3 API E2E + L4 UI E2E (Playwright; delegate to background subagent)
 python3 packages/platform-ui/scripts/bootstrap_e2e.py
-cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth          # all e2e (builds first time, ~2min; subsequent ~5min)
+cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth          # all e2e (build + run ~4min; rebuild only on source/config change)
 cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth --project=api  # L3 only
 cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth --project=authenticated  # L4 only
 # Iterating on a UI feature? Use `next dev` for hot-reload instead of next start:

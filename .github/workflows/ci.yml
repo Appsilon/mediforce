@@ -99,15 +99,20 @@ jobs:
 
       # Cache .next/ keyed by source hashes + build-time NEXT_PUBLIC_* env
       # vars baked into the bundle. Any change to source, config, lockfile,
-      # or those env vars invalidates the cache. On a hit, the Build step is
-      # skipped and `next start` reuses the restored .next/BUILD_ID — saves
-      # ~70s vs the cache miss path.
+      # workspace layout, or those env vars invalidates the cache. On a hit,
+      # the Build step is skipped and `next start` reuses the restored
+      # .next/BUILD_ID — saves ~70s vs the cache miss path.
+      #
+      # ⚠ The `-env-...` suffix is a LITERAL of the NEXT_PUBLIC_* values
+      # below. If you change any value in the "Build platform-ui for E2E"
+      # env block, bump the suffix here too (or bump the `v1` prefix to
+      # bust the whole cache). Otherwise a stale build will be served.
       - name: Cache .next build for E2E
         id: next-cache
         uses: actions/cache@v5
         with:
           path: packages/platform-ui/.next
-          key: next-e2e-v1-${{ runner.os }}-${{ hashFiles('packages/*/src/**/*.ts', 'packages/*/src/**/*.tsx', 'packages/*/src/**/*.js', 'packages/*/src/**/*.jsx', 'packages/*/src/**/*.css', 'packages/platform-ui/public/**', 'packages/platform-ui/next.config.mjs', 'packages/platform-ui/tsconfig.json', 'pnpm-lock.yaml') }}-env-fake-api-key-localhost-demo-mediforce-demo-mediforce.appspot.com-000000000000-1:000000000000:web:fake-true-http://localhost:9007
+          key: next-e2e-v1-${{ runner.os }}-${{ hashFiles('packages/*/src/**/*.ts', 'packages/*/src/**/*.tsx', 'packages/*/src/**/*.js', 'packages/*/src/**/*.jsx', 'packages/*/src/**/*.css', 'packages/platform-ui/public/**', 'packages/platform-ui/next.config.mjs', 'packages/*/tsconfig.json', 'tsconfig.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml') }}-env-fake-api-key-localhost-demo-mediforce-demo-mediforce.appspot.com-000000000000-1:000000000000:web:fake-true-http://localhost:9007
 
       # Build once with NEXT_PUBLIC_* baked for emulators. Playwright's webServer
       # then runs `next start` instead of `next dev`, skipping the JIT
