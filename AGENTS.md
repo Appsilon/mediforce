@@ -186,9 +186,13 @@ npx vitest run path/to/file.test.ts     # single file
 
 # Test — L3 API E2E + L4 UI E2E (Playwright; delegate to background subagent)
 python3 packages/platform-ui/scripts/bootstrap_e2e.py
-cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth          # all e2e
+cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth          # all e2e (builds first time, ~2min; subsequent ~5min)
 cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth --project=api  # L3 only
 cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth --project=authenticated  # L4 only
+# Iterating on a UI feature? Use `next dev` for hot-reload instead of next start:
+cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true E2E_DEV_SERVER=true pnpm test:e2e:auth --grep '<name>'
+# After editing source, rebuild before next test:e2e:auth (or use E2E_DEV_SERVER=true):
+cd packages/platform-ui && pnpm build:e2e
 
 # Test — L5 External / Tier 2 (real LLM, opt-in, costs cents)
 cd packages/platform-ui && OPENROUTER_API_KEY=... pnpm test:external

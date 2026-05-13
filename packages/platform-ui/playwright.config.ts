@@ -86,16 +86,17 @@ export default defineConfig({
     // :3000 default before Next sets PORT — the auto-runner fire-and-forget to
     // `/api/processes/:id/run` needs the right host:port.
     //
-    // CI runs a prebuilt server (`next start`) for speed — `next dev`'s JIT
-    // compile-on-request dominated e2e wall-clock. Locally we keep `next dev`
-    // so source edits hot-reload during interactive debugging. The CI build
-    // happens in a separate workflow step (`pnpm build:e2e`) before Playwright
-    // starts; `reuseExistingServer: true` means the webServer just connects to
-    // the already-listening server if the build step already started one.
+    // Default = prebuilt server (`next start`) for CI parity and speed —
+    // `next dev`'s JIT compile-on-request dominated e2e wall-clock. Opt into
+    // `next dev` via `E2E_DEV_SERVER=true` for interactive iteration where
+    // hot-reload beats suite speed (headed / --ui / recording modes).
+    // CI pre-builds in a separate step; locally, `start:e2e` auto-builds the
+    // first time. `reuseExistingServer: true` connects to a server the build
+    // step already started.
     command: useEmulators
-      ? process.env.CI
-        ? `pnpm start:e2e`
-        : `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev --webpack -p ${testPort}`
+      ? process.env.E2E_DEV_SERVER === 'true'
+        ? `NEXT_PUBLIC_USE_EMULATORS=true NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mediforce MOCK_AGENT=true MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data NEXT_PUBLIC_APP_URL=http://localhost:${testPort} NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npx next dev --webpack -p ${testPort}`
+        : `pnpm start:e2e`
       : 'pnpm dev',
     port: testPort,
     reuseExistingServer: true,
