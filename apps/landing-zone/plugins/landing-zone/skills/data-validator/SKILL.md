@@ -12,7 +12,7 @@ Read the output of a deterministic CDISC CORE validation step plus its already-c
 1. A short machine-readable verdict (`/output/result.json`) — echoing the deterministic classification.
 2. A self-contained HTML report (`/output/presentation.html`) that renders inline in the human reviewer's task UI.
 
-The validation script (`validate-script` step) is the source of truth for facts **and** for classification. This skill does **not** re-run the rules engine, does **not** classify, and does **not** invent findings. It reads the verdict, presents the data clearly, and stays out of the loop.
+The validation script (`validate-script` step) is the source of truth for facts **and** for classification. This skill does **not** re-run the rules engine, does **not** classify, and does **not** invent findings. It loads the study-owned HTML template, fills the marked slots, and writes the result.
 
 ## When to use
 
@@ -25,9 +25,9 @@ The downstream `human-review` step (or, for `clean` / `escalate` / `chaos`, an a
 
 ## Inputs
 
-The container has two read paths:
+The container has three read paths:
 
-- **`/output/input.json`** — the engine-provided step input. Contains the `validate-script` step output under the standard step-output shape:
+- **`/output/input.json`** — the engine-provided step input. Contains the `validate-script` step output:
   ```json
   {
     "scriptStatus": "ok" | "failed",
@@ -47,67 +47,83 @@ The container has two read paths:
 
 - **`/workspace/findings.json`** — the raw CORE engine output (full `Issue_Summary` + `Issue_Details` + `Conformance_Details`) persisted to the run worktree for audit. Always read this for the per-finding rows that drive the heatmap and top-findings list. If it disagrees with `/output/input.json`, prefer the workspace copy (it is the version that ended up in the run's git history).
 
-Do not assume the structure of an individual finding beyond the fields documented in `references/cdisc-categories.md`. The CORE engine emits arrays of objects; field names of interest typically include `rule_id` (or `core_id`), `dataset` (the domain), `severity`, `message`, and an issue count. Field names can vary across CORE versions — read defensively and degrade gracefully when an expected field is absent.
+- **`/workspace/templates/report-template.html`** — the canonical HTML template owned by the study repository. The skill MUST load this file and fill its slots. If it is missing, see the edge case below.
+
+Do not assume the structure of an individual finding beyond the fields documented in `references/cdisc-categories.md`. The CORE engine emits arrays of objects; field names of interest typically include `rule_id` (or `core_id`), `dataset` (the domain), `severity`, `message`, and an issue count. Read defensively.
 
 ## Workflow
 
-### Step 1 — Read inputs
+The workflow is **strict** and deterministic. The same inputs must produce the same HTML byte-for-byte, modulo the timestamp. There is no creative latitude.
 
-Read `/output/input.json` first. Then read `/workspace/findings.json` for the raw engine rows. If either read fails, surface the failure prominently in the HTML and write `result.json` echoing whatever classification the input contained (or `chaos` if input is unreadable). Do not synthesise a classification.
+### Step 1 — Load inputs
+
+Read in this order:
+
+1. `/output/input.json` — required. Parse JSON. Fail loud if it does not parse.
+2. `/workspace/findings.json` — optional. Parse JSON; degrade gracefully on read or parse error (heatmap and findings table become empty blocks that get removed).
+3. `/workspace/templates/report-template.html` — required. Read the raw file as a string. See edge case below if missing.
 
 ### Step 2 — Read the deterministic classification
 
 The classification is **already computed**. Read these fields from `/output/input.json` and use them as-is:
 
-- `classification` — one of `clean`, `minor-fix`, `recovery`, `escalate`, `chaos`. Echo this verbatim in `result.json`. Do **not** recompute it from the findings.
-- `classificationReason` — 1–2 sentence text explaining which rule fired. Echo this verbatim in `result.summary`.
-- `scriptFailedFlag` — boolean. Echo verbatim in `result.scriptFailedFlag`.
+- `classification` — one of `clean`, `minor-fix`, `recovery`, `escalate`, `chaos`. Echo in `result.json`. Do **not** recompute.
+- `classificationReason` — 1–2 sentence text explaining which rule fired. Echo in `result.summary`.
+- `scriptFailedFlag` — boolean. Echo verbatim.
 - `summary` — alias of `classificationReason`. Use whichever is non-empty.
 
-The five classes are the v0.1 product spec and the only allowed values. The router enforces them. Do not invent new labels and do not "upgrade" a class based on the findings — if the script chose `recovery` for a single critical-structure domain and the findings look bad, still emit `recovery`. Determinism is the point.
+The five classes are the v0.1 product spec and the only allowed values. Do not invent new labels and do not "upgrade" a class based on the findings — if the script chose `recovery` and the findings look bad, still emit `recovery`. Determinism is the point.
 
-### Step 3 — Build the heatmap and top-findings rows (presentation only)
+### Step 3 — Aggregate the presentation data
 
-The classification is settled, but the report still needs the visual breakdown. Read `/workspace/findings.json` and build:
+Compute the following from `/workspace/findings.json`. No prose is generated here — only numbers and pass-through fields.
 
-- **Domain × Category heatmap** — rows = SDTM domains present in `Issue_Summary`, columns = the rule categories from `references/cdisc-categories.md` (Structure / Controlled Terminology / Consistency / FDA Business Rules / PMDA / Other), cells = sum of `issues` per `(domain, category)` pair.
-- **Top findings list** — top 20 rows from `Issue_Summary` sorted by `issues` descending, then by domain. Each row shows: rule code (`rule_id` or `core_id`), domain (`dataset`), severity badge, brief `message` (truncate to ~200 chars).
+- **Severity counts**: total occurrences of each of Critical / Major / Minor / Warning across `Issue_Summary` rows (use the `issues` field per row, weighted). Missing or unknown severities are not bucketed into a category — they are counted in the "Unknown" badge if shown but excluded from named buckets.
+- **Dataset count**: unique `dataset` values in `Issue_Summary`.
+- **Heatmap matrix**: domains (rows) × categories (Structure, Controlled Terminology, Consistency, FDA Business Rules, PMDA, Other) with cell values = sum of `issues` for that pair. Use the prefix mapping from `references/cdisc-categories.md`.
+- **Top findings**: top 20 rows from `Issue_Summary` sorted by `issues` desc, then `dataset` asc. Each row carries: rule code (`rule_id` or `core_id`), `dataset`, `severity`, `issues`, `message` (truncated to 200 chars).
+- **Overflow note**: if `Issue_Summary` has more than 20 rows, the string `+ N more findings — see /workspace/findings.json for full set` (N = total rows minus 20). Else empty.
 
-Use the prefix-to-category mapping from `references/cdisc-categories.md`. The router uses the same mapping internally; the skill must mirror it for visual consistency.
+### Step 4 — Fill the template
 
-### Step 4 — Render the HTML report
+Locate each `<!-- SLOT:name -->...<!-- /SLOT:name -->` marker in the template string and replace the contents between the markers. **Do not delete the marker comments themselves** — they are the contract the next run uses to recognise valid slots.
 
-Write `/output/presentation.html`. The host iframe loads Tailwind v4 via CDN and exposes the result JSON as `window.__data__`. You can rely on Tailwind utility classes; do not re-import Tailwind.
+For block markers `<!-- BLOCK:name -->...<!-- /BLOCK:name -->`, either keep the block (and fill slots inside) or remove the entire block (including the marker comments) when its data is absent. Rules:
 
-Required sections, in order:
+- `BLOCK:heatmap`: keep if `findingsCount > 0`, otherwise remove the whole block.
+- `BLOCK:top_findings`: keep if `findingsCount > 0`, otherwise remove the whole block.
+- `BLOCK:failure_detail`: keep if `scriptFailedFlag = true`, otherwise remove the whole block.
 
-1. **Status banner** — full-width, top of page. Colour and text are driven by `classification`:
+The slots and their canonical sources:
 
-   | Classification | Banner classes              | Banner text                                                                       |
-   |----------------|-----------------------------|-----------------------------------------------------------------------------------|
-   | `clean`        | `bg-green-600 text-white`   | "Delivery is clean — no findings."                                                |
-   | `minor-fix`    | `bg-blue-600 text-white`    | "Minor fixes — terminology drift dominates."                                      |
-   | `recovery`     | `bg-amber-500 text-white`   | "Single-domain critical structure issue — recoverable."                           |
-   | `escalate`     | `bg-red-600 text-white`     | "Multi-domain critical structure failure — cannot ingest."                        |
-   | `chaos`        | `bg-zinc-900 text-white`    | "Validation could not complete (script failure or pervasive structure errors)."   |
+| Slot | Value |
+|------|-------|
+| `study_id` | `input.variables.STUDY_ID` or `STUDY_ID` env. Fall back to `"unknown"`. |
+| `delivery_id` | Basename of `input.deliveryDir`. Fall back to `"unknown"`. |
+| `generated_at` | Current UTC time, ISO 8601 (`YYYY-MM-DDTHH:MM:SSZ`). |
+| `rules_commit` | First 7 chars of `input.variables.RULES_COMMIT` if present, else `"–"`. |
+| `total_findings` | `input.findingsCount` formatted as integer. |
+| `count_critical` | Sum of `issues` for rows where severity = "Critical". |
+| `count_major` | Sum of `issues` for rows where severity = "Major". |
+| `count_minor` | Sum of `issues` for rows where severity = "Minor". |
+| `count_warning` | Sum of `issues` for rows where severity = "Warning". |
+| `dataset_count` | Distinct datasets in `Issue_Summary`. |
+| `status_banner` | EXACT HTML block from the canonical-copy table below — pick by `classification`. No edits. |
+| `classification_explainer` | EXACT paragraph from the canonical-copy table below — pick by `classification`. No edits. |
+| `heatmap_rows` | One `<tr>` per domain present, in alphabetical order. Cells with count = 0 use class `heat-0` (empty visible content). Cells 1–4 use `heat-1`, 5–19 `heat-2`, 20+ `heat-3`. |
+| `findings_rows` | One `<tr>` per top finding. Severity rendered as `<span class="badge severity-{class}">{label}</span>`. |
+| `findings_overflow_note` | The overflow string from Step 3, or empty. |
+| `failure_error` | `input.error` (script-failed path only). Plain text, no HTML escaping bypass. |
+| `failure_traceback` | `input.traceback` (script-failed path only). HTML-escape `<`, `>`, `&`. |
+| `footer_timestamp` | Same as `generated_at`. |
+| `footer_rules_commit` | Same as `rules_commit`. |
+| `footer_total_findings` | Same as `total_findings`. |
 
-   Below the headline, render the `classificationReason` (1–2 sentence text from input). When `scriptFailedFlag = true`, also include a `<details>` block holding the traceback.
+When emitting cell counts in heatmap and findings rows, HTML-escape any user-controlled text (messages, rule codes, dataset names).
 
-2. **Header** — delivery ID (from `deliveryDir` basename), study ID (read from `STUDY_ID` env if available, otherwise from `input.json.variables`), timestamp, total findings count.
+### Step 5 — Write outputs
 
-3. **Severity heatmap** — only when `findingsCount > 0`. A simple HTML table: rows = SDTM domains present in the findings, columns = the rule categories from `references/cdisc-categories.md`, cells = counts. Empty cells render blank, non-zero cells use a colour scale (light amber for 1–4, deeper amber for 5–19, red for 20+). Add a small legend.
-
-4. **Top findings list** — only when `findingsCount > 0`. Show the top 20 findings sorted by `issues` descending then by domain. For each: rule code, domain, severity badge, brief message. If `findingsCount > 20` (or `Issue_Summary.length > 20`), add a footer line "+ N more findings — see /workspace/findings.json for full set."
-
-5. **Failure detail** — only when `scriptFailedFlag = true`. The traceback inside a collapsible `<details>`. The heatmap and findings list are still rendered when raw findings exist (e.g., script failed mid-run with partial output) — show whatever signal is available without overstating it.
-
-Keep the HTML self-contained. No external scripts. No fetch calls. The iframe is sandboxed; relative URLs do not resolve. Use only Tailwind utility classes — no `<style>` blocks beyond what is strictly necessary for the heatmap colour scale.
-
-The reviewer is a human data manager. Use plain English, no marketing tone. Show counts, codes, domains, messages — not adjectives.
-
-### Step 5 — Write `/output/result.json`
-
-Exact shape — every field is echoed from input, except `htmlReportPath`:
+Write the filled template to `/output/presentation.html`. Then write `/output/result.json`:
 
 ```json
 {
@@ -119,25 +135,130 @@ Exact shape — every field is echoed from input, except `htmlReportPath`:
 }
 ```
 
-`htmlReportPath` is always `/output/presentation.html` when an HTML report was written. Omit the field if (and only if) you somehow could not write the HTML — but in v0.1 always write the HTML, even for the chaos path.
+`htmlReportPath` is always `/output/presentation.html` when an HTML report was written. Omit only if no HTML was written — but in v0.1 always write the HTML, even for the chaos path.
+
+## Canonical copy
+
+These are the only allowed values for `status_banner` and `classification_explainer`. Copy them verbatim. Do not rephrase, summarise, or extend.
+
+### `clean`
+
+**Status banner HTML:**
+
+```html
+<div class="rounded-xl px-6 py-5 bg-emerald-600 text-white">
+  <div class="text-xs font-semibold uppercase tracking-wider opacity-80">Classification</div>
+  <div class="text-2xl font-semibold mt-1">Clean — no findings</div>
+  <p class="mt-2 text-sm opacity-90">{{classificationReason}}</p>
+</div>
+```
+
+**Explainer paragraph:**
+
+> The delivery passes every CDISC CORE rule for the standard and IG version configured for this study. No structural, terminology, consistency, or regulatory findings were raised. The workflow may accept this delivery without human review unless your study contract requires a confirmation step.
+
+### `minor-fix`
+
+**Status banner HTML:**
+
+```html
+<div class="rounded-xl px-6 py-5 bg-sky-600 text-white">
+  <div class="text-xs font-semibold uppercase tracking-wider opacity-80">Classification</div>
+  <div class="text-2xl font-semibold mt-1">Minor fix — terminology drift</div>
+  <p class="mt-2 text-sm opacity-90">{{classificationReason}}</p>
+</div>
+```
+
+**Explainer paragraph:**
+
+> The majority of findings are Controlled Terminology violations — values that fall outside the codelist version configured for this study. These usually resolve with a codelist version bump or a value-level fix at the CRO, and rarely block ingestion. Review the top findings to confirm the pattern, then accept or return the delivery with a short remediation note.
+
+### `recovery`
+
+**Status banner HTML:**
+
+```html
+<div class="rounded-xl px-6 py-5 bg-amber-500 text-white">
+  <div class="text-xs font-semibold uppercase tracking-wider opacity-80">Classification</div>
+  <div class="text-2xl font-semibold mt-1">Recoverable — single-domain issue</div>
+  <p class="mt-2 text-sm opacity-90">{{classificationReason}}</p>
+</div>
+```
+
+**Explainer paragraph:**
+
+> Critical structural findings are confined to a single SDTM domain. The rest of the delivery is parseable and the issue is recoverable with a targeted fix at the CRO. Review the affected domain in the heatmap, then either reject the delivery with a fix request or accept with a follow-up if your contract allows partial ingestion.
+
+### `escalate`
+
+**Status banner HTML:**
+
+```html
+<div class="rounded-xl px-6 py-5 bg-red-600 text-white">
+  <div class="text-xs font-semibold uppercase tracking-wider opacity-80">Classification</div>
+  <div class="text-2xl font-semibold mt-1">Escalate — multi-domain structural failure</div>
+  <p class="mt-2 text-sm opacity-90">{{classificationReason}}</p>
+</div>
+```
+
+**Explainer paragraph:**
+
+> Critical structural findings span two or more SDTM domains, which prevents ingestion as a coherent package. This pattern typically indicates a problem with the CRO's build pipeline rather than individual data points. The delivery should be rejected and the CRO asked to regenerate the package; partial-domain acceptance is not safe at this scale.
+
+### `chaos`
+
+**Status banner HTML:**
+
+```html
+<div class="rounded-xl px-6 py-5 bg-zinc-900 text-white">
+  <div class="text-xs font-semibold uppercase tracking-wider opacity-80">Classification</div>
+  <div class="text-2xl font-semibold mt-1">Chaos — validation could not complete</div>
+  <p class="mt-2 text-sm opacity-90">{{classificationReason}}</p>
+</div>
+```
+
+**Explainer paragraph:**
+
+> Validation did not complete cleanly — either the rules engine errored, the delivery was unreadable, or structural failures span the majority of expected domains. The findings below (if any) are partial and should not be treated as a complete picture. Open the failure detail to see the error and traceback before deciding on next steps; in most cases the delivery should be returned to the CRO without further automated handling.
+
+In each banner block, `{{classificationReason}}` is the only string the skill substitutes — replace it with `input.classificationReason` (HTML-escaped). Everything else is fixed.
+
+## What you MUST NOT do
+
+- **Do not** add new sections to the report.
+- **Do not** reorder existing sections.
+- **Do not** rewrite, paraphrase, expand, or shorten the canonical banner or explainer copy.
+- **Do not** generate prose anywhere outside the marked slots.
+- **Do not** introduce new colours, fonts, or layout primitives in the filled template.
+- **Do not** classify or re-classify the delivery. Echo `input.classification`.
+- **Do not** invent findings, severities, rule codes, or messages.
+- **Do not** modify `/workspace/findings.json` or any other workspace file.
+- **Do not** call external services, fetch URLs at render time, or embed scripts beyond what the template already loads.
+- **Do not** ship a different template path. The template lives at `/workspace/templates/report-template.html` and nowhere else.
+
+If you find yourself wanting to write a paragraph the template does not have a slot for, stop. The slot is missing on purpose. Open a follow-up issue against this repo or the study repo instead.
 
 ## Constraints
 
-- **Do not classify.** The 5-class verdict is computed by the deterministic Python router in `validate-script` and arrives in `input.json`. Echo it; do not recompute it. This is a pharma compliance / reproducibility / cost requirement — LLM output cannot drive automated routing.
-- Do not call out to external services. Do not run `cdisc-rules-engine` yourself — that is the previous step's job.
-- Do not modify `/workspace/findings.json`. It is the audit record.
-- Do not invent findings, severities, or rule codes. If the data does not contain a field, omit the field; do not synthesise.
-- Do not include study-specific or CRO-specific text in the HTML — pull names from `input.json` / env. The skill must work for any landing-zone study with the same inputs.
+- **Do not classify.** Deterministic Python router does it. Echo.
 - All text in English.
+- The skill must work for any landing-zone study with the same input shape; study-specific text comes from `input.json` and env, never hard-coded here.
 
 ## Edge cases
 
-- **`classification` is missing from input** — fall back to `chaos` and surface the missing-classification fact in the banner. This should never happen in production (the Python router always emits one) but treat it as a script-integrity signal if it does.
-- **`/workspace/findings.json` is unreadable** — still render the banner with the input's classification + reason. Skip the heatmap and top-findings sections; note the missing audit file in the failure-detail section.
-- **Raw findings array is very large (>1000 rows)** — still write the full count to the heatmap, but truncate the top-findings list to 20 with a "+ N more" footer.
-- **`scriptStatus = ok` but `error` field is set** — surface the error as a note in the HTML alongside the otherwise-successful findings; the classification still wins the banner.
-- **No `deliveryId` in input** — fall back to the directory basename of `deliveryDir`. If neither is present, label the delivery `unknown` and add a note next to the header.
+- **`classification` missing from input** — fall back to `chaos`, render the chaos banner, and surface the missing-classification fact in the failure-detail section. Should never happen in production.
+- **`/workspace/findings.json` unreadable** — still render banner, header, key metrics (showing `0` where computation requires findings), and explainer. Remove `BLOCK:heatmap` and `BLOCK:top_findings`. Add a one-line note inside `BLOCK:failure_detail` describing the missing file.
+- **`/workspace/templates/report-template.html` missing** — write a minimal fallback HTML containing only the banner (using the canonical copy from this skill) plus a notice that the template was not found at `/workspace/templates/report-template.html`. Do not invent a layout. Still write `result.json` normally.
+- **Raw findings array very large (>1000 rows)** — heatmap shows full counts; top-findings list truncates to 20 with the overflow note.
+- **`scriptStatus = ok` but `error` field is set** — render the failure-detail block alongside the heatmap. Banner is driven by classification, not the error field.
+- **No `deliveryId` in input** — fall back to the directory basename of `deliveryDir`. If neither, label `"unknown"`.
 
 ## Reference files
 
-- `references/cdisc-categories.md` — CDISC rule categories (Structure / Controlled Terminology / Consistency / FDA Business Rules / PMDA), severity levels (Critical / Major / Minor / Warning), and the rule-code prefix conventions used to map findings into categories. Read this before building the heatmap in Step 3. The same prefix mapping is applied internally by the Python router that assigned the classification.
+- `references/cdisc-categories.md` — CDISC rule categories (Structure / Controlled Terminology / Consistency / FDA Business Rules / PMDA), severity levels, and the rule-code prefix conventions used to map findings into categories. Read this before building the heatmap. The same prefix mapping is applied internally by the Python router that assigned the classification.
+
+## External contract
+
+The HTML template is **owned by the study repository**, not this skill. It lives at `templates/report-template.html` in the study repo (e.g. `Appsilon/mediforce-landing-zone-study-demo`) and is mounted into the agent at `/workspace/templates/report-template.html`. The study team controls layout and visual identity via PRs there; this skill controls the filling logic and the canonical copy.
+
+If the template's slot or block markers change, the change must be coordinated across the study repo and this skill.
