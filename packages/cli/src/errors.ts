@@ -34,7 +34,7 @@ export function formatCliError(
     return {
       error: `Cannot reach Mediforce API${input.baseUrl ? ` at ${input.baseUrl}` : ''}`,
       cause: { message: 'server unreachable, took too long' },
-      hints: networkHints(),
+      hints: networkHints(input.baseUrl),
     };
   }
 
@@ -74,7 +74,7 @@ function formatNetworkError(systemError: SystemErrorShape, baseUrl?: string): Er
         address: systemError.address,
         port: systemError.port,
       },
-      hints: networkHints(),
+      hints: networkHints(baseUrl),
     };
   }
 
@@ -86,7 +86,7 @@ function formatNetworkError(systemError: SystemErrorShape, baseUrl?: string): Er
         message: 'hostname not resolvable',
         hostname: systemError.hostname,
       },
-      hints: networkHints(),
+      hints: networkHints(baseUrl),
     };
   }
 
@@ -94,7 +94,7 @@ function formatNetworkError(systemError: SystemErrorShape, baseUrl?: string): Er
     return {
       error: `Cannot reach Mediforce API${target}`,
       cause: { code, message: 'server unreachable, took too long' },
-      hints: networkHints(),
+      hints: networkHints(baseUrl),
     };
   }
 
@@ -102,23 +102,28 @@ function formatNetworkError(systemError: SystemErrorShape, baseUrl?: string): Er
     return {
       error: `Certificate problem reaching Mediforce API${target}`,
       cause: { code, message: 'certificate problem' },
-      hints: networkHints(),
+      hints: networkHints(baseUrl),
     };
   }
 
   return {
     error: `Cannot reach Mediforce API${target}`,
     cause: { code, message: systemError.message ?? 'network error' },
-    hints: networkHints(),
+    hints: networkHints(baseUrl),
   };
 }
 
-function networkHints(): string[] {
-  return [
-    'Is the dev server running? Start with: pnpm dev:local',
-    'To use a different host: export MEDIFORCE_BASE_URL=https://staging.mediforce.ai',
-    'Or pass --base-url https://staging.mediforce.ai to this command.',
-  ];
+function networkHints(baseUrl?: string): string[] {
+  const hints: string[] = [];
+
+  if (isLocalBaseUrl(baseUrl) === true) {
+    hints.push('Is the dev server running? Start with: pnpm dev:local');
+  }
+
+  hints.push('To use a different host: export MEDIFORCE_BASE_URL=https://staging.mediforce.ai');
+  hints.push('Or pass --base-url https://staging.mediforce.ai to this command.');
+
+  return hints;
 }
 
 
@@ -151,6 +156,15 @@ function isFetchFailure(err: unknown): boolean {
       return true;
     }
 
+    const nestedErrors = current['errors'];
+    if (Array.isArray(nestedErrors)) {
+      for (const nestedError of nestedErrors) {
+        if (isFetchFailure(nestedError)) {
+          return true;
+        }
+      }
+    }
+
     current = current['cause'];
   }
 
@@ -181,6 +195,16 @@ function findSystemError(err: unknown): SystemErrorShape | null {
         hostname: typeof current['hostname'] === 'string' ? current['hostname'] : undefined,
       };
     }
+    const nestedErrors = current['errors'];
+    if (Array.isArray(nestedErrors)) {
+      for (const nestedError of nestedErrors) {
+        const candidate = findSystemError(nestedError);
+        if (candidate !== null) {
+          return candidate;
+        }
+      }
+    }
+
     current = current['cause'];
   }
 
@@ -202,6 +226,20 @@ function findAbortError(err: unknown): unknown | null {
 
 function looksLikeNonJson404(body: unknown): boolean {
   return isRecord(body) && Object.keys(body).length === 0;
+}
+
+
+function isLocalBaseUrl(baseUrl: string | undefined): boolean {
+  if (typeof baseUrl !== 'string' || baseUrl.length === 0) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(baseUrl);
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

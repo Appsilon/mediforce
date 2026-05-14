@@ -29,6 +29,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Staging step containers can finally see workspace files — the data dir is persisted at `/var/lib/mediforce` with an identical host bind so docker.sock-spawned containers share the same path ([#405](https://github.com/Appsilon/mediforce/pull/405)).
 - CLI network failures now explain the unreachable API host, reason, and recovery hints instead of printing raw `TypeError: fetch failed` ([#397](https://github.com/Appsilon/mediforce/issues/397)).
   - Follow-up: network classification now only applies to actual fetch failures, so local I/O errors (e.g. `EACCES`) keep their original message ([#397](https://github.com/Appsilon/mediforce/issues/397)).
+  - Follow-up: dual-stack fetch failures now classify `AggregateError.errors[]` causes, and staging/remote URLs no longer suggest starting a local dev server ([#397](https://github.com/Appsilon/mediforce/issues/397)).
 
 ### Dependencies
 - tailwindcss v4.2.4 ([#374](https://github.com/Appsilon/mediforce/pull/374)), yaml v2.8.4 ([#371](https://github.com/Appsilon/mediforce/pull/371)), pnpm v10.33.2 ([#372](https://github.com/Appsilon/mediforce/pull/372)), fast-xml-parser v5.7.2 ([#375](https://github.com/Appsilon/mediforce/pull/375)), jsdom v29.1.1 ([#379](https://github.com/Appsilon/mediforce/pull/379)), lucide-react v1.14.0 ([#380](https://github.com/Appsilon/mediforce/pull/380)).

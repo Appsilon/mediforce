@@ -95,6 +95,35 @@ describe('formatCliError', () => {
       });
   });
 
+
+  it('extracts network system error from AggregateError fetch causes', () => {
+    const aggregateCause = new AggregateError([
+      { code: 'ECONNREFUSED', address: '127.0.0.1', port: 9003 },
+      { code: 'ETIMEDOUT' },
+    ]);
+    const error = new TypeError('fetch failed', { cause: aggregateCause });
+
+    expect(formatCliError(error, { baseUrl: 'http://localhost:9003' })).toMatchObject({
+      error: 'Cannot reach Mediforce API at http://localhost:9003',
+      cause: {
+        code: 'ECONNREFUSED',
+      },
+    });
+  });
+
+  it('omits local-dev hint for non-local base URL', () => {
+    const error = new TypeError('fetch failed', {
+      cause: { code: 'ETIMEDOUT' },
+    });
+
+    expect(formatCliError(error, { baseUrl: 'https://staging.mediforce.ai' })).toMatchObject({
+      hints: [
+        'To use a different host: export MEDIFORCE_BASE_URL=https://staging.mediforce.ai',
+        'Or pass --base-url https://staging.mediforce.ai to this command.',
+      ],
+    });
+  });
+
   it('does not reclassify non-fetch system errors as network errors', () => {
     const error = Object.assign(new Error('permission denied'), { code: 'EACCES' });
 
