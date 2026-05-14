@@ -44,7 +44,7 @@ jobs:
 
       - name: Open PR
         if: steps.cut.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: changelog/cut-${{ steps.date.outputs.sunday }}
           commit-message: "docs(changelog): cut week ending ${{ steps.date.outputs.sunday }}"
