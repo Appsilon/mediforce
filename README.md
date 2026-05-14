@@ -121,13 +121,13 @@ Open `http://localhost:9007`. Use this to click through the UI without configuri
 | `pnpm dev` | Default. Real Firebase per `.env.local`, agents in Docker. The main dev loop. |
 | `pnpm dev:mock` | Mocked agents + in-memory data store, port 9007. No keys, no Docker, no Firebase. |
 | `pnpm dev:no-docker` | Like `dev`, but agents run via host `claude` CLI instead of Docker. |
-| `pnpm dev:full` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Requires `pnpm worker` and `pnpm redis` running alongside. |
+| `pnpm dev:full` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Starts Redis + container-worker via `docker compose` automatically; Next.js stays native for hot-reload. Stop with `pnpm dev:full:down`. |
 
-Sidecars (separate terminals, only needed for `dev:full`):
+Manual control of queue infra (only when you want logs in separate terminals):
 
 ```bash
 pnpm redis          # Redis container
-pnpm worker         # BullMQ worker
+pnpm worker         # BullMQ worker (native, not containerized)
 ```
 
 ### Emulator + own seed data

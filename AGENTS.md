@@ -176,7 +176,7 @@ workflow-definition `skillsDir` — paths hardcoded, don't move).
 pnpm dev                                # default — real Firebase + Docker agents, :9003
 pnpm dev:mock                           # mocked agents + in-memory data, :9007 — no setup
 pnpm dev:no-docker                      # agents via host `claude` CLI (no Docker)
-pnpm dev:full                           # queue mode — needs `pnpm worker` + `pnpm redis` alongside
+pnpm dev:full                           # queue mode — auto-starts Redis + container-worker via docker compose (stop with dev:full:down)
 
 # Test — L1 unit + L2 integration (vitest)
 pnpm typecheck
