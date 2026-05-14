@@ -48,7 +48,7 @@ packages/
 
 ## Local agent execution
 
-When running with `ALLOW_LOCAL_AGENTS=true` (via `pnpm dev:local`), the platform spawns agent CLIs directly as local processes instead of Docker containers. The following tools must be installed and on your `PATH`:
+When running with `ALLOW_LOCAL_AGENTS=true` (via `pnpm dev:no-docker`), the platform spawns agent CLIs directly as local processes instead of Docker containers. The following tools must be installed and on your `PATH`:
 
 | Tool | Used by | Install |
 |------|---------|---------|
@@ -76,11 +76,8 @@ cd packages/platform-ui && pnpm dev
 ### Unit & integration tests
 
 ```bash
-# All tests
-pnpm test
-
-# Fast mode (dot reporter)
-pnpm test:fast
+# Unit + integration (vitest)
+pnpm test:unit
 
 # Only tests affected by your changes
 pnpm test:affected
@@ -90,6 +87,9 @@ pnpm test:coverage
 
 # Type checking
 pnpm typecheck
+
+# Everything (unit + e2e)
+pnpm test
 ```
 
 ### Contract tests
@@ -100,25 +100,22 @@ Handlers in `platform-api` are tested against in-memory repositories from `@medi
 
 E2E tests live in `packages/platform-ui/e2e/`.
 
-**Smoke tests** (no emulators needed):
-
-```bash
-cd packages/platform-ui
-pnpm test:e2e              # headless
-pnpm test:e2e:headed       # with browser visible
-pnpm test:e2e:ui           # interactive Playwright UI
-```
-
-**Authenticated tests** (require Firebase Emulators):
-
 ```bash
 # Terminal 1 — start emulators
-cd packages/platform-ui
 pnpm emulators
 
 # Terminal 2 — run tests
-pnpm test:e2e:auth         # headless
-pnpm test:e2e:auth:headed  # with browser visible
+pnpm test:e2e               # all E2E (L3 + L4)
+pnpm test:e2e:api           # L3 only — API E2E, no browser (~30s)
+pnpm test:e2e:ui            # L4 only — UI E2E with real Chromium (~3min)
+pnpm test:e2e:record        # record GIFs of UI journeys
+```
+
+Variants run from `packages/platform-ui`:
+
+```bash
+pnpm test:e2e:headed        # with browser visible
+pnpm test:e2e:ui-mode       # interactive Playwright UI
 ```
 
 The emulator setup automatically:
@@ -127,16 +124,17 @@ The emulator setup automatically:
 3. Authenticates and saves auth state for all tests
 
 **Test structure:**
-- `e2e/smoke.spec.ts` — unauthenticated tests (always run)
-- `e2e/authenticated/*.spec.ts` — tests requiring login (only with emulators)
+- `e2e/smoke.spec.ts` — unauthenticated tests
+- `e2e/api/*.journey.ts` — L3 API E2E
+- `e2e/ui/*.journey.ts` — L4 UI E2E
 - `e2e/helpers/` — emulator REST API helpers and seed data
 
 ### Recommended workflow
 
 1. `pnpm typecheck` — catches type errors (~5s)
 2. `pnpm test:affected` — tests for changed files only (<1s)
-3. `pnpm test` — full suite (~9s)
-4. E2E tests if UI was changed (~15-60s)
+3. `pnpm test:unit` — full L1+L2 (~9s)
+4. `pnpm test:e2e` — if UI/API contract changed (~4min)
 
 ## Build
 

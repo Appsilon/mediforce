@@ -97,8 +97,8 @@ Run validation in order (stop on first failure):
 
 1. `pnpm typecheck`
 2. `pnpm test:affected` — if the change touches tested code
-3. `pnpm test` — full suite
-4. E2E (`cd packages/platform-ui && pnpm test:e2e:auth`) — only if the change touches UI framework, React, or Next.js
+3. `pnpm test:unit` — full unit suite
+4. `pnpm test:e2e` — only if the change touches UI framework, React, or Next.js
 
 ### 5. Handle failures
 

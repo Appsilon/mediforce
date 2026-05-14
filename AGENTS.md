@@ -173,30 +173,30 @@ workflow-definition `skillsDir` — paths hardcoded, don't move).
 
 ```bash
 # Dev
-pnpm dev                                # platform-ui on :9003
-pnpm dev:local                          # + local agent execution (claude on PATH)
-pnpm dev:test                           # platform-ui :9007 + emulators + MOCK_AGENT
-pnpm dev:redis                          # Redis :6379 — separate terminal
-pnpm dev:worker                         # BullMQ worker — separate terminal (queue mode)
+pnpm dev                                # default — real Firebase + Docker agents, :9003
+pnpm dev:mock                           # mocked agents + in-memory data, :9007 — no setup
+pnpm dev:no-docker                      # agents via host `claude` CLI (no Docker)
+pnpm dev:full                           # queue mode — needs `pnpm worker` + `pnpm redis` alongside
 
 # Test — L1 unit + L2 integration (vitest)
 pnpm typecheck
 pnpm test:affected                      # <1s, changed files only
-pnpm test                               # full L1 + L2 (~9s)
+pnpm test:unit                          # full L1 + L2 (~9s)
+pnpm test                               # everything: test:unit + test:e2e
 npx vitest run path/to/file.test.ts     # single file
 
 # Test — L3 API E2E + L4 UI E2E (Playwright; delegate to background subagent)
 python3 packages/platform-ui/scripts/bootstrap_e2e.py
-cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth          # all e2e (build + run ~4min; rebuild only on source/config change)
-cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth --project=api  # L3 only
-cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth --project=authenticated  # L4 only
+pnpm test:e2e                            # all e2e (build + run ~4min; rebuild only on source/config change)
+pnpm test:e2e:api                        # L3 only — API E2E, no browser (~30s)
+pnpm test:e2e:ui                         # L4 only — UI E2E with real Chromium (~3min)
 # Iterating on a UI feature? Use `next dev` for hot-reload instead of next start:
-cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true E2E_DEV_SERVER=true pnpm test:e2e:auth --grep '<name>'
-# After editing source, rebuild before next test:e2e:auth (or use E2E_DEV_SERVER=true):
+cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true E2E_DEV_SERVER=true pnpm test:e2e --grep '<name>'
+# After editing source, rebuild before next test:e2e (or use E2E_DEV_SERVER=true):
 cd packages/platform-ui && pnpm build:e2e
 
 # Test — L5 External / Tier 2 (real LLM, opt-in, costs cents)
-cd packages/platform-ui && OPENROUTER_API_KEY=... pnpm test:external
+OPENROUTER_API_KEY=... pnpm test:external
 
 # CLI
 pnpm exec mediforce --help

@@ -5,7 +5,7 @@
 #   docker compose up               — start Redis + agent worker
 #
 # The platform-ui dev server connects to Redis when REDIS_URL is set:
-#   REDIS_URL=redis://localhost:6379 pnpm dev:ui
+#   pnpm dev:full     # (equivalent to: REDIS_URL=redis://localhost:6379 pnpm dev)
 
 services:
   redis:

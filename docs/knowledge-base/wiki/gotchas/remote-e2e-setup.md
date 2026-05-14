@@ -11,7 +11,7 @@ tags: [gotcha, e2e, playwright, firebase-emulator, remote]
 ## Symptom
 
 - E2E test fails with "Firebase SDK not initialised", "API key missing", or Playwright "chromium executable not found".
-- `test:e2e:auth` hangs on emulator startup in a proxied environment.
+- `test:e2e` hangs on emulator startup in a proxied environment.
 - `test:e2e:gif` errors on `ffmpeg: command not found`.
 
 ## Cause
@@ -38,7 +38,7 @@ python3 packages/platform-ui/scripts/bootstrap_e2e.py
 Then:
 
 ```bash
-cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth
+pnpm test:e2e
 ```
 
 ## How to avoid next time

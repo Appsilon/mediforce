@@ -10,41 +10,62 @@ Get the app running locally in minutes. Start with Firebase emulators and demo d
 
 ---
 
-## 1. Quick Start with Emulators
-
-Run the app with pre-seeded demo data. No Firebase account needed.
-
-### Step 1: Bootstrap environment
+## 1. Fastest start — click through the app (no setup)
 
 ```bash
 pnpm install
-cd packages/platform-ui
-python3 scripts/bootstrap-dev.py
+pnpm dev:mock
 ```
 
-This creates `.env.local` with demo credentials and starts Firebase emulators.
+Open http://localhost:9007. No Firebase, no keys, no Docker. Agents are mocked,
+workflow data lives in `MEDIFORCE_DATA_DIR` (in-memory file-based fake).
+Use this to explore the UI before configuring anything real.
 
-### Step 2: Seed demo data
+---
+
+## 2. Emulator + seeded demo data
+
+Run the app with pre-seeded demo workflows against Firebase emulators.
+
+### Step 1: Install + env
 
 ```bash
-pnpm seed:dev
+pnpm install
+cp packages/platform-ui/.env.example packages/platform-ui/.env.local
 ```
 
-This seeds:
+The example file's defaults already target the emulator (project id `demo-mediforce`).
+
+### Step 2: Start emulators (separate terminal)
+
+```bash
+pnpm emulators
+```
+
+This starts Firebase Auth (:9099), Firestore (:8080), and Storage (:9199),
+persisting state to `packages/platform-ui/.emulator-data/`.
+
+### Step 3: Seed demo data
+
+```bash
+pnpm seed
+```
+
+Seeds:
 - Workflow definitions (Supply Chain Review, Protocol to TFL, Workflow Designer)
 - Process instances in various states (running, paused, completed)
 - Human tasks ready for action
 - Agent runs with results
 
-### Step 3: Start the app
+### Step 4: Start the app
 
 ```bash
-NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:ui
+NEXT_PUBLIC_USE_EMULATORS=true pnpm dev
 ```
 
 Open http://localhost:9003
 
-### Step 4: Sign in
+### Step 5: Sign in
 
 Demo credentials:
 - **Email**: test@mediforce.dev
@@ -309,10 +330,24 @@ OPENROUTER_API_KEY=your-openrouter-key
 
 Required: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `PLATFORM_API_KEY`.
 
+### Service-account credentials (Firebase Admin SDK)
+
+When NOT using emulators, the server needs a Firebase service-account JSON to talk to Firestore with admin privileges.
+
+1. Firebase Console → Project Settings → Service Accounts → **Generate new private key**
+2. Save the downloaded JSON outside the repo (e.g. `~/.config/mediforce/firebase-sa.json`)
+3. Add to `.env.local`:
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=/Users/<you>/.config/mediforce/firebase-sa.json
+```
+
+Use an absolute path — the server validates the file exists on startup.
+
 ### Run with Production Firebase
 
 ```bash
-pnpm dev:ui
+pnpm dev
 ```
 
 **Important:** The UI starts empty. Your workflows and data are private to your Firebase project. Create workflows via UI or API to populate.
@@ -346,17 +381,11 @@ lsof -ti:9003 | xargs kill -9
 
 ### Emulators fail to start
 
-Run the bootstrap script:
-
-```bash
-python3 packages/platform-ui/scripts/bootstrap-dev.py
-```
-
-Or start manually:
-
 ```bash
 pnpm emulators
 ```
+
+If the port is occupied, the script prompts to kill blocking processes. If Java is missing, install with `brew install openjdk@21` (macOS) or `apt-get install openjdk-21-jre` (Linux).
 
 ### "Permission denied" Firestore errors
 
@@ -390,8 +419,8 @@ curl -H "X-Api-Key: test-api-key" \
 ### Demo data doesn't appear after seed
 
 Make sure:
-1. Emulators are running (`pnpm emulators` or bootstrap script)
-2. You ran `pnpm seed:dev` (not just bootstrap)
+1. Emulators are running (`pnpm emulators`)
+2. You ran `pnpm seed`
 3. You're using `NEXT_PUBLIC_USE_EMULATORS=true` when starting the app
 
 ---
@@ -401,15 +430,17 @@ Make sure:
 | Command | Description |
 |---------|-------------|
 | `pnpm install` | Install dependencies |
-| `python3 packages/platform-ui/scripts/bootstrap-dev.py` | Bootstrap emulator environment |
-| `cd packages/platform-ui && pnpm seed:dev` | Seed demo data |
-| `NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:ui` | Run with emulators (port 9003) |
-| `pnpm dev:ui` | Run with production Firebase |
-| `pnpm dev` | Run Platform UI + Supply Intelligence |
-| `pnpm test:fast` | Quick unit tests |
-| `pnpm test` | All unit + integration tests |
-| `cd packages/platform-ui && pnpm test:e2e:auth` | E2E with emulators |
-| `pnpm emulators` | Start Firebase emulators (Auth + Firestore) |
+| `pnpm dev:mock` | Mocked agents + in-memory data, port 9007 — no setup |
+| `pnpm emulators` | Start Firebase emulators (Auth + Firestore + Storage) |
+| `pnpm seed` | Seed demo data into running emulators |
+| `NEXT_PUBLIC_USE_EMULATORS=true pnpm dev` | Run with emulators (port 9003) |
+| `pnpm dev` | Run with production Firebase (per `.env.local`) |
+| `pnpm dev:no-docker` | Like `dev`, agents via host `claude` CLI |
+| `pnpm dev:full` | Like `dev`, production-like queue mode (needs `pnpm worker` + `pnpm redis`) |
+| `pnpm test:unit` | vitest unit + integration |
+| `pnpm test:affected` | vitest, only files changed |
+| `pnpm test:e2e` | All Playwright E2E (L3 + L4) |
+| `pnpm test` | Everything (unit + e2e) |
 
 ---
 
