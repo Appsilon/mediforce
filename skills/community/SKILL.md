@@ -4,7 +4,7 @@ description: Write short Discord updates for the MediForce community based on ro
 allowed-tools: Read, Write
 metadata:
   author: Appsilon
-  version: "1.2"
+  version: "1.3"
   domain: community
   complexity: basic
   tags: discord, community, communication
@@ -46,6 +46,7 @@ Identify the key facts: what shipped / changed / broke, the specific component o
 - User-facing features → `Shipped` / `Just shipped` / `I created`.
 - Process / tooling / internal infra → lead with the **outcome itself**, not a "Shipped X" frame. Example: `We now have a weekly CHANGELOG…` reads as something the community gains; `Shipped a weekly CHANGELOG` reads as a release announcement, which is the wrong frame for plumbing.
 - Bugfixes → `Fixed`.
+- **Perf / DX improvements** → personal benefit framing works well: `I [did X], should [help with reader's day-to-day]:`. Example: `I sped up our e2e tests, should make development more smooth:`. Connects sender → effort → audience benefit in one breath. Beats bare "X is now Y" because it tells the reader why they should care.
 
 If you can't say what a peer *gets* from the change, "Shipped" is a tell that you're announcing a release instead of communicating a benefit. Rewrite from the outcome.
 
@@ -55,9 +56,15 @@ If you can't say what a peer *gets* from the change, "Shipped" is a tell that yo
 
 ### Step 3: Write the detailed version
 
-5-8 sentences. Still leads with outcome + why. Then adds the context a peer would actually want: defaults / fallback behavior, access info (URL, where credentials live), notable tradeoffs. Surface area (API / CLI / SDK / UI) goes in *only if* it changes what someone integrates with — otherwise it's noise. Optionally close with a question, but only if there's a real one — do NOT bolt one on.
+5-8 sentences worth of content. Still leads with outcome + why. Then adds the context a peer would actually want: defaults / fallback behavior, access info (URL, where credentials live), notable tradeoffs. Surface area (API / CLI / SDK / UI) goes in *only if* it changes what someone integrates with — otherwise it's noise. Optionally close with a question, but only if there's a real one — do NOT bolt one on.
 
-**Expected:** Substantive post that could spark a real discussion or just informs cleanly.
+**Use lists, not prose chains, when describing N parallel items.** If you'd write "L1 unit + L2 integration cover logic; L3 API E2E is the foundation; L4 UI E2E stays sparse…", that's a list pretending to be a sentence. Format as numbered or bulleted list — Discord renders it cleanly and a reader can scan in one second. Same for: feature options, supported triggers, levels, tiers, layers, environments.
+
+**Explain mechanisms by their reader-visible consequence.** "Replacing `next dev` JIT with `next start`" is jargon. "Replacing JIT compilation (`next dev`) with pre-building (`next build` + `next start`) so that every page loads faster in tests" lands. Always reach for "so that…" or a parenthetical that says what the reader will notice.
+
+**Cut secondary mechanics ruthlessly.** Anything that doesn't change what the reader does today gets dropped, even if interesting. Cache hit edge cases, opt-in flags for power users, perf footnotes — all noise in a Discord post. Trust the linked PR to carry the long tail.
+
+**Expected:** Substantive post that could spark a real discussion or just informs cleanly. Scannable, with lists where they fit.
 
 **On failure:** If the update is small, the detailed version stays small. Don't pad.
 
@@ -83,6 +90,9 @@ Output short first, then `---`, then detailed. Both stand alone.
 - **Don't re-explain MediForce.** Audience knows.
 - **Problems and tradeoffs are valid posts.** "We tried X, it didn't work because Y" invites help.
 - **Practical access info belongs in the post.** Address, port, "key in 1Password" — include them if relevant.
+- **Lists beat prose chains.** When you'd otherwise write "A is X; B is Y; C is Z" — that's a list pretending to be a sentence. Use a numbered or bulleted list so a Discord reader can scan it in one second. Especially for: levels, tiers, supported triggers, feature options, layers.
+- **Mechanism + reader-visible consequence in the same breath.** Pair every "we changed X to Y" with "so that [thing reader will notice]". Without the consequence clause, you're describing plumbing; with it, you're communicating a benefit.
+- **Be ruthless about cutting secondary detail.** If a fact doesn't change what the reader does today, drop it — even if it's interesting. The linked PR carries the long tail. Test: would a peer skim past this line on a busy day? If yes, cut.
 
 ## Canonical examples
 
@@ -96,16 +106,31 @@ These three posts are the reference style. New output should feel like these —
 > Address: http://204.168.165.57:8080/
 > Key (need to give it once, then it's stored in your browser): in 1Password
 
+> I sped up our e2e tests, should make development more smooth:
+> CI e2e is now ~2x faster — 8.5min → ~4min on a typical source-change PR (#413). The main win is replacing JIT compilation (`next dev`) with pre-building the app (`next build` + `next start`) so that every page loads faster in tests.
+>
+> Same PR codifies a 5-level testing pyramid in AGENTS.md:
+> 1. unit
+> 2. integration: verify logic, with mocked database and all services
+> 3. API E2E is the foundation — every feature ships with real Next + Firebase emulator HTTP coverage in `e2e/api/` (no browser), mocked agents & external services
+> 4. UI E2E — stays sparse, only real multi-step user journeys in `e2e/ui/` (never "is button visible" checks), mocked agents & external services
+> 5. external — testing connections with real remote MCP/LLM services etc
+>
+> [#413](https://github.com/Appsilon/mediforce/pull/413)
+
 ### Patterns extracted from the examples
 
-- Opening matches the change type. User-facing feature → `Shipped` / `Just shipped` / `I created`. Process / tooling / internal infra → lead with the outcome (`We now have…`, `You can now…`). Bugfix → `Fixed`.
+- Opening matches the change type. User-facing feature → `Shipped` / `Just shipped` / `I created`. Process / tooling / internal infra → lead with the outcome (`We now have…`, `You can now…`). Bugfix → `Fixed`. Perf / DX → personal benefit framing (`I sped up X, should [help with day-to-day]:`).
 - One-clause feature name in quotes or italics when ambiguous (`"Copy workflow to namespace"`).
-- Cite PRs as **clickable markdown links**: `[#359](https://github.com/Appsilon/mediforce/pull/359)`, never bare `PR #359`.
+- Cite PRs as **clickable markdown links**: `[#359](https://github.com/Appsilon/mediforce/pull/359)`, never bare `PR #359`. (The e2e example above has an inline `(#413)` only because the same PR is also linked properly at the bottom — pick one form per post.)
+- **Use lists for N parallel items.** Test levels, tiers, supported triggers, feature options, layers — numbered or bulleted, not prose chains. Each item gets one short clause; cram disambiguators inline (`mocked agents & external services`) rather than spreading them across multiple sentences.
+- **Mechanism → consequence pairing.** Don't drop a jargon technical change without the "so that…" clause that tells the reader what they'll notice. "Replacing JIT compilation with pre-building" is half the story; "…so that every page loads faster in tests" is the half that lands.
 - Enumerate the surface area when it spans layers: `API, CLI, SDK, and a UI dialog` — only if that matters to the reader.
 - Call out defaults / fallback in a separate sentence: "If these are not defined, workflows will use the default Accept/Revise buttons that we had so far."
 - For tools / mini-apps: include Address + auth hint (where key lives) on their own lines.
 - If the update introduces a process the reader participates in, add a one-clause **hook** pointing them at the tool: "(we have a `/add-release-notes` skill for that)".
 - No mandatory closing question. Hooks are not questions — they're invitations.
+- **Cut secondary details first.** Cache hit edge cases, opt-in flags, perf footnotes, "and also we did X" — drop them. If the reader's daily action doesn't change, the detail isn't earning its line. The PR description carries the long tail.
 
 ## Validation
 
@@ -130,3 +155,6 @@ These three posts are the reference style. New output should feel like these —
 - Re-explaining MediForce — audience already knows.
 - Inflating a one-line fix into a paragraph.
 - Hardcoding product context that belongs in README — read README/docs at runtime instead.
+- **Prose-chaining N parallel items.** "L1 unit + L2 integration cover X; L3 is the foundation because Y; L4 stays sparse so Z…" forces the reader to parse a paragraph for what should be a 5-bullet list. Reach for a list whenever the items are parallel and there are ≥3 of them.
+- **Dropping mechanism without the consequence.** "Replaced JIT with pre-builds" leaves the reader to guess why it matters. Always include "so that…" or the user-visible effect.
+- **Hoarding mechanics that don't change reader behavior.** Cache hit numbers, opt-in env vars, perf footnotes — every line that doesn't change what a peer does on Monday is noise. Trust the PR.
