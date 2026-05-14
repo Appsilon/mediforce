@@ -1,8 +1,9 @@
 import { parseArgs } from 'node:util';
-import { Mediforce, ApiError } from '@mediforce/platform-api/client';
+import { Mediforce } from '@mediforce/platform-api/client';
 import type { DockerInfoResponse } from '@mediforce/platform-api/contract';
-import { resolveConfig } from '../config.js';
+import { resolveBaseUrl, resolveConfig } from '../config.js';
 import { printJson, printError, type OutputSink } from '../output.js';
+import { formatCliError } from '../errors.js';
 
 interface CommandInput {
   argv: string[];
@@ -51,12 +52,13 @@ function parseFlags(input: CommandInput): { flags: { 'base-url'?: string; json?:
   }
 }
 
-function handleApiError(err: unknown, output: OutputSink, jsonMode: boolean): number {
-  if (err instanceof ApiError) {
-    printError(output, { error: err.message, status: err.status, body: err.body }, jsonMode);
-  } else {
-    printError(output, { error: err instanceof Error ? err.message : String(err) }, jsonMode);
-  }
+function handleApiError(
+  err: unknown,
+  output: OutputSink,
+  jsonMode: boolean,
+  baseUrl: string,
+): number {
+  printError(output, formatCliError(err, { baseUrl, jsonMode }), jsonMode);
   return 1;
 }
 
@@ -90,7 +92,12 @@ export async function systemStatusCommand(input: CommandInput): Promise<number> 
     printDisk(input.output, data);
     return 0;
   } catch (err) {
-    return handleApiError(err, input.output, jsonMode);
+    return handleApiError(
+      err,
+      input.output,
+      jsonMode,
+      resolveBaseUrl({ flagBaseUrl: flags['base-url'], env: input.env }),
+    );
   }
 }
 
@@ -121,7 +128,12 @@ export async function systemImagesCommand(input: CommandInput): Promise<number> 
     printImages(input.output, data);
     return 0;
   } catch (err) {
-    return handleApiError(err, input.output, jsonMode);
+    return handleApiError(
+      err,
+      input.output,
+      jsonMode,
+      resolveBaseUrl({ flagBaseUrl: flags['base-url'], env: input.env }),
+    );
   }
 }
 
@@ -163,7 +175,12 @@ export async function systemRmiCommand(input: CommandInput): Promise<number> {
     input.output.stdout(`Deleted: ${result.deleted}`);
     return 0;
   } catch (err) {
-    return handleApiError(err, input.output, jsonMode);
+    return handleApiError(
+      err,
+      input.output,
+      jsonMode,
+      resolveBaseUrl({ flagBaseUrl: flags['base-url'], env: input.env }),
+    );
   }
 }
 
@@ -194,6 +211,11 @@ export async function systemDiskCommand(input: CommandInput): Promise<number> {
     printDisk(input.output, data);
     return 0;
   } catch (err) {
-    return handleApiError(err, input.output, jsonMode);
+    return handleApiError(
+      err,
+      input.output,
+      jsonMode,
+      resolveBaseUrl({ flagBaseUrl: flags['base-url'], env: input.env }),
+    );
   }
 }
