@@ -24,7 +24,7 @@ export function formatCliError(
     return formatApiError(err);
   }
 
-  const systemError = findSystemError(err);
+  const systemError = findFetchSystemError(err);
   if (systemError !== null) {
     return formatNetworkError(systemError, input.baseUrl);
   }
@@ -119,6 +119,42 @@ function networkHints(): string[] {
     'To use a different host: export MEDIFORCE_BASE_URL=https://staging.mediforce.ai',
     'Or pass --base-url https://staging.mediforce.ai to this command.',
   ];
+}
+
+
+function findFetchSystemError(err: unknown): SystemErrorShape | null {
+  if (!isFetchFailure(err)) {
+    return null;
+  }
+
+  return findSystemError(err);
+}
+
+function isFetchFailure(err: unknown): boolean {
+  let current: unknown = err;
+  const seen = new Set<unknown>();
+
+  while (isRecord(current) && !seen.has(current)) {
+    seen.add(current);
+
+    if (current['name'] === 'AbortError') {
+      return true;
+    }
+
+    const message = current['message'];
+    if (
+      typeof current['name'] === 'string' &&
+      current['name'] === 'TypeError' &&
+      typeof message === 'string' &&
+      message.toLowerCase() === 'fetch failed'
+    ) {
+      return true;
+    }
+
+    current = current['cause'];
+  }
+
+  return false;
 }
 
 interface SystemErrorShape {

@@ -94,4 +94,12 @@ describe('formatCliError', () => {
         ]),
       });
   });
+
+  it('does not reclassify non-fetch system errors as network errors', () => {
+    const error = Object.assign(new Error('permission denied'), { code: 'EACCES' });
+
+    expect(formatCliError(error, { baseUrl: 'http://localhost:9003' })).toMatchObject({
+      error: String(error),
+    });
+  });
 });
