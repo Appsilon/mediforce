@@ -124,11 +124,36 @@ describe('formatCliError', () => {
     });
   });
 
+
+
+  it('falls back gracefully for fetch failures without a cause', () => {
+    const error = new TypeError('fetch failed');
+
+    expect(formatCliError(error, { baseUrl: 'http://localhost:9003' })).toMatchObject({
+      error: 'fetch failed',
+    });
+  });
+
+  it('formats network errors when baseUrl is undefined', () => {
+    const error = new TypeError('fetch failed', {
+      cause: { code: 'ETIMEDOUT' },
+    });
+
+    expect(formatCliError(error)).toMatchObject({
+      error: 'Cannot reach Mediforce API',
+      cause: {
+        code: 'ETIMEDOUT',
+        message: 'server unreachable, took too long',
+      },
+      hints: expect.arrayContaining(['Is the dev server running? Start with: pnpm dev:local']),
+    });
+  });
+
   it('does not reclassify non-fetch system errors as network errors', () => {
     const error = Object.assign(new Error('permission denied'), { code: 'EACCES' });
 
     expect(formatCliError(error, { baseUrl: 'http://localhost:9003' })).toMatchObject({
-      error: String(error),
+      error: 'permission denied',
     });
   });
 });

@@ -38,6 +38,10 @@ export function formatCliError(
     };
   }
 
+  if (err instanceof Error) {
+    return { error: err.message };
+  }
+
   return { error: String(err) };
 }
 
@@ -217,7 +221,9 @@ function findAbortError(err: unknown): unknown | null {
 
   while (isRecord(current) && !seen.has(current)) {
     seen.add(current);
-    if (current['name'] === 'AbortError') return current;
+    if (current['name'] === 'AbortError') {
+      return current;
+    }
     current = current['cause'];
   }
 
@@ -225,6 +231,7 @@ function findAbortError(err: unknown): unknown | null {
 }
 
 function looksLikeNonJson404(body: unknown): boolean {
+  // parseJsonOrThrow normalizes non-JSON 404 response bodies to {} in ApiError.body.
   return isRecord(body) && Object.keys(body).length === 0;
 }
 
