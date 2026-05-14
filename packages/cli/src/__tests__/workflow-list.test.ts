@@ -20,7 +20,7 @@ describe('workflow list command', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({
         definitions: [
-          { name: wd.name, latestVersion: 3, defaultVersion: 2, definition: wd },
+          { namespace: wd.namespace, name: wd.name, latestVersion: 3, defaultVersion: 2, definition: wd },
         ],
       }),
     );
@@ -57,7 +57,7 @@ describe('workflow list command', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({
         definitions: [
-          { name: wd.name, latestVersion: 1, defaultVersion: 1, definition: wd },
+          { namespace: wd.namespace, name: wd.name, latestVersion: 1, defaultVersion: 1, definition: wd },
         ],
       }),
     );

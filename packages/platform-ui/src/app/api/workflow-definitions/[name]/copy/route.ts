@@ -41,7 +41,7 @@ export async function POST(
 
   const sourceNamespace = request.nextUrl.searchParams.get('namespace') ?? targetNamespace;
   const sourceVersion = parsed.data.version
-    ?? await processRepo.getLatestWorkflowVersion(sourceName, sourceNamespace);
+    ?? await processRepo.getLatestWorkflowVersion(sourceNamespace, sourceName);
 
   if (sourceVersion === 0) {
     return NextResponse.json(
@@ -70,8 +70,8 @@ export async function POST(
   const copyName = parsed.data.targetName ?? sourceName;
 
   const existingVersion = await processRepo.getLatestWorkflowVersion(
-    copyName,
     targetNamespace,
+    copyName,
   );
   if (existingVersion > 0) {
     return NextResponse.json(

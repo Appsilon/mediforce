@@ -28,7 +28,7 @@ export async function POST(
   if (caller instanceof NextResponse) return caller;
 
   const archiveNamespace = request.nextUrl.searchParams.get('namespace') ?? '';
-  const latestVersion = await processRepo.getLatestWorkflowVersion(name, archiveNamespace);
+  const latestVersion = await processRepo.getLatestWorkflowVersion(archiveNamespace, name);
   if (latestVersion === 0) {
     return NextResponse.json({ error: `Workflow '${name}' not found` }, { status: 404 });
   }

@@ -16,17 +16,23 @@ const fake = vi.hoisted(() => {
       listWorkflowDefinitions: async () => {
         const grouped = new Map<string, WorkflowDefinition[]>();
         for (const d of definitions) {
-          const existing = grouped.get(d.name) ?? [];
+          const key = `${d.namespace}:${d.name}`;
+          const existing = grouped.get(key) ?? [];
           existing.push(d);
-          grouped.set(d.name, existing);
+          grouped.set(key, existing);
         }
         return {
-          definitions: Array.from(grouped.entries()).map(([name, versions]) => ({
-            name,
-            versions,
-            latestVersion: Math.max(...versions.map((v) => v.version)),
-            defaultVersion: null,
-          })),
+          definitions: Array.from(grouped.entries()).map(([_key, versions]) => {
+            const namespace = versions[0].namespace;
+            const name = versions[0].name;
+            return {
+              namespace,
+              name,
+              versions,
+              latestVersion: Math.max(...versions.map((v) => v.version)),
+              defaultVersion: null,
+            };
+          }),
         };
       },
     },

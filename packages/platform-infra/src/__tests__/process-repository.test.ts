@@ -51,8 +51,49 @@ describe('InMemoryProcessRepository', () => {
       expect(version).toBe(3);
     });
 
+    it('[DATA] isolates latest versions by namespace', async () => {
+      await repo.saveWorkflowDefinition(buildWorkflowDefinition({
+        namespace: 'tenant-a',
+        name: 'shared',
+        version: 1,
+      }));
+      await repo.saveWorkflowDefinition(buildWorkflowDefinition({
+        namespace: 'tenant-b',
+        name: 'shared',
+        version: 5,
+      }));
+
+      await expect(repo.getLatestWorkflowVersion('tenant-a', 'shared')).resolves.toBe(1);
+      await expect(repo.getLatestWorkflowVersion('tenant-b', 'shared')).resolves.toBe(5);
+    });
+
+    it('[DATA] isolates default versions and list groups by namespace', async () => {
+      await repo.saveWorkflowDefinition(buildWorkflowDefinition({
+        namespace: 'tenant-a',
+        name: 'shared',
+        version: 1,
+      }));
+      await repo.saveWorkflowDefinition(buildWorkflowDefinition({
+        namespace: 'tenant-b',
+        name: 'shared',
+        version: 5,
+      }));
+      await repo.setDefaultWorkflowVersion('tenant-a', 'shared', 1);
+      await repo.setDefaultWorkflowVersion('tenant-b', 'shared', 5);
+
+      const result = await repo.listWorkflowDefinitions(false);
+
+      expect(result.definitions).toHaveLength(2);
+      expect(result.definitions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ namespace: 'tenant-a', name: 'shared', latestVersion: 1, defaultVersion: 1 }),
+          expect.objectContaining({ namespace: 'tenant-b', name: 'shared', latestVersion: 5, defaultVersion: 5 }),
+        ]),
+      );
+    });
+
     it('[DATA] getLatestWorkflowVersion returns 0 when no definitions', async () => {
-      const version = await repo.getLatestWorkflowVersion('nonexistent', 'test');
+      const version = await repo.getLatestWorkflowVersion('test', 'nonexistent');
       expect(version).toBe(0);
     });
 
@@ -290,16 +331,28 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
       ],
     });
 
-    const version = await repo.getLatestWorkflowVersion('drug-approval', 'test');
+    const version = await repo.getLatestWorkflowVersion('test', 'drug-approval');
     expect(version).toBe(3);
+    expect(mockWhere).toHaveBeenNthCalledWith(1, 'namespace', '==', 'test');
+    expect(mockWhere).toHaveBeenNthCalledWith(2, 'name', '==', 'drug-approval');
   });
 
   it('[DATA] getLatestWorkflowVersion returns 0 when no definitions exist', async () => {
     const repo = createFirestoreRepo();
     mockGet.mockResolvedValue({ docs: [], empty: true });
 
-    const version = await repo.getLatestWorkflowVersion('nonexistent', 'test');
+    const version = await repo.getLatestWorkflowVersion('test', 'nonexistent');
     expect(version).toBe(0);
+  });
+
+  it('[DATA] setDefaultWorkflowVersion uses {namespace}:{name} metadata key', async () => {
+    const repo = createFirestoreRepo();
+
+    await repo.setDefaultWorkflowVersion('tenant-a', 'shared', 5);
+
+    expect(mockCollection).toHaveBeenCalledWith('workflowMeta');
+    expect(mockDoc).toHaveBeenCalledWith('tenant-a:shared');
+    expect(mockSet).toHaveBeenCalledWith({ defaultVersion: 5 }, { merge: true });
   });
 
   it('[DATA] saveWorkflowDefinition uses {namespace}:{name}:{version} document key', async () => {

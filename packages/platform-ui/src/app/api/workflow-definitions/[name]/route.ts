@@ -25,7 +25,7 @@ export async function GET(
       );
     }
   } else {
-    version = await processRepo.getLatestWorkflowVersion(name, namespaceParam ?? '');
+    version = await processRepo.getLatestWorkflowVersion(namespaceParam ?? '', name);
     if (version === 0) {
       return NextResponse.json(
         { error: `Workflow '${name}' not found` },
@@ -74,7 +74,7 @@ export async function PATCH(
   if (caller instanceof NextResponse) return caller;
 
   const patchNamespace = request.nextUrl.searchParams.get('namespace') ?? '';
-  const latestVersion = await processRepo.getLatestWorkflowVersion(name, patchNamespace);
+  const latestVersion = await processRepo.getLatestWorkflowVersion(patchNamespace, name);
   if (latestVersion === 0) {
     return NextResponse.json({ error: `Workflow '${name}' not found` }, { status: 404 });
   }

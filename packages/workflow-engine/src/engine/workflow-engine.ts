@@ -732,7 +732,7 @@ export class WorkflowEngine {
     }
 
     // Fallback: latest version by name (handles legacy instances with string versions like "1.0.0")
-    const latestVersion = await this.processRepository.getLatestWorkflowVersion(instance.definitionName, instance.namespace ?? '');
+    const latestVersion = await this.processRepository.getLatestWorkflowVersion(ns, instance.definitionName);
     if (latestVersion > 0) {
       const wd = await this.processRepository.getWorkflowDefinition(ns, instance.definitionName, latestVersion);
       if (wd) return wd;

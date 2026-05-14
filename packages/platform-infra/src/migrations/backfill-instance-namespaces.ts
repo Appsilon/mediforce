@@ -1,5 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { FirestoreProcessRepository } from '../firestore/process-repository.js';
+import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
 
 /**
  * One-time startup migration: backfill `namespace` on processInstances
@@ -11,7 +12,7 @@ import { FirestoreProcessRepository } from '../firestore/process-repository.js';
  */
 export async function backfillInstanceNamespaces(
   db: Firestore,
-  processRepo: FirestoreProcessRepository,
+  _processRepo: FirestoreProcessRepository,
 ): Promise<void> {
   const snapshot = await db
     .collection('processInstances')
@@ -37,14 +38,22 @@ export async function backfillInstanceNamespaces(
     const defName = data.definitionName as string;
 
     if (!namespaceCache.has(defName)) {
-      const latestVersion = await processRepo.getLatestWorkflowVersion(defName, '');
-      if (latestVersion === 0) {
-        namespaceCache.set(defName, null);
-      } else {
-        // Legacy migration: try empty namespace first (old doc IDs), then query-based
-        const def = await processRepo.getWorkflowDefinition('', defName, latestVersion);
-        namespaceCache.set(defName, def?.namespace ?? null);
+      const definitionSnapshot = await db
+        .collection('workflowDefinitions')
+        .where('name', '==', defName)
+        .get();
+
+      let latestVersion = 0;
+      let namespace: string | null = null;
+      for (const definitionDoc of definitionSnapshot.docs) {
+        const parsed = WorkflowDefinitionSchema.safeParse(definitionDoc.data());
+        if (!parsed.success) continue;
+        if (parsed.data.version > latestVersion) {
+          latestVersion = parsed.data.version;
+          namespace = parsed.data.namespace;
+        }
       }
+      namespaceCache.set(defName, namespace);
     }
 
     const namespace = namespaceCache.get(defName);

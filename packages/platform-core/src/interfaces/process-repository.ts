@@ -1,6 +1,7 @@
 import type { WorkflowDefinition } from '../schemas/workflow-definition.js';
 
 export interface WorkflowDefinitionGroup {
+  namespace: string;
   name: string;
   versions: WorkflowDefinition[];
   latestVersion: number;
@@ -25,15 +26,15 @@ export interface ProcessRepository {
    *  them avoids spamming logs with safeParse failures on legacy data
    *  that nobody intends to fix. */
   listWorkflowDefinitions(includeArchived: boolean): Promise<WorkflowDefinitionListResult>;
-  getLatestWorkflowVersion(name: string, namespace: string): Promise<number>;
-  getDefaultWorkflowVersion(name: string, namespace: string): Promise<number | null>;
-  setDefaultWorkflowVersion(name: string, namespace: string, version: number): Promise<void>;
+  getLatestWorkflowVersion(namespace: string, name: string): Promise<number>;
+  getDefaultWorkflowVersion(namespace: string, name: string): Promise<number | null>;
+  setDefaultWorkflowVersion(namespace: string, name: string, version: number): Promise<void>;
 
   setProcessArchived(name: string, namespace: string, archived: boolean): Promise<void>;
   setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void>;
 
   setWorkflowVisibility(name: string, namespace: string, visibility: 'public' | 'private'): Promise<void>;
-  setWorkflowDeleted(name: string, namespace: string, deleted: boolean): Promise<void>;
-  isWorkflowNameDeleted(name: string, namespace: string): Promise<boolean>;
-  countInstancesByDefinitionName(name: string, namespace: string): Promise<number>;
+  setWorkflowDeleted(namespace: string, name: string, deleted: boolean): Promise<void>;
+  isWorkflowNameDeleted(namespace: string, name: string): Promise<boolean>;
+  countInstancesByDefinitionName(namespace: string, name: string): Promise<number>;
 }

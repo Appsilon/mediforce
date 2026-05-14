@@ -93,6 +93,7 @@ describe('mediforce.workflows.list', () => {
       jsonResponse({
         definitions: [
           {
+            namespace: wd.namespace,
             name: wd.name,
             latestVersion: 2,
             defaultVersion: 1,
