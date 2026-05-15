@@ -18,6 +18,7 @@ import {
   InMemoryAgentOAuthTokenRepository,
   InMemoryOAuthProviderRepository,
 } from '@mediforce/platform-core/testing';
+import { PluginNotFoundError } from '@mediforce/agent-runtime';
 
 // Mock platform-services module
 const mockProcessRepo = {
@@ -219,6 +220,46 @@ describe('executeAgentStep', () => {
     await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
 
     expect(mockPluginRegistry.get).toHaveBeenCalledWith('gather-data');
+  });
+
+  it('[DATA] uses mock Claude plugin when mock dev step plugin is not registered', async () => {
+    const originalMockAgent = process.env.MOCK_AGENT;
+    process.env.MOCK_AGENT = 'true';
+    mockPluginRegistry.get.mockImplementation((name: string) => {
+      if (name === 'verify-data-quality') {
+        throw new PluginNotFoundError(name);
+      }
+      if (name === 'claude-code-agent') {
+        return mockPlugin;
+      }
+      throw new PluginNotFoundError(name);
+    });
+
+    try {
+      const stepNoPlugin: WorkflowStep = {
+        ...firstStep,
+        id: 'verify-data-quality',
+        name: 'Verify Data Quality',
+      };
+
+      await executeAgentStep('inst-wf-001', 'verify-data-quality', stepNoPlugin, {}, 'user-1');
+
+      expect(mockPluginRegistry.get).toHaveBeenCalledWith('verify-data-quality');
+      expect(mockPluginRegistry.get).toHaveBeenCalledWith('claude-code-agent');
+      expect(mockAgentRunner.runWithWorkflowStep).toHaveBeenCalledWith(
+        mockPlugin,
+        expect.objectContaining({ stepId: 'verify-data-quality' }),
+      );
+      expect(mockAuditRepo.append).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: 'agent:verify-data-quality' }),
+      );
+    } finally {
+      if (originalMockAgent === undefined) {
+        delete process.env.MOCK_AGENT;
+      } else {
+        process.env.MOCK_AGENT = originalMockAgent;
+      }
+    }
   });
 
   // ---- Autonomy level resolution ----

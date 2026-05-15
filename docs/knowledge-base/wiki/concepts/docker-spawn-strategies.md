@@ -20,7 +20,7 @@ tags: [concept, docker, spawn-strategy, redis, bullmq]
 
 - Inputs serialised through Redis.
 - Job enqueued on BullMQ.
-- Worker (separate process, `pnpm dev:worker`) pops job → runs container → pushes outputs back via Redis.
+- Worker (separate process, spun up by `docker compose up -d container-worker`) pops job → runs container → pushes outputs back via Redis.
 - Distributed execution. Isolates container workload from web server.
 
 ## Activation
@@ -30,14 +30,14 @@ Env var: `REDIS_URL`. Set → `agent-runtime` swaps Local for Queued via optiona
 Dev commands for queued path:
 
 ```bash
-pnpm dev:redis          # Redis on 6379
-pnpm dev:worker         # BullMQ worker
-pnpm dev:ui:queue       # platform-ui with queue enabled
+docker compose up -d    # Redis (:6379), container-worker, bull-board (:3100)
+pnpm dev:queue          # platform-ui with REDIS_URL pointed at compose Redis
+docker compose down     # stop infra when done
 ```
 
 ## Local (non-container) execution
 
-Separate gate: `ALLOW_LOCAL_AGENTS=true` → skips Docker entirely, runs agent CLI on host. Used for `pnpm dev:local`. `BaseContainerAgentPlugin` branches on this before touching spawn strategy.
+Separate gate: `ALLOW_LOCAL_AGENTS=true` → skips Docker entirely, runs agent CLI on host. Used for `pnpm dev:no-docker`. `BaseContainerAgentPlugin` branches on this before touching spawn strategy.
 
 ## Mock mode
 

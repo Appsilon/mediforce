@@ -21,8 +21,7 @@ Starts Firebase Auth (9099) + Firestore (8080), writes `.env.local` with demo cr
 ### 2. Seed demo data
 
 ```bash
-cd packages/platform-ui
-pnpm seed:dev
+pnpm seed
 ```
 
 Seeds the test user + workflow definitions into the emulator Firestore. Includes the **Sales CSV Report** workflow — a two-step pipeline that exercises the workspace (generates `data/sales.csv`, summarises to `report/summary.md`).
@@ -32,8 +31,7 @@ Credentials: `test@mediforce.dev` / `test123456`
 ### 3. Start dev server with workspace env
 
 ```bash
-cd packages/platform-ui
-pnpm dev:test
+pnpm dev:mock
 ```
 
 Runs Next on port **9007** with:

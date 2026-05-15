@@ -94,19 +94,18 @@ Use this dedicated instance in the test. Never mutate `proc-running-1` or other 
 
 ```bash
 # Run single test while developing
-cd packages/platform-ui
-pnpm test:e2e:auth -- --grep "<test name>"
+pnpm test:e2e -- --grep "<test name>"
 
 # Run all E2E
-pnpm test:e2e:auth
+pnpm test:e2e
 
-# Record + convert to GIFs
-pnpm test:e2e:gif
+# Record + convert to GIFs (run from packages/platform-ui)
+cd packages/platform-ui && pnpm test:e2e:gif
 ```
 
 ## After Test Passes
 
-1. **Record**: `pnpm test:e2e:gif`
+1. **Record**: `cd packages/platform-ui && pnpm test:e2e:gif`
 2. **Update gallery**: add entry to `docs/features/FEATURES.md`
 3. **Commit**: GIF + FEATURES.md + test file in same PR
 
