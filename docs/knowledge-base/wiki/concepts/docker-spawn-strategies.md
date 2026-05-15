@@ -20,7 +20,7 @@ tags: [concept, docker, spawn-strategy, redis, bullmq]
 
 - Inputs serialised through Redis.
 - Job enqueued on BullMQ.
-- Worker (separate process, `pnpm worker`) pops job → runs container → pushes outputs back via Redis.
+- Worker (separate process, spun up by `docker compose up -d container-worker`) pops job → runs container → pushes outputs back via Redis.
 - Distributed execution. Isolates container workload from web server.
 
 ## Activation
@@ -30,9 +30,9 @@ Env var: `REDIS_URL`. Set → `agent-runtime` swaps Local for Queued via optiona
 Dev commands for queued path:
 
 ```bash
-pnpm redis              # Redis on 6379
-pnpm worker             # BullMQ worker
-pnpm dev:full           # platform-ui with queue enabled
+docker compose up -d    # Redis (:6379), container-worker, bull-board (:3100)
+pnpm dev:queue          # platform-ui with REDIS_URL pointed at compose Redis
+docker compose down     # stop infra when done
 ```
 
 ## Local (non-container) execution

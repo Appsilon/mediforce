@@ -436,7 +436,7 @@ Make sure:
 | `NEXT_PUBLIC_USE_EMULATORS=true pnpm dev` | Run with emulators (port 9003) |
 | `pnpm dev` | Run with production Firebase (per `.env.local`) |
 | `pnpm dev:no-docker` | Like `dev`, agents via host `claude` CLI |
-| `pnpm dev:full` | Like `dev`, production-like queue mode (needs `pnpm worker` + `pnpm redis`) |
+| `pnpm dev:queue` | Like `dev`, production-like queue mode (run `docker compose up -d` first) |
 | `pnpm test:unit` | vitest unit + integration |
 | `pnpm test:affected` | vitest, only files changed |
 | `pnpm test:e2e` | All Playwright E2E (L3 + L4) |

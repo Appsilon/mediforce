@@ -176,7 +176,7 @@ workflow-definition `skillsDir` — paths hardcoded, don't move).
 pnpm dev                                # default — real Firebase + Docker agents, :9003
 pnpm dev:mock                           # mocked agents + in-memory data, :9007 — no setup
 pnpm dev:no-docker                      # agents via host `claude` CLI (no Docker)
-pnpm dev:full                           # queue mode — auto-starts Redis + container-worker via docker compose (stop with dev:full:down)
+pnpm dev:queue                          # queue mode — run `docker compose up -d` first (Redis + worker + bull-board on :3100), `docker compose down` after
 
 # Test — L1 unit + L2 integration (vitest)
 pnpm typecheck
@@ -189,7 +189,7 @@ npx vitest run path/to/file.test.ts     # single file
 python3 packages/platform-ui/scripts/bootstrap_e2e.py
 pnpm test:e2e                            # all e2e (build + run ~4min; rebuild only on source/config change)
 pnpm test:e2e:api                        # L3 only — API E2E, no browser (~30s)
-pnpm test:e2e:ui                         # L4 only — UI E2E with real Chromium (~3min)
+pnpm --filter @mediforce/platform-ui test:e2e --project=authenticated  # L4 only — UI E2E with real Chromium (~3min)
 # Iterating on a UI feature? Use `next dev` for hot-reload instead of next start:
 cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true E2E_DEV_SERVER=true pnpm test:e2e --grep '<name>'
 # After editing source, rebuild before next test:e2e (or use E2E_DEV_SERVER=true):

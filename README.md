@@ -121,13 +121,16 @@ Open `http://localhost:9007`. Use this to click through the UI without configuri
 | `pnpm dev` | Default. Real Firebase per `.env.local`, agents in Docker. The main dev loop. |
 | `pnpm dev:mock` | Mocked agents + in-memory data store, port 9007. No keys, no Docker, no Firebase. |
 | `pnpm dev:no-docker` | Like `dev`, but agents run via host `claude` CLI instead of Docker. |
-| `pnpm dev:full` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Starts Redis + container-worker via `docker compose` automatically; Next.js stays native for hot-reload. Stop with `pnpm dev:full:down`. |
+| `pnpm dev:queue` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Requires Redis + worker running — see below. |
 
-Manual control of queue infra (only when you want logs in separate terminals):
+### Queue mode (production architecture)
+
+`docker-compose.yml` runs Redis + container-worker + bull-board (BullMQ UI on :3100):
 
 ```bash
-pnpm redis          # Redis container
-pnpm worker         # BullMQ worker (native, not containerized)
+docker compose up -d       # bring up queue infra
+pnpm dev:queue             # native UI pointed at compose Redis
+docker compose down        # stop infra when you're done
 ```
 
 ### Emulator + own seed data
@@ -155,9 +158,10 @@ E2E variants:
 
 ```bash
 pnpm test:e2e:api     # L3 only — API E2E, no browser (~30s)
-pnpm test:e2e:ui      # L4 only — UI E2E with real Chromium (~3min)
 pnpm test:e2e:record  # Record GIFs of UI journeys
 ```
+
+For UI-only journeys, run `pnpm test:e2e --project=authenticated` from the platform-ui directory (or invoke Playwright's interactive UI mode via `pnpm test:e2e:ui` there).
 
 ### CLI
 

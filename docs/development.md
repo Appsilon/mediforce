@@ -115,7 +115,7 @@ Variants run from `packages/platform-ui`:
 
 ```bash
 pnpm test:e2e:headed        # with browser visible
-pnpm test:e2e:ui-mode       # interactive Playwright UI
+pnpm test:e2e:ui            # interactive Playwright UI mode
 ```
 
 The emulator setup automatically:
