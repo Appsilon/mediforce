@@ -35,8 +35,8 @@ describe('backfillInstanceNamespaces', () => {
       { id: 'inst-1', data: { deleted: false, definitionName: 'shared', definitionVersion: '1', namespace: null } },
     ];
     const workflowDefinitions: Doc[] = [
-      { id: 'wf-a-v1', data: buildWorkflowDefinition({ id: 'wf-a-v1', name: 'shared', namespace: 'tenant-a', version: 1 }) },
-      { id: 'wf-b-v2', data: buildWorkflowDefinition({ id: 'wf-b-v2', name: 'shared', namespace: 'tenant-b', version: 2 }) },
+      { id: 'wf-a-v1', data: buildWorkflowDefinition({ name: 'shared', namespace: 'tenant-a', version: 1 }) },
+      { id: 'wf-b-v2', data: buildWorkflowDefinition({ name: 'shared', namespace: 'tenant-b', version: 2 }) },
     ];
 
     const db = new MockDb({ processInstances, workflowDefinitions });
@@ -44,5 +44,21 @@ describe('backfillInstanceNamespaces', () => {
     await backfillInstanceNamespaces(db as never, {} as never);
 
     expect(processInstances[0].data.namespace).toBe('tenant-a');
+  });
+
+  it('skips backfill when definition name and version are ambiguous across namespaces', async () => {
+    const processInstances: Doc[] = [
+      { id: 'inst-1', data: { deleted: false, definitionName: 'shared', definitionVersion: '1', namespace: null } },
+    ];
+    const workflowDefinitions: Doc[] = [
+      { id: 'wf-a-v1', data: buildWorkflowDefinition({ name: 'shared', namespace: 'tenant-a', version: 1 }) },
+      { id: 'wf-b-v1', data: buildWorkflowDefinition({ name: 'shared', namespace: 'tenant-b', version: 1 }) },
+    ];
+
+    const db = new MockDb({ processInstances, workflowDefinitions });
+
+    await backfillInstanceNamespaces(db as never, {} as never);
+
+    expect(processInstances[0].data.namespace).toBeNull();
   });
 });

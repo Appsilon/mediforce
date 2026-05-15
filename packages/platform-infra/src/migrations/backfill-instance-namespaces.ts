@@ -45,7 +45,7 @@ export async function backfillInstanceNamespaces(
         .where('name', '==', defName)
         .get();
 
-      let namespace: string | null = null;
+      const matchingNamespaces = new Set<string>();
       for (const definitionDoc of definitionSnapshot.docs) {
         const parsed = WorkflowDefinitionSchema.safeParse(definitionDoc.data());
         if (!parsed.success) continue;
@@ -56,9 +56,17 @@ export async function backfillInstanceNamespaces(
           String(parsed.data.version) === String(definitionVersion);
 
         if (versionMatches) {
-          namespace = parsed.data.namespace;
-          break;
+          matchingNamespaces.add(parsed.data.namespace);
         }
+      }
+      const namespace =
+        matchingNamespaces.size === 1
+          ? Array.from(matchingNamespaces)[0]
+          : null;
+      if (matchingNamespaces.size > 1) {
+        console.warn(
+          `[backfill] Skipping ambiguous processInstances for workflow '${defName}' v${String(definitionVersion)}; matched namespaces: ${Array.from(matchingNamespaces).join(', ')}`,
+        );
       }
       namespaceCache.set(cacheKey, namespace);
     }
