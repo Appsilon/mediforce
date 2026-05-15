@@ -165,13 +165,10 @@ pnpm test:e2e:record  # Record GIFs of UI journeys
 workflows, starting runs, and inspecting state from a terminal. The bin
 entry runs `tsx` against `src/`, so changes show up without a build.
 
-Install once globally so `mediforce` is on your PATH:
+Run it from the workspace so it always uses the checked-out source:
 
 ```bash
-pnpm setup                                 # one-time, creates PNPM_HOME
-                                           # (re-source ~/.zshrc afterwards)
-cd packages/cli && pnpm link --global
-which mediforce                            # confirm
+pnpm exec mediforce --help
 ```
 
 Auth + base URL come from env. Add to `~/.zshrc` (or the per-shell
@@ -187,11 +184,11 @@ export MEDIFORCE_BASE_URL="http://127.0.0.1:9003"
 Common commands:
 
 ```bash
-mediforce workflow list                                        # all registered workflows
-mediforce workflow register --file path/to.wd.json --namespace appsilon
-mediforce run start --workflow landing-zone-CDISCPILOT01       # fires manual trigger
-mediforce run get <runId>                                      # current status
-mediforce <command> --help                                     # per-command flags
+pnpm exec mediforce workflow list                                        # all registered workflows
+pnpm exec mediforce workflow register --file path/to.wd.json --namespace appsilon
+pnpm exec mediforce run start --workflow landing-zone-CDISCPILOT01 --namespace appsilon
+pnpm exec mediforce run get <runId>                                      # current status
+pnpm exec mediforce <command> --help                                     # per-command flags
 ```
 
 ### Building Docker images for script steps

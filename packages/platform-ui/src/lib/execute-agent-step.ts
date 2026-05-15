@@ -10,6 +10,8 @@ import {
   resolveMcpForStep,
   resolveOAuthToken,
   OAuthTokenUnavailableError,
+  PluginNotFoundError,
+  type AgentPlugin,
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
 } from '@mediforce/agent-runtime';
@@ -81,7 +83,22 @@ export async function executeAgentStep(
 
   // Resolve plugin: use workflowStep.plugin when set, fall back to stepId
   const pluginId = workflowStep.plugin ?? stepId;
-  const plugin = pluginRegistry.get(pluginId);
+  let plugin: AgentPlugin;
+  try {
+    plugin = pluginRegistry.get(pluginId);
+  } catch (err) {
+    if (
+      process.env.MOCK_AGENT !== 'true'
+      || workflowStep.executor !== 'agent'
+      || !(err instanceof PluginNotFoundError)
+    ) {
+      throw err;
+    }
+    console.warn(
+      `[mock-agent] Plugin "${pluginId}" is not registered; using claude-code-agent mock runtime.`,
+    );
+    plugin = pluginRegistry.get('claude-code-agent');
+  }
 
   // Resolve autonomy level from step (script steps are always L4)
   const autonomyLevel = workflowStep.executor === 'script'

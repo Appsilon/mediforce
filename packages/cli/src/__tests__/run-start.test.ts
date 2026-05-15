@@ -41,6 +41,22 @@ describe('run start command', () => {
     expect(body.payload).toBeUndefined();
   });
 
+  it('passes --namespace to the start run request body', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ instanceId: 'inst-ns', status: 'running' }),
+    );
+    const output = captureOutput();
+    const code = await runStartCommand({
+      argv: ['--workflow', 'my-wf', '--namespace', 'test', '--base-url', 'http://test:9000'],
+      env: BASE_ENV,
+      output,
+    });
+
+    expect(code).toBe(0);
+    const body = JSON.parse(fetchSpy.mock.calls[0]![1]?.body as string);
+    expect(body.namespace).toBe('test');
+  });
+
   it('passes inline --input JSON as payload', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({ instanceId: 'inst-2', status: 'running' }),

@@ -38,6 +38,7 @@ export type GetRunOutput = z.infer<typeof GetRunOutputSchema>;
  * version when `definitionVersion` is omitted.
  */
 export const StartRunInputSchema = z.object({
+  namespace: z.string().min(1).optional(),
   definitionName: z.string().min(1),
   definitionVersion: z.number().int().positive().optional(),
   triggerName: z.string().min(1).default('manual'),
