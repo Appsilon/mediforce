@@ -52,7 +52,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build custom Docker images for E2E tests
         run: docker build -t mediforce-node:latest -f packages/agent-runtime/container/Dockerfile.node .
-      - run: pnpm test
+      - run: pnpm test:unit
 
   e2e-tests:
     runs-on: ubuntu-latest
@@ -133,7 +133,7 @@ jobs:
           SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
 
       - name: Run E2E tests
-        run: cd packages/platform-ui && NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth
+        run: pnpm test:e2e
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost

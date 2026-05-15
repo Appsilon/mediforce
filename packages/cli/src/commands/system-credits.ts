@@ -1,7 +1,8 @@
 import { parseArgs } from 'node:util';
-import { Mediforce, ApiError } from '@mediforce/platform-api/client';
+import { Mediforce } from '@mediforce/platform-api/client';
 import { resolveConfig } from '../config.js';
 import { printJson, printError, type OutputSink } from '../output.js';
+import { formatCliError } from '../errors.js';
 
 interface CommandInput {
   argv: string[];
@@ -94,11 +95,7 @@ export async function systemCreditsCommand(input: CommandInput): Promise<number>
     input.output.stdout(`  Limit:      $${data.limit.toFixed(2)}`);
     return 0;
   } catch (err) {
-    if (err instanceof ApiError) {
-      printError(input.output, { error: err.message, status: err.status, body: err.body }, jsonMode);
-    } else {
-      printError(input.output, { error: err instanceof Error ? err.message : String(err) }, jsonMode);
-    }
+    printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);
     return 1;
   }
 }

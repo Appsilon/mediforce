@@ -1,7 +1,8 @@
 import { parseArgs } from 'node:util';
-import { Mediforce, ApiError } from '@mediforce/platform-api/client';
+import { Mediforce } from '@mediforce/platform-api/client';
 import { resolveConfig } from '../config.js';
 import { printJson, printError, type OutputSink } from '../output.js';
+import { formatCliError } from '../errors.js';
 
 interface CommandInput {
   argv: string[];
@@ -93,15 +94,7 @@ export async function workflowSetVisibilityCommand(input: CommandInput): Promise
     }
     return 0;
   } catch (err) {
-    if (err instanceof ApiError) {
-      printError(
-        input.output,
-        { error: err.message, status: err.status, body: err.body },
-        jsonMode,
-      );
-    } else {
-      printError(input.output, { error: String(err) }, jsonMode);
-    }
+    printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);
     return 1;
   }
 }

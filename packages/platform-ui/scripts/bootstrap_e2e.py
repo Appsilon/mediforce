@@ -7,7 +7,7 @@ in environments where manual setup hasn't been done (Claude Code remote, CI, etc
 Usage:
     python3 packages/platform-ui/scripts/bootstrap_e2e.py
     # Then run tests:
-    cd packages/platform-ui && pnpm test:e2e:auth
+    pnpm test:e2e
 """
 
 from __future__ import annotations
@@ -255,11 +255,10 @@ def main() -> None:
     # Summary
     print()
     log("E2E environment ready! Run tests with:")
-    print(f"  cd {PLATFORM_UI}")
-    print(f"  NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:auth")
+    print(f"  pnpm test:e2e")
     print()
     print(f"  # With recording + GIFs:")
-    print(f"  NEXT_PUBLIC_USE_EMULATORS=true pnpm test:e2e:gif")
+    print(f"  cd {PLATFORM_UI} && pnpm test:e2e:gif")
     print()
 
     if emulator_proc is not None:

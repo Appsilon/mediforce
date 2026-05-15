@@ -105,27 +105,63 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 
 **[Getting Started Guide](GETTING-STARTED.md)** — Quick start with emulators and demo data, no setup required.
 
-Quick start:
+### Fastest start (no setup)
 
 ```bash
 pnpm install
-cd packages/platform-ui
-python3 scripts/bootstrap-dev.py     # Create .env.local, start emulators
-pnpm seed:dev                        # Seed demo data
-NEXT_PUBLIC_USE_EMULATORS=true pnpm dev:ui
+pnpm dev:mock        # port 9007, mocked agents, in-memory data, no Firebase needed
 ```
 
-Demo credentials: `test@mediforce.dev` / `test123456`
+Open `http://localhost:9007`. Use this to click through the UI without configuring anything.
 
-For production Firebase setup, see the [Getting Started Guide](GETTING-STARTED.md).
+### Dev modes
 
-Run tests:
+| Command | What it gives you |
+|---|---|
+| `pnpm dev` | Default. Real Firebase per `.env.local`, agents in Docker. The main dev loop. |
+| `pnpm dev:mock` | Mocked agents + in-memory data store, port 9007. No keys, no Docker, no Firebase. |
+| `pnpm dev:no-docker` | Like `dev`, but agents run via host `claude` CLI instead of Docker. |
+| `pnpm dev:queue` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Requires Redis + worker running — see below. |
+
+### Queue mode (production architecture)
+
+`docker-compose.yml` runs Redis + container-worker + bull-board (BullMQ UI on :3100):
 
 ```bash
-pnpm typecheck      # type checking
-pnpm test           # unit + integration
-cd packages/platform-ui && pnpm test:e2e  # E2E (Playwright)
+docker compose up -d       # bring up queue infra
+pnpm dev:queue             # native UI pointed at compose Redis
+docker compose down        # stop infra when you're done
 ```
+
+### Emulator + own seed data
+
+```bash
+cp packages/platform-ui/.env.example packages/platform-ui/.env.local
+pnpm emulators                                   # terminal 1
+pnpm seed                                        # terminal 2 — seeds demo workflows + data
+NEXT_PUBLIC_USE_EMULATORS=true pnpm dev          # terminal 2
+```
+
+Demo credentials: `test@mediforce.dev` / `test123456`. For production Firebase setup, see the [Getting Started Guide](GETTING-STARTED.md).
+
+### Tests
+
+```bash
+pnpm typecheck       # type checking (~5s)
+pnpm test:unit       # vitest L1+L2 (~9s)
+pnpm test:affected   # vitest, only files changed since main (<1s)
+pnpm test:e2e        # Playwright L3+L4 (~4min, requires Firebase emulator)
+pnpm test            # everything: test:unit + test:e2e
+```
+
+E2E variants:
+
+```bash
+pnpm test:e2e:api     # L3 only — API E2E, no browser (~30s)
+pnpm test:e2e:record  # Record GIFs of UI journeys
+```
+
+For UI-only journeys, run `pnpm test:e2e --project=authenticated` from the platform-ui directory (or invoke Playwright's interactive UI mode via `pnpm test:e2e:ui` there).
 
 ### CLI
 
@@ -133,13 +169,10 @@ cd packages/platform-ui && pnpm test:e2e  # E2E (Playwright)
 workflows, starting runs, and inspecting state from a terminal. The bin
 entry runs `tsx` against `src/`, so changes show up without a build.
 
-Install once globally so `mediforce` is on your PATH:
+Run it from the workspace so it always uses the checked-out source:
 
 ```bash
-pnpm setup                                 # one-time, creates PNPM_HOME
-                                           # (re-source ~/.zshrc afterwards)
-cd packages/cli && pnpm link --global
-which mediforce                            # confirm
+pnpm exec mediforce --help
 ```
 
 Auth + base URL come from env. Add to `~/.zshrc` (or the per-shell
@@ -155,11 +188,11 @@ export MEDIFORCE_BASE_URL="http://127.0.0.1:9003"
 Common commands:
 
 ```bash
-mediforce workflow list                                        # all registered workflows
-mediforce workflow register --file path/to.wd.json --namespace appsilon
-mediforce run start --workflow landing-zone-CDISCPILOT01       # fires manual trigger
-mediforce run get <runId>                                      # current status
-mediforce <command> --help                                     # per-command flags
+pnpm exec mediforce workflow list                                        # all registered workflows
+pnpm exec mediforce workflow register --file path/to.wd.json --namespace appsilon
+pnpm exec mediforce run start --workflow landing-zone-CDISCPILOT01 --namespace appsilon
+pnpm exec mediforce run get <runId>                                      # current status
+pnpm exec mediforce <command> --help                                     # per-command flags
 ```
 
 ### Building Docker images for script steps
@@ -176,16 +209,15 @@ docker build -t mediforce-agent:protocol-to-tfl -f apps/protocol-to-tfl/containe
 
 Skip this if you only use `human` or `agent` executor steps, or run with `MOCK_AGENT=true`.
 
-### Running agents locally (without Docker)
+### Running agents without Docker
 
 By default, agents execute inside Docker containers. To run them using your local `claude` CLI instead (useful for development and reducing costs):
 
 ```bash
-pnpm dev:ui:local  # platform UI only
-pnpm dev:local     # platform UI + supply intelligence
+pnpm dev:no-docker
 ```
 
-> Requires `claude` to be available on your `PATH`. Use the `:local` scripts (not `ALLOW_LOCAL_AGENTS=true pnpm dev:ui`) — the env var doesn't propagate reliably through pnpm script aliases.
+> Requires `claude` to be available on your `PATH`. Use this script (not `ALLOW_LOCAL_AGENTS=true pnpm dev`) — the env var doesn't propagate reliably through pnpm script aliases.
 
 > Full guide: **[docs/development.md](docs/development.md)**
 

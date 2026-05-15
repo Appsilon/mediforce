@@ -11,7 +11,11 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
+
+DEFAULT_BASE_URL = "http://localhost:9003"
+MOCK_DEV_BASE_URL = "http://localhost:9007"
 
 
 def sync_models(base_url: str, api_key: str) -> dict:
@@ -70,10 +74,17 @@ def post_rankings(rankings: list[dict], base_url: str, api_key: str) -> dict:
 
 
 def main():
-    base_url = "http://localhost:9003"
+    base_url = (
+        os.environ.get("MEDIFORCE_BASE_URL")
+        or os.environ.get("PLATFORM_BASE_URL")
+        or os.environ.get("NEXT_PUBLIC_APP_URL")
+        or DEFAULT_BASE_URL
+    )
+    explicit_base_url = False
     for i, arg in enumerate(sys.argv[1:], 1):
         if arg == "--base-url" and i < len(sys.argv) - 1:
             base_url = sys.argv[i + 1]
+            explicit_base_url = True
 
     api_key = os.environ.get("MEDIFORCE_API_KEY") or os.environ.get("PLATFORM_API_KEY")
     if not api_key:
@@ -82,7 +93,14 @@ def main():
 
     # Step 1: Sync model metadata from OpenRouter API
     print(f"Step 1: Syncing models from OpenRouter API via {base_url}...")
-    sync_result = sync_models(base_url, api_key)
+    try:
+        sync_result = sync_models(base_url, api_key)
+    except urllib.error.URLError:
+        if explicit_base_url or base_url != DEFAULT_BASE_URL:
+            raise
+        base_url = MOCK_DEV_BASE_URL
+        print(f"  Could not reach {DEFAULT_BASE_URL}; retrying mock dev server at {base_url}...")
+        sync_result = sync_models(base_url, api_key)
     print(f"  Synced {sync_result['synced']} models ({sync_result['total']} from OpenRouter).")
 
     # Step 2: Scrape rankings from OpenRouter /rankings page

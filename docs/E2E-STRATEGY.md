@@ -145,12 +145,13 @@ Every PR that touches UI must include in its description:
 
 | Command | Speed | When |
 |---------|-------|------|
-| `pnpm test:e2e` | Fast | Every PR — smoke only |
-| `pnpm test:e2e:auth` | ~40s | Every PR — smoke + journeys |
-| `pnpm test:e2e:auth:headed` | Normal | Local dev — visible browser |
+| `pnpm test:e2e` | ~4min | Every PR — all E2E (smoke + L3 API + L4 UI) |
+| `pnpm test:e2e:api` | ~30s | L3 only — API E2E, no browser |
+| `pnpm test:e2e:ui` | ~3min | L4 only — UI E2E with real Chromium |
+| `pnpm test:e2e:headed` (in `packages/platform-ui`) | Normal | Local dev — visible browser |
 | `pnpm test:e2e:record` | ~3min | Feature PRs — captures video |
-| `pnpm test:e2e:gif` | ~3min | Feature PRs — video + GIF |
-| `pnpm test:e2e:check-gifs` | <1s | Check GIF freshness locally |
+| `pnpm test:e2e:gif` (in `packages/platform-ui`) | ~3min | Feature PRs — video + GIF |
+| `pnpm test:e2e:check-gifs` (in `packages/platform-ui`) | <1s | Check GIF freshness locally |
 
 ## Recording Mode
 

@@ -23,6 +23,14 @@ export interface ErrorPayload {
   error: string;
   status?: number;
   body?: unknown;
+  cause?: {
+    code?: string;
+    message: string;
+    address?: string;
+    port?: number;
+    hostname?: string;
+  };
+  hints?: string[];
 }
 
 export function printJson(sink: OutputSink, payload: unknown): void {
@@ -64,4 +72,25 @@ export function printError(
   const suffix =
     payload.status !== undefined ? ` (HTTP ${String(payload.status)})` : '';
   sink.stderr(`Error${suffix}: ${payload.error}`);
+  if (payload.cause !== undefined) {
+    sink.stderr(`  Reason: ${formatCause(payload.cause)}`);
+  }
+  if (payload.hints !== undefined && payload.hints.length > 0) {
+    sink.stderr('');
+    sink.stderr('Hints:');
+    for (const hint of payload.hints) {
+      sink.stderr(`  - ${hint}`);
+    }
+  }
+}
+
+function formatCause(cause: NonNullable<ErrorPayload['cause']>): string {
+  const details: string[] = [];
+  if (cause.code !== undefined) details.push(cause.code);
+  if (cause.address !== undefined && cause.port !== undefined) {
+    details.push(`${cause.address}:${String(cause.port)}`);
+  } else if (cause.hostname !== undefined) {
+    details.push(cause.hostname);
+  }
+  return details.length > 0 ? `${cause.message} (${details.join(' ')})` : cause.message;
 }

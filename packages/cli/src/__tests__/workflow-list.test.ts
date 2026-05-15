@@ -90,4 +90,45 @@ describe('workflow list command', () => {
     const parsed: unknown = JSON.parse(output.stdoutLines.join('\n'));
     expect(parsed).toMatchObject({ status: 403 });
   });
+
+  it('prints a friendly network error when the API is unreachable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new TypeError('fetch failed', {
+        cause: { code: 'ECONNREFUSED', address: '127.0.0.1', port: 9003 },
+      }),
+    );
+    const output = captureOutput();
+    const code = await workflowListCommand({
+      argv: [],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+    expect(code).toBe(1);
+    const text = output.stderrLines.join('\n');
+    expect(text).toContain('Cannot reach Mediforce API at http://localhost:9003');
+    expect(text).toContain('Reason: connection refused (ECONNREFUSED 127.0.0.1:9003)');
+    expect(text).toContain('pnpm dev:local');
+    expect(text).not.toContain('TypeError: fetch failed');
+  });
+
+  it('keeps network errors structured in JSON mode', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new TypeError('fetch failed', {
+        cause: { code: 'ENOTFOUND', hostname: 'does-not-exist.invalid' },
+      }),
+    );
+    const output = captureOutput();
+    const code = await workflowListCommand({
+      argv: ['--base-url', 'https://does-not-exist.invalid', '--json'],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+    expect(code).toBe(1);
+    expect(output.stderrLines).toEqual([]);
+    const parsed: unknown = JSON.parse(output.stdoutLines.join('\n'));
+    expect(parsed).toMatchObject({
+      error: 'Cannot resolve Mediforce API host for https://does-not-exist.invalid',
+      cause: { code: 'ENOTFOUND', hostname: 'does-not-exist.invalid' },
+    });
+  });
 });

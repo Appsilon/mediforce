@@ -1,8 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
-import { Mediforce, ApiError } from '@mediforce/platform-api/client';
+import { Mediforce } from '@mediforce/platform-api/client';
 import { resolveConfig } from '../config.js';
 import { printJson, printError, type OutputSink } from '../output.js';
+import { formatCliError } from '../errors.js';
 
 interface CommandInput {
   argv: string[];
@@ -20,6 +21,7 @@ Required flags:
   --workflow <name>      Workflow definition name (e.g. landing-zone-CDISCPILOT01)
 
 Optional flags:
+  --namespace <ns>      Namespace/workspace that owns the workflow
   --version <number>     Pin a specific definition version (default: latest)
   --trigger <name>       Trigger name (default: manual)
   --triggered-by <id>    Identifier recorded as the run's initiator
@@ -36,6 +38,7 @@ After start, follow the run with:
 
 const RUN_START_OPTIONS = {
   workflow: { type: 'string' },
+  namespace: { type: 'string' },
   version: { type: 'string' },
   trigger: { type: 'string' },
   'triggered-by': { type: 'string' },
@@ -49,6 +52,7 @@ const RUN_START_OPTIONS = {
 export async function runStartCommand(input: CommandInput): Promise<number> {
   let flags: {
     workflow?: string;
+    namespace?: string;
     version?: string;
     trigger?: string;
     'triggered-by'?: string;
@@ -160,6 +164,7 @@ export async function runStartCommand(input: CommandInput): Promise<number> {
   const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
   try {
     const result = await mediforce.runs.start({
+      namespace: flags.namespace,
       definitionName: flags.workflow,
       definitionVersion,
       triggerName: flags.trigger ?? 'manual',
@@ -177,15 +182,7 @@ export async function runStartCommand(input: CommandInput): Promise<number> {
     input.output.stdout(`Follow with: mediforce run get ${result.instanceId}`);
     return 0;
   } catch (err) {
-    if (err instanceof ApiError) {
-      printError(
-        input.output,
-        { error: err.message, status: err.status, body: err.body },
-        jsonMode,
-      );
-    } else {
-      printError(input.output, { error: String(err) }, jsonMode);
-    }
+    printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);
     return 1;
   }
 }
