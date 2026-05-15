@@ -36,27 +36,34 @@ export async function backfillInstanceNamespaces(
   for (const docSnap of needsBackfill) {
     const data = docSnap.data();
     const defName = data.definitionName as string;
+    const definitionVersion = data.definitionVersion as string | number | undefined;
+    const cacheKey = `${defName}:${String(definitionVersion ?? '')}`;
 
-    if (!namespaceCache.has(defName)) {
+    if (!namespaceCache.has(cacheKey)) {
       const definitionSnapshot = await db
         .collection('workflowDefinitions')
         .where('name', '==', defName)
         .get();
 
-      let latestVersion = 0;
       let namespace: string | null = null;
       for (const definitionDoc of definitionSnapshot.docs) {
         const parsed = WorkflowDefinitionSchema.safeParse(definitionDoc.data());
         if (!parsed.success) continue;
-        if (parsed.data.version > latestVersion) {
-          latestVersion = parsed.data.version;
+
+        const versionMatches =
+          definitionVersion !== undefined &&
+          definitionVersion !== null &&
+          String(parsed.data.version) === String(definitionVersion);
+
+        if (versionMatches) {
           namespace = parsed.data.namespace;
+          break;
         }
       }
-      namespaceCache.set(defName, namespace);
+      namespaceCache.set(cacheKey, namespace);
     }
 
-    const namespace = namespaceCache.get(defName);
+    const namespace = namespaceCache.get(cacheKey);
     if (namespace !== null && namespace !== undefined) {
       await db.collection('processInstances').doc(docSnap.id).update({ namespace });
       updated++;

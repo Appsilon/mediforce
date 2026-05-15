@@ -28,6 +28,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Tests now have a 5-level pyramid with API E2E as the explicit foundation — `e2e/api/` is a dedicated Playwright project running real Next + emulators over HTTP (no browser), separated from `e2e/ui/` (sparse multi-step user journeys only, not "is button visible"). Misleading legacy names cleaned up: `src/test/*.test.ts` → `src/test/integration/`, `e2e/api/` (tier-2 real-LLM) → `e2e/external/`, `e2e/journeys/` → `e2e/ui/` ([#413](https://github.com/Appsilon/mediforce/pull/413)).
 
 ### Fixed
+- Instance namespace backfill now resolves namespace per instance definition version instead of global latest-by-name, preventing cross-tenant run reassignment during migration.
 - Workflow definition storage now scopes definition and metadata keys by namespace, so tenants can register the same workflow name independently.
 - Agent report iframe no longer blows up its host panel — height is capped and `vh` classes inside the report are neutralised ([#392](https://github.com/Appsilon/mediforce/pull/392)).
 - Mock dev workflows now run seeded agent steps through the mock Claude runtime even when their demo plugin ids are not registered, the model ranking sync helper falls back from `9003` to `9007` for `pnpm dev:mock`, root API/UI E2E wrappers pass Playwright project flags correctly, and `mediforce run start` can target a namespace.
