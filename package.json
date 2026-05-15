@@ -37,7 +37,7 @@
       "fast-xml-parser": "5.7.3",
       "node-forge": "1.4.0",
       "follow-redirects": "1.16.0",
-      "brace-expansion": "5.0.5",
+      "brace-expansion": "5.0.6",
       "@tootallnate/once": "3.0.1",
       "next": "16.2.5",
       "vite": "8.0.11"
