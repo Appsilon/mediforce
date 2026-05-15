@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Mediforce, ApiError } from '@mediforce/platform-api/client';
+import { Mediforce } from '@mediforce/platform-api/client';
 import {
   RegisterWorkflowInputSchema,
   type RegisterWorkflowInput,
@@ -10,6 +10,7 @@ import {
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
 import { resolveConfig } from '../config.js';
 import { printJson, printError, type OutputSink } from '../output.js';
+import { formatCliError } from '../errors.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -223,15 +224,7 @@ export async function workflowRegisterCommand(input: CommandInput): Promise<numb
     await warnMissingImages(body, input.output, jsonMode);
     return 0;
   } catch (err) {
-    if (err instanceof ApiError) {
-      printError(
-        input.output,
-        { error: err.message, status: err.status, body: err.body },
-        jsonMode,
-      );
-    } else {
-      printError(input.output, { error: String(err) }, jsonMode);
-    }
+    printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);
     return 1;
   }
 }
