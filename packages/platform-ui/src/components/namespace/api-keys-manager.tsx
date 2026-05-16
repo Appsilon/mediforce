@@ -53,6 +53,7 @@ export function ApiKeysManager() {
   const [newKey, setNewKey] = React.useState<{ plaintext: string; id: string } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [revoking, setRevoking] = React.useState<string | null>(null);
+  const [confirmingRevoke, setConfirmingRevoke] = React.useState<string | null>(null);
 
   const loadKeys = React.useCallback(async () => {
     try {
@@ -96,6 +97,11 @@ export function ApiKeysManager() {
   }
 
   async function handleRevoke(keyId: string) {
+    if (confirmingRevoke !== keyId) {
+      setConfirmingRevoke(keyId);
+      return;
+    }
+    setConfirmingRevoke(null);
     setRevoking(keyId);
     try {
       const res = await apiFetch(`/api/api-keys/${keyId}`, { method: 'DELETE' });
@@ -184,15 +190,26 @@ export function ApiKeysManager() {
                   {k.lastUsedAt && <>{' · '}Last used {timeAgo(k.lastUsedAt)}</>}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleRevoke(k.id)}
-                disabled={revoking === k.id}
-                className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10 transition-all disabled:opacity-50"
-              >
-                <Trash2 className="h-3 w-3" />
-                Revoke
-              </button>
+              <div className="flex items-center gap-1">
+                {confirmingRevoke === k.id && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingRevoke(null)}
+                    className="inline-flex items-center rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted transition-all"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleRevoke(k.id)}
+                  disabled={revoking === k.id}
+                  className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10 transition-all disabled:opacity-50 ${confirmingRevoke === k.id ? 'bg-destructive/10 opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  {confirmingRevoke === k.id ? 'Confirm revoke' : 'Revoke'}
+                </button>
+              </div>
             </div>
           ))}
         </div>
