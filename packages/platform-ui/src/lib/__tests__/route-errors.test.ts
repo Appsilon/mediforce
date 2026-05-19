@@ -40,14 +40,21 @@ describe('classifyError', () => {
   });
 
   describe('auth/id-token-expired', () => {
+    const err = Object.assign(new Error('expired'), {
+      code: 'auth/id-token-expired',
+    });
+
     it('returns 401 "Session expired"', () => {
       vi.stubEnv('NODE_ENV', 'development');
-      const err = Object.assign(new Error('expired'), {
-        code: 'auth/id-token-expired',
-      });
       const result = classifyError(err);
       expect(result.status).toBe(401);
       expect(result.body.error).toBe('Session expired');
+      expect(result.body.hint).toBe('Sign in again');
+    });
+
+    it('keeps "Sign in again" hint in production (user-facing action, not impl detail)', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const result = classifyError(err);
       expect(result.body.hint).toBe('Sign in again');
     });
   });

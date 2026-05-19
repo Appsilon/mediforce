@@ -50,6 +50,12 @@ describe('detectCredentialMode', () => {
     expect(detectCredentialMode()).toBe('service account file');
   });
 
+  it('treats empty GOOGLE_APPLICATION_CREDENTIALS as unset', async () => {
+    vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', '');
+    const { detectCredentialMode } = await import('../firebase-admin-init.js');
+    expect(detectCredentialMode()).toBe('none');
+  });
+
   it('returns "ADC (gcloud)" when ADC file exists', async () => {
     mockAdcExists = true;
     const { detectCredentialMode } = await import('../firebase-admin-init.js');

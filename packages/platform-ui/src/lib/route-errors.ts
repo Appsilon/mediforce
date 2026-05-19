@@ -1,3 +1,5 @@
+// TODO(#241-followup): wire classifyError into route handlers. Currently
+// unused — kept here so the next PR adopting it has a single source of truth.
 export interface ClassifiedError {
   status: number;
   body: { error: string; hint?: string };
@@ -23,9 +25,10 @@ export function classifyError(err: unknown): ClassifiedError {
   }
 
   if (code === 'auth/id-token-expired') {
-    const body: ClassifiedError['body'] = { error: 'Session expired' };
-    if (inDev) body.hint = 'Sign in again';
-    return { status: 401, body };
+    return {
+      status: 401,
+      body: { error: 'Session expired', hint: 'Sign in again' },
+    };
   }
 
   return { status: 500, body: { error: 'Internal error' } };
