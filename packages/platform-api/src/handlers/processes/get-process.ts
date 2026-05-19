@@ -1,5 +1,5 @@
 import type { ProcessInstanceRepository } from '@mediforce/platform-core';
-import { assertNamespaceAccess, type CallerIdentity } from '../../auth.js';
+import { callerCanAccess, type CallerIdentity } from '../../auth.js';
 import { NotFoundError } from '../../errors.js';
 import type { GetProcessInput, GetProcessOutput } from '../../contract/processes.js';
 
@@ -10,8 +10,9 @@ export interface GetProcessDeps {
 /**
  * Get a single process instance by id. The instance's namespace gates access:
  * api-key callers always pass, user callers must be members of the
- * namespace. 404 surfaces before 403 — a non-existent id never reveals
- * "exists but denied".
+ * namespace. Access denial surfaces as 404 (not 403) — a non-member caller
+ * cannot distinguish "instance exists but denied" from "instance doesn't
+ * exist", eliminating the ID-enumeration leak.
  */
 export async function getProcess(
   input: GetProcessInput,
@@ -23,7 +24,9 @@ export async function getProcess(
     throw new NotFoundError(`Process instance ${input.instanceId} not found`);
   }
 
-  assertNamespaceAccess(caller, instance.namespace);
+  if (!callerCanAccess(caller, instance.namespace)) {
+    throw new NotFoundError(`Process instance ${input.instanceId} not found`);
+  }
 
   return instance;
 }

@@ -68,7 +68,7 @@ describe('GET /api/cowork/by-instance/[instanceId]', () => {
     expect(res.status).toBe(404);
   });
 
-  it('[AUTH] returns 403 when user is not a member of the instance namespace', async () => {
+  it('[AUTH] returns 404 (not 403) when user is not a member of the instance namespace (anti-enumeration)', async () => {
     mockResolveCallerIdentity.mockReturnValue({
       kind: 'user',
       uid: 'outsider',
@@ -80,6 +80,6 @@ describe('GET /api/cowork/by-instance/[instanceId]', () => {
 
     const res = await GET(req, { params });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 });

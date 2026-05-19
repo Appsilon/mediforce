@@ -5,7 +5,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { getProcess } from '../get-process.js';
-import { NotFoundError, ForbiddenError } from '../../../errors.js';
+import { NotFoundError } from '../../../errors.js';
 import type { CallerIdentity } from '../../../auth.js';
 
 const apiKey: CallerIdentity = { kind: 'apiKey' };
@@ -44,7 +44,7 @@ describe('getProcess handler', () => {
     ).rejects.toThrow(NotFoundError);
   });
 
-  it('throws ForbiddenError for cross-namespace user callers', async () => {
+  it('throws NotFoundError (not ForbiddenError) for cross-namespace user callers (anti-enumeration)', async () => {
     const otherUser: CallerIdentity = {
       kind: 'user',
       uid: 'u-2',
@@ -53,10 +53,10 @@ describe('getProcess handler', () => {
 
     await expect(
       getProcess({ instanceId: 'inst-a' }, { instanceRepo }, otherUser),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 
-  it('throws ForbiddenError when the instance has no namespace', async () => {
+  it('throws NotFoundError when the instance has no namespace', async () => {
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-orphan', namespace: undefined }),
     );
@@ -68,10 +68,10 @@ describe('getProcess handler', () => {
 
     await expect(
       getProcess({ instanceId: 'inst-orphan' }, { instanceRepo }, user),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 
-  it('404 still beats 403 for a missing id (no namespace leak)', async () => {
+  it('missing id and cross-namespace id are indistinguishable (no enumeration leak)', async () => {
     const user: CallerIdentity = {
       kind: 'user',
       uid: 'u-x',

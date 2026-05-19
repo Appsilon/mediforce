@@ -7,7 +7,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { getCoworkSession } from '../get-cowork-session.js';
-import { NotFoundError, ForbiddenError } from '../../../errors.js';
+import { NotFoundError } from '../../../errors.js';
 import type { CallerIdentity } from '../../../auth.js';
 
 const apiKey: CallerIdentity = { kind: 'apiKey' };
@@ -65,7 +65,7 @@ describe('getCoworkSession handler', () => {
     ).rejects.toThrow(NotFoundError);
   });
 
-  it('throws ForbiddenError when a user caller is outside the session’s namespace', async () => {
+  it('throws NotFoundError (not ForbiddenError) when a user caller is outside the session’s namespace (anti-enumeration)', async () => {
     const otherUser: CallerIdentity = {
       kind: 'user',
       uid: 'u-2',
@@ -78,10 +78,10 @@ describe('getCoworkSession handler', () => {
         { coworkSessionRepo, instanceRepo },
         otherUser,
       ),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 
-  it('throws ForbiddenError when the session’s instance has no namespace', async () => {
+  it('throws NotFoundError when the session’s instance has no namespace', async () => {
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-orphan', namespace: undefined }),
     );
@@ -103,10 +103,10 @@ describe('getCoworkSession handler', () => {
         { coworkSessionRepo, instanceRepo },
         user,
       ),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 
-  it('checks namespace AFTER the session is fetched (404 still beats 403 for missing ids)', async () => {
+  it('missing id and cross-namespace id are indistinguishable (no enumeration leak)', async () => {
     const user: CallerIdentity = {
       kind: 'user',
       uid: 'u-x',

@@ -2,7 +2,7 @@ import type {
   AuditRepository,
   ProcessInstanceRepository,
 } from '@mediforce/platform-core';
-import { assertNamespaceAccess, type CallerIdentity } from '../../auth.js';
+import { callerCanAccess, type CallerIdentity } from '../../auth.js';
 import { NotFoundError } from '../../errors.js';
 import type {
   ListAuditEventsInput,
@@ -22,8 +22,9 @@ export interface ListAuditEventsDeps {
  * when pagination lands (#231).
  *
  * Namespace gating: api-key callers always pass, user callers must be
- * members of the instance's namespace. 404 surfaces before 403 — a missing
- * instance never reveals "exists but denied".
+ * members of the instance's namespace. Access denial surfaces as 404 (not
+ * 403) so a non-member caller cannot distinguish "exists but denied" from
+ * "doesn't exist" — eliminates the ID-enumeration leak.
  */
 export async function listAuditEvents(
   input: ListAuditEventsInput,
@@ -35,7 +36,9 @@ export async function listAuditEvents(
     throw new NotFoundError(`Process instance ${input.instanceId} not found`);
   }
 
-  assertNamespaceAccess(caller, instance.namespace);
+  if (!callerCanAccess(caller, instance.namespace)) {
+    throw new NotFoundError(`Process instance ${input.instanceId} not found`);
+  }
 
   const events = await deps.auditRepo.getByProcess(input.instanceId);
   return { events };

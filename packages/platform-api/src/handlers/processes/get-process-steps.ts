@@ -3,7 +3,7 @@ import type {
   ProcessRepository,
   StepExecution,
 } from '@mediforce/platform-core';
-import { assertNamespaceAccess, type CallerIdentity } from '../../auth.js';
+import { callerCanAccess, type CallerIdentity } from '../../auth.js';
 import { NotFoundError } from '../../errors.js';
 import type {
   GetProcessStepsInput,
@@ -24,9 +24,10 @@ export interface GetProcessStepsDeps {
  * on `main`) — same status-derivation rules, same input/output shaping.
  *
  * Namespace gating: api-key callers always pass, user callers must be
- * members of the instance's namespace. 404 surfaces before 403; the
- * namespace check runs AFTER the instance is fetched but BEFORE the rest
- * of the algorithm.
+ * members of the instance's namespace. Access denial surfaces as 404 (not
+ * 403) — a non-member caller cannot distinguish "exists but denied" from
+ * "doesn't exist". The namespace check runs AFTER the instance is fetched
+ * but BEFORE the rest of the algorithm.
  */
 export async function getProcessSteps(
   input: GetProcessStepsInput,
@@ -41,7 +42,9 @@ export async function getProcessSteps(
     throw new NotFoundError(`Process instance ${instanceId} not found`);
   }
 
-  assertNamespaceAccess(caller, instance.namespace);
+  if (!callerCanAccess(caller, instance.namespace)) {
+    throw new NotFoundError(`Process instance ${instanceId} not found`);
+  }
 
   // Load workflow definition. `definitionVersion` is stored as a string on
   // the instance; `getWorkflowDefinition` takes a number — non-numeric

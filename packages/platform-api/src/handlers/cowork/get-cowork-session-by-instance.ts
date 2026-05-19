@@ -2,7 +2,7 @@ import type {
   CoworkSessionRepository,
   ProcessInstanceRepository,
 } from '@mediforce/platform-core';
-import { assertNamespaceAccess, type CallerIdentity } from '../../auth.js';
+import { callerCanAccess, type CallerIdentity } from '../../auth.js';
 import { NotFoundError } from '../../errors.js';
 import type {
   GetCoworkSessionByInstanceInput,
@@ -17,15 +17,19 @@ export interface GetCoworkSessionByInstanceDeps {
 
 /**
  * Get the most recent *active* cowork session for a given process instance.
- * Missing instance / no active session → `NotFoundError`. Namespace gating
- * runs against the instance's namespace — api-key callers always pass, user
- * callers must be members.
+ * Missing instance / no active session / cross-namespace access → all surface
+ * as the same `NotFoundError`. This is deliberate anti-probing: a non-member
+ * caller cannot distinguish "instance exists in another namespace" from
+ * "instance doesn't exist" from "instance exists but has no active session".
  *
- * 404 beats 403: a non-existent instance surfaces as 404 (we can't gate on a
- * namespace we don't know), keeping behaviour consistent with the rest of the
- * platform. Mirrors the pre-migration `GET /api/cowork/by-instance/:instanceId`
- * route: only `status === 'active'` sessions are considered; finalized /
- * abandoned sessions do not surface here even if they're the newest.
+ * Namespace gating runs AFTER the instance is fetched (we can't gate on a
+ * namespace we don't know) but BEFORE searching for sessions — otherwise the
+ * presence/absence of an active session would leak through timing/cost even
+ * though the response is identical.
+ *
+ * Mirrors the pre-migration `GET /api/cowork/by-instance/:instanceId` route:
+ * only `status === 'active'` sessions are considered; finalized / abandoned
+ * sessions do not surface here even if they're the newest.
  */
 export async function getCoworkSessionByInstance(
   input: GetCoworkSessionByInstanceInput,
@@ -39,7 +43,11 @@ export async function getCoworkSessionByInstance(
     );
   }
 
-  assertNamespaceAccess(caller, instance.namespace);
+  if (!callerCanAccess(caller, instance.namespace)) {
+    throw new NotFoundError(
+      `No active cowork session found for instance '${input.instanceId}'`,
+    );
+  }
 
   const session = await deps.coworkSessionRepo.findMostRecentActive(
     input.instanceId,

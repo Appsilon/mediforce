@@ -8,7 +8,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { getProcessSteps } from '../get-process-steps.js';
-import { NotFoundError, ForbiddenError } from '../../../errors.js';
+import { NotFoundError } from '../../../errors.js';
 import type { CallerIdentity } from '../../../auth.js';
 
 const apiKey: CallerIdentity = { kind: 'apiKey' };
@@ -242,7 +242,7 @@ describe('getProcessSteps handler', () => {
     expect(result.steps).toHaveLength(2);
   });
 
-  it('throws ForbiddenError for cross-namespace user callers', async () => {
+  it('throws NotFoundError (not ForbiddenError) for cross-namespace user callers (anti-enumeration)', async () => {
     await instanceRepo.create(
       buildProcessInstance({
         id: 'inst-1',
@@ -260,10 +260,10 @@ describe('getProcessSteps handler', () => {
 
     await expect(
       getProcessSteps({ instanceId: 'inst-1' }, { instanceRepo, processRepo }, otherUser),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 
-  it('throws ForbiddenError when the instance has no namespace', async () => {
+  it('throws NotFoundError when the instance has no namespace', async () => {
     await instanceRepo.create(
       buildProcessInstance({
         id: 'inst-orphan',
@@ -281,6 +281,6 @@ describe('getProcessSteps handler', () => {
 
     await expect(
       getProcessSteps({ instanceId: 'inst-orphan' }, { instanceRepo, processRepo }, user),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 });

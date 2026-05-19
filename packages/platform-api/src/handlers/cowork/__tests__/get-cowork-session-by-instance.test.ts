@@ -7,7 +7,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { getCoworkSessionByInstance } from '../get-cowork-session-by-instance.js';
-import { NotFoundError, ForbiddenError } from '../../../errors.js';
+import { NotFoundError } from '../../../errors.js';
 import type { CallerIdentity } from '../../../auth.js';
 
 const apiKey: CallerIdentity = { kind: 'apiKey' };
@@ -99,7 +99,7 @@ describe('getCoworkSessionByInstance handler', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('throws ForbiddenError when a user caller is outside the instance’s namespace', async () => {
+  it('throws NotFoundError (not ForbiddenError) when a user caller is outside the instance’s namespace (anti-enumeration)', async () => {
     await coworkSessionRepo.create(
       buildCoworkSession({
         id: 'sess-1',
@@ -119,10 +119,10 @@ describe('getCoworkSessionByInstance handler', () => {
         { coworkSessionRepo, instanceRepo },
         otherUser,
       ),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 
-  it('throws ForbiddenError when the instance has no namespace', async () => {
+  it('throws NotFoundError when the instance has no namespace', async () => {
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-orphan', namespace: undefined }),
     );
@@ -145,7 +145,7 @@ describe('getCoworkSessionByInstance handler', () => {
         { coworkSessionRepo, instanceRepo },
         user,
       ),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 
   it('returns the most recent active session when several exist', async () => {
@@ -175,10 +175,11 @@ describe('getCoworkSessionByInstance handler', () => {
     expect(result.id).toBe('sess-new');
   });
 
-  it('checks namespace BEFORE searching for sessions (cross-namespace user gets 403 even when no session exists)', async () => {
+  it('cross-namespace caller cannot distinguish "no active session" from "wrong namespace" (anti-probing)', async () => {
     // Instance exists in 'team-alpha', no sessions at all. A user in
     // 'team-beta' must NOT be able to probe "does this instance have an
-    // active session?" via 404 vs 403 differentiation.
+    // active session?" — both the cross-namespace and the no-session case
+    // return the same NotFoundError.
     const otherUser: CallerIdentity = {
       kind: 'user',
       uid: 'u-2',
@@ -191,6 +192,6 @@ describe('getCoworkSessionByInstance handler', () => {
         { coworkSessionRepo, instanceRepo },
         otherUser,
       ),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 });
