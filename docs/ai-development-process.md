@@ -14,14 +14,14 @@ This isn't about trusting AI blindly — it's about giving it the right instruct
 
 ```
 CLAUDE.md (root)              ← Auto-loaded. Points to AGENTS.md
-└── AGENTS.md (root)          ← Core rules, architecture, testing, skills router
-      └── Skills Router       ← Maps "what am I doing" → "which skill to invoke"
+└── AGENTS.md (root)          ← Per-task workflow + cross-cutting rules (~100 lines)
 
 skills/*/SKILL.md             ← On-demand workflows (invoked via /skill-name)
+.claude/skills/<name>         ← Symlink — Claude auto-discovers descriptions at session start
 skills/*/references/          ← Checklists, templates used by skills
 ```
 
-**Key principle:** Instructions live close to the code they describe. The root `AGENTS.md` stays under 300 lines and routes to specific skills for deep workflows.
+**Key principle:** AGENTS.md stays under ~100 lines — workflow + rules only. Every "how to do X" lives in a skill. No manual Skills Router: Claude auto-loads every skill's `description:` from `.claude/skills/` at session start, and routes from natural-language triggers in the description itself.
 
 ### The Agent Delegation Model
 
@@ -35,16 +35,20 @@ In practice: receive task → break it down → dispatch subagents → verify ou
 
 ### Skills (Standardized Workflows)
 
-Skills are reusable instruction sets invoked on demand via `/skill-name`. The Skills Router in `AGENTS.md` maps task types to the right skill:
+Skills are reusable instruction sets invoked on demand via `/skill-name`. Each skill's `description:` frontmatter contains trigger phrases — Claude auto-routes from natural language to the matching skill without any manual router. To browse: `ls .claude/skills/`.
 
 | Skill | Purpose |
 |-------|---------|
+| `/new-test` | Pick the right test level (L1-L5), scaffold the file, walk RED → GREEN |
+| `/self-review` | Pre-PR check (typecheck + affected tests + diff + code-review). MUST run as subagent |
+| `/mediforce` | mediforce CLI, dev environment, REST fallback ladder, adding a CLI command |
 | `/code-review` | Review PRs and diffs against an 8-section checklist (security, architecture, testing, etc.) |
-| `/e2e-test` | Write, run, and record E2E journey tests with TDD workflow |
+| `/e2e-test` | Write, run, and record L4 UI journey tests with GIF + gallery update |
 | `/agent-browser` | Visual verification of UI in a live browser |
 | `/renovate-review` | Triage and validate Renovate dependency PRs |
 | `/discord-update` | Write Discord updates from rough notes |
 | `/add-changelog-entry` | Append a one-line entry to CHANGELOG.md under `[Unreleased]` |
+| `/knowledge-base` | Ingest, query, and lint the LLM-compiled wiki |
 | `/generate-pitch` | Generate a Marp pitch deck from vision docs |
 
 Each skill has a `SKILL.md` with step-by-step workflow and optional `references/` with templates and checklists.
@@ -65,7 +69,7 @@ Quality gates run after every change: typecheck (~5s), affected tests (<1s), ful
 
 ### When to create a new skill
 
-When you find yourself giving the same multi-step instructions repeatedly. A skill standardizes the workflow so every invocation is consistent. Add the skill to `skills/`, register it in `_registry.yml`, symlink it into `.claude/skills/`, and add a row to the Skills Router in `AGENTS.md`.
+When you find yourself giving the same multi-step instructions repeatedly. A skill standardizes the workflow so every invocation is consistent. Add the skill to `skills/`, register it in `_registry.yml`, and symlink it into `.claude/skills/`. The symlink is what makes Claude auto-load the skill's description at session start — no edit to `AGENTS.md` needed unless the workflow itself changes.
 
 ### Writing style for instruction files
 
