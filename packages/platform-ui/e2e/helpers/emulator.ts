@@ -47,6 +47,31 @@ export async function createTestUser(
   return data.localId as string;
 }
 
+/**
+ * Sign in an existing emulator user and return a fresh Firebase ID token.
+ * Used by L3 API E2E journeys that need a `user`-kind caller (vs the
+ * `apiKey`-kind shared with most other journeys) — for example to exercise
+ * the 404 anti-enumeration path that api-key callers bypass.
+ */
+export async function signInAndGetIdToken(
+  email: string,
+  password: string,
+): Promise<string> {
+  const res = await fetch(
+    `${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to sign in ${email}: ${await res.text()}`);
+  }
+  const data = (await res.json()) as { idToken: string };
+  return data.idToken;
+}
+
 // Convert a JS value to Firestore REST API value format
 function toFirestoreValue(value: unknown): Record<string, unknown> {
   if (value === null || value === undefined) return { nullValue: null };
