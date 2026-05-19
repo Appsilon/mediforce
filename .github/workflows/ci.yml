@@ -1,5 +1,11 @@
 name: CI
 
+# NOTE: The `paths-ignore` lists below are mirrored in
+# `packages/platform-ui/vercel.json` (`ignoreCommand`) so Vercel skips
+# preview deploys for the same docs-only changes that skip CI. Keep both
+# lists in sync — adding an entry here without updating Vercel means
+# extra preview builds; the reverse means CI runs on changes Vercel
+# already skipped.
 on:
   pull_request:
     paths-ignore:
