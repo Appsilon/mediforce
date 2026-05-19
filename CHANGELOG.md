@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Removed
+- Duplicate Python migration script `scripts/migrations/migrate_workflow_doc_ids.py` — superseded by the TypeScript `packages/platform-infra/scripts/migrate-workflow-namespacing.ts` which is the canonical version ([#424](https://github.com/Appsilon/mediforce/pull/424)).
+
 ### Fixed
 - Instance namespace backfill now resolves namespace per instance definition version instead of global latest-by-name, preventing cross-tenant run reassignment during migration ([#424](https://github.com/Appsilon/mediforce/pull/424)).
 - Workflow definition storage now scopes definition and metadata keys by namespace, so tenants can register the same workflow name independently ([#424](https://github.com/Appsilon/mediforce/pull/424)).
