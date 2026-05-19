@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "ignoreCommand": "cd \"$(git rev-parse --show-toplevel)\" && git diff --quiet HEAD^ HEAD -- . ':!docs' ':!skills' ':!.claude' ':!agents' ':!.planning' ':!LICENSE' ':(exclude,glob)*.md'"
 }
