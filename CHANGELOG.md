@@ -3,7 +3,7 @@
 All notable changes to Mediforce.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Weekly cuts via [`/add-release-notes`](skills/add-release-notes/SKILL.md) + auto-cut every Monday 09:00 CET ([`.github/workflows/changelog-cut.yml`](.github/workflows/changelog-cut.yml)).
+Weekly cuts via [`/add-changelog-entry`](skills/add-changelog-entry/SKILL.md) + auto-cut every Monday 09:00 CET ([`.github/workflows/changelog-cut.yml`](.github/workflows/changelog-cut.yml)).
 
 Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos, single-line config, comment-only diffs) may be omitted. Renovate bumps batch under `### Dependencies`.
 
