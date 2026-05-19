@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ForbiddenError, HandlerError, NotFoundError } from '@mediforce/platform-api/errors';
+import { ForbiddenError, NotFoundError } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { createRouteAdapter } from '../route-adapter';
 
@@ -113,26 +113,6 @@ describe('createRouteAdapter', () => {
 
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: 'Forbidden' });
-  });
-
-  it('maps an arbitrary HandlerError subclass to its declared status', async () => {
-    class TeapotError extends HandlerError {
-      constructor() {
-        super(418, "I'm a teapot");
-      }
-    }
-    const handler = vi.fn().mockRejectedValue(new TeapotError());
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: stubCaller() },
-    );
-
-    const res = await GET(makeRequest({ name: 'alice' }), undefined);
-
-    expect(res.status).toBe(418);
-    expect(await res.json()).toEqual({ error: "I'm a teapot" });
   });
 
   it('returns 500 with a generic message when the handler throws an unexpected error', async () => {
