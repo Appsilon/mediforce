@@ -38,22 +38,49 @@ Uniform pattern. Low risk. Establishes the catalogue of read contracts that Phas
 
 | Endpoint | Domain | Status | PR |
 |---|---|---|---|
-| `GET /api/tasks` | tasks | done | #232 (pilot) |
-| `GET /api/tasks/:taskId` | tasks | todo | — |
-| `GET /api/processes/:instanceId` | processes | todo | — |
-| `GET /api/processes/:instanceId/audit` (paginated) | processes | todo | — |
-| `GET /api/processes/:instanceId/steps` | processes | todo | — |
-| `GET /api/workflow-definitions` (list) | definitions | todo | — |
-| `GET /api/workflow-definitions` (by name+version) | definitions | todo | — |
-| `GET /api/agent-definitions` | definitions | todo | — |
-| `GET /api/cowork/:sessionId` | cowork | todo | — |
-| `GET /api/cowork/by-instance/:instanceId` | cowork | todo | — |
-| `GET /api/configs` | configs | todo | — |
-| `GET /api/plugins` | misc | todo | — |
+| `GET /api/tasks` | tasks | ✅ done | #232 (pilot) |
+| `GET /api/tasks/:taskId` | tasks | ✅ done | #450 |
+| `GET /api/processes/:instanceId` | processes | ✅ done | #450 |
+| `GET /api/processes/:instanceId/audit` (paginated) | processes | ✅ done | #450 |
+| `GET /api/processes/:instanceId/steps` | processes | ✅ done | #450 |
+| `GET /api/workflow-definitions` (list) | definitions | ✅ done | #450 |
+| `GET /api/workflow-definitions/:name` (by name+version) | definitions | ✅ done | #450 |
+| `GET /api/agent-definitions` | definitions | ✅ done | #450 |
+| `GET /api/agent-definitions/:id` | definitions | ✅ done | #450 |
+| `GET /api/cowork/:sessionId` | cowork | ✅ done | #450 |
+| `GET /api/cowork/by-instance/:instanceId` | cowork | ✅ done | #450 |
+| `GET /api/configs` | configs | scoped out — deleted on main in #292 | — |
+| `GET /api/plugins` | misc | ✅ done | #450 |
 | `GET /api/agent-logs` | misc | todo? | — |
 | `GET /api/agent-output-file` | misc | todo? | — |
 | `GET /api/health` | — | stays as-is | — |
 | `GET /api/oauth/callback` | — | stays (Filip's domain) | — |
+
+**Lessons learned (Phase 1, captured during #450):**
+
+- **Auth threading.** Every handler accepts `caller: CallerIdentity` as a third
+  positional argument — not bundled into `deps`. Handlers either consume it
+  (calling `assertNamespaceAccess` / `callerCanAccess` / `filterByCaller`, or
+  branching on `caller.kind` / `caller.namespaces`) or declare themselves
+  `// @public-handler` with a one-line reason. A static grep guard
+  (`packages/platform-api/src/handlers/__tests__/auth-coverage.test.ts`) fails
+  CI on any handler that drops the caller silently — TypeScript can't catch
+  an unused parameter, so we enforce the rule out-of-band. Outstanding
+  follow-up: see #448 for terminology (`apiKey` → service-key) and per-user
+  API keys.
+- **404 vs 403 for visibility.** A private resource the caller cannot read
+  surfaces as **404, not 403**. Acknowledging "exists but denied" leaks
+  namespace existence — the route returns the same not-found shape as a
+  genuinely-missing id. This is intentional anti-enumeration, mirrored in
+  `getAgentDefinition`, `getWorkflowDefinition`, and the per-name workflow
+  fetch. 403 is reserved for *mutations* the caller proved they were trying
+  to perform on a known resource.
+- **Breaking shape change.** `GET /api/processes/:id/audit` migrated from a
+  bare array to `{ events: AuditEvent[] }`. Wrapping every list-shaped
+  response in a named envelope keeps the door open for pagination metadata
+  (`{ events, nextCursor }`) without another breaking change. Other Phase 1
+  endpoints already used envelopes (`{ tasks }`, `{ definitions }`, etc.) —
+  audit was the outlier.
 
 (Audit any missed routes when picking up this phase — `find packages/platform-ui/src/app/api -name 'route.ts'` is the source of truth.)
 
@@ -87,9 +114,32 @@ The rule of thumb: **design the contract against real UI consumers, and change t
 - Pagination cursor design — extend `HumanTaskRepository` + other repo interfaces with `{ limit, cursor }` options? Opaque cursor or field-based (`createdAt` / `id`)? (Tracked in #231.)
 - `GET /api/workflow-definitions` — the existing route returns either a list or a single doc depending on query params. Do we split into two contract endpoints (`list` + `get`) or keep one with a union-shaped output?
 
+### Phase 1.5 — Hybrid endpoint cleanup
+
+Three endpoints already declare a contract and adapter in `platform-api`
+but never finished the handler+adapter step — they still run inline route
+code that bypasses the `createRouteAdapter` pipeline. Close the loop:
+
+- `GET /api/runs` and `GET /api/runs/:runId` — contract exists in
+  `packages/platform-api/src/contract/runs.ts`; routes are inline.
+- `GET /api/workflow-secrets` — partial contract in `secrets.ts`; handler
+  needs to be extracted and the route swapped to `createRouteAdapter`.
+- `GET /api/system/docker-info` — contract in `system.ts`; route is inline.
+
+Pattern is mechanical (same shape as the Phase 1 migrations): extract the
+inline body into a pure handler, write `__tests__/<name>.test.ts`, replace
+the route with `createRouteAdapter`. Each is a small standalone PR.
+
+**Pause-safe**: yes — leaving any one on its inline handler is functionally
+identical to today.
+
 ### Phase 2 — Migrate mutations (grouped by domain)
 
-Harder than GETs because each mutation has a state machine and side effects. Break into small PRs:
+Harder than GETs because each mutation has a state machine and side effects. Break into small PRs.
+
+**Status note**: PR #445 (the first Phase 2 batch) was closed because it
+targeted the wrong base — to be redone on top of the secure branch once
+#450 lands.
 
 - **Tasks lifecycle**: `POST /api/tasks/:id/claim`, `POST /api/tasks/:id/complete`, `POST /api/tasks/:id/resolve`
 - **Process lifecycle**: `POST /api/processes`, `POST /api/processes/:id/advance`, `POST /api/processes/:id/cancel`, `POST /api/processes/:id/resume`, `POST /api/processes/:id/steps/:stepId/retry`
