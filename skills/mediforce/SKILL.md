@@ -45,12 +45,14 @@ const res = await apiFetch('/api/custom-path');
 ### From Node (server-to-server)
 
 ```ts
-import { Mediforce } from '@mediforce/cli';
+import { Mediforce } from '@mediforce/platform-api/client';
 const client = new Mediforce({ apiKey: process.env.MEDIFORCE_API_KEY!, baseUrl: process.env.MEDIFORCE_BASE_URL });
 
 // or raw, if needed:
 await fetch(`${baseUrl}/api/...`, { headers: { 'X-Api-Key': apiKey } });
 ```
+
+Only `@mediforce/platform-api/client` (and `/contract`, `/services`) are exported subpaths — never deep-import from `@mediforce/platform-api/src/*`. The CLI commands themselves all use this client; copy them as templates.
 
 ## Dev environment
 

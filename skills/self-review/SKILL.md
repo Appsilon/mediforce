@@ -34,7 +34,9 @@ pnpm typecheck
 pnpm test:affected
 ```
 
-If either fails — STOP, report the failure. No point reviewing code that doesn't compile or pass affected tests.
+If either fails for a code reason — STOP, report the failure. No point reviewing code that doesn't compile or pass affected tests.
+
+If a failure looks environmental (remote / emulator down / proxy / port collision / weird state), check `docs/knowledge-base/wiki/gotchas/` or invoke `/knowledge-base` before debugging from scratch — most repeat env failures are documented there. Distinguish "I broke this" from "the env is broken" before iterating.
 
 ## Step 2 — Read the diff
 
@@ -70,7 +72,19 @@ If coverage is missing, that's a finding — not a "nice to have".
 
 Delegate the architecture / security / convention pass to `/code-review`. It has its own 8-section checklist; don't duplicate.
 
-## Step 5 — Verdict
+## Step 5 — Full unit suite
+
+Before the verdict, run the full unit + integration suite, not just affected:
+
+```bash
+pnpm test:unit
+```
+
+~9s. Catches regressions that `test:affected` (changed files only) misses. If it fails, STOP — that's a blocker regardless of how clean the diff looks.
+
+If the diff touched UI, route handlers, middleware, or anything that would change wire-level behaviour, also run `pnpm test:e2e:api` (L3, ~30s, no browser). Full `pnpm test:e2e` (~4min, with browser) is a pre-merge gate — only run before opening the PR, not on every self-review pass.
+
+## Step 6 — Verdict
 
 Aggregate findings into one of two outputs:
 
@@ -81,6 +95,8 @@ Aggregate findings into one of two outputs:
 
 - typecheck: pass
 - test:affected: pass (N tests)
+- test:unit (full): pass (N tests)
+- test:e2e:api: pass (N tests)   ← if relevant to the diff
 - diff: clean
 - coverage: <level> in <path>
 - code-review: no blockers
@@ -109,4 +125,4 @@ Address blockers and re-run /self-review before shipping.
 
 - It does NOT commit, push, or open a PR. That's the main thread's job after acting on findings.
 - It does NOT silently fix things. Findings come back as text — the main thread decides what to apply.
-- It does NOT run `pnpm test` (full suite) or `pnpm test:e2e` — those are pre-merge gates, not self-review gates. Run them separately when needed.
+- It does NOT run the full `pnpm test:e2e` (browser, ~4min). That's a pre-merge gate — run it once before opening the PR. L3 `test:e2e:api` (~30s, no browser) IS part of Step 5 when the diff touches handlers / middleware.

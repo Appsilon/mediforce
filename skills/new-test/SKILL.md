@@ -26,6 +26,8 @@ One entry point for adding a test. **Always pick the lowest level that gives rea
 
 **Rule of thumb:** every feature MUST be covered at **L3** (foundation). L1/L2 add logic coverage. L4 is for the journey only, not edge cases. L5 is opt-in and costs cents per run.
 
+**For a new endpoint or handler, start at L3 directly.** L1/L2 are layers on top of the proven wiring, not replacements for it. Skipping L3 leaves the real Firestore + middleware + auth path untested.
+
 ## Step 2 — Scaffold
 
 ### L1 — Unit (vitest, co-located)
