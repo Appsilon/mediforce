@@ -48,11 +48,11 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    a GIF deliverable, use `/e2e-test`. Skip the test only for trivial edits
    (typo, comment, single-line config) and say so out loud.
 
-3. **Dogfood the CLI via `/mediforce`.** Any operation `pnpm exec mediforce`
+3. **Dogfood the CLI via `/use-mediforce`.** Any operation `pnpm exec mediforce`
    covers MUST go through it — never curl REST when the CLI does it. If the
-   command is missing, add it in the same task. `/mediforce` also covers the
+   command is missing, add it in the same task. `/use-mediforce` also covers the
    dev environment (`pnpm dev*`), the REST fallback ladder (browser:
-   `@/lib/mediforce` → `apiFetch` → never raw `fetch`; node: `Mediforce`
+   `@/lib/use-mediforce` → `apiFetch` → never raw `fetch`; node: `Mediforce`
    client), and the recipe for adding a CLI command. **Never hit
    production.**
 
@@ -102,7 +102,7 @@ trigger phrases match the action you're about to take. List with
 1. Simplify before coding.
 2. Test first via `/new-test` (RED → GREEN) at the lowest level with real
    signal. L3 is the foundation for every feature.
-3. CLI > REST. `/mediforce` first; add the command if missing.
+3. CLI > REST. `/use-mediforce` first; add the command if missing.
 4. `/self-review` as a subagent before reporting done.
 5. Ask, don't sneak, when a capability is missing.
 6. Delegate to subagents when it parallelises. Not as ceremony.

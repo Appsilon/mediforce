@@ -62,8 +62,8 @@ domains:
         complexity: intermediate
         language: multi
         description: Pre-PR check — typecheck, affected tests, diff, style, code-review. MUST run as subagent for objectivity
-      - id: mediforce
-        path: skills/mediforce/SKILL.md
+      - id: use-mediforce
+        path: skills/use-mediforce/SKILL.md
         complexity: intermediate
         language: multi
         description: mediforce CLI, dev environment, platform API, and adding missing CLI commands

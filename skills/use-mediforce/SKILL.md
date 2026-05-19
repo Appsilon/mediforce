@@ -1,16 +1,16 @@
 ---
-name: mediforce
+name: use-mediforce
 description: Work with the mediforce CLI, the dev environment, and the platform API. Use when running the app locally, invoking the platform from a script, calling the API from client code, or adding a CLI command that's missing. Triggers include "use the CLI", "run mediforce", "start dev", "start the app", "call the API", "list/get/create via API", "the CLI doesn't have X", "add a CLI command". Enforces the dogfood rule: CLI > REST. Never targets production.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 metadata:
   author: Mediforce
-  version: "1.0"
+  version: "1.1"
   domain: development
   complexity: intermediate
   tags: cli, dev-env, api, dogfood
 ---
 
-# Mediforce CLI, Dev Env, and API
+# Using Mediforce — CLI, Dev Env, and Platform API
 
 ## Dogfood rule
 

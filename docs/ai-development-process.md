@@ -41,7 +41,7 @@ Skills are reusable instruction sets invoked on demand via `/skill-name`. Each s
 |-------|---------|
 | `/new-test` | Pick the right test level (L1-L5), scaffold the file, walk RED → GREEN |
 | `/self-review` | Pre-PR check (typecheck + affected tests + diff + code-review). MUST run as subagent |
-| `/mediforce` | mediforce CLI, dev environment, REST fallback ladder, adding a CLI command |
+| `/use-mediforce` | mediforce CLI, dev environment, REST fallback ladder, adding a CLI command |
 | `/grill-with-docs` | Optional planning skill — interview-style stress test of a plan against CONTEXT.md / ADRs, sharpens fuzzy terms before coding (from [mattpocock/skills](https://github.com/mattpocock/skills)) |
 | `/code-review` | Review PRs and diffs against an 8-section checklist (security, architecture, testing, etc.) |
 | `/e2e-test` | Write, run, and record L4 UI journey tests with GIF + gallery update |

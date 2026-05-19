@@ -55,7 +55,7 @@ Read every line. Not just the new files — also context lines around edits. Loo
 - Dead code: unused exports, never-called helpers, leftover scaffolding.
 - Scope creep: unrelated refactors mixed in.
 - Raw `fetch('/api/...')` in `"use client"` files — must use `mediforce.<domain>` or `apiFetch`.
-- Missing CLI command for an operation that should be dogfooded — see `/mediforce`.
+- Missing CLI command for an operation that should be dogfooded — see `/use-mediforce`.
 
 ## Step 3 — Test coverage
 
