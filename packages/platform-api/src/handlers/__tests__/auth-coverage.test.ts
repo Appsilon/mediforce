@@ -24,21 +24,21 @@ import { join, resolve } from 'node:path';
 
 const HANDLERS_ROOT = resolve(__dirname, '..');
 
-/**
- * Substrings that count as "this handler is auth-aware". A handler may match
- * any of them — namespace assertions, list filtering, or a manual branch on
- * `caller.kind`.
- */
-const AUTH_MARKERS: readonly string[] = [
-  'assertNamespaceAccess',
-  'callerCanAccess',
-  'filterByCaller',
-  'caller.kind',
-  'caller.namespaces',
+const AUTH_MARKERS: readonly RegExp[] = [
+  /\bassertNamespaceAccess\s*\(/,
+  /\bcallerCanAccess\s*\(/,
+  /\bfilterByCaller\s*\(/,
+  /\bcaller\.kind\b/,
+  /\bcaller\.namespaces\b/,
 ];
 
-/** Explicit opt-out marker for handlers that legitimately have no namespace gate. */
 const PUBLIC_MARKER = '@public-handler';
+
+function stripComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+}
 
 function listHandlerFiles(dir: string): string[] {
   const out: string[] = [];
@@ -65,9 +65,10 @@ describe('platform-api handler auth coverage', () => {
 
     const offenders: string[] = [];
     for (const file of files) {
-      const source = readFileSync(file, 'utf8');
-      const isAuthAware = AUTH_MARKERS.some((m) => source.includes(m));
-      const isAnnotatedPublic = source.includes(PUBLIC_MARKER);
+      const rawSource = readFileSync(file, 'utf8');
+      const isAnnotatedPublic = rawSource.includes(PUBLIC_MARKER);
+      const stripped = stripComments(rawSource);
+      const isAuthAware = AUTH_MARKERS.some((m) => m.test(stripped));
       if (!isAuthAware && !isAnnotatedPublic) {
         offenders.push(file);
       }
