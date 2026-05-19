@@ -117,7 +117,7 @@ describe('GET /api/tasks/:taskId', () => {
     expect(res.status).toBe(404);
   });
 
-  it('[AUTH] returns 403 when user is not a member of the instance namespace', async () => {
+  it('[AUTH] returns 404 (anti-enumeration) when user is not a member of the instance namespace', async () => {
     mockResolveCallerIdentity.mockReturnValue({
       kind: 'user',
       uid: 'outsider',
@@ -129,7 +129,7 @@ describe('GET /api/tasks/:taskId', () => {
     const req = new NextRequest('http://localhost/api/tasks/task-1');
     const res = await GET(req, { params: makeParams('task-1') });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 });
 

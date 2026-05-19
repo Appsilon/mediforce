@@ -43,14 +43,16 @@ test.describe('GET /api/tasks/[taskId] — API E2E', () => {
     expect(task.completionData).toEqual({ approved: true, notes: 'All checks passed' });
   });
 
-  test('outsider user (different namespace) is forbidden — 403', async ({ request }) => {
+  test('outsider user (different namespace) gets 404 — anti-enumeration', async ({ request }) => {
     const res = await request.get('/api/tasks/task-completed-1', {
       headers: bearerHeaders(callers.outsider),
     });
-    expect(res.status()).toBe(403);
+    expect(res.status()).toBe(404);
+    const body = await res.json() as { error: string };
+    expect(body.error).toMatch(/not found/i);
   });
 
-  test('non-existent task id returns 404 (before namespace check)', async ({ request }) => {
+  test('non-existent task id returns the same 404 (indistinguishable from cross-namespace)', async ({ request }) => {
     const res = await request.get('/api/tasks/task-does-not-exist', {
       headers: bearerHeaders(callers.outsider),
     });

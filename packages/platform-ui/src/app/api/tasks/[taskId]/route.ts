@@ -11,10 +11,10 @@ interface RouteContext {
 /**
  * GET /api/tasks/:taskId
  *
- * Returns the full task including completionData. Missing tasks 404 via the
- * handler's `NotFoundError`. Namespace gating is enforced inside the handler
- * (api-key callers pass; user callers must be in the task's instance
- * namespace) and surfaces as 403 via `ForbiddenError`.
+ * Returns the full task including completionData. Missing tasks and cross-
+ * namespace access both surface as 404 (anti-enumeration) — a non-member
+ * caller cannot distinguish "this task exists but I can't see it" from
+ * "this task doesn't exist".
  */
 export const GET = createRouteAdapter<typeof GetTaskInputSchema, GetTaskInput, unknown, RouteContext>(
   GetTaskInputSchema,

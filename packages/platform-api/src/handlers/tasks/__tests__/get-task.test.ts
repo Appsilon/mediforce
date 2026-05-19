@@ -7,7 +7,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { getTask } from '../get-task.js';
-import { NotFoundError, ForbiddenError } from '../../../errors.js';
+import { NotFoundError } from '../../../errors.js';
 import type { CallerIdentity } from '../../../auth.js';
 
 const apiKey: CallerIdentity = { kind: 'apiKey' };
@@ -50,7 +50,7 @@ describe('getTask handler', () => {
     ).rejects.toThrow(NotFoundError);
   });
 
-  it('throws ForbiddenError when a user caller is outside the task’s namespace', async () => {
+  it('returns NotFoundError (anti-enumeration) when a user caller is outside the task’s namespace', async () => {
     const otherUser: CallerIdentity = {
       kind: 'user',
       uid: 'u-2',
@@ -59,10 +59,10 @@ describe('getTask handler', () => {
 
     await expect(
       getTask({ taskId: 't-a' }, { humanTaskRepo, instanceRepo }, otherUser),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 
-  it('throws ForbiddenError when the task’s instance has no namespace', async () => {
+  it('returns NotFoundError when the task’s instance has no namespace', async () => {
     await instanceRepo.create(buildProcessInstance({ id: 'inst-orphan', namespace: undefined }));
     await humanTaskRepo.create(buildHumanTask({ id: 't-orphan', processInstanceId: 'inst-orphan' }));
     const user: CallerIdentity = {
@@ -73,17 +73,17 @@ describe('getTask handler', () => {
 
     await expect(
       getTask({ taskId: 't-orphan' }, { humanTaskRepo, instanceRepo }, user),
-    ).rejects.toThrow(ForbiddenError);
+    ).rejects.toThrow(NotFoundError);
   });
 
-  it('checks namespace AFTER the task is fetched (404 still beats 403 for missing ids)', async () => {
+  it('checks namespace AFTER the task is fetched (existence-then-policy ordering, both surface as 404)', async () => {
     const user: CallerIdentity = {
       kind: 'user',
       uid: 'u-x',
-      namespaces: new Set(), // empty membership — would 403 anything real
+      namespaces: new Set(),
     };
 
-    // A non-existent task still surfaces as 404, never leaks "exists but denied".
+
     await expect(
       getTask({ taskId: 'definitely-missing' }, { humanTaskRepo, instanceRepo }, user),
     ).rejects.toThrow(NotFoundError);
