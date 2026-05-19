@@ -36,4 +36,35 @@ describe('createAgentDefinition handler', () => {
     const fetched = await agentDefinitionRepo.getById(result.agent.id);
     expect(fetched).not.toBeNull();
   });
+
+  it('assigns a unique id to each created agent', async () => {
+    const first = await createAgentDefinition(BASE_INPUT, { agentDefinitionRepo });
+    const second = await createAgentDefinition(
+      { ...BASE_INPUT, name: 'Other agent' },
+      { agentDefinitionRepo },
+    );
+
+    expect(first.agent.id).not.toBe(second.agent.id);
+  });
+
+  it('echoes the cowork kind when supplied', async () => {
+    const result = await createAgentDefinition(
+      { ...BASE_INPUT, kind: 'cowork', runtimeId: 'chat' },
+      { agentDefinitionRepo },
+    );
+
+    expect(result.agent.kind).toBe('cowork');
+    expect(result.agent.runtimeId).toBe('chat');
+  });
+
+  it('propagates repository errors instead of swallowing them', async () => {
+    const failingRepo: typeof agentDefinitionRepo = Object.create(agentDefinitionRepo);
+    failingRepo.create = async () => {
+      throw new Error('firestore unavailable');
+    };
+
+    await expect(
+      createAgentDefinition(BASE_INPUT, { agentDefinitionRepo: failingRepo }),
+    ).rejects.toThrow('firestore unavailable');
+  });
 });

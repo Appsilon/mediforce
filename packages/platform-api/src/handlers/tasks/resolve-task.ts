@@ -235,6 +235,12 @@ export async function resolveTask(
     });
   }
 
+  // TODO(#231): audit row claims "resumed after resolving step" + basis
+  // "triggered process advancement" even on the L3-revise branch above
+  // where we deliberately did NOT advance. Ported 1:1 from the inline
+  // route — this PR is the API extraction, not the semantic fix. Split the
+  // event in a follow-up: `process.resumed_after_task` vs
+  // `process.kept_on_step_for_revise`.
   await auditRepo.append({
     actorId,
     actorType: 'user',

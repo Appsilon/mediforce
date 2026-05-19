@@ -29,6 +29,13 @@ export async function createProcessConfig(
   input: CreateProcessConfigInput,
   deps: CreateProcessConfigDeps,
 ): Promise<CreateProcessConfigOutput> {
+  // TODO(#231): pre-existing bug ported 1:1 from the inline route. Both
+  // ternary branches resolve to the literal string 'latest', which is never
+  // a real `ProcessConfig.configVersion`, so `getProcessDefinition` returns
+  // `null` and the entire validator block below silently no-ops. Fixing it
+  // (use `getLatestWorkflowVersion` + look up by that version) is intentionally
+  // deferred — flipping validation on under a refactor banner risks rejecting
+  // configs that have been quietly persisted for months.
   const definition = await deps.processRepo.getProcessDefinition(
     input.processName,
     input.stepConfigs[0]?.stepId ? 'latest' : 'latest',

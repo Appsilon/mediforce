@@ -87,9 +87,15 @@ export type UpsertLegacyDefinitionOutput = z.infer<typeof UpsertLegacyDefinition
 // are assigned server-side. `namespace` is required and comes from a query
 // param on the route (the handler treats it as part of the input).
 
+// `namespace` is omitted from the draft schema even though the underlying
+// `WorkflowDefinition` requires it — the create endpoint takes it as a query
+// param and the handler stitches it into the persisted document. Keeping it
+// in the draft would force callers to send it twice (the inner copy was
+// silently overwritten in the pre-migration route).
 const WorkflowDefinitionDraftSchema = WorkflowDefinitionSchema.omit({
   version: true,
   createdAt: true,
+  namespace: true,
 });
 
 export const CreateWorkflowDefinitionInputSchema = z.object({

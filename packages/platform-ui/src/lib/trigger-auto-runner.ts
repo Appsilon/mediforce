@@ -9,9 +9,10 @@ import { getAppBaseUrl } from './app-base-url.js';
  * so this helper stays Next.js-flavoured: it reads `NEXT_PUBLIC_APP_URL` and
  * authenticates with `X-Api-Key`.
  *
- * Errors are deliberately swallowed. The caller has already committed the
- * state change (task completed, instance resumed) and the auto-runner is best
- * effort; a user-refresh or the next cron tick will retry it.
+ * Errors don't propagate (the caller has already committed the state change
+ * and the auto-runner is best effort) but they ARE logged. Otherwise a
+ * misconfigured `PLATFORM_API_KEY` produces a healthy-looking deploy where
+ * agent steps silently never fire — the exact failure mode we hit pre-Phase 1.
  */
 export function triggerAutoRunner(instanceId: string, triggeredBy: string): void {
   const appUrl = getAppBaseUrl();
@@ -22,5 +23,10 @@ export function triggerAutoRunner(instanceId: string, triggeredBy: string): void
       'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
     },
     body: JSON.stringify({ triggeredBy }),
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error(
+      `[trigger-auto-runner] Failed to trigger /run for ${instanceId}:`,
+      err,
+    );
+  });
 }
