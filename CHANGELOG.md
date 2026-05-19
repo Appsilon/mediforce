@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-05-17]
+
 ### Added
 - Workflows can now be moved between namespaces — copy + redirect lands you in the target tenant ([#359](https://github.com/Appsilon/mediforce/pull/359), [#370](https://github.com/Appsilon/mediforce/pull/370)).
 - Workflow discovery by Docker image: `GET /api/workflows/by-image` — needed to scale step containers without grepping definitions ([#377](https://github.com/Appsilon/mediforce/pull/377)).
