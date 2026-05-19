@@ -13,51 +13,36 @@ const userInNsA: CallerIdentity = {
   uid: 'u-1',
   namespaces: new Set(['ns-a']),
 };
-const userNoNs: CallerIdentity = {
-  kind: 'user',
-  uid: 'u-2',
-  namespaces: new Set(),
-};
+
+// The full matrix (every kind x every namespace state) is exercised
+// through caller fixtures in L2 handler tests; here we only assert
+// the helper contracts themselves: happy path, sad path, undefined.
 
 describe('assertNamespaceAccess', () => {
-  it('lets api-key callers through regardless of namespace', () => {
+  it('lets api-key callers through (happy)', () => {
     expect(() => assertNamespaceAccess(apiKey, 'ns-a')).not.toThrow();
-    expect(() => assertNamespaceAccess(apiKey, undefined)).not.toThrow();
-    expect(() => assertNamespaceAccess(apiKey, '')).not.toThrow();
   });
 
-  it('lets user callers through when the namespace is in their membership set', () => {
-    expect(() => assertNamespaceAccess(userInNsA, 'ns-a')).not.toThrow();
-  });
-
-  it('throws ForbiddenError when the user is not a member of the namespace', () => {
+  it('throws ForbiddenError when the user is not a member (sad)', () => {
     expect(() => assertNamespaceAccess(userInNsA, 'ns-b')).toThrow(ForbiddenError);
   });
 
-  it('throws ForbiddenError when the resource has no namespace and the caller is a user', () => {
+  it('throws ForbiddenError when the namespace is undefined for a user (edge)', () => {
     expect(() => assertNamespaceAccess(userInNsA, undefined)).toThrow(ForbiddenError);
-    expect(() => assertNamespaceAccess(userInNsA, '')).toThrow(ForbiddenError);
-  });
-
-  it('throws ForbiddenError when the user has no namespaces at all', () => {
-    expect(() => assertNamespaceAccess(userNoNs, 'ns-a')).toThrow(ForbiddenError);
   });
 });
 
 describe('callerCanAccess', () => {
-  it('returns true for api-key callers regardless of namespace', () => {
-    expect(callerCanAccess(apiKey, 'ns-a')).toBe(true);
-    expect(callerCanAccess(apiKey, undefined)).toBe(true);
-  });
-
-  it('returns true for user callers when the namespace is in their set', () => {
+  it('returns true for a user with the namespace in their set (happy)', () => {
     expect(callerCanAccess(userInNsA, 'ns-a')).toBe(true);
   });
 
-  it('returns false for user callers when the namespace is missing or unknown', () => {
+  it('returns false for a user outside the namespace (sad)', () => {
     expect(callerCanAccess(userInNsA, 'ns-b')).toBe(false);
+  });
+
+  it('returns false for a user when namespace is undefined (edge)', () => {
     expect(callerCanAccess(userInNsA, undefined)).toBe(false);
-    expect(callerCanAccess(userInNsA, '')).toBe(false);
   });
 });
 
@@ -72,19 +57,14 @@ describe('filterByCaller', () => {
     { id: '3' }, // no namespace
   ];
 
-  it('returns the whole list (cloned) for api-key callers', () => {
+  it('returns the whole list (cloned) for api-key callers (happy)', () => {
     const result = filterByCaller(items, apiKey, (i) => i.namespace);
     expect(result.map((i) => i.id)).toEqual(['1', '2', '3']);
     expect(result).not.toBe(items);
   });
 
-  it('keeps only entities in namespaces the user can access', () => {
+  it('keeps only entities in namespaces the user can access (sad path drops the rest)', () => {
     const result = filterByCaller(items, userInNsA, (i) => i.namespace);
     expect(result.map((i) => i.id)).toEqual(['1']);
-  });
-
-  it('drops entities with no namespace for user callers', () => {
-    const result = filterByCaller<Item>([{ id: 'x' }], userInNsA, (i) => i.namespace);
-    expect(result).toEqual([]);
   });
 });
