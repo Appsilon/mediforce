@@ -1,67 +1,50 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { WorkflowVisibilitySchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, callerCanAccess, requireNamespaceAccess } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { getWorkflowDefinition } from '@mediforce/platform-api/handlers';
+import { GetWorkflowDefinitionInputSchema } from '@mediforce/platform-api/contract';
+import type { GetWorkflowDefinitionInput } from '@mediforce/platform-api/contract';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ name: string }> },
-): Promise<NextResponse> {
-  const { name } = await params;
-  const versionParam = request.nextUrl.searchParams.get('version');
-  const namespaceParam = request.nextUrl.searchParams.get('namespace');
-
-  const { processRepo, namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  let version: number;
-  if (versionParam !== null) {
-    version = Number(versionParam);
-    if (!Number.isInteger(version) || version < 1) {
-      return NextResponse.json(
-        { error: `Invalid version: ${versionParam}` },
-        { status: 400 },
-      );
-    }
-  } else {
-    version = await processRepo.getLatestWorkflowVersion(namespaceParam ?? '', name);
-    if (version === 0) {
-      return NextResponse.json(
-        { error: `Workflow '${name}' not found` },
-        { status: 404 },
-      );
-    }
-  }
-
-  const lookupNamespace = namespaceParam ?? '';
-
-  const definition = await processRepo.getWorkflowDefinition(lookupNamespace, name, version);
-  if (definition === null) {
-    return NextResponse.json(
-      { error: `Workflow '${name}' not found` },
-      { status: 404 },
-    );
-  }
-
-  if (namespaceParam !== null && definition.namespace !== namespaceParam) {
-    return NextResponse.json(
-      { error: `Workflow '${name}' not found` },
-      { status: 404 },
-    );
-  }
-
-  if (!callerCanAccess(caller, definition.namespace)) {
-    if (definition.visibility !== 'public') {
-      return NextResponse.json(
-        { error: `Workflow '${name}' not found` },
-        { status: 404 },
-      );
-    }
-  }
-
-  return NextResponse.json({ definition });
+interface RouteContext {
+  params: Promise<{ name: string }>;
 }
+
+/**
+ * GET /api/workflow-definitions/:name
+ *
+ * Returns one workflow definition. Accepts optional `?version=` (defaults to
+ * latest) and `?namespace=` (filters by owning namespace). Missing
+ * name/version, namespace mismatch, and visibility-denied private workflows
+ * all surface as 404 via `NotFoundError` — visibility-denied is intentionally
+ * 404 (anti-enumeration), not 403.
+ */
+export const GET = createRouteAdapter<
+  typeof GetWorkflowDefinitionInputSchema,
+  GetWorkflowDefinitionInput,
+  unknown,
+  RouteContext
+>(
+  GetWorkflowDefinitionInputSchema,
+  async (req, ctx) => {
+    const { name } = await ctx.params;
+    const url = new URL(req.url);
+    const versionParam = url.searchParams.get('version');
+    const namespaceParam = url.searchParams.get('namespace');
+    const input: Record<string, unknown> = { name };
+    if (versionParam !== null) {
+      const parsed = Number(versionParam);
+      input.version = Number.isFinite(parsed) ? parsed : versionParam;
+    }
+    if (namespaceParam !== null) input.namespace = namespaceParam;
+    return input;
+  },
+  (input, caller) => {
+    const { processRepo } = getPlatformServices();
+    return getWorkflowDefinition(input, { processRepo }, caller);
+  },
+);
 
 export async function PATCH(
   request: NextRequest,

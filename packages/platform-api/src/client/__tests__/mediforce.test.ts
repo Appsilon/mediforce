@@ -497,6 +497,70 @@ describe('Mediforce', () => {
     });
   });
 
+  describe('workflowDefinitions.get', () => {
+    it('calls GET /api/workflow-definitions/:name and parses the envelope', async () => {
+      const definition = buildWorkflowDefinition({ name: 'flow-a' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ definition }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.workflowDefinitions.get({ name: 'flow-a' });
+
+      expect(result.definition.name).toBe('flow-a');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/workflow-definitions/flow-a`,
+      );
+    });
+
+    it('serialises version and namespace into the query string', async () => {
+      const definition = buildWorkflowDefinition({ name: 'flow-a', version: 2 });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ definition }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.workflowDefinitions.get({
+        name: 'flow-a',
+        version: 2,
+        namespace: 'team-alpha',
+      });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/workflow-definitions/flow-a?version=2&namespace=team-alpha`,
+      );
+    });
+
+    it('URL-encodes the name', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ error: 'x' }, 404));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.workflowDefinitions
+        .get({ name: 'flow/a' })
+        .catch(() => undefined);
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/workflow-definitions/flow%2Fa`,
+      );
+    });
+
+    it('throws ApiError on 404', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ error: 'Workflow not found' }, 404),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const err = await mediforce.workflowDefinitions
+        .get({ name: 'missing' })
+        .catch((e) => e);
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).status).toBe(404);
+    });
+  });
+
   describe('agentDefinitions.list', () => {
     it('calls GET /api/agent-definitions and parses the envelope', async () => {
       const agent = buildAgentDefinition({ id: 'a-1' });

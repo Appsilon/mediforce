@@ -12,6 +12,7 @@ export { getProcessSteps, type GetProcessStepsDeps } from './processes/get-proce
 export { listWorkflowDefinitions, type ListWorkflowDefinitionsDeps } from './definitions/list-workflow-definitions.js';
 export { listAgentDefinitions, type ListAgentDefinitionsDeps } from './definitions/list-agent-definitions.js';
 export { getAgentDefinition, type GetAgentDefinitionDeps } from './definitions/get-agent-definition.js';
+export { getWorkflowDefinition, type GetWorkflowDefinitionDeps } from './definitions/get-workflow-definition.js';
 
 export { getCoworkSession, type GetCoworkSessionDeps } from './cowork/get-cowork-session.js';
 export { getCoworkSessionByInstance, type GetCoworkSessionByInstanceDeps } from './cowork/get-cowork-session-by-instance.js';

@@ -51,6 +51,8 @@ import {
   ListAgentDefinitionsOutputSchema,
   GetAgentDefinitionInputSchema,
   GetAgentDefinitionOutputSchema,
+  GetWorkflowDefinitionInputSchema,
+  GetWorkflowDefinitionOutputSchema,
   GetCoworkSessionInputSchema,
   GetCoworkSessionOutputSchema,
   GetCoworkSessionByInstanceInputSchema,
@@ -120,6 +122,8 @@ import {
   type ListAgentDefinitionsOutput,
   type GetAgentDefinitionInput,
   type GetAgentDefinitionOutput,
+  type GetWorkflowDefinitionInput,
+  type GetWorkflowDefinitionOutput,
   type GetCoworkSessionInput,
   type GetCoworkSessionOutput,
   type GetCoworkSessionByInstanceInput,
@@ -195,6 +199,7 @@ export class Mediforce {
 
   readonly workflowDefinitions: {
     list: (input?: ListWorkflowDefinitionsInput) => Promise<ListWorkflowDefinitionsOutput>;
+    get: (input: GetWorkflowDefinitionInput) => Promise<GetWorkflowDefinitionOutput>;
   };
 
   readonly agentDefinitions: {
@@ -351,6 +356,18 @@ export class Mediforce {
         const res = await this.request(`/api/workflow-definitions${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflowDefinitions.list');
         return ListWorkflowDefinitionsOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetWorkflowDefinitionInputSchema.parse(input);
+        const qs = toSearchParams({
+          version: validated.version !== undefined ? String(validated.version) : undefined,
+          namespace: validated.namespace,
+        });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.workflowDefinitions.get');
+        return GetWorkflowDefinitionOutputSchema.parse(body);
       },
     };
 

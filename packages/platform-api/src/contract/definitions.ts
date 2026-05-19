@@ -40,6 +40,21 @@ export type WorkflowDefinitionSummary = z.infer<typeof WorkflowDefinitionSummary
 export type ListWorkflowDefinitionsInput = z.infer<typeof ListWorkflowDefinitionsInputSchema>;
 export type ListWorkflowDefinitionsOutput = z.infer<typeof ListWorkflowDefinitionsOutputSchema>;
 
+// ---- GET /api/workflow-definitions/:name ------------------------------------
+
+export const GetWorkflowDefinitionInputSchema = z.object({
+  name: z.string().min(1),
+  version: z.number().int().min(1).optional(),
+  namespace: z.string().min(1).optional(),
+});
+
+export const GetWorkflowDefinitionOutputSchema = z.object({
+  definition: WorkflowDefinitionSchema,
+});
+
+export type GetWorkflowDefinitionInput = z.infer<typeof GetWorkflowDefinitionInputSchema>;
+export type GetWorkflowDefinitionOutput = z.infer<typeof GetWorkflowDefinitionOutputSchema>;
+
 // ---- GET /api/agent-definitions ---------------------------------------------
 
 export const ListAgentDefinitionsInputSchema = z.object({});

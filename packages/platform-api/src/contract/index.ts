@@ -155,6 +155,8 @@ export {
   ListAgentDefinitionsOutputSchema,
   GetAgentDefinitionInputSchema,
   GetAgentDefinitionOutputSchema,
+  GetWorkflowDefinitionInputSchema,
+  GetWorkflowDefinitionOutputSchema,
   type WorkflowDefinitionSummary,
   type ListWorkflowDefinitionsInput,
   type ListWorkflowDefinitionsOutput,
@@ -162,6 +164,8 @@ export {
   type ListAgentDefinitionsOutput,
   type GetAgentDefinitionInput,
   type GetAgentDefinitionOutput,
+  type GetWorkflowDefinitionInput,
+  type GetWorkflowDefinitionOutput,
 } from './definitions.js';
 
 export {
