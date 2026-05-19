@@ -1,7 +1,7 @@
 version: "1.0"
 generated: "2026-05-19"
 standard: "agentskills.io/specification"
-total_skills: 11
+total_skills: 12
 
 # Runtime skills have their own per-app registries:
 #   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml
@@ -67,3 +67,8 @@ domains:
         complexity: intermediate
         language: multi
         description: mediforce CLI, dev environment, platform API, and adding missing CLI commands
+      - id: grill-with-docs
+        path: skills/grill-with-docs/SKILL.md
+        complexity: basic
+        language: multi
+        description: Interview-style plan stress-test against CONTEXT.md and ADRs (vendored from mattpocock/skills)

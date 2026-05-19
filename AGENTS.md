@@ -34,7 +34,11 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
 
 1. **Simplify first.** Before coding, ask: *can this be smaller?* Cut layers,
    abstractions, scope. KISS. The simplest change that solves the actual
-   problem wins.
+   problem wins. For plans worth stress-testing (architectural change,
+   new domain concept, anything you'd struggle to explain in two
+   sentences), invoke `/grill-with-docs` — it challenges the plan against
+   the codebase's language and surfaces fuzzy terms before you write code.
+   Optional, not every task needs it.
 
 2. **Test first via `/new-test`.** Write a failing test at the lowest level
    that gives real signal before implementation. `/new-test` picks the level

@@ -72,19 +72,7 @@ If coverage is missing, that's a finding — not a "nice to have".
 
 Delegate the architecture / security / convention pass to `/code-review`. It has its own 8-section checklist; don't duplicate.
 
-## Step 5 — Full unit suite
-
-Before the verdict, run the full unit + integration suite, not just affected:
-
-```bash
-pnpm test:unit
-```
-
-~9s. Catches regressions that `test:affected` (changed files only) misses. If it fails, STOP — that's a blocker regardless of how clean the diff looks.
-
-If the diff touched UI, route handlers, middleware, or anything that would change wire-level behaviour, also run `pnpm test:e2e:api` (L3, ~30s, no browser). Full `pnpm test:e2e` (~4min, with browser) is a pre-merge gate — only run before opening the PR, not on every self-review pass.
-
-## Step 6 — Verdict
+## Step 5 — Verdict
 
 Aggregate findings into one of two outputs:
 
