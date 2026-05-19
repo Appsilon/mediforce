@@ -1,7 +1,7 @@
 version: "1.0"
-generated: "2026-05-13"
+generated: "2026-05-19"
 standard: "agentskills.io/specification"
-total_skills: 8
+total_skills: 11
 
 # Runtime skills have their own per-app registries:
 #   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml
@@ -52,3 +52,18 @@ domains:
         complexity: basic
         language: multi
         description: Append a one-line entry for a merged PR under [Unreleased] in CHANGELOG.md (Keep-a-Changelog)
+      - id: new-test
+        path: skills/new-test/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Pick the right test level (L1-L5), scaffold the file, and walk the RED-GREEN loop
+      - id: self-review
+        path: skills/self-review/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: Pre-PR check — typecheck, affected tests, diff, style, code-review. MUST run as subagent for objectivity
+      - id: mediforce
+        path: skills/mediforce/SKILL.md
+        complexity: intermediate
+        language: multi
+        description: mediforce CLI, dev environment, platform API, and adding missing CLI commands
