@@ -1,13 +1,13 @@
 ---
-name: add-release-notes
-description: Append a one-line entry for a merged (or about-to-merge) PR under the `[Unreleased]` section in CHANGELOG.md. Use after merging a non-trivial PR, when batching multiple PRs covering one feature, or when updating a Keep-a-Changelog entry.
+name: add-changelog-entry
+description: Append a one-line entry for a merged (or about-to-merge) PR under the `[Unreleased]` section in CHANGELOG.md. Use after merging a non-trivial PR, when batching multiple PRs covering one feature, or when updating a Keep-a-Changelog entry. Triggers: "add to changelog", "log this change", "update CHANGELOG", "release notes".
 allowed-tools: Bash, Read, Edit
 metadata:
   author: Mediforce
-  version: "2.0"
+  version: "2.1"
   domain: development
   complexity: basic
-  tags: changelog, release-notes, keep-a-changelog
+  tags: changelog, keep-a-changelog
 ---
 
 # Add Release Notes
@@ -17,9 +17,9 @@ metadata:
 ## Usage
 
 ```
-/add-release-notes                  # infer from latest merged PR on main
-/add-release-notes 408              # specific PR number
-/add-release-notes 402 408          # group multiple PRs as one item
+/add-changelog-entry                  # infer from latest merged PR on main
+/add-changelog-entry 408              # specific PR number
+/add-changelog-entry 402 408          # group multiple PRs as one item
 ```
 
 ## When to add

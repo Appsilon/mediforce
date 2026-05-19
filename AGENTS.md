@@ -93,7 +93,7 @@ self-test → self-review → report.
 
 10. **Log it in CHANGELOG.md.** Every non-trivial PR appends a one-line
     bullet under `## [Unreleased]` in `CHANGELOG.md` via
-    `/add-release-notes`, using Keep-a-Changelog categories (Added /
+    `/add-changelog-entry`, using Keep-a-Changelog categories (Added /
     Changed / Deprecated / Removed / Fixed / Security / Dependencies).
     Group several PRs covering one thing as a nested list. Skip only for
     trivial edits (typos, single-line config, comment-only diffs).
@@ -160,10 +160,10 @@ Invoke before starting work when the task matches:
 - `/e2e-test` — write or run E2E journey tests (incl. GIF recording)
 - `/agent-browser` — visual UI verification in a live browser
 - `/renovate-review` — review a Renovate dependency PR
-- `/community` — Discord community update
+- `/discord-update` — Discord community update
 - `/generate-pitch` — pitch deck
 - `/knowledge-base` — wiki / synthesise architecture
-- `/add-release-notes` — append bullet under `[Unreleased]` in `CHANGELOG.md`
+- `/add-changelog-entry` — append bullet under `[Unreleased]` in `CHANGELOG.md`
 
 Two tiers: `skills/` (dev-time slash commands, indexed in `skills/_registry.yml`)
 and `apps/*/plugins/*/skills/` (runtime, loaded by `agent-runtime` via
@@ -212,6 +212,6 @@ pnpm exec mediforce --help
 4. Self code review (`git diff` + `/code-review`) before reporting done.
 5. Ask, don't sneak, when a capability is missing.
 6. Delegate to subagents when it parallelises. Not as ceremony.
-7. Log non-trivial changes in `CHANGELOG.md` (`/add-release-notes`).
+7. Log non-trivial changes in `CHANGELOG.md` (`/add-changelog-entry`).
 
 See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).

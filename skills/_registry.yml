@@ -17,8 +17,8 @@ domains:
         complexity: intermediate
         language: multi
         description: Browser automation CLI for AI agents
-      - id: community
-        path: skills/community/SKILL.md
+      - id: discord-update
+        path: skills/discord-update/SKILL.md
         complexity: basic
         language: multi
         description: Write Discord updates for the MediForce community
@@ -47,8 +47,8 @@ domains:
         complexity: basic
         language: multi
         description: Ingest, query, and lint the LLM-compiled wiki (Karpathy LLM Wiki pattern)
-      - id: add-release-notes
-        path: skills/add-release-notes/SKILL.md
+      - id: add-changelog-entry
+        path: skills/add-changelog-entry/SKILL.md
         complexity: basic
         language: multi
-        description: Append a one-line entry for a merged PR to the current week's section in RELEASE_NOTES.md
+        description: Append a one-line entry for a merged PR under [Unreleased] in CHANGELOG.md (Keep-a-Changelog)

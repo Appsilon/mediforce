@@ -1,10 +1,10 @@
 ---
-name: community
-description: Write short Discord updates for the MediForce community based on rough notes. Produces two versions (short and detailed) following engineer-to-peers tone with no marketing language.
+name: discord-update
+description: Write a Discord update for the MediForce community from rough notes. Use when the user asks for a "Discord update", "Discord post", "community update", "weekly digest for Discord", or hands over bullet-point notes to turn into a community announcement. Produces two versions (short and detailed) in engineer-to-peers tone, no marketing language.
 allowed-tools: Read, Write
 metadata:
   author: Appsilon
-  version: "1.3"
+  version: "1.4"
   domain: community
   complexity: basic
   tags: discord, community, communication
@@ -78,7 +78,7 @@ Output short first, then `---`, then detailed. Both stand alone.
   - Bad: "We refactored the workflow copy handler across API, CLI, and SDK."
   - Good: "You can now copy any workflow into your own namespace and edit it freely — no fork, no upstream sync to maintain."
 - **Discord-safe links.** Bare `#NNN`, `PR #NNN`, `issue #NNN` do NOT auto-link on Discord (only GitHub renders them). Always write `[#NNN](https://github.com/Appsilon/mediforce/pull/NNN)` so the link works in Discord, Slack, blogs, and GitHub alike. Same for external URLs — use `[label](url)`, never bare URLs except for short standalone "Address:" lines.
-- **Actionable hook, not passive description.** Tell the reader what *they* can now do or should do, not just "this happens". `Every non-trivial PR drops a bullet` reads like magic; `Every non-trivial PR should add a bullet (we have a /add-release-notes skill for that)` invites the reader to participate and points them at the tool.
+- **Actionable hook, not passive description.** Tell the reader what *they* can now do or should do, not just "this happens". `Every non-trivial PR drops a bullet` reads like magic; `Every non-trivial PR should add a bullet (we have a /add-changelog-entry skill for that)` invites the reader to participate and points them at the tool.
 - **Active voice + real ownership.** If a human is in the loop, name the actor. "PRs should add a bullet" beats "PRs drop a bullet" — the latter falsely implies automation that doesn't exist.
 - **No marketing language.** No "exciting", "thrilled", "game-changing", "revolutionary", "powerful". Zero adjectives that sell.
 - **Be specific.** Name the component, the PR, the dialog, the CLI command. Vague is worse than short.
@@ -128,7 +128,7 @@ These three posts are the reference style. New output should feel like these —
 - Enumerate the surface area when it spans layers: `API, CLI, SDK, and a UI dialog` — only if that matters to the reader.
 - Call out defaults / fallback in a separate sentence: "If these are not defined, workflows will use the default Accept/Revise buttons that we had so far."
 - For tools / mini-apps: include Address + auth hint (where key lives) on their own lines.
-- If the update introduces a process the reader participates in, add a one-clause **hook** pointing them at the tool: "(we have a `/add-release-notes` skill for that)".
+- If the update introduces a process the reader participates in, add a one-clause **hook** pointing them at the tool: "(we have a `/add-changelog-entry` skill for that)".
 - No mandatory closing question. Hooks are not questions — they're invitations.
 - **Cut secondary details first.** Cache hit edge cases, opt-in flags, perf footnotes, "and also we did X" — drop them. If the reader's daily action doesn't change, the detail isn't earning its line. The PR description carries the long tail.
 

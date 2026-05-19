@@ -43,7 +43,8 @@ Skills are reusable instruction sets invoked on demand via `/skill-name`. The Sk
 | `/e2e-test` | Write, run, and record E2E journey tests with TDD workflow |
 | `/agent-browser` | Visual verification of UI in a live browser |
 | `/renovate-review` | Triage and validate Renovate dependency PRs |
-| `/community` | Write Discord updates from rough notes |
+| `/discord-update` | Write Discord updates from rough notes |
+| `/add-changelog-entry` | Append a one-line entry to CHANGELOG.md under `[Unreleased]` |
 | `/generate-pitch` | Generate a Marp pitch deck from vision docs |
 
 Each skill has a `SKILL.md` with step-by-step workflow and optional `references/` with templates and checklists.
