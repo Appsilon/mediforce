@@ -65,16 +65,20 @@ Uniform pattern. Low risk. Establishes the catalogue of read contracts that Phas
   `// @public-handler` with a one-line reason. A static grep guard
   (`packages/platform-api/src/handlers/__tests__/auth-coverage.test.ts`) fails
   CI on any handler that drops the caller silently — TypeScript can't catch
-  an unused parameter, so we enforce the rule out-of-band. Outstanding
-  follow-up: see #448 for terminology (`apiKey` → service-key) and per-user
-  API keys.
-- **404 vs 403 for visibility.** A private resource the caller cannot read
-  surfaces as **404, not 403**. Acknowledging "exists but denied" leaks
-  namespace existence — the route returns the same not-found shape as a
-  genuinely-missing id. This is intentional anti-enumeration, mirrored in
-  `getAgentDefinition`, `getWorkflowDefinition`, and the per-name workflow
-  fetch. 403 is reserved for *mutations* the caller proved they were trying
-  to perform on a known resource.
+  an unused parameter, so we enforce the rule out-of-band. The guard uses
+  regex + comment stripping to avoid false positives from bare imports or
+  comment-only mentions. Outstanding follow-ups: #448 (terminology rename
+  `apiKey` → `admin`, per-user API keys land via #376 mapping to `'user'`
+  kind) and #452 (models mutations marked `@public-handler` need an admin
+  gate once #448 lands).
+- **404 anti-enumeration on every namespace-gated read.** A resource the
+  caller cannot read surfaces as **404, not 403** across all 10 Phase 1
+  GET endpoints — tasks, processes, audit, steps, agent-definitions list +
+  detail, workflow-definitions list + detail, cowork (both shapes). The
+  route returns the same not-found body as a genuinely-missing id, so a
+  non-member caller cannot tell "this id exists but I can't see it" from
+  "this id doesn't exist". 403 is reserved for *mutations* the caller
+  proved they were trying to perform on a known resource (Phase 2).
 - **Breaking shape change.** `GET /api/processes/:id/audit` migrated from a
   bare array to `{ events: AuditEvent[] }`. Wrapping every list-shaped
   response in a named envelope keeps the door open for pagination metadata
@@ -138,8 +142,12 @@ identical to today.
 Harder than GETs because each mutation has a state machine and side effects. Break into small PRs.
 
 **Status note**: PR #445 (the first Phase 2 batch) was closed because it
-targeted the wrong base — to be redone on top of the secure branch once
-#450 lands.
+was stacked on #256 (the original Phase 1 PR without caller threading) —
+copy-pasting the same auth gap into every mutation handler. Redo from
+branch `claude/cool-jennings-035e0c` (preserved) on top of #450 once it
+lands: every mutation handler picks up the `caller: CallerIdentity` third
+argument and the `auth-coverage.test.ts` guard runs against the new files
+automatically.
 
 - **Tasks lifecycle**: `POST /api/tasks/:id/claim`, `POST /api/tasks/:id/complete`, `POST /api/tasks/:id/resolve`
 - **Process lifecycle**: `POST /api/processes`, `POST /api/processes/:id/advance`, `POST /api/processes/:id/cancel`, `POST /api/processes/:id/resume`, `POST /api/processes/:id/steps/:stepId/retry`
