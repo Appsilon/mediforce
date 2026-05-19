@@ -9,11 +9,19 @@ import { useCollection } from './use-collection';
 
 export type ProcessStatusFilter = 'all' | 'running' | 'paused' | 'completed' | 'failed' | 'created';
 
+/**
+ * List process instances scoped to a workspace.
+ *
+ * `namespace` is REQUIRED to prevent cross-workspace leaks. The hook reads
+ * from the unscoped `processInstances` Firestore collection and filters
+ * client-side, so callers must pass the current workspace `handle`.
+ * See PR #424 + issue #447 for the wider audit.
+ */
 export function useProcessInstances(
-  statusFilter: ProcessStatusFilter = 'all',
-  definitionName?: string,
-  showArchived = false,
-  namespace?: string,
+  statusFilter: ProcessStatusFilter,
+  definitionName: string | undefined,
+  showArchived: boolean,
+  namespace: string,
 ) {
   const constraints = useMemo(() => {
     const c = [];
@@ -33,7 +41,7 @@ export function useProcessInstances(
     const filtered = result.data
       .filter((instance) => !instance.deleted)
       .filter((instance) => showArchived || instance.archived !== true)
-      .filter((instance) => !namespace || instance.namespace === namespace);
+      .filter((instance) => instance.namespace === namespace);
     if (!definitionName) return filtered;
     return [...filtered].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),

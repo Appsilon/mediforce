@@ -39,30 +39,36 @@ export class InMemoryProcessRepository implements ProcessRepository {
     const grouped = new Map<string, WorkflowDefinition[]>();
     for (const definition of this.workflowDefinitions.values()) {
       if (!includeArchived && definition.archived === true) continue;
-      const existing = grouped.get(definition.name) ?? [];
+      const key = this.compositeKey(definition.namespace, definition.name, '');
+      const existing = grouped.get(key) ?? [];
       existing.push(definition);
-      grouped.set(definition.name, existing);
+      grouped.set(key, existing);
     }
     const definitions: WorkflowDefinitionGroup[] = Array.from(grouped.entries()).map(
-      ([name, versions]) => ({
-        name,
-        versions,
-        latestVersion: Math.max(...versions.map((v) => v.version)),
-        defaultVersion: this.workflowDefaults.get(name) ?? null,
-      }),
+      ([_key, versions]) => {
+        const namespace = versions[0].namespace;
+        const name = versions[0].name;
+        return {
+          namespace,
+          name,
+          versions,
+          latestVersion: Math.max(...versions.map((v) => v.version)),
+          defaultVersion: this.workflowDefaults.get(`${namespace}:${name}`) ?? null,
+        };
+      },
     );
     return { definitions };
   }
 
-  async getDefaultWorkflowVersion(name: string, namespace: string): Promise<number | null> {
+  async getDefaultWorkflowVersion(namespace: string, name: string): Promise<number | null> {
     return this.workflowDefaults.get(`${namespace}:${name}`) ?? null;
   }
 
-  async setDefaultWorkflowVersion(name: string, namespace: string, version: number): Promise<void> {
+  async setDefaultWorkflowVersion(namespace: string, name: string, version: number): Promise<void> {
     this.workflowDefaults.set(`${namespace}:${name}`, version);
   }
 
-  async getLatestWorkflowVersion(name: string, namespace: string): Promise<number> {
+  async getLatestWorkflowVersion(namespace: string, name: string): Promise<number> {
     let latest = 0;
     for (const definition of this.workflowDefinitions.values()) {
       if (
@@ -106,15 +112,24 @@ export class InMemoryProcessRepository implements ProcessRepository {
     if (!found) throw new Error(`Workflow '${name}' not found`);
   }
 
-  async setWorkflowDeleted(_name: string, _namespace: string, _deleted: boolean): Promise<void> {
-    // No-op in test double
+  async setWorkflowDeleted(namespace: string, name: string, deleted: boolean): Promise<void> {
+    for (const [key, def] of this.workflowDefinitions) {
+      if (def.name === name && def.namespace === namespace) {
+        this.workflowDefinitions.set(key, { ...def, deleted });
+      }
+    }
   }
 
-  async isWorkflowNameDeleted(_name: string, _namespace: string): Promise<boolean> {
+  async isWorkflowNameDeleted(namespace: string, name: string): Promise<boolean> {
+    for (const definition of this.workflowDefinitions.values()) {
+      if (definition.name === name && definition.namespace === namespace && definition.deleted === true) {
+        return true;
+      }
+    }
     return false;
   }
 
-  async countInstancesByDefinitionName(_name: string, _namespace: string): Promise<number> {
+  async countInstancesByDefinitionName(_namespace: string, _name: string): Promise<number> {
     return 0;
   }
 

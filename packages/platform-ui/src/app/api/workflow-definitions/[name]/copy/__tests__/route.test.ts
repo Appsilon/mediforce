@@ -64,7 +64,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
     vi.clearAllMocks();
     mockCallerIdentity = { kind: 'apiKey' };
     // First call: source version lookup; Second call: target exists check
-    mockGetLatestWorkflowVersion.mockImplementation((_name: string, namespace: string) =>
+    mockGetLatestWorkflowVersion.mockImplementation((namespace: string, _name: string) =>
       namespace === 'target-ns' ? Promise.resolve(0) : Promise.resolve(3),
     );
     mockGetWorkflowDefinition.mockResolvedValue(sourceDefinition);
@@ -116,7 +116,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
   });
 
   it('returns 409 when name exists in target namespace', async () => {
-    mockGetLatestWorkflowVersion.mockImplementation((_name: string, namespace: string) =>
+    mockGetLatestWorkflowVersion.mockImplementation((namespace: string, _name: string) =>
       namespace === 'target-ns' ? Promise.resolve(2) : Promise.resolve(3),
     );
 

@@ -74,6 +74,7 @@ describe('ListWorkflowsOutputSchema', () => {
     const result = ListWorkflowsOutputSchema.safeParse({
       definitions: [
         {
+          namespace: wd.namespace,
           name: wd.name,
           latestVersion: 2,
           defaultVersion: 1,
@@ -88,6 +89,7 @@ describe('ListWorkflowsOutputSchema', () => {
     const result = ListWorkflowsOutputSchema.safeParse({
       definitions: [
         {
+          namespace: 'test',
           name: 'wf',
           latestVersion: 1,
           defaultVersion: null,

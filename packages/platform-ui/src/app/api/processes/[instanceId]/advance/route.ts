@@ -32,7 +32,7 @@ export async function POST(
 
     const versionNum = parseInt(instance.definitionVersion, 10);
     const latestVersion = isNaN(versionNum)
-      ? await processRepo.getLatestWorkflowVersion(instance.definitionName, instance.namespace ?? '')
+      ? await processRepo.getLatestWorkflowVersion(instance.namespace ?? '', instance.definitionName)
       : versionNum;
     const definition = await processRepo.getWorkflowDefinition(instance.namespace ?? '', instance.definitionName, latestVersion);
     if (!definition) {

@@ -67,7 +67,7 @@ export async function saveWorkflowDefinition(
   const { processRepo } = getPlatformServices();
 
   try {
-    const isDeleted = await processRepo.isWorkflowNameDeleted(parsed.data.name, parsed.data.namespace);
+    const isDeleted = await processRepo.isWorkflowNameDeleted(parsed.data.namespace, parsed.data.name);
     if (isDeleted) {
       return {
         success: false,
@@ -75,7 +75,7 @@ export async function saveWorkflowDefinition(
       };
     }
 
-    const latestVersion = await processRepo.getLatestWorkflowVersion(parsed.data.name, parsed.data.namespace);
+    const latestVersion = await processRepo.getLatestWorkflowVersion(parsed.data.namespace, parsed.data.name);
     const nextVersion = latestVersion + 1;
 
     const definition: WorkflowDefinition = {
@@ -112,7 +112,7 @@ export async function setDefaultWorkflowVersion(
     if (!def) {
       return { success: false, error: `Version ${version} not found` };
     }
-    await processRepo.setDefaultWorkflowVersion(name, namespace, version);
+    await processRepo.setDefaultWorkflowVersion(namespace, name, version);
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
@@ -162,7 +162,7 @@ export type DeleteResult = { success: true; deletedRuns: number } | { success: f
 
 export async function getWorkflowRunCount(workflowName: string, namespace: string): Promise<number> {
   const { processRepo } = getPlatformServices();
-  return processRepo.countInstancesByDefinitionName(workflowName, namespace);
+  return processRepo.countInstancesByDefinitionName(namespace, workflowName);
 }
 
 export async function deleteWorkflow(
@@ -174,7 +174,7 @@ export async function deleteWorkflow(
 
   try {
     // Verify run count still matches to prevent stale confirmations
-    const actualRunCount = await processRepo.countInstancesByDefinitionName(workflowName, namespace);
+    const actualRunCount = await processRepo.countInstancesByDefinitionName(namespace, workflowName);
     if (actualRunCount !== expectedRunCount) {
       return {
         success: false,
@@ -198,7 +198,7 @@ export async function deleteWorkflow(
     });
 
     // Soft-delete workflow definitions (all versions + meta)
-    await processRepo.setWorkflowDeleted(workflowName, namespace, true);
+    await processRepo.setWorkflowDeleted(namespace, workflowName, true);
 
     // Soft-delete all associated process instances and their human tasks
     if (actualRunCount > 0) {

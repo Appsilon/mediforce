@@ -1,5 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { FirestoreProcessRepository } from '../firestore/process-repository.js';
+import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
 
 /**
  * One-time startup migration: backfill `namespace` on processInstances
@@ -11,7 +12,7 @@ import { FirestoreProcessRepository } from '../firestore/process-repository.js';
  */
 export async function backfillInstanceNamespaces(
   db: Firestore,
-  processRepo: FirestoreProcessRepository,
+  _processRepo: FirestoreProcessRepository,
 ): Promise<void> {
   const snapshot = await db
     .collection('processInstances')
@@ -35,19 +36,42 @@ export async function backfillInstanceNamespaces(
   for (const docSnap of needsBackfill) {
     const data = docSnap.data();
     const defName = data.definitionName as string;
+    const definitionVersion = data.definitionVersion as string | number | undefined;
+    const cacheKey = `${defName}:${String(definitionVersion ?? '')}`;
 
-    if (!namespaceCache.has(defName)) {
-      const latestVersion = await processRepo.getLatestWorkflowVersion(defName, '');
-      if (latestVersion === 0) {
-        namespaceCache.set(defName, null);
-      } else {
-        // Legacy migration: try empty namespace first (old doc IDs), then query-based
-        const def = await processRepo.getWorkflowDefinition('', defName, latestVersion);
-        namespaceCache.set(defName, def?.namespace ?? null);
+    if (!namespaceCache.has(cacheKey)) {
+      const definitionSnapshot = await db
+        .collection('workflowDefinitions')
+        .where('name', '==', defName)
+        .get();
+
+      const matchingNamespaces = new Set<string>();
+      for (const definitionDoc of definitionSnapshot.docs) {
+        const parsed = WorkflowDefinitionSchema.safeParse(definitionDoc.data());
+        if (!parsed.success) continue;
+
+        const versionMatches =
+          definitionVersion !== undefined &&
+          definitionVersion !== null &&
+          String(parsed.data.version) === String(definitionVersion);
+
+        if (versionMatches) {
+          matchingNamespaces.add(parsed.data.namespace);
+        }
       }
+      const namespace =
+        matchingNamespaces.size === 1
+          ? Array.from(matchingNamespaces)[0]
+          : null;
+      if (matchingNamespaces.size > 1) {
+        console.warn(
+          `[backfill] Skipping ambiguous processInstances for workflow '${defName}' v${String(definitionVersion)}; matched namespaces: ${Array.from(matchingNamespaces).join(', ')}`,
+        );
+      }
+      namespaceCache.set(cacheKey, namespace);
     }
 
-    const namespace = namespaceCache.get(defName);
+    const namespace = namespaceCache.get(cacheKey);
     if (namespace !== null && namespace !== undefined) {
       await db.collection('processInstances').doc(docSnap.id).update({ namespace });
       updated++;

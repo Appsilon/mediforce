@@ -24,7 +24,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const requestNamespace = body.namespace ?? '';
     let version: number | undefined = body.definitionVersion ?? (body.version ? Number(body.version) : undefined);
     if (!version) {
-      const resolved = await processRepo.getLatestWorkflowVersion(body.definitionName, requestNamespace);
+      const resolved = await processRepo.getLatestWorkflowVersion(requestNamespace, body.definitionName);
       if (resolved === 0) {
         return NextResponse.json(
           { error: `No workflow definition found for '${body.definitionName}'` },

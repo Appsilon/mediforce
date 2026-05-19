@@ -60,8 +60,8 @@ export class WebhookRouter {
     }
 
     const version = await this.processRepository.getLatestWorkflowVersion(
-      input.workflowName,
       input.namespace,
+      input.workflowName,
     );
     if (version === 0) {
       return {

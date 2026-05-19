@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api-fetch';
 import type { DefinitionGroup } from './use-process-definitions';
 
 export interface ApiDefinitionItem {
+  namespace: string;
   name: string;
   latestVersion: number;
   defaultVersion: number;

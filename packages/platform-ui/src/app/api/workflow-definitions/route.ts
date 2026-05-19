@@ -24,6 +24,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const result = definitions.map((group) => {
     const latest = group.versions.find((v) => v.version === group.latestVersion);
     return {
+      namespace: group.namespace,
       name: group.name,
       latestVersion: group.latestVersion,
       defaultVersion: group.defaultVersion,
@@ -94,7 +95,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const { processRepo } = getPlatformServices();
 
   try {
-    const latestVersion = await processRepo.getLatestWorkflowVersion(parsed.data.name, namespace);
+    const latestVersion = await processRepo.getLatestWorkflowVersion(namespace, parsed.data.name);
     const nextVersion = latestVersion + 1;
 
     const definition = {

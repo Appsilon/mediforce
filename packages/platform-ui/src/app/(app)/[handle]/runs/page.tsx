@@ -57,6 +57,7 @@ function RunsPageContent({ handle }: { handle: string }) {
     'all',
     workflowFilter ?? undefined,
     showArchivedRuns,
+    handle,
   );
   const { data: activeTasks } = useMyTasks(null);
 

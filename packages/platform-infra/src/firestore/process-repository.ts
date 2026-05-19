@@ -45,18 +45,10 @@ export class FirestoreProcessRepository implements ProcessRepository {
     name: string,
     version: number,
   ): Promise<WorkflowDefinition | null> {
-    let snapshot = await this.db
+    const snapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
       .doc(`${namespace}:${name}:${version}`)
       .get();
-
-    // Fallback: pre-migration doc ID format ({name}:{version})
-    if (!snapshot.exists) {
-      snapshot = await this.db
-        .collection(this.workflowDefinitionsCollection)
-        .doc(`${name}:${version}`)
-        .get();
-    }
 
     if (!snapshot.exists) return null;
 
@@ -125,21 +117,17 @@ export class FirestoreProcessRepository implements ProcessRepository {
         const name = versions[0].name;
         const namespace = versions[0].namespace;
         const latestVersion = Math.max(...versions.map((v) => v.version));
-        const defaultVersion = await this.getDefaultWorkflowVersion(name, namespace);
-        return { name, versions, latestVersion, defaultVersion };
+        const defaultVersion = await this.getDefaultWorkflowVersion(namespace, name);
+        return { namespace, name, versions, latestVersion, defaultVersion };
       }),
     );
 
     return { definitions };
   }
 
-  async getDefaultWorkflowVersion(name: string, namespace: string): Promise<number | null> {
+  async getDefaultWorkflowVersion(namespace: string, name: string): Promise<number | null> {
     try {
-      let snapshot = await this.db.collection('workflowMeta').doc(`${namespace}:${name}`).get();
-      // Fallback: pre-migration key
-      if (!snapshot.exists) {
-        snapshot = await this.db.collection('workflowMeta').doc(name).get();
-      }
+      const snapshot = await this.db.collection('workflowMeta').doc(`${namespace}:${name}`).get();
       if (!snapshot.exists) return null;
       const data = snapshot.data();
       return typeof data?.defaultVersion === 'number' ? data.defaultVersion : null;
@@ -148,18 +136,18 @@ export class FirestoreProcessRepository implements ProcessRepository {
     }
   }
 
-  async setDefaultWorkflowVersion(name: string, namespace: string, version: number): Promise<void> {
+  async setDefaultWorkflowVersion(namespace: string, name: string, version: number): Promise<void> {
     await this.db
       .collection('workflowMeta')
       .doc(`${namespace}:${name}`)
       .set({ defaultVersion: version }, { merge: true });
   }
 
-  async getLatestWorkflowVersion(name: string, namespace: string): Promise<number> {
+  async getLatestWorkflowVersion(namespace: string, name: string): Promise<number> {
     const snapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
-      .where('name', '==', name)
       .where('namespace', '==', namespace)
+      .where('name', '==', name)
       .get();
 
     if (snapshot.empty) {
@@ -191,15 +179,8 @@ export class FirestoreProcessRepository implements ProcessRepository {
   }
 
   async setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void> {
-    let docId = `${namespace}:${name}:${version}`;
-    let docRef = this.db.collection(this.workflowDefinitionsCollection).doc(docId);
-    let snap = await docRef.get();
-    // Fallback: pre-migration doc ID format
-    if (!snap.exists) {
-      docId = `${name}:${version}`;
-      docRef = this.db.collection(this.workflowDefinitionsCollection).doc(docId);
-      snap = await docRef.get();
-    }
+    const docRef = this.db.collection(this.workflowDefinitionsCollection).doc(`${namespace}:${name}:${version}`);
+    const snap = await docRef.get();
     if (!snap.exists) {
       throw new WorkflowDefinitionVersionNotFoundError(name, version);
     }
@@ -222,7 +203,7 @@ export class FirestoreProcessRepository implements ProcessRepository {
     await batch.commit();
   }
 
-  async setWorkflowDeleted(name: string, namespace: string, deleted: boolean): Promise<void> {
+  async setWorkflowDeleted(namespace: string, name: string, deleted: boolean): Promise<void> {
     const workflowSnapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
       .where('name', '==', name)
@@ -242,7 +223,7 @@ export class FirestoreProcessRepository implements ProcessRepository {
     }
   }
 
-  async isWorkflowNameDeleted(name: string, namespace: string): Promise<boolean> {
+  async isWorkflowNameDeleted(namespace: string, name: string): Promise<boolean> {
     const snapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
       .where('name', '==', name)
@@ -252,7 +233,7 @@ export class FirestoreProcessRepository implements ProcessRepository {
     return !snapshot.empty;
   }
 
-  async countInstancesByDefinitionName(name: string, namespace: string): Promise<number> {
+  async countInstancesByDefinitionName(namespace: string, name: string): Promise<number> {
     const snapshot = await this.db
       .collection('processInstances')
       .where('definitionName', '==', name)

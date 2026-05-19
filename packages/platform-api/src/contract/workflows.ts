@@ -34,6 +34,7 @@ export const RegisterWorkflowOutputSchema = z.object({
 });
 
 export const WorkflowDefinitionGroupSchema = z.object({
+  namespace: z.string().min(1),
   name: z.string().min(1),
   latestVersion: z.number().int().positive(),
   defaultVersion: z.number().int().positive().nullable(),
