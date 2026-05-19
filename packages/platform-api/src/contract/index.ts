@@ -33,7 +33,6 @@ export {
   UpsertLegacyDefinitionOutputSchema,
   CreateWorkflowDefinitionInputSchema,
   CreateWorkflowDefinitionOutputSchema,
-  CreateAgentDefinitionInputContractSchema,
   CreateAgentDefinitionOutputSchema,
   type ListWorkflowDefinitionsInput,
   type ListWorkflowDefinitionsOutput,
@@ -117,3 +116,12 @@ export {
   type HeartbeatInput,
   type HeartbeatOutput,
 } from './cron.js';
+
+// Re-export the agent-definition create input schema from platform-core so
+// callers (route adapters, the typed client) have one place to pull every
+// contract symbol from. The schema itself lives next to `AgentDefinitionSchema`
+// in platform-core because it's derived from it (`.omit`).
+export {
+  CreateAgentDefinitionInputSchema,
+  type CreateAgentDefinitionInput,
+} from '@mediforce/platform-core';

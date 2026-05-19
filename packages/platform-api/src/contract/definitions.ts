@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import {
   AgentDefinitionSchema,
-  CreateAgentDefinitionInputSchema,
   WorkflowDefinitionSchema,
 } from '@mediforce/platform-core';
 
@@ -72,6 +71,12 @@ export const UpsertLegacyDefinitionInputSchema = z.object({
   yaml: z.string().min(1, 'YAML body is required'),
 });
 
+// Note: `version` is a STRING here because the legacy `ProcessDefinitionSchema`
+// uses string versions ("1.0", "1.1-alpha"). The newer
+// `CreateWorkflowDefinitionOutputSchema` returns a NUMBER (`version: 1, 2, ...`)
+// because `WorkflowDefinitionSchema` uses monotonically-incrementing integers.
+// The shapes diverge on purpose — don't try to unify them. Clients pick the
+// endpoint that matches the data model they're producing.
 export const UpsertLegacyDefinitionOutputSchema = z.object({
   success: z.literal(true),
   name: z.string(),
@@ -113,8 +118,10 @@ export type CreateWorkflowDefinitionInput = z.infer<typeof CreateWorkflowDefinit
 export type CreateWorkflowDefinitionOutput = z.infer<typeof CreateWorkflowDefinitionOutputSchema>;
 
 // ---- POST /api/agent-definitions -------------------------------------------
-
-export const CreateAgentDefinitionInputContractSchema = CreateAgentDefinitionInputSchema;
+//
+// Input shape is `CreateAgentDefinitionInputSchema` re-exported directly from
+// `@mediforce/platform-core` — see the contract index. Output wraps the
+// created agent in `{ agent }` for parity with the GET endpoints.
 
 export const CreateAgentDefinitionOutputSchema = z.object({
   agent: AgentDefinitionSchema,

@@ -5,7 +5,7 @@ import {
   ClaimTaskOutputSchema,
   CompleteTaskInputSchema,
   CompleteTaskOutputSchema,
-  CreateAgentDefinitionInputContractSchema,
+  CreateAgentDefinitionInputSchema,
   CreateAgentDefinitionOutputSchema,
   CreateProcessConfigInputSchema,
   CreateProcessConfigOutputSchema,
@@ -84,8 +84,8 @@ import {
   type ResumeProcessOutput,
   type UpsertLegacyDefinitionInput,
   type UpsertLegacyDefinitionOutput,
+  type CreateAgentDefinitionInput,
 } from '../contract/index.js';
-import type { CreateAgentDefinitionInput } from '@mediforce/platform-core';
 
 /**
  * Typed client for the Mediforce API. Runtime-agnostic — works in the
@@ -404,7 +404,7 @@ export class Mediforce {
         return GetAgentDefinitionOutputSchema.parse(body);
       },
       create: async (input) => {
-        const validated = CreateAgentDefinitionInputContractSchema.parse(input);
+        const validated = CreateAgentDefinitionInputSchema.parse(input);
         const res = await this.request('/api/agent-definitions', {
           method: 'POST',
           body: JSON.stringify(validated),

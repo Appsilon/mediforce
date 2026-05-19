@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { HumanTaskSchema, HumanTaskStatusSchema, type HumanTaskStatus } from '@mediforce/platform-core';
+import {
+  HumanTaskSchema,
+  HumanTaskStatusSchema,
+  InstanceStatusSchema,
+  type HumanTaskStatus,
+} from '@mediforce/platform-core';
 
 /**
  * Contract for `GET /api/tasks`.
@@ -143,7 +148,11 @@ export const ResolveTaskOutputSchema = z.object({
   resolvedStepId: z.string(),
   processInstanceId: z.string(),
   nextStepId: z.string().nullable(),
-  status: z.string(),
+  // `'unknown'` is the handler's fallback when the post-advance refetch of
+  // the instance returns null (a race that shouldn't happen in practice but
+  // is defended against). Otherwise it's one of the canonical
+  // `InstanceStatusSchema` values.
+  status: z.union([InstanceStatusSchema, z.literal('unknown')]),
 });
 
 export type ResolveTaskInput = z.infer<typeof ResolveTaskInputSchema>;

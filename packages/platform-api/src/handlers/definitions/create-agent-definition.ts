@@ -10,9 +10,8 @@ export interface CreateAgentDefinitionDeps {
 
 /**
  * Pure handler for `POST /api/agent-definitions`.
- * Input shape is the existing `CreateAgentDefinitionInputSchema` from
- * platform-core — the contract re-exports it under
- * `CreateAgentDefinitionInputContractSchema`.
+ * Input shape is `CreateAgentDefinitionInputSchema` from platform-core
+ * (re-exported via `@mediforce/platform-api/contract`).
  */
 export async function createAgentDefinition(
   input: CreateAgentDefinitionInput,

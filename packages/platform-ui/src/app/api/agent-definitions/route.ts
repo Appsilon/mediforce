@@ -7,7 +7,7 @@ import {
 } from '@mediforce/platform-api/handlers';
 import {
   ListAgentDefinitionsInputSchema,
-  CreateAgentDefinitionInputContractSchema,
+  CreateAgentDefinitionInputSchema,
 } from '@mediforce/platform-api/contract';
 
 /**
@@ -26,7 +26,7 @@ export const GET = createRouteAdapter(
  * POST /api/agent-definitions — create a new agent definition.
  */
 export const POST = createRouteAdapter(
-  CreateAgentDefinitionInputContractSchema,
+  CreateAgentDefinitionInputSchema,
   async (req: NextRequest) => readJsonBody(req),
   (input) =>
     createAgentDefinition(input, {
