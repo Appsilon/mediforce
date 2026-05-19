@@ -15,7 +15,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Duplicate Python migration script `scripts/migrations/migrate_workflow_doc_ids.py` — superseded by the TypeScript `packages/platform-infra/scripts/migrate-workflow-namespacing.ts` which is the canonical version ([#424](https://github.com/Appsilon/mediforce/pull/424)).
 
 ### Fixed
-- Workspace `Runs` page no longer leaks runs from other namespaces the viewer is a member of — list is now filtered to the current `handle` ([#424](https://github.com/Appsilon/mediforce/pull/424)).
+- Workspace `Runs` page no longer leaks runs from other namespaces the viewer is a member of — list is now filtered to the current `handle`, and `useProcessInstances` requires `namespace` so TypeScript catches future regressions compile-time ([#424](https://github.com/Appsilon/mediforce/pull/424), follow-ups tracked in [#447](https://github.com/Appsilon/mediforce/issues/447) and [#448](https://github.com/Appsilon/mediforce/issues/448)).
 - Instance namespace backfill now resolves namespace per instance definition version instead of global latest-by-name, preventing cross-tenant run reassignment during migration ([#424](https://github.com/Appsilon/mediforce/pull/424)).
 - Workflow definition storage now scopes definition and metadata keys by namespace, so tenants can register the same workflow name independently ([#424](https://github.com/Appsilon/mediforce/pull/424)).
   - Migration script splits the legacy global `workflowMeta/<name>` into one doc per owning namespace and strips `defaultVersion` for tenants that don't own that version, avoiding dangling defaults pointing at non-existent workflow definitions ([#424](https://github.com/Appsilon/mediforce/pull/424)).
