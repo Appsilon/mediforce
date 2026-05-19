@@ -67,12 +67,22 @@ async function rewriteDocument(
   return true;
 }
 
+interface DefinitionIndex {
+  namespacesByName: Map<string, Set<string>>;
+  versionsByNamespaceName: Map<string, Set<number>>;
+}
+
+function indexKey(namespace: string, name: string): string {
+  return `${namespace}:${name}`;
+}
+
 async function migrateWorkflowDefinitions(
   db: Firestore,
   options: MigrationOptions,
-): Promise<{ rewritten: number; skipped: number; namespacesByName: Map<string, Set<string>> }> {
+): Promise<{ rewritten: number; skipped: number; index: DefinitionIndex }> {
   const snapshot = await db.collection('workflowDefinitions').get();
   const namespacesByName = new Map<string, Set<string>>();
+  const versionsByNamespaceName = new Map<string, Set<number>>();
   let rewritten = 0;
   let skipped = 0;
 
@@ -89,6 +99,11 @@ async function migrateWorkflowDefinitions(
     namespaceSet.add(parsed.data.namespace);
     namespacesByName.set(parsed.data.name, namespaceSet);
 
+    const versionsKey = indexKey(parsed.data.namespace, parsed.data.name);
+    const versionsSet = versionsByNamespaceName.get(versionsKey) ?? new Set<number>();
+    versionsSet.add(parsed.data.version);
+    versionsByNamespaceName.set(versionsKey, versionsSet);
+
     const newId = `${parsed.data.namespace}:${parsed.data.name}:${parsed.data.version}`;
     const didRewrite = await rewriteDocument(
       db,
@@ -101,12 +116,12 @@ async function migrateWorkflowDefinitions(
     if (didRewrite) rewritten++;
   }
 
-  return { rewritten, skipped, namespacesByName };
+  return { rewritten, skipped, index: { namespacesByName, versionsByNamespaceName } };
 }
 
 async function migrateWorkflowMeta(
   db: Firestore,
-  namespacesByName: Map<string, Set<string>>,
+  index: DefinitionIndex,
   options: MigrationOptions,
 ): Promise<{ rewritten: number; skipped: number }> {
   const snapshot = await db.collection('workflowMeta').get();
@@ -120,7 +135,7 @@ async function migrateWorkflowMeta(
       continue;
     }
 
-    const namespaces = namespacesByName.get(docSnap.id);
+    const namespaces = index.namespacesByName.get(docSnap.id);
     if (!namespaces || namespaces.size === 0) {
       console.log(`[workflow-namespacing] skip workflowMeta/${docSnap.id} no workflowDefinitions namespace found`);
       skipped++;
@@ -128,13 +143,33 @@ async function migrateWorkflowMeta(
     }
 
     const data = docSnap.data() as FirestoreData;
+    const legacyDefaultVersion = data.defaultVersion;
+
     for (const namespace of namespaces) {
+      // Per-namespace meta must only carry a defaultVersion that exists in that
+      // namespace's version set. Pre-migration workflowMeta/<name> was a global
+      // document, so its defaultVersion may point at a version that only one
+      // of the tenants actually owns. Stripping it for tenants who don't own
+      // that version avoids creating dangling defaults that would resolve to
+      // non-existent workflow definitions.
+      const perNamespaceData = { ...data };
+      if (typeof legacyDefaultVersion === 'number') {
+        const ownedVersions = index.versionsByNamespaceName.get(indexKey(namespace, docSnap.id));
+        if (ownedVersions === undefined || !ownedVersions.has(legacyDefaultVersion)) {
+          console.log(
+            `[workflow-namespacing] strip defaultVersion=${legacyDefaultVersion} from workflowMeta/${namespace}:${docSnap.id} ` +
+              `(not present in namespace versions)`,
+          );
+          delete perNamespaceData.defaultVersion;
+        }
+      }
+
       const didRewrite = await rewriteDocument(
         db,
         'workflowMeta',
         docSnap.id,
         `${namespace}:${docSnap.id}`,
-        data,
+        perNamespaceData,
         options,
       );
       if (didRewrite) rewritten++;
@@ -149,7 +184,7 @@ export async function migrateWorkflowNamespacing(
   options: MigrationOptions = { dryRun: true },
 ): Promise<MigrationResult> {
   const definitionResult = await migrateWorkflowDefinitions(db, options);
-  const metaResult = await migrateWorkflowMeta(db, definitionResult.namespacesByName, options);
+  const metaResult = await migrateWorkflowMeta(db, definitionResult.index, options);
 
   return {
     workflowDefinitionsRewritten: definitionResult.rewritten,

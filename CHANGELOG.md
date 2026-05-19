@@ -30,6 +30,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ### Fixed
 - Instance namespace backfill now resolves namespace per instance definition version instead of global latest-by-name, preventing cross-tenant run reassignment during migration.
 - Workflow definition storage now scopes definition and metadata keys by namespace, so tenants can register the same workflow name independently.
+  - Migration script splits the legacy global `workflowMeta/<name>` into one doc per owning namespace and strips `defaultVersion` for tenants that don't own that version, avoiding dangling defaults pointing at non-existent workflow definitions.
 - Agent report iframe no longer blows up its host panel — height is capped and `vh` classes inside the report are neutralised ([#392](https://github.com/Appsilon/mediforce/pull/392)).
 - Mock dev workflows now run seeded agent steps through the mock Claude runtime even when their demo plugin ids are not registered, the model ranking sync helper falls back from `9003` to `9007` for `pnpm dev:mock`, root API/UI E2E wrappers pass Playwright project flags correctly, and `mediforce run start` can target a namespace.
 - Staging step containers can finally see workspace files — the data dir is persisted at `/var/lib/mediforce` with an identical host bind so docker.sock-spawned containers share the same path ([#405](https://github.com/Appsilon/mediforce/pull/405)).
