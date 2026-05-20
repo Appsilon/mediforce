@@ -137,7 +137,37 @@ the route with `createRouteAdapter`. Each is a small standalone PR.
 **Pause-safe**: yes — leaving any one on its inline handler is functionally
 identical to today.
 
+### Phase 1.7 — Authorization architecture decision (prerequisite for Phase 2)
+
+Phase 1 ended with namespace authorization threaded **explicitly** through every handler — six GET handlers repeat the same load-then-`callerCanAccess` dance. Phase 2 adds 12+ mutations with the same shape. Before any mutation handler ships, settle whether authorization stays in handlers or moves into the data-access layer.
+
+**Working hypothesis (under design review):** push namespace + visibility authorization down into a scoped data-access bag. Handlers receive a `Services` object whose per-domain entries (`services.tasks`, `services.processes`, …) wrap the underlying repositories with caller-aware reads, writes, and actions. The bag also passes through public/system repos (`tools`, `cron`, `namespaces`, `apiKeys`, `models`) without scoping. Handler signature becomes `(input, services: Services) ⇒ Promise<Output>` — `caller` only stays on handlers that need it for audit, role, or personalization, not authz.
+
+**Why this is a phase, not a side-quest.** The decision is foundational:
+- Reverberates through every Phase 2/3 handler shape.
+- Survives the NextAuth migration (ADR-002 in PR review) because `CallerIdentity` stays as the abstraction.
+- Preempts the per-user-API-key landing pattern (#376) — scoped layer doesn't care how the caller was authenticated.
+- Affects #448 (`apiKey` terminology / scope of admin bypass).
+
+**Open questions to settle in design review:**
+- Domain naming. `services.tasks` (Rails-style) vs `services.scopedHumanTasks` (explicit) vs `services.taskOps` (suffix-typed). What aligns with existing language in `packages/platform-core/src/interfaces/`?
+- Type name for the bag itself. `Services`, `Scope`, `HandlerServices`, `AppServices` — keep `PlatformServices` as the raw factory's return type?
+- Enforcement layers. Is TypeScript signature enough, or do we need a structural test (analogue of `auth-coverage.test.ts`) that fails CI when a handler imports raw repos? ESLint?
+- Direct vs indirect repos. Five repos have a `namespace` field directly (`ProcessInstance`, `WorkflowDefinition`, `AgentDefinition`, `Secrets`, `WorkflowSecrets`); four (`HumanTask`, `CoworkSession`, `AgentRun`, `Audit`, `Handoff`) resolve namespace through the parent instance. Cost: ~70 LOC per direct wrapper, ~100 LOC per indirect (N+1 lookup on list paths).
+- Cost vs alternative. A single `loadWithNamespaceGate(caller, loader, error)` helper adds ~30 LOC and saves ~4 LOC per handler. Why is full scoped-services worth +~1200 LOC infra over that?
+- Does Phase 3 break the pattern? Cowork SSE handlers become orchestrators with side effects — does scope still apply, or does the abstraction leak?
+- Do mutations that **create** resources (`POST /api/processes`) fit "load + gate + delegate" cleanly, or is creation special?
+
+**Output of this phase:**
+- Decisions crystallised in `docs/headless-migration.md` + (likely) `docs/decisions/ADR-003-authorization-architecture.md`.
+- If we commit to scoped services: the scope layer implemented as the first PR of Phase 2, before any mutation handler ships.
+- If we reject it: the duplication is accepted as Phase-2 cost, with the alternative (`loadWithNamespaceGate` helper or status quo) documented.
+
+**Status:** in design review via the `/grill-with-docs` skill, stress-testing the working hypothesis against the existing domain model, ADRs, and Mediforce-specific concerns (pharma tenant isolation, NextAuth migration, per-user API keys). See the spawned design session.
+
 ### Phase 2 — Migrate mutations (grouped by domain)
+
+**Prerequisite:** Phase 1.7 closed — authorization architecture decision merged. Mutation handlers are written against the decided shape, not retrofitted.
 
 Harder than GETs because each mutation has a state machine and side effects. Break into small PRs.
 
