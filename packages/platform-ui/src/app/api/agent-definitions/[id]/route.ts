@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { UpdateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
+import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess, type CallerIdentity } from '@/lib/api-auth';
+import { getAgentDefinition } from '@mediforce/platform-api/handlers';
+import { GetAgentDefinitionInputSchema } from '@mediforce/platform-api/contract';
+import type { GetAgentDefinitionInput } from '@mediforce/platform-api/contract';
 
-function canRead(caller: CallerIdentity, agent: { namespace?: string; visibility: string }): NextResponse | null {
-  if (caller.kind === 'apiKey') return null;
-  if (agent.visibility === 'public') return null;
-  if (typeof agent.namespace === 'string' && caller.namespaces.has(agent.namespace)) return null;
-  return NextResponse.json({ error: 'Not found' }, { status: 404 });
+interface RouteContext {
+  params: Promise<{ id: string }>;
 }
 
 function canMutate(caller: CallerIdentity, agent: { namespace?: string }): NextResponse | null {
@@ -18,26 +19,26 @@ function canMutate(caller: CallerIdentity, agent: { namespace?: string }): NextR
   return requireNamespaceAccess(caller, agent.namespace);
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
-  const { id } = await params;
-  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
-
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const agent = await agentDefinitionRepo.getById(id);
-  if (!agent) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const denied = canRead(caller, agent);
-  if (denied) return denied;
-
-  return NextResponse.json({ agent });
-}
+/**
+ * GET /api/agent-definitions/:id
+ *
+ * 404 for missing ids (surfaces before visibility checks). For private
+ * agents, the caller must be in the agent's namespace; public agents are
+ * always readable.
+ */
+export const GET = createRouteAdapter<
+  typeof GetAgentDefinitionInputSchema,
+  GetAgentDefinitionInput,
+  unknown,
+  RouteContext
+>(
+  GetAgentDefinitionInputSchema,
+  async (_req, ctx) => ({ id: (await ctx.params).id }),
+  (input, caller) => {
+    const { agentDefinitionRepo } = getPlatformServices();
+    return getAgentDefinition(input, { agentDefinitionRepo }, caller);
+  },
+);
 
 export async function PUT(
   request: Request,

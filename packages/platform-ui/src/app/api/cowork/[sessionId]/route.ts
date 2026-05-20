@@ -1,30 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { getCoworkSession } from '@mediforce/platform-api/handlers';
+import { GetCoworkSessionInputSchema } from '@mediforce/platform-api/contract';
+import type { GetCoworkSessionInput } from '@mediforce/platform-api/contract';
+
+interface RouteContext {
+  params: Promise<{ sessionId: string }>;
+}
 
 /**
  * GET /api/cowork/:sessionId
  *
- * Returns the cowork session including conversation history and current artifact.
+ * Returns the cowork session including conversation history and current
+ * artifact. Missing sessions 404 via the handler's `NotFoundError`. Namespace
+ * gating is enforced inside the handler (api-key callers pass; user callers
+ * must be in the parent instance's namespace) and surfaces as 403 via
+ * `ForbiddenError`.
  */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> },
-): Promise<NextResponse> {
-  const { sessionId } = await params;
-  const { coworkSessionRepo, instanceRepo, namespaceRepo } = getPlatformServices();
-
-  const caller = await resolveCallerIdentity(req, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const session = await coworkSessionRepo.getById(sessionId);
-  if (!session) {
-    return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-  }
-
-  const instance = await instanceRepo.getById(session.processInstanceId);
-  const denied = requireNamespaceAccess(caller, instance?.namespace);
-  if (denied) return denied;
-
-  return NextResponse.json(session);
-}
+export const GET = createRouteAdapter<
+  typeof GetCoworkSessionInputSchema,
+  GetCoworkSessionInput,
+  unknown,
+  RouteContext
+>(
+  GetCoworkSessionInputSchema,
+  async (_req, ctx) => ({ sessionId: (await ctx.params).sessionId }),
+  (input, caller) => {
+    const { coworkSessionRepo, instanceRepo } = getPlatformServices();
+    return getCoworkSession(input, { coworkSessionRepo, instanceRepo }, caller);
+  },
+);

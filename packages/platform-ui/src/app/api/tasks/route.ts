@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, callerCanAccess } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
 import { listTasks } from '@mediforce/platform-api/handlers';
-import { ListTasksInputSchema } from '@mediforce/platform-api/contract';
-import type { ListTasksInput } from '@mediforce/platform-api/contract';
+import {
+  ListTasksInputSchema,
+  type ListTasksInput,
+} from '@mediforce/platform-api/contract';
 
 /**
  * GET /api/tasks
@@ -12,62 +13,25 @@ import type { ListTasksInput } from '@mediforce/platform-api/contract';
  *   - `instanceId` OR `role` — exactly one is required
  *   - `stepId`               — optional filter within the instance/role
  *   - `status`               — repeatable; e.g. `?status=pending&status=claimed`
+ *
+ * Namespace gating is enforced inside the handler: api-key callers see every
+ * matching task, user callers only see tasks whose process instance belongs
+ * to a namespace they're a member of.
  */
-export async function GET(req: NextRequest): Promise<NextResponse> {
-  const { humanTaskRepo, instanceRepo, namespaceRepo } = getPlatformServices();
-
-  const caller = await resolveCallerIdentity(req, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const params = req.nextUrl.searchParams;
-  const statuses = params.getAll('status');
-  const rawInput = {
-    instanceId: params.get('instanceId') ?? undefined,
-    role: params.get('role') ?? undefined,
-    stepId: params.get('stepId') ?? undefined,
-    status: statuses.length > 0 ? statuses : undefined,
-  };
-
-  const parsed = ListTasksInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-
-  const { tasks } = await listTasks(parsed.data as ListTasksInput, { humanTaskRepo });
-
-  // API-key callers get unfiltered results
-  if (caller.kind === 'apiKey') {
-    return NextResponse.json({ tasks });
-  }
-
-  // For authenticated users, filter tasks to those whose process instance
-  // belongs to a namespace the caller has access to.
-  const filtered = await filterTasksByNamespace(tasks, caller, instanceRepo);
-  return NextResponse.json({ tasks: filtered });
-}
-
-async function filterTasksByNamespace<
-  T extends { processInstanceId: string },
->(
-  tasks: readonly T[],
-  caller: Extract<Awaited<ReturnType<typeof resolveCallerIdentity>>, { kind: 'user' }>,
-  instanceRepo: { getById: (id: string) => Promise<{ namespace?: string } | null> },
-): Promise<T[]> {
-  // Batch-deduplicate instance lookups — many tasks may share the same instance
-  const instanceIds = [...new Set(tasks.map((t) => t.processInstanceId))];
-  const instanceMap = new Map<string, { namespace?: string } | null>();
-  await Promise.all(
-    instanceIds.map(async (id) => {
-      instanceMap.set(id, await instanceRepo.getById(id));
-    }),
-  );
-
-  return tasks.filter((task) => {
-    const instance = instanceMap.get(task.processInstanceId);
-    if (!instance || typeof instance.namespace !== 'string') return false;
-    return callerCanAccess(caller, instance.namespace);
-  });
-}
+export const GET = createRouteAdapter<typeof ListTasksInputSchema, ListTasksInput>(
+  ListTasksInputSchema,
+  (req) => {
+    const params = req.nextUrl.searchParams;
+    const statuses = params.getAll('status');
+    return {
+      instanceId: params.get('instanceId') ?? undefined,
+      role: params.get('role') ?? undefined,
+      stepId: params.get('stepId') ?? undefined,
+      status: statuses.length > 0 ? statuses : undefined,
+    };
+  },
+  (input, caller) => {
+    const { humanTaskRepo, instanceRepo } = getPlatformServices();
+    return listTasks(input, { humanTaskRepo, instanceRepo }, caller);
+  },
+);

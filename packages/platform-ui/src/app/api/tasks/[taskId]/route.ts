@@ -1,36 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { getTask } from '@mediforce/platform-api/handlers';
+import { GetTaskInputSchema } from '@mediforce/platform-api/contract';
+import type { GetTaskInput } from '@mediforce/platform-api/contract';
+
+interface RouteContext {
+  params: Promise<{ taskId: string }>;
+}
 
 /**
  * GET /api/tasks/:taskId
  *
- * Returns full task details including completionData (agent output for review tasks).
+ * Returns the full task including completionData. Missing tasks and cross-
+ * namespace access both surface as 404 (anti-enumeration) — a non-member
+ * caller cannot distinguish "this task exists but I can't see it" from
+ * "this task doesn't exist".
  */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ taskId: string }> },
-): Promise<NextResponse> {
-  try {
-    const { taskId } = await params;
-    const { humanTaskRepo, instanceRepo, namespaceRepo } = getPlatformServices();
-
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
-    if (caller instanceof NextResponse) return caller;
-
-    const task = await humanTaskRepo.getById(taskId);
-
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-    }
-
-    const instance = await instanceRepo.getById(task.processInstanceId);
-    const denied = requireNamespaceAccess(caller, instance?.namespace);
-    if (denied) return denied;
-
-    return NextResponse.json(task);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+export const GET = createRouteAdapter<typeof GetTaskInputSchema, GetTaskInput, unknown, RouteContext>(
+  GetTaskInputSchema,
+  async (_req, ctx) => ({ taskId: (await ctx.params).taskId }),
+  (input, caller) => {
+    const { humanTaskRepo, instanceRepo } = getPlatformServices();
+    return getTask(input, { humanTaskRepo, instanceRepo }, caller);
+  },
+);

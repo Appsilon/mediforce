@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { ForbiddenError, NotFoundError } from '@mediforce/platform-api/errors';
+import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { createRouteAdapter } from '../route-adapter';
 
 const InputSchema = z.object({ name: z.string().min(1) });
+
+const apiKeyCaller: CallerIdentity = { kind: 'apiKey' };
 
 function makeRequest(params?: Record<string, string>): NextRequest {
   const url = new URL('http://localhost/api/test');
@@ -13,24 +17,30 @@ function makeRequest(params?: Record<string, string>): NextRequest {
   return new NextRequest(url.toString());
 }
 
+function stubCaller(caller: CallerIdentity = apiKeyCaller) {
+  return vi.fn().mockResolvedValue(caller);
+}
+
 describe('createRouteAdapter', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  // Auth is enforced globally by `src/middleware.ts` (X-Api-Key or Firebase
-  // ID token) before any route handler runs. This adapter therefore does not
-  // reimplement auth — it only covers input parsing, delegation, and error
-  // sanitisation. See `src/test/integration/middleware.test.ts` for auth coverage.
+  // Auth pipeline: middleware (`src/middleware.ts`) first gates `/api/*` for
+  // presence of credentials. The adapter then resolves those credentials into
+  // a typed `CallerIdentity` and threads it into the handler so domain code
+  // can enforce namespace policy. Both layers run in production; tests stub
+  // `resolveCaller` to bypass Firebase/Firestore.
 
   it('returns 400 with the first Zod issue when input fails validation', async () => {
     const GET = createRouteAdapter(
       InputSchema,
       (req) => ({ name: req.nextUrl.searchParams.get('name') }),
       vi.fn(),
+      { resolveCaller: stubCaller() },
     );
 
-    const res = await GET(makeRequest());
+    const res = await GET(makeRequest(), undefined);
 
     expect(res.status).toBe(400);
     const json = await res.json();
@@ -38,35 +48,107 @@ describe('createRouteAdapter', () => {
     expect(json.error.length).toBeGreaterThan(0);
   });
 
-  it('passes parsed input to the handler and returns its result as JSON', async () => {
+  it('passes parsed input + caller to the handler and returns its result as JSON', async () => {
     const handler = vi.fn().mockResolvedValue({ greeting: 'hello alice' });
+    const userCaller: CallerIdentity = {
+      kind: 'user',
+      uid: 'u1',
+      namespaces: new Set(['ns-a']),
+    };
     const GET = createRouteAdapter(
       InputSchema,
       (req) => ({ name: req.nextUrl.searchParams.get('name') }),
       handler,
+      { resolveCaller: stubCaller(userCaller) },
     );
 
-    const res = await GET(makeRequest({ name: 'alice' }));
+    const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ greeting: 'hello alice' });
-    expect(handler).toHaveBeenCalledWith({ name: 'alice' });
+    expect(handler).toHaveBeenCalledWith({ name: 'alice' }, userCaller);
   });
 
-  it('returns 500 with a generic message when the handler throws', async () => {
+  it('short-circuits with the 401 response returned by resolveCaller', async () => {
+    const handler = vi.fn();
+    const unauthorized = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const GET = createRouteAdapter(
+      InputSchema,
+      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+      handler,
+      { resolveCaller: vi.fn().mockResolvedValue(unauthorized) },
+    );
+
+    const res = await GET(makeRequest({ name: 'alice' }), undefined);
+
+    expect(res.status).toBe(401);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('maps NotFoundError to 404 with the error message', async () => {
+    const handler = vi.fn().mockRejectedValue(new NotFoundError('Task not found'));
+    const GET = createRouteAdapter(
+      InputSchema,
+      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+      handler,
+      { resolveCaller: stubCaller() },
+    );
+
+    const res = await GET(makeRequest({ name: 'alice' }), undefined);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Task not found' });
+  });
+
+  it('maps ForbiddenError to 403 with the error message', async () => {
+    const handler = vi.fn().mockRejectedValue(new ForbiddenError());
+    const GET = createRouteAdapter(
+      InputSchema,
+      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+      handler,
+      { resolveCaller: stubCaller() },
+    );
+
+    const res = await GET(makeRequest({ name: 'alice' }), undefined);
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Forbidden' });
+  });
+
+  it('returns 500 with a generic message when the handler throws an unexpected error', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const handler = vi.fn().mockRejectedValue(new Error('database on fire'));
     const GET = createRouteAdapter(
       InputSchema,
       (req) => ({ name: req.nextUrl.searchParams.get('name') }),
       handler,
+      { resolveCaller: stubCaller() },
     );
 
-    const res = await GET(makeRequest({ name: 'alice' }));
+    const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: 'Internal error' });
     expect(consoleError).toHaveBeenCalled();
+  });
+
+  it('awaits async inputFromRequest (for dynamic-segment route params)', async () => {
+    interface RouteContext {
+      params: Promise<{ id: string }>;
+    }
+    const handler = vi.fn().mockResolvedValue({ ok: true, id: 'abc' });
+    const ParamSchema = z.object({ id: z.string().min(1) });
+    const GET = createRouteAdapter<typeof ParamSchema, { id: string }, { ok: true; id: string }, RouteContext>(
+      ParamSchema,
+      async (_req, ctx) => ({ id: (await ctx.params).id }),
+      handler,
+      { resolveCaller: stubCaller() },
+    );
+
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'abc' }) });
+
+    expect(res.status).toBe(200);
+    expect(handler).toHaveBeenCalledWith({ id: 'abc' }, apiKeyCaller);
   });
 
   describe('NarrowInput generic', () => {
@@ -94,9 +176,9 @@ describe('createRouteAdapter', () => {
       );
 
     it('passes the narrowed input type through to the handler', async () => {
-      const handler = vi.fn<(input: NarrowExample) => Promise<{ ok: true }>>().mockResolvedValue({
-        ok: true,
-      });
+      const handler = vi
+        .fn<(input: NarrowExample, caller: CallerIdentity) => Promise<{ ok: true }>>()
+        .mockResolvedValue({ ok: true });
 
       const GET = createRouteAdapter<typeof UnionSchema, NarrowExample>(
         UnionSchema,
@@ -105,9 +187,10 @@ describe('createRouteAdapter', () => {
           role: req.nextUrl.searchParams.get('role') ?? undefined,
         }),
         handler,
+        { resolveCaller: stubCaller() },
       );
 
-      const res = await GET(makeRequest({ instanceId: 'inst-a' }));
+      const res = await GET(makeRequest({ instanceId: 'inst-a' }), undefined);
 
       expect(res.status).toBe(200);
       expect(handler).toHaveBeenCalledTimes(1);

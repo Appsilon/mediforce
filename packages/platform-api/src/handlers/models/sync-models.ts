@@ -6,6 +6,7 @@ export interface SyncModelsDeps {
   modelRegistryRepo: ModelRegistryRepository;
 }
 
+/** @public-handler  Model registry is platform-wide; sync is an admin operation. */
 export async function syncModels(deps: SyncModelsDeps): Promise<SyncModelsOutput> {
   const result = await syncFromOpenRouter(deps.modelRegistryRepo);
   return {

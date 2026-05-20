@@ -6,6 +6,14 @@ export * from './contract/index.js';
 // Import these from `@mediforce/platform-api/handlers` when mounting in an HTTP adapter.
 export * from './handlers/index.js';
 
+// Typed errors handlers may throw — mapped to HTTP statuses by the route adapter.
+// Import from `@mediforce/platform-api/errors`.
+export * from './errors.js';
+
+// Caller identity + namespace policy helpers — pure, framework-free.
+// Import from `@mediforce/platform-api/auth`.
+export * from './auth.js';
+
 // Services (factory + seeding) intentionally NOT re-exported here — import from
 // `@mediforce/platform-api/services` so consumers of `/contract` or `/handlers`
 // never evaluate Firestore/Firebase-admin wiring transitively.

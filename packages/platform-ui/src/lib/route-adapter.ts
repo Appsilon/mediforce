@@ -1,59 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
+import type { z } from 'zod';
+import { HandlerError } from '@mediforce/platform-api/errors';
+import type { CallerIdentity } from '@mediforce/platform-api/auth';
+import { resolveCallerIdentity } from './api-auth.js';
+import { getPlatformServices } from './platform-services.js';
 
 /**
  * Wraps a pure handler (from `@mediforce/platform-api`) into a Next.js route.
  *
- * Auth is handled globally by `src/middleware.ts` (X-Api-Key or Firebase ID
- * token) for `/api/*` paths — routes built on top of this adapter never
- * re-check auth. **Server actions and non-`/api` entry points are NOT covered
- * by that middleware** (it matches `/api/:path*` only). If you compose a pure
- * handler into a server action, that action is responsible for its own auth
- * check. `api-boundaries.test.ts` allows `app/actions/*.ts` to import handlers
- * precisely for that kind of composition — the guard cannot distinguish
- * "middleware-protected caller" from "self-auth caller".
+ * The adapter is the single place that translates between Next.js's
+ * `Request`/`NextResponse` world and the framework-free handler world. Every
+ * `/api/*` route should compose through it — never re-implement auth, input
+ * parsing, or error-to-status mapping inline.
  *
- * What this helper does:
+ * Pipeline (in order, short-circuits on first failure):
  *
- *   1. `inputFromRequest(req)` maps the request to a raw contract-input object
- *   2. Zod validation → 400 with the first issue's message
- *   3. Delegation to the handler
- *   4. Unknown errors → 500 with a generic message (full error logged server-side)
+ *   1. Auth — `resolveCallerIdentity` reads `X-Api-Key` or a Firebase ID
+ *      token. Failure → 401. The resolved `CallerIdentity` is threaded into
+ *      the handler so domain code can enforce namespace policy.
+ *   2. Input — `inputFromRequest(req, ctx)` returns a raw object; the Zod
+ *      schema validates it. Failure → 400 with the first issue's message.
+ *      Note: `ctx` is Next.js's `RouteContext` shape (`{ params: Promise<…> }`)
+ *      for dynamic-segment routes, or `unknown` for flat routes.
+ *   3. Handler — invoked with the parsed input and the caller. Throws of type
+ *      `HandlerError` (e.g. `NotFoundError`, `ForbiddenError`) map to their
+ *      declared HTTP status. Anything else is a 500 (full error logged).
  *
- * Example usage:
+ * Auth note: middleware in `src/middleware.ts` already gates `/api/*` for
+ * presence of credentials — that's the first line of defense and exists so
+ * unauthenticated traffic never reaches handler code. The adapter's own
+ * resolution step is what turns those credentials into a typed
+ * `CallerIdentity` for namespace policy. Both run today; do not remove either.
  *
- *   export const GET = createRouteAdapter(ListTasksInputSchema, (req) => ({
- *     instanceId: req.nextUrl.searchParams.get('instanceId') ?? undefined,
- *     role:       req.nextUrl.searchParams.get('role') ?? undefined,
- *     status:     req.nextUrl.searchParams.get('status') ?? undefined,
- *   }), (input) => listTasks(input, { humanTaskRepo: getPlatformServices().humanTaskRepo }));
+ * Test seam: pass `options.resolveCaller` to bypass real Firebase /
+ * Firestore in unit tests. Production code never sets it.
  *
  * The `NarrowInput` generic defaults to `z.infer<InputSchema>`. Pass it
  * explicitly when the handler expects a narrower type than the schema's
- * `z.infer`, e.g. a discriminated union backed by a Zod refine:
- *
- *   createRouteAdapter<typeof ListTasksInputSchema, ListTasksInput>(...)
- *
- * **`NarrowInput` contract**: must be a *strict subset* of `z.infer<InputSchema>`.
- * The adapter casts `parsed.data` to `NarrowInput` on a successful parse — the
- * cast is trusted, not verified. In the pilot this is sound because the Zod
- * refine that produces the discriminated union runs inside `safeParse`, so
- * only instances that satisfy the refine reach the cast. For other usages,
- * the refine must logically enforce whatever narrowing `NarrowInput` claims,
- * or the cast becomes a silent lie. If you need a looser supertype rather
- * than a subset, do not use this generic — parse inside the handler instead.
+ * `z.infer`, e.g. a discriminated union backed by a Zod refine. Must be a
+ * *strict subset* of `z.infer<InputSchema>` — the adapter casts `parsed.data`
+ * to `NarrowInput` on success, the cast is trusted, not verified.
  */
+export interface RouteAdapterOptions {
+  /** Override caller resolution. Default reads from request headers. */
+  readonly resolveCaller?: (req: NextRequest) => Promise<CallerIdentity | NextResponse>;
+}
+
+export type RouteHandler<Input, Output> = (
+  input: Input,
+  caller: CallerIdentity,
+) => Promise<Output>;
+
 export function createRouteAdapter<
   InputSchema extends z.ZodType,
   NarrowInput = z.infer<InputSchema>,
   Output = unknown,
+  Ctx = unknown,
 >(
   inputSchema: InputSchema,
-  inputFromRequest: (req: NextRequest) => unknown,
-  handler: (input: NarrowInput) => Promise<Output>,
-): (req: NextRequest) => Promise<NextResponse> {
-  return async (req) => {
-    const parsed = inputSchema.safeParse(inputFromRequest(req));
+  inputFromRequest: (req: NextRequest, ctx: Ctx) => unknown | Promise<unknown>,
+  handler: RouteHandler<NarrowInput, Output>,
+  options: RouteAdapterOptions = {},
+): (req: NextRequest, ctx: Ctx) => Promise<NextResponse> {
+  const resolveCaller = options.resolveCaller ?? defaultResolveCaller;
+
+  return async (req, ctx) => {
+    const callerOrResponse = await resolveCaller(req);
+    if (callerOrResponse instanceof NextResponse) return callerOrResponse;
+    const caller = callerOrResponse;
+
+    let raw: unknown;
+    try {
+      raw = await inputFromRequest(req, ctx);
+    } catch (err) {
+      console.error('[route-adapter] inputFromRequest error:', err);
+      return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+    }
+
+    const parsed = inputSchema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
@@ -62,11 +86,19 @@ export function createRouteAdapter<
     }
 
     try {
-      const result = await handler(parsed.data as NarrowInput);
+      const result = await handler(parsed.data as NarrowInput, caller);
       return NextResponse.json(result);
     } catch (err) {
+      if (err instanceof HandlerError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode });
+      }
       console.error('[route-adapter] handler error:', err);
       return NextResponse.json({ error: 'Internal error' }, { status: 500 });
     }
   };
+}
+
+async function defaultResolveCaller(req: NextRequest): Promise<CallerIdentity | NextResponse> {
+  const { namespaceRepo } = getPlatformServices();
+  return resolveCallerIdentity(req, namespaceRepo);
 }

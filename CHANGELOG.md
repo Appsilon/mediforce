@@ -23,6 +23,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [2026-05-17]
 
 ### Added
+- Phase 1 of the headless-API migration is done — 10 GET endpoints across tasks, processes, definitions, cowork and plugins now sit behind framework-free handlers in `@mediforce/platform-api`, with namespace policy enforced inside the handler (every handler signature requires a `CallerIdentity`, so a missing gate is a code-level decision in review, not a silent regression). Wraps `audit` response as `{ events }` and surfaces visibility-denied agent definitions as 404 (anti-enumeration). Supersedes [#256](https://github.com/Appsilon/mediforce/pull/256), which predated the namespace access control on `main` and would have regressed it.
 - Workflows can now be moved between namespaces — copy + redirect lands you in the target tenant ([#359](https://github.com/Appsilon/mediforce/pull/359), [#370](https://github.com/Appsilon/mediforce/pull/370)).
 - Workflow discovery by Docker image: `GET /api/workflows/by-image` — needed to scale step containers without grepping definitions ([#377](https://github.com/Appsilon/mediforce/pull/377)).
 - Human review steps are no longer binary — each step declares its own verdicts and target transitions (e.g. approve / request changes / escalate), wired end-to-end from schema to UI ([#396](https://github.com/Appsilon/mediforce/pull/396)).

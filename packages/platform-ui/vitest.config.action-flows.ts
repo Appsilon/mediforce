@@ -21,6 +21,8 @@ export default defineConfig({
       '@mediforce/platform-api/contract': resolve(__dirname, '../platform-api/src/contract/index.ts'),
       '@mediforce/platform-api/handlers': resolve(__dirname, '../platform-api/src/handlers/index.ts'),
       '@mediforce/platform-api/client': resolve(__dirname, '../platform-api/src/client/index.ts'),
+      '@mediforce/platform-api/errors': resolve(__dirname, '../platform-api/src/errors.ts'),
+      '@mediforce/platform-api/auth': resolve(__dirname, '../platform-api/src/auth.ts'),
       '@mediforce/platform-api': resolve(__dirname, '../platform-api/src/index.ts'),
       '@mediforce/workflow-engine': resolve(__dirname, '../workflow-engine/src/index.ts'),
       '@mediforce/agent-runtime': resolve(__dirname, '../agent-runtime/src/index.ts'),

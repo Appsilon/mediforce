@@ -1,6 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Mediforce, ApiError, type ClientConfig } from '../index.js';
-import { buildHumanTask } from '@mediforce/platform-core/testing';
+import {
+  buildHumanTask,
+  buildProcessInstance,
+  buildAuditEvent,
+  buildCoworkSession,
+  buildWorkflowDefinition,
+} from '@mediforce/platform-core/testing';
+import type { AgentDefinition } from '@mediforce/platform-core';
+
+function buildAgentDefinition(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
+  return {
+    id: 'agent-1',
+    kind: 'plugin',
+    runtimeId: 'claude-code-agent',
+    name: 'Test Agent',
+    iconName: 'robot',
+    description: 'An agent for testing',
+    foundationModel: 'gpt-4',
+    systemPrompt: 'You are a test agent',
+    inputDescription: 'text',
+    outputDescription: 'json',
+    skillFileNames: [],
+    visibility: 'private',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -249,6 +276,258 @@ describe('Mediforce', () => {
 
       expect(error).toBeInstanceOf(ApiError);
       expect((error as ApiError).status).toBe(500);
+    });
+  });
+
+  // ---- Per-method contracts (table-driven) ----
+  //
+  // For methods whose contract reduces to (build URL → parse 200 → ApiError on 4xx),
+  // a single table-driven helper covers happy-path URL/parse + ApiError on 404.
+  // Methods with non-trivial input encoding (query strings, repeated params) keep
+  // their verbose tests below.
+
+  type MethodContract = {
+    name: string;
+    call: (client: Mediforce) => Promise<unknown>;
+    expectedUrl: string;
+    fixture: unknown;
+    parsedField: (result: unknown) => unknown;
+    parsedExpected: unknown;
+  };
+
+  const methodContracts: MethodContract[] = [
+    {
+      name: 'processes.get',
+      call: (c) => c.processes.get({ instanceId: 'inst-a' }),
+      expectedUrl: `${TEST_BASE_URL}/api/processes/inst-a`,
+      fixture: buildProcessInstance({ id: 'inst-a' }),
+      parsedField: (r) => (r as { id: string }).id,
+      parsedExpected: 'inst-a',
+    },
+    {
+      name: 'processes.listAuditEvents',
+      call: (c) => c.processes.listAuditEvents({ instanceId: 'inst-a' }),
+      expectedUrl: `${TEST_BASE_URL}/api/processes/inst-a/audit`,
+      fixture: { events: [buildAuditEvent({ processInstanceId: 'inst-a' })] },
+      parsedField: (r) => (r as { events: unknown[] }).events.length,
+      parsedExpected: 1,
+    },
+    {
+      name: 'processes.getSteps',
+      call: (c) => c.processes.getSteps({ instanceId: 'inst-a' }),
+      expectedUrl: `${TEST_BASE_URL}/api/processes/inst-a/steps`,
+      fixture: {
+        instanceId: 'inst-a',
+        definitionName: 'supply-chain-review',
+        definitionVersion: '1.0',
+        instanceStatus: 'running',
+        currentStepId: 'step-intake',
+        steps: [],
+      },
+      parsedField: (r) => (r as { instanceId: string }).instanceId,
+      parsedExpected: 'inst-a',
+    },
+    {
+      name: 'workflowDefinitions.list',
+      call: (c) => c.workflowDefinitions.list(),
+      expectedUrl: `${TEST_BASE_URL}/api/workflow-definitions`,
+      fixture: {
+        definitions: [
+          {
+            namespace: 'team-alpha',
+            name: 'supply-chain-review',
+            latestVersion: 1,
+            defaultVersion: 1,
+            definition: buildWorkflowDefinition(),
+          },
+        ],
+      },
+      parsedField: (r) => (r as { definitions: unknown[] }).definitions.length,
+      parsedExpected: 1,
+    },
+    {
+      name: 'agentDefinitions.list',
+      call: (c) => c.agentDefinitions.list(),
+      expectedUrl: `${TEST_BASE_URL}/api/agent-definitions`,
+      fixture: { agents: [buildAgentDefinition({ id: 'a-1' })] },
+      parsedField: (r) => (r as { agents: { id: string }[] }).agents[0].id,
+      parsedExpected: 'a-1',
+    },
+    {
+      name: 'agentDefinitions.get',
+      call: (c) => c.agentDefinitions.get({ id: 'a-1' }),
+      expectedUrl: `${TEST_BASE_URL}/api/agent-definitions/a-1`,
+      fixture: { agent: buildAgentDefinition({ id: 'a-1' }) },
+      parsedField: (r) => (r as { agent: { id: string } }).agent.id,
+      parsedExpected: 'a-1',
+    },
+    {
+      name: 'cowork.get',
+      call: (c) => c.cowork.get({ sessionId: 'sess-1' }),
+      expectedUrl: `${TEST_BASE_URL}/api/cowork/sess-1`,
+      fixture: buildCoworkSession({ id: 'sess-1' }),
+      parsedField: (r) => (r as { id: string }).id,
+      parsedExpected: 'sess-1',
+    },
+    {
+      name: 'cowork.getByInstance',
+      call: (c) => c.cowork.getByInstance({ instanceId: 'inst-a' }),
+      expectedUrl: `${TEST_BASE_URL}/api/cowork/by-instance/inst-a`,
+      fixture: buildCoworkSession({ processInstanceId: 'inst-a' }),
+      parsedField: (r) => (r as { processInstanceId: string }).processInstanceId,
+      parsedExpected: 'inst-a',
+    },
+    {
+      name: 'plugins.list',
+      call: (c) => c.plugins.list(),
+      expectedUrl: `${TEST_BASE_URL}/api/plugins`,
+      fixture: { plugins: [{ name: 'claude-code-agent' }, { name: 'opencode-agent' }] },
+      parsedField: (r) => (r as { plugins: unknown[] }).plugins.length,
+      parsedExpected: 2,
+    },
+    {
+      name: 'tasks.get',
+      call: (c) => c.tasks.get({ taskId: 'task-1' }),
+      expectedUrl: `${TEST_BASE_URL}/api/tasks/task-1`,
+      fixture: buildHumanTask({ id: 'task-1' }),
+      parsedField: (r) => (r as { id: string }).id,
+      parsedExpected: 'task-1',
+    },
+  ];
+
+  describe.each(methodContracts)('$name', (contract) => {
+    it('builds URL + parses 200 response', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(contract.fixture));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await contract.call(mediforce);
+
+      expect(contract.parsedField(result)).toEqual(contract.parsedExpected);
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(contract.expectedUrl);
+    });
+
+    it('throws ApiError on 404 with parsed body', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ error: 'Not found' }, 404),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const err = await contract.call(mediforce).catch((e) => e);
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).status).toBe(404);
+    });
+  });
+
+  // ---- Methods with non-trivial input encoding (kept verbose) ----
+
+  describe('tasks.get (path encoding)', () => {
+    it('URL-encodes the taskId path segment', async () => {
+      const task = buildHumanTask({ id: 'task 1/2' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse(task));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.tasks.get({ taskId: 'task 1/2' });
+
+      expect(result.id).toBe('task 1/2');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/tasks/task%201%2F2`,
+      );
+    });
+  });
+
+  describe('workflowDefinitions.get (version + namespace query)', () => {
+    it('calls GET /api/workflow-definitions/:name and parses the envelope', async () => {
+      const definition = buildWorkflowDefinition({ name: 'flow-a' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ definition }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.workflowDefinitions.get({ name: 'flow-a' });
+
+      expect(result.definition.name).toBe('flow-a');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/workflow-definitions/flow-a`,
+      );
+    });
+
+    it('serialises version and namespace into the query string', async () => {
+      const definition = buildWorkflowDefinition({ name: 'flow-a', version: 2 });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ definition }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.workflowDefinitions.get({
+        name: 'flow-a',
+        version: 2,
+        namespace: 'team-alpha',
+      });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/workflow-definitions/flow-a?version=2&namespace=team-alpha`,
+      );
+    });
+
+    it('URL-encodes the name', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ error: 'x' }, 404));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.workflowDefinitions
+        .get({ name: 'flow/a' })
+        .catch(() => undefined);
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/workflow-definitions/flow%2Fa`,
+      );
+    });
+
+    it('throws ApiError on 404', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ error: 'Workflow not found' }, 404),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const err = await mediforce.workflowDefinitions
+        .get({ name: 'missing' })
+        .catch((e) => e);
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).status).toBe(404);
+    });
+  });
+
+  describe('workflowDefinitions.list (namespace query)', () => {
+    it('serialises namespace into the query string when provided', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ definitions: [] }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.workflowDefinitions.list({ namespace: 'team-alpha' });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/workflow-definitions?namespace=team-alpha`,
+      );
+    });
+  });
+
+  describe('cowork.getByInstance (input refine)', () => {
+    it('rejects an empty instanceId before firing any request', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await expect(
+        mediforce.cowork.getByInstance({ instanceId: '' }),
+      ).rejects.toThrow();
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 });

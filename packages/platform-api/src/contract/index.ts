@@ -1,8 +1,13 @@
 export {
   ListTasksInputSchema,
   ListTasksOutputSchema,
+  GetTaskInputSchema,
+  GetTaskOutputSchema,
+  ACTIONABLE_STATUSES,
   type ListTasksInput,
   type ListTasksOutput,
+  type GetTaskInput,
+  type GetTaskOutput,
 } from './tasks.js';
 
 export {
@@ -120,3 +125,65 @@ export {
   type DeleteSecretInput,
   type DeleteSecretOutput,
 } from './secrets.js';
+
+export {
+  GetProcessInputSchema,
+  GetProcessOutputSchema,
+  ListAuditEventsInputSchema,
+  ListAuditEventsOutputSchema,
+  GetProcessStepsInputSchema,
+  GetProcessStepsOutputSchema,
+  StepEntrySchema,
+  StepEntryStatusSchema,
+  StepExecutorTypeSchema,
+  type GetProcessInput,
+  type GetProcessOutput,
+  type ListAuditEventsInput,
+  type ListAuditEventsOutput,
+  type GetProcessStepsInput,
+  type GetProcessStepsOutput,
+  type StepEntry,
+  type StepEntryStatus,
+  type StepExecutorType,
+} from './processes.js';
+
+export {
+  WorkflowDefinitionSummarySchema,
+  ListWorkflowDefinitionsInputSchema,
+  ListWorkflowDefinitionsOutputSchema,
+  ListAgentDefinitionsInputSchema,
+  ListAgentDefinitionsOutputSchema,
+  GetAgentDefinitionInputSchema,
+  GetAgentDefinitionOutputSchema,
+  GetWorkflowDefinitionInputSchema,
+  GetWorkflowDefinitionOutputSchema,
+  type WorkflowDefinitionSummary,
+  type ListWorkflowDefinitionsInput,
+  type ListWorkflowDefinitionsOutput,
+  type ListAgentDefinitionsInput,
+  type ListAgentDefinitionsOutput,
+  type GetAgentDefinitionInput,
+  type GetAgentDefinitionOutput,
+  type GetWorkflowDefinitionInput,
+  type GetWorkflowDefinitionOutput,
+} from './definitions.js';
+
+export {
+  GetCoworkSessionInputSchema,
+  GetCoworkSessionOutputSchema,
+  GetCoworkSessionByInstanceInputSchema,
+  GetCoworkSessionByInstanceOutputSchema,
+  type GetCoworkSessionInput,
+  type GetCoworkSessionOutput,
+  type GetCoworkSessionByInstanceInput,
+  type GetCoworkSessionByInstanceOutput,
+} from './cowork.js';
+
+export {
+  ListPluginsInputSchema,
+  ListPluginsOutputSchema,
+  PluginSummarySchema,
+  type ListPluginsInput,
+  type ListPluginsOutput,
+  type PluginSummary,
+} from './plugins.js';

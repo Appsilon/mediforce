@@ -5,6 +5,7 @@ export interface GetModelDeps {
   modelRegistryRepo: ModelRegistryRepository;
 }
 
+/** @public-handler  Model registry is platform-wide, not namespaced. */
 export async function getModel(
   input: GetModelInput,
   deps: GetModelDeps,

@@ -14,12 +14,16 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import {
   InMemoryHumanTaskRepository,
+  InMemoryProcessInstanceRepository,
   buildHumanTask,
 } from '@mediforce/platform-core/testing';
 import { listTasks } from '@mediforce/platform-api/handlers';
 import { ListTasksInputSchema } from '@mediforce/platform-api/contract';
+import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { Mediforce } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
+
+const apiKeyCaller: CallerIdentity = { kind: 'apiKey' };
 
 function loopbackFetch(
   route: (req: NextRequest) => Promise<Response>,
@@ -33,11 +37,13 @@ function loopbackFetch(
 
 describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => {
   let humanTaskRepo: InMemoryHumanTaskRepository;
+  let instanceRepo: InMemoryProcessInstanceRepository;
   let mediforce: Mediforce;
   let route: (req: NextRequest) => Promise<Response>;
 
   beforeEach(() => {
     humanTaskRepo = new InMemoryHumanTaskRepository();
+    instanceRepo = new InMemoryProcessInstanceRepository();
 
     route = createRouteAdapter(
       ListTasksInputSchema,
@@ -51,7 +57,10 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
           status: statuses.length > 0 ? statuses : undefined,
         };
       },
-      (input) => listTasks(input, { humanTaskRepo }),
+      (input, caller) => listTasks(input, { humanTaskRepo, instanceRepo }, caller),
+      // Stub caller resolution so the test doesn't pull in Firebase Admin /
+      // env-gated services. The handler itself is what we're integrating.
+      { resolveCaller: async () => apiKeyCaller },
     );
 
     mediforce = new Mediforce({ fetch: loopbackFetch(route) });

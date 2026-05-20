@@ -1,154 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
-import type { StepExecution, WorkflowStep } from '@mediforce/platform-core';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { getProcessSteps } from '@mediforce/platform-api/handlers';
+import { GetProcessStepsInputSchema } from '@mediforce/platform-api/contract';
+import type { GetProcessStepsInput } from '@mediforce/platform-api/contract';
+
+interface RouteContext {
+  params: Promise<{ instanceId: string }>;
+}
 
 /**
  * GET /api/processes/:instanceId/steps
  *
- * Returns step-by-step input/output for every step in the workflow definition.
- * For agent steps: data comes from step execution records.
- * For human steps: data comes from instance.variables[stepId].
- *
- * Each entry includes:
- *   - stepId, name, type, executorType
- *   - status: completed | running | pending
- *   - input: what the engine passed to this step (null if not yet reached)
- *   - output: what the step produced (null if still running or not yet reached)
- *   - execution: full StepExecution record (agent steps only)
+ * Derived per-step view: walks the workflow definition in order, joins each
+ * step's latest execution + `instance.variables[stepId]`, and tags every
+ * step with `completed | running | pending`. Missing instance or definition
+ * → 404 via `NotFoundError`. Namespace gating enforced inside the handler.
  */
-
-interface StepEntry {
-  stepId: string;
-  name: string;
-  type: string;
-  executorType: string;
-  status: 'completed' | 'running' | 'pending';
-  input: Record<string, unknown> | null;
-  output: Record<string, unknown> | null;
-  execution: StepExecution | null;
-}
-
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ instanceId: string }> },
-): Promise<NextResponse> {
-  try {
-    const { instanceId } = await params;
-    const { instanceRepo, processRepo, namespaceRepo } = getPlatformServices();
-
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
-    if (caller instanceof NextResponse) return caller;
-
-    const instance = await instanceRepo.getById(instanceId);
-    if (!instance) {
-      return NextResponse.json({ error: 'Instance not found' }, { status: 404 });
-    }
-
-    const denied = requireNamespaceAccess(caller, instance.namespace);
-    if (denied) return denied;
-
-    // Load workflow definition
-    const versionNum = parseInt(instance.definitionVersion, 10);
-    const definition = !isNaN(versionNum)
-      ? await processRepo.getWorkflowDefinition(instance.namespace ?? '', instance.definitionName, versionNum)
-      : null;
-
-    if (!definition) {
-      return NextResponse.json(
-        { error: 'Workflow definition not found' },
-        { status: 404 },
-      );
-    }
-
-    // Fetch all step executions in one query
-    const executions = await instanceRepo.getStepExecutions(instanceId);
-
-    // Index executions by stepId (latest per step)
-    const executionsByStep = new Map<string, StepExecution>();
-    for (const exec of executions) {
-      const existing = executionsByStep.get(exec.stepId);
-      if (!existing || exec.startedAt > existing.startedAt) {
-        executionsByStep.set(exec.stepId, exec);
-      }
-    }
-
-    // Determine which steps have been reached by walking the definition order
-    const currentStepId = instance.currentStepId;
-    const variables = (instance.variables ?? {}) as Record<string, Record<string, unknown>>;
-
-    // Build ordered list of non-terminal steps
-    const stepEntries: StepEntry[] = [];
-    let pastCurrentStep = false;
-
-    for (const step of definition.steps) {
-      if (step.type === 'terminal') continue;
-
-      const wfStep = step as WorkflowStep;
-      const executorType = wfStep.executor ?? 'unknown';
-      const execution = executionsByStep.get(step.id) ?? null;
-      const stepVariables = variables[step.id] ?? null;
-
-      // Determine step status
-      let status: StepEntry['status'];
-      if (pastCurrentStep) {
-        status = 'pending';
-      } else if (step.id === currentStepId) {
-        // Current step -- could be running or waiting
-        status = 'running';
-        pastCurrentStep = true;
-      } else {
-        // Before current step -- check if we have output
-        const hasOutput = execution?.output !== null || stepVariables !== null;
-        status = hasOutput ? 'completed' : 'pending';
-      }
-
-      // If instance is completed/failed and this is the current step, mark accordingly
-      if (step.id === currentStepId && instance.status === 'completed') {
-        status = 'completed';
-      }
-      // If instance completed and currentStepId is null, all steps are done
-      if (instance.status === 'completed' && currentStepId === null) {
-        const hasOutput = execution?.output !== null || stepVariables !== null;
-        status = hasOutput ? 'completed' : 'pending';
-      }
-
-      // Build input/output based on executor type
-      let input: Record<string, unknown> | null = null;
-      let output: Record<string, unknown> | null = null;
-
-      if (executorType === 'agent' && execution) {
-        input = execution.input;
-        output = execution.output;
-      } else if (executorType === 'human') {
-        // Human steps: the step definition describes what's expected,
-        // the output is whatever was submitted (stored in variables)
-        input = wfStep.ui ? { ui: wfStep.ui } : null;
-        output = stepVariables;
-      }
-
-      stepEntries.push({
-        stepId: step.id,
-        name: step.name,
-        type: step.type,
-        executorType,
-        status,
-        input,
-        output,
-        execution,
-      });
-    }
-
-    return NextResponse.json({
-      instanceId,
-      definitionName: instance.definitionName,
-      definitionVersion: instance.definitionVersion,
-      instanceStatus: instance.status,
-      currentStepId,
-      steps: stepEntries,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+export const GET = createRouteAdapter<
+  typeof GetProcessStepsInputSchema,
+  GetProcessStepsInput,
+  unknown,
+  RouteContext
+>(
+  GetProcessStepsInputSchema,
+  async (_req, ctx) => ({ instanceId: (await ctx.params).instanceId }),
+  (input, caller) => {
+    const { instanceRepo, processRepo } = getPlatformServices();
+    return getProcessSteps(input, { instanceRepo, processRepo }, caller);
+  },
+);

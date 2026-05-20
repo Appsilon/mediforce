@@ -1,29 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { getProcess } from '@mediforce/platform-api/handlers';
+import { GetProcessInputSchema } from '@mediforce/platform-api/contract';
+import type { GetProcessInput } from '@mediforce/platform-api/contract';
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ instanceId: string }> },
-): Promise<NextResponse> {
-  try {
-    const { instanceId } = await params;
-    const { instanceRepo, namespaceRepo } = getPlatformServices();
-
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
-    if (caller instanceof NextResponse) return caller;
-
-    const instance = await instanceRepo.getById(instanceId);
-    if (!instance) {
-      return NextResponse.json({ error: 'Instance not found' }, { status: 404 });
-    }
-
-    const denied = requireNamespaceAccess(caller, instance.namespace);
-    if (denied) return denied;
-
-    return NextResponse.json(instance);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+interface RouteContext {
+  params: Promise<{ instanceId: string }>;
 }
+
+/**
+ * GET /api/processes/:instanceId
+ *
+ * Returns the full process instance. Missing instances 404 via the handler's
+ * `NotFoundError`. Namespace gating is enforced inside the handler (api-key
+ * callers pass; user callers must be in the instance's namespace) and
+ * surfaces as 403 via `ForbiddenError`.
+ */
+export const GET = createRouteAdapter<
+  typeof GetProcessInputSchema,
+  GetProcessInput,
+  unknown,
+  RouteContext
+>(
+  GetProcessInputSchema,
+  async (_req, ctx) => ({ instanceId: (await ctx.params).instanceId }),
+  (input, caller) => {
+    const { instanceRepo } = getPlatformServices();
+    return getProcess(input, { instanceRepo }, caller);
+  },
+);
