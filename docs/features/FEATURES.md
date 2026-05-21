@@ -12,6 +12,7 @@ Visual documentation of Mediforce features, auto-generated from E2E journey test
 **Tasks** — human review queue for workflow steps requiring human input
 - [Task Browsing & Grouping](#task-browsing--grouping) — reviewers find their tasks across workflows
 - [Task Approve Flow](#task-approve-flow) — reviewer sees context, submits verdict
+- [Tasks Namespace Isolation](#tasks-namespace-isolation) — tasks page shows only tasks belonging to the current workspace
 
 **Workflows** — defining and managing automated processes
 - [Workflow Home](#workflow-home) — overview of all workflows and their active runs
@@ -108,6 +109,12 @@ Reviewers land here to see what needs their attention. Tasks from all workflows 
 The core review screen. Reviewer sees the task context, previous step's output (what the agent produced), and the verdict buttons. This is the human-in-the-loop decision point.
 
 ![task-approve-flow](task-approve-flow.gif)
+
+### Tasks Namespace Isolation
+
+Browsing `/[handle]/tasks` only surfaces tasks that belong to that workspace. Users who hold the same `assignedRole` in multiple workspaces see no cross-namespace bleed — tasks stamped with a different `namespace` are dropped by the client-side hook before they reach the inbox.
+
+![tasks-namespace-isolation](tasks-namespace-isolation.gif)
 
 ---
 
