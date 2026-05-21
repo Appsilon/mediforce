@@ -1,4 +1,4 @@
-# 0003 — Authorization enforcement moves to a scoped data-access layer
+# 0004 — Authorization enforcement moves to a scoped data-access layer
 
 - **Status:** Proposed
 - **Date:** 2026-05-21
