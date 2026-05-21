@@ -36,12 +36,19 @@ Move the primary datastore to **self-hosted Postgres 16**, accessed via
    `drizzle-kit` migrations). Repository interfaces in
    `packages/platform-core/src/interfaces/` stay unchanged; the in-memory test
    doubles remain the L2 path.
-3. **Fail-proof repository scoping.** Every concrete repository inherits from a
-   `WorkspaceScopedRepository` base that enforces, on every default read path:
-   (a) workspace scoping (`WHERE workspace = $me`) and (b) soft-delete
-   filtering (`WHERE deleted_at IS NULL AND archived_at IS NULL`). Crossing
-   those filters requires an explicit, audit-logged opt-out method (e.g.
+3. **Fail-proof repository scoping.** Every concrete repository inherits from an
+   `AuthorizedRepository` base that enforces, on every default read and write
+   path: (a) workspace scoping (`WHERE workspace IN $callerWorkspaces`, or
+   unrestricted for `caller.kind === 'apiKey'`) and (b) soft-delete filtering
+   (`WHERE deleted_at IS NULL AND archived_at IS NULL`). Crossing those
+   filters requires an explicit, audit-logged opt-out method (e.g.
    `discoverPublicWorkflows()`, `includeDeleted()`, `includeArchived()`).
+   A URL-driven single-workspace variant (`scopedTo(handle)`) is available
+   for routes that pin to one `/{handle}/…` segment. The wrapper layer that
+   consumes this base class — `CallerScope` plus per-entity
+   `Authorized<Entity>Repository` types — lands ahead of the Postgres swap;
+   see [ADR-0003](./0003-scoped-data-access-authorization.md) for the
+   wrapper layer's design and timing.
 4. **Soft-delete via timestamps.** Replace existing `deleted: boolean` and
    `archived: boolean` flags with `deleted_at timestamptz` and
    `archived_at timestamptz` columns. NULL = active. Soft-delete is **forever**
