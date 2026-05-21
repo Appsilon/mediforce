@@ -59,14 +59,19 @@ export function TaskContextPanel({
       .filter((e) =>
         e.stepId !== stepId &&
         e.status === 'completed' &&
-        e.output &&
+        (e.output !== null || (typeof e.agentOutput?.presentation === 'string' && e.agentOutput.presentation.length > 0)) &&
         new Date(e.startedAt).getTime() <= currentStepStart,
       )
       .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
     return completed.length > 0 ? completed[completed.length - 1] : null;
   }, [executions, stepId]);
 
-  const hasContent = previousStepOutput !== null && previousStepOutput.output !== null;
+  const hasContent =
+    previousStepOutput !== null &&
+    (
+      previousStepOutput.output !== null ||
+      (typeof previousStepOutput.agentOutput?.presentation === 'string' && previousStepOutput.agentOutput.presentation.length > 0)
+    );
 
   // Notify parent about content availability
   React.useEffect(() => {
@@ -98,7 +103,7 @@ export function TaskContextPanel({
   }
 
   const previousStep = previousStepOutput!;
-  const output = previousStep.output!;
+  const output = previousStep.output;
   const isObject = typeof output === 'object' && output !== null;
 
   return (
@@ -119,6 +124,7 @@ export function TaskContextPanel({
             rawOutput={output}
             instanceId={processInstanceId}
             previousStepId={previousStep.stepId}
+            agentPresentation={previousStep.agentOutput?.presentation ?? null}
           />
         </Collapsible.Content>
       </div>
@@ -131,6 +137,7 @@ interface PreviousStepOutputTabsProps {
   rawOutput: unknown;
   instanceId: string;
   previousStepId: string;
+  agentPresentation: string | null;
 }
 
 function PreviousStepOutputTabs({
@@ -138,11 +145,14 @@ function PreviousStepOutputTabs({
   rawOutput,
   instanceId,
   previousStepId,
+  agentPresentation,
 }: PreviousStepOutputTabsProps) {
   const inlinePresentation =
-    output !== null && typeof output.presentation === 'string' && output.presentation.length > 0
-      ? output.presentation
-      : null;
+    typeof agentPresentation === 'string' && agentPresentation.length > 0
+      ? agentPresentation
+      : output !== null && typeof output.presentation === 'string' && output.presentation.length > 0
+        ? output.presentation
+        : null;
 
   const htmlReportPath =
     output !== null && typeof output.htmlReportPath === 'string' && output.htmlReportPath.length > 0

@@ -399,14 +399,20 @@ export class ScriptContainerPlugin extends ContainerPlugin {
   ): Promise<{ stdout: string; stderr: string; exitCode: number | null; signal: string | null }> {
     return new Promise((resolve) => {
       const [cmd, ...args] = cmdArgs;
+      const childEnv: NodeJS.ProcessEnv = {
+        NODE_ENV: process.env.NODE_ENV,
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        TMPDIR: process.env.TMPDIR,
+        TEMP: process.env.TEMP,
+        TMP: process.env.TMP,
+        ...this.resolvedEnv.vars,
+        RUN_ID: this.context.processInstanceId,
+        STEP_ID: this.context.stepId,
+      };
       const child = spawn(cmd, args, {
         cwd,
-        env: {
-          ...process.env,
-          ...this.resolvedEnv.vars,
-          RUN_ID: this.context.processInstanceId,
-          STEP_ID: this.context.stepId,
-        },
+        env: childEnv,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 

@@ -61,6 +61,7 @@ export function AgentOutputDisplay({
       ? agentOutput.presentation
       : null;
   const hasPresentation = presentationHtml !== null;
+  const result = agentOutput.result ?? {};
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = React.useState(300);
   const { resolvedTheme } = useTheme();
@@ -90,7 +91,8 @@ export function AgentOutputDisplay({
     iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
   }, [isDark, hasPresentation]);
 
-  const hasContent = agentOutput.result !== null && Object.keys(agentOutput.result).length > 0;
+  const hasResult = agentOutput.result !== null && Object.keys(agentOutput.result).length > 0;
+  const hasContent = hasResult || hasPresentation;
 
   const outputFilePath = React.useMemo(
     () => (agentOutput.result ? extractOutputFilePath(agentOutput.result) : null),
@@ -216,12 +218,12 @@ export function AgentOutputDisplay({
         )}
 
         <Tabs.Content value="summary" className="p-4">
-          <MetadataSummary result={agentOutput.result!} />
+          <MetadataSummary result={result} />
         </Tabs.Content>
 
         <Tabs.Content value="full" className="p-4">
           <pre className="rounded-md bg-muted p-4 text-xs overflow-auto max-h-[600px] whitespace-pre-wrap break-words">
-            {JSON.stringify(agentOutput.result, null, 2)}
+            {JSON.stringify(result, null, 2)}
           </pre>
         </Tabs.Content>
       </Tabs.Root>

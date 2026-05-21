@@ -23,7 +23,7 @@ vi.mock('next-themes', () => ({
 }));
 
 import { TaskContextPanel } from '../task-context-panel';
-import { MAX_IFRAME_HEIGHT } from '../iframe-helpers';
+import { buildSrcdoc, MAX_IFRAME_HEIGHT } from '../iframe-helpers';
 
 type StepExecutionRecord = StepExecution & { id: string };
 
@@ -106,6 +106,35 @@ describe('TaskContextPanel', () => {
 
     // No fetch needed for inline mode
     expect(mockApiFetch).not.toHaveBeenCalled();
+  });
+
+  it('renders report from agentOutput presentation when result output is empty', async () => {
+    const execution = buildExecution({
+      output: null,
+      agentOutput: {
+        confidence: null,
+        confidence_rationale: null,
+        reasoning: null,
+        model: null,
+        duration_ms: null,
+        gitMetadata: null,
+        presentation: '<section id="agent-output-report">Agent output body</section>',
+      },
+    });
+    setSubcollection([execution]);
+
+    render(
+      <TaskContextPanel
+        processInstanceId="inst-1"
+        stepId="human-review"
+      />,
+    );
+    await expandPanel();
+    await activateReportTab();
+
+    const iframe = document.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe!.getAttribute('srcdoc')).toContain('agent-output-report');
   });
 
   it('fetches the report file and renders it in the iframe when htmlReportPath is set', async () => {
@@ -448,5 +477,22 @@ describe('TaskContextPanel', () => {
     await waitFor(() => {
       expect(postMessageSpy).toHaveBeenCalledWith({ type: 'theme', dark: true }, '*');
     });
+  });
+
+  it('hardens srcdoc with CSP and escapes stringify fallback data', () => {
+    const result = {};
+    Object.defineProperty(result, 'unsafe', {
+      enumerable: true,
+      get() {
+        throw new Error('</script><script>alert(1)</script>');
+      },
+    });
+
+    const srcdoc = buildSrcdoc('<div>body</div>', result, false);
+
+    expect(srcdoc).toContain('Content-Security-Policy');
+    expect(srcdoc).toContain("connect-src 'none'");
+    expect(srcdoc).not.toContain('</script><script>alert(1)</script>');
+    expect(srcdoc).toContain('<\\/script><script>alert(1)<\\/script>');
   });
 });

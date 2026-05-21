@@ -34,6 +34,19 @@ describe('AgentOutputReviewPanel', () => {
     expect(iframe!.getAttribute('sandbox')).toBe('allow-scripts');
   });
 
+  it('renders presentation even when structured result is empty', () => {
+    const agentOutput = buildAgentOutput({
+      presentation: '<div>Presentation only</div>',
+      result: null,
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
+
+    const iframe = document.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe!.getAttribute('srcdoc')).toContain('Presentation only');
+  });
+
   it('iframe has sandbox="allow-scripts" (no allow-same-origin)', () => {
     const agentOutput = buildAgentOutput({
       presentation: '<div>Content</div>',
