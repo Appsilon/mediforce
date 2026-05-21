@@ -47,7 +47,7 @@ Move the primary datastore to **self-hosted Postgres 16**, accessed via
    for routes that pin to one `/{handle}/…` segment. The wrapper layer that
    consumes this base class — `CallerScope` plus per-entity
    `Authorized<Entity>Repository` types — lands ahead of the Postgres swap;
-   see [ADR-0003](./0003-scoped-data-access-authorization.md) for the
+   see [ADR-0004](./0004-scoped-data-access-authorization.md) for the
    wrapper layer's design and timing.
 4. **Soft-delete via timestamps.** Replace existing `deleted: boolean` and
    `archived: boolean` flags with `deleted_at timestamptz` and
