@@ -46,6 +46,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const { instanceId } = await params;
   const { instanceRepo, processRepo, auditRepo, namespaceRepo } = getPlatformServices();
+  let runLockAcquired = false;
 
   const caller = await resolveCallerIdentity(req, namespaceRepo);
   if (caller instanceof NextResponse) return caller;
@@ -79,6 +80,7 @@ export async function POST(
         { status: 409 },
       );
     }
+    runLockAcquired = true;
 
     // Load WorkflowDefinition — try exact version, fall back to latest
     const versionNum = parseInt(initialInstance.definitionVersion, 10);
@@ -94,6 +96,7 @@ export async function POST(
     }
     if (!workflowDefinition) {
       releaseRunLock(instanceId);
+      runLockAcquired = false;
       return NextResponse.json(
         { error: 'WorkflowDefinition not found — run migration first', definitionName: initialInstance.definitionName },
         { status: 404 },
@@ -128,6 +131,7 @@ export async function POST(
           updatedAt: new Date().toISOString(),
         });
         releaseRunLock(instanceId);
+        runLockAcquired = false;
         return NextResponse.json(
           { error: 'Missing environment variables', missing: allMissing, instanceId },
           { status: 422 },
@@ -617,7 +621,9 @@ export async function POST(
       { status: 202 },
     );
   } catch (err) {
-    releaseRunLock(instanceId);
+    if (runLockAcquired) {
+      releaseRunLock(instanceId);
+    }
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error(`[auto-runner] Validation error for instance '${instanceId}': ${message}`);
     return NextResponse.json({ error: message }, { status: 500 });
