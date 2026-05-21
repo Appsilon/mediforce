@@ -15,6 +15,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Duplicate Python migration script `scripts/migrations/migrate_workflow_doc_ids.py` — superseded by the TypeScript `packages/platform-infra/scripts/migrate-workflow-namespacing.ts` which is the canonical version ([#424](https://github.com/Appsilon/mediforce/pull/424)).
 
 ### Fixed
+- `pnpm dev:mock` now starts local Firebase emulators, seeds demo data, and then boots Next, so the browser no longer falls into offline Firestore/Auth mode on a fresh mock-dev run.
 - Workspace `Runs` page no longer leaks runs from other namespaces the viewer is a member of — list is now filtered to the current `handle`, and `useProcessInstances` requires `namespace` so TypeScript catches future regressions compile-time ([#424](https://github.com/Appsilon/mediforce/pull/424), follow-ups tracked in [#447](https://github.com/Appsilon/mediforce/issues/447) and [#448](https://github.com/Appsilon/mediforce/issues/448)).
 - Instance namespace backfill now resolves namespace per instance definition version instead of global latest-by-name, preventing cross-tenant run reassignment during migration ([#424](https://github.com/Appsilon/mediforce/pull/424)).
 - Workflow definition storage now scopes definition and metadata keys by namespace, so tenants can register the same workflow name independently ([#424](https://github.com/Appsilon/mediforce/pull/424)).

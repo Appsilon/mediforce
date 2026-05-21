@@ -109,17 +109,17 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 
 ```bash
 pnpm install
-pnpm dev:mock        # port 9007, mocked agents, in-memory data, no Firebase needed
+pnpm dev:mock        # port 9007, mocked agents, local emulators + demo data
 ```
 
-Open `http://localhost:9007`. Use this to click through the UI without configuring anything.
+Open `http://localhost:9007`. Use this to click through the UI without configuring a Firebase project, cloud keys, Docker, or real agents.
 
 ### Dev modes
 
 | Command | What it gives you |
 |---|---|
 | `pnpm dev` | Default. Real Firebase per `.env.local`, agents in Docker. The main dev loop. |
-| `pnpm dev:mock` | Mocked agents + in-memory data store, port 9007. No keys, no Docker, no Firebase. |
+| `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007. No cloud keys, no Docker, no Firebase project. |
 | `pnpm dev:no-docker` | Like `dev`, but agents run via host `claude` CLI instead of Docker. |
 | `pnpm dev:queue` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Requires Redis + worker running — see below. |
 

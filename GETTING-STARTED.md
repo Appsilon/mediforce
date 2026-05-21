@@ -17,8 +17,9 @@ pnpm install
 pnpm dev:mock
 ```
 
-Open http://localhost:9007. No Firebase, no keys, no Docker. Agents are mocked,
-workflow data lives in `MEDIFORCE_DATA_DIR` (in-memory file-based fake).
+Open http://localhost:9007. No Firebase project, cloud keys, Docker, or real agents.
+The launcher starts local Firebase emulators, seeds demo data, and uses mocked
+agent execution.
 Use this to explore the UI before configuring anything real.
 
 ---
@@ -430,7 +431,7 @@ Make sure:
 | Command | Description |
 |---------|-------------|
 | `pnpm install` | Install dependencies |
-| `pnpm dev:mock` | Mocked agents + in-memory data, port 9007 — no setup |
+| `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007 |
 | `pnpm emulators` | Start Firebase emulators (Auth + Firestore + Storage) |
 | `pnpm seed` | Seed demo data into running emulators |
 | `NEXT_PUBLIC_USE_EMULATORS=true pnpm dev` | Run with emulators (port 9003) |
