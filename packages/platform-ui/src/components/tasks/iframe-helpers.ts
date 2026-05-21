@@ -52,12 +52,38 @@ export function buildSrcdoc(
   result: Record<string, unknown> | null,
   isDark: boolean,
 ): string {
-  // Escape closing script tags in data to prevent XSS breakout
-  const safeData = JSON.stringify(result ?? {}).replace(/<\//g, '<\\/');
+  const csp = [
+    "default-src 'none'",
+    "script-src 'unsafe-inline' https://cdn.jsdelivr.net",
+    "style-src 'unsafe-inline'",
+    "img-src data: blob:",
+    "font-src data:",
+    "media-src data: blob:",
+    "connect-src 'none'",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join('; ');
+
+  // Escape closing script tags in data to prevent XSS breakout. JSON.stringify
+  // throws on circular refs — agents are unlikely to produce one, but instead
+  // of silently degrading to `{}` (which looks like a normal "no data" case)
+  // we surface the failure as `window.__data__._error` so the presenter can
+  // distinguish it from a missing payload.
+  let safeData: string;
+  try {
+    safeData = JSON.stringify(result ?? {}).replace(/<\//g, '<\\/');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown error';
+    console.warn('[iframe-helpers] result not JSON-serialisable:', err);
+    safeData = JSON.stringify({ _error: `result not serialisable: ${msg}` }).replace(/<\//g, '<\\/');
+  }
   return `<!DOCTYPE html>
 <html class="${isDark ? 'dark' : ''}">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${csp}">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <style type="text/tailwindcss">
 @theme {
@@ -102,6 +128,10 @@ body {
 <body>
 ${presentation}
 <script>
+// Sandboxed iframes without allow-same-origin get a null origin, so
+// postMessage cannot use a concrete target — '*' is the only valid value
+// here. The parent verifies inbound messages with
+// event.source === iframeRef.current.contentWindow.
 const ro = new ResizeObserver(() => {
   window.parent.postMessage({ type: 'resize', height: document.body.scrollHeight }, '*');
 });

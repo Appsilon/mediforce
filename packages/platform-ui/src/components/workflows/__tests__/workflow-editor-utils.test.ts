@@ -143,4 +143,22 @@ describe('ensureTerminalConnected', () => {
     // terminal should not get an outgoing transition to itself
     expect(result.transitions.some((t) => t.from === 'done')).toBe(false);
   });
+
+  it('does not treat review steps with verdict targets as orphans', () => {
+    const reviewStep: WorkflowStep = {
+      id: 'review',
+      name: 'Review',
+      type: 'review',
+      executor: 'human',
+      verdicts: {
+        approve: { target: 'next-step' },
+        revise: { target: 'prev-step' },
+      },
+    };
+    const steps = [step('prev-step'), reviewStep, step('next-step'), step('done', 'terminal')];
+    const transitions = [tr('prev-step', 'review'), tr('next-step', 'done')];
+    const result = ensureTerminalConnected(steps, transitions);
+    // review step should NOT get a phantom transition to done
+    expect(result.transitions.some((t) => t.from === 'review' && t.to === 'done')).toBe(false);
+  });
 });

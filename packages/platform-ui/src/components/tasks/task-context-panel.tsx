@@ -37,16 +37,41 @@ export function TaskContextPanel({
     'stepExecutions',
   );
 
-  // Find the most recent completed step execution that is NOT the current human step
+  // Find the completed step execution that directly precedes this human task's
+  // current entry into the review step. On L3 agent-reviewer iteration loops a
+  // single review stepId may be entered multiple times — for each entry the
+  // reviewer wants to see the output produced just before *that* entry, not
+  // before the very first one. So we use the **most recent** start of this
+  // review stepId as the boundary: the latest completed execution from a
+  // different step with `startedAt <= mostRecentReviewStart` is what triggered
+  // the current review iteration.
   const previousStepOutput = React.useMemo(() => {
     if (!executions.length) return null;
+
+    const currentStepExecs = executions
+      .filter((e) => e.stepId === stepId)
+      .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
+    const currentStepStart = currentStepExecs.length > 0
+      ? new Date(currentStepExecs[currentStepExecs.length - 1].startedAt).getTime()
+      : Infinity;
+
     const completed = executions
-      .filter((e) => e.stepId !== stepId && e.status === 'completed' && e.output)
+      .filter((e) =>
+        e.stepId !== stepId &&
+        e.status === 'completed' &&
+        (e.output !== null || (typeof e.agentOutput?.presentation === 'string' && e.agentOutput.presentation.length > 0)) &&
+        new Date(e.startedAt).getTime() <= currentStepStart,
+      )
       .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
     return completed.length > 0 ? completed[completed.length - 1] : null;
   }, [executions, stepId]);
 
-  const hasContent = previousStepOutput !== null && previousStepOutput.output !== null;
+  const hasContent =
+    previousStepOutput !== null &&
+    (
+      previousStepOutput.output !== null ||
+      (typeof previousStepOutput.agentOutput?.presentation === 'string' && previousStepOutput.agentOutput.presentation.length > 0)
+    );
 
   // Notify parent about content availability
   React.useEffect(() => {
@@ -78,7 +103,7 @@ export function TaskContextPanel({
   }
 
   const previousStep = previousStepOutput!;
-  const output = previousStep.output!;
+  const output = previousStep.output;
   const isObject = typeof output === 'object' && output !== null;
 
   return (
@@ -99,6 +124,7 @@ export function TaskContextPanel({
             rawOutput={output}
             instanceId={processInstanceId}
             previousStepId={previousStep.stepId}
+            agentPresentation={previousStep.agentOutput?.presentation ?? null}
           />
         </Collapsible.Content>
       </div>
@@ -111,6 +137,7 @@ interface PreviousStepOutputTabsProps {
   rawOutput: unknown;
   instanceId: string;
   previousStepId: string;
+  agentPresentation: string | null;
 }
 
 function PreviousStepOutputTabs({
@@ -118,11 +145,14 @@ function PreviousStepOutputTabs({
   rawOutput,
   instanceId,
   previousStepId,
+  agentPresentation,
 }: PreviousStepOutputTabsProps) {
   const inlinePresentation =
-    output !== null && typeof output.presentation === 'string' && output.presentation.length > 0
-      ? output.presentation
-      : null;
+    typeof agentPresentation === 'string' && agentPresentation.length > 0
+      ? agentPresentation
+      : output !== null && typeof output.presentation === 'string' && output.presentation.length > 0
+        ? output.presentation
+        : null;
 
   const htmlReportPath =
     output !== null && typeof output.htmlReportPath === 'string' && output.htmlReportPath.length > 0
@@ -260,7 +290,12 @@ function ReportPane({ html, loading, error, result }: ReportPaneProps) {
     return () => window.removeEventListener('message', handler);
   }, [html]);
 
-  // Sync theme changes to iframe
+  // Sync theme changes to iframe. Iframe is sandboxed without
+  // `allow-same-origin`, so its origin is null. `postMessage` rejects the
+  // literal string 'null' as targetOrigin and we can't compute the parent
+  // origin from inside the iframe — '*' is the only valid value here. The
+  // payload is benign (theme bool only), and the iframe-side handler does
+  // not act on sensitive data, so wildcard is acceptable.
   React.useEffect(() => {
     if (html === null) return;
     iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');

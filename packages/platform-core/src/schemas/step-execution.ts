@@ -38,6 +38,7 @@ export const AgentOutputSnapshotSchema = z.object({
   deliverableFile: z.string().nullable().optional(),
   tokenUsage: TokenUsageSchema.optional(),
   estimatedCostUsd: z.number().optional(),
+  presentation: z.string().nullable().optional(),
 });
 
 export const StepExecutionSchema = z.object({
