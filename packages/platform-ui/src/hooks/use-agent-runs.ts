@@ -7,30 +7,33 @@ import type { AgentRun, ProcessInstance } from '@mediforce/platform-core';
 import { db } from '@/lib/firebase';
 import { useCollection, type FirestoreState } from './use-collection';
 
-export function useAgentRuns() {
-  // Always order by startedAt desc — most recent runs first
-  // The agentRuns collection was created in Plan 01 (FirestoreAgentRunRepository + AgentRunner write path)
-  const constraints = useMemo(
-    () => [orderBy('startedAt', 'desc')],
-    [],
+export function useAgentRuns(namespace: string): FirestoreState<AgentRun> {
+  const constraints = useMemo(() => [orderBy('startedAt', 'desc')], []);
+  const { data: allRuns, loading, error } = useCollection<AgentRun>('agentRuns', constraints);
+  const processNameMap = useProcessNameMap(namespace);
+  const data = useMemo(
+    () => allRuns.filter((run) => processNameMap.has(run.processInstanceId)),
+    [allRuns, processNameMap],
   );
-  return useCollection<AgentRun>('agentRuns', constraints);
+  return { data, loading, error };
 }
 
 /**
- * Subscribe to all processInstances and return a Map of instanceId -> definitionName.
- * Single collection subscription avoids N+1 queries.
+ * Subscribe to processInstances scoped to `namespace` and return a Map of
+ * instanceId -> definitionName. Namespace-scoped to prevent cross-workspace leaks.
  */
-export function useProcessNameMap(): Map<string, string> {
+export function useProcessNameMap(namespace: string): Map<string, string> {
   const { data: instances } = useCollection<ProcessInstance>('processInstances');
 
   return useMemo(() => {
     const map = new Map<string, string>();
     for (const inst of instances) {
-      map.set(inst.id, inst.definitionName);
+      if (inst.namespace === namespace) {
+        map.set(inst.id, inst.definitionName);
+      }
     }
     return map;
-  }, [instances]);
+  }, [instances, namespace]);
 }
 
 /**

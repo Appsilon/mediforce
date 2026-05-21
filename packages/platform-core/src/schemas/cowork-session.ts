@@ -86,6 +86,7 @@ export const CoworkSessionSchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   finalizedAt: z.string().datetime().nullable(),
+  namespace: z.string().min(1).optional(),
 });
 
 export type CoworkSessionStatus = z.infer<typeof CoworkSessionStatusSchema>;

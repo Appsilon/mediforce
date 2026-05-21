@@ -494,7 +494,7 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
 
   const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions();
   const { data: allInstances, loading: instancesLoading } = useProcessInstances('all', undefined, false, handle);
-  const { data: activeTasks } = useMyTasks(null);
+  const { data: activeTasks } = useMyTasks(null, handle);
 
   const loading = defsLoading || instancesLoading;
 

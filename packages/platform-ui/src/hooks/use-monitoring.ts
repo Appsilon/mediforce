@@ -18,9 +18,9 @@ export interface MonitoringData {
   loading: boolean;
 }
 
-export function useMonitoringData(): MonitoringData {
+export function useMonitoringData(namespace: string): MonitoringData {
   const instanceConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
-  const { data: instances, loading: instancesLoading } = useCollection<ProcessInstance>(
+  const { data: allInstances, loading: instancesLoading } = useCollection<ProcessInstance>(
     'processInstances',
     instanceConstraints,
   );
@@ -29,9 +29,19 @@ export function useMonitoringData(): MonitoringData {
     () => [where('status', 'in', ['pending', 'claimed']), orderBy('createdAt', 'asc')],
     [],
   );
-  const { data: tasks, loading: tasksLoading } = useCollection<HumanTask>(
+  const { data: allTasks, loading: tasksLoading } = useCollection<HumanTask>(
     'humanTasks',
     taskConstraints,
+  );
+
+  const instances = useMemo(
+    () => allInstances.filter((i) => i.namespace === namespace),
+    [allInstances, namespace],
+  );
+
+  const tasks = useMemo(
+    () => allTasks.filter((t) => t.namespace === namespace),
+    [allTasks, namespace],
   );
 
   const statusCounts = useMemo(() => {

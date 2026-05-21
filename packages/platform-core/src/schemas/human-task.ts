@@ -37,6 +37,7 @@ export const HumanTaskSchema = z.object({
     requiresComment: z.boolean(),
   })).optional(),
   deleted: z.boolean().optional(),
+  namespace: z.string().min(1).optional(),
 });
 
 export type HumanTaskStatus = z.infer<typeof HumanTaskStatusSchema>;

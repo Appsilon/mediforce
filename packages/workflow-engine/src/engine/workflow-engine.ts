@@ -299,6 +299,7 @@ export class WorkflowEngine {
             completedAt: null,
             completionData: null,
             creationReason: 'human_executor',
+            ...(updatedInstance.namespace ? { namespace: updatedInstance.namespace } : {}),
             ...(nextStep.ui ? { ui: nextStep.ui } : {}),
             ...(nextStep.params?.length ? { params: nextStep.params } : {}),
             ...selectionFields,
