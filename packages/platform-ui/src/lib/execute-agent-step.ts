@@ -316,6 +316,7 @@ export async function executeAgentStep(
         iterationNumber: priorReviewExecutions,
       },
       creationReason: 'agent_review_l3',
+      ...(instance.namespace ? { namespace: instance.namespace } : {}),
     });
 
     await auditRepo.append({
