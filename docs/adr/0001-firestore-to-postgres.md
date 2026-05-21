@@ -79,22 +79,63 @@ Move the primary datastore to **self-hosted Postgres 16**, accessed via
 
 ## Considered alternatives
 
+### Datastore engine
+
 - **Stay on Firestore.** Rejected: blocks pharma on-prem GTM; the migration
   surface only grows as new collections accrue.
+- **MySQL / MariaDB.** Considered — many pharma IT shops already operate
+  one. Rejected because: weaker JSON / `jsonb` story (no native `jsonb`
+  path operators and partial indexes are more limited); no native
+  publish-subscribe equivalent of `LISTEN / NOTIFY`; weaker row-level
+  security primitives that the future RLS ADR will rely on; the vector,
+  full-text, and extension ecosystem (`pgvector`, FTS) trails Postgres.
+  Postgres is the more capable target at no extra operational cost.
+- **SQLite (+ Litestream for backups).** Considered — irresistibly simple.
+  Rejected because: a single-writer concurrency model bottlenecks the
+  workflow engine + UI + worker writing concurrently; no usable network
+  protocol, so the worker and the Next.js process must share a filesystem;
+  no RLS path; mediocre support for `bytea`-sized rows we'll store for
+  skills and attachments (see ADR-0003). Fine as a future "tiny demo"
+  side-target if we ever ship a personal-use SKU, not a fit for the main
+  product.
+- **MongoDB or another document store.** Rejected — it preserves the
+  document-DB ergonomics that drove us off Firestore (poor joins, awkward
+  multi-collection consistency, weaker SQL tooling, identical vendor-risk
+  conversation in pharma reviews).
+- **CockroachDB / YugabyteDB / TiDB (distributed Postgres-compatible).**
+  Rejected as overkill for single-tenant pharma deployments. They solve
+  multi-region HA we don't need; in exchange they add deployment
+  complexity (multiple nodes, gossip, raft), operational cost, and
+  occasional Postgres incompatibility (transactional ergonomics, certain
+  extensions). Postgres scales vertically far past where any pharma
+  customer's mediforce instance will land.
 - **Supabase self-hosted stack** (Postgres + PostgREST + GoTrue + Realtime +
   Storage). Rejected: 8–10-container stack widens the customer's operational
   surface; "just Postgres" is easier to defend in a vendor review. We can
-  adopt individual Supabase services later if needed; the schema is portable.
+  adopt individual Supabase services later if needed; the schema is
+  portable. If a customer specifically asks for Supabase, the same schema
+  lights up on top of theirs.
+
+### Access layer / ORM
+
 - **DB-agnostic ORM (Prisma, TypeORM).** Rejected: the existing repository
   pattern already provides the abstraction that matters (in-memory ↔ real
-  database swap). Forcing the lowest-common-denominator across DBs sacrifices
-  the Postgres-specific features (`jsonb` paths, RLS, partial indexes,
-  `LISTEN/NOTIFY`, `pgvector`) where the real wins live.
+  database swap). Forcing the lowest-common-denominator across DBs
+  sacrifices the Postgres-specific features (`jsonb` paths, RLS, partial
+  indexes, `LISTEN/NOTIFY`, `pgvector`) where the real wins live.
 - **Postgres + Prisma.** Considered; rejected for heavier runtime, awkward
   `jsonb` support, higher exit cost. Drizzle stays close to SQL.
-- **Per-workspace dual-write cutover.** Rejected as overengineering for our
-  scale and life-cycle stage. Big-bang is lower-kit-cost and matches a
-  platform still being shaped, not one with a 24/7 SLA.
+- **Postgres + raw `postgres.js` + Zod** (no ORM at all). Considered;
+  Drizzle wins for ~20 repositories because typed query builders catch
+  column-typo and join-shape bugs at compile time and keep migrations in
+  one tool. We can drop Drizzle later and the hand-written SQL underneath
+  stays valid — exit cost is low.
+
+### Migration approach
+
+- **Per-workspace dual-write cutover.** Rejected as overengineering for
+  our scale and life-cycle stage. Big-bang is lower-kit-cost and matches
+  a platform still being shaped, not one with a 24/7 SLA.
 
 ## Consequences
 
