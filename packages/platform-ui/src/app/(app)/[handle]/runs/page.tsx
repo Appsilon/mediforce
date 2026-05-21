@@ -59,7 +59,7 @@ function RunsPageContent({ handle }: { handle: string }) {
     showArchivedRuns,
     handle,
   );
-  const { data: activeTasks } = useMyTasks(null);
+  const { data: activeTasks } = useMyTasks(null, handle);
 
   const activeTaskByInstance = React.useMemo(() => {
     const map = new Map<string, string>();

@@ -186,7 +186,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
   const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName, handle);
   const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns, handle);
-  const { data: activeTasks } = useMyTasks(null);
+  const { data: activeTasks } = useMyTasks(null, handle);
 
   const activeTaskByInstance = React.useMemo(() => {
     const map = new Map<string, string>();

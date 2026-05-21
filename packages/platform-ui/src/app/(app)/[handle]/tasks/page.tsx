@@ -3,6 +3,7 @@
 import * as React from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { SlidersHorizontal, Check } from 'lucide-react';
+import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { useMyTasks, useCompletedTasks, useMyCoworkSessions, useFinalizedCoworkSessions } from '@/hooks/use-tasks';
 import { TaskGroupedView, type GroupByField } from '@/components/tasks/task-grouped-view';
@@ -67,6 +68,7 @@ function DisplayPopover({
 }
 
 export default function TasksPage() {
+  const { handle } = useParams<{ handle: string }>();
   const { firebaseUser } = useAuth();
   const [groupByFields, setGroupByFields] = React.useState<Set<GroupByField>>(
     () => new Set<GroupByField>(),
@@ -95,10 +97,10 @@ export default function TasksPage() {
     });
   }, [firebaseUser]);
 
-  const { data: activeTasks, loading: activeLoading } = useMyTasks(role);
-  const { data: completedTasks, loading: completedLoading } = useCompletedTasks(role);
-  const { data: activeCoworkSessions, loading: coworkLoading } = useMyCoworkSessions(role);
-  const { data: finalizedCoworkSessions, loading: finalizedLoading } = useFinalizedCoworkSessions(role);
+  const { data: activeTasks, loading: activeLoading } = useMyTasks(role, handle);
+  const { data: completedTasks, loading: completedLoading } = useCompletedTasks(role, handle);
+  const { data: activeCoworkSessions, loading: coworkLoading } = useMyCoworkSessions(role, handle);
+  const { data: finalizedCoworkSessions, loading: finalizedLoading } = useFinalizedCoworkSessions(role, handle);
   const currentUserId = firebaseUser?.uid ?? '';
 
   const activeItems: ActionItem[] = React.useMemo(

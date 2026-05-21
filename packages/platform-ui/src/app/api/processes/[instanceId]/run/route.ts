@@ -244,6 +244,7 @@ export async function POST(
             createdAt: now,
             updatedAt: now,
             finalizedAt: null,
+            ...(instance.namespace ? { namespace: instance.namespace } : {}),
           });
 
           await auditRepo.append({
@@ -298,6 +299,7 @@ export async function POST(
             completedAt: null,
             completionData: null,
             creationReason: 'human_executor',
+            ...(instance.namespace ? { namespace: instance.namespace } : {}),
             ...(currentStep.ui ? { ui: currentStep.ui } : {}),
             ...(currentStep.params?.length ? { params: currentStep.params } : {}),
             ...(options ? { options } : {}),

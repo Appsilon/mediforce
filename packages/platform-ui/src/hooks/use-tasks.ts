@@ -5,7 +5,7 @@ import { where, orderBy } from 'firebase/firestore';
 import type { HumanTask, CoworkSession } from '@mediforce/platform-core';
 import { useCollection } from './use-collection';
 
-export function useMyTasks(assignedRole: string | null) {
+export function useMyTasks(assignedRole: string | null, namespace: string) {
   const constraints = useMemo(
     () =>
       assignedRole
@@ -22,18 +22,18 @@ export function useMyTasks(assignedRole: string | null) {
 
   const filtered = useMemo(
     () => {
-      const notDeleted = data.filter((task) => !task.deleted);
+      const notDeleted = data.filter((task) => !task.deleted && task.namespace === namespace);
       return assignedRole
         ? notDeleted
         : notDeleted.filter((task) => task.status !== 'completed');
     },
-    [data, assignedRole],
+    [data, assignedRole, namespace],
   );
 
   return { data: filtered, loading, error };
 }
 
-export function useCompletedTasks(assignedRole: string | null) {
+export function useCompletedTasks(assignedRole: string | null, namespace: string) {
   const constraints = useMemo(
     () =>
       assignedRole
@@ -50,12 +50,12 @@ export function useCompletedTasks(assignedRole: string | null) {
 
   const filtered = useMemo(
     () => {
-      const notDeleted = data.filter((task) => !task.deleted);
+      const notDeleted = data.filter((task) => !task.deleted && task.namespace === namespace);
       return assignedRole
         ? notDeleted
         : notDeleted.filter((task) => task.status === 'completed');
     },
-    [data, assignedRole],
+    [data, assignedRole, namespace],
   );
 
   return { data: filtered, loading, error };
@@ -118,7 +118,7 @@ export function useActiveCoworkSession(processInstanceId: string | null) {
   return { session, loading };
 }
 
-export function useMyCoworkSessions(assignedRole: string | null) {
+export function useMyCoworkSessions(assignedRole: string | null, namespace: string) {
   const constraints = useMemo(
     () =>
       assignedRole
@@ -134,10 +134,17 @@ export function useMyCoworkSessions(assignedRole: string | null) {
     [assignedRole],
   );
 
-  return useCollection<CoworkSession>('coworkSessions', constraints);
+  const result = useCollection<CoworkSession>('coworkSessions', constraints);
+
+  const data = useMemo(
+    () => result.data.filter((session) => session.namespace === namespace),
+    [result.data, namespace],
+  );
+
+  return { ...result, data };
 }
 
-export function useFinalizedCoworkSessions(assignedRole: string | null) {
+export function useFinalizedCoworkSessions(assignedRole: string | null, namespace: string) {
   const constraints = useMemo(
     () =>
       assignedRole
@@ -153,5 +160,12 @@ export function useFinalizedCoworkSessions(assignedRole: string | null) {
     [assignedRole],
   );
 
-  return useCollection<CoworkSession>('coworkSessions', constraints);
+  const result = useCollection<CoworkSession>('coworkSessions', constraints);
+
+  const data = useMemo(
+    () => result.data.filter((session) => session.namespace === namespace),
+    [result.data, namespace],
+  );
+
+  return { ...result, data };
 }

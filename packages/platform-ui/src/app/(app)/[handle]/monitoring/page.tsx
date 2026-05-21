@@ -1,12 +1,14 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import { useMonitoringData } from '@/hooks/use-monitoring';
 import { MonitoringSummaryCards } from '@/components/monitoring/monitoring-summary-cards';
 import { StuckProcessesList } from '@/components/monitoring/stuck-processes-list';
 import { AssignmentMap } from '@/components/monitoring/assignment-map';
 
 export default function MonitoringPage() {
-  const { statusCounts, stuckProcesses, roleCounts, loading } = useMonitoringData();
+  const { handle } = useParams<{ handle: string }>();
+  const { statusCounts, stuckProcesses, roleCounts, loading } = useMonitoringData(handle);
 
   return (
     <div className="p-6 space-y-8">
