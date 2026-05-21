@@ -5,6 +5,7 @@
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
 - **Depends on:** [ADR-0001](./0001-firestore-to-postgres.md) (Postgres + Drizzle is the adapter target)
+- **Coordinates with:** [ADR-0004](./0004-scoped-data-access-authorization.md) (the `CallerIdentity` and session resolver this ADR defines feed the caller-set repository base from ADR-0004) and the headless migration's Phase 4 typed `apiClient` (the browser `Mediforce` client's `bearerToken` callback flips from `auth.currentUser.getIdToken()` to a NextAuth session resolver — `await getSession()` — when this ADR lands; tracked in [`docs/headless-migration.md`](../headless-migration.md))
 - **Implementation plan:** [PLAN-0002.md](./PLAN-0002.md)
 
 ## Context
