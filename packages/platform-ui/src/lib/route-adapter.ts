@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { z } from 'zod';
 import { HandlerError } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
+import { createCallerScope, type CallerScope } from '@mediforce/platform-api/repositories';
 import { resolveCallerIdentity } from './api-auth.js';
 import { getPlatformServices } from './platform-services.js';
 
@@ -48,8 +49,13 @@ export interface RouteAdapterOptions {
 
 export type RouteHandler<Input, Output> = (
   input: Input,
-  caller: CallerIdentity,
+  scope: CallerScope,
 ) => Promise<Output>;
+
+/** Builder seam: tests substitute a stub scope without spinning up services. */
+export interface RouteAdapterOptionsInternal extends RouteAdapterOptions {
+  readonly buildScope?: (caller: CallerIdentity) => CallerScope;
+}
 
 export function createRouteAdapter<
   InputSchema extends z.ZodType,
@@ -60,9 +66,10 @@ export function createRouteAdapter<
   inputSchema: InputSchema,
   inputFromRequest: (req: NextRequest, ctx: Ctx) => unknown | Promise<unknown>,
   handler: RouteHandler<NarrowInput, Output>,
-  options: RouteAdapterOptions = {},
+  options: RouteAdapterOptionsInternal = {},
 ): (req: NextRequest, ctx: Ctx) => Promise<NextResponse> {
   const resolveCaller = options.resolveCaller ?? defaultResolveCaller;
+  const buildScope = options.buildScope ?? defaultBuildScope;
 
   return async (req, ctx) => {
     const callerOrResponse = await resolveCaller(req);
@@ -86,7 +93,8 @@ export function createRouteAdapter<
     }
 
     try {
-      const result = await handler(parsed.data as NarrowInput, caller);
+      const scope = buildScope(caller);
+      const result = await handler(parsed.data as NarrowInput, scope);
       return NextResponse.json(result);
     } catch (err) {
       if (err instanceof HandlerError) {
@@ -96,6 +104,10 @@ export function createRouteAdapter<
       return NextResponse.json({ error: 'Internal error' }, { status: 500 });
     }
   };
+}
+
+function defaultBuildScope(caller: CallerIdentity): CallerScope {
+  return createCallerScope(getPlatformServices(), caller);
 }
 
 async function defaultResolveCaller(req: NextRequest): Promise<CallerIdentity | NextResponse> {

@@ -5,9 +5,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { getWorkflowDefinition } from '../get-workflow-definition.js';
 import { NotFoundError } from '../../../errors.js';
-import type { CallerIdentity } from '../../../auth.js';
-
-const apiKey: CallerIdentity = { kind: 'apiKey' };
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 describe('getWorkflowDefinition handler', () => {
   let processRepo: InMemoryProcessRepository;
@@ -27,10 +25,10 @@ describe('getWorkflowDefinition handler', () => {
       buildWorkflowDefinition({ name: 'flow-a', version: 2, namespace: '' }),
     );
 
+    const scope = createTestScope({ processRepo });
     const result = await getWorkflowDefinition(
       { name: 'flow-a' },
-      { processRepo },
-      apiKey,
+      scope,
     );
 
     expect(result.definition.version).toBe(3);
@@ -44,18 +42,19 @@ describe('getWorkflowDefinition handler', () => {
       buildWorkflowDefinition({ name: 'flow-a', version: 2, namespace: '' }),
     );
 
+    const scope = createTestScope({ processRepo });
     const result = await getWorkflowDefinition(
       { name: 'flow-a', version: 1 },
-      { processRepo },
-      apiKey,
+      scope,
     );
 
     expect(result.definition.version).toBe(1);
   });
 
   it('throws NotFoundError when the name is unknown', async () => {
+    const scope = createTestScope({ processRepo });
     await expect(
-      getWorkflowDefinition({ name: 'missing' }, { processRepo }, apiKey),
+      getWorkflowDefinition({ name: 'missing' }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -64,8 +63,9 @@ describe('getWorkflowDefinition handler', () => {
       buildWorkflowDefinition({ name: 'flow-a', version: 1, namespace: '' }),
     );
 
+    const scope = createTestScope({ processRepo });
     await expect(
-      getWorkflowDefinition({ name: 'flow-a', version: 99 }, { processRepo }, apiKey),
+      getWorkflowDefinition({ name: 'flow-a', version: 99 }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -79,11 +79,11 @@ describe('getWorkflowDefinition handler', () => {
       }),
     );
 
+    const scope = createTestScope({ processRepo });
     await expect(
       getWorkflowDefinition(
         { name: 'flow-a', namespace: 'team-beta' },
-        { processRepo },
-        apiKey,
+        scope,
       ),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
@@ -98,10 +98,10 @@ describe('getWorkflowDefinition handler', () => {
       }),
     );
 
+    const scope = createTestScope({ processRepo });
     const result = await getWorkflowDefinition(
       { name: 'flow-a', namespace: 'team-alpha' },
-      { processRepo },
-      apiKey,
+      scope,
     );
 
     expect(result.definition.name).toBe('flow-a');
@@ -117,16 +117,14 @@ describe('getWorkflowDefinition handler', () => {
       }),
     );
 
-    const stranger: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-1',
-      namespaces: new Set(['team-other']),
-    };
+    const scope = createTestScope({
+      processRepo,
+      caller: userCaller('u-1', ['team-other']),
+    });
 
     const result = await getWorkflowDefinition(
       { name: 'flow-public', namespace: 'team-alpha' },
-      { processRepo },
-      stranger,
+      scope,
     );
 
     expect(result.definition.name).toBe('flow-public');
@@ -142,16 +140,14 @@ describe('getWorkflowDefinition handler', () => {
       }),
     );
 
-    const member: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-1',
-      namespaces: new Set(['team-alpha']),
-    };
+    const scope = createTestScope({
+      processRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
 
     const result = await getWorkflowDefinition(
       { name: 'flow-private', namespace: 'team-alpha' },
-      { processRepo },
-      member,
+      scope,
     );
 
     expect(result.definition.name).toBe('flow-private');
@@ -170,17 +166,15 @@ describe('getWorkflowDefinition handler', () => {
       }),
     );
 
-    const stranger: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-2',
-      namespaces: new Set(['team-beta']),
-    };
+    const scope = createTestScope({
+      processRepo,
+      caller: userCaller('u-2', ['team-beta']),
+    });
 
     await expect(
       getWorkflowDefinition(
         { name: 'flow-private', namespace: 'team-alpha' },
-        { processRepo },
-        stranger,
+        scope,
       ),
     ).rejects.toBeInstanceOf(NotFoundError);
   });

@@ -8,9 +8,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { getCoworkSession } from '../get-cowork-session.js';
 import { NotFoundError } from '../../../errors.js';
-import type { CallerIdentity } from '../../../auth.js';
-
-const apiKey: CallerIdentity = { kind: 'apiKey' };
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 describe('getCoworkSession handler', () => {
   let coworkSessionRepo: InMemoryCoworkSessionRepository;
@@ -30,53 +28,51 @@ describe('getCoworkSession handler', () => {
   });
 
   it('returns the session for api-key callers', async () => {
+    const scope = createTestScope({ coworkSessionRepo, instanceRepo });
     const result = await getCoworkSession(
       { sessionId: 'sess-1' },
-      { coworkSessionRepo, instanceRepo },
-      apiKey,
+      scope,
     );
     expect(result.id).toBe('sess-1');
     expect(result.processInstanceId).toBe('inst-a');
   });
 
   it('returns the session for user callers who are members of the namespace', async () => {
-    const user: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-1',
-      namespaces: new Set(['team-alpha']),
-    };
+    const scope = createTestScope({
+      coworkSessionRepo,
+      instanceRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
 
     const result = await getCoworkSession(
       { sessionId: 'sess-1' },
-      { coworkSessionRepo, instanceRepo },
-      user,
+      scope,
     );
 
     expect(result.id).toBe('sess-1');
   });
 
   it('throws NotFoundError when the session does not exist', async () => {
+    const scope = createTestScope({ coworkSessionRepo, instanceRepo });
     await expect(
       getCoworkSession(
         { sessionId: 'missing' },
-        { coworkSessionRepo, instanceRepo },
-        apiKey,
+        scope,
       ),
     ).rejects.toThrow(NotFoundError);
   });
 
   it('throws NotFoundError (not ForbiddenError) when a user caller is outside the session’s namespace (anti-enumeration)', async () => {
-    const otherUser: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-2',
-      namespaces: new Set(['team-beta']),
-    };
+    const scope = createTestScope({
+      coworkSessionRepo,
+      instanceRepo,
+      caller: userCaller('u-2', ['team-beta']),
+    });
 
     await expect(
       getCoworkSession(
         { sessionId: 'sess-1' },
-        { coworkSessionRepo, instanceRepo },
-        otherUser,
+        scope,
       ),
     ).rejects.toThrow(NotFoundError);
   });
@@ -91,34 +87,32 @@ describe('getCoworkSession handler', () => {
         processInstanceId: 'inst-orphan',
       }),
     );
-    const user: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-3',
-      namespaces: new Set(['team-alpha']),
-    };
+    const scope = createTestScope({
+      coworkSessionRepo,
+      instanceRepo,
+      caller: userCaller('u-3', ['team-alpha']),
+    });
 
     await expect(
       getCoworkSession(
         { sessionId: 'sess-orphan' },
-        { coworkSessionRepo, instanceRepo },
-        user,
+        scope,
       ),
     ).rejects.toThrow(NotFoundError);
   });
 
   it('missing id and cross-namespace id are indistinguishable (no enumeration leak)', async () => {
-    const user: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-x',
-      namespaces: new Set(), // empty — would 403 anything real
-    };
+    const scope = createTestScope({
+      coworkSessionRepo,
+      instanceRepo,
+      caller: userCaller('u-x', []), // empty — would 403 anything real
+    });
 
     // A non-existent session still surfaces as 404, never leaks "exists but denied".
     await expect(
       getCoworkSession(
         { sessionId: 'definitely-missing' },
-        { coworkSessionRepo, instanceRepo },
-        user,
+        scope,
       ),
     ).rejects.toThrow(NotFoundError);
   });

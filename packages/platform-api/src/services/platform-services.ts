@@ -4,6 +4,7 @@ import {
   FirestoreAuditRepository,
   FirestoreAgentRunRepository,
   FirestoreHumanTaskRepository,
+  FirestoreHandoffRepository,
   FirestoreAgentDefinitionRepository,
   FirestoreCoworkSessionRepository,
   FirestoreCronTriggerStateRepository,
@@ -63,7 +64,9 @@ export interface PlatformServices {
   processRepo: FirestoreProcessRepository;
   instanceRepo: FirestoreProcessInstanceRepository;
   auditRepo: FirestoreAuditRepository;
+  agentRunRepo: FirestoreAgentRunRepository;
   humanTaskRepo: FirestoreHumanTaskRepository;
+  handoffRepo: FirestoreHandoffRepository;
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
   coworkSessionRepo: FirestoreCoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
@@ -90,6 +93,7 @@ export function getPlatformServices(): PlatformServices {
   const auditRepo = new FirestoreAuditRepository(db);
   const agentRunRepo = new FirestoreAgentRunRepository(db);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db);
+  const handoffRepo = new FirestoreHandoffRepository(db);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
   const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);
   const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
@@ -199,7 +203,9 @@ export function getPlatformServices(): PlatformServices {
     processRepo,
     instanceRepo,
     auditRepo,
+    agentRunRepo,
     humanTaskRepo,
+    handoffRepo,
     agentDefinitionRepo,
     coworkSessionRepo,
     cronTriggerStateRepo,

@@ -6,9 +6,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { getProcess } from '../get-process.js';
 import { NotFoundError } from '../../../errors.js';
-import type { CallerIdentity } from '../../../auth.js';
-
-const apiKey: CallerIdentity = { kind: 'apiKey' };
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 describe('getProcess handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
@@ -22,37 +20,37 @@ describe('getProcess handler', () => {
   });
 
   it('returns the instance for api-key callers', async () => {
-    const result = await getProcess({ instanceId: 'inst-a' }, { instanceRepo }, apiKey);
+    const scope = createTestScope({ instanceRepo });
+    const result = await getProcess({ instanceId: 'inst-a' }, scope);
     expect(result.id).toBe('inst-a');
   });
 
   it('returns the instance for user callers in the namespace', async () => {
-    const user: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-1',
-      namespaces: new Set(['team-alpha']),
-    };
+    const scope = createTestScope({
+      instanceRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
 
-    const result = await getProcess({ instanceId: 'inst-a' }, { instanceRepo }, user);
+    const result = await getProcess({ instanceId: 'inst-a' }, scope);
 
     expect(result.id).toBe('inst-a');
   });
 
   it('throws NotFoundError when the instance does not exist', async () => {
+    const scope = createTestScope({ instanceRepo });
     await expect(
-      getProcess({ instanceId: 'missing' }, { instanceRepo }, apiKey),
+      getProcess({ instanceId: 'missing' }, scope),
     ).rejects.toThrow(NotFoundError);
   });
 
   it('throws NotFoundError (not ForbiddenError) for cross-namespace user callers (anti-enumeration)', async () => {
-    const otherUser: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-2',
-      namespaces: new Set(['team-beta']),
-    };
+    const scope = createTestScope({
+      instanceRepo,
+      caller: userCaller('u-2', ['team-beta']),
+    });
 
     await expect(
-      getProcess({ instanceId: 'inst-a' }, { instanceRepo }, otherUser),
+      getProcess({ instanceId: 'inst-a' }, scope),
     ).rejects.toThrow(NotFoundError);
   });
 
@@ -60,26 +58,24 @@ describe('getProcess handler', () => {
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-orphan', namespace: undefined }),
     );
-    const user: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-3',
-      namespaces: new Set(['team-alpha']),
-    };
+    const scope = createTestScope({
+      instanceRepo,
+      caller: userCaller('u-3', ['team-alpha']),
+    });
 
     await expect(
-      getProcess({ instanceId: 'inst-orphan' }, { instanceRepo }, user),
+      getProcess({ instanceId: 'inst-orphan' }, scope),
     ).rejects.toThrow(NotFoundError);
   });
 
   it('missing id and cross-namespace id are indistinguishable (no enumeration leak)', async () => {
-    const user: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-x',
-      namespaces: new Set(),
-    };
+    const scope = createTestScope({
+      instanceRepo,
+      caller: userCaller('u-x', []),
+    });
 
     await expect(
-      getProcess({ instanceId: 'definitely-missing' }, { instanceRepo }, user),
+      getProcess({ instanceId: 'definitely-missing' }, scope),
     ).rejects.toThrow(NotFoundError);
   });
 });

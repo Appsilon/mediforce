@@ -47,6 +47,7 @@ const nextConfig = {
       '@mediforce/platform-api/client': path.join(packagesDir, 'platform-api/src/client/index.ts'),
       '@mediforce/platform-api/errors': path.join(packagesDir, 'platform-api/src/errors.ts'),
       '@mediforce/platform-api/auth': path.join(packagesDir, 'platform-api/src/auth.ts'),
+      '@mediforce/platform-api/repositories': path.join(packagesDir, 'platform-api/src/repositories/index.ts'),
       '@mediforce/platform-api': path.join(packagesDir, 'platform-api/src/index.ts'),
       '@mediforce/workflow-engine': path.join(packagesDir, 'workflow-engine/src/index.ts'),
       '@mediforce/agent-runtime': path.join(packagesDir, 'agent-runtime/src/index.ts'),

@@ -19,6 +19,11 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - Human-task body rendering now routes through a small registry (`task-body-registry.tsx`) keyed on `ui.component`, with file-upload/selection/params/verdict extracted into focused view files. Adding a new task body kind is a one-line registry entry.
 - Workflow engine copies `prevOutput.options` onto the next human task regardless of whether the next step declares `selection`, so non-selection components (like `assignment-table`) consume the items array. Selection-style steps keep the min-count validation; existing apps unaffected.
 
+### Added
+- ADR-0004 + PLAN-0004 implementation (Phase 1.7 of the headless-API migration): scoped data-access authorization wrapper layer in `packages/platform-api/src/repositories/`. Every API handler now accepts a `CallerScope` instead of raw repositories; 13 `Authorized<Entity>Repository` wrappers enforce workspace membership + visibility on every read/write. The 10 Phase 1 GET handlers from [#450](https://github.com/Appsilon/mediforce/pull/450) lose their inline `callerCanAccess` guards (now in the wrapper). The static guard becomes `no-raw-repo-imports.test.ts` (structural — handlers cannot import raw repositories); `auth-coverage.test.ts` removed ([#458](https://github.com/Appsilon/mediforce/pull/458)).
+- `@mediforce/platform-api/repositories` subpath export: `CallerScope`, `createCallerScope`, `AuthorizedRepository` base, and per-entity wrappers.
+- `@mediforce/platform-api/testing` subpath export: `createTestScope`, `userCaller` — builds a real `CallerScope` from in-memory repos for handler tests downstream of `platform-api`.
+
 ### Removed
 - Duplicate Python migration script `scripts/migrations/migrate_workflow_doc_ids.py` — superseded by the TypeScript `packages/platform-infra/scripts/migrate-workflow-namespacing.ts` which is the canonical version ([#424](https://github.com/Appsilon/mediforce/pull/424)).
 

@@ -1,30 +1,19 @@
-import type { ProcessRepository } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../../auth.js';
+import type { CallerScope } from '../../repositories/index.js';
 import { NotFoundError } from '../../errors.js';
 import type {
   GetWorkflowDefinitionInput,
   GetWorkflowDefinitionOutput,
 } from '../../contract/definitions.js';
 
-export interface GetWorkflowDefinitionDeps {
-  processRepo: ProcessRepository;
-}
-
 /**
  * Fetch one workflow definition by name (+ optional version, + optional
- * namespace filter). Public workflows are readable by any authenticated
- * caller; private workflows only by callers in the workflow's namespace.
- *
- * Visibility-denied responses use 404 (not 403) on purpose — acknowledging
- * existence of a private workflow would leak namespace information, so the
- * handler returns the same "not found" shape as a truly missing name.
- * Matches the pre-migration behaviour from
- * `app/api/workflow-definitions/[name]/route.ts`.
+ * namespace filter). Workspace + visibility gating is enforced by the
+ * `scope.workflowDefinitions` wrapper. Out-of-scope or private-not-allowed
+ * collapses to 404 — same shape as a truly missing definition.
  */
 export async function getWorkflowDefinition(
   input: GetWorkflowDefinitionInput,
-  deps: GetWorkflowDefinitionDeps,
-  caller: CallerIdentity,
+  scope: CallerScope,
 ): Promise<GetWorkflowDefinitionOutput> {
   const lookupNamespace = input.namespace ?? '';
 
@@ -32,17 +21,13 @@ export async function getWorkflowDefinition(
   if (input.version !== undefined) {
     version = input.version;
   } else {
-    version = await deps.processRepo.getLatestWorkflowVersion(lookupNamespace, input.name);
+    version = await scope.workflowDefinitions.getLatestVersion(lookupNamespace, input.name);
     if (version === 0) {
       throw new NotFoundError(`Workflow '${input.name}' not found`);
     }
   }
 
-  const definition = await deps.processRepo.getWorkflowDefinition(
-    lookupNamespace,
-    input.name,
-    version,
-  );
+  const definition = await scope.workflowDefinitions.get(lookupNamespace, input.name, version);
   if (definition === null) {
     throw new NotFoundError(`Workflow '${input.name}' not found`);
   }
@@ -51,10 +36,5 @@ export async function getWorkflowDefinition(
     throw new NotFoundError(`Workflow '${input.name}' not found`);
   }
 
-  if (caller.kind === 'apiKey') return { definition };
-  if (definition.visibility === 'public') return { definition };
-  if (caller.namespaces.has(definition.namespace)) {
-    return { definition };
-  }
-  throw new NotFoundError(`Workflow '${input.name}' not found`);
+  return { definition };
 }

@@ -2,9 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { InMemoryAgentDefinitionRepository } from '@mediforce/platform-core/testing';
 import { getAgentDefinition } from '../get-agent-definition.js';
 import { NotFoundError } from '../../../errors.js';
-import type { CallerIdentity } from '../../../auth.js';
-
-const apiKey: CallerIdentity = { kind: 'apiKey' };
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 const baseInput = {
   kind: 'plugin' as const,
@@ -33,26 +31,27 @@ describe('getAgentDefinition handler', () => {
       visibility: 'private',
     });
 
-    const result = await getAgentDefinition({ id: 'agent-42' }, { agentDefinitionRepo }, apiKey);
+    const scope = createTestScope({ agentDefinitionRepo });
+    const result = await getAgentDefinition({ id: 'agent-42' }, scope);
 
     expect(result.agent.id).toBe('agent-42');
   });
 
   it('throws NotFoundError when the id is unknown', async () => {
+    const scope = createTestScope({ agentDefinitionRepo });
     await expect(
-      getAgentDefinition({ id: 'missing' }, { agentDefinitionRepo }, apiKey),
+      getAgentDefinition({ id: 'missing' }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('throws NotFoundError before checking visibility for missing ids', async () => {
-    const stranger: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-x',
-      namespaces: new Set(),
-    };
+    const scope = createTestScope({
+      agentDefinitionRepo,
+      caller: userCaller('u-x', []),
+    });
 
     await expect(
-      getAgentDefinition({ id: 'definitely-missing' }, { agentDefinitionRepo }, stranger),
+      getAgentDefinition({ id: 'definitely-missing' }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -63,16 +62,14 @@ describe('getAgentDefinition handler', () => {
       visibility: 'public',
     });
 
-    const stranger: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-1',
-      namespaces: new Set(['team-other']),
-    };
+    const scope = createTestScope({
+      agentDefinitionRepo,
+      caller: userCaller('u-1', ['team-other']),
+    });
 
     const result = await getAgentDefinition(
       { id: 'public-agent' },
-      { agentDefinitionRepo },
-      stranger,
+      scope,
     );
 
     expect(result.agent.id).toBe('public-agent');
@@ -85,16 +82,14 @@ describe('getAgentDefinition handler', () => {
       visibility: 'private',
     });
 
-    const userInAlpha: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-1',
-      namespaces: new Set(['team-alpha']),
-    };
+    const scope = createTestScope({
+      agentDefinitionRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
 
     const result = await getAgentDefinition(
       { id: 'private-agent' },
-      { agentDefinitionRepo },
-      userInAlpha,
+      scope,
     );
 
     expect(result.agent.id).toBe('private-agent');
@@ -110,14 +105,13 @@ describe('getAgentDefinition handler', () => {
       visibility: 'private',
     });
 
-    const stranger: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-2',
-      namespaces: new Set(['team-beta']),
-    };
+    const scope = createTestScope({
+      agentDefinitionRepo,
+      caller: userCaller('u-2', ['team-beta']),
+    });
 
     await expect(
-      getAgentDefinition({ id: 'private-agent' }, { agentDefinitionRepo }, stranger),
+      getAgentDefinition({ id: 'private-agent' }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -127,14 +121,13 @@ describe('getAgentDefinition handler', () => {
       visibility: 'private',
     });
 
-    const someUser: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-3',
-      namespaces: new Set(['team-alpha']),
-    };
+    const scope = createTestScope({
+      agentDefinitionRepo,
+      caller: userCaller('u-3', ['team-alpha']),
+    });
 
     await expect(
-      getAgentDefinition({ id: 'orphan-private' }, { agentDefinitionRepo }, someUser),
+      getAgentDefinition({ id: 'orphan-private' }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

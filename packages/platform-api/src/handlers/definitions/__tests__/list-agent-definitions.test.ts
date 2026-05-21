@@ -1,9 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { InMemoryAgentDefinitionRepository } from '@mediforce/platform-core/testing';
 import { listAgentDefinitions } from '../list-agent-definitions.js';
-import type { CallerIdentity } from '../../../auth.js';
-
-const apiKey: CallerIdentity = { kind: 'apiKey' };
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 function makeInput(overrides: Partial<Parameters<InMemoryAgentDefinitionRepository['create']>[0]> = {}) {
   return {
@@ -30,7 +28,8 @@ describe('listAgentDefinitions handler', () => {
   });
 
   it('returns { agents: [] } when nothing is registered', async () => {
-    const result = await listAgentDefinitions({}, { agentDefinitionRepo }, apiKey);
+    const scope = createTestScope({ agentDefinitionRepo });
+    const result = await listAgentDefinitions({}, scope);
     expect(result.agents).toEqual([]);
   });
 
@@ -39,7 +38,8 @@ describe('listAgentDefinitions handler', () => {
     await agentDefinitionRepo.create(makeInput({ name: 'B', namespace: 'team-beta', visibility: 'private' }));
     await agentDefinitionRepo.create(makeInput({ name: 'C', visibility: 'public' }));
 
-    const result = await listAgentDefinitions({}, { agentDefinitionRepo }, apiKey);
+    const scope = createTestScope({ agentDefinitionRepo });
+    const result = await listAgentDefinitions({}, scope);
 
     expect(result.agents.map((a) => a.name).sort()).toEqual(['A', 'B', 'C']);
   });
@@ -50,13 +50,12 @@ describe('listAgentDefinitions handler', () => {
     await agentDefinitionRepo.create(makeInput({ name: 'public-no-ns', visibility: 'public' }));
     await agentDefinitionRepo.create(makeInput({ name: 'public-with-ns', namespace: 'team-beta', visibility: 'public' }));
 
-    const userInAlpha: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-1',
-      namespaces: new Set(['team-alpha']),
-    };
+    const scope = createTestScope({
+      agentDefinitionRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
 
-    const result = await listAgentDefinitions({}, { agentDefinitionRepo }, userInAlpha);
+    const result = await listAgentDefinitions({}, scope);
 
     expect(result.agents.map((a) => a.name).sort()).toEqual([
       'alpha-private',
@@ -68,13 +67,12 @@ describe('listAgentDefinitions handler', () => {
   it('drops private agents without a namespace for user callers', async () => {
     await agentDefinitionRepo.create(makeInput({ name: 'orphan-private', visibility: 'private' }));
 
-    const stranger: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-2',
-      namespaces: new Set(['team-anything']),
-    };
+    const scope = createTestScope({
+      agentDefinitionRepo,
+      caller: userCaller('u-2', ['team-anything']),
+    });
 
-    const result = await listAgentDefinitions({}, { agentDefinitionRepo }, stranger);
+    const result = await listAgentDefinitions({}, scope);
 
     expect(result.agents).toEqual([]);
   });

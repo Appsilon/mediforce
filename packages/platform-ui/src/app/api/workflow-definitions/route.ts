@@ -10,9 +10,9 @@ import { ListWorkflowDefinitionsInputSchema } from '@mediforce/platform-api/cont
 /**
  * GET /api/workflow-definitions
  *
- * List workflow definitions visible to the caller. Namespace + visibility
- * gating, plus the optional `?namespace=` filter, are enforced inside the
- * handler.
+ * List workflow definitions visible to the caller. Workspace + visibility
+ * filtering lives in `scope.workflowDefinitions`; the optional `?namespace=`
+ * query param narrows further but does not grant access.
  */
 export const GET = createRouteAdapter(
   ListWorkflowDefinitionsInputSchema,
@@ -21,10 +21,7 @@ export const GET = createRouteAdapter(
     const namespace = url.searchParams.get('namespace');
     return namespace !== null ? { namespace } : {};
   },
-  (input, caller) => {
-    const { processRepo } = getPlatformServices();
-    return listWorkflowDefinitions(input, { processRepo }, caller);
-  },
+  listWorkflowDefinitions,
 );
 
 /**

@@ -9,9 +9,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import { getProcessSteps } from '../get-process-steps.js';
 import { NotFoundError } from '../../../errors.js';
-import type { CallerIdentity } from '../../../auth.js';
-
-const apiKey: CallerIdentity = { kind: 'apiKey' };
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 /**
  * Locks in the status-derivation rules across the common shapes (running,
@@ -42,8 +40,9 @@ describe('getProcessSteps handler', () => {
   });
 
   it('throws NotFoundError when the instance does not exist', async () => {
+    const scope = createTestScope({ instanceRepo, processRepo });
     await expect(
-      getProcessSteps({ instanceId: 'missing' }, { instanceRepo, processRepo }, apiKey),
+      getProcessSteps({ instanceId: 'missing' }, scope),
     ).rejects.toThrow(NotFoundError);
   });
 
@@ -57,8 +56,9 @@ describe('getProcessSteps handler', () => {
         currentStepId: 's1',
       }),
     );
+    const scope = createTestScope({ instanceRepo, processRepo });
     await expect(
-      getProcessSteps({ instanceId: 'inst-1' }, { instanceRepo, processRepo }, apiKey),
+      getProcessSteps({ instanceId: 'inst-1' }, scope),
     ).rejects.toThrow(NotFoundError);
   });
 
@@ -72,8 +72,9 @@ describe('getProcessSteps handler', () => {
         currentStepId: 's1',
       }),
     );
+    const scope = createTestScope({ instanceRepo, processRepo });
     await expect(
-      getProcessSteps({ instanceId: 'inst-1' }, { instanceRepo, processRepo }, apiKey),
+      getProcessSteps({ instanceId: 'inst-1' }, scope),
     ).rejects.toThrow(NotFoundError);
   });
 
@@ -88,10 +89,10 @@ describe('getProcessSteps handler', () => {
       }),
     );
 
+    const scope = createTestScope({ instanceRepo, processRepo });
     const result = await getProcessSteps(
       { instanceId: 'inst-1' },
-      { instanceRepo, processRepo },
-      apiKey,
+      scope,
     );
 
     expect(result.steps.map((s) => s.stepId)).toEqual(['s1', 's2']);
@@ -108,10 +109,10 @@ describe('getProcessSteps handler', () => {
       }),
     );
 
+    const scope = createTestScope({ instanceRepo, processRepo });
     const result = await getProcessSteps(
       { instanceId: 'inst-1' },
-      { instanceRepo, processRepo },
-      apiKey,
+      scope,
     );
 
     expect(result.steps.find((s) => s.stepId === 's1')?.status).toBe('running');
@@ -133,10 +134,10 @@ describe('getProcessSteps handler', () => {
       buildStepExecution({ instanceId: 'inst-1', stepId: 's1', output: { done: true } }),
     );
 
+    const scope = createTestScope({ instanceRepo, processRepo });
     const result = await getProcessSteps(
       { instanceId: 'inst-1' },
-      { instanceRepo, processRepo },
-      apiKey,
+      scope,
     );
 
     expect(result.steps.find((s) => s.stepId === 's1')?.status).toBe('completed');
@@ -155,10 +156,10 @@ describe('getProcessSteps handler', () => {
       }),
     );
 
+    const scope = createTestScope({ instanceRepo, processRepo });
     const result = await getProcessSteps(
       { instanceId: 'inst-42' },
-      { instanceRepo, processRepo },
-      apiKey,
+      scope,
     );
 
     expect(result).toMatchObject({
@@ -182,10 +183,10 @@ describe('getProcessSteps handler', () => {
       }),
     );
 
+    const scope = createTestScope({ instanceRepo, processRepo });
     const result = await getProcessSteps(
       { instanceId: 'inst-1' },
-      { instanceRepo, processRepo },
-      apiKey,
+      scope,
     );
 
     const s1 = result.steps.find((s) => s.stepId === 's1');
@@ -208,10 +209,10 @@ describe('getProcessSteps handler', () => {
       }),
     );
 
+    const scope = createTestScope({ instanceRepo, processRepo });
     const result = await getProcessSteps(
       { instanceId: 'inst-1' },
-      { instanceRepo, processRepo },
-      apiKey,
+      scope,
     );
 
     expect(result.steps.find((s) => s.stepId === 's1')?.status).toBe('completed');
@@ -228,16 +229,15 @@ describe('getProcessSteps handler', () => {
         currentStepId: 's1',
       }),
     );
-    const user: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-1',
-      namespaces: new Set(['team-alpha']),
-    };
+    const scope = createTestScope({
+      instanceRepo,
+      processRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
 
     const result = await getProcessSteps(
       { instanceId: 'inst-1' },
-      { instanceRepo, processRepo },
-      user,
+      scope,
     );
     expect(result.steps).toHaveLength(2);
   });
@@ -252,14 +252,14 @@ describe('getProcessSteps handler', () => {
         currentStepId: 's1',
       }),
     );
-    const otherUser: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-2',
-      namespaces: new Set(['team-beta']),
-    };
+    const scope = createTestScope({
+      instanceRepo,
+      processRepo,
+      caller: userCaller('u-2', ['team-beta']),
+    });
 
     await expect(
-      getProcessSteps({ instanceId: 'inst-1' }, { instanceRepo, processRepo }, otherUser),
+      getProcessSteps({ instanceId: 'inst-1' }, scope),
     ).rejects.toThrow(NotFoundError);
   });
 
@@ -273,14 +273,14 @@ describe('getProcessSteps handler', () => {
         currentStepId: 's1',
       }),
     );
-    const user: CallerIdentity = {
-      kind: 'user',
-      uid: 'u-3',
-      namespaces: new Set(['team-alpha']),
-    };
+    const scope = createTestScope({
+      instanceRepo,
+      processRepo,
+      caller: userCaller('u-3', ['team-alpha']),
+    });
 
     await expect(
-      getProcessSteps({ instanceId: 'inst-orphan' }, { instanceRepo, processRepo }, user),
+      getProcessSteps({ instanceId: 'inst-orphan' }, scope),
     ).rejects.toThrow(NotFoundError);
   });
 });

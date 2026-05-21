@@ -34,10 +34,7 @@ export const GET = createRouteAdapter<
 >(
   GetAgentDefinitionInputSchema,
   async (_req, ctx) => ({ id: (await ctx.params).id }),
-  (input, caller) => {
-    const { agentDefinitionRepo } = getPlatformServices();
-    return getAgentDefinition(input, { agentDefinitionRepo }, caller);
-  },
+  getAgentDefinition,
 );
 
 export async function PUT(
