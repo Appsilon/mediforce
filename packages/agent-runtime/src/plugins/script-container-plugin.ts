@@ -458,7 +458,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         child.kill('SIGTERM');
         killTimer = setTimeout(() => {
           killTimer = null;
-          if (!child.killed) child.kill('SIGKILL');
+          if (!settled) child.kill('SIGKILL');
         }, 5_000);
       }, timeoutMs);
 
