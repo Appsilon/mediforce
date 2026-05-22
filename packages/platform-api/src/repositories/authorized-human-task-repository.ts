@@ -1,48 +1,39 @@
 import type {
   HumanTask,
   HumanTaskRepository,
-  ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
 import { AuthorizedScope } from './authorized-repository.js';
-import { filterByParentNamespace } from './indirect-namespace.js';
 
 /**
  * Workspace-scoped view of `HumanTaskRepository`. Tasks have no namespace
  * field of their own — workspace membership is reached via the parent
- * `ProcessInstance` (the run the task belongs to). List paths batch-dedupe
- * parent lookups so we issue at most one read per distinct run regardless of
- * task count (same shape as PR #450's `listTasks` handler).
+ * `ProcessInstance`, which the raw repo resolves internally. Wrapper picks
+ * between system-actor and namespace-scoped variants per call.
  */
 export class AuthorizedHumanTaskRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: HumanTaskRepository,
-    private readonly parents: ProcessInstanceRepository,
   ) {
     super(caller);
   }
 
-  getById = async (taskId: string): Promise<HumanTask | null> => {
-    const task = await this.raw.getById(taskId);
-    if (task === null) return null;
-    if (this.caller.isSystemActor) return task;
-    const parent = await this.parents.getById(task.processInstanceId);
-    return this.canSeeNamespace(parent?.namespace) ? task : null;
-  };
+  getById = async (taskId: string): Promise<HumanTask | null> =>
+    this.caller.isSystemActor
+      ? this.raw.getById(taskId)
+      : this.raw.getByIdInNamespaces(taskId, [...this.caller.namespaces]);
 
-  getByRole = async (role: string): Promise<HumanTask[]> => {
-    const tasks = await this.raw.getByRole(role);
-    return filterByParentNamespace(tasks, this.caller, this.parents);
-  };
+  getByRole = async (role: string): Promise<HumanTask[]> =>
+    this.caller.isSystemActor
+      ? this.raw.getByRoleAll(role)
+      : this.raw.getByRoleInNamespaces(role, [...this.caller.namespaces]);
 
-  getByInstanceId = async (instanceId: string): Promise<HumanTask[]> => {
-    const tasks = await this.raw.getByInstanceId(instanceId);
-    if (tasks.length === 0) return [];
-    const parent = await this.parents.getById(instanceId);
-    return this.canSeeNamespace(parent?.namespace) ? tasks : [];
-  };
+  getByInstanceId = async (instanceId: string): Promise<HumanTask[]> =>
+    this.caller.isSystemActor
+      ? this.raw.getByInstanceId(instanceId)
+      : this.raw.getByInstanceIdInNamespaces(instanceId, [...this.caller.namespaces]);
 
   claim = async (taskId: string, userId: string): Promise<HumanTask> => {
     await this.assertCanMutate(taskId);

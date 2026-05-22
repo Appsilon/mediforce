@@ -16,8 +16,8 @@ describe('getCoworkSession handler', () => {
 
   beforeEach(async () => {
     resetFactorySequence();
-    coworkSessionRepo = new InMemoryCoworkSessionRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
+    coworkSessionRepo = new InMemoryCoworkSessionRepository(instanceRepo);
 
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),

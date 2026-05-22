@@ -1,12 +1,18 @@
 import type { AuditRepository, AuditEvent } from '../index.js';
+import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository.js';
 
 /**
  * In-memory implementation of AuditRepository for testing.
  * Stores events in an array, simulates serverTimestamp with current time.
- * Reusable by any package that needs test doubles for audit operations.
+ *
+ * Namespace-scoped read (`getByProcessInNamespaces`) resolves the parent
+ * run's namespace via the injected `ProcessInstanceRepository`. Tests that
+ * don't exercise that path may omit the dep.
  */
 export class InMemoryAuditRepository implements AuditRepository {
   private events: AuditEvent[] = [];
+
+  constructor(private readonly parents?: ProcessInstanceRepository) {}
 
   async append(
     event: Omit<AuditEvent, 'serverTimestamp'>,
@@ -33,6 +39,21 @@ export class InMemoryAuditRepository implements AuditRepository {
     return this.events
       .filter((e) => e.processInstanceId === processInstanceId)
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }
+
+  async getByProcessInNamespaces(
+    processInstanceId: string,
+    allowed: readonly string[],
+  ): Promise<AuditEvent[]> {
+    if (this.parents === undefined) {
+      throw new Error(
+        'InMemoryAuditRepository: ProcessInstanceRepository required for namespace-scoped methods',
+      );
+    }
+    const parent = await this.parents.getById(processInstanceId);
+    if (!parent || typeof parent.namespace !== 'string') return [];
+    if (!allowed.includes(parent.namespace)) return [];
+    return this.getByProcess(processInstanceId);
   }
 
   async getByActor(

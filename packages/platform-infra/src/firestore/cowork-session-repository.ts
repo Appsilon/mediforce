@@ -4,6 +4,7 @@ import {
   type CoworkSession,
   type ConversationTurn,
   type CoworkSessionRepository,
+  type ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 
 /**
@@ -36,7 +37,10 @@ function sanitizeSessionData(data: Record<string, unknown>): Record<string, unkn
 export class FirestoreCoworkSessionRepository implements CoworkSessionRepository {
   private readonly collectionName = 'coworkSessions';
 
-  constructor(private readonly db: Firestore) {}
+  constructor(
+    private readonly db: Firestore,
+    private readonly parents: ProcessInstanceRepository,
+  ) {}
 
   async create(session: CoworkSession): Promise<CoworkSession> {
     await this.db.collection(this.collectionName).doc(session.id).set(session);
@@ -47,6 +51,17 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
     const snap = await this.db.collection(this.collectionName).doc(sessionId).get();
     if (!snap.exists) return null;
     return CoworkSessionSchema.parse(sanitizeSessionData(snap.data() as Record<string, unknown>));
+  }
+
+  async getByIdInNamespaces(
+    sessionId: string,
+    allowed: readonly string[],
+  ): Promise<CoworkSession | null> {
+    const session = await this.getById(sessionId);
+    if (session === null) return null;
+    const parent = await this.parents.getById(session.processInstanceId);
+    if (!parent || typeof parent.namespace !== 'string') return null;
+    return allowed.includes(parent.namespace) ? session : null;
   }
 
   async getByInstanceId(instanceId: string): Promise<CoworkSession[]> {
@@ -67,6 +82,16 @@ export class FirestoreCoworkSessionRepository implements CoworkSessionRepository
       .get();
     if (snap.empty) return null;
     return CoworkSessionSchema.parse(sanitizeSessionData(snap.docs[0].data()));
+  }
+
+  async findMostRecentActiveInNamespaces(
+    instanceId: string,
+    allowed: readonly string[],
+  ): Promise<CoworkSession | null> {
+    const parent = await this.parents.getById(instanceId);
+    if (!parent || typeof parent.namespace !== 'string') return null;
+    if (!allowed.includes(parent.namespace)) return null;
+    return this.findMostRecentActive(instanceId);
   }
 
   async addTurn(sessionId: string, turn: ConversationTurn): Promise<CoworkSession> {

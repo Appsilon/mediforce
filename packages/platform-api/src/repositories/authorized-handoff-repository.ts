@@ -1,18 +1,18 @@
 import type {
   HandoffEntity,
   HandoffRepository,
-  ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
 import { AuthorizedScope } from './authorized-repository.js';
-import { filterByParentNamespace } from './indirect-namespace.js';
 
 /**
  * Workspace-scoped handoff entity reads + mutations. Handoffs have no
- * workspace field; namespace is reached via the parent `ProcessInstance`.
+ * workspace field; namespace is reached via the parent `ProcessInstance`,
+ * resolved inside the raw repo. Wrapper routes between unscoped and
+ * namespace-scoped variants by `caller.isSystemActor`.
  *
- * `resolve` and `acknowledge` enforce workspace at the wrapper layer; the
+ * `resolve` and `acknowledge` enforce workspace via `assertCanMutate`; the
  * remaining business invariants (`userId === assignedUserId`, resolution
  * validation) live in the underlying repo and the handler.
  */
@@ -20,29 +20,24 @@ export class AuthorizedHandoffRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: HandoffRepository,
-    private readonly parents: ProcessInstanceRepository,
   ) {
     super(caller);
   }
 
-  getById = async (entityId: string): Promise<HandoffEntity | null> => {
-    const entity = await this.raw.getById(entityId);
-    if (entity === null) return null;
-    if (this.caller.isSystemActor) return entity;
-    const parent = await this.parents.getById(entity.processInstanceId);
-    return this.canSeeNamespace(parent?.namespace) ? entity : null;
-  };
+  getById = async (entityId: string): Promise<HandoffEntity | null> =>
+    this.caller.isSystemActor
+      ? this.raw.getById(entityId)
+      : this.raw.getByIdInNamespaces(entityId, [...this.caller.namespaces]);
 
-  getByRole = async (role: string): Promise<HandoffEntity[]> => {
-    const entities = await this.raw.getByRole(role);
-    return filterByParentNamespace(entities, this.caller, this.parents);
-  };
+  getByRole = async (role: string): Promise<HandoffEntity[]> =>
+    this.caller.isSystemActor
+      ? this.raw.getByRoleAll(role)
+      : this.raw.getByRoleInNamespaces(role, [...this.caller.namespaces]);
 
-  getByInstanceId = async (instanceId: string): Promise<HandoffEntity[]> => {
-    const parent = await this.parents.getById(instanceId);
-    if (!this.canSeeNamespace(parent?.namespace)) return [];
-    return this.raw.getByInstanceId(instanceId);
-  };
+  getByInstanceId = async (instanceId: string): Promise<HandoffEntity[]> =>
+    this.caller.isSystemActor
+      ? this.raw.getByInstanceId(instanceId)
+      : this.raw.getByInstanceIdInNamespaces(instanceId, [...this.caller.namespaces]);
 
   claim = async (entityId: string, userId: string): Promise<HandoffEntity> => {
     await this.assertCanMutate(entityId);

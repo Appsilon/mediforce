@@ -26,7 +26,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const caller = await resolveCallerIdentity(req, namespaceRepo);
     if (caller instanceof NextResponse) return caller;
 
-    const instances = await instanceRepo.list({
+    const instances = await instanceRepo.listAll({
       definitionName: workflow,
       status,
       limit,

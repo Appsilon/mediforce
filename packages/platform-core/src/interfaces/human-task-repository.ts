@@ -1,10 +1,24 @@
 import type { HumanTask } from '../schemas/human-task.js';
 
+/**
+ * Storage-layer authorization (ADR-0004): tasks have no namespace field of
+ * their own — workspace membership is reached via the parent `ProcessInstance`.
+ * Implementations resolve parent namespaces internally (via an injected
+ * `ProcessInstanceRepository`) so the wrapper layer stays a thin router.
+ */
 export interface HumanTaskRepository {
   create(task: HumanTask): Promise<HumanTask>;
+
   getById(taskId: string): Promise<HumanTask | null>;
-  getByRole(role: string): Promise<HumanTask[]>;             // every task with this assignedRole (all statuses — caller must filter via `ACTIONABLE_STATUSES` or explicit list if it wants the "actionable" subset)
+  /** Returns the task only if its parent run's namespace is in `allowed`. */
+  getByIdInNamespaces(taskId: string, allowed: readonly string[]): Promise<HumanTask | null>;
+
+  getByRoleAll(role: string): Promise<HumanTask[]>;             // every task with this assignedRole (all statuses — caller must filter via `ACTIONABLE_STATUSES` or explicit list if it wants the "actionable" subset)
+  getByRoleInNamespaces(role: string, allowed: readonly string[]): Promise<HumanTask[]>;
+
   getByInstanceId(instanceId: string): Promise<HumanTask[]>;
+  getByInstanceIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<HumanTask[]>;
+
   claim(taskId: string, userId: string): Promise<HumanTask>; // sets assignedUserId + status: 'claimed'
   complete(taskId: string, completionData: Record<string, unknown>): Promise<HumanTask>;
   cancel(taskId: string): Promise<HumanTask>;

@@ -1,4 +1,8 @@
-import type { AuditRepository, AuditEvent } from '@mediforce/platform-core';
+import type {
+  AuditRepository,
+  AuditEvent,
+  ProcessInstanceRepository,
+} from '@mediforce/platform-core';
 import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore';
 
 /**
@@ -8,7 +12,10 @@ import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore'
 export class FirestoreAuditRepository implements AuditRepository {
   private readonly collectionName = 'auditEvents';
 
-  constructor(private readonly db: Firestore) {}
+  constructor(
+    private readonly db: Firestore,
+    private readonly parents: ProcessInstanceRepository,
+  ) {}
 
   async append(
     event: Omit<AuditEvent, 'serverTimestamp'>,
@@ -52,6 +59,16 @@ export class FirestoreAuditRepository implements AuditRepository {
     return snapshot.docs
       .map((d) => this.docToAuditEvent(d.data()))
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  }
+
+  async getByProcessInNamespaces(
+    processInstanceId: string,
+    allowed: readonly string[],
+  ): Promise<AuditEvent[]> {
+    const parent = await this.parents.getById(processInstanceId);
+    if (!parent || typeof parent.namespace !== 'string') return [];
+    if (!allowed.includes(parent.namespace)) return [];
+    return this.getByProcess(processInstanceId);
   }
 
   async getByActor(

@@ -40,6 +40,17 @@ export class FirestoreProcessInstanceRepository
     return ProcessInstanceSchema.parse(snapshot.data());
   }
 
+  async getByIdInNamespaces(
+    instanceId: string,
+    allowed: readonly string[],
+  ): Promise<ProcessInstance | null> {
+    const instance = await this.getById(instanceId);
+    if (instance === null) return null;
+    return typeof instance.namespace === 'string' && allowed.includes(instance.namespace)
+      ? instance
+      : null;
+  }
+
   async update(
     instanceId: string,
     updates: Partial<ProcessInstance>,
@@ -50,14 +61,11 @@ export class FirestoreProcessInstanceRepository
     });
   }
 
-  async list(options: ListInstancesOptions): Promise<ProcessInstance[]> {
+  async listAll(options: ListInstancesOptions): Promise<ProcessInstance[]> {
     let query: FirebaseFirestore.Query = this.db
       .collection(this.collectionName)
       .where('deleted', '==', false);
 
-    if (options.namespace !== undefined) {
-      query = query.where('namespace', '==', options.namespace);
-    }
     if (options.definitionName !== undefined) {
       query = query.where('definitionName', '==', options.definitionName);
     }
@@ -70,13 +78,32 @@ export class FirestoreProcessInstanceRepository
     return snapshot.docs.map((d) => ProcessInstanceSchema.parse(d.data()));
   }
 
-  async getByStatus(status: InstanceStatus): Promise<ProcessInstance[]> {
+  async listInNamespaces(
+    allowed: readonly string[],
+    options: ListInstancesOptions,
+  ): Promise<ProcessInstance[]> {
+    // Firestore-era: fetch with the existing filters (no namespace where-clause)
+    // and filter the namespace set in JS. The Postgres-era impl will push this
+    // down to `WHERE namespace = ANY($)`.
+    const all = await this.listAll(options);
+    return all.filter((i) => typeof i.namespace === 'string' && allowed.includes(i.namespace));
+  }
+
+  async getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]> {
     const snapshot = await this.db
       .collection(this.collectionName)
       .where('status', '==', status)
       .orderBy('createdAt', 'desc')
       .get();
     return snapshot.docs.map((d) => ProcessInstanceSchema.parse(d.data()));
+  }
+
+  async getByStatusInNamespaces(
+    status: InstanceStatus,
+    allowed: readonly string[],
+  ): Promise<ProcessInstance[]> {
+    const all = await this.getByStatusAll(status);
+    return all.filter((i) => typeof i.namespace === 'string' && allowed.includes(i.namespace));
   }
 
   async getByDefinition(

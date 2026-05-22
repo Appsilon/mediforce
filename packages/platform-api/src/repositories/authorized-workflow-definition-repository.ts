@@ -8,12 +8,9 @@ import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace + visibility-scoped view of `ProcessRepository`'s workflow-
- * definition surface. A user caller sees:
- *
- *   - any version of a definition owned by a workspace they're a member of,
- *   - the latest version of any `visibility: 'public'` definition.
- *
- * System-actor callers see everything.
+ * definition surface. Routes to `listAllWorkflowDefinitions` for system
+ * actors and `listWorkflowDefinitionsVisibleTo` for user callers — the
+ * storage layer enforces the public-OR-allowed predicate.
  *
  * Out-of-scope reads return null (single) or are filtered out (list). The
  * handler turns null into 404 — so a non-member cannot distinguish "exists in
@@ -29,21 +26,23 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
 
   get = async (namespace: string, name: string, version: number): Promise<WorkflowDefinition | null> => {
     const def = await this.raw.getWorkflowDefinition(namespace, name, version);
-    return def !== null && this.canSeeDefinition(def) ? def : null;
+    if (def === null) return null;
+    if (this.caller.isSystemActor) return def;
+    if (def.visibility === 'public') return def;
+    return this.caller.namespaces.has(def.namespace) ? def : null;
   };
 
   getLatestVersion = async (namespace: string, name: string): Promise<number> =>
     this.raw.getLatestWorkflowVersion(namespace, name);
 
-  /** Group-level filter: returns groups whose latest visible version the
-   *  caller may see. Drops groups where the latest version is invisible
-   *  (private, foreign workspace) — same shape as the pre-migration listing. */
   listGroups = async (includeArchived: boolean): Promise<WorkflowDefinitionGroup[]> => {
-    const { definitions } = await this.raw.listWorkflowDefinitions(includeArchived);
-    return definitions.filter((group) => {
-      const latest = group.versions.find((v) => v.version === group.latestVersion);
-      return latest !== undefined && this.canSeeDefinition(latest);
-    });
+    const { definitions } = this.caller.isSystemActor
+      ? await this.raw.listAllWorkflowDefinitions(includeArchived)
+      : await this.raw.listWorkflowDefinitionsVisibleTo(
+          [...this.caller.namespaces],
+          includeArchived,
+        );
+    return definitions;
   };
 
   save = async (definition: WorkflowDefinition): Promise<void> => {
@@ -65,10 +64,4 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
     this.assertNamespaceWrite(namespace);
     await this.raw.setVersionArchived(namespace, name, version, archived);
   };
-
-  private canSeeDefinition(def: WorkflowDefinition): boolean {
-    if (this.caller.isSystemActor) return true;
-    if (def.visibility === 'public') return true;
-    return this.caller.namespaces.has(def.namespace);
-  }
 }

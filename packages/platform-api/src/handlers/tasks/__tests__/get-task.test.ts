@@ -16,8 +16,8 @@ describe('getTask handler', () => {
 
   beforeEach(async () => {
     resetFactorySequence();
-    humanTaskRepo = new InMemoryHumanTaskRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
+    humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
 
     await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
     await humanTaskRepo.create(

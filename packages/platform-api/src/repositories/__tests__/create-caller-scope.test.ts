@@ -102,7 +102,7 @@ describe('createCallerScope', () => {
 
     it('gates tasks by the parent run namespace', async () => {
       const instanceRepo = new InMemoryProcessInstanceRepository();
-      const humanTaskRepo = new InMemoryHumanTaskRepository();
+      const humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
       await instanceRepo.create(buildProcessInstance({ id: 'inst-alpha', namespace: 'team-alpha' }));
       await instanceRepo.create(buildProcessInstance({ id: 'inst-beta', namespace: 'team-beta' }));
       await humanTaskRepo.create(buildHumanTask({ id: 't-alpha', processInstanceId: 'inst-alpha' }));
@@ -125,11 +125,11 @@ describe('createCallerScope', () => {
     // in-memory indirect, pass-through) is enough to catch a missed wire-up.
     const instanceRepo = new InMemoryProcessInstanceRepository();
     const processRepo = new InMemoryProcessRepository();
-    const auditRepo = new InMemoryAuditRepository();
-    const humanTaskRepo = new InMemoryHumanTaskRepository();
-    const handoffRepo = new InMemoryHandoffRepository();
+    const auditRepo = new InMemoryAuditRepository(instanceRepo);
+    const humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
+    const handoffRepo = new InMemoryHandoffRepository(instanceRepo);
     const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
-    const coworkSessionRepo = new InMemoryCoworkSessionRepository();
+    const coworkSessionRepo = new InMemoryCoworkSessionRepository(instanceRepo);
     const cronTriggerStateRepo = new InMemoryCronTriggerStateRepository();
     const toolCatalogRepo = new InMemoryToolCatalogRepository();
     const oauthProviderRepo = new InMemoryOAuthProviderRepository();

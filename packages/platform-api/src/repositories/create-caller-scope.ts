@@ -81,11 +81,7 @@ export function createCallerScope(
   return {
     caller,
 
-    tasks: new AuthorizedHumanTaskRepository(
-      caller,
-      services.humanTaskRepo,
-      services.instanceRepo,
-    ),
+    tasks: new AuthorizedHumanTaskRepository(caller, services.humanTaskRepo),
     runs: new AuthorizedWorkflowRunRepository(caller, services.instanceRepo),
     workflowDefinitions: new AuthorizedWorkflowDefinitionRepository(
       caller,
@@ -98,23 +94,10 @@ export function createCallerScope(
     coworkSessions: new AuthorizedCoworkSessionRepository(
       caller,
       services.coworkSessionRepo,
-      services.instanceRepo,
     ),
-    agentRuns: new AuthorizedAgentRunRepository(
-      caller,
-      services.agentRunRepo,
-      services.instanceRepo,
-    ),
-    auditEvents: new AuthorizedAuditEventRepository(
-      caller,
-      services.auditRepo,
-      services.instanceRepo,
-    ),
-    handoffs: new AuthorizedHandoffRepository(
-      caller,
-      services.handoffRepo,
-      services.instanceRepo,
-    ),
+    agentRuns: new AuthorizedAgentRunRepository(caller, services.agentRunRepo),
+    auditEvents: new AuthorizedAuditEventRepository(caller, services.auditRepo),
+    handoffs: new AuthorizedHandoffRepository(caller, services.handoffRepo),
     toolCatalog: new AuthorizedToolCatalogRepository(caller, services.toolCatalogRepo),
     oauthProviders: new AuthorizedOAuthProviderRepository(
       caller,

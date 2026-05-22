@@ -16,8 +16,8 @@ describe('listAuditEvents handler', () => {
 
   beforeEach(async () => {
     resetFactorySequence();
-    auditRepo = new InMemoryAuditRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
+    auditRepo = new InMemoryAuditRepository(instanceRepo);
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
     );

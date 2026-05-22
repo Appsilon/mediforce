@@ -26,6 +26,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ### Changed
 - `CallerIdentity` now carries `readonly isSystemActor: boolean`. The free function `isSystemActor(caller)` was replaced by reading `caller.isSystemActor` directly — one less import, future-proof against the planned `'apiKey'` discriminator rename ([#448](https://github.com/Appsilon/mediforce/issues/448)).
+- Storage-layer authorization: raw repository interfaces split into system-actor and namespace-scoped variants (`listAll` / `listInNamespaces`, `getById` / `getByIdInNamespaces`, etc.). Wrappers in `platform-api/src/repositories/` become thin routers that pick the right method based on `caller.isSystemActor`. Filter logic moves from JavaScript wrappers to the storage layer, ready for ADR-0001's Postgres swap to push it down to SQL.
 
 ### Removed
 - Duplicate Python migration script `scripts/migrations/migrate_workflow_doc_ids.py` — superseded by the TypeScript `packages/platform-infra/scripts/migrate-workflow-namespacing.ts` which is the canonical version ([#424](https://github.com/Appsilon/mediforce/pull/424)).

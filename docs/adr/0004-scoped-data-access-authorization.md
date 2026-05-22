@@ -189,6 +189,17 @@ visible to handlers.
   signature does not expose raw repositories." That's a one-line answer
   to a compliance reviewer's "how do you prevent cross-tenant data leaks
   at the API layer?".
+- **Storage-layer filter, today.** Raw repository interfaces declare paired
+  methods — one unscoped (`listAll`, `getById`, …) for system actors and one
+  namespace-scoped (`listInNamespaces`, `getByIdInNamespaces`,
+  `listVisibleTo`, …) for user callers. The Firestore-era implementation
+  filters in-memory inside the raw repo. The wrapper layer in
+  `platform-api/src/repositories/` is a pure router: `caller.isSystemActor`
+  picks the variant. A handler cannot accidentally call the unscoped
+  variant from a user-caller branch — the type system forces an explicit
+  choice at the wrapper, and the static guard already forbids reaching the
+  raw repo directly. The Postgres-era impl pushes the filter into
+  `WHERE namespace = ANY($)` without changing the interface or the wrapper.
 
 ## Out of scope
 

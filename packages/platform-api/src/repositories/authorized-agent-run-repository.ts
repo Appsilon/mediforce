@@ -1,35 +1,29 @@
 import type {
   AgentRun,
   AgentRunRepository,
-  ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace-scoped agent-run reads. AgentRun has no namespace field;
- * membership is reached via the parent `ProcessInstance`.
+ * membership is reached via the parent `ProcessInstance` inside the raw repo.
  */
 export class AuthorizedAgentRunRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: AgentRunRepository,
-    private readonly parents: ProcessInstanceRepository,
   ) {
     super(caller);
   }
 
-  getById = async (runId: string): Promise<AgentRun | null> => {
-    const run = await this.raw.getById(runId);
-    if (run === null) return null;
-    if (this.caller.isSystemActor) return run;
-    const parent = await this.parents.getById(run.processInstanceId);
-    return this.canSeeNamespace(parent?.namespace) ? run : null;
-  };
+  getById = async (runId: string): Promise<AgentRun | null> =>
+    this.caller.isSystemActor
+      ? this.raw.getById(runId)
+      : this.raw.getByIdInNamespaces(runId, [...this.caller.namespaces]);
 
-  getByInstanceId = async (instanceId: string): Promise<AgentRun[]> => {
-    const parent = await this.parents.getById(instanceId);
-    if (!this.canSeeNamespace(parent?.namespace)) return [];
-    return this.raw.getByInstanceId(instanceId);
-  };
+  getByInstanceId = async (instanceId: string): Promise<AgentRun[]> =>
+    this.caller.isSystemActor
+      ? this.raw.getByInstanceId(instanceId)
+      : this.raw.getByInstanceIdInNamespaces(instanceId, [...this.caller.namespaces]);
 }

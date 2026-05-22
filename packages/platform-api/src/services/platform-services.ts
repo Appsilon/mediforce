@@ -90,12 +90,15 @@ export function getPlatformServices(): PlatformServices {
 
   const processRepo = new FirestoreProcessRepository(db);
   const instanceRepo = new FirestoreProcessInstanceRepository(db);
-  const auditRepo = new FirestoreAuditRepository(db);
-  const agentRunRepo = new FirestoreAgentRunRepository(db);
-  const humanTaskRepo = new FirestoreHumanTaskRepository(db);
-  const handoffRepo = new FirestoreHandoffRepository(db);
+  // Indirect-namespace repos depend on instanceRepo for parent-run namespace
+  // resolution inside the namespace-scoped read variants (ADR-0004 §"Storage-
+  // layer filter, today").
+  const auditRepo = new FirestoreAuditRepository(db, instanceRepo);
+  const agentRunRepo = new FirestoreAgentRunRepository(db, instanceRepo);
+  const humanTaskRepo = new FirestoreHumanTaskRepository(db, instanceRepo);
+  const handoffRepo = new FirestoreHandoffRepository(db, instanceRepo);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
-  const coworkSessionRepo = new FirestoreCoworkSessionRepository(db);
+  const coworkSessionRepo = new FirestoreCoworkSessionRepository(db, instanceRepo);
   const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
   const toolCatalogRepo = new FirestoreToolCatalogRepository(db);
   const namespaceRepo = new FirestoreNamespaceRepository(db);

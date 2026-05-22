@@ -2,28 +2,16 @@ import type { CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
 
 /**
- * Workspace-scope primitives for `Authorized<Entity>Repository` wrappers in
- * `platform-api`. Every wrapper extends this to gain a `caller` reference plus
- * the two membership primitives every gate boils down to:
+ * Workspace-scope base for `Authorized<Entity>Repository` wrappers in
+ * `platform-api`. Per ADR-0004 §"Storage-layer filter, today", read gating
+ * for direct- and indirect-namespace entities lives in the raw repository
+ * (`*InNamespaces` / `*VisibleTo` variants); those wrappers route on
+ * `caller.isSystemActor` and do not call into this base for reads.
  *
- *   - `canSeeNamespace(ns)` — synchronous predicate, returns true for apiKey
- *     callers (system actor) or when the namespace is in the user caller's
- *     membership set. Direct-namespace wrappers gate reads on this; indirect-
- *     namespace wrappers (HumanTask → parent run) compose it after a parent
- *     lookup.
- *   - `assertNamespaceWrite(ns)` — write-path guard; throws `ForbiddenError`
- *     for user callers outside the namespace.
- *
- * The base intentionally exposes only these two primitives + `caller`. Entity-
- * shaped helpers (`<T>`, `namespaceOf`, `gate`, `filter`) used to live here
- * but had a single concrete user (`AuthorizedWorkflowRunRepository`), so they
- * are now inlined at the call site. Rule of three: if a second direct-entity
- * wrapper appears with the same shape we'll re-extract.
- *
- * Visibility (`public` vs `private`) and soft-delete filtering are NOT in the
- * base — they belong to the one or two entities that have them and are
- * expressed in the wrapper. Per ADR-0004 §"What the wrapper does NOT enforce":
- * role enforcement is out of scope here.
+ * Path-prefix wrappers (ToolCatalog, OAuthProvider, AgentOAuthToken,
+ * Workflow/WorkspaceSecrets) still gate on a namespace they receive as a
+ * direct argument — they use `canSeeNamespace` for the read predicate
+ * and `assertNamespaceWrite` for writes.
  *
  * Subclass once per entity. Construct with the caller; instances are
  * per-request and disposable.

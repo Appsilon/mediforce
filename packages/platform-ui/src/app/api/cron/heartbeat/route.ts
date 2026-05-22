@@ -24,7 +24,7 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
   const skipped: SkippedEntry[] = [];
 
   try {
-    const { definitions: definitionGroups } = await processRepo.listWorkflowDefinitions(false);
+    const { definitions: definitionGroups } = await processRepo.listAllWorkflowDefinitions(false);
 
     // Flatten to latest version of each definition that has at least one cron trigger.
     // Archived WDs are already filtered at the repo layer (includeArchived=false).

@@ -26,8 +26,8 @@ describe('listTasks handler', () => {
 
   beforeEach(() => {
     resetFactorySequence();
-    humanTaskRepo = new InMemoryHumanTaskRepository();
     instanceRepo = new InMemoryProcessInstanceRepository();
+    humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
   });
 
   describe('filtering by instanceId', () => {
