@@ -2,7 +2,7 @@
 // `CallerScope` instead of raw repositories; the wrappers enforce workspace
 // membership + visibility on every read and write.
 export { AuthorizedScope } from './authorized-repository.js';
-export type { CallerScope, PluginsRegistryView, NamespaceLookupView, SystemServices } from './caller-scope.js';
+export type { CallerScope, PluginsRegistryView, SystemServices } from './caller-scope.js';
 export { createCallerScope } from './create-caller-scope.js';
 export type { CallerScopeServices } from './create-caller-scope.js';
 

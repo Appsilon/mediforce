@@ -9,6 +9,7 @@ import type {
   HandoffRepository,
   HumanTaskRepository,
   ModelRegistryRepository,
+  NamespaceRepository,
   NamespaceSecretsRepository,
   OAuthProviderRepository,
   ProcessInstanceRepository,
@@ -23,7 +24,7 @@ import type {
   WorkflowEngine,
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
-import type { CallerScope, NamespaceLookupView } from './caller-scope.js';
+import type { CallerScope } from './caller-scope.js';
 import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
 import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
 import { AuthorizedAgentRunRepository } from './authorized-agent-run-repository.js';
@@ -54,7 +55,7 @@ export interface CallerScopeServices {
   readonly coworkSessionRepo: CoworkSessionRepository;
   readonly cronTriggerStateRepo: CronTriggerStateRepository;
   readonly toolCatalogRepo: ToolCatalogRepository;
-  readonly namespaceRepo: NamespaceLookupView;
+  readonly namespaceRepo: NamespaceRepository;
   readonly oauthProviderRepo: OAuthProviderRepository;
   readonly agentOAuthTokenRepo: AgentOAuthTokenRepository;
   readonly modelRegistryRepo: ModelRegistryRepository;

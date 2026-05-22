@@ -2,6 +2,7 @@ import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   CronTriggerStateRepository,
   ModelRegistryRepository,
+  NamespaceRepository,
 } from '@mediforce/platform-core';
 import type {
   CronTrigger,
@@ -64,7 +65,7 @@ export interface CallerScope {
   // Deployment-global pass-throughs
   readonly models: ModelRegistryRepository;
   readonly plugins: PluginsRegistryView;
-  readonly workspaces: NamespaceLookupView;
+  readonly workspaces: NamespaceRepository;
   readonly cron: CronTriggerStateRepository;
 
   // System services (engine, manual trigger, etc.) — handlers use these
@@ -77,11 +78,6 @@ export interface CallerScope {
  *  pluginRegistry passes; declared structurally so handler tests don't have to
  *  spin up the real registry). */
 export type PluginsRegistryView = Pick<PluginRegistry, 'list'>;
-
-/** Structural view of the namespace lookup surface used by handlers. */
-export interface NamespaceLookupView {
-  getNamespace(handle: string): Promise<unknown | null>;
-}
 
 /**
  * System-actor handles exposed to handlers that genuinely need them. Use

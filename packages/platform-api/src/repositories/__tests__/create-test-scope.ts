@@ -20,12 +20,13 @@ import type {
   AgentRun,
   AgentRunRepository,
   ModelRegistryRepository,
+  NamespaceRepository,
   NamespaceSecretsRepository,
   ProcessInstanceRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../auth.js';
-import type { CallerScope, NamespaceLookupView } from '../caller-scope.js';
+import type { CallerScope } from '../caller-scope.js';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope.js';
 
 class InMemoryAgentRunRepository implements AgentRunRepository {
@@ -46,9 +47,33 @@ class InMemoryAgentRunRepository implements AgentRunRepository {
   }
 }
 
-const stubNamespaceRepo: NamespaceLookupView = {
-  async getNamespace(): Promise<unknown | null> {
+const stubNamespaceRepo: NamespaceRepository = {
+  async getNamespace() {
     return null;
+  },
+  async createNamespace() {
+    /* no-op */
+  },
+  async updateNamespace() {
+    /* no-op */
+  },
+  async getNamespacesByUser() {
+    return [];
+  },
+  async addMember() {
+    /* no-op */
+  },
+  async removeMember() {
+    /* no-op */
+  },
+  async getMember() {
+    return null;
+  },
+  async getMembers() {
+    return [];
+  },
+  async getUserNamespaces() {
+    return [];
   },
 };
 
