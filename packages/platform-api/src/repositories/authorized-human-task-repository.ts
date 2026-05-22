@@ -6,6 +6,7 @@ import type {
 import type { CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
 import { AuthorizedRepository } from './authorized-repository.js';
+import { filterByParentNamespace } from './indirect-namespace.js';
 
 /**
  * Workspace-scoped view of `HumanTaskRepository`. Tasks have no namespace
@@ -45,7 +46,7 @@ export class AuthorizedHumanTaskRepositoryImpl
 
   getByRole = async (role: string): Promise<HumanTask[]> => {
     const tasks = await this.raw.getByRole(role);
-    return this.filterByParents(tasks);
+    return filterByParentNamespace(tasks, this.caller, this.parents);
   };
 
   getByInstanceId = async (instanceId: string): Promise<HumanTask[]> => {
@@ -74,19 +75,5 @@ export class AuthorizedHumanTaskRepositoryImpl
   private async assertCanMutate(taskId: string): Promise<void> {
     const task = await this.getById(taskId);
     if (task === null) throw new ForbiddenError();
-  }
-
-  private async filterByParents(tasks: HumanTask[]): Promise<HumanTask[]> {
-    if (this.caller.kind === 'apiKey') return tasks;
-    if (tasks.length === 0) return [];
-    const instanceIds = [...new Set(tasks.map((t) => t.processInstanceId))];
-    const namespaceById = new Map<string, string | undefined>();
-    await Promise.all(
-      instanceIds.map(async (id) => {
-        const parent = await this.parents.getById(id);
-        namespaceById.set(id, parent?.namespace);
-      }),
-    );
-    return tasks.filter((task) => this.canSeeNamespace(namespaceById.get(task.processInstanceId)));
   }
 }

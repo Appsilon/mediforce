@@ -23,9 +23,9 @@ import { getPlatformServices } from './platform-services.js';
  *      schema validates it. Failure → 400 with the first issue's message.
  *      Note: `ctx` is Next.js's `RouteContext` shape (`{ params: Promise<…> }`)
  *      for dynamic-segment routes, or `unknown` for flat routes.
- *   3. Handler — invoked with the parsed input and the caller. Throws of type
- *      `HandlerError` (e.g. `NotFoundError`, `ForbiddenError`) map to their
- *      declared HTTP status. Anything else is a 500 (full error logged).
+ *   3. Handler — invoked with the parsed input and a `CallerScope`. Throws of
+ *      type `HandlerError` (e.g. `NotFoundError`, `ForbiddenError`) map to
+ *      their declared HTTP status. Anything else is a 500 (full error logged).
  *
  * Auth note: middleware in `src/middleware.ts` already gates `/api/*` for
  * presence of credentials — that's the first line of defense and exists so
@@ -33,8 +33,9 @@ import { getPlatformServices } from './platform-services.js';
  * resolution step is what turns those credentials into a typed
  * `CallerIdentity` for namespace policy. Both run today; do not remove either.
  *
- * Test seam: pass `options.resolveCaller` to bypass real Firebase /
- * Firestore in unit tests. Production code never sets it.
+ * Test seams: pass `options.resolveCaller` to bypass real Firebase /
+ * Firestore auth, or `options.buildScope` to substitute a stub scope without
+ * spinning up services. Production code never sets either.
  *
  * The `NarrowInput` generic defaults to `z.infer<InputSchema>`. Pass it
  * explicitly when the handler expects a narrower type than the schema's
@@ -45,17 +46,14 @@ import { getPlatformServices } from './platform-services.js';
 export interface RouteAdapterOptions {
   /** Override caller resolution. Default reads from request headers. */
   readonly resolveCaller?: (req: NextRequest) => Promise<CallerIdentity | NextResponse>;
+  /** Override scope construction. Default wires the platform's real services. */
+  readonly buildScope?: (caller: CallerIdentity) => CallerScope;
 }
 
 export type RouteHandler<Input, Output> = (
   input: Input,
   scope: CallerScope,
 ) => Promise<Output>;
-
-/** Builder seam: tests substitute a stub scope without spinning up services. */
-export interface RouteAdapterOptionsInternal extends RouteAdapterOptions {
-  readonly buildScope?: (caller: CallerIdentity) => CallerScope;
-}
 
 export function createRouteAdapter<
   InputSchema extends z.ZodType,
@@ -66,7 +64,7 @@ export function createRouteAdapter<
   inputSchema: InputSchema,
   inputFromRequest: (req: NextRequest, ctx: Ctx) => unknown | Promise<unknown>,
   handler: RouteHandler<NarrowInput, Output>,
-  options: RouteAdapterOptionsInternal = {},
+  options: RouteAdapterOptions = {},
 ): (req: NextRequest, ctx: Ctx) => Promise<NextResponse> {
   const resolveCaller = options.resolveCaller ?? defaultResolveCaller;
   const buildScope = options.buildScope ?? defaultBuildScope;

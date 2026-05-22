@@ -1,4 +1,5 @@
 import type { CallerIdentity } from '../auth.js';
+import { ForbiddenError } from '../errors.js';
 
 /**
  * Base class for `Authorized<Entity>Repository` wrappers in `platform-api`.
@@ -58,5 +59,12 @@ export abstract class AuthorizedRepository<T> {
   protected filter(entities: readonly T[]): T[] {
     if (this.caller.kind === 'apiKey') return [...entities];
     return entities.filter((e) => this.canSee(e));
+  }
+
+  protected assertNamespaceWrite(namespace: string | undefined): void {
+    if (this.caller.kind === 'apiKey') return;
+    if (typeof namespace !== 'string' || !this.caller.namespaces.has(namespace)) {
+      throw new ForbiddenError();
+    }
   }
 }

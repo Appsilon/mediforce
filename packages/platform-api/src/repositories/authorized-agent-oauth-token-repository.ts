@@ -3,7 +3,6 @@ import type {
   AgentOAuthTokenRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
 import { AuthorizedRepository } from './authorized-repository.js';
 
 /**
@@ -55,7 +54,7 @@ export class AuthorizedAgentOAuthTokenRepositoryImpl
     serverName: string,
     token: AgentOAuthToken,
   ): Promise<void> => {
-    this.assertWrite(namespace);
+    this.assertNamespaceWrite(namespace);
     await this.raw.put(namespace, agentId, serverName, token);
   };
 
@@ -64,7 +63,7 @@ export class AuthorizedAgentOAuthTokenRepositoryImpl
     agentId: string,
     serverName: string,
   ): Promise<boolean> => {
-    this.assertWrite(namespace);
+    this.assertNamespaceWrite(namespace);
     return this.raw.delete(namespace, agentId, serverName);
   };
 
@@ -75,9 +74,4 @@ export class AuthorizedAgentOAuthTokenRepositoryImpl
     if (!this.canSeeNamespace(namespace)) return [];
     return this.raw.listByAgent(namespace, agentId);
   };
-
-  private assertWrite(namespace: string): void {
-    if (this.caller.kind === 'apiKey') return;
-    if (!this.caller.namespaces.has(namespace)) throw new ForbiddenError();
-  }
 }

@@ -41,7 +41,7 @@ import { AuthorizedWorkspaceSecretRepositoryImpl } from './authorized-workspace-
 /**
  * Subset of `PlatformServices` (interface-typed) that `createCallerScope`
  * depends on. Tests build this from in-memory repos; production wires it
- * straight to the concrete Firestore services.
+ * to the concrete services from `getPlatformServices()`.
  */
 export interface CallerScopeServices {
   readonly instanceRepo: ProcessInstanceRepository;

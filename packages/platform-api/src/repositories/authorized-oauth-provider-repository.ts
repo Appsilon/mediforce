@@ -5,7 +5,6 @@ import type {
   UpdateOAuthProviderInput,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
 import { AuthorizedRepository } from './authorized-repository.js';
 
 /**
@@ -49,7 +48,7 @@ export class AuthorizedOAuthProviderRepositoryImpl
     namespace: string,
     input: CreateOAuthProviderInput,
   ): Promise<OAuthProviderConfig> => {
-    this.assertWrite(namespace);
+    this.assertNamespaceWrite(namespace);
     return this.raw.create(namespace, input);
   };
 
@@ -58,17 +57,12 @@ export class AuthorizedOAuthProviderRepositoryImpl
     id: string,
     patch: UpdateOAuthProviderInput,
   ): Promise<OAuthProviderConfig | null> => {
-    this.assertWrite(namespace);
+    this.assertNamespaceWrite(namespace);
     return this.raw.update(namespace, id, patch);
   };
 
   delete = async (namespace: string, id: string): Promise<boolean> => {
-    this.assertWrite(namespace);
+    this.assertNamespaceWrite(namespace);
     return this.raw.delete(namespace, id);
   };
-
-  private assertWrite(namespace: string): void {
-    if (this.caller.kind === 'apiKey') return;
-    if (!this.caller.namespaces.has(namespace)) throw new ForbiddenError();
-  }
 }

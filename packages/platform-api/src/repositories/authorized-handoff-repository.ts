@@ -6,6 +6,7 @@ import type {
 import type { CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
 import { AuthorizedRepository } from './authorized-repository.js';
+import { filterByParentNamespace } from './indirect-namespace.js';
 
 /**
  * Workspace-scoped handoff entity reads + mutations. Handoffs have no
@@ -50,7 +51,7 @@ export class AuthorizedHandoffRepositoryImpl
 
   getByRole = async (role: string): Promise<HandoffEntity[]> => {
     const entities = await this.raw.getByRole(role);
-    return this.filterByParents(entities);
+    return filterByParentNamespace(entities, this.caller, this.parents);
   };
 
   getByInstanceId = async (instanceId: string): Promise<HandoffEntity[]> => {
@@ -82,19 +83,5 @@ export class AuthorizedHandoffRepositoryImpl
   private async assertCanMutate(entityId: string): Promise<void> {
     const entity = await this.getById(entityId);
     if (entity === null) throw new ForbiddenError();
-  }
-
-  private async filterByParents(entities: HandoffEntity[]): Promise<HandoffEntity[]> {
-    if (this.caller.kind === 'apiKey') return entities;
-    if (entities.length === 0) return [];
-    const instanceIds = [...new Set(entities.map((e) => e.processInstanceId))];
-    const namespaceById = new Map<string, string | undefined>();
-    await Promise.all(
-      instanceIds.map(async (id) => {
-        const parent = await this.parents.getById(id);
-        namespaceById.set(id, parent?.namespace);
-      }),
-    );
-    return entities.filter((e) => this.canSeeNamespace(namespaceById.get(e.processInstanceId)));
   }
 }

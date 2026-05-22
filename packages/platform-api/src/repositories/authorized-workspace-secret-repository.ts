@@ -1,5 +1,4 @@
 import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
 import { AuthorizedRepository } from './authorized-repository.js';
 
 /**
@@ -50,22 +49,17 @@ export class AuthorizedWorkspaceSecretRepositoryImpl
   };
 
   setSecrets = async (namespace: string, secrets: Record<string, string>): Promise<void> => {
-    this.assertWrite(namespace);
+    this.assertNamespaceWrite(namespace);
     await this.raw.setSecrets(namespace, secrets);
   };
 
   upsertSecret = async (namespace: string, key: string, value: string): Promise<void> => {
-    this.assertWrite(namespace);
+    this.assertNamespaceWrite(namespace);
     await this.raw.upsertSecret(namespace, key, value);
   };
 
   deleteSecret = async (namespace: string, key: string): Promise<void> => {
-    this.assertWrite(namespace);
+    this.assertNamespaceWrite(namespace);
     await this.raw.deleteSecret(namespace, key);
   };
-
-  private assertWrite(namespace: string): void {
-    if (this.caller.kind === 'apiKey') return;
-    if (!this.caller.namespaces.has(namespace)) throw new ForbiddenError();
-  }
 }

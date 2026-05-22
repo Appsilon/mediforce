@@ -5,7 +5,7 @@ import type {
   UpdateAgentDefinitionInput,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError, NotFoundError } from '../errors.js';
+import { NotFoundError } from '../errors.js';
 import { AuthorizedRepository } from './authorized-repository.js';
 
 /**
@@ -74,12 +74,5 @@ export class AuthorizedAgentDefinitionRepositoryImpl
   private canMutateAgent(agent: AgentDefinition): boolean {
     if (this.caller.kind === 'apiKey') return true;
     return typeof agent.namespace === 'string' && this.caller.namespaces.has(agent.namespace);
-  }
-
-  private assertNamespaceWrite(namespace: string | undefined): void {
-    if (this.caller.kind === 'apiKey') return;
-    if (typeof namespace !== 'string' || !this.caller.namespaces.has(namespace)) {
-      throw new ForbiddenError();
-    }
   }
 }

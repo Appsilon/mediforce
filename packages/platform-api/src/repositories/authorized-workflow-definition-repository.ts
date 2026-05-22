@@ -4,7 +4,6 @@ import type {
   WorkflowDefinitionGroup,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
 import { AuthorizedRepository } from './authorized-repository.js';
 
 /**
@@ -61,9 +60,7 @@ export class AuthorizedWorkflowDefinitionRepositoryImpl
   };
 
   save = async (definition: WorkflowDefinition): Promise<void> => {
-    if (this.caller.kind !== 'apiKey' && !this.caller.namespaces.has(definition.namespace)) {
-      throw new ForbiddenError();
-    }
+    this.assertNamespaceWrite(definition.namespace);
     await this.raw.saveWorkflowDefinition(definition);
   };
 
@@ -86,10 +83,5 @@ export class AuthorizedWorkflowDefinitionRepositoryImpl
     if (this.caller.kind === 'apiKey') return true;
     if (def.visibility === 'public') return true;
     return this.caller.namespaces.has(def.namespace);
-  }
-
-  private assertNamespaceWrite(namespace: string): void {
-    if (this.caller.kind === 'apiKey') return;
-    if (!this.caller.namespaces.has(namespace)) throw new ForbiddenError();
   }
 }

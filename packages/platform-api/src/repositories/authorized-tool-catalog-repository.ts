@@ -3,7 +3,6 @@ import type {
   ToolCatalogRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
 import { AuthorizedRepository } from './authorized-repository.js';
 
 /**
@@ -41,17 +40,12 @@ export class AuthorizedToolCatalogRepositoryImpl
   };
 
   upsert = async (namespace: string, entry: ToolCatalogEntry): Promise<ToolCatalogEntry> => {
-    this.assertWrite(namespace);
+    this.assertNamespaceWrite(namespace);
     return this.raw.upsert(namespace, entry);
   };
 
   delete = async (namespace: string, entryId: string): Promise<void> => {
-    this.assertWrite(namespace);
+    this.assertNamespaceWrite(namespace);
     await this.raw.delete(namespace, entryId);
   };
-
-  private assertWrite(namespace: string): void {
-    if (this.caller.kind === 'apiKey') return;
-    if (!this.caller.namespaces.has(namespace)) throw new ForbiddenError();
-  }
 }

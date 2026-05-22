@@ -14,7 +14,6 @@ import { AuthorizedRepository } from './authorized-repository.js';
  */
 export interface AuthorizedAuditEventRepository {
   getByProcess(processInstanceId: string): Promise<AuditEvent[]>;
-  append(event: Omit<AuditEvent, 'serverTimestamp'>): Promise<AuditEvent>;
 }
 
 export class AuthorizedAuditEventRepositoryImpl
@@ -34,18 +33,5 @@ export class AuthorizedAuditEventRepositoryImpl
     const parent = await this.parents.getById(processInstanceId);
     if (!this.canSeeNamespace(parent?.namespace)) return [];
     return this.raw.getByProcess(processInstanceId);
-  };
-
-  /** Append is a system-actor operation routed through the engine in practice;
-   *  callers via the API are typically apiKey. Gate by parent run when present. */
-  append = async (event: Omit<AuditEvent, 'serverTimestamp'>): Promise<AuditEvent> => {
-    if (this.caller.kind === 'apiKey') return this.raw.append(event);
-    const parent = event.processInstanceId !== undefined
-      ? await this.parents.getById(event.processInstanceId)
-      : null;
-    if (!this.canSeeNamespace(parent?.namespace)) {
-      throw new Error('Forbidden');
-    }
-    return this.raw.append(event);
   };
 }
