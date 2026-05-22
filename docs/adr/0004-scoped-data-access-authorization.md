@@ -67,6 +67,13 @@ visible to handlers.
    `AuditEvent`, `Handoff` — workspace via parent `WorkflowRun`) load the
    parent for the membership check. The wrapper for `getById` returns `null`
    on out-of-scope; list/query methods filter out unreachable entries.
+   Wrapper methods take no `namespace` argument from handler input; the
+   namespace is derived from the entity (read) or from the caller (write
+   to an entity the caller is creating). The create-style path is the one
+   exception — `input.namespace` arrives from the route, and the wrapper
+   routes through `assertNamespaceWrite(input.namespace)` on the base
+   class (system-actor bypass, otherwise membership required) before
+   delegating to the raw repo.
 3. **Handler signature.** `(input: ParsedInput, scope: CallerScope) => Promise<Output>`.
    No raw repos, no `caller` third arg (it lives in `scope.caller` when the
    handler needs it for audit/personalization).
@@ -91,7 +98,7 @@ visible to handlers.
    for system code is god-mode-by-design, audited via `AuditEvent`.
 7. **Caller-set scope, not singular workspace.** The base class
    `AuthorizedRepository` filters `workspace IN caller.workspaces` (or
-   unrestricted for `caller.kind === 'apiKey'`). This is a small reshape of
+   unrestricted when `caller.isSystemActor`). This is a small reshape of
    [ADR-0001](./0001-firestore-to-postgres.md) sec. 2.1, whose sketch took a
    singular `workspace: string`. The reshape matches both today's
    multi-workspace `GET /api/tasks?role=…` use case and the future
@@ -100,7 +107,7 @@ visible to handlers.
    An opt-in `scopedTo(handle)` mode covers URL-driven single-workspace
    flows (`/{handle}/…`).
 8. **No `predicates.ts` file on spec.** Tiny gates that recur (e.g. cron
-   heartbeat's `caller.kind === 'apiKey'` check) inline in handlers. A
+   heartbeat's `caller.isSystemActor` check) inline in handlers. A
    shared predicate module only lands when role enforcement does (it will
    need >1 caller).
 9. **Static guard.** Replace `auth-coverage.test.ts` with
@@ -180,7 +187,7 @@ visible to handlers.
   imports from handlers") instead of a regex menu of acceptable markers.
 - A handler that needs to express a public/system endpoint does so by
   bypassing the wrapper deliberately (e.g. cron heartbeat checks
-  `scope.caller.kind === 'apiKey'` inline) — visible at the call site, no
+  `scope.caller.isSystemActor` inline) — visible at the call site, no
   magic annotation.
 - Indirect-namespace lookups (HumanTask → Run → workspace) become an
   intrinsic property of the wrapper. The pattern already exists inline in
@@ -236,6 +243,6 @@ visible to handlers.
 - **Reshape ADR-0001 sec. 2.1 to caller-set scope.** Proposed patch:
   `WorkspaceScopedRepository(db, table, workspace: string)` →
   `AuthorizedRepository(db, table, caller: CallerIdentity)` with default
-  `scoped() ⇒ WHERE workspace IN caller.workspaces (or unrestricted for
-  apiKey)` and an opt-in `scopedTo(handle)` for URL-driven flows. Confirm
+  `scoped() ⇒ WHERE workspace IN caller.workspaces (or unrestricted when
+  caller.isSystemActor)` and an opt-in `scopedTo(handle)` for URL-driven flows. Confirm
   before ADR-0001 implementation begins.
