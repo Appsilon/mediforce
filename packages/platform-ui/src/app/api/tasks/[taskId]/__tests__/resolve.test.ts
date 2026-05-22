@@ -768,7 +768,7 @@ describe('POST /api/tasks/:taskId/resolve — assignment-table', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
     mockInstanceGetById.mockResolvedValue(pausedInstance);
     mockInstanceUpdate.mockResolvedValue(undefined);
     mockAdvanceStep.mockResolvedValue(advancedInstance);

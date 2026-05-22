@@ -1,5 +1,5 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
-import { getCoworkSession } from '@mediforce/platform-api/handlers';
+import { getByIdAdapter } from '@mediforce/platform-api/handlers';
 import { GetCoworkSessionInputSchema } from '@mediforce/platform-api/contract';
 import type { GetCoworkSessionInput } from '@mediforce/platform-api/contract';
 
@@ -21,5 +21,8 @@ export const GET = createRouteAdapter<
 >(
   GetCoworkSessionInputSchema,
   async (_req, ctx) => ({ sessionId: (await ctx.params).sessionId }),
-  getCoworkSession,
+  getByIdAdapter(
+    (input, scope) => scope.coworkSessions.getById(input.sessionId),
+    (input) => `Cowork session ${input.sessionId} not found`,
+  ),
 );

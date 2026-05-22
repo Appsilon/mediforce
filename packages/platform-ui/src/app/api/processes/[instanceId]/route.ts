@@ -1,5 +1,5 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
-import { getProcess } from '@mediforce/platform-api/handlers';
+import { getByIdAdapter } from '@mediforce/platform-api/handlers';
 import { GetProcessInputSchema } from '@mediforce/platform-api/contract';
 import type { GetProcessInput } from '@mediforce/platform-api/contract';
 
@@ -21,5 +21,8 @@ export const GET = createRouteAdapter<
 >(
   GetProcessInputSchema,
   async (_req, ctx) => ({ instanceId: (await ctx.params).instanceId }),
-  getProcess,
+  getByIdAdapter(
+    (input, scope) => scope.runs.getById(input.instanceId),
+    (input) => `Process instance ${input.instanceId} not found`,
+  ),
 );

@@ -1,5 +1,5 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
-import { getTask } from '@mediforce/platform-api/handlers';
+import { getByIdAdapter } from '@mediforce/platform-api/handlers';
 import { GetTaskInputSchema } from '@mediforce/platform-api/contract';
 import type { GetTaskInput } from '@mediforce/platform-api/contract';
 
@@ -17,5 +17,5 @@ interface RouteContext {
 export const GET = createRouteAdapter<typeof GetTaskInputSchema, GetTaskInput, unknown, RouteContext>(
   GetTaskInputSchema,
   async (_req, ctx) => ({ taskId: (await ctx.params).taskId }),
-  getTask,
+  getByIdAdapter((input, scope) => scope.tasks.getById(input.taskId), 'Task not found'),
 );

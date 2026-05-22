@@ -3,7 +3,7 @@ import { UpdateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess, type CallerIdentity } from '@/lib/api-auth';
-import { getAgentDefinition } from '@mediforce/platform-api/handlers';
+import { getByIdAdapter } from '@mediforce/platform-api/handlers';
 import { GetAgentDefinitionInputSchema } from '@mediforce/platform-api/contract';
 import type { GetAgentDefinitionInput } from '@mediforce/platform-api/contract';
 
@@ -34,7 +34,11 @@ export const GET = createRouteAdapter<
 >(
   GetAgentDefinitionInputSchema,
   async (_req, ctx) => ({ id: (await ctx.params).id }),
-  getAgentDefinition,
+  getByIdAdapter(
+    (input, scope) => scope.agentDefinitions.getById(input.id),
+    (input) => `Agent definition ${input.id} not found`,
+    'agent',
+  ),
 );
 
 export async function PUT(

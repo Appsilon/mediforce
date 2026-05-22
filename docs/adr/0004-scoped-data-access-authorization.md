@@ -68,6 +68,13 @@ visible to handlers.
    `AuditEvent`, `Handoff` — workspace via parent `WorkflowRun`) load the
    parent for the membership check. The wrapper for `getById` returns `null`
    on out-of-scope; list/query methods filter out unreachable entries.
+   Wrapper methods take no `namespace` argument from handler input; the
+   namespace is derived from the entity (read) or from the caller (write
+   to an entity the caller is creating). The path-prefix create path is the
+   one exception — `input.namespace` arrives from the route, and the
+   wrapper routes through `assertNamespaceWrite(input.namespace)` on
+   `AuthorizedScope` (system-actor bypass, otherwise membership required)
+   before delegating to the raw repo.
 3. **Handler signature.** `(input: ParsedInput, scope: CallerScope) => Promise<Output>`.
    No raw repos, no `caller` third arg (it lives in `scope.caller` when the
    handler needs it for audit/personalization).
@@ -93,7 +100,7 @@ visible to handlers.
 7. **Caller-set scope, not singular workspace.** The base class
    `AuthorizedScope` exposes a `canSeeNamespace` predicate so wrappers
    filter `workspace IN caller.workspaces` (or
-   unrestricted for `caller.kind === 'apiKey'`). This is a small reshape of
+   unrestricted when `caller.isSystemActor`). This is a small reshape of
    [ADR-0001](./0001-firestore-to-postgres.md) sec. 2.1, whose sketch took a
    singular `workspace: string`. The reshape matches both today's
    multi-workspace `GET /api/tasks?role=…` use case and the future
@@ -102,7 +109,7 @@ visible to handlers.
    An opt-in `scopedTo(handle)` mode covers URL-driven single-workspace
    flows (`/{handle}/…`).
 8. **No `predicates.ts` file on spec.** Tiny gates that recur (e.g. cron
-   heartbeat's `caller.kind === 'apiKey'` check) inline in handlers. A
+   heartbeat's `caller.isSystemActor` check) inline in handlers. A
    shared predicate module only lands when role enforcement does (it will
    need >1 caller).
 9. **Static guard.** Replace `auth-coverage.test.ts` with
@@ -111,11 +118,32 @@ visible to handlers.
    `@mediforce/platform-core/interfaces` or `@mediforce/platform-infra`.
    The TypeScript handler signature already forbids it; the test is
    belt-and-suspenders against bypass.
-10. **One follow-up PR delivers it all.** That PR rewrites the 10 GET
-    handlers from PR #450 (mechanical, ~5 LOC each), adds the wrapper
-    layer (~300 LOC), and lands Phase 2 mutations on top. Total
-    ~600 LOC, one coherent pattern in the codebase at every commit
-    boundary.
+10. **Trivial handlers are deleted, not kept as one-line pass-throughs.**
+    A handler whose body reduces to `return { items: await scope.X.list() }`
+    or `const x = await scope.X.getById(id); if (!x) throw NotFoundError;
+    return x;` carries no decision the wrapper hasn't already taken. The
+    route adapter exposes two generic, fully-typed helpers — `listAdapter`
+    and `getByIdAdapter` — that bind directly to a scope-bound repository
+    method; the route file wires them with the contract schemas. A
+    handler file is justified only when one of the following holds:
+    (a) cross-entity load (`get-cowork-session-by-instance`,
+    `get-process-steps`),
+    (b) non-workspace authorization — role, ownership, lifecycle state
+    (`claim`, `complete`, `cancel`, `resolve`),
+    (c) shape transform beyond a single envelope key,
+    (d) `@public-handler` rationale that needs review-visible justification.
+    Under this rule, five PR #450 GET handlers — `listAgentDefinitions`
+    plus the `getX` family (`getTask`, `getProcess`, `getCoworkSession`,
+    `getAgentDefinition`) — disappear in the rewrite rather than being
+    rewritten. The remaining handlers stay because each meets a carve-out:
+    `listWorkflowDefinitions` (summary transform), `listAuditEvents`
+    (cross-entity load), `getWorkflowDefinition` (version + namespace
+    resolution), `getCoworkSessionByInstance` (specialised lookup),
+    `getProcessSteps` (150-LOC derivation), `listPlugins`
+    (`@public-handler` + per-item shape map), `listTasks` (role/status
+    filter), and all Phase 2 mutations. The static guard (decision 9)
+    covers the adapter helpers too: neither route files nor adapter call
+    sites may import raw repositories.
 
 ## Considered alternatives
 
@@ -156,13 +184,15 @@ visible to handlers.
 
 ## Consequences
 
-- One handler signature for the whole HTTP API surface
-  (`(input, scope) => Promise<Output>`). Phase 2 onwards builds on it.
+- Handlers that survive the rewrite share one signature
+  (`(input, scope) => Promise<Output>`); trivial reads have no handler
+  file at all and the route wires `listAdapter` / `getByIdAdapter`
+  directly. Phase 2 onwards builds on the same convention.
 - The static guard becomes a single, structural assertion ("no raw repo
   imports from handlers") instead of a regex menu of acceptable markers.
 - A handler that needs to express a public/system endpoint does so by
   bypassing the wrapper deliberately (e.g. cron heartbeat checks
-  `scope.caller.kind === 'apiKey'` inline) — visible at the call site, no
+  `scope.caller.isSystemActor` inline) — visible at the call site, no
   magic annotation.
 - Indirect-namespace lookups (HumanTask → Run → workspace) become an
   intrinsic property of the wrapper. The pattern already exists inline in
@@ -249,9 +279,5 @@ visible to handlers.
   `WorkspaceScopedRepository(db, table, workspace: string)` →
   base class taking a `CallerIdentity` instead of a singular workspace,
   with default `scoped() ⇒ WHERE workspace IN caller.workspaces (or
-  unrestricted for apiKey)` and an opt-in `scopedTo(handle)` for
-  URL-driven flows. Confirm before ADR-0001 implementation begins.
-- **Combined PR vs split.** Proposed: a single PR that rewrites PR #450's
-  10 GET handlers, adds the wrapper layer, and lands Phase 2 mutations
-  (~600 LOC, mechanical). Confirm in PR review that the size is
-  reviewable.
+  unrestricted when caller.isSystemActor)` and an opt-in `scopedTo(handle)`
+  for URL-driven flows. Confirm before ADR-0001 implementation begins.

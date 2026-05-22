@@ -3,7 +3,7 @@ import { CreateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
-import { listAgentDefinitions } from '@mediforce/platform-api/handlers';
+import { listAdapter } from '@mediforce/platform-api/handlers';
 import { ListAgentDefinitionsInputSchema } from '@mediforce/platform-api/contract';
 
 /**
@@ -15,7 +15,7 @@ import { ListAgentDefinitionsInputSchema } from '@mediforce/platform-api/contrac
 export const GET = createRouteAdapter(
   ListAgentDefinitionsInputSchema,
   () => ({}),
-  listAgentDefinitions,
+  listAdapter('agents', (_input, scope) => scope.agentDefinitions.list()),
 );
 
 export async function POST(request: Request): Promise<NextResponse> {
