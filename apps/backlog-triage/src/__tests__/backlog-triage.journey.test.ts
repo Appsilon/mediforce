@@ -267,7 +267,8 @@ describe('backlog-triage journey', () => {
       const step = wd.steps.find((s) => s.id === 'dispatch')!;
       const script = step.agent!.inlineScript!;
       mockFetch
-        .mockResolvedValueOnce(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })) // GitHub PATCH
+        .mockResolvedValueOnce(new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } })) // GitHub POST /labels
+        .mockResolvedValueOnce(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })) // GitHub POST /assignees
         .mockResolvedValueOnce(new Response(JSON.stringify({ instanceId: 'run-abc', status: 'running' }), { status: 200, headers: { 'content-type': 'application/json' } })); // Mediforce POST
 
       const result = await runInlineScript(
@@ -286,17 +287,20 @@ describe('backlog-triage journey', () => {
         },
       );
 
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
 
-      const [patchUrl, patchInit] = mockFetch.mock.calls[0];
-      expect(patchUrl).toBe('https://api.github.com/repos/owner/repo/issues/101');
-      expect((patchInit as { method: string }).method).toBe('PATCH');
-      expect((patchInit as { headers: Record<string, string> }).headers.Authorization).toBe('Bearer ghp_xxx');
-      const patchBody = JSON.parse((patchInit as { body: string }).body);
-      expect(patchBody.assignees).toEqual(['filip']);
-      expect(patchBody.labels).toEqual(['priority/P0']);
+      const [labelsUrl, labelsInit] = mockFetch.mock.calls[0];
+      expect(labelsUrl).toBe('https://api.github.com/repos/owner/repo/issues/101/labels');
+      expect((labelsInit as { method: string }).method).toBe('POST');
+      expect((labelsInit as { headers: Record<string, string> }).headers.Authorization).toBe('Bearer ghp_xxx');
+      expect(JSON.parse((labelsInit as { body: string }).body)).toEqual({ labels: ['priority/P0'] });
 
-      const [postUrl, postInit] = mockFetch.mock.calls[1];
+      const [assigneesUrl, assigneesInit] = mockFetch.mock.calls[1];
+      expect(assigneesUrl).toBe('https://api.github.com/repos/owner/repo/issues/101/assignees');
+      expect((assigneesInit as { method: string }).method).toBe('POST');
+      expect(JSON.parse((assigneesInit as { body: string }).body)).toEqual({ assignees: ['filip'] });
+
+      const [postUrl, postInit] = mockFetch.mock.calls[2];
       expect(postUrl).toBe('https://mediforce.test/api/processes');
       expect((postInit as { method: string }).method).toBe('POST');
       expect((postInit as { headers: Record<string, string> }).headers['X-Api-Key']).toBe('mf_yyy');
@@ -312,11 +316,25 @@ describe('backlog-triage journey', () => {
       expect(result.errors).toEqual([]);
     });
 
+    it('dispatch rejects an invalid repo format early', async () => {
+      const step = wd.steps.find((s) => s.id === 'dispatch')!;
+      const script = step.agent!.inlineScript!;
+
+      await expect(
+        runInlineScript(
+          script,
+          { repo: 'not a repo with spaces', assignments: [] },
+          { GITHUB_TOKEN: 'ghp_xxx', PLATFORM_API_KEY: 'mf_yyy', APP_BASE_URL: 'https://mediforce.test' },
+        ),
+      ).resolves.toEqual({});
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it('dispatch records per-assignment errors but continues', async () => {
       const step = wd.steps.find((s) => s.id === 'dispatch')!;
       const script = step.agent!.inlineScript!;
       mockFetch
-        .mockResolvedValueOnce(new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } })) // GitHub PATCH fails
+        .mockResolvedValueOnce(new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } })) // GitHub POST /labels fails — script skips /assignees for this row
         .mockResolvedValueOnce(new Response(JSON.stringify({ instanceId: 'run-zzz', status: 'running' }), { status: 200, headers: { 'content-type': 'application/json' } }));
 
       const result = await runInlineScript(
