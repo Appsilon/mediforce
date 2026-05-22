@@ -8,7 +8,7 @@ import { createRouteAdapter } from '../route-adapter';
 
 const InputSchema = z.object({ name: z.string().min(1) });
 
-const apiKeyCaller: CallerIdentity = { kind: 'apiKey' };
+const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
 /** Minimal scope stub — adapter tests don't exercise wrapper internals, so
  *  an opaque object carrying just the caller is enough to verify routing. */
@@ -63,6 +63,7 @@ describe('createRouteAdapter', () => {
       kind: 'user',
       uid: 'u1',
       namespaces: new Set(['ns-a']),
+      isSystemActor: false,
     };
     const GET = createRouteAdapter(
       InputSchema,

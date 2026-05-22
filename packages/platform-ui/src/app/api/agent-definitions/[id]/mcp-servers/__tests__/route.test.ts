@@ -48,7 +48,7 @@ const coworkAgent = {
 describe('GET /api/agent-definitions/:id/mcp-servers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
   });
 
   it('[DATA] returns mcpServers for a cowork agent', async () => {
@@ -87,6 +87,7 @@ describe('GET /api/agent-definitions/:id/mcp-servers', () => {
       kind: 'user',
       uid: 'outsider',
       namespaces: new Set(['other-ns']),
+      isSystemActor: false,
     });
     mockAgentGetById.mockResolvedValue({ ...coworkAgent, namespace: 'test-ns' });
 

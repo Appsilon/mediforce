@@ -3,7 +3,7 @@ import type {
   WorkflowDefinition,
   WorkflowDefinitionGroup,
 } from '@mediforce/platform-core';
-import { isSystemActor, type CallerIdentity } from '../auth.js';
+import type { CallerIdentity } from '../auth.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
 /**
@@ -13,7 +13,7 @@ import { AuthorizedScope } from './authorized-repository.js';
  *   - any version of a definition owned by a workspace they're a member of,
  *   - the latest version of any `visibility: 'public'` definition.
  *
- * apiKey callers see everything.
+ * System-actor callers see everything.
  *
  * Out-of-scope reads return null (single) or are filtered out (list). The
  * handler turns null into 404 — so a non-member cannot distinguish "exists in
@@ -67,7 +67,7 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
   };
 
   private canSeeDefinition(def: WorkflowDefinition): boolean {
-    if (isSystemActor(this.caller)) return true;
+    if (this.caller.isSystemActor) return true;
     if (def.visibility === 'public') return true;
     return this.caller.namespaces.has(def.namespace);
   }

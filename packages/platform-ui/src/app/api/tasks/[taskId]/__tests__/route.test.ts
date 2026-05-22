@@ -40,7 +40,7 @@ import { GET } from '../route';
 describe('GET /api/tasks/:taskId', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
   });
 
   it('returns task by id (wiring smoke)', async () => {

@@ -3,7 +3,7 @@ import type {
   HandoffRepository,
   ProcessInstanceRepository,
 } from '@mediforce/platform-core';
-import { isSystemActor, type CallerIdentity } from '../auth.js';
+import type { CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
 import { AuthorizedScope } from './authorized-repository.js';
 import { filterByParentNamespace } from './indirect-namespace.js';
@@ -28,7 +28,7 @@ export class AuthorizedHandoffRepository extends AuthorizedScope {
   getById = async (entityId: string): Promise<HandoffEntity | null> => {
     const entity = await this.raw.getById(entityId);
     if (entity === null) return null;
-    if (isSystemActor(this.caller)) return entity;
+    if (this.caller.isSystemActor) return entity;
     const parent = await this.parents.getById(entity.processInstanceId);
     return this.canSeeNamespace(parent?.namespace) ? entity : null;
   };

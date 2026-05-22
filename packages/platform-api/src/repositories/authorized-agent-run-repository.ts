@@ -3,7 +3,7 @@ import type {
   AgentRunRepository,
   ProcessInstanceRepository,
 } from '@mediforce/platform-core';
-import { isSystemActor, type CallerIdentity } from '../auth.js';
+import type { CallerIdentity } from '../auth.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
 /**
@@ -22,7 +22,7 @@ export class AuthorizedAgentRunRepository extends AuthorizedScope {
   getById = async (runId: string): Promise<AgentRun | null> => {
     const run = await this.raw.getById(runId);
     if (run === null) return null;
-    if (isSystemActor(this.caller)) return run;
+    if (this.caller.isSystemActor) return run;
     const parent = await this.parents.getById(run.processInstanceId);
     return this.canSeeNamespace(parent?.namespace) ? run : null;
   };

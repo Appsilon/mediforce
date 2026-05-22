@@ -22,7 +22,7 @@ import { Mediforce } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
 import { createTestScope } from '@mediforce/platform-api/testing';
 
-const apiKeyCaller: CallerIdentity = { kind: 'apiKey' };
+const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
 function loopbackFetch(
   route: (req: NextRequest) => Promise<Response>,

@@ -14,28 +14,18 @@ import { ForbiddenError } from './errors.js';
  * from a `Request`.
  */
 export type CallerIdentity =
-  | { readonly kind: 'apiKey' }
-  | { readonly kind: 'user'; readonly uid: string; readonly namespaces: ReadonlySet<string> };
-
-/**
- * True for system-actor callers (CLI, agent runtime, internal services
- * server-to-server). System actors bypass workspace gating; they're
- * trusted to scope themselves.
- *
- * Per #448 the underlying discriminator (`'apiKey'`) will be renamed to
- * `'admin'` or `'system'`. Callers should reach for this helper instead
- * of comparing `caller.kind` directly so the rename is a single-line edit.
- */
-export function isSystemActor(
-  caller: CallerIdentity,
-): caller is Extract<CallerIdentity, { kind: 'apiKey' }> {
-  return caller.kind === 'apiKey';
-}
+  | { readonly kind: 'apiKey'; readonly isSystemActor: true }
+  | {
+      readonly kind: 'user';
+      readonly uid: string;
+      readonly namespaces: ReadonlySet<string>;
+      readonly isSystemActor: false;
+    };
 
 /**
  * Throw `ForbiddenError` unless the caller is allowed to touch resources in
- * `namespace`. API-key callers are unrestricted; user callers must have the
- * namespace in their membership set. Missing namespaces are treated as
+ * `namespace`. System-actor callers are unrestricted; user callers must have
+ * the namespace in their membership set. Missing namespaces are treated as
  * forbidden — every domain entity that's gated must carry its namespace.
  *
  * Handlers call this AFTER fetching the resource (so 404 still beats 403 for
@@ -45,7 +35,7 @@ export function assertNamespaceAccess(
   caller: CallerIdentity,
   namespace: string | undefined,
 ): void {
-  if (caller.kind === 'apiKey') return;
+  if (caller.isSystemActor) return;
   if (typeof namespace !== 'string' || namespace.length === 0) {
     throw new ForbiddenError('Resource has no namespace');
   }
@@ -55,7 +45,7 @@ export function assertNamespaceAccess(
 }
 
 export function callerCanAccess(caller: CallerIdentity, namespace: string | undefined): boolean {
-  if (caller.kind === 'apiKey') return true;
+  if (caller.isSystemActor) return true;
   if (typeof namespace !== 'string' || namespace.length === 0) return false;
   return caller.namespaces.has(namespace);
 }
@@ -70,6 +60,6 @@ export function filterByCaller<T>(
   caller: CallerIdentity,
   namespaceOf: (item: T) => string | undefined,
 ): T[] {
-  if (caller.kind === 'apiKey') return [...items];
+  if (caller.isSystemActor) return [...items];
   return items.filter((item) => callerCanAccess(caller, namespaceOf(item)));
 }

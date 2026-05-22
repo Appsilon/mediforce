@@ -159,7 +159,7 @@ export interface TestScopeOverrides {
   readonly modelRegistryRepo?: ModelRegistryRepository;
 }
 
-const apiKeyCaller: CallerIdentity = { kind: 'apiKey' };
+const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
 /**
  * Build a `CallerScope` backed entirely by in-memory repositories. Default
@@ -202,5 +202,5 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
 
 /** Construct a user caller with the given namespace memberships. */
 export function userCaller(uid: string, namespaces: readonly string[]): CallerIdentity {
-  return { kind: 'user', uid, namespaces: new Set(namespaces) };
+  return { kind: 'user', uid, namespaces: new Set(namespaces), isSystemActor: false };
 }

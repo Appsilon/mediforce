@@ -4,7 +4,7 @@ import type {
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
 } from '@mediforce/platform-core';
-import { isSystemActor, type CallerIdentity } from '../auth.js';
+import type { CallerIdentity } from '../auth.js';
 import { NotFoundError } from '../errors.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
@@ -54,13 +54,13 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
   };
 
   private canSeeAgent(agent: AgentDefinition): boolean {
-    if (isSystemActor(this.caller)) return true;
+    if (this.caller.isSystemActor) return true;
     if (agent.visibility === 'public') return true;
     return typeof agent.namespace === 'string' && this.caller.namespaces.has(agent.namespace);
   }
 
   private canMutateAgent(agent: AgentDefinition): boolean {
-    if (isSystemActor(this.caller)) return true;
+    if (this.caller.isSystemActor) return true;
     return typeof agent.namespace === 'string' && this.caller.namespaces.has(agent.namespace);
   }
 }

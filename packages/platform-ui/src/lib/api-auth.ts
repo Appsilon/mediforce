@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth } from '@mediforce/platform-infra';
 import type { FirestoreNamespaceRepository } from '@mediforce/platform-infra';
-import { isSystemActor, type CallerIdentity } from '@mediforce/platform-api/auth';
+import type { CallerIdentity } from '@mediforce/platform-api/auth';
 
 // Re-export the canonical type from platform-api so route handlers can import
 // it from a single place. Pure-handler code in @mediforce/platform-api uses
 // the same shape — the Next.js layer only adds the resolution-from-Request
 // part below.
 export type { CallerIdentity };
-export { callerCanAccess, assertNamespaceAccess, filterByCaller, isSystemActor } from '@mediforce/platform-api/auth';
+export { callerCanAccess, assertNamespaceAccess, filterByCaller } from '@mediforce/platform-api/auth';
 
 /**
  * Resolve caller identity from request headers.
@@ -26,7 +26,7 @@ export async function resolveCallerIdentity(
   const apiKey = request.headers.get('X-Api-Key');
   const expectedKey = process.env.PLATFORM_API_KEY;
   if (apiKey && expectedKey && apiKey === expectedKey) {
-    return { kind: 'apiKey' };
+    return { kind: 'apiKey', isSystemActor: true };
   }
 
   const authHeader = request.headers.get('Authorization') ?? '';
@@ -44,7 +44,12 @@ export async function resolveCallerIdentity(
   }
 
   const namespaces = await namespaceRepo.getNamespacesByUser(uid);
-  return { kind: 'user', uid, namespaces: new Set(namespaces.map((ns) => ns.handle)) };
+  return {
+    kind: 'user',
+    uid,
+    namespaces: new Set(namespaces.map((ns) => ns.handle)),
+    isSystemActor: false,
+  };
 }
 
 /**
@@ -59,7 +64,7 @@ export function requireNamespaceAccess(
   caller: CallerIdentity,
   namespace: string | undefined,
 ): NextResponse | null {
-  if (isSystemActor(caller)) return null;
+  if (caller.isSystemActor) return null;
   if (!namespace) {
     return NextResponse.json({ error: 'Resource has no namespace' }, { status: 403 });
   }
@@ -77,6 +82,6 @@ export function filterByNamespace<T extends { namespace?: string }>(
   caller: CallerIdentity,
   items: T[],
 ): T[] {
-  if (isSystemActor(caller)) return items;
+  if (caller.isSystemActor) return items;
   return items.filter((item) => typeof item.namespace === 'string' && caller.namespaces.has(item.namespace));
 }

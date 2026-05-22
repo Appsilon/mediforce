@@ -87,7 +87,7 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
     mockInstanceGetById.mockResolvedValue(pausedInstance);
     mockInstanceUpdate.mockResolvedValue(undefined);
     mockAdvanceStep.mockResolvedValue(advancedInstance);
@@ -390,6 +390,7 @@ describe('POST /api/tasks/:taskId/resolve — verdict', () => {
       kind: 'user',
       uid: 'outsider',
       namespaces: new Set(['other-ns']),
+      isSystemActor: false,
     });
     mockGetById.mockResolvedValue(claimedVerdictTask);
     mockInstanceGetById.mockResolvedValue(pausedInstance);
@@ -429,7 +430,7 @@ describe('POST /api/tasks/:taskId/resolve — selection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
     mockInstanceGetById.mockResolvedValue(pausedInstance);
     mockInstanceUpdate.mockResolvedValue(undefined);
     mockAdvanceStep.mockResolvedValue(advancedInstance);
@@ -542,7 +543,7 @@ describe('POST /api/tasks/:taskId/resolve — file-upload', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
     mockInstanceGetById.mockResolvedValue(pausedInstance);
     mockInstanceUpdate.mockResolvedValue(undefined);
     mockAdvanceStep.mockResolvedValue(advancedInstance);

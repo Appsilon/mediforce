@@ -57,7 +57,7 @@ const mockExecuteAgentStep = vi.mocked(executeAgentStep);
 describe('advance route', () => {
   beforeEach(() => {
     mockExecuteAgentStep.mockClear();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
   });
 
   it('[AUTH] POST calls executeAgentStep with 4 args (no autonomyLevel)', async () => {
@@ -120,6 +120,7 @@ describe('advance route', () => {
       kind: 'user',
       uid: 'outsider',
       namespaces: new Set(['other-ns']),
+      isSystemActor: false,
     });
 
     const req = new Request('http://localhost/api/processes/inst-001/advance', {

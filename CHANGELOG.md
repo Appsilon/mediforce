@@ -24,6 +24,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 - `@mediforce/platform-api/repositories` subpath export: `CallerScope`, `createCallerScope`, `AuthorizedRepository` base, and per-entity wrappers.
 - `@mediforce/platform-api/testing` subpath export: `createTestScope`, `userCaller` — builds a real `CallerScope` from in-memory repos for handler tests downstream of `platform-api`.
 
+### Changed
+- `CallerIdentity` now carries `readonly isSystemActor: boolean`. The free function `isSystemActor(caller)` was replaced by reading `caller.isSystemActor` directly — one less import, future-proof against the planned `'apiKey'` discriminator rename ([#448](https://github.com/Appsilon/mediforce/issues/448)).
+
 ### Removed
 - Duplicate Python migration script `scripts/migrations/migrate_workflow_doc_ids.py` — superseded by the TypeScript `packages/platform-infra/scripts/migrate-workflow-namespacing.ts` which is the canonical version ([#424](https://github.com/Appsilon/mediforce/pull/424)).
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, isSystemActor } from '@/lib/api-auth';
+import { resolveCallerIdentity } from '@/lib/api-auth';
 
 function normalizeImage(ref: string): string {
   return ref.includes(':') ? ref : `${ref}:latest`;
@@ -37,7 +37,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (!latest) continue;
 
     const ns = latest.namespace;
-    if (!isSystemActor(caller)) {
+    if (!caller.isSystemActor) {
       const accessible = caller.namespaces.has(ns) || latest.visibility === 'public';
       if (!accessible) continue;
     }
