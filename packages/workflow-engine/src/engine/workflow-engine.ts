@@ -264,19 +264,27 @@ export class WorkflowEngine {
           const now = new Date().toISOString();
 
           const selectionFields: { selection?: Selection; options?: Record<string, unknown>[] } = {};
+          const prevOutput = updatedInstance.variables[instance.currentStepId!] as Record<string, unknown> | undefined;
+          const rawOptions = prevOutput?.options;
+          const hasOptions = Array.isArray(rawOptions) && rawOptions.length > 0;
+
           if (nextStep.selection !== undefined) {
             selectionFields.selection = nextStep.selection;
-            const prevOutput = updatedInstance.variables[instance.currentStepId!] as Record<string, unknown> | undefined;
-            const rawOptions = prevOutput?.options;
-            if (Array.isArray(rawOptions) && rawOptions.length > 0) {
+            if (hasOptions) {
               const { min } = normalizeSelection(nextStep.selection);
-              if (rawOptions.length < min) {
+              if (rawOptions!.length < min) {
                 throw new Error(
-                  `Step "${nextStep.id}" requires selecting at least ${min} but only ${rawOptions.length} options available`,
+                  `Step "${nextStep.id}" requires selecting at least ${min} but only ${rawOptions!.length} options available`,
                 );
               }
-              selectionFields.options = rawOptions as Record<string, unknown>[];
             }
+          }
+
+          // `options` flow to the task whenever the previous step produced them,
+          // not just for selection-style steps. Components like assignment-table
+          // consume them as their items list.
+          if (hasOptions) {
+            selectionFields.options = rawOptions as Record<string, unknown>[];
           }
 
           // L3 agent review tasks are created in execute-agent-step, not here;
