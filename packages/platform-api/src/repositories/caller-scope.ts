@@ -83,7 +83,7 @@ export type PluginsRegistryView = Pick<PluginRegistry, 'list'>;
  * System-actor handles exposed to handlers that genuinely need them. Use
  * sparingly: every reach into `scope.system` is a workspace-gate bypass and
  * MUST be paired with an explicit caller check (e.g. cron heartbeat's
- * `caller.kind === 'apiKey'`).
+ * `isSystemActor(caller)` gate).
  */
 export interface SystemServices {
   readonly engine: WorkflowEngine;

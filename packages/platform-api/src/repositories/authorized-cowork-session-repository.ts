@@ -3,7 +3,7 @@ import type {
   CoworkSessionRepository,
   ProcessInstanceRepository,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
+import { isSystemActor, type CallerIdentity } from '../auth.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
 /**
@@ -24,12 +24,13 @@ export class AuthorizedCoworkSessionRepository extends AuthorizedScope {
   getById = async (sessionId: string): Promise<CoworkSession | null> => {
     const session = await this.raw.getById(sessionId);
     if (session === null) return null;
-    if (this.caller.kind === 'apiKey') return session;
+    if (isSystemActor(this.caller)) return session;
     const parent = await this.parents.getById(session.processInstanceId);
     return this.canSeeNamespace(parent?.namespace) ? session : null;
   };
 
   findMostRecentActiveForInstance = async (instanceId: string): Promise<CoworkSession | null> => {
+    if (isSystemActor(this.caller)) return this.raw.findMostRecentActive(instanceId);
     const parent = await this.parents.getById(instanceId);
     if (parent === null) return null;
     if (!this.canSeeNamespace(parent.namespace)) return null;

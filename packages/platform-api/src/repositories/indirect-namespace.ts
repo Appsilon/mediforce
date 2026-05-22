@@ -1,4 +1,4 @@
-import type { CallerIdentity } from '../auth.js';
+import { isSystemActor, type CallerIdentity } from '../auth.js';
 import type { ProcessInstanceRepository } from '@mediforce/platform-core';
 
 /** Batch-dedupe parent run lookups and filter entities by the parent's
@@ -10,7 +10,7 @@ export async function filterByParentNamespace<T extends { processInstanceId: str
   caller: CallerIdentity,
   parents: ProcessInstanceRepository,
 ): Promise<T[]> {
-  if (caller.kind === 'apiKey') return entities;
+  if (isSystemActor(caller)) return entities;
   if (entities.length === 0) return [];
   const instanceIds = [...new Set(entities.map((e) => e.processInstanceId))];
   const namespaceById = new Map<string, string | undefined>();

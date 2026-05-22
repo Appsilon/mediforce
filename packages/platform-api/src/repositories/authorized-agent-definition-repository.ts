@@ -4,7 +4,7 @@ import type {
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
+import { isSystemActor, type CallerIdentity } from '../auth.js';
 import { NotFoundError } from '../errors.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
@@ -29,7 +29,6 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
 
   list = async (): Promise<AgentDefinition[]> => {
     const agents = await this.raw.list();
-    if (this.caller.kind === 'apiKey') return agents;
     return agents.filter((agent) => this.canSeeAgent(agent));
   };
 
@@ -55,13 +54,13 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
   };
 
   private canSeeAgent(agent: AgentDefinition): boolean {
-    if (this.caller.kind === 'apiKey') return true;
+    if (isSystemActor(this.caller)) return true;
     if (agent.visibility === 'public') return true;
     return typeof agent.namespace === 'string' && this.caller.namespaces.has(agent.namespace);
   }
 
   private canMutateAgent(agent: AgentDefinition): boolean {
-    if (this.caller.kind === 'apiKey') return true;
+    if (isSystemActor(this.caller)) return true;
     return typeof agent.namespace === 'string' && this.caller.namespaces.has(agent.namespace);
   }
 }

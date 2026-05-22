@@ -3,7 +3,7 @@ import type {
   HumanTaskRepository,
   ProcessInstanceRepository,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
+import { isSystemActor, type CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
 import { AuthorizedScope } from './authorized-repository.js';
 import { filterByParentNamespace } from './indirect-namespace.js';
@@ -27,7 +27,7 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
   getById = async (taskId: string): Promise<HumanTask | null> => {
     const task = await this.raw.getById(taskId);
     if (task === null) return null;
-    if (this.caller.kind === 'apiKey') return task;
+    if (isSystemActor(this.caller)) return task;
     const parent = await this.parents.getById(task.processInstanceId);
     return this.canSeeNamespace(parent?.namespace) ? task : null;
   };
@@ -39,7 +39,6 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
 
   getByInstanceId = async (instanceId: string): Promise<HumanTask[]> => {
     const tasks = await this.raw.getByInstanceId(instanceId);
-    if (this.caller.kind === 'apiKey') return tasks;
     if (tasks.length === 0) return [];
     const parent = await this.parents.getById(instanceId);
     return this.canSeeNamespace(parent?.namespace) ? tasks : [];

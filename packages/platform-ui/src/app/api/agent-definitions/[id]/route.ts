@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { UpdateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
-import { resolveCallerIdentity, requireNamespaceAccess, type CallerIdentity } from '@/lib/api-auth';
+import { resolveCallerIdentity, requireNamespaceAccess, isSystemActor, type CallerIdentity } from '@/lib/api-auth';
 import { getAgentDefinition } from '@mediforce/platform-api/handlers';
 import { GetAgentDefinitionInputSchema } from '@mediforce/platform-api/contract';
 import type { GetAgentDefinitionInput } from '@mediforce/platform-api/contract';
@@ -12,7 +12,7 @@ interface RouteContext {
 }
 
 function canMutate(caller: CallerIdentity, agent: { namespace?: string }): NextResponse | null {
-  if (caller.kind === 'apiKey') return null;
+  if (isSystemActor(caller)) return null;
   if (typeof agent.namespace !== 'string') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

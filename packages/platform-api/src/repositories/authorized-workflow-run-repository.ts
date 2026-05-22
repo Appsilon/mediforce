@@ -66,7 +66,6 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
   };
 
   private filterByNamespace(runs: readonly ProcessInstance[]): ProcessInstance[] {
-    if (this.caller.kind === 'apiKey') return [...runs];
     return runs.filter((run) => this.canSeeNamespace(run.namespace));
   }
 }

@@ -22,7 +22,6 @@ export class AuthorizedAuditEventRepository extends AuthorizedScope {
   }
 
   getByProcess = async (processInstanceId: string): Promise<AuditEvent[]> => {
-    if (this.caller.kind === 'apiKey') return this.raw.getByProcess(processInstanceId);
     const parent = await this.parents.getById(processInstanceId);
     if (!this.canSeeNamespace(parent?.namespace)) return [];
     return this.raw.getByProcess(processInstanceId);

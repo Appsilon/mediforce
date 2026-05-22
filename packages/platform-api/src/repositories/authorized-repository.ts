@@ -1,4 +1,4 @@
-import type { CallerIdentity } from '../auth.js';
+import { isSystemActor, type CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
 
 /**
@@ -32,12 +32,12 @@ export abstract class AuthorizedScope {
   constructor(protected readonly caller: CallerIdentity) {}
 
   protected canSeeNamespace(namespace: string | undefined): boolean {
-    if (this.caller.kind === 'apiKey') return true;
+    if (isSystemActor(this.caller)) return true;
     return typeof namespace === 'string' && this.caller.namespaces.has(namespace);
   }
 
   protected assertNamespaceWrite(namespace: string | undefined): void {
-    if (this.caller.kind === 'apiKey') return;
+    if (isSystemActor(this.caller)) return;
     if (typeof namespace !== 'string' || !this.caller.namespaces.has(namespace)) {
       throw new ForbiddenError();
     }

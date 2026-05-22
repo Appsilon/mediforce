@@ -3,7 +3,7 @@ import type {
   WorkflowDefinition,
   WorkflowDefinitionGroup,
 } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../auth.js';
+import { isSystemActor, type CallerIdentity } from '../auth.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
 /**
@@ -40,7 +40,6 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
    *  (private, foreign workspace) — same shape as the pre-migration listing. */
   listGroups = async (includeArchived: boolean): Promise<WorkflowDefinitionGroup[]> => {
     const { definitions } = await this.raw.listWorkflowDefinitions(includeArchived);
-    if (this.caller.kind === 'apiKey') return definitions;
     return definitions.filter((group) => {
       const latest = group.versions.find((v) => v.version === group.latestVersion);
       return latest !== undefined && this.canSeeDefinition(latest);
@@ -68,7 +67,7 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
   };
 
   private canSeeDefinition(def: WorkflowDefinition): boolean {
-    if (this.caller.kind === 'apiKey') return true;
+    if (isSystemActor(this.caller)) return true;
     if (def.visibility === 'public') return true;
     return this.caller.namespaces.has(def.namespace);
   }

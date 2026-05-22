@@ -18,6 +18,21 @@ export type CallerIdentity =
   | { readonly kind: 'user'; readonly uid: string; readonly namespaces: ReadonlySet<string> };
 
 /**
+ * True for system-actor callers (CLI, agent runtime, internal services
+ * server-to-server). System actors bypass workspace gating; they're
+ * trusted to scope themselves.
+ *
+ * Per #448 the underlying discriminator (`'apiKey'`) will be renamed to
+ * `'admin'` or `'system'`. Callers should reach for this helper instead
+ * of comparing `caller.kind` directly so the rename is a single-line edit.
+ */
+export function isSystemActor(
+  caller: CallerIdentity,
+): caller is Extract<CallerIdentity, { kind: 'apiKey' }> {
+  return caller.kind === 'apiKey';
+}
+
+/**
  * Throw `ForbiddenError` unless the caller is allowed to touch resources in
  * `namespace`. API-key callers are unrestricted; user callers must have the
  * namespace in their membership set. Missing namespaces are treated as
