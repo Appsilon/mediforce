@@ -4,7 +4,7 @@ import type {
   ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace-scoped audit-event reads. Events have no workspace field; the
@@ -17,7 +17,7 @@ export interface AuthorizedAuditEventRepository {
 }
 
 export class AuthorizedAuditEventRepositoryImpl
-  extends AuthorizedRepository<AuditEvent>
+  extends AuthorizedScope
   implements AuthorizedAuditEventRepository
 {
   constructor(

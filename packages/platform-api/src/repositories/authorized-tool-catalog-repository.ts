@@ -3,7 +3,7 @@ import type {
   ToolCatalogRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace-scoped view of `ToolCatalogRepository`. The underlying store is
@@ -19,7 +19,7 @@ export interface AuthorizedToolCatalogRepository {
 }
 
 export class AuthorizedToolCatalogRepositoryImpl
-  extends AuthorizedRepository<ToolCatalogEntry>
+  extends AuthorizedScope
   implements AuthorizedToolCatalogRepository
 {
   constructor(

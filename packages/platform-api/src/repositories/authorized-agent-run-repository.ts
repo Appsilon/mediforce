@@ -4,7 +4,7 @@ import type {
   ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace-scoped agent-run reads. AgentRun has no namespace field;
@@ -16,7 +16,7 @@ export interface AuthorizedAgentRunRepository {
 }
 
 export class AuthorizedAgentRunRepositoryImpl
-  extends AuthorizedRepository<AgentRun>
+  extends AuthorizedScope
   implements AuthorizedAgentRunRepository
 {
   constructor(

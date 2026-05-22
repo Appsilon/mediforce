@@ -5,7 +5,7 @@ import type {
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 import { filterByParentNamespace } from './indirect-namespace.js';
 
 /**
@@ -30,7 +30,7 @@ export interface AuthorizedHandoffRepository {
 }
 
 export class AuthorizedHandoffRepositoryImpl
-  extends AuthorizedRepository<HandoffEntity>
+  extends AuthorizedScope
   implements AuthorizedHandoffRepository
 {
   constructor(

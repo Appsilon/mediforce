@@ -1,5 +1,5 @@
 import type { CallerIdentity } from '../auth.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Minimal namespace-secret store the wrapper depends on. Declared structurally
@@ -28,7 +28,7 @@ export interface AuthorizedWorkspaceSecretRepository {
 }
 
 export class AuthorizedWorkspaceSecretRepositoryImpl
-  extends AuthorizedRepository<never>
+  extends AuthorizedScope
   implements AuthorizedWorkspaceSecretRepository
 {
   constructor(

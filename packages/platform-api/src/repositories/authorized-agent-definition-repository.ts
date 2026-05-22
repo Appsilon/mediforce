@@ -6,7 +6,7 @@ import type {
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
 import { NotFoundError } from '../errors.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace + visibility-scoped view of `AgentDefinitionRepository`. Mirrors
@@ -23,7 +23,7 @@ export interface AuthorizedAgentDefinitionRepository {
 }
 
 export class AuthorizedAgentDefinitionRepositoryImpl
-  extends AuthorizedRepository<AgentDefinition>
+  extends AuthorizedScope
   implements AuthorizedAgentDefinitionRepository
 {
   constructor(

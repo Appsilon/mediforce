@@ -7,7 +7,7 @@ import type {
 import type { ListInstancesOptions } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace-scoped view of `ProcessInstanceRepository`.
@@ -31,7 +31,7 @@ export interface AuthorizedWorkflowRunRepository {
 }
 
 export class AuthorizedWorkflowRunRepositoryImpl
-  extends AuthorizedRepository<ProcessInstance>
+  extends AuthorizedScope
   implements AuthorizedWorkflowRunRepository
 {
   constructor(
@@ -41,35 +41,44 @@ export class AuthorizedWorkflowRunRepositoryImpl
     super(caller);
   }
 
-  getById = async (id: string): Promise<ProcessInstance | null> =>
-    this.gate(await this.raw.getById(id));
+  getById = async (id: string): Promise<ProcessInstance | null> => {
+    const run = await this.raw.getById(id);
+    return run !== null && this.canSeeNamespace(run.namespace) ? run : null;
+  };
 
   list = async (options: ListInstancesOptions): Promise<ProcessInstance[]> =>
-    this.filter(await this.raw.list(options));
+    this.filterByNamespace(await this.raw.list(options));
 
   getByStatus = async (status: InstanceStatus): Promise<ProcessInstance[]> =>
-    this.filter(await this.raw.getByStatus(status));
+    this.filterByNamespace(await this.raw.getByStatus(status));
 
   getByDefinition = async (name: string, version: string): Promise<ProcessInstance[]> =>
-    this.filter(await this.raw.getByDefinition(name, version));
+    this.filterByNamespace(await this.raw.getByDefinition(name, version));
 
   /** Step executions belong to the parent run; gating is on the parent. */
   getStepExecutions = async (id: string): Promise<StepExecution[]> => {
     const run = await this.raw.getById(id);
-    if (!this.canSee(run)) return [];
+    if (run === null || !this.canSeeNamespace(run.namespace)) return [];
     return this.raw.getStepExecutions(id);
   };
 
   getLatestStepExecution = async (id: string, stepId: string): Promise<StepExecution | null> => {
     const run = await this.raw.getById(id);
-    if (!this.canSee(run)) return null;
+    if (run === null || !this.canSeeNamespace(run.namespace)) return null;
     return this.raw.getLatestStepExecution(id, stepId);
   };
 
   /** Update is workspace-gated through `getById`. Callers must look up first. */
   update = async (id: string, updates: Partial<ProcessInstance>): Promise<void> => {
     const existing = await this.raw.getById(id);
-    if (!this.canSee(existing)) throw new ForbiddenError();
+    if (existing === null || !this.canSeeNamespace(existing.namespace)) {
+      throw new ForbiddenError();
+    }
     await this.raw.update(id, updates);
   };
+
+  private filterByNamespace(runs: readonly ProcessInstance[]): ProcessInstance[] {
+    if (this.caller.kind === 'apiKey') return [...runs];
+    return runs.filter((run) => this.canSeeNamespace(run.namespace));
+  }
 }

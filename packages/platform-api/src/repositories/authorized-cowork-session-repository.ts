@@ -4,7 +4,7 @@ import type {
   ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace-scoped cowork sessions. Namespace is reached via the parent
@@ -18,7 +18,7 @@ export interface AuthorizedCoworkSessionRepository {
 }
 
 export class AuthorizedCoworkSessionRepositoryImpl
-  extends AuthorizedRepository<CoworkSession>
+  extends AuthorizedScope
   implements AuthorizedCoworkSessionRepository
 {
   constructor(

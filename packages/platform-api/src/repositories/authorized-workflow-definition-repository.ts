@@ -4,7 +4,7 @@ import type {
   WorkflowDefinitionGroup,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace + visibility-scoped view of `ProcessRepository`'s workflow-
@@ -29,7 +29,7 @@ export interface AuthorizedWorkflowDefinitionRepository {
 }
 
 export class AuthorizedWorkflowDefinitionRepositoryImpl
-  extends AuthorizedRepository<WorkflowDefinition>
+  extends AuthorizedScope
   implements AuthorizedWorkflowDefinitionRepository
 {
   constructor(

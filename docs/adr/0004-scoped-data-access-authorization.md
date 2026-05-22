@@ -90,7 +90,8 @@ visible to handlers.
    the system actor and continue to take raw repositories. Authorization
    for system code is god-mode-by-design, audited via `AuditEvent`.
 7. **Caller-set scope, not singular workspace.** The base class
-   `AuthorizedRepository` filters `workspace IN caller.workspaces` (or
+   `AuthorizedScope` exposes a `canSeeNamespace` predicate so wrappers
+   filter `workspace IN caller.workspaces` (or
    unrestricted for `caller.kind === 'apiKey'`). This is a small reshape of
    [ADR-0001](./0001-firestore-to-postgres.md) sec. 2.1, whose sketch took a
    singular `workspace: string`. The reshape matches both today's
@@ -171,10 +172,14 @@ visible to handlers.
 - ADR-0001 implementation simplifies: the Postgres backend swap touches
   `packages/platform-infra/src/postgres/`; the wrapper layer in
   `packages/platform-api/src/repositories/` is unchanged. The
-  `AuthorizedRepository<TRow>` base class lives in `platform-infra` (per
-  ADR-0001 sec. 2.1, reshaped to take a `CallerIdentity` instead of a
-  singular workspace); the wrappers in `platform-api` consume it via the
-  raw repo interface from `platform-core`.
+  `AuthorizedScope` base class (formerly `AuthorizedRepository<TRow>` in
+  spec) lives in `platform-api` next to the wrappers, reshaped to take a
+  `CallerIdentity` instead of a singular workspace; wrappers consume the
+  raw repo interface from `platform-core`. The entity-shaped helpers
+  (`<T>`, `namespaceOf`, `gate`, `filter`) that the spec sketched on the
+  base are inlined at the single direct-entity wrapper today
+  (`AuthorizedWorkflowRunRepository`); re-extract when a second direct-
+  entity wrapper appears.
 - `CallerIdentity` is unchanged by this ADR. ADR-0002's NextAuth landing
   expands it (per-workspace roles, membership level) and the wrapper layer
   inherits the new shape with no change.
@@ -208,17 +213,16 @@ visible to handlers.
 - **Wrapper layer placement: `platform-api/src/repositories/` vs a new
   `platform-authz` package.** Defaulting to `platform-api/`. Confirm in PR
   review.
-- **`AuthorizedRepository<TRow>` base class location.** ADR-0001 sec. 2.1
-  places it in `packages/platform-infra/src/postgres/repositories/`. The
-  Firestore-era equivalent for this ADR's introduction belongs in
-  `packages/platform-infra/src/firestore/` (next to the raw repos) so the
-  Postgres swap is purely additive. Confirm.
+- **`AuthorizedScope` base class location.** Lives in
+  `packages/platform-api/src/repositories/` next to the wrappers; the
+  Postgres swap is additive (raw repos move; wrapper layer unchanged).
+  Resolved.
 - **Reshape ADR-0001 sec. 2.1 to caller-set scope.** Proposed patch:
   `WorkspaceScopedRepository(db, table, workspace: string)` →
-  `AuthorizedRepository(db, table, caller: CallerIdentity)` with default
-  `scoped() ⇒ WHERE workspace IN caller.workspaces (or unrestricted for
-  apiKey)` and an opt-in `scopedTo(handle)` for URL-driven flows. Confirm
-  before ADR-0001 implementation begins.
+  base class taking a `CallerIdentity` instead of a singular workspace,
+  with default `scoped() ⇒ WHERE workspace IN caller.workspaces (or
+  unrestricted for apiKey)` and an opt-in `scopedTo(handle)` for
+  URL-driven flows. Confirm before ADR-0001 implementation begins.
 - **Combined PR vs split.** Proposed: a single PR that rewrites PR #450's
   10 GET handlers, adds the wrapper layer, and lands Phase 2 mutations
   (~600 LOC, mechanical). Confirm in PR review that the size is

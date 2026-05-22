@@ -3,7 +3,7 @@ import type {
   AgentOAuthTokenRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace-scoped storage of per-agent OAuth tokens. Namespace is path
@@ -29,7 +29,7 @@ export interface AuthorizedAgentOAuthTokenRepository {
 }
 
 export class AuthorizedAgentOAuthTokenRepositoryImpl
-  extends AuthorizedRepository<AgentOAuthToken>
+  extends AuthorizedScope
   implements AuthorizedAgentOAuthTokenRepository
 {
   constructor(

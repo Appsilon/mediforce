@@ -5,7 +5,7 @@ import type {
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 import { filterByParentNamespace } from './indirect-namespace.js';
 
 /**
@@ -25,7 +25,7 @@ export interface AuthorizedHumanTaskRepository {
 }
 
 export class AuthorizedHumanTaskRepositoryImpl
-  extends AuthorizedRepository<HumanTask>
+  extends AuthorizedScope
   implements AuthorizedHumanTaskRepository
 {
   constructor(

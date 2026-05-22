@@ -5,7 +5,7 @@ import type {
   UpdateOAuthProviderInput,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { AuthorizedRepository } from './authorized-repository.js';
+import { AuthorizedScope } from './authorized-repository.js';
 
 /**
  * Workspace-scoped OAuth provider configs. Namespace is path-prefix on every
@@ -24,7 +24,7 @@ export interface AuthorizedOAuthProviderRepository {
 }
 
 export class AuthorizedOAuthProviderRepositoryImpl
-  extends AuthorizedRepository<OAuthProviderConfig>
+  extends AuthorizedScope
   implements AuthorizedOAuthProviderRepository
 {
   constructor(
