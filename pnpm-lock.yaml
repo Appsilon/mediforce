@@ -96,7 +96,7 @@ importers:
         version: link:../platform-core
       firebase-admin:
         specifier: ^13.6.1
-        version: 13.9.0
+        version: 13.10.0
     devDependencies:
       '@types/node':
         specifier: ^24.12.2
@@ -252,7 +252,7 @@ importers:
         version: 12.13.0
       firebase-admin:
         specifier: ^13.6.1
-        version: 13.9.0
+        version: 13.10.0
     devDependencies:
       '@types/node':
         specifier: ^24.12.2
@@ -382,7 +382,7 @@ importers:
         version: 12.13.0
       firebase-admin:
         specifier: ^13.6.1
-        version: 13.9.0
+        version: 13.10.0
       ioredis:
         specifier: ^5.10.1
         version: 5.10.1
@@ -2681,8 +2681,8 @@ packages:
     resolution: {integrity: sha512-S8KoZgRZN+a5rNwqTxlZZePjT/4cnm0ROV70LedRHZ0p8u9fRID0hJUZQpkKLzro8LfmC8sx23bY6tVNxv8pQA==}
     engines: {node: '>= 18.0.0'}
 
-  firebase-admin@13.9.0:
-    resolution: {integrity: sha512-qiCVBBFH+kfLiCXuuE9eAbBQSckPuA43fbQ/MNvQfd9nZcHFQExmQICD/N0sZrNZDNy8FSywhjFzJJGVQzG5UA==}
+  firebase-admin@13.10.0:
+    resolution: {integrity: sha512-rbuCrJvYRwqBqvbccMS8fj/x2zsaMisdf5RQbRzQzr14Rbq9r2UlpuBHqWAwrO6c9dIRF56xF/xoepXsD5yDuQ==}
     engines: {node: '>=18'}
 
   firebase@12.13.0:
@@ -3196,10 +3196,6 @@ packages:
     resolution: {integrity: sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
-  node-forge@1.4.0:
-    resolution: {integrity: sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==}
-    engines: {node: '>= 6.13.0'}
-
   node-gyp-build-optional-packages@5.2.2:
     resolution: {integrity: sha512-s+w+rBWnpTMwSFbaE0UXsRlg7hU4FjekKU4eyAih5T8nJuNZT1nNsskXpxmeqSK9UzkBl6UgRlnKc8hz8IEqOw==}
     hasBin: true
@@ -3639,10 +3635,6 @@ packages:
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
-
-  uuid@11.1.1:
-    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
-    hasBin: true
 
   uuid@8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
@@ -6091,7 +6083,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  firebase-admin@13.9.0:
+  firebase-admin@13.10.0:
     dependencies:
       '@fastify/busboy': 3.2.0
       '@firebase/database-compat': 2.1.4
@@ -6101,8 +6093,6 @@ snapshots:
       google-auth-library: 10.6.2
       jsonwebtoken: 9.0.3
       jwks-rsa: 3.2.2
-      node-forge: 1.4.0
-      uuid: 11.1.1
     optionalDependencies:
       '@google-cloud/firestore': 7.11.6
       '@google-cloud/storage': 7.19.0
@@ -6694,8 +6684,6 @@ snapshots:
       fetch-blob: 3.2.0
       formdata-polyfill: 4.0.10
 
-  node-forge@1.4.0: {}
-
   node-gyp-build-optional-packages@5.2.2:
     dependencies:
       detect-libc: 2.1.2
@@ -7163,8 +7151,6 @@ snapshots:
 
   util-deprecate@1.0.2:
     optional: true
-
-  uuid@11.1.1: {}
 
   uuid@8.3.2:
     optional: true
