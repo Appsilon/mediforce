@@ -189,17 +189,33 @@ visible to handlers.
   signature does not expose raw repositories." That's a one-line answer
   to a compliance reviewer's "how do you prevent cross-tenant data leaks
   at the API layer?".
-- **Storage-layer filter, today.** Raw repository interfaces declare paired
-  methods — one unscoped (`listAll`, `getById`, …) for system actors and one
-  namespace-scoped (`listInNamespaces`, `getByIdInNamespaces`,
-  `listVisibleTo`, …) for user callers. The Firestore-era implementation
-  filters in-memory inside the raw repo. The wrapper layer in
-  `platform-api/src/repositories/` is a pure router: `caller.isSystemActor`
-  picks the variant. A handler cannot accidentally call the unscoped
-  variant from a user-caller branch — the type system forces an explicit
-  choice at the wrapper, and the static guard already forbids reaching the
-  raw repo directly. The Postgres-era impl pushes the filter into
-  `WHERE namespace = ANY($)` without changing the interface or the wrapper.
+- **Storage-layer filter for reads; wrapper-side gate for writes.** Raw
+  repository interfaces declare paired read methods — one unscoped
+  (`listAll`, `getById`, …) for system actors and one namespace-scoped
+  (`listInNamespaces`, `getByIdInNamespaces`, `listVisibleTo`, …) for user
+  callers. The Firestore-era impl filters in-memory inside the raw repo.
+  The wrapper layer in `platform-api/src/repositories/` is a pure router
+  for reads: `caller.isSystemActor` picks the variant. A handler cannot
+  accidentally call the unscoped variant from a user-caller branch — the
+  type system forces an explicit choice at the wrapper, and the static
+  guard already forbids reaching the raw repo directly. The Postgres-era
+  impl pushes the read filter into `WHERE namespace = ANY($)` without
+  changing the interface or the wrapper.
+
+  **Writes are asymmetric on purpose.** Path-prefix writes (Secrets,
+  ToolCatalog, OAuth*) take the namespace as a method argument, so there
+  is no `xxxAll` / `xxxInNamespaces` to pair — there is exactly one
+  shape: "write to this namespace". The raw repo stays caller-agnostic
+  (engine, cron, agent-runner, container-worker all `put(namespace, …)`
+  without a caller in hand). The wrapper enforces the gate before
+  delegating, via `assertNamespaceWrite(namespace)` on `AuthorizedScope`.
+  Pushing the gate into the raw repo would require every system caller
+  to construct or pass a caller identity (or a special "system" sentinel)
+  on every write — same complication, no benefit. The asymmetry mirrors
+  the asymmetry of reads vs writes: reads have a query shape that can
+  filter; writes target a single namespace and the question is binary.
+  ADR-0001's Postgres-era base class folds both sides into one (it takes
+  `caller` per request), at which point the asymmetry disappears.
 
 ## Out of scope
 
