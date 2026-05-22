@@ -218,3 +218,41 @@ export async function completeUploadTask(
     };
   }
 }
+
+// --------------------------------------------------------------------------
+// completeAssignmentTask — submit per-item assignments for an assignment-table
+// human task. The dispatch step downstream consumes `stepOutput.assignments`.
+// --------------------------------------------------------------------------
+interface AssignmentPayload {
+  assignments: Array<{
+    itemId: string;
+    assigneeId: string;
+    assigneeKind: 'human' | 'agent';
+    priority: string;
+    note?: string;
+    raw?: Record<string, unknown>;
+  }>;
+}
+
+export async function completeAssignmentTask(
+  taskId: string,
+  payload: AssignmentPayload,
+  idToken: string = '',
+): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireUserId(idToken);
+  if ('error' in auth) return { success: false, error: auth.error };
+  const { uid } = auth;
+
+  try {
+    const result = await resolveTask(taskId, { assignments: payload.assignments }, uid);
+    if (isResolveError(result)) {
+      return { success: false, error: result.error };
+    }
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
+}

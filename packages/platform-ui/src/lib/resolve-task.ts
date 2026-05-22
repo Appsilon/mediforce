@@ -65,6 +65,7 @@ export async function resolveTask(
 
   const actorId = resolvedTask.assignedUserId ?? userId ?? 'api-user';
   const isFileUpload = resolvedTask.ui?.component === 'file-upload';
+  const isAssignmentTable = resolvedTask.ui?.component === 'assignment-table';
   const isParamsTask =
     Array.isArray(resolvedTask.params) && resolvedTask.params.length > 0;
 
@@ -73,6 +74,13 @@ export async function resolveTask(
     const validationError = validateFileUploadBody(body, resolvedTask);
     if (validationError) {
       return { error: validationError, httpStatus: 400 };
+    }
+  } else if (isAssignmentTable) {
+    if (!Array.isArray(body.assignments)) {
+      return {
+        error: 'assignments array required for assignment-table task',
+        httpStatus: 400,
+      };
     }
   } else if (isParamsTask) {
     if (!body.paramValues || typeof body.paramValues !== 'object') {
@@ -140,6 +148,10 @@ export async function resolveTask(
 
     completionData = { files, completedBy: actorId, completedAt: now };
     stepOutput = { files };
+  } else if (isAssignmentTable) {
+    const assignments = body.assignments as Array<Record<string, unknown>>;
+    completionData = { assignments, completedBy: actorId, completedAt: now };
+    stepOutput = { assignments };
   } else if (isParamsTask) {
     const paramValues = body.paramValues as Record<string, unknown>;
     completionData = { paramValues, completedBy: actorId, completedAt: now };
@@ -261,22 +273,26 @@ export async function resolveTask(
     action: 'task.completed',
     description: isFileUpload
       ? `Task '${taskId}' resolved with ${(body.attachments as Attachment[]).length} file(s) for step '${resolvedTask.stepId}'`
-      : isParamsTask
-        ? `Task '${taskId}' resolved with param values for step '${resolvedTask.stepId}'`
-        : `Task '${taskId}' resolved with verdict '${body.verdict}' for step '${resolvedTask.stepId}'`,
+      : isAssignmentTable
+        ? `Task '${taskId}' resolved with ${(body.assignments as unknown[]).length} assignment(s) for step '${resolvedTask.stepId}'`
+        : isParamsTask
+          ? `Task '${taskId}' resolved with param values for step '${resolvedTask.stepId}'`
+          : `Task '${taskId}' resolved with verdict '${body.verdict}' for step '${resolvedTask.stepId}'`,
     timestamp: now,
     inputSnapshot: {
       taskId,
       stepId: resolvedTask.stepId,
       ...(isFileUpload
         ? { fileCount: (body.attachments as Attachment[]).length }
-        : isParamsTask
-          ? {
-              paramKeys: Object.keys(
-                body.paramValues as Record<string, unknown>,
-              ),
-            }
-          : { verdict: body.verdict }),
+        : isAssignmentTable
+          ? { assignmentCount: (body.assignments as unknown[]).length }
+          : isParamsTask
+            ? {
+                paramKeys: Object.keys(
+                  body.paramValues as Record<string, unknown>,
+                ),
+              }
+            : { verdict: body.verdict }),
     },
     outputSnapshot: { status: 'completed', completionData },
     basis: 'Task resolved via API',
