@@ -18,6 +18,7 @@
       "name": "repo",
       "type": "string",
       "required": true,
+      "default": "appsilon/mediforce",
       "description": "owner/repo to triage (e.g. appsilon/mediforce)"
     },
     {
