@@ -11,6 +11,14 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Added
+- Backlog triage workflow (`apps/backlog-triage/`) — fetches open GitHub issues, an LLM suggests assignments (human or AI workflow) with priority and rationale, a triager reviews and edits in a table, then dispatch PATCHes GitHub and POSTs the Mediforce process-start API for agent delegations.
+- `assignment-table` human-task UI for many-to-one item assignment with per-row assignee/priority/note. Items flow via `task.options` from the previous step; the assignee allowlist and labels live in `task.ui.config`.
+
+### Changed
+- Human-task body rendering now routes through a small registry (`task-body-registry.tsx`) keyed on `ui.component`, with file-upload/selection/params/verdict extracted into focused view files. Adding a new task body kind is a one-line registry entry.
+- Workflow engine copies `prevOutput.options` onto the next human task regardless of whether the next step declares `selection`, so non-selection components (like `assignment-table`) consume the items array. Selection-style steps keep the min-count validation; existing apps unaffected.
+
 ### Removed
 - Duplicate Python migration script `scripts/migrations/migrate_workflow_doc_ids.py` — superseded by the TypeScript `packages/platform-infra/scripts/migrate-workflow-namespacing.ts` which is the canonical version ([#424](https://github.com/Appsilon/mediforce/pull/424)).
 

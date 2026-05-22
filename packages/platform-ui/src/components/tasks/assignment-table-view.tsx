@@ -51,25 +51,20 @@ interface SubmittedAssignment {
   raw?: Record<string, unknown>;
 }
 
-export function AssignmentTableView({ task, remainingTaskCount }: TaskBodyProps) {
+export function AssignmentTableView({ task }: TaskBodyProps) {
   const isActionable = task.status === 'claimed' || task.status === 'pending';
   const isCompleted = task.status === 'completed';
 
   if (isActionable) {
-    return <AssignmentTableForm task={task} remainingTaskCount={remainingTaskCount} />;
+    return <AssignmentTableForm task={task} />;
   }
   if (isCompleted && task.completionData) {
-    return (
-      <AssignmentTableConfirmation
-        completionData={task.completionData}
-        remainingTaskCount={remainingTaskCount}
-      />
-    );
+    return <AssignmentTableConfirmation completionData={task.completionData} />;
   }
   return null;
 }
 
-function AssignmentTableForm({ task }: TaskBodyProps) {
+function AssignmentTableForm({ task }: { task: TaskBodyProps['task'] }) {
   const { firebaseUser } = useAuth();
   const items = (task.options ?? []) as unknown as AssignmentItem[];
   const config = (task.ui?.config ?? {}) as Record<string, unknown>;
@@ -333,7 +328,6 @@ function AssignmentTableConfirmation({
   completionData,
 }: {
   completionData: Record<string, unknown>;
-  remainingTaskCount?: number;
 }) {
   const assignments = (completionData.assignments as SubmittedAssignment[] | undefined) ?? [];
   const completedAt = completionData.completedAt as string | undefined;
