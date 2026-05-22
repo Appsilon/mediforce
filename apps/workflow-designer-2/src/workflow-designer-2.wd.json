@@ -37,6 +37,7 @@
       "autonomyLevel": "L3",
       "plugin": "claude-code-agent",
       "agent": {
+        "image": "mediforce-golden-image",
         "skill": "generate-steps",
         "skillsDir": "apps/workflow-designer-2/plugins/workflow-designer-2/skills",
         "model": "sonnet",
