@@ -51,6 +51,11 @@
       "plugin": "claude-code-agent",
       "autonomyLevel": "L4",
       "description": "LLM enriches each issue with a suggested assignee, priority, and one-sentence rationale.",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
       "agent": {
         "image": "mediforce-golden-image:latest",
         "model": "sonnet",
