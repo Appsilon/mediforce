@@ -38,4 +38,4 @@ Sequential, zero-padded to four digits (`0001`, `0002`, …). Never reuse a numb
 
 - [0001 — Move primary datastore from Firestore to self-hosted Postgres](./0001-firestore-to-postgres.md) (+ [PLAN](./PLAN-0001.md))
 - [0002 — Move authentication from Firebase Auth to NextAuth (Auth.js v5)](./0002-firebase-auth-to-nextauth.md) (+ [PLAN](./PLAN-0002.md))
-- [0004 — Authorization enforcement moves to a scoped data-access layer](./0004-scoped-data-access-authorization.md) (+ [PLAN](./PLAN-0004.md))
+- [0004 — Authorization enforcement moves to a scoped data-access layer](./0004-scoped-data-access-authorization.md)

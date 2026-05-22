@@ -1,9 +1,10 @@
 # 0004 — Authorization enforcement moves to a scoped data-access layer
 
-- **Status:** Proposed
-- **Date:** 2026-05-21
+- **Status:** Accepted
+- **Date:** 2026-05-22
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)
+- **Implementation:** [PR #463](https://github.com/Appsilon/mediforce/pull/463)
 - **Relates to:** Supersedes (architecturally) the handler-resident decision from
   PR #450; brings forward [ADR-0001](./0001-firestore-to-postgres.md)
   invariant 3 (`WorkspaceScopedRepository` base class) into the Firestore era
