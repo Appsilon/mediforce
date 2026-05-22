@@ -109,11 +109,29 @@ visible to handlers.
    `@mediforce/platform-core/interfaces` or `@mediforce/platform-infra`.
    The TypeScript handler signature already forbids it; the test is
    belt-and-suspenders against bypass.
-10. **One follow-up PR delivers it all.** That PR rewrites the 10 GET
-    handlers from PR #450 (mechanical, ~5 LOC each), adds the wrapper
-    layer (~300 LOC), and lands Phase 2 mutations on top. Total
-    ~600 LOC, one coherent pattern in the codebase at every commit
-    boundary.
+10. **Trivial handlers are deleted, not kept as one-line pass-throughs.**
+    A handler whose body reduces to `return { items: await scope.X.list() }`
+    or `const x = await scope.X.getById(id); if (!x) throw NotFoundError;
+    return x;` carries no decision the wrapper hasn't already taken. The
+    route adapter exposes two generic, fully-typed helpers — `listAdapter`
+    and `getByIdAdapter` — that bind directly to a scope-bound repository
+    method; the route file wires them with the contract schemas. A
+    handler file is justified only when one of the following holds:
+    (a) cross-entity load (`get-cowork-session-by-instance`,
+    `get-process-steps`),
+    (b) non-workspace authorization — role, ownership, lifecycle state
+    (`claim`, `complete`, `cancel`, `resolve`),
+    (c) shape transform beyond a single envelope key,
+    (d) `@public-handler` rationale that needs review-visible justification.
+    Under this rule, several PR #450 GET handlers
+    (`listAgentDefinitions`, `listWorkflowDefinitions`,
+    `listAuditEvents`, `listPlugins`, and the `getX` family once
+    `NotFoundError` mapping lives in `getByIdAdapter`) disappear in the
+    rewrite rather than being rewritten. The remaining handlers
+    (`get-process-steps`, both cowork lookups, all Phase 2 mutations)
+    keep their files because they meet (a)–(d). The static guard
+    (decision 9) covers the adapter helpers too: neither route files
+    nor adapter call sites may import raw repositories.
 
 ## Considered alternatives
 
@@ -154,8 +172,10 @@ visible to handlers.
 
 ## Consequences
 
-- One handler signature for the whole HTTP API surface
-  (`(input, scope) => Promise<Output>`). Phase 2 onwards builds on it.
+- Handlers that survive the rewrite share one signature
+  (`(input, scope) => Promise<Output>`); trivial reads have no handler
+  file at all and the route wires `listAdapter` / `getByIdAdapter`
+  directly. Phase 2 onwards builds on the same convention.
 - The static guard becomes a single, structural assertion ("no raw repo
   imports from handlers") instead of a regex menu of acceptable markers.
 - A handler that needs to express a public/system endpoint does so by
@@ -219,7 +239,3 @@ visible to handlers.
   `scoped() ⇒ WHERE workspace IN caller.workspaces (or unrestricted for
   apiKey)` and an opt-in `scopedTo(handle)` for URL-driven flows. Confirm
   before ADR-0001 implementation begins.
-- **Combined PR vs split.** Proposed: a single PR that rewrites PR #450's
-  10 GET handlers, adds the wrapper layer, and lands Phase 2 mutations
-  (~600 LOC, mechanical). Confirm in PR review that the size is
-  reviewable.
