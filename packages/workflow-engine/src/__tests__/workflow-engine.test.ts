@@ -867,6 +867,57 @@ describe('WorkflowEngine', () => {
         ),
       ).rejects.toThrow(/options/);
     });
+
+    it('copies options to HumanTask even when next step has no selection (e.g. assignment-table)', async () => {
+      const humanTaskRepo = new InMemoryHumanTaskRepository();
+      const tableEngine = new WorkflowEngine(
+        processRepo, instanceRepo, auditRepo, undefined, undefined, undefined,
+        humanTaskRepo,
+      );
+
+      const tableDef: WorkflowDefinition = {
+        name: 'assignment-process',
+        version: 1,
+        namespace: 'test',
+        visibility: 'private',
+        steps: [
+          { id: 'fetch', name: 'Fetch', type: 'creation', executor: 'agent' },
+          {
+            id: 'assign',
+            name: 'Assign',
+            type: 'creation',
+            executor: 'human',
+            allowedRoles: ['triager'],
+            ui: { component: 'assignment-table', config: { assignees: [{ id: 'a', label: 'A', kind: 'human' }] } },
+          },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [
+          { from: 'fetch', to: 'assign' },
+          { from: 'assign', to: 'done' },
+        ],
+        triggers: [{ type: 'manual', name: 'Start' }],
+      };
+      await processRepo.saveWorkflowDefinition(tableDef);
+
+      const instance = await tableEngine.createInstance('test',
+        'assignment-process', 1, 'user-1', 'manual', {},
+      );
+      await tableEngine.startInstance(instance.id);
+      await tableEngine.advanceStep(
+        instance.id,
+        { options: [{ id: '101', label: '#101' }, { id: '102', label: '#102' }] },
+        { id: 'user-1', role: 'operator' },
+      );
+
+      const tasks = humanTaskRepo.getAll();
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].selection).toBeUndefined();
+      expect(tasks[0].options).toEqual([
+        { id: '101', label: '#101' },
+        { id: '102', label: '#102' },
+      ]);
+    });
   });
 });
 

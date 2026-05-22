@@ -718,3 +718,139 @@ describe('POST /api/tasks/:taskId/resolve — file-upload', () => {
     );
   });
 });
+
+// ---- Assignment table resolution ----
+
+describe('POST /api/tasks/:taskId/resolve — assignment-table', () => {
+  const claimedAssignmentTask = {
+    id: 'task-3',
+    processInstanceId: 'inst-1',
+    stepId: 'assign',
+    assignedRole: 'triager',
+    assignedUserId: 'user-1',
+    status: 'claimed',
+    completionData: null,
+    ui: {
+      component: 'assignment-table',
+      config: {
+        assignees: [
+          { id: 'filip', label: 'Filip', kind: 'human' },
+          { id: 'fullstack-agent', label: 'Fullstack agent', kind: 'agent' },
+        ],
+      },
+    },
+    options: [
+      { id: '101', label: '#101', raw: { issueNumber: 101 } },
+      { id: '102', label: '#102', raw: { issueNumber: 102 } },
+    ],
+    createdAt: '2026-05-22T10:00:00Z',
+    updatedAt: '2026-05-22T10:00:00Z',
+  };
+
+  const validAssignments = [
+    {
+      itemId: '101',
+      assigneeId: 'filip',
+      assigneeKind: 'human' as const,
+      priority: 'P1',
+      raw: { issueNumber: 101 },
+    },
+    {
+      itemId: '102',
+      assigneeId: 'fullstack-agent',
+      assigneeKind: 'agent' as const,
+      priority: 'P2',
+      note: 'autonomous candidate',
+      raw: { issueNumber: 102 },
+    },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockInstanceGetById.mockResolvedValue(pausedInstance);
+    mockInstanceUpdate.mockResolvedValue(undefined);
+    mockAdvanceStep.mockResolvedValue(advancedInstance);
+    mockComplete.mockResolvedValue({ ...claimedAssignmentTask, status: 'completed' });
+  });
+
+  it('[DATA] resolves an assignment-table task and passes assignments to advanceStep', async () => {
+    mockGetById.mockResolvedValue(claimedAssignmentTask);
+    mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(advancedInstance);
+
+    const res = await POST(
+      makeRequest('task-3', { assignments: validAssignments }),
+      { params: makeParams('task-3') },
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.ok).toBe(true);
+
+    const stepOutput = mockAdvanceStep.mock.calls[0][1] as Record<string, unknown>;
+    expect(stepOutput.assignments).toEqual(validAssignments);
+    expect(stepOutput.verdict).toBeUndefined();
+  });
+
+  it('[DATA] completionData includes assignments plus actor metadata', async () => {
+    mockGetById.mockResolvedValue(claimedAssignmentTask);
+    mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(advancedInstance);
+
+    await POST(
+      makeRequest('task-3', { assignments: validAssignments }),
+      { params: makeParams('task-3') },
+    );
+
+    const completionArg = mockComplete.mock.calls[0][1] as Record<string, unknown>;
+    expect(completionArg.assignments).toEqual(validAssignments);
+    expect(completionArg.completedBy).toBeDefined();
+    expect(completionArg.completedAt).toBeDefined();
+  });
+
+  it('[ERROR] returns 400 when assignments missing', async () => {
+    mockGetById.mockResolvedValue(claimedAssignmentTask);
+
+    const res = await POST(
+      makeRequest('task-3', {}),
+      { params: makeParams('task-3') },
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('assignments');
+  });
+
+  it('[ERROR] returns 400 when assignments is not an array', async () => {
+    mockGetById.mockResolvedValue(claimedAssignmentTask);
+
+    const res = await POST(
+      makeRequest('task-3', { assignments: 'nope' }),
+      { params: makeParams('task-3') },
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('[DATA] accepts empty assignments array (everything skipped)', async () => {
+    mockGetById.mockResolvedValue(claimedAssignmentTask);
+    mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(advancedInstance);
+
+    const res = await POST(
+      makeRequest('task-3', { assignments: [] }),
+      { params: makeParams('task-3') },
+    );
+
+    expect(res.status).toBe(200);
+    const stepOutput = mockAdvanceStep.mock.calls[0][1] as Record<string, unknown>;
+    expect(stepOutput.assignments).toEqual([]);
+  });
+});
