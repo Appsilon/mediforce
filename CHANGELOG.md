@@ -12,6 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Added
+- AFK developer workflow (`apps/mediforce-ai-developer/`) — picks the next open issue on `Appsilon/mediforce` labeled `mediforce-ai-developer`, implements it TDD-style per `AGENTS.md`, opens a PR via GitHub MCP, posts an automated `/code-review` comment on the PR, and addresses blocker/major findings on the same branch before stopping. Sequential by design (workflow-level singleton via `/api/runs?status=running` + per-issue `mediforce-ai-in-progress` label lock); never merges or closes. Inspired by sandcastle's `parallel-planner-with-review`, simplified to one issue per run.
 - Backlog triage workflow (`apps/backlog-triage/`) — fetches open GitHub issues, an LLM suggests assignments (human or AI workflow) with priority and rationale, a triager reviews and edits in a table, then dispatch PATCHes GitHub and POSTs the Mediforce process-start API for agent delegations.
 - `assignment-table` human-task UI for many-to-one item assignment with per-row assignee/priority/note. Items flow via `task.options` from the previous step; the assignee allowlist and labels live in `task.ui.config`.
 

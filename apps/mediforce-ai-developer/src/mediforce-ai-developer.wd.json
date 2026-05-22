@@ -1,0 +1,168 @@
+{
+  "name": "mediforce-ai-developer",
+  "namespace": "appsilon",
+  "version": 1,
+  "title": "Mediforce AI Developer (AFK)",
+  "description": "Picks the next open issue on Appsilon/mediforce labeled `mediforce-ai-developer`, implements it (TDD per AGENTS.md), opens a PR, posts an automated code review on the PR, addresses the review on the same branch, and stops. Sequential — only one run at a time (workflow-level singleton + per-issue label lock).",
+  "preamble": "## Why this workflow exists\nDogfooding: Mediforce uses its own platform to drive a small, deterministic 'AFK programmer' against its GitHub backlog. Inspired by the sandcastle `parallel-planner-with-review` template (https://github.com/mattpocock/sandcastle/tree/main/src/templates/parallel-planner-with-review), simplified to a single-issue, single-instance pipeline — no planner, no parallelism, no auto-merge.\n\n## Triggering criteria\nAn issue on `Appsilon/mediforce` enters the queue when it carries the label `mediforce-ai-developer` and does NOT already carry `mediforce-ai-in-progress` (in-progress lock added by this workflow). FIFO by creation time.\n\n## Concurrency\nTwo layers, both must hold:\n1. **Workflow-level singleton** — `check-singleton` queries `GET /api/runs?workflow=mediforce-ai-developer&status=running`. If any other run is active, this run terminates at `skipped`.\n2. **Issue-level lock** — `pick-issue` adds `mediforce-ai-in-progress` to the chosen issue. `cleanup` removes it on exit. If the workflow crashes mid-flight the label stays and a human can remove it.\n\n## No merge, no human reviewer step\nThe workflow does NOT merge the PR. It posts a review comment, addresses it on the same branch, then stops. A human is expected to merge (or close) the PR. Renovate PRs are out of scope here — they get their own workflow.\n\n## Push model\nNo `git push` from `/workspace` (the run worktree's `.git` points at a host-side bare repo). All writes go through the GitHub MCP tools (`create_branch`, `push_files`, `create_pull_request`, `add_issue_comment`).\n\n## Source repo + skills\nThe target repo is mounted at `/workspace` via `workspace.remote: Appsilon/mediforce`. The agent reads `AGENTS.md` / `CLAUDE.md` from that workspace for project conventions (RGR, L3 test floor, KISS, no `any`, CLI > REST).",
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "GITHUB_TOKEN": "{{GITHUB_TOKEN}}",
+    "APP_BASE_URL": "{{APP_BASE_URL}}",
+    "PLATFORM_API_KEY": "{{PLATFORM_API_KEY}}"
+  },
+  "workspace": {
+    "remote": "Appsilon/mediforce",
+    "remoteAuth": "GITHUB_TOKEN"
+  },
+  "triggers": [
+    { "name": "poll-backlog", "type": "cron", "schedule": "*/15 * * * *" },
+    { "name": "manual", "type": "manual" }
+  ],
+  "steps": [
+    {
+      "id": "check-singleton",
+      "name": "Singleton guard",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Query the platform API for other running instances of this workflow. If any exist, terminate at `skipped` — only one AFK developer run at a time.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const baseUrl = process.env.APP_BASE_URL;\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const selfRunId = input.runId || input.instanceId || input._runId;\n  if (!baseUrl || !apiKey) { console.error('APP_BASE_URL or PLATFORM_API_KEY missing'); process.exit(1); }\n  const url = `${baseUrl}/api/runs?workflow=mediforce-ai-developer&status=running&limit=100`;\n  const res = await fetch(url, { headers: { 'X-Api-Key': apiKey, Accept: 'application/json' } });\n  if (!res.ok) { const body = await res.text(); console.error(`runs API ${res.status}: ${body.slice(0,300)}`); process.exit(1); }\n  const data = await res.json();\n  const others = (data.runs || []).filter((r) => r.runId !== selfRunId);\n  const skip = others.length > 0;\n  console.log(`Singleton check: ${others.length} other running run(s) — ${skip ? 'SKIP' : 'PROCEED'}`);\n  writeFileSync('/output/result.json', JSON.stringify({ skip, otherRunIds: others.map((r) => r.runId), summary: skip ? `Another run is active (${others[0].runId}) — skipping.` : 'No other run active — proceeding.' }));\n} catch (err) {\n  console.error('check-singleton crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "skipped",
+      "name": "Skipped (another run active)",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Another mediforce-ai-developer run is already in flight. This run exits without doing anything."
+    },
+    {
+      "id": "pick-issue",
+      "name": "Pick the next issue",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "List open issues on Appsilon/mediforce labeled `mediforce-ai-developer` AND NOT labeled `mediforce-ai-in-progress`. Take the oldest (FIFO). Claim it by adding `mediforce-ai-in-progress`. If no eligible issue, terminate at `no-issue`.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const REPO = 'Appsilon/mediforce';\n  const READY_LABEL = 'mediforce-ai-developer';\n  const LOCK_LABEL = 'mediforce-ai-in-progress';\n  const token = process.env.GITHUB_TOKEN;\n  if (!token) { console.error('GITHUB_TOKEN missing'); process.exit(1); }\n  const ghHeaders = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };\n  const url = new URL(`https://api.github.com/repos/${REPO}/issues`);\n  url.searchParams.set('state', 'open');\n  url.searchParams.set('labels', READY_LABEL);\n  url.searchParams.set('sort', 'created');\n  url.searchParams.set('direction', 'asc');\n  url.searchParams.set('per_page', '50');\n  const res = await fetch(url, { headers: ghHeaders });\n  if (!res.ok) { const body = await res.text(); console.error(`GitHub list issues ${res.status}: ${body.slice(0,300)}`); process.exit(1); }\n  const all = await res.json();\n  const candidates = all.filter((i) => !i.pull_request).filter((i) => !(i.labels || []).some((l) => (typeof l === 'string' ? l : l.name) === LOCK_LABEL));\n  if (candidates.length === 0) {\n    console.log(`No eligible issue (checked ${all.length} with label=${READY_LABEL})`);\n    writeFileSync('/output/result.json', JSON.stringify({ noIssue: true, summary: `No issue ready (label=${READY_LABEL}, not ${LOCK_LABEL}).` }));\n    process.exit(0);\n  }\n  const issue = candidates[0];\n  console.log(`Picked #${issue.number}: ${issue.title}`);\n  const lockRes = await fetch(`https://api.github.com/repos/${REPO}/issues/${issue.number}/labels`, {\n    method: 'POST',\n    headers: { ...ghHeaders, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ labels: [LOCK_LABEL] }),\n  });\n  if (!lockRes.ok) { const body = await lockRes.text(); console.error(`GitHub add lock label ${lockRes.status}: ${body.slice(0,300)}`); process.exit(1); }\n  const slug = (issue.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'task';\n  const branch = `mediforce-ai/issue-${issue.number}-${slug}`;\n  writeFileSync('/output/result.json', JSON.stringify({\n    noIssue: false,\n    repo: REPO,\n    issueNumber: issue.number,\n    issueTitle: issue.title,\n    issueBody: issue.body || '',\n    issueUrl: issue.html_url,\n    issueLabels: (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name)),\n    branch,\n    lockLabel: LOCK_LABEL,\n    summary: `Picked issue #${issue.number} — ${issue.title}. Locked with '${LOCK_LABEL}'.`,\n  }));\n} catch (err) {\n  console.error('pick-issue crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "no-issue",
+      "name": "No issue to work on",
+      "type": "terminal",
+      "executor": "script",
+      "description": "No open issue carries `mediforce-ai-developer` without `mediforce-ai-in-progress`. Nothing to do this tick."
+    },
+    {
+      "id": "implement",
+      "name": "Implement the issue",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "agentId": "WJ1LB0n9e2xGV0guSkvy",
+      "autonomyLevel": "L4",
+      "description": "Read the issue, follow AGENTS.md (RGR, L3 test floor, KISS), implement in /workspace, then push files + open a PR via GitHub MCP. Output {prNumber, prUrl, branch, baseSha, headSha, diff, filesChanged}.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "model": "sonnet",
+        "timeoutMinutes": 60,
+        "prompt": "# Task\n\nYou are the **Mediforce AFK developer**. Implement ONE issue end-to-end, open ONE pull request, and stop. Inspired by the sandcastle `implement-prompt` (https://github.com/mattpocock/sandcastle/tree/main/src/templates/parallel-planner-with-review) — adapted to this codebase's conventions.\n\n## Inputs\n\nThe previous step (`pick-issue`) supplied (in `## Previous Step Outputs`):\n- `repo` — always `Appsilon/mediforce`\n- `issueNumber`, `issueTitle`, `issueBody`, `issueUrl`, `issueLabels`\n- `branch` — pre-computed branch name `mediforce-ai/issue-<n>-<slug>`. Use it verbatim.\n\n## Environment\n\n- `/workspace` is a fresh checkout of `Appsilon/mediforce` on a per-run branch (`run/<runId>`). Read AND edit files here. **You cannot `git push` from `/workspace`** — the worktree's `.git` is not bind-mounted to a pushable remote. All writes to GitHub go through the GitHub MCP tools.\n- Your default toolset includes Bash, Read, Write, Edit, Glob, Grep, the Skill invocation, and the GitHub MCP toolset (`create_branch`, `push_files`, `create_pull_request`, `get_file_contents`, `list_pull_requests`, `add_issue_comment`, etc).\n- `AGENTS.md` and `CLAUDE.md` live at the workspace root. **Read them first.** They are the controlling style/test/CLI conventions for this codebase.\n\n## Execution\n\n1. **Read the issue** — `issueTitle` + `issueBody` are above. If the body references a parent PRD or linked issue, fetch it via the GitHub MCP (`get_issue`).\n2. **Read AGENTS.md** (especially: simplify, RGR test-first, L3 floor, no `any`, CLI > REST). Internalize these — they are not optional.\n3. **Explore** the repo with Glob/Grep/Read to fill context: the package(s) the issue touches, neighbouring tests, related schemas. Don't open files you won't use.\n4. **Decide scope.** The simplest change that solves the actual problem wins. If the issue is ambiguous, pick the narrowest reasonable interpretation; note your interpretation in the PR body.\n5. **Test first (RGR)**. Use the `/new-test` mental model — write the failing test at the lowest level with real signal (L3 is the floor for any feature touching Firestore/middleware/auth). Run it: it must fail for the right reason.\n6. **Implement** until the test passes.\n7. **Refactor** mercilessly. Delete dead code. No comments unless WHY is non-obvious.\n8. **Run typecheck + the relevant tests locally** in `/workspace`:\n   - `pnpm typecheck`\n   - `pnpm test:unit` (full unit suite if change is small; `pnpm vitest run <path>` for targeted)\n   Do not proceed to step 9 unless both are green. If a pre-existing test was already red, note it in the PR body and continue.\n9. **Self-review**: re-read your own diff with the `/self-review` mindset. Is the diff something you'd approve in someone else's PR? If not, iterate.\n10. **Changelog**: add a one-line bullet under `## [Unreleased]` in `CHANGELOG.md` (Keep-a-Changelog category). Skip only for trivial edits.\n\n## Publish\n\nAll GitHub writes use the GitHub MCP, in this order:\n\n1. `create_branch` — `owner=Appsilon, repo=mediforce, branch=<branch>, from_branch=main`. Idempotent — \"already exists\" is fine.\n2. `push_files` — pass every file you changed in `/workspace`, with its FULL new content (not a diff). Commit message: imperative one-liner describing what changed, NOT prefixed with `RALPH:` (that's a sandcastle convention; ours is plain).\n3. `create_pull_request` — `owner=Appsilon, repo=mediforce, base=main, head=<branch>, title=\"<issueTitle>\", draft=false, body=<see below>`.\n4. Capture `number` and `html_url` from the create_pull_request response.\n\n**PR body template:**\n```\nFixes #<issueNumber>\n\n## What\n<one paragraph — what changed and why>\n\n## How\n<bullets — key decisions, test approach, edge cases handled>\n\n## Tests\n- typecheck: PASS\n- unit: PASS (or note specifics)\n- L3 added: <path> (or N/A with reason)\n\n## Notes / open questions\n<anything the reviewer should look at carefully — interpretation choices, follow-ups, blockers>\n\n---\n🤖 Opened by the **Mediforce AI Developer** workflow. The next step in this run will post an automated code review.\n```\n\n## Output\n\nWrite to `${output_dir}/result.json`:\n```json\n{\n  \"success\": true,\n  \"prNumber\": <number>,\n  \"prUrl\": \"<html_url>\",\n  \"branch\": \"<branch>\",\n  \"issueNumber\": <issueNumber>,\n  \"baseSha\": \"<base_sha>\",\n  \"headSha\": \"<head_sha>\",\n  \"diff\": \"<output of `git diff main...HEAD` in /workspace, full unified diff>\",\n  \"filesChanged\": [\"path/a.ts\", \"path/b.ts\"],\n  \"summary\": \"<2 sentences: what was implemented + how it was tested>\"\n}\n```\n\nIf you cannot complete the issue (genuinely blocked — missing capability, ambiguous spec you can't safely narrow, pre-existing breakage you'd need to fix first), write:\n```json\n{ \"success\": false, \"reason\": \"<short, actionable>\", \"issueNumber\": <issueNumber> }\n```\nand stop without opening a PR. The lock label gets cleaned up by the `cleanup` step.\n\n## Hard rules\n\n- ONE issue. Do not touch other issues, do not start follow-up work.\n- Never `git push` — only GitHub MCP `push_files`.\n- Never close the issue. Never merge the PR.\n- No `any` types; English only; no decorative comments.\n- If `pnpm typecheck` or `pnpm test:unit` fails on YOUR changes, fix them before publishing. Do not push red code."
+      }
+    },
+    {
+      "id": "review",
+      "name": "Code review",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L4",
+      "description": "Run the `code-review` skill against the inline diff carried over from `implement`. Sandboxed — no GitHub access. Output a ready-to-post review comment + a hasFindings flag.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "skill": "code-review",
+        "skillsDir": "skills",
+        "model": "sonnet",
+        "timeoutMinutes": 15,
+        "prompt": "## Inputs\n\nThe previous step (`implement`) provided (under `## Previous Step Outputs` → `implement`):\n- `prNumber`, `prUrl`, `branch`, `issueNumber`\n- `diff` — full unified diff of the change\n- `filesChanged`, `summary`\n\nThe `code-review` skill text above explains the review structure and rubric.\n\n## Task\n\nApply the `code-review` skill to the diff. Be honest. Focus on correctness, hidden assumptions, test gaps, security (input validation, secret leakage, injection), and adherence to AGENTS.md (no `any`, KISS, L3 test floor, English, no decorative comments).\n\n## Output\n\nWrite to `${output_dir}/result.json`:\n```json\n{\n  \"review_comment\": \"<markdown — see header rules below>\",\n  \"hasFindings\": true | false,\n  \"findings\": [\n    { \"severity\": \"blocker\" | \"major\" | \"minor\" | \"nit\", \"file\": \"<path>\", \"summary\": \"<one sentence>\" }\n  ]\n}\n```\n\n**`hasFindings` semantics**: true if there is at least ONE `blocker` or `major` finding that warrants a code change. Pure `minor`/`nit` issues set `hasFindings: false` — they can be commented but should NOT trigger the address-review step (we don't want infinite polishing loops on style).\n\n**Required header.** The first line of `review_comment` must be exactly:\n\n```\n> 🤖 Automated review by **Mediforce AI Developer** — flag false positives so we can tune the prompt.\n```\n\nFollowed by a blank line, then the review body (Summary / Findings grouped by severity / Verdict). Keep the body tight — bullets, not essays.\n\nWrite ONLY the JSON to `${output_dir}/result.json`. No chat-style summary outside it. Do not call any external tools — work only from the diff already in the prompt."
+      }
+    },
+    {
+      "id": "post-review",
+      "name": "Post review comment on PR",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "agentId": "WJ1LB0n9e2xGV0guSkvy",
+      "autonomyLevel": "L4",
+      "description": "Post the review markdown from `review` as a single issue comment on the PR. Visible in the PR conversation in the repo.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "model": "haiku",
+        "timeoutMinutes": 5,
+        "prompt": "## Task\n\nPost the review comment from step `review` on the PR opened by step `implement`. Use the GitHub MCP only.\n\n- `owner`: `Appsilon`\n- `repo`: `mediforce`\n- `issue_number`: from `## Previous Step Outputs` → `implement.prNumber`\n- `body`: from `## Previous Step Outputs` → `review.review_comment` (verbatim)\n\nCall `add_issue_comment` once. Capture the returned `id`, `html_url`.\n\n## Output\n\nWrite to `${output_dir}/result.json`:\n```json\n{\n  \"posted\": true,\n  \"commentId\": <id>,\n  \"commentUrl\": \"<html_url>\",\n  \"hasFindings\": <copy from review.hasFindings>,\n  \"prNumber\": <copy from implement.prNumber>,\n  \"branch\": \"<copy from implement.branch>\",\n  \"issueNumber\": <copy from pick-issue.issueNumber>\n}\n```\n\nNo other tool calls. No chat-style summary outside the JSON."
+      }
+    },
+    {
+      "id": "address-review",
+      "name": "Address review findings",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "agentId": "WJ1LB0n9e2xGV0guSkvy",
+      "autonomyLevel": "L4",
+      "description": "Apply the review feedback on the same PR branch. Reads files via GitHub MCP `get_file_contents`, edits in-memory, pushes with `push_files`, then posts a reply comment summarising what was addressed.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "model": "sonnet",
+        "timeoutMinutes": 30,
+        "prompt": "## Task\n\nThe previous review (`review.findings`, severity `blocker` or `major`) needs to be addressed on the PR branch. Apply the changes via GitHub MCP — do NOT use `/workspace` (it's pinned to `main`, not the PR branch).\n\n## Inputs\n\nFrom `## Previous Step Outputs`:\n- `implement.prNumber`, `implement.branch`, `implement.prUrl`\n- `review.findings` — array of `{severity, file, summary}`\n- `review.review_comment` — the full markdown review (for context)\n- `post-review.commentId`, `post-review.commentUrl`\n\nOnly findings with severity `blocker` or `major` are in scope. Ignore `minor` and `nit` — those are commentary, not work items.\n\n## Execution\n\n1. For each in-scope finding's `file`:\n   - `get_file_contents` with `owner=Appsilon, repo=mediforce, path=<file>, ref=<branch>` → get current content on the PR branch.\n   - Apply the fix in memory. Keep the change MINIMAL — only what the finding demands. Do NOT refactor unrelated code.\n2. After processing all findings, call `push_files` once with the full set of edited files (path + full new content). Commit message: `Address review: <2-3 word summary>`.\n3. Call `add_issue_comment` with `issue_number=<prNumber>` and a body that starts with:\n   ```\n   > 🤖 Mediforce AI Developer — addressed review\n   ```\n   followed by a blank line, then a bullet list, one per in-scope finding, of the form:\n   `- **<severity>** \\`<file>\\` — <what you changed>`\n   Then a final line: `Original review: <post-review.commentUrl>`.\n\n## Output\n\nWrite to `${output_dir}/result.json`:\n```json\n{\n  \"addressed\": true,\n  \"replyCommentId\": <id from add_issue_comment>,\n  \"replyCommentUrl\": \"<html_url>\",\n  \"filesEdited\": [\"path/a.ts\", \"path/b.ts\"],\n  \"prNumber\": <prNumber>,\n  \"branch\": \"<branch>\",\n  \"summary\": \"<one sentence>\"\n}\n```\n\nIf there are no `blocker` or `major` findings (shouldn't happen — `hasFindings` gates this step), write `{\"addressed\": false, \"reason\": \"no in-scope findings\", \"prNumber\": <n>, \"branch\": \"<b>\"}` and stop.\n\n## Hard rules\n\n- One pass — do not loop back to a second review.\n- Never close the PR. Never merge.\n- Touch only files named in `findings[*].file` (or files those edits structurally require, like a co-located test)."
+      }
+    },
+    {
+      "id": "cleanup",
+      "name": "Cleanup — remove in-progress label",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "continueOnError": true,
+      "description": "Remove `mediforce-ai-in-progress` from the issue. Continue-on-error: a stale label is preferable to a failing terminal step. If the implement step failed we still arrive here via the failure branch.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const REPO = 'Appsilon/mediforce';\n  const LOCK_LABEL = 'mediforce-ai-in-progress';\n  const issueNumber = input.steps?.['pick-issue']?.issueNumber ?? input.issueNumber;\n  const token = process.env.GITHUB_TOKEN;\n  if (!issueNumber) { console.log('cleanup: no issueNumber in upstream — nothing to do'); writeFileSync('/output/result.json', JSON.stringify({ cleaned: false, reason: 'no issueNumber' })); process.exit(0); }\n  if (!token) { console.error('GITHUB_TOKEN missing'); process.exit(1); }\n  const url = `https://api.github.com/repos/${REPO}/issues/${issueNumber}/labels/${encodeURIComponent(LOCK_LABEL)}`;\n  const res = await fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });\n  if (res.status === 404) { console.log(`cleanup: label '${LOCK_LABEL}' not present on #${issueNumber} — ok`); }\n  else if (!res.ok) { const body = await res.text(); console.error(`GitHub DELETE label ${res.status}: ${body.slice(0,300)}`); process.exit(1); }\n  else { console.log(`cleanup: removed '${LOCK_LABEL}' from #${issueNumber}`); }\n  writeFileSync('/output/result.json', JSON.stringify({ cleaned: true, issueNumber, labelRemoved: LOCK_LABEL }));\n} catch (err) {\n  console.error('cleanup crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "script",
+      "description": "PR opened, review posted, review addressed (if needed), lock label removed. Waiting for a human to merge or close."
+    }
+  ],
+  "transitions": [
+    { "from": "check-singleton", "to": "skipped", "when": "output.skip == true" },
+    { "from": "check-singleton", "to": "pick-issue", "when": "output.skip == false" },
+    { "from": "pick-issue", "to": "no-issue", "when": "output.noIssue == true" },
+    { "from": "pick-issue", "to": "implement", "when": "output.noIssue == false" },
+    { "from": "implement", "to": "review", "when": "output.success == true" },
+    { "from": "implement", "to": "cleanup", "when": "output.success == false" },
+    { "from": "review", "to": "post-review" },
+    { "from": "post-review", "to": "address-review", "when": "output.hasFindings == true" },
+    { "from": "post-review", "to": "cleanup", "when": "output.hasFindings == false" },
+    { "from": "address-review", "to": "cleanup" },
+    { "from": "cleanup", "to": "done" }
+  ]
+}
