@@ -64,22 +64,30 @@ describe('backlog-triage journey', () => {
       await processRepo.saveWorkflowDefinition(wd);
     });
 
-    it('drives the WD from fetch → propose → assign → dispatch → report', async () => {
+    it('drives the WD from fetch → check-tags (pass) → propose → assign → dispatch → report', async () => {
       const instance = await engine.createInstance(
         'appsilon', 'backlog-triage', 1, 'user-1', 'manual',
         { repo: 'owner/repo' },
       );
       await engine.startInstance(instance.id);
 
-      // fetch-backlog → propose-assignments
+      // fetch-backlog → check-tags
       await engine.advanceStep(
         instance.id,
         { options: fakeIssues, repo: 'owner/repo' },
         triagerActor,
       );
       let state = await instanceRepo.getById(instance.id);
+      expect(state?.currentStepId).toBe('check-tags');
+
+      // check-tags → propose-assignments (all tagged)
+      await engine.advanceStep(
+        instance.id,
+        { needsTagging: false, options: fakeIssues, repo: 'owner/repo' },
+        triagerActor,
+      );
+      state = await instanceRepo.getById(instance.id);
       expect(state?.currentStepId).toBe('propose-assignments');
-      expect(state?.status).toBe('running');
 
       // propose-assignments → assign (human, creates task)
       await engine.advanceStep(
@@ -103,7 +111,6 @@ describe('backlog-triage journey', () => {
       expect(assignees.some((a) => a.id === 'filip' && a.kind === 'human')).toBe(true);
       expect(assignees.some((a) => a.id === 'fullstack-on-issue' && a.kind === 'agent')).toBe(true);
 
-      // Resume + advance with assignments (one human, one agent, one skipped via omission)
       const assignments = [
         { itemId: '101', assigneeId: 'filip', assigneeKind: 'human', priority: 'P0', note: 'auto', raw: { issueNumber: 101 } },
         { itemId: '102', assigneeId: 'fullstack-on-issue', assigneeKind: 'agent', priority: 'P2', raw: { issueNumber: 102 } },
@@ -114,7 +121,6 @@ describe('backlog-triage journey', () => {
       state = await instanceRepo.getById(instance.id);
       expect(state?.currentStepId).toBe('dispatch');
 
-      // dispatch → report (terminal)
       await engine.advanceStep(
         instance.id,
         {
@@ -137,6 +143,7 @@ describe('backlog-triage journey', () => {
       );
       await engine.startInstance(instance.id);
       await engine.advanceStep(instance.id, { options: fakeIssues, repo: 'owner/repo' }, triagerActor);
+      await engine.advanceStep(instance.id, { needsTagging: false, options: fakeIssues, repo: 'owner/repo' }, triagerActor);
       await engine.advanceStep(instance.id, { options: enrichedIssues, repo: 'owner/repo' }, triagerActor);
 
       const assignments = [
@@ -147,6 +154,44 @@ describe('backlog-triage journey', () => {
 
       const state = await instanceRepo.getById(instance.id);
       expect(state?.variables?.assign).toEqual({ assignments });
+    });
+
+    it('routes to tag-issues when check-tags reports needsTagging=true, then loops back to fetch-backlog on done verdict', async () => {
+      const instance = await engine.createInstance(
+        'appsilon', 'backlog-triage', 1, 'user-1', 'manual',
+        { repo: 'owner/repo' },
+      );
+      await engine.startInstance(instance.id);
+
+      // fetch-backlog → check-tags
+      await engine.advanceStep(instance.id, { options: fakeIssues, repo: 'owner/repo' }, triagerActor);
+
+      // check-tags reports untagged → routes to tag-issues (human)
+      await engine.advanceStep(
+        instance.id,
+        { needsTagging: true, untaggedCount: 2, repo: 'owner/repo' },
+        triagerActor,
+      );
+
+      let state = await instanceRepo.getById(instance.id);
+      expect(state?.currentStepId).toBe('tag-issues');
+      expect(state?.status).toBe('paused');
+
+      const tasks = humanTaskRepo.getAll();
+      expect(tasks).toHaveLength(1);
+      const tagTask = tasks[0];
+      expect(tagTask.stepId).toBe('tag-issues');
+      expect(tagTask.ui).toBeUndefined();
+      expect(tagTask.verdicts?.find((v) => v.key === 'done')).toBeDefined();
+      // No assignment-table or selection — tag-issues falls through to VerdictView via registry.
+      expect(tagTask.options).toBeUndefined();
+
+      // Reviewer submits "done" verdict — engine routes back to fetch-backlog per verdict target.
+      await instanceRepo.update(instance.id, { status: 'running', pauseReason: null });
+      await engine.advanceStep(instance.id, { verdict: 'done' }, triagerActor);
+
+      state = await instanceRepo.getById(instance.id);
+      expect(state?.currentStepId).toBe('fetch-backlog');
     });
   });
 

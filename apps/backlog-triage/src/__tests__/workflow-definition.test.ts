@@ -21,21 +21,22 @@ describe('backlog-triage', () => {
     expect(result.success).toBe(true);
   });
 
-  it('has exactly one terminal step and five total', () => {
+  it('has exactly one terminal step and seven total', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.steps).toHaveLength(5);
+    expect(result.data.steps).toHaveLength(7);
     expect(result.data.steps.filter((s) => s.type === 'terminal')).toHaveLength(1);
   });
 
-  it('declares triggerInput for repo and labelFilter', () => {
+  it('declares triggerInput for repo, labelFilter, limit, sprintDays', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
-    const names = (result.data.triggerInput ?? []).map((p) => p.name);
-    expect(names).toContain('repo');
-    expect(names).toContain('labelFilter');
+    const params = result.data.triggerInput ?? [];
+    const names = params.map((p) => p.name);
+    expect(names).toEqual(['repo', 'labelFilter', 'limit', 'sprintDays']);
+    expect(params.find((p) => p.name === 'sprintDays')?.default).toBe(5);
   });
 
   it('assign step uses assignment-table with assignees and priorities in ui.config', () => {
@@ -61,11 +62,11 @@ describe('backlog-triage', () => {
     expect(result.data.env?.APP_BASE_URL).toBe('{{APP_BASE_URL}}');
   });
 
-  it('fetch-backlog and dispatch run on golden image with javascript inlineScript', () => {
+  it('fetch-backlog, check-tags, and dispatch run on golden image with javascript inlineScript', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
-    for (const stepId of ['fetch-backlog', 'dispatch']) {
+    for (const stepId of ['fetch-backlog', 'check-tags', 'dispatch']) {
       const step = result.data.steps.find((s) => s.id === stepId);
       expect(step?.executor).toBe('script');
       expect(step?.plugin).toBe('script-container');
@@ -75,35 +76,56 @@ describe('backlog-triage', () => {
     }
   });
 
-  it('propose-assignments is an L4 agent step with an inline prompt', () => {
+  it('check-tags writes presentation.html when issues are missing tags', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const step = result.data.steps.find((s) => s.id === 'check-tags');
+    expect(step?.agent?.inlineScript).toMatch(/presentation\.html/);
+    expect(step?.agent?.inlineScript).toMatch(/needsTagging/);
+  });
+
+  it('tag-issues human step has a single Done verdict looping back to fetch-backlog', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const step = result.data.steps.find((s) => s.id === 'tag-issues');
+    expect(step?.executor).toBe('human');
+    expect(step?.ui).toBeUndefined();
+    expect(step?.verdicts?.done?.target).toBe('fetch-backlog');
+  });
+
+  it('propose-assignments is an L4 agent step that mentions sprintDays + AI-bottleneck guidance', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'propose-assignments');
     expect(step?.executor).toBe('agent');
     expect(step?.autonomyLevel).toBe('L4');
-    expect(step?.agent?.prompt).toMatch(/options/i);
-    expect(step?.agent?.prompt).toMatch(/suggestion/i);
+    expect(step?.agent?.prompt).toMatch(/sprintDays/);
+    expect(step?.agent?.prompt).toMatch(/reviewer/i);
   });
 
-  it('transitions form a single chain through all non-terminal steps', () => {
+  it('transitions branch on check-tags.needsTagging output', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
-    const chain: string[] = ['fetch-backlog'];
-    let current = 'fetch-backlog';
-    while (true) {
-      const next = result.data.transitions.find((t) => t.from === current);
-      if (!next) break;
-      chain.push(next.to);
-      current = next.to;
-    }
-    expect(chain).toEqual([
-      'fetch-backlog',
-      'propose-assignments',
-      'assign',
-      'dispatch',
-      'report',
-    ]);
+    const fromCheck = result.data.transitions.filter((t) => t.from === 'check-tags');
+    expect(fromCheck).toHaveLength(2);
+    expect(fromCheck.find((t) => t.to === 'tag-issues')?.when).toBe('output.needsTagging == true');
+    expect(fromCheck.find((t) => t.to === 'propose-assignments')?.when).toBe('output.needsTagging == false');
+  });
+
+  it('straight-line happy path: fetch → check → propose → assign → dispatch → report', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const t = (from: string, to: string, when?: string) =>
+      result.data.transitions.some((tr) => tr.from === from && tr.to === to && tr.when === when);
+    expect(t('fetch-backlog', 'check-tags')).toBe(true);
+    expect(t('check-tags', 'propose-assignments', 'output.needsTagging == false')).toBe(true);
+    expect(t('propose-assignments', 'assign')).toBe(true);
+    expect(t('assign', 'dispatch')).toBe(true);
+    expect(t('dispatch', 'report')).toBe(true);
   });
 });
