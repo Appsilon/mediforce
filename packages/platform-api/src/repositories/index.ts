@@ -17,7 +17,5 @@ export { AuthorizedHandoffRepository } from './authorized-handoff-repository.js'
 export { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository.js';
 export { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository.js';
 export { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
-export type { NamespaceSecretsRepositoryView } from './authorized-workspace-secret-repository.js';
 export { AuthorizedWorkspaceSecretRepository } from './authorized-workspace-secret-repository.js';
-export type { WorkflowSecretsRepositoryView } from './authorized-workflow-secret-repository.js';
 export { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository.js';

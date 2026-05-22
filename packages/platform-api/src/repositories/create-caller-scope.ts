@@ -9,10 +9,12 @@ import type {
   HandoffRepository,
   HumanTaskRepository,
   ModelRegistryRepository,
+  NamespaceSecretsRepository,
   OAuthProviderRepository,
   ProcessInstanceRepository,
   ProcessRepository,
   ToolCatalogRepository,
+  WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type {
   CronTrigger,
@@ -22,8 +24,6 @@ import type {
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
 import type { CallerScope, NamespaceLookupView } from './caller-scope.js';
-import type { NamespaceSecretsRepositoryView } from './authorized-workspace-secret-repository.js';
-import type { WorkflowSecretsRepositoryView } from './authorized-workflow-secret-repository.js';
 import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
 import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
 import { AuthorizedAgentRunRepository } from './authorized-agent-run-repository.js';
@@ -58,8 +58,8 @@ export interface CallerScopeServices {
   readonly oauthProviderRepo: OAuthProviderRepository;
   readonly agentOAuthTokenRepo: AgentOAuthTokenRepository;
   readonly modelRegistryRepo: ModelRegistryRepository;
-  readonly secretsRepo: WorkflowSecretsRepositoryView;
-  readonly namespaceSecretsRepo: NamespaceSecretsRepositoryView;
+  readonly secretsRepo: WorkflowSecretsRepository;
+  readonly namespaceSecretsRepo: NamespaceSecretsRepository;
   readonly pluginRegistry: PluginRegistry;
   readonly engine: WorkflowEngine;
   readonly manualTrigger: ManualTrigger;

@@ -193,6 +193,8 @@ export type {
   CoworkSessionRepository,
   CronTriggerStateRepository,
   ToolCatalogRepository,
+  NamespaceSecretsRepository,
+  WorkflowSecretsRepository,
   SendEmailParams,
   SendEmailResult,
   SendEmailFn,

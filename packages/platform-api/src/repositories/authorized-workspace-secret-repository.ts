@@ -1,18 +1,6 @@
 import type { CallerIdentity } from '../auth.js';
+import type { NamespaceSecretsRepository } from '@mediforce/platform-core';
 import { AuthorizedScope } from './authorized-repository.js';
-
-/**
- * Minimal namespace-secret store the wrapper depends on. Declared structurally
- * so tests can pass an in-memory map without depending on `platform-infra`.
- * The real `FirestoreNamespaceSecretsRepository` satisfies this shape.
- */
-export interface NamespaceSecretsRepositoryView {
-  getSecrets(namespace: string): Promise<Record<string, string>>;
-  getSecretKeys(namespace: string): Promise<string[]>;
-  setSecrets(namespace: string, secrets: Record<string, string>): Promise<void>;
-  upsertSecret(namespace: string, key: string, value: string): Promise<void>;
-  deleteSecret(namespace: string, key: string): Promise<void>;
-}
 
 /**
  * Workspace-scoped workspace secret access. Plaintext values flow through the
@@ -22,7 +10,7 @@ export interface NamespaceSecretsRepositoryView {
 export class AuthorizedWorkspaceSecretRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
-    private readonly raw: NamespaceSecretsRepositoryView,
+    private readonly raw: NamespaceSecretsRepository,
   ) {
     super(caller);
   }

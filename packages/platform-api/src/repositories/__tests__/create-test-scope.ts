@@ -20,12 +20,12 @@ import type {
   AgentRun,
   AgentRunRepository,
   ModelRegistryRepository,
+  NamespaceSecretsRepository,
   ProcessInstanceRepository,
+  WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../auth.js';
 import type { CallerScope, NamespaceLookupView } from '../caller-scope.js';
-import type { NamespaceSecretsRepositoryView } from '../authorized-workspace-secret-repository.js';
-import type { WorkflowSecretsRepositoryView } from '../authorized-workflow-secret-repository.js';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope.js';
 
 class InMemoryAgentRunRepository implements AgentRunRepository {
@@ -81,7 +81,7 @@ const stubModelRegistry: ModelRegistryRepository = {
   },
 };
 
-const stubWorkflowSecrets: WorkflowSecretsRepositoryView = {
+const stubWorkflowSecrets: WorkflowSecretsRepository = {
   async getSecrets() {
     return {};
   },
@@ -98,7 +98,7 @@ const stubWorkflowSecrets: WorkflowSecretsRepositoryView = {
     /* no-op */
   },
 };
-const stubNamespaceSecrets: NamespaceSecretsRepositoryView = {
+const stubNamespaceSecrets: NamespaceSecretsRepository = {
   async getSecrets() {
     return {};
   },

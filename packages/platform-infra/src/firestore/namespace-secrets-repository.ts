@@ -1,6 +1,7 @@
 import {
   NamespaceSecretsSchema,
   type NamespaceSecrets,
+  type NamespaceSecretsRepository,
 } from '@mediforce/platform-core';
 import type { Firestore } from 'firebase-admin/firestore';
 import { encrypt, decrypt } from '../crypto/secrets-cipher.js';
@@ -11,7 +12,7 @@ import { encrypt, decrypt } from '../crypto/secrets-cipher.js';
  *
  * Path: namespaces/{handle}/namespaceSecrets/_config
  */
-export class FirestoreNamespaceSecretsRepository {
+export class FirestoreNamespaceSecretsRepository implements NamespaceSecretsRepository {
   constructor(private readonly db: Firestore) {}
 
   private docRef(namespace: string) {
