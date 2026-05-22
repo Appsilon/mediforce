@@ -1,0 +1,113 @@
+{
+  "name": "backlog-triage",
+  "namespace": "appsilon",
+  "title": "Backlog Triage",
+  "description": "Fetches open GitHub issues, has an LLM propose initial assignments to humans or AI workflows, lets a person edit assignments in a table, then assigns humans on GitHub and spawns Mediforce runs for AI delegations.",
+  "preamble": "## Domain Context\nThis workflow operates on a software-engineering backlog (GitHub issues + team roster). Treat issue titles/bodies and assignee names as technical content. No domain-specific hedging.",
+  "env": {
+    "GITHUB_TOKEN": "{{GITHUB_TOKEN}}",
+    "MEDIFORCE_API_KEY": "{{MEDIFORCE_API_KEY}}",
+    "APP_BASE_URL": "{{APP_BASE_URL}}"
+  },
+  "roles": ["triager"],
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "triggerInput": [
+    {
+      "name": "repo",
+      "type": "string",
+      "required": true,
+      "description": "owner/repo to triage (e.g. appsilon/mediforce)"
+    },
+    {
+      "name": "labelFilter",
+      "type": "string",
+      "required": false,
+      "description": "Optional comma-separated GitHub label filter"
+    }
+  ],
+  "steps": [
+    {
+      "id": "fetch-backlog",
+      "name": "Fetch backlog",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Fetch open issues from GitHub via REST. Skip pull requests. Emits an options array keyed by issue id.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst repo = input.repo;\nconst labelFilter = input.labelFilter;\nconst token = process.env.GITHUB_TOKEN;\nif (!repo) { writeFileSync('/output/result.json', JSON.stringify({ error: 'repo trigger param is required', options: [] })); process.exit(1); }\nif (!token) { writeFileSync('/output/result.json', JSON.stringify({ error: 'GITHUB_TOKEN secret not set', options: [] })); process.exit(1); }\nconst url = new URL(`https://api.github.com/repos/${repo}/issues`);\nurl.searchParams.set('state', 'open');\nurl.searchParams.set('per_page', '100');\nif (labelFilter) url.searchParams.set('labels', labelFilter);\nconst res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });\nif (!res.ok) { const body = await res.text(); writeFileSync('/output/result.json', JSON.stringify({ error: `GitHub ${res.status}: ${body}`, options: [] })); process.exit(1); }\nconst issues = await res.json();\nconst onlyIssues = issues.filter((i) => !i.pull_request);\nconst options = onlyIssues.map((i) => {\n  const labels = (i.labels || []).map((l) => typeof l === 'string' ? l : l.name);\n  return {\n    id: String(i.number),\n    label: `#${i.number} ${i.title}`,\n    sublabel: labels.join(', '),\n    href: i.html_url,\n    badges: labels,\n    currentAssignee: i.assignee?.login,\n    raw: { issueNumber: i.number, title: i.title, body: i.body, labels, currentAssignee: i.assignee?.login, url: i.html_url },\n  };\n});\nwriteFileSync('/output/result.json', JSON.stringify({ options, repo, summary: `Fetched ${options.length} open issue(s) from ${repo}` }));\n"
+      }
+    },
+    {
+      "id": "propose-assignments",
+      "name": "Propose initial assignments",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L4",
+      "description": "LLM enriches each issue with a suggested assignee, priority, and one-sentence rationale.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "model": "sonnet",
+        "timeoutMinutes": 5,
+        "prompt": "# Propose Backlog Assignments\n\nYou are triaging a GitHub backlog. The previous step (`fetch-backlog`) gave you a list of open issues. For each issue, suggest one assignee plus a priority and a one-sentence rationale. The next step shows a human reviewer your suggestions in a table — they will tweak and confirm.\n\n## Input\n\nRead `/output/input.json`. The previous step's output is merged at the top level. You will find:\n\n- `options[]` — list of issues. Each item has `id`, `label`, `sublabel`, `href`, `badges`, `currentAssignee`, `raw.issueNumber`, `raw.title`, `raw.body`, `raw.labels`.\n- `repo` — owner/repo string for context.\n\n## Available assignees\n\nUse **exactly** one of these ids per issue (no other names, no invented ids):\n\n- `filip` — human, fullstack\n- `marek` — human, product-owner\n- `marcin` — human, fullstack\n- `vedha` — human, fullstack\n- `fullstack-on-issue` — AI agent workflow, autonomous fullstack work on a single issue\n\n## Heuristics\n\n1. If `currentAssignee` matches one of the ids above, prefer that person.\n2. Map labels to skills: `bug` and `enhancement` → fullstack; `product`/`scoping` → product-owner.\n3. Priority: blocker/regression bugs → P0/P1; enhancements → P2; tech debt / docs → P3.\n4. Delegate to `fullstack-on-issue` when the issue is well-scoped, has a clear acceptance test, and could be done autonomously.\n\n## Output contract\n\nWrite `/output/result.json` with the SAME `options` array shape, but add a `suggestion` field to each entry:\n\n```json\n{\n  \"options\": [\n    {\n      \"id\": \"123\",\n      \"label\": \"#123 ...\",\n      \"sublabel\": \"...\",\n      \"href\": \"...\",\n      \"badges\": [\"...\"],\n      \"currentAssignee\": \"...\",\n      \"raw\": { \"issueNumber\": 123, \"title\": \"...\", \"body\": \"...\", \"labels\": [\"...\"] },\n      \"suggestion\": { \"assigneeId\": \"filip\", \"priority\": \"P1\", \"note\": \"one sentence why\" }\n    }\n  ],\n  \"repo\": \"<copy from input>\"\n}\n```\n\nRules:\n\n- Preserve every input issue. Do not drop any.\n- Do not add issues that weren't in the input.\n- `suggestion.assigneeId` must exactly match one of the ids listed above.\n- `suggestion.priority` must be one of `P0`, `P1`, `P2`, `P3`.\n- `suggestion.note` is one short sentence — optional.\n- Output strict JSON only — no markdown, no commentary outside the result file."
+      }
+    },
+    {
+      "id": "assign",
+      "name": "Assign",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["triager"],
+      "description": "Human triager reviews each suggestion, edits assignee/priority/note as needed, and confirms.",
+      "ui": {
+        "component": "assignment-table",
+        "config": {
+          "assignees": [
+            { "id": "filip", "label": "Filip", "kind": "human", "role": "fullstack" },
+            { "id": "marek", "label": "Marek", "kind": "human", "role": "product-owner" },
+            { "id": "marcin", "label": "Marcin", "kind": "human", "role": "fullstack" },
+            { "id": "vedha", "label": "Vedha", "kind": "human", "role": "fullstack" },
+            { "id": "fullstack-on-issue", "label": "Fullstack agent", "kind": "agent" }
+          ],
+          "priorities": ["P0", "P1", "P2", "P3"],
+          "defaultPriority": "P2",
+          "allowSkip": true,
+          "submitLabel": "Dispatch",
+          "itemColumnLabel": "Issue"
+        }
+      }
+    },
+    {
+      "id": "dispatch",
+      "name": "Dispatch",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "PATCH each human-assigned issue on GitHub with assignee + priority label, POST each agent-assigned issue to the Mediforce process-start API. Per-assignment errors are logged but do not fail the step.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst assignments = input.assignments || [];\nconst repo = input.repo || input.steps?.['fetch-backlog']?.repo;\nconst token = process.env.GITHUB_TOKEN;\nconst apiKey = process.env.MEDIFORCE_API_KEY;\nconst baseUrl = process.env.APP_BASE_URL;\nconst humanAssignments = [];\nconst agentRuns = [];\nconst errors = [];\nfor (const a of assignments) {\n  const issueNumber = a.raw?.issueNumber ?? Number(a.itemId);\n  try {\n    if (a.assigneeKind === 'human') {\n      if (!repo || !token) { errors.push({ itemId: a.itemId, kind: 'human', message: 'repo or GITHUB_TOKEN missing' }); continue; }\n      const res = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}`, {\n        method: 'PATCH',\n        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' },\n        body: JSON.stringify({ assignees: [a.assigneeId], labels: [`priority/${a.priority}`] }),\n      });\n      if (!res.ok) { const body = await res.text(); errors.push({ itemId: a.itemId, kind: 'human', message: `GitHub PATCH ${res.status}: ${body}` }); }\n      else { humanAssignments.push({ issueNumber, assignee: a.assigneeId, priority: a.priority }); }\n    } else if (a.assigneeKind === 'agent') {\n      if (!apiKey || !baseUrl) { errors.push({ itemId: a.itemId, kind: 'agent', message: 'MEDIFORCE_API_KEY or APP_BASE_URL missing' }); continue; }\n      const res = await fetch(`${baseUrl}/api/processes`, {\n        method: 'POST',\n        headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },\n        body: JSON.stringify({ definitionName: a.assigneeId, triggerName: 'manual', triggeredBy: 'backlog-triage', payload: { issueNumber } }),\n      });\n      const body = res.headers.get('content-type')?.includes('json') ? await res.json() : { error: await res.text() };\n      if (!res.ok) { errors.push({ itemId: a.itemId, kind: 'agent', message: `Mediforce POST ${res.status}: ${body.error || ''}` }); }\n      else { agentRuns.push({ issueNumber, workflowId: a.assigneeId, runId: body.instanceId, url: `${baseUrl}/runs/${body.instanceId}` }); }\n    }\n  } catch (err) {\n    errors.push({ itemId: a.itemId, kind: a.assigneeKind, message: String(err?.message ?? err) });\n  }\n}\nwriteFileSync('/output/result.json', JSON.stringify({ humanAssignments, agentRuns, errors, summary: `Dispatched ${humanAssignments.length} human(s), ${agentRuns.length} agent run(s), ${errors.length} error(s)` }));\n"
+      }
+    },
+    {
+      "id": "report",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Workflow complete. Inspect dispatch step output for human assignments, spawned agent runs, and per-item errors."
+    }
+  ],
+  "transitions": [
+    { "from": "fetch-backlog", "to": "propose-assignments" },
+    { "from": "propose-assignments", "to": "assign" },
+    { "from": "assign", "to": "dispatch" },
+    { "from": "dispatch", "to": "report" }
+  ]
+}

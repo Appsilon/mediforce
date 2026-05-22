@@ -46,6 +46,21 @@ importers:
         specifier: ^4.1.4
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1)(vite@8.0.13(@types/node@24.12.4)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.0)(yaml@2.9.0))
 
+  apps/backlog-triage:
+    dependencies:
+      '@mediforce/platform-api':
+        specifier: workspace:*
+        version: link:../../packages/platform-api
+      '@mediforce/platform-core':
+        specifier: workspace:*
+        version: link:../../packages/platform-core
+      '@mediforce/platform-infra':
+        specifier: workspace:*
+        version: link:../../packages/platform-infra
+      '@mediforce/workflow-engine':
+        specifier: workspace:*
+        version: link:../../packages/workflow-engine
+
   apps/community-digest:
     dependencies:
       '@mediforce/platform-core':
