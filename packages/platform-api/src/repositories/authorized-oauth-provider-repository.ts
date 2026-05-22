@@ -11,22 +11,7 @@ import { AuthorizedScope } from './authorized-repository.js';
  * Workspace-scoped OAuth provider configs. Namespace is path-prefix on every
  * method, so the wrapper asserts membership before delegating.
  */
-export interface AuthorizedOAuthProviderRepository {
-  list(namespace: string): Promise<OAuthProviderConfig[]>;
-  get(namespace: string, id: string): Promise<OAuthProviderConfig | null>;
-  create(namespace: string, input: CreateOAuthProviderInput): Promise<OAuthProviderConfig>;
-  update(
-    namespace: string,
-    id: string,
-    patch: UpdateOAuthProviderInput,
-  ): Promise<OAuthProviderConfig | null>;
-  delete(namespace: string, id: string): Promise<boolean>;
-}
-
-export class AuthorizedOAuthProviderRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedOAuthProviderRepository
-{
+export class AuthorizedOAuthProviderRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: OAuthProviderRepository,

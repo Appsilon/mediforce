@@ -14,18 +14,7 @@ import { AuthorizedScope } from './authorized-repository.js';
  * private agents only by callers in the agent's workspace. Agents without a
  * namespace are visible only when `visibility: 'public'`.
  */
-export interface AuthorizedAgentDefinitionRepository {
-  getById(id: string): Promise<AgentDefinition | null>;
-  list(): Promise<AgentDefinition[]>;
-  upsert(id: string, input: CreateAgentDefinitionInput): Promise<AgentDefinition>;
-  update(id: string, input: UpdateAgentDefinitionInput): Promise<AgentDefinition>;
-  delete(id: string): Promise<void>;
-}
-
-export class AuthorizedAgentDefinitionRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedAgentDefinitionRepository
-{
+export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: AgentDefinitionRepository,

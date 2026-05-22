@@ -24,19 +24,19 @@ import type { CallerIdentity } from '../auth.js';
 import type { CallerScope, NamespaceLookupView } from './caller-scope.js';
 import type { NamespaceSecretsRepositoryView } from './authorized-workspace-secret-repository.js';
 import type { WorkflowSecretsRepositoryView } from './authorized-workflow-secret-repository.js';
-import { AuthorizedAgentDefinitionRepositoryImpl } from './authorized-agent-definition-repository.js';
-import { AuthorizedAgentOAuthTokenRepositoryImpl } from './authorized-agent-oauth-token-repository.js';
-import { AuthorizedAgentRunRepositoryImpl } from './authorized-agent-run-repository.js';
-import { AuthorizedAuditEventRepositoryImpl } from './authorized-audit-event-repository.js';
-import { AuthorizedCoworkSessionRepositoryImpl } from './authorized-cowork-session-repository.js';
-import { AuthorizedHandoffRepositoryImpl } from './authorized-handoff-repository.js';
-import { AuthorizedHumanTaskRepositoryImpl } from './authorized-human-task-repository.js';
-import { AuthorizedOAuthProviderRepositoryImpl } from './authorized-oauth-provider-repository.js';
-import { AuthorizedToolCatalogRepositoryImpl } from './authorized-tool-catalog-repository.js';
-import { AuthorizedWorkflowDefinitionRepositoryImpl } from './authorized-workflow-definition-repository.js';
-import { AuthorizedWorkflowRunRepositoryImpl } from './authorized-workflow-run-repository.js';
-import { AuthorizedWorkflowSecretRepositoryImpl } from './authorized-workflow-secret-repository.js';
-import { AuthorizedWorkspaceSecretRepositoryImpl } from './authorized-workspace-secret-repository.js';
+import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
+import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
+import { AuthorizedAgentRunRepository } from './authorized-agent-run-repository.js';
+import { AuthorizedAuditEventRepository } from './authorized-audit-event-repository.js';
+import { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository.js';
+import { AuthorizedHandoffRepository } from './authorized-handoff-repository.js';
+import { AuthorizedHumanTaskRepository } from './authorized-human-task-repository.js';
+import { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository.js';
+import { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository.js';
+import { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository.js';
+import { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository.js';
+import { AuthorizedWorkflowSecretRepository } from './authorized-workflow-secret-repository.js';
+import { AuthorizedWorkspaceSecretRepository } from './authorized-workspace-secret-repository.js';
 
 /**
  * Subset of `PlatformServices` (interface-typed) that `createCallerScope`
@@ -80,54 +80,54 @@ export function createCallerScope(
   return {
     caller,
 
-    tasks: new AuthorizedHumanTaskRepositoryImpl(
+    tasks: new AuthorizedHumanTaskRepository(
       caller,
       services.humanTaskRepo,
       services.instanceRepo,
     ),
-    runs: new AuthorizedWorkflowRunRepositoryImpl(caller, services.instanceRepo),
-    workflowDefinitions: new AuthorizedWorkflowDefinitionRepositoryImpl(
+    runs: new AuthorizedWorkflowRunRepository(caller, services.instanceRepo),
+    workflowDefinitions: new AuthorizedWorkflowDefinitionRepository(
       caller,
       services.processRepo,
     ),
-    agentDefinitions: new AuthorizedAgentDefinitionRepositoryImpl(
+    agentDefinitions: new AuthorizedAgentDefinitionRepository(
       caller,
       services.agentDefinitionRepo,
     ),
-    coworkSessions: new AuthorizedCoworkSessionRepositoryImpl(
+    coworkSessions: new AuthorizedCoworkSessionRepository(
       caller,
       services.coworkSessionRepo,
       services.instanceRepo,
     ),
-    agentRuns: new AuthorizedAgentRunRepositoryImpl(
+    agentRuns: new AuthorizedAgentRunRepository(
       caller,
       services.agentRunRepo,
       services.instanceRepo,
     ),
-    auditEvents: new AuthorizedAuditEventRepositoryImpl(
+    auditEvents: new AuthorizedAuditEventRepository(
       caller,
       services.auditRepo,
       services.instanceRepo,
     ),
-    handoffs: new AuthorizedHandoffRepositoryImpl(
+    handoffs: new AuthorizedHandoffRepository(
       caller,
       services.handoffRepo,
       services.instanceRepo,
     ),
-    toolCatalog: new AuthorizedToolCatalogRepositoryImpl(caller, services.toolCatalogRepo),
-    oauthProviders: new AuthorizedOAuthProviderRepositoryImpl(
+    toolCatalog: new AuthorizedToolCatalogRepository(caller, services.toolCatalogRepo),
+    oauthProviders: new AuthorizedOAuthProviderRepository(
       caller,
       services.oauthProviderRepo,
     ),
-    agentOAuthTokens: new AuthorizedAgentOAuthTokenRepositoryImpl(
+    agentOAuthTokens: new AuthorizedAgentOAuthTokenRepository(
       caller,
       services.agentOAuthTokenRepo,
     ),
-    workspaceSecrets: new AuthorizedWorkspaceSecretRepositoryImpl(
+    workspaceSecrets: new AuthorizedWorkspaceSecretRepository(
       caller,
       services.namespaceSecretsRepo,
     ),
-    workflowSecrets: new AuthorizedWorkflowSecretRepositoryImpl(caller, services.secretsRepo),
+    workflowSecrets: new AuthorizedWorkflowSecretRepository(caller, services.secretsRepo),
 
     models: services.modelRegistryRepo,
     plugins: services.pluginRegistry,

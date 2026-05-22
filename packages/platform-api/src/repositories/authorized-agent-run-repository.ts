@@ -10,15 +10,7 @@ import { AuthorizedScope } from './authorized-repository.js';
  * Workspace-scoped agent-run reads. AgentRun has no namespace field;
  * membership is reached via the parent `ProcessInstance`.
  */
-export interface AuthorizedAgentRunRepository {
-  getById(runId: string): Promise<AgentRun | null>;
-  getByInstanceId(instanceId: string): Promise<AgentRun[]>;
-}
-
-export class AuthorizedAgentRunRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedAgentRunRepository
-{
+export class AuthorizedAgentRunRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: AgentRunRepository,

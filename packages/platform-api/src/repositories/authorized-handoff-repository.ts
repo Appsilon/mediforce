@@ -16,23 +16,7 @@ import { filterByParentNamespace } from './indirect-namespace.js';
  * remaining business invariants (`userId === assignedUserId`, resolution
  * validation) live in the underlying repo and the handler.
  */
-export interface AuthorizedHandoffRepository {
-  getById(entityId: string): Promise<HandoffEntity | null>;
-  getByRole(role: string): Promise<HandoffEntity[]>;
-  getByInstanceId(instanceId: string): Promise<HandoffEntity[]>;
-  claim(entityId: string, userId: string): Promise<HandoffEntity>;
-  acknowledge(entityId: string, userId: string): Promise<HandoffEntity>;
-  resolve(
-    entityId: string,
-    userId: string,
-    resolution: Record<string, unknown>,
-  ): Promise<HandoffEntity>;
-}
-
-export class AuthorizedHandoffRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedHandoffRepository
-{
+export class AuthorizedHandoffRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: HandoffRepository,

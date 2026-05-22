@@ -15,19 +15,7 @@ import { filterByParentNamespace } from './indirect-namespace.js';
  * parent lookups so we issue at most one read per distinct run regardless of
  * task count (same shape as PR #450's `listTasks` handler).
  */
-export interface AuthorizedHumanTaskRepository {
-  getById(taskId: string): Promise<HumanTask | null>;
-  getByRole(role: string): Promise<HumanTask[]>;
-  getByInstanceId(instanceId: string): Promise<HumanTask[]>;
-  claim(taskId: string, userId: string): Promise<HumanTask>;
-  complete(taskId: string, completionData: Record<string, unknown>): Promise<HumanTask>;
-  cancel(taskId: string): Promise<HumanTask>;
-}
-
-export class AuthorizedHumanTaskRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedHumanTaskRepository
-{
+export class AuthorizedHumanTaskRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: HumanTaskRepository,

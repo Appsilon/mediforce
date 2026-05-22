@@ -12,15 +12,7 @@ import { AuthorizedScope } from './authorized-repository.js';
  * to a `null` return — handlers convert to 404 so a non-member cannot
  * distinguish "exists in another namespace" from "doesn't exist at all".
  */
-export interface AuthorizedCoworkSessionRepository {
-  getById(sessionId: string): Promise<CoworkSession | null>;
-  findMostRecentActiveForInstance(instanceId: string): Promise<CoworkSession | null>;
-}
-
-export class AuthorizedCoworkSessionRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedCoworkSessionRepository
-{
+export class AuthorizedCoworkSessionRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: CoworkSessionRepository,

@@ -23,12 +23,7 @@ export interface WorkflowSecretsRepositoryView {
 }
 
 /** Workspace-scoped workflow secret access. Membership is on the workspace. */
-export type AuthorizedWorkflowSecretRepository = WorkflowSecretsRepositoryView;
-
-export class AuthorizedWorkflowSecretRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedWorkflowSecretRepository
-{
+export class AuthorizedWorkflowSecretRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: WorkflowSecretsRepositoryView,

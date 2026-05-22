@@ -11,17 +11,7 @@ import { AuthorizedScope } from './authorized-repository.js';
  * required argument on every method; the wrapper asserts membership before
  * delegating.
  */
-export interface AuthorizedToolCatalogRepository {
-  getById(namespace: string, entryId: string): Promise<ToolCatalogEntry | null>;
-  list(namespace: string): Promise<ToolCatalogEntry[]>;
-  upsert(namespace: string, entry: ToolCatalogEntry): Promise<ToolCatalogEntry>;
-  delete(namespace: string, entryId: string): Promise<void>;
-}
-
-export class AuthorizedToolCatalogRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedToolCatalogRepository
-{
+export class AuthorizedToolCatalogRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: ToolCatalogRepository,

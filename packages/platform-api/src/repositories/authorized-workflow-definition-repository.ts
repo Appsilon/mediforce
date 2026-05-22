@@ -19,19 +19,7 @@ import { AuthorizedScope } from './authorized-repository.js';
  * handler turns null into 404 — so a non-member cannot distinguish "exists in
  * another workspace" from "doesn't exist".
  */
-export interface AuthorizedWorkflowDefinitionRepository {
-  get(namespace: string, name: string, version: number): Promise<WorkflowDefinition | null>;
-  getLatestVersion(namespace: string, name: string): Promise<number>;
-  listGroups(includeArchived: boolean): Promise<WorkflowDefinitionGroup[]>;
-  save(definition: WorkflowDefinition): Promise<void>;
-  setArchived(namespace: string, name: string, archived: boolean): Promise<void>;
-  setVersionArchived(namespace: string, name: string, version: number, archived: boolean): Promise<void>;
-}
-
-export class AuthorizedWorkflowDefinitionRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedWorkflowDefinitionRepository
-{
+export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: ProcessRepository,

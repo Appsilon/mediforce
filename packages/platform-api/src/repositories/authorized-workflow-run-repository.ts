@@ -21,19 +21,7 @@ import { AuthorizedScope } from './authorized-repository.js';
  * workspace at construction time of the created entity (user callers cannot
  * create runs outside their namespaces; apiKey callers are unrestricted).
  */
-export interface AuthorizedWorkflowRunRepository {
-  getById(id: string): Promise<ProcessInstance | null>;
-  list(options: ListInstancesOptions): Promise<ProcessInstance[]>;
-  getByStatus(status: InstanceStatus): Promise<ProcessInstance[]>;
-  getByDefinition(name: string, version: string): Promise<ProcessInstance[]>;
-  getStepExecutions(id: string): Promise<StepExecution[]>;
-  getLatestStepExecution(id: string, stepId: string): Promise<StepExecution | null>;
-}
-
-export class AuthorizedWorkflowRunRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedWorkflowRunRepository
-{
+export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: ProcessInstanceRepository,

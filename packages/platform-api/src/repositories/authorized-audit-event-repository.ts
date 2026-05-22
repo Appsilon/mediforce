@@ -12,14 +12,7 @@ import { AuthorizedScope } from './authorized-repository.js';
  * parent yields an empty list — handlers surface that as 404 when the parent
  * lookup is the access decision (see PR #450's `listAuditEvents` shape).
  */
-export interface AuthorizedAuditEventRepository {
-  getByProcess(processInstanceId: string): Promise<AuditEvent[]>;
-}
-
-export class AuthorizedAuditEventRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedAuditEventRepository
-{
+export class AuthorizedAuditEventRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: AuditRepository,

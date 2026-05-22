@@ -9,29 +9,7 @@ import { AuthorizedScope } from './authorized-repository.js';
  * Workspace-scoped storage of per-agent OAuth tokens. Namespace is path
  * prefix on every method.
  */
-export interface AuthorizedAgentOAuthTokenRepository {
-  get(
-    namespace: string,
-    agentId: string,
-    serverName: string,
-  ): Promise<AgentOAuthToken | null>;
-  put(
-    namespace: string,
-    agentId: string,
-    serverName: string,
-    token: AgentOAuthToken,
-  ): Promise<void>;
-  delete(namespace: string, agentId: string, serverName: string): Promise<boolean>;
-  listByAgent(
-    namespace: string,
-    agentId: string,
-  ): Promise<Array<AgentOAuthToken & { serverName: string }>>;
-}
-
-export class AuthorizedAgentOAuthTokenRepositoryImpl
-  extends AuthorizedScope
-  implements AuthorizedAgentOAuthTokenRepository
-{
+export class AuthorizedAgentOAuthTokenRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: AgentOAuthTokenRepository,
