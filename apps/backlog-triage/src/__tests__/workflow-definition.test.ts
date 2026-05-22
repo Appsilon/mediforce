@@ -57,7 +57,7 @@ describe('backlog-triage', () => {
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.data.env?.GITHUB_TOKEN).toBe('{{GITHUB_TOKEN}}');
-    expect(result.data.env?.MEDIFORCE_API_KEY).toBe('{{MEDIFORCE_API_KEY}}');
+    expect(result.data.env?.PLATFORM_API_KEY).toBe('{{PLATFORM_API_KEY}}');
     expect(result.data.env?.APP_BASE_URL).toBe('{{APP_BASE_URL}}');
   });
 

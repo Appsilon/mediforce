@@ -236,7 +236,7 @@ describe('backlog-triage journey', () => {
         },
         {
           GITHUB_TOKEN: 'ghp_xxx',
-          MEDIFORCE_API_KEY: 'mf_yyy',
+          PLATFORM_API_KEY: 'mf_yyy',
           APP_BASE_URL: 'https://mediforce.test',
         },
       );
@@ -285,7 +285,7 @@ describe('backlog-triage journey', () => {
         },
         {
           GITHUB_TOKEN: 'ghp_xxx',
-          MEDIFORCE_API_KEY: 'mf_yyy',
+          PLATFORM_API_KEY: 'mf_yyy',
           APP_BASE_URL: 'https://mediforce.test',
         },
       );
