@@ -32,12 +32,12 @@ describe('getAgentOutputFromSiblings', () => {
     // For review1, the nearest preceding sibling with output is agent1 ("v1")
     const outputForReview1 = getAgentOutputFromSiblings(review1, siblings);
     expect(outputForReview1).not.toBeNull();
-    expect(outputForReview1!.presentation).toBe('v1');
+    expect(outputForReview1!.presentation).toEqual({ kind: 'html', content: 'v1' });
 
     // For review2, the nearest preceding sibling with output is agent2 ("v2")
     const outputForReview2 = getAgentOutputFromSiblings(review2, siblings);
     expect(outputForReview2).not.toBeNull();
-    expect(outputForReview2!.presentation).toBe('v2');
+    expect(outputForReview2!.presentation).toEqual({ kind: 'html', content: 'v2' });
   });
 
   it('[DATA] returns null when no preceding sibling has output', () => {
@@ -59,7 +59,7 @@ describe('getAgentOutputFromSiblings', () => {
 });
 
 describe('getAgentOutput', () => {
-  it('[DATA] extracts presentation from task completionData', () => {
+  it('[DATA] coerces a legacy raw-string presentation into {kind:html, content}', () => {
     const task = buildHumanTask({
       completionData: {
         agentOutput: {
@@ -72,8 +72,34 @@ describe('getAgentOutput', () => {
 
     const output = getAgentOutput(task);
     expect(output).not.toBeNull();
-    expect(output!.presentation).toBe('<div>some html</div>');
+    expect(output!.presentation).toEqual({ kind: 'html', content: '<div>some html</div>' });
     expect(output!.confidence).toBe(0.95);
     expect(output!.reasoning).toBe('looks good');
+  });
+
+  it('[DATA] passes through a structured markdown presentation', () => {
+    const task = buildHumanTask({
+      completionData: {
+        agentOutput: {
+          presentation: { kind: 'markdown', content: '# Hi\n\n- one' },
+        },
+      },
+    });
+
+    const output = getAgentOutput(task);
+    expect(output!.presentation).toEqual({ kind: 'markdown', content: '# Hi\n\n- one' });
+  });
+
+  it('[DATA] returns null presentation for malformed shapes', () => {
+    const task = buildHumanTask({
+      completionData: {
+        agentOutput: {
+          presentation: { kind: 'rich', content: 'nope' },
+        },
+      },
+    });
+
+    const output = getAgentOutput(task);
+    expect(output!.presentation).toBeNull();
   });
 });

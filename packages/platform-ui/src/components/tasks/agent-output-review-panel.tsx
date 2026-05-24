@@ -26,7 +26,7 @@ export function AgentOutputReviewPanel({
   instanceId,
 }: AgentOutputReviewPanelProps) {
   const hasResult = agentOutput.result !== null && Object.keys(agentOutput.result).length > 0;
-  const hasPresentation = typeof agentOutput.presentation === 'string' && agentOutput.presentation.length > 0;
+  const hasPresentation = agentOutput.presentation !== null;
   const hasContent = hasResult || hasPresentation;
 
   if (!hasContent) {

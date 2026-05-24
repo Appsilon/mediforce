@@ -237,6 +237,90 @@ describe('backlog-triage journey', () => {
       return resultPayload;
     }
 
+    /** Run an inline script that writes multiple distinct files (e.g.
+     *  result.json + presentation.md). Returns the raw content of each
+     *  written path keyed by basename — caller decides what to parse. */
+    async function runInlineScriptCapturingFiles(
+      script: string,
+      inputJson: Record<string, unknown>,
+      env: Record<string, string>,
+    ): Promise<Record<string, string>> {
+      const fakeFs = {
+        readFileSync: () => JSON.stringify(inputJson),
+      };
+      const files: Record<string, string> = {};
+      const captureWrite = (path: string, content: string): void => {
+        const base = path.replace(/^.*\//, '');
+        files[base] = content;
+      };
+      const stripImports = script.replace(/^import\s+\{[^}]+\}\s+from\s+'fs';?\s*\n?/m, '');
+      const wrapped = `return (async () => {\n${stripImports}\n})();`;
+      const fn = new Function('readFileSync', 'writeFileSync', 'process', 'fetch', wrapped);
+      try {
+        await fn(
+          fakeFs.readFileSync,
+          captureWrite,
+          { env, exit: (code: number) => { throw new ScriptExit(code); } },
+          mockFetch,
+        );
+      } catch (err) {
+        if (!(err instanceof ScriptExit)) throw err;
+      }
+      return files;
+    }
+
+    it('check-tags writes a markdown bullet list to presentation.md for untagged issues', async () => {
+      const step = wd.steps.find((s) => s.id === 'check-tags')!;
+      const script = step.agent!.inlineScript!;
+      const files = await runInlineScriptCapturingFiles(
+        script,
+        {
+          repo: 'owner/repo',
+          options: [
+            { id: '101', label: '#101 No labels', href: 'https://github.com/owner/repo/issues/101', badges: [] },
+            { id: '102', label: '#102 Has bug label', href: 'https://github.com/owner/repo/issues/102', badges: ['bug'] },
+            { id: '103', label: '#103 Random tag', href: 'https://github.com/owner/repo/issues/103', badges: ['triage'] },
+          ],
+        },
+        {},
+      );
+
+      const md = files['presentation.md'];
+      expect(md).toBeDefined();
+      expect(md).not.toBeUndefined();
+      // Result still reports the gate decision
+      const result = JSON.parse(files['result.json']);
+      expect(result.needsTagging).toBe(true);
+      expect(result.untaggedCount).toBe(2); // #101 and #103
+      // Heading + a markdown bullet per untagged issue
+      expect(md).toMatch(/##\s+2 issue\(s\) need a category tag/);
+      expect(md).toContain('- [#101 No labels](https://github.com/owner/repo/issues/101)');
+      expect(md).toContain('- [#103 Random tag](https://github.com/owner/repo/issues/103)');
+      // No HTML in the output — markdown is the new contract.
+      expect(md).not.toMatch(/<\/?\w+/);
+    });
+
+    it('check-tags escapes brackets in issue titles so [P0]-style labels render correctly', async () => {
+      // GitHub titles routinely contain bracketed prefixes. Without escaping
+      // both [ and ], CommonMark parses them as a phantom inner link and
+      // breaks the bullet's display label.
+      const step = wd.steps.find((s) => s.id === 'check-tags')!;
+      const script = step.agent!.inlineScript!;
+      const files = await runInlineScriptCapturingFiles(
+        script,
+        {
+          repo: 'owner/repo',
+          options: [
+            { id: '7', label: '#7 [P0] Login broken', href: 'https://github.com/owner/repo/issues/7', badges: [] },
+          ],
+        },
+        {},
+      );
+
+      const md = files['presentation.md'];
+      expect(md).toContain('- [#7 \\[P0\\] Login broken](https://github.com/owner/repo/issues/7)');
+    });
+
     it('fetch-backlog GETs the repo issues endpoint with the auth header', async () => {
       const step = wd.steps.find((s) => s.id === 'fetch-backlog')!;
       const script = step.agent!.inlineScript!;
