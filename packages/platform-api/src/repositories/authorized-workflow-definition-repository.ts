@@ -32,8 +32,20 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
     return this.caller.namespaces.has(def.namespace) ? def : null;
   };
 
-  getLatestVersion = async (namespace: string, name: string): Promise<number> =>
-    this.raw.getLatestWorkflowVersion(namespace, name);
+  /**
+   * Returns the latest version that this caller is allowed to see — mirrors
+   * the visibility gate in `get()`. For foreign workspaces we cross-check
+   * visibility against the actual latest definition, so a non-member cannot
+   * enumerate private-WD names by probing the version number.
+   */
+  getLatestVersion = async (namespace: string, name: string): Promise<number> => {
+    const version = await this.raw.getLatestWorkflowVersion(namespace, name);
+    if (version === 0) return 0;
+    if (this.caller.isSystemActor) return version;
+    if (this.caller.namespaces.has(namespace)) return version;
+    const def = await this.raw.getWorkflowDefinition(namespace, name, version);
+    return def?.visibility === 'public' ? version : 0;
+  };
 
   listGroups = async (includeArchived: boolean): Promise<WorkflowDefinitionGroup[]> => {
     const { definitions } = this.caller.isSystemActor

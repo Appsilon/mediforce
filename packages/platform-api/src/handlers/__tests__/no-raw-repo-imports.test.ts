@@ -35,6 +35,11 @@ const ALWAYS_BANNED: readonly RegExp[] = [
   /from\s+['"]@mediforce\/platform-core\/repositories/,
 ];
 
+// TODO(ADR-0004 follow-up): tighten guard to also reject `import type { *Repository }`
+// from the top-level `@mediforce/platform-core` barrel. Today the barrel re-exports
+// raw repo types (ProcessInstanceRepository, HumanTaskRepository, etc.) and the
+// subpath bans above don't catch that route — only the handler signature does.
+
 /** Banned EXCEPT in @public-handler files. */
 const PUBLIC_GATED_BANNED: readonly RegExp[] = [
   /from\s+['"]@mediforce\/platform-infra(['"\/])/,

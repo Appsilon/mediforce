@@ -32,9 +32,10 @@ a regex-passing `if (caller.kind === 'user') { return everything; }`).
 
 In parallel, [ADR-0001](./0001-firestore-to-postgres.md) commits — as
 invariant 3 — to a `WorkspaceScopedRepository` base class that auto-filters
-every default read by workspace and soft-delete. That ADR scopes the base
-class to the Postgres backend; the wrapper is intended to land with the
-Drizzle implementation. If Phase 2 ships handler-resident, the codebase
+every default read by workspace and soft-delete at the storage layer. That
+ADR scopes the base class to the Postgres backend; the wrapper introduced
+here is the workspace-membership half of that contract and is intended to
+compose with the storage-layer soft-delete filter once Drizzle lands. If Phase 2 ships handler-resident, the codebase
 acquires a pattern that gets unwound a few months later when ADR-0001's
 implementation arrives. Two pattern shifts in 3–4 months is more churn than
 one early pivot.
@@ -62,8 +63,17 @@ visible to handlers.
    every read and write:
    (a) workspace membership (caller's reachable workspaces intersect the
    entity's workspace),
-   (b) soft-delete / archived filtering,
-   (c) `WorkflowDefinition` visibility filtering (`public` vs `private`).
+   (b) `WorkflowDefinition` visibility filtering (`public` vs `private`).
+
+   Soft-delete / archived filtering is **not** a wrapper concern. Each raw
+   repository decides per-method whether tombstoned rows are excluded; the
+   wrapper passes those reads through. Adding wrapper-level filtering would
+   double-filter rows that storage already excludes and silently mask rows
+   that storage chose to surface (e.g. admin / system-actor reads). When
+   the Postgres rewrite (ADR-0001) lands, `WorkspaceScopedRepository` will
+   own the default `WHERE deleted = false` predicate at the storage layer,
+   not here.
+
    Indirect-namespace entities (`HumanTask`, `CoworkSession`, `AgentRun`,
    `AuditEvent`, `Handoff` — workspace via parent `WorkflowRun`) load the
    parent for the membership check. The wrapper for `getById` returns `null`
@@ -115,9 +125,17 @@ visible to handlers.
 9. **Static guard.** Replace `auth-coverage.test.ts` with
    `no-raw-repo-imports.test.ts` — fails CI if any file under
    `packages/platform-api/src/handlers/` imports from
-   `@mediforce/platform-core/interfaces` or `@mediforce/platform-infra`.
+   `@mediforce/platform-core/interfaces`, `@mediforce/platform-core/repositories`,
+   or `@mediforce/platform-infra`.
    The TypeScript handler signature already forbids it; the test is
    belt-and-suspenders against bypass.
+   _Known gap (TODO):_ the top-level `@mediforce/platform-core` barrel
+   currently re-exports raw repository **types** (`ProcessInstanceRepository`,
+   `HumanTaskRepository`, …); a handler could `import type` one of those
+   from the barrel and the regex wouldn't catch it. Mitigated in practice
+   by the handler signature (`(input, scope)`) — there is no parameter to
+   bind a raw repo to — but the guard should also reject `*Repository`-suffixed
+   type imports from the top-level barrel. Tracked for a follow-up.
 10. **Trivial handlers are deleted, not kept as one-line pass-throughs.**
     A handler whose body reduces to `return { items: await scope.X.list() }`
     or `const x = await scope.X.getById(id); if (!x) throw NotFoundError;
@@ -269,8 +287,11 @@ visible to handlers.
 ## Open questions for review
 
 - **Wrapper layer placement: `platform-api/src/repositories/` vs a new
-  `platform-authz` package.** Defaulting to `platform-api/`. Confirm in PR
-  review.
+  `platform-authz` package.** Resolved — lands in
+  `platform-api/src/repositories/`. A separate package would need
+  `CallerIdentity` (currently in `platform-api`) as a peer dependency and
+  would only host one consumer (the route adapter); the split has no
+  callers waiting for it.
 - **`AuthorizedScope` base class location.** Lives in
   `packages/platform-api/src/repositories/` next to the wrappers; the
   Postgres swap is additive (raw repos move; wrapper layer unchanged).

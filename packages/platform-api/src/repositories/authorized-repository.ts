@@ -15,6 +15,16 @@ import { ForbiddenError } from '../errors.js';
  *
  * Subclass once per entity. Construct with the caller; instances are
  * per-request and disposable.
+ *
+ * TODO(ADR-0004 Phase 2): mutation methods (`claim`, `complete`, `resolve`,
+ * `cancel`, `upsert`, etc.) are present on several wrappers but have no
+ * handler caller yet — they're armed surface, not inert. The Phase 2 PR
+ * that wires the mutation handlers must (a) re-audit each mutation's
+ * pre-conditions (lifecycle state, role, ownership — none of which the
+ * wrapper enforces today), (b) narrow `Partial<Entity>` patch types to
+ * exclude `namespace` / `deleted` where applicable (see
+ * `AuthorizedWorkflowRunRepository.update` for the pattern), and
+ * (c) add wrapper-level tests for each mutation, not just the handler.
  */
 export abstract class AuthorizedScope {
   constructor(protected readonly caller: CallerIdentity) {}

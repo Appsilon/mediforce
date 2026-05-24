@@ -44,6 +44,12 @@ export function assertNamespaceAccess(
   }
 }
 
+/**
+ * @deprecated ADR-0004 — handlers should reach data via `CallerScope` wrappers,
+ *   which enforce this gate at the call site. Remaining inline callers under
+ *   `platform-ui/src/app/api/**` are pre-Phase-2 routes that haven't migrated
+ *   yet; new code must not use this helper.
+ */
 export function callerCanAccess(caller: CallerIdentity, namespace: string | undefined): boolean {
   if (caller.isSystemActor) return true;
   if (typeof namespace !== 'string' || namespace.length === 0) return false;
@@ -54,6 +60,10 @@ export function callerCanAccess(caller: CallerIdentity, namespace: string | unde
  * Filter a list of entities to those the caller may see. Each entity supplies
  * its namespace via `namespaceOf` — keeps this helper agnostic of entity
  * shape (some store namespace at top level, some via a parent instance).
+ *
+ * @deprecated ADR-0004 — list/query methods on `Authorized<Entity>Repository`
+ *   filter at the storage layer (`*VisibleTo` / `*InNamespaces`). New code
+ *   must reach data through `CallerScope`, not via this post-filter.
  */
 export function filterByCaller<T>(
   items: readonly T[],

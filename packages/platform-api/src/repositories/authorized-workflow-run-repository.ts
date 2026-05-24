@@ -66,10 +66,24 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
     return this.raw.getLatestStepExecution(id, stepId);
   };
 
-  /** Update is workspace-gated through `getById`. Callers must look up first. */
+  /**
+   * Update is workspace-gated through `getById`. Callers must look up first.
+   *
+   * `namespace` is asserted immutable: the gate above checks the workspace
+   * the run *currently* lives in, so allowing a patch to rewrite namespace
+   * would let a member move a run into a workspace they don't belong to (or
+   * out of one they do) under cover of a single check. Same reasoning for
+   * `deleted` — soft-delete is a privileged tombstone, not a patch field.
+   */
   update = async (id: string, updates: Partial<ProcessInstance>): Promise<void> => {
     const existing = await this.getById(id);
     if (existing === null) {
+      throw new ForbiddenError();
+    }
+    if (updates.namespace !== undefined && updates.namespace !== existing.namespace) {
+      throw new ForbiddenError();
+    }
+    if (updates.deleted !== undefined && !this.caller.isSystemActor) {
       throw new ForbiddenError();
     }
     await this.raw.update(id, updates);
