@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { z } from 'zod';
-import { HandlerError } from '@mediforce/platform-api/errors';
+import { z } from 'zod';
+import {
+  ApiError,
+  HandlerError,
+  apiErrorCodeForStatus,
+  httpStatusForApiErrorCode,
+  type ApiErrorCode,
+} from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { createCallerScope, type CallerScope } from '@mediforce/platform-api/repositories';
 import { resolveCallerIdentity } from './api-auth.js';
@@ -79,14 +85,15 @@ export function createRouteAdapter<
       raw = await inputFromRequest(req, ctx);
     } catch (err) {
       console.error('[route-adapter] inputFromRequest error:', err);
-      return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+      return jsonError('validation', 'Invalid input');
     }
 
     const parsed = inputSchema.safeParse(raw);
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
-        { status: 400 },
+      return jsonError(
+        'validation',
+        parsed.error.issues[0]?.message ?? 'Invalid input',
+        parsed.error.issues,
       );
     }
 
@@ -95,13 +102,31 @@ export function createRouteAdapter<
       const result = await handler(parsed.data as NarrowInput, scope);
       return NextResponse.json(result);
     } catch (err) {
+      if (err instanceof ApiError) {
+        return jsonError(err.code, err.message, err.details);
+      }
       if (err instanceof HandlerError) {
-        return NextResponse.json({ error: err.message }, { status: err.statusCode });
+        return jsonError(apiErrorCodeForStatus(err.statusCode), err.message);
+      }
+      if (err instanceof z.ZodError) {
+        return jsonError('validation', 'Invalid input', err.issues);
       }
       console.error('[route-adapter] handler error:', err);
-      return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+      return jsonError('internal', 'Internal error');
     }
   };
+}
+
+/**
+ * Serialize the ADR-0005 §1 envelope. `code` drives the HTTP status via the
+ * §3 table — single source of truth across reads and mutations.
+ */
+function jsonError(code: ApiErrorCode, message: string, details?: unknown): NextResponse {
+  const body: { error: { code: ApiErrorCode; message: string; details?: unknown } } = {
+    error: { code, message },
+  };
+  if (details !== undefined) body.error.details = details;
+  return NextResponse.json(body, { status: httpStatusForApiErrorCode(code) });
 }
 
 function defaultBuildScope(caller: CallerIdentity): CallerScope {

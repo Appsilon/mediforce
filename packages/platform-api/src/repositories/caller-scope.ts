@@ -1,5 +1,6 @@
 import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
 import type {
+  AuditRepository,
   CronTriggerStateRepository,
   ModelRegistryRepository,
   NamespaceRepository,
@@ -91,4 +92,13 @@ export interface SystemServices {
   readonly cronTrigger: CronTrigger;
   readonly webhookRouter: WebhookRouter;
   readonly agentRunner: AgentRunner;
+  /**
+   * Raw audit-write surface — Phase 2 bridge per ADR-0005 §7. Handler-emitted
+   * audit events use this; persistence-layer emission (post-headless-migration
+   * audit-wiring phase) deletes this entry. Lives on `scope.system` rather
+   * than the `AuthorizedAuditEventRepository` because `Authorized*Repository`
+   * semantics promise per-method workspace gating, and `append` doesn't gate
+   * (the writer is a handler that already passed the read-side gate).
+   */
+  readonly audit: AuditRepository;
 }

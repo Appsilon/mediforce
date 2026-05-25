@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Mediforce, ApiError } from '../index.js';
+import { Mediforce, MediforceClientError } from '../index.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -66,7 +66,7 @@ describe('mediforce.runs.get', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('throws ApiError on 404', async () => {
+  it('throws MediforceClientError on 404', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({ error: 'Run not found' }, 404),
     );
@@ -74,7 +74,7 @@ describe('mediforce.runs.get', () => {
     const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
     const error = await mediforce.runs.get({ runId: 'nope' }).catch((err) => err);
 
-    expect(error).toBeInstanceOf(ApiError);
-    expect((error as ApiError).status).toBe(404);
+    expect(error).toBeInstanceOf(MediforceClientError);
+    expect((error as MediforceClientError).status).toBe(404);
   });
 });

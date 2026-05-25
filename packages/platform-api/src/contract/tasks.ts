@@ -67,3 +67,22 @@ export const GetTaskOutputSchema = HumanTaskSchema;
 
 export type GetTaskInput = z.infer<typeof GetTaskInputSchema>;
 export type GetTaskOutput = z.infer<typeof GetTaskOutputSchema>;
+
+/**
+ * Contract for `POST /api/tasks/:taskId/claim`.
+ *
+ * Input is just the path-derived `taskId` — the claimer's identity comes from
+ * the auth carrier (Firebase ID token for browser, `X-Api-Key` for S2S), not
+ * the request body. Per ADR-0005 §5 the response echoes the post-mutation
+ * entity (status `claimed`, `assignedUserId` set).
+ */
+export const ClaimTaskInputSchema = z.object({
+  taskId: z.string().min(1),
+});
+
+export const ClaimTaskOutputSchema = z.object({
+  task: HumanTaskSchema,
+});
+
+export type ClaimTaskInput = z.infer<typeof ClaimTaskInputSchema>;
+export type ClaimTaskOutput = z.infer<typeof ClaimTaskOutputSchema>;

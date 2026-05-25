@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Mediforce, ApiError, type ClientConfig } from '../index.js';
+import { Mediforce, MediforceClientError, type ClientConfig } from '../index.js';
 import {
   buildHumanTask,
   buildProcessInstance,
@@ -250,8 +250,8 @@ describe('Mediforce', () => {
     });
   });
 
-  describe('ApiError', () => {
-    it('throws ApiError with the server-reported message on non-2xx', async () => {
+  describe('MediforceClientError', () => {
+    it('throws MediforceClientError with the server-reported message on non-2xx', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         jsonResponse({ error: 'Exactly one of `instanceId` or `role`' }, 400),
       );
@@ -261,12 +261,12 @@ describe('Mediforce', () => {
         .list({ instanceId: 'inst-a' })
         .catch((err) => err);
 
-      expect(error).toBeInstanceOf(ApiError);
-      expect((error as ApiError).status).toBe(400);
-      expect((error as ApiError).message).toMatch(/exactly one of/i);
+      expect(error).toBeInstanceOf(MediforceClientError);
+      expect((error as MediforceClientError).status).toBe(400);
+      expect((error as MediforceClientError).message).toMatch(/exactly one of/i);
     });
 
-    it('throws ApiError even when the server returns no JSON body', async () => {
+    it('throws MediforceClientError even when the server returns no JSON body', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 500 }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
@@ -274,15 +274,15 @@ describe('Mediforce', () => {
         .list({ instanceId: 'inst-a' })
         .catch((err) => err);
 
-      expect(error).toBeInstanceOf(ApiError);
-      expect((error as ApiError).status).toBe(500);
+      expect(error).toBeInstanceOf(MediforceClientError);
+      expect((error as MediforceClientError).status).toBe(500);
     });
   });
 
   // ---- Per-method contracts (table-driven) ----
   //
-  // For methods whose contract reduces to (build URL → parse 200 → ApiError on 4xx),
-  // a single table-driven helper covers happy-path URL/parse + ApiError on 404.
+  // For methods whose contract reduces to (build URL → parse 200 → MediforceClientError on 4xx),
+  // a single table-driven helper covers happy-path URL/parse + MediforceClientError on 404.
   // Methods with non-trivial input encoding (query strings, repeated params) keep
   // their verbose tests below.
 
@@ -408,7 +408,7 @@ describe('Mediforce', () => {
       expect(fetchSpy.mock.calls[0]?.[0]).toBe(contract.expectedUrl);
     });
 
-    it('throws ApiError on 404 with parsed body', async () => {
+    it('throws MediforceClientError on 404 with parsed body', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         jsonResponse({ error: 'Not found' }, 404),
       );
@@ -416,8 +416,8 @@ describe('Mediforce', () => {
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
       const err = await contract.call(mediforce).catch((e) => e);
 
-      expect(err).toBeInstanceOf(ApiError);
-      expect((err as ApiError).status).toBe(404);
+      expect(err).toBeInstanceOf(MediforceClientError);
+      expect((err as MediforceClientError).status).toBe(404);
     });
   });
 
@@ -489,7 +489,7 @@ describe('Mediforce', () => {
       );
     });
 
-    it('throws ApiError on 404', async () => {
+    it('throws MediforceClientError on 404', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         jsonResponse({ error: 'Workflow not found' }, 404),
       );
@@ -499,8 +499,8 @@ describe('Mediforce', () => {
         .get({ name: 'missing' })
         .catch((e) => e);
 
-      expect(err).toBeInstanceOf(ApiError);
-      expect((err as ApiError).status).toBe(404);
+      expect(err).toBeInstanceOf(MediforceClientError);
+      expect((err as MediforceClientError).status).toBe(404);
     });
   });
 
@@ -528,6 +528,97 @@ describe('Mediforce', () => {
         mediforce.cowork.getByInstance({ instanceId: '' }),
       ).rejects.toThrow();
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('tasks.claim', () => {
+    it('POSTs to /api/tasks/:taskId/claim and parses the entity envelope', async () => {
+      const task = buildHumanTask({
+        id: 'task-1',
+        status: 'claimed',
+        assignedUserId: 'u-1',
+      });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ task }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.tasks.claim({ taskId: 'task-1' });
+
+      expect(result.task.id).toBe('task-1');
+      expect(result.task.status).toBe('claimed');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/tasks/task-1/claim`);
+      expect(fetchSpy.mock.calls[0]?.[1]?.method).toBe('POST');
+    });
+
+    it('URL-encodes the taskId path segment', async () => {
+      const task = buildHumanTask({ id: 'task 1/2', status: 'claimed', assignedUserId: 'u-1' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ task }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.tasks.claim({ taskId: 'task 1/2' });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/tasks/task%201%2F2/claim`,
+      );
+    });
+
+    it('rejects an empty taskId before firing any request', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await expect(mediforce.tasks.claim({ taskId: '' })).rejects.toThrow();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('throws MediforceClientError with envelope code/message/details on a typed 409', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse(
+          {
+            error: {
+              code: 'precondition_failed',
+              message: 'Cannot claim a claimed task',
+              details: { taskId: 'task-1', currentStatus: 'claimed' },
+            },
+          },
+          409,
+        ),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const err = (await mediforce.tasks
+        .claim({ taskId: 'task-1' })
+        .catch((e) => e)) as MediforceClientError;
+
+      expect(err).toBeInstanceOf(MediforceClientError);
+      expect(err.status).toBe(409);
+      expect(err.message).toBe('Cannot claim a claimed task');
+      expect(err.code).toBe('precondition_failed');
+      expect(err.details).toEqual({ taskId: 'task-1', currentStatus: 'claimed' });
+    });
+  });
+
+  describe('error envelope back-compat (legacy `{ error: string }`)', () => {
+    it('extracts the message from the legacy string envelope', async () => {
+      // Some Phase 1 routes still throw plain HandlerError with a custom
+      // shape, and the legacy 5xx surface (`{ error: <string> }`) hasn't
+      // been migrated. The client must tolerate both shapes during the
+      // transition.
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ error: 'Legacy failure mode' }, 500),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const err = (await mediforce.tasks
+        .list({ instanceId: 'inst-a' })
+        .catch((e) => e)) as MediforceClientError;
+
+      expect(err).toBeInstanceOf(MediforceClientError);
+      expect(err.status).toBe(500);
+      expect(err.message).toBe('Legacy failure mode');
+      expect(err.code).toBeUndefined();
     });
   });
 });

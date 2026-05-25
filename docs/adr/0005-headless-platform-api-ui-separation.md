@@ -254,11 +254,16 @@ Phase 2 deletes the actions; without a bridge, audit coverage on these
 mutations would silently regress.
 
 **Phase 2 bridge:** each migrated mutation handler emits audit inline
-via `scope.auditEvents.append({...})` — same shape as today's Server
+via `scope.system.audit.append({...})` — same shape as today's Server
 Action code, ~6 LOC per handler. Net-zero LOC if the existing emission
-code is moved (not added) from action to handler. Required addition:
-`.append()` method on `AuthorizedAuditEventRepository` (read-only
-today).
+code is moved (not added) from action to handler. The raw write surface
+lives on `scope.system.audit` (existing trusted-bypass lane that already
+holds `engine` / `agentRunner` / `manualTrigger`), not on the Authorized
+wrapper. Reason: `Authorized*Repository` semantics promise per-method
+workspace gating; `append` would not gate (writer trusted by-construction —
+the handler just loaded the parent through a gated wrapper). Putting it
+on `scope.system` makes the trust explicit and groups it with the other
+god-mode-by-design handles.
 
 **Long-term direction (separate audit-wiring phase, post-headless-
 migration):** audit emission moves to the **persistence boundary
@@ -302,8 +307,14 @@ Closed action-name set for Phase 2 (extensible by amendment):
 - `HumanTaskRepository.unclaim(taskId, userId)` + wrapper passthrough
   (no method today; current `unclaimTask` Server Action writes Firestore
   directly).
-- `AuthorizedAuditEventRepository.append(event)` — write-side method
-  (read-only today).
+
+Raw audit-write surface lives on `scope.system.audit` (existing
+trusted-bypass lane), not on the Authorized wrapper. Reason:
+`Authorized*Repository` semantics promise per-method gating; `append`
+would not gate (writer trusted by-construction). Putting it on
+`scope.system` makes the trust explicit and aligns with where `engine` /
+`agentRunner` already live. `AuthorizedAuditEventRepository` stays
+read-only.
 
 `AuthorizedWorkflowRunRepository` has `getById` / `list` / `update` only.
 Phase 2 adds:
@@ -333,6 +344,13 @@ These are domain methods on the wrapper, mirroring how
   — same gap as adapter-orchestrated. Acceptable as Phase 2 bridge
   only because the existing Server Action emission is being moved
   rather than newly introduced.
+- **`.append()` on `AuthorizedAuditEventRepository`** as the write
+  surface during the bridge. Rejected — `Authorized*Repository` names
+  a contract ("every method gates on caller's workspace membership"),
+  and `append` does not gate. Putting it there forces a misleading
+  doc-comment on every read of the file. Raw write goes on
+  `scope.system.audit` instead, next to the other trusted-bypass
+  handles (`engine`, `agentRunner`, `manualTrigger`).
 - **Keep Server Actions alongside the API.** Rejected — empirical:
   today's actions use zero Server Action features. They are API-route-
   shaped code in a Server Action costume, paying the auth-bifurcation

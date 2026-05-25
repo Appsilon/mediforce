@@ -278,12 +278,13 @@ So Phase 2 narrows to **uniform lifecycle mutations** — same handler shape (lo
   audit coverage for these mutations. To avoid a compliance regression
   during the gap between Phase 2 and the future audit-wiring phase
   (see "Captured for later" below), each new Phase 2 mutation handler
-  emits audit inline via `scope.auditEvents.append({...})` — same shape
+  emits audit inline via `scope.system.audit.append({...})` — same shape
   as today's Server Action code, ~6 LOC per handler. This is throwaway
   bridge code: the audit-wiring phase rewrites to repo-resident
-  `MutationContext` and removes the handler-level emits. Add a `.append()`
-  method to `AuthorizedAuditEventRepository` (read-only today) to enable
-  this.
+  `MutationContext` and removes the handler-level emits. The raw audit
+  write surface lives on `scope.system.audit` (the existing trusted-
+  bypass lane that already holds `engine` / `agentRunner`), not on
+  `AuthorizedAuditEventRepository` — see ADR-0005 §7/§8 for why.
 
 **Server Action policy.** Per-endpoint judgement. Default: when migrating
 a mutation, delete the parallel Server Action; UI moves to
@@ -386,14 +387,16 @@ PR1 picks a true minimal mutation instead.
 - `packages/platform-api/src/handlers/tasks/claim-task.ts` — new.
   Handler: assert `scope.caller.userId`, call `scope.humanTasks.claim()`
   (wrapper already exists), emit audit-bridge via
-  `scope.auditEvents.append({...})` — move the audit-emission code from
+  `scope.system.audit.append({...})` — move the audit-emission code from
   today's `claimTask` Server Action (`packages/platform-ui/src/app/actions/tasks.ts:43-59`),
   do not author new audit shape.
 - `packages/platform-api/src/handlers/tasks/__tests__/claim-task.test.ts`
   — contract + handler tests against in-memory scope.
-- `packages/platform-api/src/repositories/authorized-audit-event-repository.ts`
-  — add `append(event)` write method. Delegates to raw `auditRepo.append()`.
-  Update `__tests__/`.
+- `packages/platform-api/src/repositories/caller-scope.ts` — extend
+  `SystemServices` with `readonly audit: AuditRepository` (raw write
+  surface for the audit bridge per ADR-0005 §7). Wired in
+  `create-caller-scope.ts` from `services.auditRepo`.
+  `AuthorizedAuditEventRepository` stays read-only.
 - `packages/platform-ui/src/app/api/tasks/[taskId]/claim/route.ts` —
   replace inline handler with `createRouteAdapter` call. Path-param
   `taskId` merged into input via the `inputFromReq` callback.
@@ -462,7 +465,7 @@ Endpoints:
   input + output schemas (output reuses entity schemas per ADR-0005 §5).
 - `packages/platform-api/src/handlers/<tasks|processes>/<name>.ts` —
   new handler. Calls `scope.X.method()`, emits audit via
-  `scope.auditEvents.append({...})` (bridge per ADR-0005 §7).
+  `scope.system.audit.append({...})` (bridge per ADR-0005 §7).
 - `packages/platform-api/src/handlers/<tasks|processes>/__tests__/<name>.test.ts`
   — contract + handler tests.
 - `packages/platform-ui/src/app/api/<path>/route.ts` — replace inline

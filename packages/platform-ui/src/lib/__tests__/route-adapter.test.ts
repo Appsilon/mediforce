@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ForbiddenError, NotFoundError } from '@mediforce/platform-api/errors';
+import { ApiError, ForbiddenError, NotFoundError } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import type { CallerScope } from '@mediforce/platform-api/repositories';
 import { createRouteAdapter } from '../route-adapter';
@@ -53,8 +53,10 @@ describe('createRouteAdapter', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBeTypeOf('string');
-    expect(json.error.length).toBeGreaterThan(0);
+    expect(json.error.code).toBe('validation');
+    expect(json.error.message).toBeTypeOf('string');
+    expect(json.error.message.length).toBeGreaterThan(0);
+    expect(Array.isArray(json.error.details)).toBe(true);
   });
 
   it('passes parsed input + scope to the handler and returns its result as JSON', async () => {
@@ -98,7 +100,45 @@ describe('createRouteAdapter', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('maps NotFoundError to 404 with the error message', async () => {
+  describe('typed-error → envelope mapping (ADR-0005 §3)', () => {
+    const cases: ReadonlyArray<{ code: string; status: number }> = [
+      { code: 'unauthorized', status: 401 },
+      { code: 'forbidden', status: 403 },
+      { code: 'not_found', status: 404 },
+      { code: 'validation', status: 400 },
+      { code: 'precondition_failed', status: 409 },
+      { code: 'conflict', status: 409 },
+      { code: 'rate_limited', status: 429 },
+      { code: 'internal', status: 500 },
+    ];
+
+    for (const { code, status } of cases) {
+      it(`maps ApiError('${code}') to HTTP ${status} with typed envelope`, async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const handler = vi
+          .fn()
+          .mockRejectedValue(
+            new ApiError(code as never, `boom: ${code}`, { hint: 'detail' }),
+          );
+        const GET = createRouteAdapter(
+          InputSchema,
+          (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+          handler,
+          { resolveCaller: stubCaller(), buildScope },
+        );
+
+        const res = await GET(makeRequest({ name: 'alice' }), undefined);
+
+        expect(res.status).toBe(status);
+        expect(await res.json()).toEqual({
+          error: { code, message: `boom: ${code}`, details: { hint: 'detail' } },
+        });
+        consoleError.mockRestore();
+      });
+    }
+  });
+
+  it('maps legacy NotFoundError → { code: "not_found", message } at 404', async () => {
     const handler = vi.fn().mockRejectedValue(new NotFoundError('Task not found'));
     const GET = createRouteAdapter(
       InputSchema,
@@ -110,10 +150,12 @@ describe('createRouteAdapter', () => {
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: 'Task not found' });
+    expect(await res.json()).toEqual({
+      error: { code: 'not_found', message: 'Task not found' },
+    });
   });
 
-  it('maps ForbiddenError to 403 with the error message', async () => {
+  it('maps legacy ForbiddenError → { code: "forbidden", message } at 403', async () => {
     const handler = vi.fn().mockRejectedValue(new ForbiddenError());
     const GET = createRouteAdapter(
       InputSchema,
@@ -125,10 +167,34 @@ describe('createRouteAdapter', () => {
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: 'Forbidden' });
+    expect(await res.json()).toEqual({
+      error: { code: 'forbidden', message: 'Forbidden' },
+    });
   });
 
-  it('returns 500 with a generic message when the handler throws an unexpected error', async () => {
+  it('maps a thrown ZodError to validation with the issues in details', async () => {
+    const Inner = z.object({ x: z.number() });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const handler = vi.fn().mockImplementation(() => {
+      Inner.parse({ x: 'not-a-number' });
+    });
+    const GET = createRouteAdapter(
+      InputSchema,
+      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+      handler,
+      { resolveCaller: stubCaller(), buildScope },
+    );
+
+    const res = await GET(makeRequest({ name: 'alice' }), undefined);
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe('validation');
+    expect(Array.isArray(body.error.details)).toBe(true);
+    consoleError.mockRestore();
+  });
+
+  it('returns 500 with a generic envelope when the handler throws an unexpected error', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const handler = vi.fn().mockRejectedValue(new Error('database on fire'));
     const GET = createRouteAdapter(
@@ -141,7 +207,9 @@ describe('createRouteAdapter', () => {
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: 'Internal error' });
+    expect(await res.json()).toEqual({
+      error: { code: 'internal', message: 'Internal error' },
+    });
     expect(consoleError).toHaveBeenCalled();
   });
 

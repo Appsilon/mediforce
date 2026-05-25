@@ -75,7 +75,8 @@ test.describe('GET /api/cowork/* — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status()).toBe(404);
-    const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/no active cowork session/i);
+    const body = await res.json() as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('not_found');
+    expect(body.error.message).toMatch(/no active cowork session/i);
   });
 });

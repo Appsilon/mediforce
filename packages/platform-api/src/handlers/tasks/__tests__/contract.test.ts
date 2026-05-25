@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { buildHumanTask } from '@mediforce/platform-core/testing';
 import {
   ACTIONABLE_STATUSES,
+  ClaimTaskInputSchema,
+  ClaimTaskOutputSchema,
   ListTasksInputSchema,
   ListTasksOutputSchema,
 } from '../../../contract/tasks.js';
@@ -148,6 +151,44 @@ describe('ListTasksOutputSchema', () => {
   it('rejects tasks that miss required fields', () => {
     const result = ListTasksOutputSchema.safeParse({
       tasks: [{ id: 'task-1' }],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('ClaimTaskInputSchema', () => {
+  it('accepts a non-empty taskId', () => {
+    const result = ClaimTaskInputSchema.safeParse({ taskId: 'task-1' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an empty-string taskId', () => {
+    const result = ClaimTaskInputSchema.safeParse({ taskId: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a missing taskId', () => {
+    const result = ClaimTaskInputSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('ClaimTaskOutputSchema', () => {
+  it('accepts a well-formed task envelope', () => {
+    const result = ClaimTaskOutputSchema.safeParse({
+      task: buildHumanTask({ id: 'task-1', status: 'claimed', assignedUserId: 'u-1' }),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects payloads missing the task field', () => {
+    const result = ClaimTaskOutputSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a task missing required fields', () => {
+    const result = ClaimTaskOutputSchema.safeParse({
+      task: { id: 'task-1' },
     });
     expect(result.success).toBe(false);
   });

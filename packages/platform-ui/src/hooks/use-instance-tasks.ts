@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { HumanTask } from '@mediforce/platform-core';
-import { mediforce, ApiError } from '@/lib/mediforce';
+import { mediforce, MediforceClientError } from '@/lib/mediforce';
 
 /**
  * Fetches the full set of human tasks belonging to a single process instance
@@ -41,7 +41,7 @@ export function useInstanceTasks(instanceId: string | undefined): {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        const normalised = err instanceof ApiError || err instanceof Error
+        const normalised = err instanceof MediforceClientError || err instanceof Error
           ? err
           : new Error(String(err));
         setError(normalised);
