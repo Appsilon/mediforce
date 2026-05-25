@@ -15,5 +15,6 @@ export { getCoworkSessionByInstance } from './cowork/get-cowork-session-by-insta
 export { listPlugins } from './plugins/list-plugins.js';
 
 export { listRuns } from './runs/list-runs.js';
+export { getRun } from './runs/get-run.js';
 
 export { listAdapter, getByIdAdapter } from './_generic.js';
