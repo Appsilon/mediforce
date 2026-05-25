@@ -4,7 +4,7 @@
 // per-workspace view to enforce.
 
 import type { CallerScope } from '../../repositories/index.js';
-import type { DockerInfoResponse } from '../../contract/system.js';
+import type { DockerInfoResponse, GetDockerInfoInput } from '../../contract/system.js';
 import {
   fetchFromContainerWorker,
   fetchFromLocalDocker,
@@ -12,7 +12,7 @@ import {
 } from './_docker.js';
 
 export async function getDockerInfo(
-  _input: Record<string, never>,
+  _input: GetDockerInfoInput,
   _scope: CallerScope,
 ): Promise<DockerInfoResponse> {
   try {
