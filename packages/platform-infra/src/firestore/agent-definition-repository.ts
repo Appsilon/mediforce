@@ -64,9 +64,32 @@ export class FirestoreAgentDefinitionRepository implements AgentDefinitionReposi
     return toAgentDefinition(snap.id, snap.data() as Record<string, unknown>);
   }
 
-  async list(): Promise<AgentDefinition[]> {
+  async listAll(): Promise<AgentDefinition[]> {
     const snap = await this.col.get();
     return snap.docs.map((d) => toAgentDefinition(d.id, d.data()));
+  }
+
+  async listVisibleTo(allowed: readonly string[]): Promise<AgentDefinition[]> {
+    // Firestore-era: single fetch + in-memory visibility filter. Postgres-era
+    // pushes this to `WHERE visibility = 'public' OR namespace = ANY($)`.
+    const all = await this.listAll();
+    return all.filter((agent) => {
+      if (agent.visibility === 'public') return true;
+      return typeof agent.namespace === 'string' && allowed.includes(agent.namespace);
+    });
+  }
+
+  async getByIdVisibleTo(
+    id: string,
+    allowed: readonly string[],
+  ): Promise<AgentDefinition | null> {
+    const agent = await this.getById(id);
+    if (agent === null) return null;
+    if (agent.visibility === 'public') return agent;
+    if (typeof agent.namespace === 'string' && allowed.includes(agent.namespace)) {
+      return agent;
+    }
+    return null;
   }
 
   async update(id: string, input: UpdateAgentDefinitionInput): Promise<AgentDefinition> {

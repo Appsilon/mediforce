@@ -1,4 +1,3 @@
-import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { listTasks } from '@mediforce/platform-api/handlers';
 import {
@@ -14,9 +13,9 @@ import {
  *   - `stepId`               — optional filter within the instance/role
  *   - `status`               — repeatable; e.g. `?status=pending&status=claimed`
  *
- * Namespace gating is enforced inside the handler: api-key callers see every
- * matching task, user callers only see tasks whose process instance belongs
- * to a namespace they're a member of.
+ * Workspace gating is enforced inside `scope.tasks`: api-key callers see every
+ * matching task, user callers only see tasks whose parent run belongs to a
+ * workspace they're a member of.
  */
 export const GET = createRouteAdapter<typeof ListTasksInputSchema, ListTasksInput>(
   ListTasksInputSchema,
@@ -30,8 +29,5 @@ export const GET = createRouteAdapter<typeof ListTasksInputSchema, ListTasksInpu
       status: statuses.length > 0 ? statuses : undefined,
     };
   },
-  (input, caller) => {
-    const { humanTaskRepo, instanceRepo } = getPlatformServices();
-    return listTasks(input, { humanTaskRepo, instanceRepo }, caller);
-  },
+  listTasks,
 );

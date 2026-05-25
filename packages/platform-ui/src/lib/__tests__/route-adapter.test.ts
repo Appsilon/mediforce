@@ -3,11 +3,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ForbiddenError, NotFoundError } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
+import type { CallerScope } from '@mediforce/platform-api/repositories';
 import { createRouteAdapter } from '../route-adapter';
 
 const InputSchema = z.object({ name: z.string().min(1) });
 
-const apiKeyCaller: CallerIdentity = { kind: 'apiKey' };
+const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
+
+/** Minimal scope stub — adapter tests don't exercise wrapper internals, so
+ *  an opaque object carrying just the caller is enough to verify routing. */
+function stubScope(caller: CallerIdentity): CallerScope {
+  return { caller } as unknown as CallerScope;
+}
 
 function makeRequest(params?: Record<string, string>): NextRequest {
   const url = new URL('http://localhost/api/test');
@@ -21,6 +28,8 @@ function stubCaller(caller: CallerIdentity = apiKeyCaller) {
   return vi.fn().mockResolvedValue(caller);
 }
 
+const buildScope = (c: CallerIdentity): CallerScope => stubScope(c);
+
 describe('createRouteAdapter', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -28,16 +37,16 @@ describe('createRouteAdapter', () => {
 
   // Auth pipeline: middleware (`src/middleware.ts`) first gates `/api/*` for
   // presence of credentials. The adapter then resolves those credentials into
-  // a typed `CallerIdentity` and threads it into the handler so domain code
-  // can enforce namespace policy. Both layers run in production; tests stub
-  // `resolveCaller` to bypass Firebase/Firestore.
+  // a typed `CallerIdentity`, builds a per-request `CallerScope` from the
+  // platform services, and threads it into the handler. Tests stub both
+  // resolveCaller and buildScope to bypass Firebase/Firestore.
 
   it('returns 400 with the first Zod issue when input fails validation', async () => {
     const GET = createRouteAdapter(
       InputSchema,
       (req) => ({ name: req.nextUrl.searchParams.get('name') }),
       vi.fn(),
-      { resolveCaller: stubCaller() },
+      { resolveCaller: stubCaller(), buildScope },
     );
 
     const res = await GET(makeRequest(), undefined);
@@ -48,25 +57,29 @@ describe('createRouteAdapter', () => {
     expect(json.error.length).toBeGreaterThan(0);
   });
 
-  it('passes parsed input + caller to the handler and returns its result as JSON', async () => {
+  it('passes parsed input + scope to the handler and returns its result as JSON', async () => {
     const handler = vi.fn().mockResolvedValue({ greeting: 'hello alice' });
     const userCaller: CallerIdentity = {
       kind: 'user',
       uid: 'u1',
       namespaces: new Set(['ns-a']),
+      isSystemActor: false,
     };
     const GET = createRouteAdapter(
       InputSchema,
       (req) => ({ name: req.nextUrl.searchParams.get('name') }),
       handler,
-      { resolveCaller: stubCaller(userCaller) },
+      { resolveCaller: stubCaller(userCaller), buildScope },
     );
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ greeting: 'hello alice' });
-    expect(handler).toHaveBeenCalledWith({ name: 'alice' }, userCaller);
+    expect(handler).toHaveBeenCalledWith(
+      { name: 'alice' },
+      expect.objectContaining({ caller: userCaller }),
+    );
   });
 
   it('short-circuits with the 401 response returned by resolveCaller', async () => {
@@ -76,7 +89,7 @@ describe('createRouteAdapter', () => {
       InputSchema,
       (req) => ({ name: req.nextUrl.searchParams.get('name') }),
       handler,
-      { resolveCaller: vi.fn().mockResolvedValue(unauthorized) },
+      { resolveCaller: vi.fn().mockResolvedValue(unauthorized), buildScope },
     );
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
@@ -91,7 +104,7 @@ describe('createRouteAdapter', () => {
       InputSchema,
       (req) => ({ name: req.nextUrl.searchParams.get('name') }),
       handler,
-      { resolveCaller: stubCaller() },
+      { resolveCaller: stubCaller(), buildScope },
     );
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
@@ -106,7 +119,7 @@ describe('createRouteAdapter', () => {
       InputSchema,
       (req) => ({ name: req.nextUrl.searchParams.get('name') }),
       handler,
-      { resolveCaller: stubCaller() },
+      { resolveCaller: stubCaller(), buildScope },
     );
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
@@ -122,7 +135,7 @@ describe('createRouteAdapter', () => {
       InputSchema,
       (req) => ({ name: req.nextUrl.searchParams.get('name') }),
       handler,
-      { resolveCaller: stubCaller() },
+      { resolveCaller: stubCaller(), buildScope },
     );
 
     const res = await GET(makeRequest({ name: 'alice' }), undefined);
@@ -142,26 +155,23 @@ describe('createRouteAdapter', () => {
       ParamSchema,
       async (_req, ctx) => ({ id: (await ctx.params).id }),
       handler,
-      { resolveCaller: stubCaller() },
+      { resolveCaller: stubCaller(), buildScope },
     );
 
     const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'abc' }) });
 
     expect(res.status).toBe(200);
-    expect(handler).toHaveBeenCalledWith({ id: 'abc' }, apiKeyCaller);
+    expect(handler).toHaveBeenCalledWith(
+      { id: 'abc' },
+      expect.objectContaining({ caller: apiKeyCaller }),
+    );
   });
 
   describe('NarrowInput generic', () => {
-    // Discriminated union narrower than the schema's `z.infer` — the handler
-    // wants exactly-one-of, but the schema parses a refine on an object where
-    // both keys are optional. Callers opt in by passing the narrow type
-    // explicitly as the second type parameter.
     type NarrowExample =
       | { instanceId: string; role?: undefined }
       | { role: string; instanceId?: undefined };
 
-    // Type-level sanity check: a valid narrowed value is assignable to the
-    // union, and discriminating on presence of `instanceId` narrows correctly.
     const _check: NarrowExample = { instanceId: 'x' };
     void _check;
 
@@ -177,7 +187,7 @@ describe('createRouteAdapter', () => {
 
     it('passes the narrowed input type through to the handler', async () => {
       const handler = vi
-        .fn<(input: NarrowExample, caller: CallerIdentity) => Promise<{ ok: true }>>()
+        .fn<(input: NarrowExample, scope: CallerScope) => Promise<{ ok: true }>>()
         .mockResolvedValue({ ok: true });
 
       const GET = createRouteAdapter<typeof UnionSchema, NarrowExample>(
@@ -187,7 +197,7 @@ describe('createRouteAdapter', () => {
           role: req.nextUrl.searchParams.get('role') ?? undefined,
         }),
         handler,
-        { resolveCaller: stubCaller() },
+        { resolveCaller: stubCaller(), buildScope },
       );
 
       const res = await GET(makeRequest({ instanceId: 'inst-a' }), undefined);
@@ -196,7 +206,6 @@ describe('createRouteAdapter', () => {
       expect(handler).toHaveBeenCalledTimes(1);
       const received = handler.mock.calls[0]?.[0];
       expect(received).toEqual({ instanceId: 'inst-a' });
-      // Runtime narrowing mirrors what the type claims.
       if (received !== undefined && received.instanceId !== undefined) {
         expect(received.instanceId).toBe('inst-a');
       }

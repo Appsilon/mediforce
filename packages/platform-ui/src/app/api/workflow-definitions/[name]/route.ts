@@ -3,9 +3,9 @@ import { WorkflowVisibilitySchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
-import { getWorkflowDefinition } from '@mediforce/platform-api/handlers';
-import { GetWorkflowDefinitionInputSchema } from '@mediforce/platform-api/contract';
-import type { GetWorkflowDefinitionInput } from '@mediforce/platform-api/contract';
+import { getWorkflow } from '@mediforce/platform-api/handlers';
+import { GetWorkflowInputSchema } from '@mediforce/platform-api/contract';
+import type { GetWorkflowInput } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ name: string }>;
@@ -21,12 +21,12 @@ interface RouteContext {
  * 404 (anti-enumeration), not 403.
  */
 export const GET = createRouteAdapter<
-  typeof GetWorkflowDefinitionInputSchema,
-  GetWorkflowDefinitionInput,
+  typeof GetWorkflowInputSchema,
+  GetWorkflowInput,
   unknown,
   RouteContext
 >(
-  GetWorkflowDefinitionInputSchema,
+  GetWorkflowInputSchema,
   async (req, ctx) => {
     const { name } = await ctx.params;
     const url = new URL(req.url);
@@ -40,10 +40,7 @@ export const GET = createRouteAdapter<
     if (namespaceParam !== null) input.namespace = namespaceParam;
     return input;
   },
-  (input, caller) => {
-    const { processRepo } = getPlatformServices();
-    return getWorkflowDefinition(input, { processRepo }, caller);
-  },
+  getWorkflow,
 );
 
 export async function PATCH(

@@ -40,13 +40,21 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    the codebase's language and surfaces fuzzy terms before you write code.
    Optional, not every task needs it.
 
-2. **Test first via `/new-test`.** Write a failing test at the lowest level
-   that gives real signal before implementation. `/new-test` picks the level
-   (L1 unit / L2 integration / L3 API E2E / L4 UI / L5 external),
-   scaffolds the file, and walks RED → GREEN. Every feature MUST land at
-   **L3** (proves Firestore + middleware + auth). For L4 UI journeys with
-   a GIF deliverable, use `/e2e-test`. Skip the test only for trivial edits
-   (typo, comment, single-line config) and say so out loud.
+2. **Test first via `/new-test` — for product code.** Write a failing test at
+   the lowest level that gives real signal before implementation. `/new-test`
+   picks the level (L1 unit / L2 integration / L3 API E2E / L4 UI / L5
+   external), scaffolds the file, and walks RED → GREEN. Product features
+   MUST land at **L3** (proves Firestore + middleware + auth). For L4 UI
+   journeys with a GIF deliverable, use `/e2e-test`.
+
+   **Don't test infra/tooling/workflow code.** CI scripts, build glue, dev
+   tooling, workflow configs (`apps/*/workflow.yaml`), one-off migrations —
+   these don't get unit tests. They get exercised by the thing they support
+   (the actual CI run, the actual workflow execution). Writing tests for
+   tests-of-tests is over-engineering. Use judgement; if you're unsure
+   whether something is "product" or "tooling," ask. Also skip the test for
+   trivial product edits (typo, comment, single-line config) — and say so
+   out loud.
 
 3. **Dogfood the CLI via `/use-mediforce`.** Any operation `pnpm exec mediforce`
    covers MUST go through it — never curl REST when the CLI does it. If the
@@ -71,11 +79,32 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    d. Spawn a subagent here to add it inline.
    Default: small + mechanical → (d); larger or architectural → (b).
 
-6. **Main thread is the architect, not an IC.** Delegate to subagents for
-   multi-file research, scans >3 queries, test runs >30s, design, code
-   review. Parallelize independent work. Verify the diff, not the agent's
-   summary. NEVER delegate when it slows things down — a 30-second edit
-   doesn't need a subagent.
+6. **Main thread is manager and lead architect.** Owns the outcome,
+   decomposes, delegates, narrates. Subagents are ICs doing the heavy
+   lifting (sometimes architects themselves — Plan, code-review).
+   Owning the outcome means verifying actual results, not avoiding
+   spawn to stay "safe".
+
+   - **NEVER run subagents or non-trivial bash in foreground.** ALWAYS
+     `run_in_background: true` unless it's trivial bash (`ls`, `mv`,
+     single `grep`). Foreground long work physically blocks the harness —
+     UI won't accept user messages until it returns.
+   - **Never go silent.** Decompose long work into small spawns
+     (5×3min beats 1×20min). Tell the user upfront what's spawned +
+     expected duration. Main-thread tool-calling between spawns
+     naturally produces narration. One huge spawn = dead silence.
+   - **Pick the right worker:**
+     - Long command, output IS the answer (`pnpm test`, `docker build`)
+       → `Bash(run_in_background: true)` + `Monitor`. Zero prompt-prep,
+       prefer over subagent.
+     - Multi-file exploration (>3 searches), parallel independent edits,
+       fresh-eyes review of own diff, anything that'd dump significant
+       output into main context → `Agent` subagent. Spawn parallel
+       agents in one message when work is independent. To iterate on
+       prior work with full context, `SendMessage` to the agent's ID
+       instead of new `Agent`.
+     - Heuristic: prompt-prep <30s AND task >2min → spawn. Otherwise
+       main thread does it.
 
 7. **Style.** English everywhere. No `any` — Zod + `z.infer`. No one-letter
    names. Self-documenting code over comments; NEVER add docstrings/types/
@@ -105,7 +134,8 @@ trigger phrases match the action you're about to take. List with
 3. CLI > REST. `/use-mediforce` first; add the command if missing.
 4. `/self-review` as a subagent before reporting done.
 5. Ask, don't sneak, when a capability is missing.
-6. Delegate to subagents when it parallelises. Not as ceremony.
+6. Main thread = manager + lead architect. NEVER fg subagent or
+   non-trivial bash. Decompose, narrate, verify actual output.
 7. Log non-trivial changes via `/add-changelog-entry`.
 
 See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).

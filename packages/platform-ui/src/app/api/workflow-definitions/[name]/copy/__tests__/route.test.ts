@@ -28,7 +28,7 @@ vi.mock('@/lib/platform-services', () => ({
   }),
 }));
 
-let mockCallerIdentity: { kind: string; namespaces?: Set<string> } = { kind: 'apiKey' };
+let mockCallerIdentity: { kind: string; namespaces?: Set<string>; isSystemActor: boolean } = { kind: 'apiKey', isSystemActor: true };
 
 vi.mock('@/lib/api-auth', () => ({
   resolveCallerIdentity: () => mockCallerIdentity,
@@ -62,7 +62,7 @@ function makeRequest(name: string, targetNamespace: string, body?: Record<string
 describe('POST /api/workflow-definitions/[name]/copy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCallerIdentity = { kind: 'apiKey' };
+    mockCallerIdentity = { kind: 'apiKey', isSystemActor: true };
     // First call: source version lookup; Second call: target exists check
     mockGetLatestWorkflowVersion.mockImplementation((namespace: string, _name: string) =>
       namespace === 'target-ns' ? Promise.resolve(0) : Promise.resolve(3),
@@ -138,7 +138,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
   });
 
   it('returns 404 for private workflow when caller lacks source access', async () => {
-    mockCallerIdentity = { kind: 'user', namespaces: new Set(['target-ns']) };
+    mockCallerIdentity = { kind: 'user', namespaces: new Set(['target-ns']), isSystemActor: false };
     mockGetWorkflowDefinition.mockResolvedValue({ ...sourceDefinition, visibility: 'private' });
 
     const res = await POST(makeRequest('my-workflow', 'target-ns', undefined, 'source-ns'), {
@@ -148,7 +148,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
   });
 
   it('copies private workflow when caller has source namespace access', async () => {
-    mockCallerIdentity = { kind: 'user', namespaces: new Set(['source-ns', 'target-ns']) };
+    mockCallerIdentity = { kind: 'user', namespaces: new Set(['source-ns', 'target-ns']), isSystemActor: false };
     mockGetWorkflowDefinition.mockResolvedValue({ ...sourceDefinition, visibility: 'private' });
 
     const res = await POST(makeRequest('my-workflow', 'target-ns', undefined, 'source-ns'), {
@@ -158,7 +158,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
   });
 
   it('returns 403 when caller is not member of target namespace', async () => {
-    mockCallerIdentity = { kind: 'user', namespaces: new Set(['other-ns']) };
+    mockCallerIdentity = { kind: 'user', namespaces: new Set(['other-ns']), isSystemActor: false };
 
     const res = await POST(makeRequest('my-workflow', 'target-ns'), {
       params: Promise.resolve({ name: 'my-workflow' }),

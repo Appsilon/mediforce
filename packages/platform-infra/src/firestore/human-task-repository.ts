@@ -1,10 +1,18 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import { HumanTaskSchema, type HumanTask, type HumanTaskRepository } from '@mediforce/platform-core';
+import {
+  HumanTaskSchema,
+  type HumanTask,
+  type HumanTaskRepository,
+  type ProcessInstanceRepository,
+} from '@mediforce/platform-core';
 
 export class FirestoreHumanTaskRepository implements HumanTaskRepository {
   private readonly collectionName = 'humanTasks';
 
-  constructor(private readonly db: Firestore) {}
+  constructor(
+    private readonly db: Firestore,
+    private readonly parents: ProcessInstanceRepository,
+  ) {}
 
   async create(task: HumanTask): Promise<HumanTask> {
     await this.db.collection(this.collectionName).doc(task.id).set(task);
@@ -17,7 +25,18 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     return HumanTaskSchema.parse(snap.data());
   }
 
-  async getByRole(role: string): Promise<HumanTask[]> {
+  async getByIdInNamespaces(
+    taskId: string,
+    allowed: readonly string[],
+  ): Promise<HumanTask | null> {
+    const task = await this.getById(taskId);
+    if (task === null) return null;
+    const parent = await this.parents.getById(task.processInstanceId);
+    if (!parent || typeof parent.namespace !== 'string') return null;
+    return allowed.includes(parent.namespace) ? task : null;
+  }
+
+  async getByRoleAll(role: string): Promise<HumanTask[]> {
     // Requires composite index: (assignedRole ASC, createdAt ASC).
     // No status filter — callers narrow explicitly if they need actionable-only.
     const snap = await this.db
@@ -28,12 +47,30 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     return snap.docs.map((d) => HumanTaskSchema.parse(d.data()));
   }
 
+  async getByRoleInNamespaces(
+    role: string,
+    allowed: readonly string[],
+  ): Promise<HumanTask[]> {
+    const rows = await this.getByRoleAll(role);
+    return this.filterByParentNamespace(rows, allowed);
+  }
+
   async getByInstanceId(instanceId: string): Promise<HumanTask[]> {
     const snap = await this.db
       .collection(this.collectionName)
       .where('processInstanceId', '==', instanceId)
       .get();
     return snap.docs.map((d) => HumanTaskSchema.parse(d.data()));
+  }
+
+  async getByInstanceIdInNamespaces(
+    instanceId: string,
+    allowed: readonly string[],
+  ): Promise<HumanTask[]> {
+    const parent = await this.parents.getById(instanceId);
+    if (!parent || typeof parent.namespace !== 'string') return [];
+    if (!allowed.includes(parent.namespace)) return [];
+    return this.getByInstanceId(instanceId);
   }
 
   async claim(taskId: string, userId: string): Promise<HumanTask> {
@@ -77,5 +114,24 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
         await this.db.collection(this.collectionName).doc(d.id).update({ deleted });
       }
     }
+  }
+
+  private async filterByParentNamespace<T extends { processInstanceId: string }>(
+    rows: T[],
+    allowed: readonly string[],
+  ): Promise<T[]> {
+    if (rows.length === 0) return [];
+    const instanceIds = [...new Set(rows.map((r) => r.processInstanceId))];
+    const namespaceById = new Map<string, string | undefined>();
+    await Promise.all(
+      instanceIds.map(async (id) => {
+        const parent = await this.parents.getById(id);
+        namespaceById.set(id, parent?.namespace);
+      }),
+    );
+    return rows.filter((r) => {
+      const ns = namespaceById.get(r.processInstanceId);
+      return typeof ns === 'string' && allowed.includes(ns);
+    });
   }
 }

@@ -73,7 +73,7 @@ vi.mock('@/lib/platform-services', () => ({
 }));
 
 vi.mock('@/lib/api-auth', () => ({
-  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
+  resolveCallerIdentity: () => ({ kind: 'apiKey', isSystemActor: true }),
   requireNamespaceAccess: () => null,
   filterByNamespace: (_caller: unknown, items: unknown[]) => items,
 }));
@@ -82,8 +82,8 @@ vi.mock('@/lib/api-auth', () => ({
 // anyway) so they resolve `@/lib/platform-services` to the fake.
 import * as catalogRoute from '@/app/api/admin/tool-catalog/route';
 import * as catalogByIdRoute from '@/app/api/admin/tool-catalog/[id]/route';
-import * as mcpServersListRoute from '@/app/api/agent-definitions/[id]/mcp-servers/route';
-import * as mcpServerByNameRoute from '@/app/api/agent-definitions/[id]/mcp-servers/[name]/route';
+import * as mcpServersListRoute from '@/app/api/agents/[id]/mcp-servers/route';
+import * as mcpServerByNameRoute from '@/app/api/agents/[id]/mcp-servers/[name]/route';
 
 // ---- Fixtures ----
 
@@ -168,7 +168,7 @@ async function bindTealflowToCowork(): Promise<void> {
   const res = await mcpServerByNameRoute.PUT(
     jsonRequest(
       'PUT',
-      '/api/agent-definitions/tealflow-cowork-chat/mcp-servers/tealflow',
+      '/api/agents/tealflow-cowork-chat/mcp-servers/tealflow',
       { type: 'stdio', catalogId: 'tealflow-mcp' },
     ),
     { params: Promise.resolve({ id: 'tealflow-cowork-chat', name: 'tealflow' }) },
@@ -214,7 +214,7 @@ describe('MCP lifecycle — admin REST API composed with runtime resolver', () =
 
     // D. Agent bindings endpoint reflects the new mapping.
     const bindingsRes = await mcpServersListRoute.GET(
-      jsonRequest('GET', '/api/agent-definitions/tealflow-cowork-chat/mcp-servers'),
+      jsonRequest('GET', '/api/agents/tealflow-cowork-chat/mcp-servers'),
       { params: Promise.resolve({ id: 'tealflow-cowork-chat' }) },
     );
     const bindingsBody = await bindingsRes.json();
@@ -303,7 +303,7 @@ describe('MCP lifecycle — admin REST API composed with runtime resolver', () =
     const evilRes = await mcpServerByNameRoute.PUT(
       jsonRequest(
         'PUT',
-        '/api/agent-definitions/tealflow-cowork-chat/mcp-servers/evil',
+        '/api/agents/tealflow-cowork-chat/mcp-servers/evil',
         {
           type: 'stdio',
           catalogId: 'tealflow-mcp',
@@ -317,7 +317,7 @@ describe('MCP lifecycle — admin REST API composed with runtime resolver', () =
 
     // Nothing leaked into the agent — the binding was never attached.
     const bindingsRes = await mcpServersListRoute.GET(
-      jsonRequest('GET', '/api/agent-definitions/tealflow-cowork-chat/mcp-servers'),
+      jsonRequest('GET', '/api/agents/tealflow-cowork-chat/mcp-servers'),
       { params: Promise.resolve({ id: 'tealflow-cowork-chat' }) },
     );
     const bindingsBody = await bindingsRes.json();
@@ -335,7 +335,7 @@ describe('MCP lifecycle — admin REST API composed with runtime resolver', () =
     const res = await mcpServerByNameRoute.PUT(
       jsonRequest(
         'PUT',
-        '/api/agent-definitions/claude-code-agent/mcp-servers/tealflow',
+        '/api/agents/claude-code-agent/mcp-servers/tealflow',
         { type: 'stdio', catalogId: 'tealflow-mcp', allowedTools: ['list_apps'] },
       ),
       { params: Promise.resolve({ id: 'claude-code-agent', name: 'tealflow' }) },
@@ -360,7 +360,7 @@ describe('MCP lifecycle — admin REST API composed with runtime resolver', () =
     const bindRes = await mcpServerByNameRoute.PUT(
       jsonRequest(
         'PUT',
-        '/api/agent-definitions/tealflow-cowork-chat/mcp-servers/tealflow',
+        '/api/agents/tealflow-cowork-chat/mcp-servers/tealflow',
         {
           type: 'stdio',
           catalogId: 'tealflow-mcp',

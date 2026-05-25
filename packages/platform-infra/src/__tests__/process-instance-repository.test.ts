@@ -99,11 +99,11 @@ describe('InMemoryProcessInstanceRepository (contract tests)', () => {
       await repo.create(createTestInstance({ id: 'inst-b', status: 'completed' }));
       await repo.create(createTestInstance({ id: 'inst-c', status: 'running' }));
 
-      const running = await repo.getByStatus('running');
+      const running = await repo.getByStatusAll('running');
       expect(running).toHaveLength(2);
       expect(running.map((i) => i.id).sort()).toEqual(['inst-a', 'inst-c']);
 
-      const completed = await repo.getByStatus('completed');
+      const completed = await repo.getByStatusAll('completed');
       expect(completed).toHaveLength(1);
       expect(completed[0].id).toBe('inst-b');
     });

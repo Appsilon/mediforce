@@ -1,55 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices } from '@/lib/platform-services';
-import { ListRunsInputSchema } from '@mediforce/platform-api/contract';
-import { resolveCallerIdentity, filterByNamespace } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { listRuns } from '@mediforce/platform-api/handlers';
+import {
+  ListRunsInputSchema,
+  type ListRunsInput,
+} from '@mediforce/platform-api/contract';
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
-  const params = req.nextUrl.searchParams;
-
-  const parseResult = ListRunsInputSchema.safeParse({
-    workflow: params.get('workflow') ?? undefined,
-    status: params.get('status') ?? undefined,
-    limit: params.get('limit') ?? undefined,
-  });
-
-  if (!parseResult.success) {
-    return NextResponse.json(
-      { error: parseResult.error.issues.map((i) => i.message).join('; ') },
-      { status: 400 },
-    );
-  }
-
-  const { workflow, status, limit } = parseResult.data;
-
-  try {
-    const { instanceRepo, namespaceRepo } = getPlatformServices();
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
-    if (caller instanceof NextResponse) return caller;
-
-    const instances = await instanceRepo.list({
-      definitionName: workflow,
-      status,
-      limit,
-    });
-
-    const filtered = filterByNamespace(caller, instances);
-
-    const runs = filtered.map((inst) => ({
-      runId: inst.id,
-      status: inst.status,
-      definitionName: inst.definitionName,
-      definitionVersion: inst.definitionVersion,
-      currentStepId: inst.currentStepId,
-      error: inst.error,
-      createdAt: inst.createdAt,
-      updatedAt: inst.updatedAt,
-      createdBy: inst.createdBy,
-      ...(inst.totalCostUsd != null ? { totalCostUsd: inst.totalCostUsd } : {}),
-    }));
-
-    return NextResponse.json({ runs });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+/**
+ * GET /api/runs
+ *
+ * Lists workflow runs visible to the caller. Workspace gating lives in
+ * `scope.runs.list` — api-key callers see every run, user callers see only
+ * runs in workspaces they're a member of.
+ */
+export const GET = createRouteAdapter<typeof ListRunsInputSchema, ListRunsInput>(
+  ListRunsInputSchema,
+  (req) => {
+    const params = req.nextUrl.searchParams;
+    return {
+      workflow: params.get('workflow') ?? undefined,
+      status: params.get('status') ?? undefined,
+      limit: params.get('limit') ?? undefined,
+    };
+  },
+  listRuns,
+);

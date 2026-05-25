@@ -14,7 +14,7 @@ A single running Mediforce installation. Typically dedicated to one customer
 
 **Namespace** *(today canonical; rename to Workspace proposed in ADR-001)*:
 An isolated scope of work inside a Deployment. Owns workflow definitions,
-process instances, agent definitions, OAuth providers, secrets, tool catalog,
+workflow runs, agents, OAuth providers, secrets, tool catalog,
 cowork sessions. Identified by a URL-safe `handle`. Two types: `personal`
 (auto-created per user, linked via `linkedUserId`) and `organization`
 (multi-member, shared — e.g. a department inside the customer tenant).
@@ -28,14 +28,24 @@ storage key.
 
 ### Workflow domain
 
+**Workflow**:
+A named, reusable process. Identified by `(namespace, name)`. Owns many
+versioned **Workflow Definitions**, a default-version pointer, visibility,
+archive state. The named thing users create, edit, share, and run.
+_Code:_ no explicit `Workflow` schema — encoded as `(namespace, name)` tuple
+with the `WorkflowDefinitionGroup` query-result type aggregating its versions.
+_Avoid_: "Workflow" used loosely for one version (= Workflow Definition) or
+for one execution (= Workflow Run).
+
 **Workflow Definition**:
-Authoritative template for a runnable workflow. Versioned (integer), immutable
-once created. Belongs to one Namespace. Contains steps, transitions,
-triggers, declared roles, env, optional git workspace. Has
-`visibility: public | private` — `public` discoverable read-only across
-Namespaces, `private` members-only.
-_Avoid_: Process Definition (legacy schema, replaced by Workflow Definition),
-"Workflow" used loosely for a running instance — that is a Workflow Run.
+One versioned spec of a Workflow — the JSON content with steps, transitions,
+triggers, declared roles, env, optional git workspace. Versioned (integer),
+immutable once created. Belongs to one Namespace. Has
+`visibility: public | private` on the parent Workflow — `public` discoverable
+read-only across Namespaces, `private` members-only. The runnable artifact:
+a Workflow Run is instantiated from one specific Workflow Definition (version).
+_Avoid_: Process Definition (legacy schema name, replaced by Workflow
+Definition), conflating with the parent Workflow.
 
 **Workflow Run** *(today's `ProcessInstance` — rename to `WorkflowRun` proposed)*:
 One execution of a Workflow Definition. Tracks current step, status,
@@ -79,8 +89,10 @@ finalized artifact is promoted to Output only when the cowork step completes.
 ### Agent + human work
 
 **Agent Run**:
-One autonomous (L0–L4) execution of an agent for a Step Execution.
-Result: an Agent Output Envelope. Immutable once created.
+The execution of one `agent`-type Step inside a Workflow Run. An autonomous
+(L0–L4) attempt by one Agent (the template the Step's `agentId` resolves to)
+to produce the Step's Output. Belongs to the workflow domain — not an
+agent-side concept. Result: an Agent Output Envelope. Immutable once created.
 
 **Cowork Session**:
 A real-time, human-in-the-loop session attached to a Step Execution where
@@ -115,15 +127,24 @@ A code artifact (script or git repo) consumed by an agent at spawn time
 (e.g. Claude Code loads it into the container).
 _Avoid_: Conflating with Plugin — Plugin is the runtime; Skill is data.
 
-**Agent Definition** *(template)*:
-Reusable spec for an agent runtime (Claude Code / OpenCode / cowork-chat /
-voice-realtime) including system prompt, model, MCP bindings, skills.
-Referenced by Workflow Step via `agentId`. Decoupled from steps so the same
-agent can power many steps.
+**Agent**:
+A reusable agent the platform can run — Claude Code / OpenCode /
+cowork-chat / voice-realtime / future runtimes. Bundles system prompt,
+foundation model, MCP server bindings, skills (and, in the future, tools).
+Referenced by a Workflow Step via `agentId`; the same Agent powers many
+Steps across many Workflows. Single mutable document — **not versioned
+today** (the agent IS the spec, one row per agent).
+_Future:_ if we introduce versioning, an **Agent Definition** would emerge
+as one versioned spec of an Agent (parallel to Workflow / Workflow Definition).
+_Code:_ user-facing surface (UI, URL `/api/agents/*`, CLI `agent-*`) uses
+"Agent". Schema (`AgentDefinitionSchema`), repository
+(`AgentDefinitionRepository`), and ADR-0001 Postgres table name are legacy
+artifacts from before this glossary entry was canonicalised — rename to
+`Agent*` pending in a follow-up.
 
 **MCP Server**:
 External tool host (stdio or HTTP) accessible to an agent via Model Context
-Protocol. Attached to an Agent Definition via Agent MCP Binding; narrowed
+Protocol. Attached to an Agent via Agent MCP Binding; narrowed
 per-step via Step MCP Restriction (subtractive).
 
 **Tool Catalog Entry**:
@@ -169,7 +190,7 @@ Authorization-server endpoint + credentials. GitHub / Google built-in; custom
 OIDC supported.
 
 **Agent OAuth Token** *(per Namespace + Agent + Server)*:
-Persisted token used by one Agent Definition to authenticate to one MCP
+Persisted token used by one Agent to authenticate to one MCP
 server. Two Agents needing GitHub connect twice — by design.
 
 **Namespace Secret** *(broader scope)*:
@@ -195,17 +216,18 @@ the user-facing immutable log.
 ## Relationships
 
 - A **Deployment** contains many **Namespaces**.
-- A **Namespace** owns its **Workflow Definitions**, **Workflow Runs**,
-  **Agent Definitions**, **OAuth Providers**, **Secrets**, **Tool Catalog**.
-- A **Workflow Definition** has many versioned revisions; its `visibility`
+- A **Namespace** owns its **Workflows** (with their **Workflow Definitions**),
+  **Workflow Runs**, **Agents**, **OAuth Providers**, **Secrets**,
+  **Tool Catalog**.
+- A **Workflow** has many versioned **Workflow Definitions**; its `visibility`
   controls cross-Namespace read access.
 - A **Workflow Run** belongs to exactly one **Workflow Definition**
-  (`name`+`version`).
+  (`name`+`version` identifies which version of which Workflow).
 - A **Workflow Run** has many **Step Executions**.
 - A **Step Execution** has 0..1 **Agent Run**, 0..1 **Cowork Session**,
   0..N **Human Tasks** attached.
 - An **Agent Run** may produce 0..N **Handoffs**.
-- An **Agent Definition** has many **Agent MCP Bindings** (per server) and
+- An **Agent** has many **Agent MCP Bindings** (per server) and
   many **Agent OAuth Tokens** (per server).
 
 ## Flagged ambiguities
@@ -223,6 +245,16 @@ the user-facing immutable log.
   ubiquitous. ADR-001 renames at storage level only (column names);
   follow-up PRs rename repositories and types incrementally. New code
   uses Workflow.
+- **Agent vs Agent Definition** *(legacy asymmetry)*: Canonical user-facing
+  term is **Agent** (UI labels, URL `/api/agents/*`, CLI `agent-*`). Today
+  there is no versioning — one mutable document per Agent. The schema
+  (`AgentDefinitionSchema`) and repository (`AgentDefinitionRepository`)
+  carry the "Definition" suffix as a historical artifact, mirroring the
+  Workflow / Workflow Definition split that exists in the workflow domain
+  because workflows really are versioned. Rename of schema + repo to
+  drop the suffix is pending in a follow-up PR. If we ever introduce
+  agent versioning, the suffix will earn its keep — see the **Agent**
+  glossary entry.
 - **Output vs Variables vs Artifact**: three distinct concepts, often
   confused. Output = one step's immediate result. Variables = accumulated
   outputs forwarded across steps. Artifact = collaboratively built

@@ -1,6 +1,7 @@
 import {
   WorkflowSecretsSchema,
   type WorkflowSecrets,
+  type WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type { Firestore } from 'firebase-admin/firestore';
 import { encrypt, decrypt } from '../crypto/secrets-cipher.js';
@@ -11,7 +12,7 @@ import { encrypt, decrypt } from '../crypto/secrets-cipher.js';
  *
  * Path: namespaces/{handle}/workflowSecrets/{workflowName}
  */
-export class FirestoreWorkflowSecretsRepository {
+export class FirestoreWorkflowSecretsRepository implements WorkflowSecretsRepository {
   constructor(private readonly db: Firestore) {}
 
   private docRef(namespace: string, workflowName: string) {

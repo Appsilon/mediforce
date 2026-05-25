@@ -27,6 +27,15 @@ export class InMemoryProcessInstanceRepository
     return instance ? { ...instance } : null;
   }
 
+  async getByIdInNamespaces(
+    instanceId: string,
+    allowed: readonly string[],
+  ): Promise<ProcessInstance | null> {
+    const instance = this.instances.get(instanceId);
+    if (!instance) return null;
+    return allowed.includes(instance.namespace ?? '') ? { ...instance } : null;
+  }
+
   async update(
     instanceId: string,
     updates: Partial<ProcessInstance>,
@@ -38,11 +47,25 @@ export class InMemoryProcessInstanceRepository
     this.instances.set(instanceId, { ...existing, ...updates });
   }
 
-  async list(options: ListInstancesOptions): Promise<ProcessInstance[]> {
-    let results = [...this.instances.values()].filter((i) => i.deleted !== true);
-    if (options.namespace !== undefined) {
-      results = results.filter((i) => i.namespace === options.namespace);
-    }
+  async listAll(options: ListInstancesOptions): Promise<ProcessInstance[]> {
+    return this.applyListFilters([...this.instances.values()], options);
+  }
+
+  async listInNamespaces(
+    allowed: readonly string[],
+    options: ListInstancesOptions,
+  ): Promise<ProcessInstance[]> {
+    const inScope = [...this.instances.values()].filter((i) =>
+      allowed.includes(i.namespace ?? ''),
+    );
+    return this.applyListFilters(inScope, options);
+  }
+
+  private applyListFilters(
+    rows: ProcessInstance[],
+    options: ListInstancesOptions,
+  ): ProcessInstance[] {
+    let results = rows.filter((i) => i.deleted !== true);
     if (options.definitionName !== undefined) {
       results = results.filter((i) => i.definitionName === options.definitionName);
     }
@@ -53,8 +76,17 @@ export class InMemoryProcessInstanceRepository
     return results.slice(0, options.limit ?? 20);
   }
 
-  async getByStatus(status: InstanceStatus): Promise<ProcessInstance[]> {
+  async getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]> {
     return [...this.instances.values()].filter((i) => i.status === status);
+  }
+
+  async getByStatusInNamespaces(
+    status: InstanceStatus,
+    allowed: readonly string[],
+  ): Promise<ProcessInstance[]> {
+    return [...this.instances.values()].filter(
+      (i) => i.status === status && allowed.includes(i.namespace ?? ''),
+    );
   }
 
   async getByDefinition(

@@ -140,14 +140,14 @@ describe('middleware Firebase ID token (emulator mode)', () => {
   it('passes when Authorization: Bearer carries a valid emulator ID token', async () => {
     const token = buildEmulatorToken(validEmulatorPayload());
     const res = await middleware(
-      makeRequest('/api/agent-definitions', { headers: { Authorization: `Bearer ${token}` } }),
+      makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
     );
     expect(res.status).not.toBe(401);
   });
 
   it('returns 401 when Bearer token is malformed (not a JWT)', async () => {
     const res = await middleware(
-      makeRequest('/api/agent-definitions', { headers: { Authorization: 'Bearer not-a-jwt' } }),
+      makeRequest('/api/agents', { headers: { Authorization: 'Bearer not-a-jwt' } }),
     );
     expect(res.status).toBe(401);
   });
@@ -157,7 +157,7 @@ describe('middleware Firebase ID token (emulator mode)', () => {
       validEmulatorPayload({ exp: Math.floor(Date.now() / 1000) - 10, iat: Math.floor(Date.now() / 1000) - 3610 }),
     );
     const res = await middleware(
-      makeRequest('/api/agent-definitions', { headers: { Authorization: `Bearer ${token}` } }),
+      makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
     );
     expect(res.status).toBe(401);
   });
@@ -165,7 +165,7 @@ describe('middleware Firebase ID token (emulator mode)', () => {
   it('returns 401 when Bearer token aud does not match project', async () => {
     const token = buildEmulatorToken(validEmulatorPayload({ aud: 'other-project' }));
     const res = await middleware(
-      makeRequest('/api/agent-definitions', { headers: { Authorization: `Bearer ${token}` } }),
+      makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
     );
     expect(res.status).toBe(401);
   });
@@ -173,7 +173,7 @@ describe('middleware Firebase ID token (emulator mode)', () => {
   it('accepts X-Api-Key when present even if Authorization is missing', async () => {
     // Regression guard: adding Bearer support must not break server-to-server X-Api-Key auth
     const res = await middleware(
-      makeRequest('/api/agent-definitions', { headers: { 'X-Api-Key': 'test-secret-key' } }),
+      makeRequest('/api/agents', { headers: { 'X-Api-Key': 'test-secret-key' } }),
     );
     expect(res.status).not.toBe(401);
   });
@@ -182,7 +182,7 @@ describe('middleware Firebase ID token (emulator mode)', () => {
     // Either credential is sufficient
     const token = buildEmulatorToken(validEmulatorPayload());
     const res = await middleware(
-      makeRequest('/api/agent-definitions', {
+      makeRequest('/api/agents', {
         headers: { Authorization: `Bearer ${token}`, 'X-Api-Key': 'wrong' },
       }),
     );

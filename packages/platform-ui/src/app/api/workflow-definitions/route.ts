@@ -4,27 +4,24 @@ import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform
 import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
-import { listWorkflowDefinitions } from '@mediforce/platform-api/handlers';
-import { ListWorkflowDefinitionsInputSchema } from '@mediforce/platform-api/contract';
+import { listWorkflows } from '@mediforce/platform-api/handlers';
+import { ListWorkflowsInputSchema } from '@mediforce/platform-api/contract';
 
 /**
  * GET /api/workflow-definitions
  *
- * List workflow definitions visible to the caller. Namespace + visibility
- * gating, plus the optional `?namespace=` filter, are enforced inside the
- * handler.
+ * List workflow definitions visible to the caller. Workspace + visibility
+ * filtering lives in `scope.workflowDefinitions`; the optional `?namespace=`
+ * query param narrows further but does not grant access.
  */
 export const GET = createRouteAdapter(
-  ListWorkflowDefinitionsInputSchema,
+  ListWorkflowsInputSchema,
   (req) => {
     const url = new URL(req.url);
     const namespace = url.searchParams.get('namespace');
     return namespace !== null ? { namespace } : {};
   },
-  (input, caller) => {
-    const { processRepo } = getPlatformServices();
-    return listWorkflowDefinitions(input, { processRepo }, caller);
-  },
+  listWorkflows,
 );
 
 /**
