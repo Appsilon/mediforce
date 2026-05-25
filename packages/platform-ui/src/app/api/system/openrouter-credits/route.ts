@@ -5,19 +5,16 @@ import {
   type OpenRouterCreditsInput,
 } from '@mediforce/platform-api/contract';
 
-/**
- * GET /api/system/openrouter-credits?namespace=…
- *
- * Reads the workspace's OPENROUTER_API_KEY via the scoped wrapper and
- * proxies to openrouter.ai. All failure modes (no key, upstream error,
- * unexpected shape) degrade to `{available: false, error}` without
- * throwing — the UI panel renders a single fallback.
- */
+// Why: Next-specific 60s revalidate on the upstream openrouter.ai fetch.
+// Lives at the route layer so the handler stays framework-free.
+const cachedFetch: typeof globalThis.fetch = (input, init) =>
+  globalThis.fetch(input, { ...init, next: { revalidate: 60 } });
+
 export const GET = createRouteAdapter<
   typeof OpenRouterCreditsInputSchema,
   OpenRouterCreditsInput
 >(
   OpenRouterCreditsInputSchema,
   (req) => ({ namespace: req.nextUrl.searchParams.get('namespace') ?? undefined }),
-  getOpenRouterCredits,
+  (input, scope) => getOpenRouterCredits(input, scope, { fetch: cachedFetch }),
 );

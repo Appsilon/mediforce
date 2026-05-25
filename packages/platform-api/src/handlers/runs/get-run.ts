@@ -1,6 +1,7 @@
 import type { CallerScope } from '../../repositories/index.js';
 import { NotFoundError } from '../../errors.js';
 import type { GetRunInput, GetRunOutput } from '../../contract/runs.js';
+import type { InstanceStatus } from '@mediforce/platform-core';
 
 /**
  * Fetch one run by id. Out-of-scope ids surface as 404 (anti-enumeration —
@@ -39,7 +40,7 @@ export async function getRun(
 }
 
 async function resolveFinalOutput(
-  status: string,
+  status: InstanceStatus,
   runId: string,
   scope: CallerScope,
 ): Promise<unknown> {

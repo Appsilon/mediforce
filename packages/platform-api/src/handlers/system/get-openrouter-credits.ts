@@ -29,13 +29,8 @@ export async function getOpenRouterCredits(
   scope: CallerScope,
   options: GetOpenRouterCreditsOptions = {},
 ): Promise<OpenRouterCreditsOutput> {
-  let apiKey: string | undefined;
-  try {
-    const secrets = await scope.workspaceSecrets.getSecrets(input.namespace);
-    apiKey = secrets['OPENROUTER_API_KEY'];
-  } catch (err) {
-    return { ...EMPTY, error: err instanceof Error ? err.message : 'Failed to read workspace secrets' };
-  }
+  const secrets = await scope.workspaceSecrets.getSecrets(input.namespace);
+  const apiKey = secrets['OPENROUTER_API_KEY'];
 
   if (apiKey === undefined || apiKey === '') {
     return { ...EMPTY, error: 'OPENROUTER_API_KEY not configured in workspace secrets' };
