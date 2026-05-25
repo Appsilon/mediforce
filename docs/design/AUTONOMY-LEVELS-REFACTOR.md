@@ -94,6 +94,26 @@ The silent-observer and shadow behaviours (current L0–L2) were developer instr
 
 ---
 
+## Scope: What This Refactor Does and Does Not Change
+
+This is a **UX and schema rename**, not a backend engine change.
+
+### What changes
+
+- The names and structure of values in workflow definition schemas (e.g. `executor`, `autonomyLevel` → `controlMode`).
+- UI labels, badge text, and any frontend component that renders the current level identifiers.
+- The Firestore migration script that rewrites stored workflow definitions to use the new field names.
+
+### What does not change
+
+- **The Cowork session engine.** The chat and voice-realtime session infrastructure that powers the current `cowork` executor is not being modified. Mode 2 (Collaborate) is the same engine — it is only being brought under the unified `controlMode` axis rather than living in a separate `executor` enum. No cowork session logic, state machine, or API contract is touched.
+- **The workflow engine's step execution logic.** The engine already branches on executor type and autonomy level to decide how to run a step. That branching logic stays in place; only the field names it reads will change, in sync with the schema migration.
+- **Agent runtime, plugin infrastructure, or any worker.** Nothing in `agent-runtime`, `container-worker`, or `workflow-engine` internals is being rewritten.
+
+If you maintain any code that reads `executor === 'cowork'` or `autonomyLevel`, the migration section below documents the exact rename. No other change is required.
+
+---
+
 ## Migration
 
 This is a **breaking change** to the workflow definition schema. Existing `workflowDefinitions` in Firestore will need to be migrated. Given that production workflows use almost exclusively `L3`, `L4`, and `cowork`, the mapping is straightforward:
