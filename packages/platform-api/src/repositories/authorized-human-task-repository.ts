@@ -3,7 +3,7 @@ import type {
   HumanTaskRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
+import { ApiError } from '../errors.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
 /**
@@ -52,6 +52,6 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
 
   private async assertCanMutate(taskId: string): Promise<void> {
     const task = await this.getById(taskId);
-    if (task === null) throw new ForbiddenError();
+    if (task === null) throw new ApiError('forbidden', 'Forbidden');
   }
 }

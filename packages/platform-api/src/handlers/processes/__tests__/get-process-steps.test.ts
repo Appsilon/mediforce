@@ -8,7 +8,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { getProcessSteps } from '../get-process-steps.js';
-import { NotFoundError } from '../../../errors.js';
+import { ApiError } from '../../../errors.js';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 /**
@@ -39,14 +39,14 @@ describe('getProcessSteps handler', () => {
     );
   });
 
-  it('throws NotFoundError when the instance does not exist', async () => {
+  it('throws ApiError(not_found) when the instance does not exist', async () => {
     const scope = createTestScope({ instanceRepo, processRepo });
     await expect(
       getProcessSteps({ instanceId: 'missing' }, scope),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 
-  it('throws NotFoundError when the workflow definition is missing', async () => {
+  it('throws ApiError(not_found) when the workflow definition is missing', async () => {
     await instanceRepo.create(
       buildProcessInstance({
         id: 'inst-1',
@@ -59,10 +59,10 @@ describe('getProcessSteps handler', () => {
     const scope = createTestScope({ instanceRepo, processRepo });
     await expect(
       getProcessSteps({ instanceId: 'inst-1' }, scope),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 
-  it('throws NotFoundError when definitionVersion is not numeric', async () => {
+  it('throws ApiError(not_found) when definitionVersion is not numeric', async () => {
     await instanceRepo.create(
       buildProcessInstance({
         id: 'inst-1',
@@ -75,7 +75,7 @@ describe('getProcessSteps handler', () => {
     const scope = createTestScope({ instanceRepo, processRepo });
     await expect(
       getProcessSteps({ instanceId: 'inst-1' }, scope),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 
   it('skips terminal steps in the output', async () => {
@@ -242,7 +242,7 @@ describe('getProcessSteps handler', () => {
     expect(result.steps).toHaveLength(2);
   });
 
-  it('throws NotFoundError (not ForbiddenError) for cross-namespace user callers (anti-enumeration)', async () => {
+  it('throws ApiError(not_found) (not forbidden) for cross-namespace user callers (anti-enumeration)', async () => {
     await instanceRepo.create(
       buildProcessInstance({
         id: 'inst-1',
@@ -260,10 +260,10 @@ describe('getProcessSteps handler', () => {
 
     await expect(
       getProcessSteps({ instanceId: 'inst-1' }, scope),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 
-  it('throws NotFoundError when the instance has no namespace', async () => {
+  it('throws ApiError(not_found) when the instance has no namespace', async () => {
     await instanceRepo.create(
       buildProcessInstance({
         id: 'inst-orphan',
@@ -281,6 +281,6 @@ describe('getProcessSteps handler', () => {
 
     await expect(
       getProcessSteps({ instanceId: 'inst-orphan' }, scope),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 });

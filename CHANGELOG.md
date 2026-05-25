@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Changed
+- ADR-0005 PR1.1 cleanup: merge legacy `HandlerError` / `NotFoundError` / `ForbiddenError` hierarchy into `ApiError`. The route-adapter loses its `instanceof HandlerError` arm + `apiErrorCodeForStatus` helper — `ApiError` is now the sole throwable in `@mediforce/platform-api`. `mediforce.workflows.setVisibility()` now requires `namespace` and the UI workflow page consumes the typed client (no more `apiFetch` + envelope-sniffing). CLI `workflow set-visibility` gains a `--namespace` flag.
+
 ### Fixed
 - `check-gif-freshness.py` now evaluates the net PR diff vs base instead of summing per-commit diffs. Add-then-revert within the same PR no longer trips the GIF freshness check (regression surfaced on [#481](https://github.com/Appsilon/mediforce/pull/481)).
 

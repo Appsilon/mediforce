@@ -1,5 +1,5 @@
 import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
+import { ApiError } from '../../errors.js';
 import type { GetRunInput, GetRunOutput } from '../../contract/runs.js';
 import type { InstanceStatus } from '@mediforce/platform-core';
 
@@ -21,7 +21,7 @@ export async function getRun(
 ): Promise<GetRunOutput> {
   const run = await scope.runs.getById(input.runId);
   if (run === null) {
-    throw new NotFoundError(`Run ${input.runId} not found`);
+    throw new ApiError('not_found', `Run ${input.runId} not found`);
   }
 
   const finalOutput = await resolveFinalOutput(run.status, input.runId, scope);

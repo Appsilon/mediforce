@@ -100,6 +100,7 @@ export type ArchiveAllOutput = z.infer<typeof ArchiveAllOutputSchema>;
 
 export const SetVisibilityInputSchema = z.object({
   name: z.string().min(1),
+  namespace: z.string().min(1),
   visibility: WorkflowVisibilitySchema,
 });
 

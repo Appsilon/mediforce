@@ -1,4 +1,4 @@
-import { ForbiddenError } from './errors.js';
+import { ApiError } from './errors.js';
 
 /**
  * Identity of the caller hitting an API handler.
@@ -23,10 +23,11 @@ export type CallerIdentity =
     };
 
 /**
- * Throw `ForbiddenError` unless the caller is allowed to touch resources in
- * `namespace`. System-actor callers are unrestricted; user callers must have
- * the namespace in their membership set. Missing namespaces are treated as
- * forbidden — every domain entity that's gated must carry its namespace.
+ * Throw `ApiError('forbidden', …)` unless the caller is allowed to touch
+ * resources in `namespace`. System-actor callers are unrestricted; user
+ * callers must have the namespace in their membership set. Missing namespaces
+ * are treated as forbidden — every domain entity that's gated must carry its
+ * namespace.
  *
  * Handlers call this AFTER fetching the resource (so 404 still beats 403 for
  * non-existent ids — surfacing "exists but denied" leaks information).
@@ -37,10 +38,10 @@ export function assertNamespaceAccess(
 ): void {
   if (caller.isSystemActor) return;
   if (typeof namespace !== 'string' || namespace.length === 0) {
-    throw new ForbiddenError('Resource has no namespace');
+    throw new ApiError('forbidden', 'Resource has no namespace');
   }
   if (!caller.namespaces.has(namespace)) {
-    throw new ForbiddenError();
+    throw new ApiError('forbidden', 'Forbidden');
   }
 }
 

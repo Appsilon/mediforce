@@ -3,7 +3,7 @@ import type {
   HandoffRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
+import { ApiError } from '../errors.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
 /**
@@ -60,6 +60,6 @@ export class AuthorizedHandoffRepository extends AuthorizedScope {
 
   private async assertCanMutate(entityId: string): Promise<void> {
     const entity = await this.getById(entityId);
-    if (entity === null) throw new ForbiddenError();
+    if (entity === null) throw new ApiError('forbidden', 'Forbidden');
   }
 }

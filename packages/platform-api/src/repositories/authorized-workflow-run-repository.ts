@@ -6,7 +6,7 @@ import type {
 } from '@mediforce/platform-core';
 import type { ListInstancesOptions } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
+import { ApiError } from '../errors.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
 /**
@@ -78,13 +78,13 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
   update = async (id: string, updates: Partial<ProcessInstance>): Promise<void> => {
     const existing = await this.getById(id);
     if (existing === null) {
-      throw new ForbiddenError();
+      throw new ApiError('forbidden', 'Forbidden');
     }
     if (updates.namespace !== undefined && updates.namespace !== existing.namespace) {
-      throw new ForbiddenError();
+      throw new ApiError('forbidden', 'Forbidden');
     }
     if (updates.deleted !== undefined && !this.caller.isSystemActor) {
-      throw new ForbiddenError();
+      throw new ApiError('forbidden', 'Forbidden');
     }
     await this.raw.update(id, updates);
   };

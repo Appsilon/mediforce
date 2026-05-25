@@ -1,5 +1,5 @@
 import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
+import { ApiError } from '../../errors.js';
 import type {
   ListAuditEventsInput,
   ListAuditEventsOutput,
@@ -20,7 +20,7 @@ export async function listAuditEvents(
 ): Promise<ListAuditEventsOutput> {
   const instance = await scope.runs.getById(input.instanceId);
   if (instance === null) {
-    throw new NotFoundError(`Process instance ${input.instanceId} not found`);
+    throw new ApiError('not_found', `Process instance ${input.instanceId} not found`);
   }
   const events = await scope.auditEvents.getByProcess(input.instanceId);
   return { events };

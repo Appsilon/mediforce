@@ -23,10 +23,7 @@ describe('loadOr404', () => {
     expect((err as ApiError).message).toBe('Task not found');
   });
 
-  it('uses ApiError so the new typed envelope is produced (not legacy NotFoundError)', async () => {
-    // Sanity check: new handlers throw the ADR-0005 typed error, so the
-    // adapter takes the `instanceof ApiError` arm — no `code` derivation
-    // from a legacy `statusCode`.
+  it('uses ApiError so the typed envelope is produced', async () => {
     const err = await loadOr404(Promise.resolve(null), 'missing').catch((e) => e);
     expect((err as ApiError).name).toBe('ApiError');
   });

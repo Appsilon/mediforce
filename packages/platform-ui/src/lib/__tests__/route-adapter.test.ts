@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ApiError, ForbiddenError, NotFoundError } from '@mediforce/platform-api/errors';
+import { ApiError } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import type { CallerScope } from '@mediforce/platform-api/repositories';
 import { createRouteAdapter } from '../route-adapter';
@@ -136,40 +136,6 @@ describe('createRouteAdapter', () => {
         consoleError.mockRestore();
       });
     }
-  });
-
-  it('maps legacy NotFoundError → { code: "not_found", message } at 404', async () => {
-    const handler = vi.fn().mockRejectedValue(new NotFoundError('Task not found'));
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: stubCaller(), buildScope },
-    );
-
-    const res = await GET(makeRequest({ name: 'alice' }), undefined);
-
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({
-      error: { code: 'not_found', message: 'Task not found' },
-    });
-  });
-
-  it('maps legacy ForbiddenError → { code: "forbidden", message } at 403', async () => {
-    const handler = vi.fn().mockRejectedValue(new ForbiddenError());
-    const GET = createRouteAdapter(
-      InputSchema,
-      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
-      handler,
-      { resolveCaller: stubCaller(), buildScope },
-    );
-
-    const res = await GET(makeRequest({ name: 'alice' }), undefined);
-
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({
-      error: { code: 'forbidden', message: 'Forbidden' },
-    });
   });
 
   it('maps a thrown ZodError to validation with the issues in details', async () => {

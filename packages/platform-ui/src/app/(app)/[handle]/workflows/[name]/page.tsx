@@ -13,6 +13,7 @@ import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { setProcessArchived, transferWorkflowNamespace } from '@/app/actions/definitions';
 import { apiFetch } from '@/lib/api-fetch';
+import { mediforce } from '@/lib/mediforce';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { VersionLabel } from '@/components/ui/version-label';
 import { DeleteWorkflowDialog } from '@/components/workflows/delete-workflow-dialog';
@@ -372,20 +373,14 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     setMenuOpen(false);
                     setTogglingVisibility(true);
                     try {
-                      const res = await apiFetch(`/api/workflow-definitions/${encodeURIComponent(decodedName)}?namespace=${encodeURIComponent(handle)}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ visibility: newVisibility }),
+                      await mediforce.workflows.setVisibility({
+                        name: decodedName,
+                        namespace: handle,
+                        visibility: newVisibility,
                       });
-                      if (res.ok) {
-                        setVisibilityOverride(newVisibility);
-                      } else {
-                        const body = await res.json().catch(() => null);
-                        const msg = typeof body?.error === 'object' && body?.error !== null
-                          ? (body.error.message ?? 'Failed to update visibility')
-                          : (body?.error ?? 'Failed to update visibility');
-                        alert(msg);
-                      }
+                      setVisibilityOverride(newVisibility);
+                    } catch (err) {
+                      alert(err instanceof Error ? err.message : 'Failed to update visibility');
                     } finally {
                       setTogglingVisibility(false);
                     }

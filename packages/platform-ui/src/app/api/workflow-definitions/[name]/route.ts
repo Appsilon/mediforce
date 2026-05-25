@@ -17,7 +17,7 @@ interface RouteContext {
  * Returns one workflow definition. Accepts optional `?version=` (defaults to
  * latest) and `?namespace=` (filters by owning namespace). Missing
  * name/version, namespace mismatch, and visibility-denied private workflows
- * all surface as 404 via `NotFoundError` — visibility-denied is intentionally
+ * all surface as 404 via `ApiError('not_found', …)` — visibility-denied is intentionally
  * 404 (anti-enumeration), not 403.
  */
 export const GET = createRouteAdapter<

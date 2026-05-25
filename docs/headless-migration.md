@@ -134,7 +134,7 @@ mutations set the next pattern in stone.
 | `GET /api/runs` | runs | `scope.runs.list({def, status, limit})` |
 | `GET /api/runs/:runId` | runs | `scope.runs.getById` + `scope.workflowDefinitions.getByNameVersion` (custom handler — finalOutput walk + definitionNamespace enrichment) |
 | `GET /api/workflow-secrets` | secrets | `scope.workflowSecrets` or `scope.workspaceSecrets` (workflow query param picks) |
-| `PUT /api/workflow-secrets` | secrets | same; write methods throw `ForbiddenError` for non-members |
+| `PUT /api/workflow-secrets` | secrets | same; write methods throw `ApiError('forbidden', …)` for non-members |
 | `DELETE /api/workflow-secrets` | secrets | same |
 | `GET /api/system/docker-info` | system | `@public-handler` — deployment-global. Dispatcher delegates to `_docker.ts` (local execFile vs container-worker fetch). |
 | `GET /api/system/openrouter-credits` | system | `scope.workspaceSecrets.getSecrets(workspace)` to pluck `OPENROUTER_API_KEY`, then external fetch to openrouter.ai. |
@@ -151,7 +151,7 @@ machine mutations only".
 - `GET /api/runs/:runId` switches from **403 → 404** for foreign-workspace
   ids, matching the Phase 1 anti-enumeration lesson. The `scope.runs.getById`
   wrapper returns `null` for out-of-scope; `getByIdAdapter` (well, the custom
-  handler here) maps to `NotFoundError`. Grep CLI/UI for 403-specific
+  handler here) maps to `ApiError('not_found', …)`. Grep CLI/UI for 403-specific
   branching before merge — none expected, but cheap to confirm.
 - `GET /api/workflow-secrets` for a foreign workspace now returns an empty
   `{ keys: [] }` (soft-fail per wrapper contract) instead of 403.
@@ -361,20 +361,16 @@ PR1 picks a true minimal mutation instead.
 
 **Files to touch:**
 - `packages/platform-api/src/errors.ts` — add the `ApiError` class +
-  `ApiErrorCode` union. Existing `HandlerError` / `NotFoundError` /
-  `ForbiddenError` from [#482](https://github.com/Appsilon/mediforce/pull/482)
-  **stay** as a coexistence bridge — new code throws `ApiError`,
-  existing throws keep working, both produce the same envelope shape.
-  Migration of legacy throws to `ApiError` is incremental, not PR1
-  blocking.
+  `ApiErrorCode` union. PR1 originally kept the legacy `HandlerError`
+  / `NotFoundError` / `ForbiddenError` hierarchy from [#482](https://github.com/Appsilon/mediforce/pull/482)
+  as a coexistence bridge; **PR1.1 deleted that hierarchy** — `ApiError`
+  is now the sole throwable.
 - `packages/platform-ui/src/lib/route-adapter.ts` — extend the catch
-  block with two arms per ADR-0005 §3/§4:
-  - `instanceof ApiError` → envelope with `err.code`.
-  - `instanceof HandlerError` → derive code from `statusCode`
-    (`404 → 'not_found'`, `403 → 'forbidden'`); same envelope shape.
+  block per ADR-0005 §3/§4: `instanceof ApiError` → envelope with
+  `err.code`. (PR1's transitional `instanceof HandlerError` arm was
+  removed in PR1.1.)
 - `packages/platform-ui/src/lib/__tests__/route-adapter.test.ts` —
-  extend with tests per `ApiErrorCode` for status + envelope, plus
-  the `HandlerError` legacy-throw arm.
+  extend with tests per `ApiErrorCode` for status + envelope.
 - `loadOr404` helper — extract per [#482](https://github.com/Appsilon/mediforce/pull/482)
   out-of-scope note ("third copy" rule reached for the
   `entity = await scope.X.getById(id); if (!entity) throw …` pattern).
@@ -432,8 +428,7 @@ through the loopback pattern.
 - Audit emission preserved bit-for-bit: AuditEvent rows produced by
   the migrated handler match what `claimTask` Server Action emitted
   (action `task.claimed`, same actor/description/snapshots/basis).
-- All `ApiError` codes + the `HandlerError` legacy arm mapped to
-  correct HTTP status in adapter tests.
+- All `ApiError` codes mapped to correct HTTP status in adapter tests.
 - `api-boundaries.test.ts` + `no-raw-repo-imports.test.ts` pass.
 - Existing Phase 1 / Phase 1.5 GET endpoints retroactively return the
   new error envelope (`{ error: string }` → `{ error: { code, message } }`).

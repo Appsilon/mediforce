@@ -128,6 +128,12 @@ Rejected: Result types (`Result<T, ApiError>`). Throws + a single
 well-known base class is idiomatic in TS; result types add boilerplate
 at every call site.
 
+**Amendment (PR1.1):** the legacy `HandlerError` / `NotFoundError` /
+`ForbiddenError` hierarchy (originally kept as a Phase 1 coexistence
+bridge) is deleted. `ApiError` is now the sole throwable in `platform-
+api`. The adapter catch in §4 lost its `instanceof HandlerError` arm
+accordingly.
+
 #### 2a. Throw site
 
 State-machine invariants throw from the **wrapper repository layer** when

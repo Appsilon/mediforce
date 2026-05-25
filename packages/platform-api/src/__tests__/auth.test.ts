@@ -5,7 +5,7 @@ import {
   filterByCaller,
   type CallerIdentity,
 } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
+import { ApiError } from '../errors.js';
 
 const apiKey: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 const userInNsA: CallerIdentity = {
@@ -24,12 +24,22 @@ describe('assertNamespaceAccess', () => {
     expect(() => assertNamespaceAccess(apiKey, 'ns-a')).not.toThrow();
   });
 
-  it('throws ForbiddenError when the user is not a member (sad)', () => {
-    expect(() => assertNamespaceAccess(userInNsA, 'ns-b')).toThrow(ForbiddenError);
+  it('throws ApiError forbidden when the user is not a member (sad)', () => {
+    expect(() => assertNamespaceAccess(userInNsA, 'ns-b')).toThrow(ApiError);
+    try {
+      assertNamespaceAccess(userInNsA, 'ns-b');
+    } catch (err) {
+      expect((err as ApiError).code).toBe('forbidden');
+    }
   });
 
-  it('throws ForbiddenError when the namespace is undefined for a user (edge)', () => {
-    expect(() => assertNamespaceAccess(userInNsA, undefined)).toThrow(ForbiddenError);
+  it('throws ApiError forbidden when the namespace is undefined for a user (edge)', () => {
+    expect(() => assertNamespaceAccess(userInNsA, undefined)).toThrow(ApiError);
+    try {
+      assertNamespaceAccess(userInNsA, undefined);
+    } catch (err) {
+      expect((err as ApiError).code).toBe('forbidden');
+    }
   });
 });
 

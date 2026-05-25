@@ -7,7 +7,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { listAuditEvents } from '../list-audit-events.js';
-import { NotFoundError } from '../../../errors.js';
+import { ApiError } from '../../../errors.js';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 describe('listAuditEvents handler', () => {
@@ -58,14 +58,14 @@ describe('listAuditEvents handler', () => {
     expect(result.events).toHaveLength(2);
   });
 
-  it('throws NotFoundError when the instance does not exist', async () => {
+  it('throws ApiError(not_found) when the instance does not exist', async () => {
     const scope = createTestScope({ auditRepo, instanceRepo });
     await expect(
       listAuditEvents({ instanceId: 'inst-missing' }, scope),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 
-  it('throws NotFoundError (not ForbiddenError) for cross-namespace user callers (anti-enumeration)', async () => {
+  it('throws ApiError(not_found) (not forbidden) for cross-namespace user callers (anti-enumeration)', async () => {
     const scope = createTestScope({
       auditRepo,
       instanceRepo,
@@ -73,10 +73,10 @@ describe('listAuditEvents handler', () => {
     });
     await expect(
       listAuditEvents({ instanceId: 'inst-a' }, scope),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 
-  it('throws NotFoundError when the instance has no namespace', async () => {
+  it('throws ApiError(not_found) when the instance has no namespace', async () => {
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-orphan', namespace: undefined }),
     );
@@ -87,6 +87,6 @@ describe('listAuditEvents handler', () => {
     });
     await expect(
       listAuditEvents({ instanceId: 'inst-orphan' }, scope),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 });

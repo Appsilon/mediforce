@@ -1,5 +1,5 @@
 import type { CallerIdentity } from '../auth.js';
-import { ForbiddenError } from '../errors.js';
+import { ApiError } from '../errors.js';
 
 /**
  * Workspace-scope base for `Authorized<Entity>Repository` wrappers in
@@ -37,7 +37,7 @@ export abstract class AuthorizedScope {
   protected assertNamespaceWrite(namespace: string | undefined): void {
     if (this.caller.isSystemActor) return;
     if (typeof namespace !== 'string' || !this.caller.namespaces.has(namespace)) {
-      throw new ForbiddenError();
+      throw new ApiError('forbidden', 'Forbidden');
     }
   }
 }

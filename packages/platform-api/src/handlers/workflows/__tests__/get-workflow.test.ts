@@ -4,7 +4,7 @@ import {
   buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
 import { getWorkflow } from '../get-workflow.js';
-import { NotFoundError } from '../../../errors.js';
+import { ApiError } from '../../../errors.js';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 describe('getWorkflow handler', () => {
@@ -51,14 +51,14 @@ describe('getWorkflow handler', () => {
     expect(result.definition.version).toBe(1);
   });
 
-  it('throws NotFoundError when the name is unknown', async () => {
+  it('throws ApiError(not_found) when the name is unknown', async () => {
     const scope = createTestScope({ processRepo });
     await expect(
       getWorkflow({ name: 'missing' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    ).rejects.toBeInstanceOf(ApiError);
   });
 
-  it('throws NotFoundError when the explicit version does not exist', async () => {
+  it('throws ApiError(not_found) when the explicit version does not exist', async () => {
     await processRepo.saveWorkflowDefinition(
       buildWorkflowDefinition({ name: 'flow-a', version: 1, namespace: '' }),
     );
@@ -66,10 +66,10 @@ describe('getWorkflow handler', () => {
     const scope = createTestScope({ processRepo });
     await expect(
       getWorkflow({ name: 'flow-a', version: 99 }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    ).rejects.toBeInstanceOf(ApiError);
   });
 
-  it('throws NotFoundError when the namespace filter does not match', async () => {
+  it('throws ApiError(not_found) when the namespace filter does not match', async () => {
     await processRepo.saveWorkflowDefinition(
       buildWorkflowDefinition({
         name: 'flow-a',
@@ -85,7 +85,7 @@ describe('getWorkflow handler', () => {
         { name: 'flow-a', namespace: 'team-beta' },
         scope,
       ),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    ).rejects.toBeInstanceOf(ApiError);
   });
 
   it('apiKey callers bypass visibility on private workflows', async () => {
@@ -153,7 +153,7 @@ describe('getWorkflow handler', () => {
     expect(result.definition.name).toBe('flow-private');
   });
 
-  it('returns NotFoundError (not Forbidden) when a user reads a private workflow outside their namespace', async () => {
+  it('returns ApiError(not_found) (not forbidden) when a user reads a private workflow outside their namespace', async () => {
     // Anti-enumeration: a forbidden private workflow looks identical on the
     // wire to a missing one. Matches the pre-migration behaviour from
     // `app/api/workflow-definitions/[name]/route.ts`.
@@ -176,6 +176,6 @@ describe('getWorkflow handler', () => {
         { name: 'flow-private', namespace: 'team-alpha' },
         scope,
       ),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    ).rejects.toBeInstanceOf(ApiError);
   });
 });

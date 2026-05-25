@@ -5,7 +5,7 @@ import type {
   UpdateAgentDefinitionInput,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
-import { NotFoundError } from '../errors.js';
+import { ApiError } from '../errors.js';
 import { AuthorizedScope } from './authorized-repository.js';
 
 /**
@@ -42,24 +42,24 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
     // Mutations require workspace-write on the existing agent's namespace.
     // System actors bypass.
     const existing = await this.raw.getById(id);
-    if (existing === null) throw new NotFoundError();
+    if (existing === null) throw new ApiError('not_found', 'Not found');
     this.assertWriteOrThrowNotFound(existing.namespace);
     return this.raw.update(id, input);
   };
 
   delete = async (id: string): Promise<void> => {
     const existing = await this.raw.getById(id);
-    if (existing === null) throw new NotFoundError();
+    if (existing === null) throw new ApiError('not_found', 'Not found');
     this.assertWriteOrThrowNotFound(existing.namespace);
     await this.raw.delete(id);
   };
 
-  /** Mutation-path anti-enumeration: convert ForbiddenError into NotFoundError
-   *  so non-members can't probe existence of out-of-scope agents. */
+  /** Mutation-path anti-enumeration: surface as `not_found` so non-members
+   *  can't probe existence of out-of-scope agents. */
   private assertWriteOrThrowNotFound(namespace: string | undefined): void {
     if (this.caller.isSystemActor) return;
     if (typeof namespace !== 'string' || !this.caller.namespaces.has(namespace)) {
-      throw new NotFoundError();
+      throw new ApiError('not_found', 'Not found');
     }
   }
 }

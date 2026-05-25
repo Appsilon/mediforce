@@ -602,7 +602,7 @@ describe('Mediforce', () => {
 
   describe('error envelope back-compat (legacy `{ error: string }`)', () => {
     it('extracts the message from the legacy string envelope', async () => {
-      // Some Phase 1 routes still throw plain HandlerError with a custom
+      // Some Phase 1 routes still throw ApiError with a custom
       // shape, and the legacy 5xx surface (`{ error: <string> }`) hasn't
       // been migrated. The client must tolerate both shapes during the
       // transition.

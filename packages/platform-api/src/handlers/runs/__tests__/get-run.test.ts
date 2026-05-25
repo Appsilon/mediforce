@@ -8,7 +8,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { getRun } from '../get-run.js';
-import { NotFoundError } from '../../../errors.js';
+import { ApiError } from '../../../errors.js';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 describe('getRun handler', () => {
@@ -121,7 +121,7 @@ describe('getRun handler', () => {
     expect(result.runId).toBe('r1');
   });
 
-  it('throws NotFoundError for a foreign-workspace runId (anti-enumeration)', async () => {
+  it('throws ApiError(not_found) for a foreign-workspace runId (anti-enumeration)', async () => {
     await instanceRepo.create(buildProcessInstance({ id: 'r1', namespace: 'alpha' }));
 
     const scope = createTestScope({
@@ -130,11 +130,11 @@ describe('getRun handler', () => {
       caller: userCaller('u-2', ['beta']),
     });
 
-    await expect(getRun({ runId: 'r1' }, scope)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getRun({ runId: 'r1' }, scope)).rejects.toBeInstanceOf(ApiError);
   });
 
-  it('throws NotFoundError for a truly missing runId', async () => {
+  it('throws ApiError(not_found) for a truly missing runId', async () => {
     const scope = createTestScope({ instanceRepo, processRepo });
-    await expect(getRun({ runId: 'missing' }, scope)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getRun({ runId: 'missing' }, scope)).rejects.toBeInstanceOf(ApiError);
   });
 });

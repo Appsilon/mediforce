@@ -14,9 +14,10 @@ import {
  *   - GET /api/processes/:instanceId/steps     → per-step input/output/status
  *
  * 404 semantics: missing instances (or the workflow definition behind a steps
- * lookup) surface as `NotFoundError` from the handler and map to HTTP 404 in
- * the route adapter. Namespace gating is enforced inside each handler and
- * maps to 403 via `ForbiddenError` — 404 always beats 403 for missing ids.
+ * lookup) surface as `ApiError('not_found', …)` from the handler and map to
+ * HTTP 404 in the route adapter. Namespace gating is enforced inside each
+ * handler and maps to 403 via `ApiError('forbidden', …)` — 404 always beats
+ * 403 for missing ids.
  */
 
 // Mirrors `WorkflowStep.type` (`creation | review | decision | terminal`).

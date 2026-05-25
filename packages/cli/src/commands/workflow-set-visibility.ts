@@ -10,7 +10,7 @@ interface CommandInput {
   output: OutputSink;
 }
 
-const HELP = `Usage: mediforce workflow set-visibility <name> --visibility <public|private> [options]
+const HELP = `Usage: mediforce workflow set-visibility <name> --namespace <ns> --visibility <public|private> [options]
 
 Set the visibility of a workflow definition.
 
@@ -18,6 +18,7 @@ Positional:
   <name>               Workflow definition name
 
 Required flags:
+  --namespace <ns>     Namespace that owns the workflow
   --visibility <v>     Visibility level (public | private)
 
 Optional flags:
@@ -27,6 +28,7 @@ Optional flags:
 `;
 
 const SET_VISIBILITY_OPTIONS = {
+  namespace: { type: 'string' },
   visibility: { type: 'string' },
   'base-url': { type: 'string' },
   json: { type: 'boolean' },
@@ -36,6 +38,7 @@ const SET_VISIBILITY_OPTIONS = {
 export async function workflowSetVisibilityCommand(input: CommandInput): Promise<number> {
   let positionals: string[];
   let flags: {
+    namespace?: string;
     visibility?: string;
     'base-url'?: string;
     json?: boolean;
@@ -70,6 +73,12 @@ export async function workflowSetVisibilityCommand(input: CommandInput): Promise
     return 2;
   }
 
+  if (typeof flags.namespace !== 'string' || flags.namespace.length === 0) {
+    printError(input.output, { error: '--namespace is required' }, jsonMode);
+    return 2;
+  }
+  const namespace = flags.namespace;
+
   if (flags.visibility !== 'public' && flags.visibility !== 'private') {
     printError(input.output, { error: '--visibility must be "public" or "private"' }, jsonMode);
     return 2;
@@ -86,7 +95,7 @@ export async function workflowSetVisibilityCommand(input: CommandInput): Promise
 
   const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
   try {
-    const result = await mediforce.workflows.setVisibility({ name, visibility });
+    const result = await mediforce.workflows.setVisibility({ name, namespace, visibility });
     if (jsonMode) {
       printJson(input.output, result);
     } else {

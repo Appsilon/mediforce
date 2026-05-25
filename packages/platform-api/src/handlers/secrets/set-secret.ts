@@ -4,7 +4,7 @@ import type { SetSecretInput, SetSecretOutput } from '../../contract/secrets.js'
 /**
  * Upsert a secret value. When `workflow` is set, writes to the workflow-
  * scoped store; otherwise writes to the workspace-scoped store. The wrapper
- * (`assertNamespaceWrite`) throws `ForbiddenError` for non-members — the
+ * (`assertNamespaceWrite`) throws `ApiError('forbidden', …)` for non-members — the
  * adapter maps that to 403, so this handler never pre-checks.
  */
 export async function setSecret(

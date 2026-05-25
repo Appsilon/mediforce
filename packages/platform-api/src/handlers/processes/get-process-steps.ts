@@ -1,6 +1,6 @@
 import type { StepExecution } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
+import { ApiError } from '../../errors.js';
 import type {
   GetProcessStepsInput,
   GetProcessStepsOutput,
@@ -21,7 +21,7 @@ export async function getProcessSteps(
 
   const instance = await scope.runs.getById(instanceId);
   if (instance === null) {
-    throw new NotFoundError(`Process instance ${instanceId} not found`);
+    throw new ApiError('not_found', `Process instance ${instanceId} not found`);
   }
 
   const versionNum = Number.parseInt(instance.definitionVersion, 10);
@@ -34,7 +34,8 @@ export async function getProcessSteps(
     : null;
 
   if (definition === null) {
-    throw new NotFoundError(
+    throw new ApiError(
+      'not_found',
       `Workflow definition ${instance.definitionName}@${instance.definitionVersion} not found`,
     );
   }

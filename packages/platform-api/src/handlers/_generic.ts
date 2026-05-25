@@ -1,5 +1,5 @@
 import type { CallerScope } from '../repositories/index.js';
-import { NotFoundError } from '../errors.js';
+import { ApiError } from '../errors.js';
 
 type ScopeHandler<Input, Output> = (input: Input, scope: CallerScope) => Promise<Output>;
 
@@ -17,8 +17,8 @@ export function listAdapter<Input, Item, Key extends string>(
 }
 
 /**
- * Build a handler that calls a scope-bound lookup, throws NotFoundError on
- * null, and returns the entity directly.
+ * Build a handler that calls a scope-bound lookup, throws
+ * `ApiError('not_found', …)` on null, and returns the entity directly.
  */
 export function getByIdAdapter<Input, Item>(
   fetch: (input: Input, scope: CallerScope) => Promise<Item | null>,
@@ -43,7 +43,7 @@ export function getByIdAdapter<Input, Item, Key extends string>(
     const result = await fetch(input, scope);
     if (result === null) {
       const msg = typeof notFoundMessage === 'function' ? notFoundMessage(input) : notFoundMessage;
-      throw new NotFoundError(msg);
+      throw new ApiError('not_found', msg);
     }
     return envelopeKey !== undefined
       ? ({ [envelopeKey]: result } as Record<Key, Item>)

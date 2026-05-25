@@ -1,29 +1,6 @@
 import { z } from 'zod';
 
-// ADR-0005 typed errors. `ApiError` is preferred for new handlers; the
-// `HandlerError` family stays as a coexistence bridge for Phase 1 throw sites.
-export class HandlerError extends Error {
-  constructor(public readonly statusCode: number, message: string) {
-    super(message);
-    this.name = 'HandlerError';
-  }
-}
-
-export class NotFoundError extends HandlerError {
-  constructor(message = 'Not found') {
-    super(404, message);
-    this.name = 'NotFoundError';
-  }
-}
-
-export class ForbiddenError extends HandlerError {
-  constructor(message = 'Forbidden') {
-    super(403, message);
-    this.name = 'ForbiddenError';
-  }
-}
-
-// Closed union of error codes. Zod is the source of truth so both the
+// ADR-0005 typed errors. Closed union of error codes. Zod is the source of truth so both the
 // adapter (output) and the client (input) parse against the same enum.
 export const ApiErrorCodeSchema = z.enum([
   'unauthorized',
@@ -89,21 +66,3 @@ export function httpStatusForApiErrorCode(code: ApiErrorCode): number {
   }
 }
 
-export function apiErrorCodeForStatus(statusCode: number): ApiErrorCode {
-  switch (statusCode) {
-    case 400:
-      return 'validation';
-    case 401:
-      return 'unauthorized';
-    case 403:
-      return 'forbidden';
-    case 404:
-      return 'not_found';
-    case 409:
-      return 'precondition_failed';
-    case 429:
-      return 'rate_limited';
-    default:
-      return 'internal';
-  }
-}

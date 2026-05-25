@@ -32,7 +32,7 @@ export const GET = createRouteAdapter<typeof ListSecretKeysInputSchema, ListSecr
 /**
  * PUT /api/workflow-secrets?namespace=…&workflow=…  body: {key, value}
  *
- * Writes go through the wrapper, which throws `ForbiddenError` for non-
+ * Writes go through the wrapper, which throws `ApiError('forbidden', …)` for non-
  * members; the adapter maps that to 403.
  */
 export const PUT = createRouteAdapter<typeof SetSecretInputSchema, SetSecretInput>(

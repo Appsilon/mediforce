@@ -4,7 +4,7 @@ import type {
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import { deleteSecret } from '../delete-secret.js';
-import { ForbiddenError } from '../../../errors.js';
+import { ApiError } from '../../../errors.js';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 import {
   buildNamespaceSecretsRepo,
@@ -59,7 +59,7 @@ describe('deleteSecret handler', () => {
     expect(await workflowSecretsRepo.getSecretKeys('alpha', 'wf-1')).toEqual(['KEEP']);
   });
 
-  it('throws ForbiddenError when a user caller deletes outside their namespaces', async () => {
+  it('throws ApiError(forbidden) when a user caller deletes outside their namespaces', async () => {
     const scope = createTestScope({
       namespaceSecretsRepo: workspaceSecretsRepo,
       secretsRepo: workflowSecretsRepo,
@@ -68,9 +68,9 @@ describe('deleteSecret handler', () => {
 
     await expect(
       deleteSecret({ namespace: 'alpha', key: 'KEEP_ME' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    ).rejects.toBeInstanceOf(ApiError);
     await expect(
       deleteSecret({ namespace: 'alpha', workflow: 'wf-1', key: 'DB_URL' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    ).rejects.toBeInstanceOf(ApiError);
   });
 });

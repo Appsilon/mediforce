@@ -6,7 +6,7 @@ import type {
 
 /**
  * Delete a secret. Workflow-scoped when `workflow` is set, workspace-scoped
- * otherwise. The wrapper throws `ForbiddenError` for non-members; this
+ * otherwise. The wrapper throws `ApiError('forbidden', …)` for non-members; this
  * handler delegates and trusts the adapter to translate the throw.
  */
 export async function deleteSecret(

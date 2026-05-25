@@ -1,5 +1,5 @@
 import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
+import { ApiError } from '../../errors.js';
 import type {
   GetWorkflowInput,
   GetWorkflowOutput,
@@ -23,17 +23,17 @@ export async function getWorkflow(
   } else {
     version = await scope.workflowDefinitions.getLatestVersion(lookupNamespace, input.name);
     if (version === 0) {
-      throw new NotFoundError(`Workflow '${input.name}' not found`);
+      throw new ApiError('not_found', `Workflow '${input.name}' not found`);
     }
   }
 
   const definition = await scope.workflowDefinitions.get(lookupNamespace, input.name, version);
   if (definition === null) {
-    throw new NotFoundError(`Workflow '${input.name}' not found`);
+    throw new ApiError('not_found', `Workflow '${input.name}' not found`);
   }
 
   if (input.namespace !== undefined && definition.namespace !== input.namespace) {
-    throw new NotFoundError(`Workflow '${input.name}' not found`);
+    throw new ApiError('not_found', `Workflow '${input.name}' not found`);
   }
 
   return { definition };

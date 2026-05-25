@@ -123,3 +123,37 @@ describe('mediforce.workflows.list', () => {
     await expect(mediforce.workflows.list()).rejects.toThrow();
   });
 });
+
+describe('mediforce.workflows.setVisibility', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('PATCHes /api/workflow-definitions/<name>?namespace=<ns> with the visibility body', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ success: true, name: 'wf', visibility: 'public' }),
+    );
+
+    const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+    const result = await mediforce.workflows.setVisibility({
+      name: 'wf',
+      namespace: 'Appsilon',
+      visibility: 'public',
+    });
+
+    expect(result).toEqual({ success: true, name: 'wf', visibility: 'public' });
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe('http://localhost/api/workflow-definitions/wf?namespace=Appsilon');
+    expect(init?.method).toBe('PATCH');
+    expect(init?.body).toBe(JSON.stringify({ visibility: 'public' }));
+  });
+
+  it('rejects when namespace is empty', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+    await expect(
+      mediforce.workflows.setVisibility({ name: 'wf', namespace: '', visibility: 'public' }),
+    ).rejects.toThrow();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});

@@ -7,7 +7,7 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { getCoworkSessionByInstance } from '../get-cowork-session-by-instance.js';
-import { NotFoundError } from '../../../errors.js';
+import { ApiError } from '../../../errors.js';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 describe('getCoworkSessionByInstance handler', () => {
@@ -66,19 +66,19 @@ describe('getCoworkSessionByInstance handler', () => {
     expect(result.id).toBe('sess-1');
   });
 
-  it('throws NotFoundError when the instance is completely unknown', async () => {
+  it('throws ApiError(not_found) when the instance is completely unknown', async () => {
     const scope = createTestScope({ coworkSessionRepo, instanceRepo });
     const err = await getCoworkSessionByInstance(
       { instanceId: 'inst-missing' },
       scope,
     ).catch((e) => e);
 
-    expect(err).toBeInstanceOf(NotFoundError);
-    expect((err as NotFoundError).statusCode).toBe(404);
-    expect((err as NotFoundError).message).toContain('inst-missing');
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).code).toBe('not_found');
+    expect((err as ApiError).message).toContain('inst-missing');
   });
 
-  it('throws NotFoundError when the instance has no active session', async () => {
+  it('throws ApiError(not_found) when the instance has no active session', async () => {
     await coworkSessionRepo.create(
       buildCoworkSession({
         id: 'sess-abandoned',
@@ -93,10 +93,10 @@ describe('getCoworkSessionByInstance handler', () => {
         { instanceId: 'inst-a' },
         scope,
       ),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    ).rejects.toBeInstanceOf(ApiError);
   });
 
-  it('throws NotFoundError (not ForbiddenError) when a user caller is outside the instance’s namespace (anti-enumeration)', async () => {
+  it('throws ApiError(not_found) (not forbidden) when a user caller is outside the instance’s namespace (anti-enumeration)', async () => {
     await coworkSessionRepo.create(
       buildCoworkSession({
         id: 'sess-1',
@@ -115,10 +115,10 @@ describe('getCoworkSessionByInstance handler', () => {
         { instanceId: 'inst-a' },
         scope,
       ),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 
-  it('throws NotFoundError when the instance has no namespace', async () => {
+  it('throws ApiError(not_found) when the instance has no namespace', async () => {
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-orphan', namespace: undefined }),
     );
@@ -140,7 +140,7 @@ describe('getCoworkSessionByInstance handler', () => {
         { instanceId: 'inst-orphan' },
         scope,
       ),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 
   it('returns the most recent active session when several exist', async () => {
@@ -174,7 +174,7 @@ describe('getCoworkSessionByInstance handler', () => {
     // Instance exists in 'team-alpha', no sessions at all. A user in
     // 'team-beta' must NOT be able to probe "does this instance have an
     // active session?" — both the cross-namespace and the no-session case
-    // return the same NotFoundError.
+    // return the same ApiError(not_found).
     const scope = createTestScope({
       coworkSessionRepo,
       instanceRepo,
@@ -186,6 +186,6 @@ describe('getCoworkSessionByInstance handler', () => {
         { instanceId: 'inst-a' },
         scope,
       ),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(ApiError);
   });
 });

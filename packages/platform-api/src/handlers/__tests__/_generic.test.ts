@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
+import { ApiError } from '../../errors.js';
 import { getByIdAdapter, listAdapter } from '../_generic.js';
 
 const fakeScope = {} as unknown as CallerScope;
@@ -46,16 +46,16 @@ describe('getByIdAdapter', () => {
     expect(result).toEqual({ agent: { id: 'x' } });
   });
 
-  it('throws NotFoundError with a string message when the fetch returns null', async () => {
+  it('throws ApiError(not_found) with a string message when the fetch returns null', async () => {
     const handler = getByIdAdapter<{ id: string }, unknown>(
       async () => null,
       'Task not found',
     );
-    await expect(handler({ id: 'missing' }, fakeScope)).rejects.toThrow(NotFoundError);
+    await expect(handler({ id: 'missing' }, fakeScope)).rejects.toThrow(ApiError);
     await expect(handler({ id: 'missing' }, fakeScope)).rejects.toThrow('Task not found');
   });
 
-  it('throws NotFoundError with a function-built message including input fields', async () => {
+  it('throws ApiError(not_found) with a function-built message including input fields', async () => {
     const handler = getByIdAdapter<{ id: string }, unknown>(
       async () => null,
       (input) => `Entity ${input.id} not found`,
@@ -63,13 +63,13 @@ describe('getByIdAdapter', () => {
     await expect(handler({ id: 'abc' }, fakeScope)).rejects.toThrow('Entity abc not found');
   });
 
-  it('throws NotFoundError even with the envelope-key overload', async () => {
+  it('throws ApiError(not_found) even with the envelope-key overload', async () => {
     const handler = getByIdAdapter<{ id: string }, unknown, 'agent'>(
       async () => null,
       (input) => `Agent ${input.id} not found`,
       'agent',
     );
-    await expect(handler({ id: 'zzz' }, fakeScope)).rejects.toThrow(NotFoundError);
+    await expect(handler({ id: 'zzz' }, fakeScope)).rejects.toThrow(ApiError);
     await expect(handler({ id: 'zzz' }, fakeScope)).rejects.toThrow('Agent zzz not found');
   });
 

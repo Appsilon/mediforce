@@ -6,8 +6,8 @@ import { CoworkSessionSchema } from '@mediforce/platform-core';
  *
  * Single-resource reads — the output is `CoworkSessionSchema` bare (no
  * wrapper), matching the pattern set by `GET /api/tasks/:taskId`. Missing
- * sessions surface as `NotFoundError` from the handler and are mapped to
- * HTTP 404 by the route adapter. Namespace gating happens inside the
+ * sessions surface as `ApiError('not_found', …)` from the handler and are
+ * mapped to HTTP 404 by the route adapter. Namespace gating happens inside the
  * handler via the parent process instance's namespace, surfacing as 403
  * for non-member user callers.
  */

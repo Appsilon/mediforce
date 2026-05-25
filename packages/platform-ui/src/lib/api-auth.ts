@@ -56,7 +56,7 @@ export async function resolveCallerIdentity(
  * Inline-route convenience: returns a 403 `NextResponse` when the caller is
  * not allowed to access `namespace`, or `null` when access is permitted.
  *
- * NEW handlers should throw `ForbiddenError` from @mediforce/platform-api/auth
+ * NEW handlers should throw `ApiError` from @mediforce/platform-api/auth
  * via `assertNamespaceAccess` instead — the route adapter handles the HTTP
  * mapping. This helper is kept for routes that still have inline handlers.
  */

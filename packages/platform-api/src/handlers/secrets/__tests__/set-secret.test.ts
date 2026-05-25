@@ -4,7 +4,7 @@ import type {
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import { setSecret } from '../set-secret.js';
-import { ForbiddenError } from '../../../errors.js';
+import { ApiError } from '../../../errors.js';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 import {
   buildNamespaceSecretsRepo,
@@ -62,7 +62,7 @@ describe('setSecret handler', () => {
     expect(await workspaceSecretsRepo.getSecrets('alpha')).toEqual({});
   });
 
-  it('throws ForbiddenError when a user caller writes outside their namespaces', async () => {
+  it('throws ApiError(forbidden) when a user caller writes outside their namespaces', async () => {
     const scope = createTestScope({
       namespaceSecretsRepo: workspaceSecretsRepo,
       secretsRepo: workflowSecretsRepo,
@@ -71,9 +71,9 @@ describe('setSecret handler', () => {
 
     await expect(
       setSecret({ namespace: 'alpha', key: 'X', value: 'y' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    ).rejects.toBeInstanceOf(ApiError);
     await expect(
       setSecret({ namespace: 'alpha', workflow: 'wf-1', key: 'X', value: 'y' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    ).rejects.toBeInstanceOf(ApiError);
   });
 });

@@ -455,8 +455,9 @@ export class Mediforce {
       },
       setVisibility: async (input) => {
         const validated = SetVisibilityInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
         const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}`,
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
           {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },

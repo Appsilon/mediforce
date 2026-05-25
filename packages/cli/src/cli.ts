@@ -54,7 +54,7 @@ Commands:
   workflow register --file <path> --namespace <ns>   Register a workflow definition
   workflow list                                      List registered workflow definitions
   workflow get <name> --namespace <ns>               Fetch a workflow definition
-  workflow set-visibility <name> --visibility <v>    Set workflow visibility (public|private)
+  workflow set-visibility <name> --namespace <ns> --visibility <v>    Set workflow visibility (public|private)
   workflow copy <name> --target-namespace <ns>       Copy workflow to another namespace
   workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
   agent list                                         List agent definitions
@@ -97,7 +97,7 @@ Subcommands:
   register --file <path> --namespace <ns>   Register a workflow definition
   list                                      List registered workflow definitions
   get <name>                                Fetch a workflow definition
-  set-visibility <name> --visibility <v>    Set workflow visibility (public|private)
+  set-visibility <name> --namespace <ns> --visibility <v>    Set workflow visibility (public|private)
   copy <name> --target-namespace <ns>        Copy workflow to another namespace
   archive <name> --version <n>|--all        Archive/unarchive workflow versions
 
