@@ -120,22 +120,68 @@ The rule of thumb: **design the contract against real UI consumers, and change t
 
 ### Phase 1.5 — Hybrid endpoint cleanup
 
-Three endpoints already declare a contract and adapter in `platform-api`
-but never finished the handler+adapter step — they still run inline route
-code that bypasses the `createRouteAdapter` pipeline. Close the loop:
+Five endpoints already declare contracts in `platform-api` but still run
+inline route code that bypasses the `createRouteAdapter` pipeline AND the
+ADR-0004 scoped data-access layer. Drain the backlog before Phase 2
+mutations set the next pattern in stone.
 
-- `GET /api/runs` and `GET /api/runs/:runId` — contract exists in
-  `packages/platform-api/src/contract/runs.ts`; routes are inline.
-- `GET /api/workflow-secrets` — partial contract in `secrets.ts`; handler
-  needs to be extracted and the route swapped to `createRouteAdapter`.
-- `GET /api/system/docker-info` — contract in `system.ts`; route is inline.
+**Scope — one PR, three domains:**
 
-Pattern is mechanical (same shape as the Phase 1 migrations): extract the
-inline body into a pure handler, write `__tests__/<name>.test.ts`, replace
-the route with `createRouteAdapter`. Each is a small standalone PR.
+| Endpoint | Domain | Wrapper / annotation |
+|---|---|---|
+| `GET /api/runs` | runs | `scope.runs.list({def, status, limit})` |
+| `GET /api/runs/:runId` | runs | `scope.runs.getById` + `scope.workflowDefinitions.getByNameVersion` (custom handler — finalOutput walk + definitionNamespace enrichment) |
+| `GET /api/workflow-secrets` | secrets | `scope.workflowSecrets` or `scope.workspaceSecrets` (workflow query param picks) |
+| `PUT /api/workflow-secrets` | secrets | same; write methods throw `ForbiddenError` for non-members |
+| `DELETE /api/workflow-secrets` | secrets | same |
+| `GET /api/system/docker-info` | system | `@public-handler` — deployment-global. Dispatcher delegates to `_docker.ts` (local execFile vs container-worker fetch). |
+| `GET /api/system/openrouter-credits` | system | `scope.workspaceSecrets.getSecrets(workspace)` to pluck `OPENROUTER_API_KEY`, then external fetch to openrouter.ai. |
 
-**Pause-safe**: yes — leaving any one on its inline handler is functionally
-identical to today.
+**Bundled secrets PUT/DELETE rationale.** Splitting the secrets file across
+phases would leave `route.ts` half-`createRouteAdapter`, half-inline. The
+mutations are idempotent single-call wrappers with no state machine —
+closer in mechanics to GETs than to Phase 2's `tasks.claim` /
+`processes.cancel` (real lifecycle invariants). Phase 2 stays "state-
+machine mutations only".
+
+**Behavioural changes worth flagging in the PR description:**
+
+- `GET /api/runs/:runId` switches from **403 → 404** for foreign-workspace
+  ids, matching the Phase 1 anti-enumeration lesson. The `scope.runs.getById`
+  wrapper returns `null` for out-of-scope; `getByIdAdapter` (well, the custom
+  handler here) maps to `NotFoundError`. Grep CLI/UI for 403-specific
+  branching before merge — none expected, but cheap to confirm.
+- `GET /api/workflow-secrets` for a foreign workspace now returns an empty
+  `{ keys: [] }` (soft-fail per wrapper contract) instead of 403.
+
+**`docker-info` auth — `@public-handler`, deliberate.** Every authenticated
+user fetches it: workflow editor, start-run button, processes problems
+panel, plus admin infrastructure page. UI features depend on the image
+list. Single-tenant deployments today; namespaces split teams inside one
+tenant, not separate organisations. The `caller.isSystemActor` flag
+would block all `user` callers (UI), so gating on it is wrong. A tracking
+issue captures the "revisit when multi-tenant" follow-up.
+
+**Tests** (handler layer against `createTestScope`):
+
+- `list-runs`, `get-run`, `list-secret-keys`, `set-secret`, `delete-secret`,
+  `openrouter-credits` — apiKey / user-in-ns / user-out-of-ns paths.
+- `docker-info` — logic split into `handlers/system/_docker.ts` units
+  (`fetchFromLocalDocker`, `fetchFromContainerWorker` with mocked `execFile`
+  / `fetch`); handler itself is a 5-line dispatcher, not separately tested.
+- Existing `contract/__tests__/{runs,secrets,system}.test.ts` already
+  cover wire-shape invariants — extend only on a real gap.
+- L3 API E2E journeys (`packages/platform-ui/e2e/api/*.journey.ts`)
+  re-run before merge — PR #463 left these unverified and Phase 1.5
+  touches paths they cover.
+
+**Out of scope — moved to a later "Phase 1.8" effort:** `agent-logs`,
+`agent-output-file`, `step-logs`, `tickets`. No contract started yet,
+so they're new work rather than finishing-the-loop. File-serving shape
+deserves its own design pass.
+
+**Pause-safe**: yes — per-file route swaps revert cleanly if any one is
+contentious in review.
 
 ### Phase 1.7 — Authorization architecture decision (prerequisite for Phase 2)
 
