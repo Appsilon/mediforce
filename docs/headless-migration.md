@@ -73,7 +73,7 @@ Uniform pattern. Low risk. Establishes the catalogue of read contracts that Phas
   gate once #448 lands).
 - **404 anti-enumeration on every namespace-gated read.** A resource the
   caller cannot read surfaces as **404, not 403** across all 10 Phase 1
-  GET endpoints — tasks, processes, audit, steps, agent-definitions list +
+  GET endpoints — tasks, processes, audit, steps, agents list +
   detail, workflow-definitions list + detail, cowork (both shapes). The
   route returns the same not-found body as a genuinely-missing id, so a
   non-member caller cannot tell "this id exists but I can't see it" from
