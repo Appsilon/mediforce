@@ -12,11 +12,45 @@ import subprocess
 import sys
 
 
-def last_commit_touching(base: str, pattern: str, *, exclude: str | None = None) -> int | None:
-    """Return the index (0 = oldest) of the last commit in base..HEAD that touches pattern.
+def files_changed_net(base: str, pattern: str, *, exclude: str | None = None) -> set[str]:
+    """Files whose NET diff vs base matches pattern (after rename/exclude filters).
 
-    Files matching `exclude` (if set) are not counted.
+    `--find-renames=100%` only detects renames when content is byte-identical
+    (similarity score = 100%); any content change makes git emit the new path
+    as Added (A) instead of Renamed (R). `--diff-filter=AM` then keeps Added
+    and Modified, dropping pure-rename R entries. Net result: pure file moves
+    (e.g., e2e/journeys/ -> e2e/ui/) don't force a GIF refresh, but a rename
+    WITH any content tweak does.
     """
+    result = subprocess.run(
+        [
+            "git", "diff",
+            "--name-only",
+            "--find-renames=100%",
+            "--diff-filter=AM",
+            f"{base}...HEAD",
+        ],
+        capture_output=True, text=True, check=True,
+    )
+    files = result.stdout.strip().splitlines()
+    matched = [f for f in files if re.search(pattern, f)]
+    if exclude is not None:
+        matched = [f for f in matched if not re.search(exclude, f)]
+    return set(matched)
+
+
+def last_commit_touching(base: str, pattern: str, *, exclude: str | None = None) -> int | None:
+    """Return the index (0 = oldest) of the last commit in base..HEAD that touches
+    a file whose NET diff vs base matches pattern. Returns None if no such file.
+
+    Computing the net set first means add-then-revert within the same PR doesn't
+    trip the freshness check — the reverted file isn't in the net diff, so the
+    commit that touched it is ignored.
+    """
+    relevant = files_changed_net(base, pattern, exclude=exclude)
+    if not relevant:
+        return None
+
     result = subprocess.run(
         ["git", "log", "--oneline", f"{base}..HEAD"],
         capture_output=True, text=True, check=True,
@@ -30,12 +64,6 @@ def last_commit_touching(base: str, pattern: str, *, exclude: str | None = None)
     last = None
     for idx, line in enumerate(commits):
         sha = line.split()[0]
-        # `--find-renames=100%` only detects renames when content is byte-identical
-        # (similarity score = 100%); any content change makes git emit the new path
-        # as Added (A) instead of Renamed (R). `--diff-filter=AM` then keeps Added
-        # and Modified, dropping pure-rename R entries. Net result: pure file moves
-        # (e.g., e2e/journeys/ -> e2e/ui/) don't force a GIF refresh, but a rename
-        # WITH any content tweak does.
         diff = subprocess.run(
             [
                 "git", "diff",
@@ -48,10 +76,8 @@ def last_commit_touching(base: str, pattern: str, *, exclude: str | None = None)
         )
         if diff.returncode != 0:
             continue
-        matched = [f for f in diff.stdout.strip().splitlines() if re.search(pattern, f)]
-        if exclude is not None:
-            matched = [f for f in matched if not re.search(exclude, f)]
-        if matched:
+        touched = set(diff.stdout.strip().splitlines())
+        if touched & relevant:
             last = idx
     return last
 
