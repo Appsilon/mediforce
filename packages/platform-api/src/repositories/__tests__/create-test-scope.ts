@@ -188,6 +188,8 @@ export interface TestScopeOverrides {
   readonly agentOAuthTokenRepo?: InMemoryAgentOAuthTokenRepository;
   readonly pluginRegistry?: { list: () => ReadonlyArray<{ name: string; metadata?: unknown }> };
   readonly modelRegistryRepo?: ModelRegistryRepository;
+  readonly secretsRepo?: WorkflowSecretsRepository;
+  readonly namespaceSecretsRepo?: NamespaceSecretsRepository;
 }
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
@@ -224,8 +226,8 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     oauthProviderRepo: overrides.oauthProviderRepo ?? new InMemoryOAuthProviderRepository(),
     agentOAuthTokenRepo: overrides.agentOAuthTokenRepo ?? new InMemoryAgentOAuthTokenRepository(),
     modelRegistryRepo: overrides.modelRegistryRepo ?? stubModelRegistry,
-    secretsRepo: stubWorkflowSecrets,
-    namespaceSecretsRepo: stubNamespaceSecrets,
+    secretsRepo: overrides.secretsRepo ?? stubWorkflowSecrets,
+    namespaceSecretsRepo: overrides.namespaceSecretsRepo ?? stubNamespaceSecrets,
     pluginRegistry: (overrides.pluginRegistry ?? stubPluginRegistry) as CallerScopeServices['pluginRegistry'],
     engine: null as unknown as CallerScopeServices['engine'],
     manualTrigger: null as unknown as CallerScopeServices['manualTrigger'],
