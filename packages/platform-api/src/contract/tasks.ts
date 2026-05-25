@@ -34,6 +34,10 @@ export const ListTasksInputSchema = z
     role: z.string().min(1).optional(),
     stepId: z.string().min(1).optional(),
     status: z.array(HumanTaskStatusSchema).min(1).optional(),
+    // Narrows the `role` / caller-scope axes to one workspace. Intersection
+    // semantics like `runs.list` — a namespace the caller isn't a member of
+    // yields an empty list, not a 403.
+    namespace: z.string().min(1).optional(),
   })
   .refine(
     (val) => !(val.instanceId !== undefined && val.role !== undefined),

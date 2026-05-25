@@ -775,6 +775,7 @@ export class Mediforce {
           role: validated.role,
           stepId: validated.stepId,
           status: validated.status,
+          namespace: validated.namespace,
         });
         const res = await this.request(`/api/tasks${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.list');

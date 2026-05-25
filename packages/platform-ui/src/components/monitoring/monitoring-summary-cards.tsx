@@ -11,26 +11,26 @@ const CARD_STYLES: StatusCard[] = [
   {
     label: 'Running',
     count: 0,
-    color: 'text-green-700 dark:text-green-300',
-    bgColor: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
+    color: 'text-foreground',
+    bgColor: 'bg-card border-border',
   },
   {
     label: 'Paused',
     count: 0,
-    color: 'text-amber-700 dark:text-amber-300',
-    bgColor: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
+    color: 'text-amber-600 dark:text-amber-400',
+    bgColor: 'bg-card border-border',
   },
   {
     label: 'Failed',
     count: 0,
-    color: 'text-red-700 dark:text-red-300',
-    bgColor: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
+    color: 'text-red-600 dark:text-red-400',
+    bgColor: 'bg-card border-border',
   },
   {
     label: 'Completed',
     count: 0,
-    color: 'text-muted-foreground',
-    bgColor: 'bg-muted/30 border-border',
+    color: 'text-green-600 dark:text-green-400',
+    bgColor: 'bg-card border-border',
   },
 ];
 
