@@ -11,6 +11,8 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+## [2026-05-24]
+
 ### Added
 - Backlog triage workflow (`apps/backlog-triage/`) — fetches open GitHub issues, an LLM suggests assignments (human or AI workflow) with priority and rationale, a triager reviews and edits in a table, then dispatch PATCHes GitHub and POSTs the Mediforce process-start API for agent delegations.
 - `assignment-table` human-task UI for many-to-one item assignment with per-row assignee/priority/note. Items flow via `task.options` from the previous step; the assignee allowlist and labels live in `task.ui.config`.
