@@ -77,6 +77,7 @@ export default function WorkspaceSelectionPage() {
   const { namespaces, loading: nsLoading } = useAllUserNamespaces(firebaseUser?.uid);
   const [alwaysHandle, setAlwaysHandle] = React.useState<string | null>(null);
   const [ready, setReady] = React.useState(false);
+  const [redirecting, setRedirecting] = React.useState(false);
 
   // Read localStorage once on mount (SSR-safe)
   React.useEffect(() => {
@@ -85,26 +86,31 @@ export default function WorkspaceSelectionPage() {
   }, []);
 
   React.useEffect(() => {
-    if (authLoading || nsLoading || !ready) return;
+    if (authLoading || !ready) return;
 
     if (!firebaseUser) {
       router.replace('/login');
       return;
     }
 
-    // Single namespace — no choice needed, go straight there
-    if (namespaces.length <= 1) {
-      const target = namespaces[0]?.handle;
-      if (target !== undefined) {
-        router.replace(`/${target}`);
-      }
+    // Wait for namespaces to actually load (guards against stale nsLoading=false
+    // during the uid transition in useAllUserNamespaces)
+    if (nsLoading || namespaces.length === 0) return;
+
+    // Preferred workspace — check first so it wins over single-namespace shortcut
+    const preferred = localStorage.getItem(ALWAYS_KEY);
+    const handles = namespaces.map((ns) => ns.handle);
+    if (preferred !== null && preferred !== '' && handles.includes(preferred)) {
+      setRedirecting(true);
+      router.replace(`/${preferred}`);
       return;
     }
 
-    // Preferred workspace set — skip the picker
-    const preferred = localStorage.getItem(ALWAYS_KEY);
-    if (preferred !== null && preferred !== '' && namespaces.some((ns) => ns.handle === preferred)) {
-      router.replace(`/${preferred}`);
+    // Single namespace — no choice needed
+    if (namespaces.length === 1) {
+      setRedirecting(true);
+      router.replace(`/${namespaces[0].handle}`);
+      return;
     }
   }, [authLoading, nsLoading, ready, firebaseUser, namespaces, router]);
 
@@ -123,8 +129,10 @@ export default function WorkspaceSelectionPage() {
   }
 
   const loading = authLoading || nsLoading || !ready;
+  const willRedirect = !loading && alwaysHandle !== null && alwaysHandle !== ''
+    && namespaces.some((ns) => ns.handle === alwaysHandle);
 
-  if (loading || !firebaseUser) {
+  if (loading || !firebaseUser || redirecting || willRedirect) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
