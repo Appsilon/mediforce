@@ -120,9 +120,11 @@ The rule of thumb: **design the contract against real UI consumers, and change t
 
 ### Phase 1.5 — Hybrid endpoint cleanup
 
-Five endpoints already declare contracts in `platform-api` but still run
-inline route code that bypasses the `createRouteAdapter` pipeline AND the
-ADR-0004 scoped data-access layer. Drain the backlog before Phase 2
+**✅ Status: done in [#482](https://github.com/Appsilon/mediforce/pull/482)** (merged 2026-05-25). Shipped scope below for historical record; planning notes preserved for the institutional memory of why we did this before Phase 2.
+
+Five endpoints already declared contracts in `platform-api` but still ran
+inline route code that bypassed the `createRouteAdapter` pipeline AND the
+ADR-0004 scoped data-access layer. Drained the backlog in #482 before Phase 2
 mutations set the next pattern in stone.
 
 **Scope — one PR, three domains:**
@@ -353,11 +355,24 @@ on.
   No audit emission (`@no-audit` operational exemption per ADR-0005 §7).
 - `packages/platform-api/src/handlers/cron/__tests__/heartbeat.test.ts`
   — new. Contract + handler tests against in-memory scope.
-- `packages/platform-api/src/errors.ts` — extend with the `ApiError`
-  class + `ApiErrorCode` union (replaces today's narrower error
-  helpers if any).
-- `packages/platform-ui/src/lib/route-adapter.ts` — extend with
-  `ApiError` catch + status-mapping table per ADR-0005 §3/§4.
+- `packages/platform-api/src/errors.ts` — add the `ApiError` class +
+  `ApiErrorCode` union. Existing `HandlerError` / `NotFoundError` /
+  `ForbiddenError` from [#482](https://github.com/Appsilon/mediforce/pull/482)
+  **stay** as a coexistence bridge — new code throws `ApiError`,
+  existing throws keep working, both produce the same envelope shape.
+  Migration of legacy throws to `ApiError` is incremental, not PR1
+  blocking.
+- `packages/platform-ui/src/lib/route-adapter.ts` — extend the catch
+  block with two arms per ADR-0005 §3/§4:
+  - `instanceof ApiError` → envelope with `err.code`.
+  - `instanceof HandlerError` → derive code from `statusCode`
+    (`404 → 'not_found'`, `403 → 'forbidden'`); same envelope shape.
+- `loadOr404` helper — extract per [#482](https://github.com/Appsilon/mediforce/pull/482)
+  out-of-scope note ("third copy" rule reached for the
+  `entity = await scope.X.getById(id); if (!entity) throw …` pattern).
+  Lives in `packages/platform-api/src/handlers/_helpers.ts` (or
+  similar); used by `get-run` plus any new lookup-with-404 handler in
+  PR2.
 - `packages/platform-ui/src/lib/__tests__/route-adapter.test.ts` —
   extend with tests for each code → status mapping.
 - `packages/platform-ui/src/app/api/cron/heartbeat/route.ts` —
@@ -491,8 +506,7 @@ Wider mutation surface that doesn't fit Phase 2's uniform shape. Each group has 
 - `POST /api/agents/:id/oauth/:provider/start` — initiate OAuth flow.
 - `POST /api/agents/:id/oauth/:provider` + `oauth-discover` — callback-side persistence.
 
-**Workflow secrets:**
-- `POST /api/workflow-secrets` — workspace + workflow-scoped secret write.
+**Workflow secrets:** ✅ done in [#482](https://github.com/Appsilon/mediforce/pull/482). `set-secret` handler is an upsert (PUT semantics) covering create + update — no separate `POST` needed.
 
 **Admin (deployment-admin-only):**
 - `POST/PUT/DELETE /api/admin/oauth-providers[/:id]`
@@ -755,6 +769,24 @@ Phases are independent; we can pause between any two and still have a working, t
 Items surfaced during phase grilling that are real and worth doing, but
 explicitly outside the UI/API separation goal. Review this section when the
 migration is done — most of these become dedicated phases of their own.
+
+### Phase 1.8 — File-serving + ticket endpoints (deferred from #482)
+
+Endpoints with no contract started yet, so finishing-the-loop logic from
+Phase 1.5 didn't apply. File-serving shape (streaming, range requests,
+content-type negotiation) deserves its own design pass before the
+contract gets written.
+
+- `GET /api/agent-logs` — agent run log retrieval.
+- `GET /api/agent-output-file` — agent output file retrieval.
+- `GET /api/step-logs` — step execution log retrieval.
+- `POST /api/tickets` — GitHub Issues bridge. Already inline-forever per
+  Phase 2.5 out-of-scope list (external integration, has its own rate
+  limit). Mentioned here only because #482 grouped it with the file-
+  serving deferral; the headless-migration position is unchanged
+  (stays inline).
+- `DELETE /api/admin/docker-images` — mutation + deployment-admin
+  auth; folds into Phase 2.5 admin bullet rather than Phase 1.8.
 
 ### Mutation audit emission (deferred during Phase 2 grilling, 2026-05-25)
 
