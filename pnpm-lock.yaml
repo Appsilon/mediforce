@@ -153,7 +153,7 @@ importers:
         version: link:../platform-core
       bullmq:
         specifier: ^5.52.0
-        version: 5.76.8
+        version: 5.76.10
       zod:
         specifier: ^4.0.0
         version: 4.4.3
@@ -379,7 +379,7 @@ importers:
         version: 12.10.2(@types/react@19.2.14)(immer@11.1.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       bullmq:
         specifier: ^5.71.0
-        version: 5.76.8
+        version: 5.76.10
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2368,8 +2368,8 @@ packages:
   buffer-equal-constant-time@1.0.1:
     resolution: {integrity: sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==}
 
-  bullmq@5.76.8:
-    resolution: {integrity: sha512-v3WTwA8diFtsADaJ8eK2ozyi2CYK9rDZCeoKF+dIPF/MUL8HxAOa3H72Gmu1lC4yKlho6t1PwNr/QpDVqaNEZQ==}
+  bullmq@5.76.10:
+    resolution: {integrity: sha512-LWve7SpQjYSpCP2GEsWmoyzTz2H37L8HRmSTu3YihYsTOr5kJxrfEX6aEV7m6eskEMWXSHZYTMZepX6qNaH6CQ==}
     engines: {node: '>=12.22.0'}
 
   bytes@3.1.2:
@@ -5750,7 +5750,7 @@ snapshots:
 
   buffer-equal-constant-time@1.0.1: {}
 
-  bullmq@5.76.8:
+  bullmq@5.76.10:
     dependencies:
       cron-parser: 4.9.0
       ioredis: 5.10.1
