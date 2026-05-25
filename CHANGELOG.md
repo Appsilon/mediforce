@@ -11,6 +11,10 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Fixed
+- Default workspace auto-redirect race condition — `useAllUserNamespaces` hook had a stale `nsLoading=false` window during uid transition, causing the redirect effect to skip the preferred-workspace check. Users with a default workspace set got stuck on the picker every time ([#489](https://github.com/Appsilon/mediforce/pull/489), proper fix via server-side user preferences tracked in [#486](https://github.com/Appsilon/mediforce/issues/486)).
+- E2E workspace-selection test cleared wrong localStorage key (`workspace-default-key` → `alwaysNamespace`).
+
 ### Added
 - Backlog triage workflow (`apps/backlog-triage/`) — fetches open GitHub issues, an LLM suggests assignments (human or AI workflow) with priority and rationale, a triager reviews and edits in a table, then dispatch PATCHes GitHub and POSTs the Mediforce process-start API for agent delegations.
 - `assignment-table` human-task UI for many-to-one item assignment with per-row assignee/priority/note. Items flow via `task.options` from the previous step; the assignee allowlist and labels live in `task.ui.config`.
