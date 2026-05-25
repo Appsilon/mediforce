@@ -45,8 +45,8 @@ Uniform pattern. Low risk. Establishes the catalogue of read contracts that Phas
 | `GET /api/processes/:instanceId/steps` | processes | ✅ done | #450 |
 | `GET /api/workflow-definitions` (list) | definitions | ✅ done | #450 |
 | `GET /api/workflow-definitions/:name` (by name+version) | definitions | ✅ done | #450 |
-| `GET /api/agent-definitions` | definitions | ✅ done | #450 |
-| `GET /api/agent-definitions/:id` | definitions | ✅ done | #450 |
+| `GET /api/agents` | definitions | ✅ done | #450 |
+| `GET /api/agents/:id` | definitions | ✅ done | #450 |
 | `GET /api/cowork/:sessionId` | cowork | ✅ done | #450 |
 | `GET /api/cowork/by-instance/:instanceId` | cowork | ✅ done | #450 |
 | `GET /api/configs` | configs | scoped out — deleted on main in #292 | — |
@@ -181,7 +181,7 @@ automatically.
 
 - **Tasks lifecycle**: `POST /api/tasks/:id/claim`, `POST /api/tasks/:id/complete`, `POST /api/tasks/:id/resolve`
 - **Process lifecycle**: `POST /api/processes`, `POST /api/processes/:id/advance`, `POST /api/processes/:id/cancel`, `POST /api/processes/:id/resume`, `POST /api/processes/:id/steps/:stepId/retry`
-- **Definitions & configs**: `PUT /api/definitions`, `POST /api/workflow-definitions`, `POST /api/agent-definitions`, `POST /api/configs`, `PUT /api/configs`
+- **Definitions & configs**: `PUT /api/definitions`, `POST /api/workflow-definitions`, `POST /api/agents`, `POST /api/configs`, `PUT /api/configs`
 - **Cron heartbeat**: `POST /api/cron/heartbeat`
 
 **Additional concerns per mutation:**

@@ -26,7 +26,7 @@ export default function ToolDetailPage() {
     try {
       const [fetchedEntry, agentList] = await Promise.all([
         getCatalogEntry(handle, toolId),
-        apiFetch('/api/agent-definitions').then(async (res) =>
+        apiFetch('/api/agents').then(async (res) =>
           res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
         ),
       ]);

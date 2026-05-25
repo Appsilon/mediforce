@@ -328,8 +328,8 @@ describe('Mediforce', () => {
       parsedExpected: 'inst-a',
     },
     {
-      name: 'workflowDefinitions.list',
-      call: (c) => c.workflowDefinitions.list(),
+      name: 'workflows.list',
+      call: (c) => c.workflows.list(),
       expectedUrl: `${TEST_BASE_URL}/api/workflow-definitions`,
       fixture: {
         definitions: [
@@ -346,17 +346,17 @@ describe('Mediforce', () => {
       parsedExpected: 1,
     },
     {
-      name: 'agentDefinitions.list',
-      call: (c) => c.agentDefinitions.list(),
-      expectedUrl: `${TEST_BASE_URL}/api/agent-definitions`,
+      name: 'agents.list',
+      call: (c) => c.agents.list(),
+      expectedUrl: `${TEST_BASE_URL}/api/agents`,
       fixture: { agents: [buildAgentDefinition({ id: 'a-1' })] },
       parsedField: (r) => (r as { agents: { id: string }[] }).agents[0].id,
       parsedExpected: 'a-1',
     },
     {
-      name: 'agentDefinitions.get',
-      call: (c) => c.agentDefinitions.get({ id: 'a-1' }),
-      expectedUrl: `${TEST_BASE_URL}/api/agent-definitions/a-1`,
+      name: 'agents.get',
+      call: (c) => c.agents.get({ id: 'a-1' }),
+      expectedUrl: `${TEST_BASE_URL}/api/agents/a-1`,
       fixture: { agent: buildAgentDefinition({ id: 'a-1' }) },
       parsedField: (r) => (r as { agent: { id: string } }).agent.id,
       parsedExpected: 'a-1',
@@ -440,7 +440,7 @@ describe('Mediforce', () => {
     });
   });
 
-  describe('workflowDefinitions.get (version + namespace query)', () => {
+  describe('workflows.get (version + namespace query)', () => {
     it('calls GET /api/workflow-definitions/:name and parses the envelope', async () => {
       const definition = buildWorkflowDefinition({ name: 'flow-a' });
       const fetchSpy = vi
@@ -448,7 +448,7 @@ describe('Mediforce', () => {
         .mockResolvedValue(jsonResponse({ definition }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      const result = await mediforce.workflowDefinitions.get({ name: 'flow-a' });
+      const result = await mediforce.workflows.get({ name: 'flow-a' });
 
       expect(result.definition.name).toBe('flow-a');
       expect(fetchSpy.mock.calls[0]?.[0]).toBe(
@@ -463,7 +463,7 @@ describe('Mediforce', () => {
         .mockResolvedValue(jsonResponse({ definition }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      await mediforce.workflowDefinitions.get({
+      await mediforce.workflows.get({
         name: 'flow-a',
         version: 2,
         namespace: 'team-alpha',
@@ -480,7 +480,7 @@ describe('Mediforce', () => {
         .mockResolvedValue(jsonResponse({ error: 'x' }, 404));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      await mediforce.workflowDefinitions
+      await mediforce.workflows
         .get({ name: 'flow/a' })
         .catch(() => undefined);
 
@@ -495,7 +495,7 @@ describe('Mediforce', () => {
       );
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      const err = await mediforce.workflowDefinitions
+      const err = await mediforce.workflows
         .get({ name: 'missing' })
         .catch((e) => e);
 
@@ -504,14 +504,14 @@ describe('Mediforce', () => {
     });
   });
 
-  describe('workflowDefinitions.list (namespace query)', () => {
+  describe('workflows.list (namespace query)', () => {
     it('serialises namespace into the query string when provided', async () => {
       const fetchSpy = vi
         .spyOn(globalThis, 'fetch')
         .mockResolvedValue(jsonResponse({ definitions: [] }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      await mediforce.workflowDefinitions.list({ namespace: 'team-alpha' });
+      await mediforce.workflows.list({ namespace: 'team-alpha' });
 
       expect(fetchSpy.mock.calls[0]?.[0]).toBe(
         `${TEST_BASE_URL}/api/workflow-definitions?namespace=team-alpha`,

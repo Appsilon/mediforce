@@ -2,7 +2,7 @@ import { apiFetch } from './api-fetch';
 import type { AgentMcpBinding, AgentMcpBindingMap } from '@mediforce/platform-core';
 
 /**
- * Thin typed wrappers over `/api/agent-definitions/:id/mcp-servers` REST surface.
+ * Thin typed wrappers over `/api/agents/:id/mcp-servers` REST surface.
  * All calls attach the Firebase ID token via `apiFetch`.
  *
  * When #232's generated API client lands, this module becomes a mechanical
@@ -18,7 +18,7 @@ async function parseOrThrow<T>(res: Response, label: string): Promise<T> {
 }
 
 export async function listAgentBindings(agentId: string): Promise<AgentMcpBindingMap> {
-  const res = await apiFetch(`/api/agent-definitions/${encodeURIComponent(agentId)}/mcp-servers`);
+  const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/mcp-servers`);
   const { mcpServers } = await parseOrThrow<{ mcpServers: AgentMcpBindingMap }>(res, 'List agent bindings');
   return mcpServers;
 }
@@ -29,7 +29,7 @@ export async function putAgentBinding(
   binding: AgentMcpBinding,
 ): Promise<AgentMcpBindingMap> {
   const res = await apiFetch(
-    `/api/agent-definitions/${encodeURIComponent(agentId)}/mcp-servers/${encodeURIComponent(serverName)}`,
+    `/api/agents/${encodeURIComponent(agentId)}/mcp-servers/${encodeURIComponent(serverName)}`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -45,7 +45,7 @@ export async function deleteAgentBinding(
   serverName: string,
 ): Promise<AgentMcpBindingMap> {
   const res = await apiFetch(
-    `/api/agent-definitions/${encodeURIComponent(agentId)}/mcp-servers/${encodeURIComponent(serverName)}`,
+    `/api/agents/${encodeURIComponent(agentId)}/mcp-servers/${encodeURIComponent(serverName)}`,
     { method: 'DELETE' },
   );
   const { mcpServers } = await parseOrThrow<{ mcpServers: AgentMcpBindingMap }>(res, 'Delete agent binding');

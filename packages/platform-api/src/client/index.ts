@@ -5,6 +5,7 @@ import {
   GetTaskOutputSchema,
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
+  ListWorkflowsInputSchema,
   ListWorkflowsOutputSchema,
   GetWorkflowInputSchema,
   GetWorkflowOutputSchema,
@@ -26,6 +27,7 @@ import {
   RemoveImageOutputSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
+  ListAgentsInputSchema,
   ListAgentsOutputSchema,
   GetAgentInputSchema,
   GetAgentOutputSchema,
@@ -46,13 +48,6 @@ import {
   ListAuditEventsOutputSchema,
   GetProcessStepsInputSchema,
   GetProcessStepsOutputSchema,
-  ListWorkflowDefinitionsInputSchema,
-  ListWorkflowDefinitionsOutputSchema,
-  ListAgentDefinitionsOutputSchema,
-  GetAgentDefinitionInputSchema,
-  GetAgentDefinitionOutputSchema,
-  GetWorkflowDefinitionInputSchema,
-  GetWorkflowDefinitionOutputSchema,
   GetCoworkSessionInputSchema,
   GetCoworkSessionOutputSchema,
   GetCoworkSessionByInstanceInputSchema,
@@ -65,6 +60,7 @@ import {
   type RegisterWorkflowInput,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
+  type ListWorkflowsInput,
   type ListWorkflowsOutput,
   type GetWorkflowInput,
   type GetWorkflowOutput,
@@ -87,6 +83,7 @@ import {
   type RemoveImageOutput,
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
+  type ListAgentsInput,
   type ListAgentsOutput,
   type GetAgentInput,
   type GetAgentOutput,
@@ -117,13 +114,6 @@ import {
   type ListAuditEventsOutput,
   type GetProcessStepsInput,
   type GetProcessStepsOutput,
-  type ListWorkflowDefinitionsInput,
-  type ListWorkflowDefinitionsOutput,
-  type ListAgentDefinitionsOutput,
-  type GetAgentDefinitionInput,
-  type GetAgentDefinitionOutput,
-  type GetWorkflowDefinitionInput,
-  type GetWorkflowDefinitionOutput,
   type GetCoworkSessionInput,
   type GetCoworkSessionOutput,
   type GetCoworkSessionByInstanceInput,
@@ -197,16 +187,6 @@ export class Mediforce {
     getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
   };
 
-  readonly workflowDefinitions: {
-    list: (input?: ListWorkflowDefinitionsInput) => Promise<ListWorkflowDefinitionsOutput>;
-    get: (input: GetWorkflowDefinitionInput) => Promise<GetWorkflowDefinitionOutput>;
-  };
-
-  readonly agentDefinitions: {
-    list: () => Promise<ListAgentDefinitionsOutput>;
-    get: (input: GetAgentDefinitionInput) => Promise<GetAgentDefinitionOutput>;
-  };
-
   readonly cowork: {
     get: (input: GetCoworkSessionInput) => Promise<GetCoworkSessionOutput>;
     getByInstance: (
@@ -223,7 +203,7 @@ export class Mediforce {
       input: RegisterWorkflowInput,
       options: RegisterWorkflowOptions,
     ) => Promise<RegisterWorkflowOutput>;
-    list: () => Promise<ListWorkflowsOutput>;
+    list: (input?: ListWorkflowsInput) => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
     archiveVersion: (input: ArchiveVersionInput) => Promise<ArchiveVersionOutput>;
     archiveAll: (input: ArchiveAllInput) => Promise<ArchiveAllOutput>;
@@ -238,7 +218,7 @@ export class Mediforce {
   };
 
   readonly agents: {
-    list: () => Promise<ListAgentsOutput>;
+    list: (input?: ListAgentsInput) => Promise<ListAgentsOutput>;
     get: (input: GetAgentInput) => Promise<GetAgentOutput>;
     delete: (input: DeleteAgentInput) => Promise<DeleteAgentOutput>;
     update: (input: UpdateAgentInput, body: UpdateAgentBody) => Promise<UpdateAgentOutput>;
@@ -347,46 +327,6 @@ export class Mediforce {
       },
     };
 
-    this.workflowDefinitions = {
-      list: async (input) => {
-        const validated = input ? ListWorkflowDefinitionsInputSchema.parse(input) : undefined;
-        const qs = validated
-          ? toSearchParams({ namespace: validated.namespace })
-          : '';
-        const res = await this.request(`/api/workflow-definitions${qs}`);
-        const body = await parseJsonOrThrow(res, 'mediforce.workflowDefinitions.list');
-        return ListWorkflowDefinitionsOutputSchema.parse(body);
-      },
-      get: async (input) => {
-        const validated = GetWorkflowDefinitionInputSchema.parse(input);
-        const qs = toSearchParams({
-          version: validated.version !== undefined ? String(validated.version) : undefined,
-          namespace: validated.namespace,
-        });
-        const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
-        );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflowDefinitions.get');
-        return GetWorkflowDefinitionOutputSchema.parse(body);
-      },
-    };
-
-    this.agentDefinitions = {
-      list: async () => {
-        const res = await this.request('/api/agent-definitions');
-        const body = await parseJsonOrThrow(res, 'mediforce.agentDefinitions.list');
-        return ListAgentDefinitionsOutputSchema.parse(body);
-      },
-      get: async (input) => {
-        const validated = GetAgentDefinitionInputSchema.parse(input);
-        const res = await this.request(
-          `/api/agent-definitions/${encodeURIComponent(validated.id)}`,
-        );
-        const body = await parseJsonOrThrow(res, 'mediforce.agentDefinitions.get');
-        return GetAgentDefinitionOutputSchema.parse(body);
-      },
-    };
-
     this.cowork = {
       get: async (input) => {
         const validated = GetCoworkSessionInputSchema.parse(input);
@@ -432,16 +372,20 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.register');
         return RegisterWorkflowOutputSchema.parse(body);
       },
-      list: async () => {
-        const res = await this.request('/api/workflow-definitions');
+      list: async (input) => {
+        const validated = input ? ListWorkflowsInputSchema.parse(input) : undefined;
+        const qs = validated
+          ? toSearchParams({ namespace: validated.namespace })
+          : '';
+        const res = await this.request(`/api/workflow-definitions${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.list');
         return ListWorkflowsOutputSchema.parse(body);
       },
       get: async (input) => {
         const validated = GetWorkflowInputSchema.parse(input);
         const qs = toSearchParams({
-          namespace: validated.namespace,
           version: validated.version !== undefined ? String(validated.version) : undefined,
+          namespace: validated.namespace,
         });
         const res = await this.request(
           `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
@@ -509,14 +453,14 @@ export class Mediforce {
 
     this.agents = {
       list: async () => {
-        const res = await this.request('/api/agent-definitions');
+        const res = await this.request('/api/agents');
         const body = await parseJsonOrThrow(res, 'mediforce.agents.list');
         return ListAgentsOutputSchema.parse(body);
       },
       get: async (input) => {
         const validated = GetAgentInputSchema.parse(input);
         const res = await this.request(
-          `/api/agent-definitions/${encodeURIComponent(validated.id)}`,
+          `/api/agents/${encodeURIComponent(validated.id)}`,
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agents.get');
         return GetAgentOutputSchema.parse(body);
@@ -524,7 +468,7 @@ export class Mediforce {
       delete: async (input) => {
         const validated = DeleteAgentInputSchema.parse(input);
         const res = await this.request(
-          `/api/agent-definitions/${encodeURIComponent(validated.id)}`,
+          `/api/agents/${encodeURIComponent(validated.id)}`,
           { method: 'DELETE' },
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agents.delete');
@@ -534,7 +478,7 @@ export class Mediforce {
         const validatedInput = UpdateAgentInputSchema.parse(input);
         const validatedBody = UpdateAgentBodySchema.parse(updateBody);
         const res = await this.request(
-          `/api/agent-definitions/${encodeURIComponent(validatedInput.id)}`,
+          `/api/agents/${encodeURIComponent(validatedInput.id)}`,
           {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },

@@ -1,9 +1,9 @@
 import type { CallerScope } from '../../repositories/index.js';
 import type {
-  ListWorkflowDefinitionsInput,
-  ListWorkflowDefinitionsOutput,
-  WorkflowDefinitionSummary,
-} from '../../contract/definitions.js';
+  ListWorkflowsInput,
+  ListWorkflowsOutput,
+  WorkflowDefinitionGroupSummary,
+} from '../../contract/workflows.js';
 
 /**
  * List workflow definitions visible to the caller, grouped by name with the
@@ -11,12 +11,12 @@ import type {
  * version the caller cannot see (private + foreign workspace). The optional
  * `namespace` input narrows further but does not grant access.
  */
-export async function listWorkflowDefinitions(
-  input: ListWorkflowDefinitionsInput,
+export async function listWorkflows(
+  input: ListWorkflowsInput,
   scope: CallerScope,
-): Promise<ListWorkflowDefinitionsOutput> {
+): Promise<ListWorkflowsOutput> {
   const groups = await scope.workflowDefinitions.listGroups(false);
-  const summaries: WorkflowDefinitionSummary[] = groups.map((group) => {
+  const summaries: WorkflowDefinitionGroupSummary[] = groups.map((group) => {
     const latest = group.versions.find((v) => v.version === group.latestVersion) ?? null;
     return {
       namespace: group.namespace,

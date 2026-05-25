@@ -4,8 +4,8 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess, type CallerIdentity } from '@/lib/api-auth';
 import { getByIdAdapter } from '@mediforce/platform-api/handlers';
-import { GetAgentDefinitionInputSchema } from '@mediforce/platform-api/contract';
-import type { GetAgentDefinitionInput } from '@mediforce/platform-api/contract';
+import { GetAgentInputSchema } from '@mediforce/platform-api/contract';
+import type { GetAgentInput } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -20,23 +20,23 @@ function canMutate(caller: CallerIdentity, agent: { namespace?: string }): NextR
 }
 
 /**
- * GET /api/agent-definitions/:id
+ * GET /api/agents/:id
  *
  * 404 for missing ids (surfaces before visibility checks). For private
  * agents, the caller must be in the agent's namespace; public agents are
  * always readable.
  */
 export const GET = createRouteAdapter<
-  typeof GetAgentDefinitionInputSchema,
-  GetAgentDefinitionInput,
+  typeof GetAgentInputSchema,
+  GetAgentInput,
   unknown,
   RouteContext
 >(
-  GetAgentDefinitionInputSchema,
+  GetAgentInputSchema,
   async (_req, ctx) => ({ id: (await ctx.params).id }),
   getByIdAdapter(
     (input, scope) => scope.agentDefinitions.getById(input.id),
-    (input) => `Agent definition ${input.id} not found`,
+    (input) => `Agent ${input.id} not found`,
     'agent',
   ),
 );

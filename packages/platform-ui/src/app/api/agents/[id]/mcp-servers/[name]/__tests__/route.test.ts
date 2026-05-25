@@ -30,7 +30,7 @@ const makeParams = (id: string, name: string) => Promise.resolve({ id, name });
 
 function makePutRequest(id: string, name: string, body: unknown): NextRequest {
   return new NextRequest(
-    `http://localhost/api/agent-definitions/${id}/mcp-servers/${name}`,
+    `http://localhost/api/agents/${id}/mcp-servers/${name}`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -41,7 +41,7 @@ function makePutRequest(id: string, name: string, body: unknown): NextRequest {
 
 function makeDeleteRequest(id: string, name: string): NextRequest {
   return new NextRequest(
-    `http://localhost/api/agent-definitions/${id}/mcp-servers/${name}`,
+    `http://localhost/api/agents/${id}/mcp-servers/${name}`,
     { method: 'DELETE' },
   );
 }
@@ -77,7 +77,7 @@ const httpBinding = { type: 'http', url: 'https://mcp.example.com/server' };
 
 // ---- PUT ----
 
-describe('PUT /api/agent-definitions/:id/mcp-servers/:name', () => {
+describe('PUT /api/agents/:id/mcp-servers/:name', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
@@ -220,7 +220,7 @@ describe('PUT /api/agent-definitions/:id/mcp-servers/:name', () => {
 
 // ---- DELETE ----
 
-describe('DELETE /api/agent-definitions/:id/mcp-servers/:name', () => {
+describe('DELETE /api/agents/:id/mcp-servers/:name', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });

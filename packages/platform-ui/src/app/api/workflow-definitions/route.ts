@@ -4,8 +4,8 @@ import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform
 import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
-import { listWorkflowDefinitions } from '@mediforce/platform-api/handlers';
-import { ListWorkflowDefinitionsInputSchema } from '@mediforce/platform-api/contract';
+import { listWorkflows } from '@mediforce/platform-api/handlers';
+import { ListWorkflowsInputSchema } from '@mediforce/platform-api/contract';
 
 /**
  * GET /api/workflow-definitions
@@ -15,13 +15,13 @@ import { ListWorkflowDefinitionsInputSchema } from '@mediforce/platform-api/cont
  * query param narrows further but does not grant access.
  */
 export const GET = createRouteAdapter(
-  ListWorkflowDefinitionsInputSchema,
+  ListWorkflowsInputSchema,
   (req) => {
     const url = new URL(req.url);
     const namespace = url.searchParams.get('namespace');
     return namespace !== null ? { namespace } : {};
   },
-  listWorkflowDefinitions,
+  listWorkflows,
 );
 
 /**

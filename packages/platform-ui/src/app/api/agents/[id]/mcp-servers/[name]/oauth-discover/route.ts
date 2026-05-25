@@ -20,7 +20,7 @@ interface DiscoverBody {
   namespace: string;
 }
 
-/** POST /api/agent-definitions/:id/mcp-servers/:name/oauth-discover
+/** POST /api/agents/:id/mcp-servers/:name/oauth-discover
  *
  *  Given an existing HTTP binding on this agent, probe the URL for OAuth
  *  metadata, dynamically register a client with the discovered
