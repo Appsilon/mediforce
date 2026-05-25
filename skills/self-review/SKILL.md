@@ -16,11 +16,14 @@ metadata:
 
 If you are the agent who wrote the code in this conversation, **STOP**. Spawn a subagent and have it run this skill. Reviewing your own work in the same context where you wrote it is unreliable — you carry "I just wrote this, it must be good" assumptions that an outside reader doesn't.
 
-From the main thread:
+From the main thread, spawn with `run_in_background: true` so the user isn't blocked:
 
 ```
-Spawn subagent with prompt:
-  Run /self-review on branch <current>. Report findings with verdict.
+Agent({
+  description: "Self-review",
+  prompt: "Run /self-review on branch <current>. Report findings with verdict.",
+  run_in_background: true,
+})
 ```
 
 If you ARE the subagent invoked for this purpose, continue with the checks below. Treat the diff as if a stranger wrote it.
