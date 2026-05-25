@@ -12,7 +12,7 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ## [Unreleased]
 
 ### Fixed
-- `check-gif-freshness.py` now evaluates the net PR diff vs base instead of summing per-commit diffs. Add-then-revert within the same PR no longer trips the GIF freshness check (regression surfaced on [#481](https://github.com/Appsilon/mediforce/pull/481)). Smoke test under `packages/platform-ui/scripts/__tests__/` covers add-then-revert, pure add, add+gif, and no-change cases.
+- `check-gif-freshness.py` now evaluates the net PR diff vs base instead of summing per-commit diffs. Add-then-revert within the same PR no longer trips the GIF freshness check (regression surfaced on [#481](https://github.com/Appsilon/mediforce/pull/481)).
 
 ### Added
 - Backlog triage workflow (`apps/backlog-triage/`) — fetches open GitHub issues, an LLM suggests assignments (human or AI workflow) with priority and rationale, a triager reviews and edits in a table, then dispatch PATCHes GitHub and POSTs the Mediforce process-start API for agent delegations.

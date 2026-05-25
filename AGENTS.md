@@ -40,13 +40,21 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    the codebase's language and surfaces fuzzy terms before you write code.
    Optional, not every task needs it.
 
-2. **Test first via `/new-test`.** Write a failing test at the lowest level
-   that gives real signal before implementation. `/new-test` picks the level
-   (L1 unit / L2 integration / L3 API E2E / L4 UI / L5 external),
-   scaffolds the file, and walks RED → GREEN. Every feature MUST land at
-   **L3** (proves Firestore + middleware + auth). For L4 UI journeys with
-   a GIF deliverable, use `/e2e-test`. Skip the test only for trivial edits
-   (typo, comment, single-line config) and say so out loud.
+2. **Test first via `/new-test` — for product code.** Write a failing test at
+   the lowest level that gives real signal before implementation. `/new-test`
+   picks the level (L1 unit / L2 integration / L3 API E2E / L4 UI / L5
+   external), scaffolds the file, and walks RED → GREEN. Product features
+   MUST land at **L3** (proves Firestore + middleware + auth). For L4 UI
+   journeys with a GIF deliverable, use `/e2e-test`.
+
+   **Don't test infra/tooling/workflow code.** CI scripts, build glue, dev
+   tooling, workflow configs (`apps/*/workflow.yaml`), one-off migrations —
+   these don't get unit tests. They get exercised by the thing they support
+   (the actual CI run, the actual workflow execution). Writing tests for
+   tests-of-tests is over-engineering. Use judgement; if you're unsure
+   whether something is "product" or "tooling," ask. Also skip the test for
+   trivial product edits (typo, comment, single-line config) — and say so
+   out loud.
 
 3. **Dogfood the CLI via `/use-mediforce`.** Any operation `pnpm exec mediforce`
    covers MUST go through it — never curl REST when the CLI does it. If the
