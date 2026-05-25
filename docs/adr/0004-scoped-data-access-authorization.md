@@ -1,6 +1,6 @@
 # 0004 — Authorization enforcement moves to a scoped data-access layer
 
-- **Status:** Accepted
+- **Status:** Finalized (frozen 2026-05-25 per the post-merge note below; this ADR predates the formal `Finalized` status — treat it as locked, changes via supersession only)
 - **Date:** 2026-05-22
 - **Authors:** Marek Rogala (@marekrogala)
 - **Reviewers:** Filip Stachura (@filipstachura), Paweł Przytuła (@przytu1)

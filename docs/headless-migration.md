@@ -211,39 +211,316 @@ Phase 1 ended with namespace authorization threaded **explicitly** through every
 
 **Status:** in design review via the `/grill-with-docs` skill, stress-testing the working hypothesis against the existing domain model, ADRs, and Mediforce-specific concerns (pharma tenant isolation, NextAuth migration, per-user API keys). See the spawned design session.
 
-### Phase 2 — Migrate mutations (grouped by domain)
+### Phase 2 — Lifecycle mutations (narrow)
 
-**Prerequisite:** Phase 1.7 closed — authorization architecture decision merged. Mutation handlers are written against the decided shape, not retrofitted.
+**Prerequisite:** Phase 1.7 closed — [ADR-0004](./adr/0004-scoped-data-access-authorization.md) merged in #463 (2026-05-25). Mutation handlers ship with the `(input, scope: CallerScope)` signature from day one; no raw repo access.
 
-Harder than GETs because each mutation has a state machine and side effects. Break into small PRs.
+**Scope note (rewritten 2026-05-25):** the original Phase 2 list (PR #445 / branch `claude/cool-jennings-035e0c`) bundled tasks + process + definitions + configs + cron into one phase. Three things changed since:
+1. Mutation surface is wider in practice (~30 routes, not 14). Agents+MCP+OAuth subroutes, admin oauth-providers/tool-catalog/docker-images, users invite, workflow-definitions archive/copy/version-archive landed after the plan was written.
+2. ADR-0004 wrapper layer is new — mutation pattern is unproven. Validate on uniform state-machine cases before tackling cross-entity work (archive cascades, copy across versions).
+3. `configs` was deleted on main in #292; the original bullet is dead.
 
-**Status note**: PR #445 (the first Phase 2 batch) was closed because it
-was stacked on #256 (the original Phase 1 PR without caller threading) —
-copy-pasting the same auth gap into every mutation handler. Redo from
-branch `claude/cool-jennings-035e0c` (preserved) on top of #450 once it
-lands: every mutation handler picks up the `caller: CallerIdentity` third
-argument and the `auth-coverage.test.ts` guard runs against the new files
-automatically.
+So Phase 2 narrows to **uniform lifecycle mutations** — same handler shape (load → gate → state transition → write → audit), no cross-entity cascades, no special namespace semantics. The wider surface moves to **Phase 2.5**, planned against the lessons Phase 2 produces.
 
-- **Tasks lifecycle**: `POST /api/tasks/:id/claim`, `POST /api/tasks/:id/complete`, `POST /api/tasks/:id/resolve`
-- **Process lifecycle**: `POST /api/processes`, `POST /api/processes/:id/advance`, `POST /api/processes/:id/cancel`, `POST /api/processes/:id/resume`, `POST /api/processes/:id/steps/:stepId/retry`
-- **Definitions & configs**: `PUT /api/definitions`, `POST /api/workflow-definitions`, `POST /api/agents`, `POST /api/configs`, `PUT /api/configs`
-- **Cron heartbeat**: `POST /api/cron/heartbeat`
+**In scope:**
+
+| Endpoint | Domain | Shape |
+|---|---|---|
+| `POST /api/tasks/:taskId/claim` | tasks | scope.tasks.claim(taskId, caller) |
+| `POST /api/tasks/:taskId/complete` | tasks | scope.tasks.complete(taskId, data) — validates against parent run's step gate |
+| `POST /api/tasks/:taskId/resolve` | tasks | scope.tasks.resolve(taskId, verdict) |
+| `POST /api/processes/:instanceId/cancel` | processes | scope.runs.cancel(id, reason) |
+| `POST /api/processes/:instanceId/resume` | processes | scope.runs.resume(id) |
+| `POST /api/cron/heartbeat` | cron | `caller.isSystemActor` bypass; no scope gate |
+
+**Out of Phase 2 (moved to Phase 2.5 or Phase 3):**
+
+- `POST /api/processes` (create new run) → Phase 2.5 — workspace-write gate, trigger payload validation, idempotency design needed.
+- `POST /api/processes/:id/advance`, `POST /api/processes/:id/run`, `POST /api/processes/:id/steps/:stepId/retry` → **Phase 3** — orchestrates `WorkflowEngine` + `AgentRunner`, spawns Docker, fire-and-forget side effects. Needs its own design pass (sync vs queued execution).
+- All cowork (`chat`/`message`/`finalize`) → **Phase 3** — SSE adapter unsolved.
+
+**Already shipped (post-original-plan):** `POST /api/model-registry/sync`, `POST /api/model-registry/rankings`, `GET /api/model-registry`, `GET /api/model-registry/:id` — five model-registry endpoints landed under `packages/platform-api/src/handlers/models/` ahead of the formal Phase 2 plan because that domain was being touched anyway. Treat them as Phase 2 reference shape for future mutations.
 
 **Additional concerns per mutation:**
 
-- Response shape often echoes the corresponding GET — reuse the schema.
-- Fire-and-forget internal fetches (`getAppBaseUrl()` callers) keep working because we stay on same-origin deploy.
-- State-machine invariants surface as additional contract refines (e.g. "cannot complete a task that is not claimed").
+- **Response shape: entity echo.** Every single-entity mutation returns
+  the entity in its post-mutation state — `POST /api/tasks/:id/claim` →
+  `{ task: HumanTask }`, `POST /api/processes/:id/cancel` →
+  `{ run: WorkflowRun }`. Reuse the GET output schema verbatim. This is
+  the REST textbook answer (Stripe, GitHub, Linear, Shopify all do it).
+  Eliminates "did it work + what's the new state" round trips, kills
+  drift between client-synthesised state and server truth.
 
-**PR sizing**: one lifecycle domain per PR (all Tasks mutations, all Process mutations, all Definitions). Typically 3-5 endpoints.
+  Carve-outs (use when they apply, not by default):
+  | Op kind | Response shape |
+  |---|---|
+  | Create | `201 Created` + entity echo (`{ run }`, `{ definition, version }`) |
+  | State transition | `200 OK` + entity echo (`{ task }`, `{ run }`) |
+  | Bulk | `{ results: Array<{ id, status: 'ok' \| 'error', error? }> }` |
+  | Async / queued | `202 Accepted` + `{ jobId, status: 'queued' }` |
+  | Streaming (Phase 3 cowork) | SSE response, not entity echo |
+  | Operational ping (cron heartbeat) | `{ ok: true, processedAt }` |
+  | True DELETE with nothing to say | `204 No Content` |
 
-**Pause-safe**: yes — same as Phase 1, unmigrated mutations stay on their inline Next.js handlers.
+  Today's inconsistency (`{ ok, taskId, verdict, processInstanceId }` for
+  complete; `{ instanceId, status }` for cancel/resume) is hand-rolled
+  drift, not a deliberate pattern. Migration normalises in the same PR
+  as each endpoint moves; UI callers update inline (~3 components in
+  Phase 2).
 
-**Open questions to settle before starting**:
-- How do we encode state-machine preconditions in the contract? Candidate: extra Zod `.refine()` on the output of a prior GET shape, combined with repo-level assertions throwing a typed `PreconditionFailedError` that the adapter maps to 409.
-- Do we still have separate Server Actions and API routes for the same mutation, or does migrating the handler let us delete the server action? (Next.js-specific concerns like `revalidatePath` stay behind.)
-- Idempotency keys for operations like `POST /api/processes` — worth adding now or later?
+- State-machine invariants surface as typed errors (`ApiError` with `code: 'precondition_failed'` → 409). See the **error contract** open question below.
+- **Audit emission — bridge.** Today's Server Actions hand-roll audit
+  (`auditRepo.append({...})` inline in each action). API routes don't
+  emit. Deleting the actions during Phase 2 would erase the only existing
+  audit coverage for these mutations. To avoid a compliance regression
+  during the gap between Phase 2 and the future audit-wiring phase
+  (see "Captured for later" below), each new Phase 2 mutation handler
+  emits audit inline via `scope.auditEvents.append({...})` — same shape
+  as today's Server Action code, ~6 LOC per handler. This is throwaway
+  bridge code: the audit-wiring phase rewrites to repo-resident
+  `MutationContext` and removes the handler-level emits. Add a `.append()`
+  method to `AuthorizedAuditEventRepository` (read-only today) to enable
+  this.
+
+**Server Action policy.** Per-endpoint judgement. Default: when migrating
+a mutation, delete the parallel Server Action; UI moves to
+`apiClient.X.Y()`. Keep a Server Action only when an actually-used Server
+Action feature justifies it — `<form action={...}>` progressive
+enhancement, `revalidatePath()` post-mutation freshness, or
+`redirect()`. Today's actions in `src/app/actions/` use **none** of
+these features (they take `idToken` as an explicit arg and call
+`verifyIdToken`, i.e. API-route-shaped code wearing a Server Action
+costume); the empirical default is therefore "delete". When a future
+mutation genuinely needs a Server Action feature, the policy doesn't
+forbid adding a thin wrapper:
+
+```ts
+'use server';
+export async function claimTaskAction(taskId: string) {
+  const result = await claimTaskHandler({ taskId }, await getServerScope());
+  revalidatePath(`/tasks/${taskId}`);
+  return result;
+}
+```
+
+Action file may only call handlers — never raw repos, never Firestore
+SDK, never inline business logic. Enforced by PR review; no boundary
+test until drift proves it's needed.
+
+**Phase 2 Server Action deletions** (concrete list, all in
+`packages/platform-ui/src/app/actions/`):
+
+| File | Functions to delete in Phase 2 |
+|---|---|
+| `tasks.ts` | `claimTask`, `unclaimTask`, `completeTask`, `completeParamsTask`, `completeUploadTask`, `completeAssignmentTask` (all 6) |
+| `processes.ts` | `cancelProcessRun`, `resumeProcessRun` (Phase 2 lifecycle scope) |
+
+Phase 2.5 / Phase 3 picks up the rest (`processes.ts`:
+`startWorkflowRun` / `retryFailedStep` / `archiveProcessRun` /
+`bulkCancelProcessRuns` / `bulkArchiveProcessRuns`; whole files for
+`cowork.ts` / `definitions.ts` / `namespace-secrets.ts` /
+`workflow-secrets.ts`). Surfaced gap: `unclaimTask` currently writes
+Firestore directly (`db.collection('humanTasks').doc(taskId).update(...)`),
+bypassing the repo — Phase 2 must add an `unclaim` method to
+`HumanTaskRepository` + wrapper to give the migrated handler a
+non-bypass path.
+
+**PR sizing**: one lifecycle domain per PR. Five PRs total — tasks (3 endpoints), process-state (2), cron (1, trivial). 1-2 week phase.
+
+**Pause-safe**: yes — same as Phase 1.
+
+### Phase 2 — Implementation tracker
+
+Locked design decisions live in
+[ADR-0005](./adr/0005-headless-platform-api-ui-separation.md);
+code-architecture concepts in [`api-architecture.md`](./api-architecture.md).
+This tracker is the entry point for a fresh session picking up Phase 2.
+
+**Two PRs, sequential.** Pattern is unproven (wrapper layer has only
+served GETs); smallest endpoint first to validate it, then the rest.
+
+#### PR1 — Cron heartbeat + adapter `ApiError` extension
+
+**Scope.** One endpoint (`POST /api/cron/heartbeat`) plus the
+`createRouteAdapter` extension that every subsequent mutation depends
+on.
+
+**Files to touch:**
+- `packages/platform-api/src/contract/cron.ts` — new. `HeartbeatInputSchema`
+  (empty / trivial), `HeartbeatOutputSchema` (`{ ok, processedAt }`).
+- `packages/platform-api/src/handlers/cron/heartbeat.ts` — new. System-
+  actor bypass: `if (!scope.caller.isSystemActor) throw new ApiError('forbidden', ...)`.
+  No audit emission (`@no-audit` operational exemption per ADR-0005 §7).
+- `packages/platform-api/src/handlers/cron/__tests__/heartbeat.test.ts`
+  — new. Contract + handler tests against in-memory scope.
+- `packages/platform-api/src/errors.ts` — extend with the `ApiError`
+  class + `ApiErrorCode` union (replaces today's narrower error
+  helpers if any).
+- `packages/platform-ui/src/lib/route-adapter.ts` — extend with
+  `ApiError` catch + status-mapping table per ADR-0005 §3/§4.
+- `packages/platform-ui/src/lib/__tests__/route-adapter.test.ts` —
+  extend with tests for each code → status mapping.
+- `packages/platform-ui/src/app/api/cron/heartbeat/route.ts` —
+  replace inline handler with `createRouteAdapter` call.
+- `packages/platform-api/src/client/mediforce.ts` — add
+  `mediforce.cron.heartbeat()` method.
+
+**Server Actions deleted:** none in this PR.
+
+**New routes added:** none (heartbeat route already exists).
+
+**Test layers:** contract + handler + adapter + 1 cross-layer integration.
+
+**Exit criteria:**
+- `POST /api/cron/heartbeat` returns `{ ok: true, processedAt }` on
+  system-actor caller; `403` + ApiError envelope otherwise.
+- All `ApiError` codes mapped to correct HTTP status in adapter tests.
+- `api-boundaries.test.ts` + `no-raw-repo-imports.test.ts` pass.
+- Existing GET endpoints retroactively return the new error envelope
+  (no regression — they previously returned `{ error: string }`; now
+  return `{ error: { code, message } }`; UI codemod `err.error` →
+  `err.error.message` lands same PR).
+
+#### PR2 — Tasks + Process state lifecycle mutations
+
+**Scope.** Six endpoints + audit-bridge wiring + Server Action
+deletions.
+
+Endpoints:
+- `POST /api/tasks/:taskId/claim` — migrate existing route.
+- `POST /api/tasks/:taskId/unclaim` — **new route** (no existing
+  route today; current functionality is Server Action only).
+- `POST /api/tasks/:taskId/complete` — migrate. Body uses discriminated
+  union over four kinds (`verdict | params | upload | assignment`)
+  covering today's `completeTask`, `completeParamsTask`,
+  `completeUploadTask`, `completeAssignmentTask` Server Actions.
+- `POST /api/tasks/:taskId/resolve` — migrate.
+- `POST /api/processes/:instanceId/cancel` — migrate.
+- `POST /api/processes/:instanceId/resume` — migrate.
+
+**Files to touch (per endpoint):**
+- `packages/platform-api/src/contract/<tasks|processes>.ts` — add
+  input + output schemas (output reuses entity schemas per ADR-0005 §5).
+- `packages/platform-api/src/handlers/<tasks|processes>/<name>.ts` —
+  new handler. Calls `scope.X.method()`, emits audit via
+  `scope.auditEvents.append({...})` (bridge per ADR-0005 §7).
+- `packages/platform-api/src/handlers/<tasks|processes>/__tests__/<name>.test.ts`
+  — contract + handler tests.
+- `packages/platform-ui/src/app/api/<path>/route.ts` — replace inline
+  with `createRouteAdapter`.
+- `packages/platform-api/src/client/mediforce.ts` — add typed methods.
+
+**Server Actions deleted (move, don't add):**
+- `packages/platform-ui/src/app/actions/tasks.ts` — delete all six
+  (`claimTask`, `unclaimTask`, `completeTask`, `completeParamsTask`,
+  `completeUploadTask`, `completeAssignmentTask`). Move audit-emission
+  code into the corresponding handlers.
+- `packages/platform-ui/src/app/actions/processes.ts` — delete
+  `cancelProcessRun` and `resumeProcessRun`. Move audit code. Leave
+  `startWorkflowRun`, `retryFailedStep`, `archiveProcessRun`,
+  `bulkCancelProcessRuns`, `bulkArchiveProcessRuns` in place
+  (Phase 2.5 / Phase 3 scope).
+
+**UI callers to update:**
+- `packages/platform-ui/src/components/tasks/claim-button.tsx` —
+  replace `claimTask` / `unclaimTask` action imports with
+  `mediforce.tasks.claim()` / `mediforce.tasks.unclaim()`.
+- Components calling the other `complete*` actions — same pattern;
+  body shape becomes discriminated union (`{ kind: 'verdict', ... }`,
+  etc.).
+- Process detail components calling `cancelProcessRun` /
+  `resumeProcessRun` — same.
+
+**Repository layer additions:**
+- `HumanTaskRepository.unclaim(taskId, userId)` — new method on both
+  the interface and `InMemoryHumanTaskRepository` and the Firestore
+  impl. `AuthorizedHumanTaskRepository.unclaim()` wrapper passthrough
+  (calls `assertCanMutate` first like the existing `claim`).
+- `ProcessInstanceRepository.cancel(id, reason)` — new method on
+  interface + in-memory + Firestore. `AuthorizedWorkflowRunRepository.cancel()`
+  wrapper.
+- `ProcessInstanceRepository.resume(id)` — same.
+- `AuthorizedAuditEventRepository.append(event)` — new write method
+  on the wrapper (read-only today). Delegates to raw `auditRepo.append()`.
+
+**Test layers:** contract + handler + adapter + hook update + journey
+test for at least one tasks flow (claim → complete) and one process
+flow (cancel).
+
+**Exit criteria:**
+- All eight Server Actions deleted; `app/actions/tasks.ts` empty
+  (delete file); `app/actions/processes.ts` retains only the five
+  out-of-Phase-2 functions.
+- UI callers updated to use `mediforce` client; `apiFetch` direct
+  calls for these mutations removed.
+- Audit emission preserved (move-not-add): the AuditEvent rows
+  produced before and after Phase 2 are identical in actor/action/
+  description/snapshots for the eight migrated mutations.
+- `api-boundaries.test.ts` + `no-raw-repo-imports.test.ts` +
+  Phase 2 audit-coverage structural guard pass.
+- Discriminated-union `/complete` body validates all four variants
+  end-to-end (contract test).
+- E2E journey for claim→complete still green.
+
+**Open questions to settle before starting** (carried forward + new):
+
+- **Error contract schema** (from Phase 1 gap list — now blocking). Mutations introduce 409 (precondition_failed), 412 (state-machine), 422 (validation-with-context). Today's `{ error: string }` shape can't carry a discriminant for the client. Proposal: `{ error: { code: 'precondition_failed' | 'not_found' | ..., message: string, details?: unknown } }`. Decide before any mutation handler ships.
+- **State-machine precondition encoding.** Two layers: contract refines (input shape — "verdict must be `approve`/`reject`") + repo-level typed errors (`TaskNotClaimedError`, `TaskAlreadyCompletedError`) that the adapter maps to 409 with the agreed error code. Stay out of Zod refines for cross-entity invariants.
+- **Server Actions vs API routes.** Many tasks/process mutations have parallel Server Actions in `src/app/actions/*.ts` for form posts (`revalidatePath`). Decide per endpoint: delete the action (UI moves to `apiClient.tasks.claim()` + manual revalidation), or keep the action as a thin wrapper around the handler. Default: delete unless `revalidatePath` is load-bearing.
+- **Idempotency keys.** Not needed for tasks/process-state mutations (each has a natural idempotency via target state — claiming an already-claimed task by you is a no-op, by someone else is 409). Revisit for `POST /api/processes` in Phase 2.5.
+- **`apiKey` god-mode rename (#448).** Cron heartbeat uses `caller.isSystemActor`. If #448 lands first, terminology stays clean; if not, document the alias and rename in follow-up.
+
+### Phase 2.5 — Definitions, agents, admin, users
+
+Wider mutation surface that doesn't fit Phase 2's uniform shape. Each group has a quirk that justifies its own design pass once Phase 2 has validated the wrapper-layer mutation pattern.
+
+**Definitions & versioning:**
+- `POST /api/workflow-definitions` — creates new version of a workflow. Mints next `version` integer; concurrency on version assignment needs thought (DB sequence vs check-then-insert).
+- `PUT /api/workflow-definitions/:name` — update default-version pointer / visibility.
+- `POST /api/workflow-definitions/:name/archive` — archives the whole workflow (cascades to all versions — soft-delete pattern).
+- `POST /api/workflow-definitions/:name/copy` — copies into another workspace (cross-namespace write, needs both source-read and target-write gates).
+- `POST /api/workflow-definitions/:name/versions/:version/archive` — archives one version only.
+
+**Process create (split from Phase 2):**
+- `POST /api/processes` — instantiate run from definition. Trigger payload validation against definition's input schema. Idempotency design (client-supplied key vs server-derived dedupe window).
+
+**Agents:**
+- `POST /api/agents` — create new agent (workspace-scoped write).
+- `PUT /api/agents/:id` — update agent.
+- `PUT/DELETE /api/agents/:id/mcp-servers/:name` — MCP binding lifecycle.
+- `POST /api/agents/:id/oauth/:provider/start` — initiate OAuth flow.
+- `POST /api/agents/:id/oauth/:provider` + `oauth-discover` — callback-side persistence.
+
+**Workflow secrets:**
+- `POST /api/workflow-secrets` — workspace + workflow-scoped secret write.
+
+**Admin (deployment-admin-only):**
+- `POST/PUT/DELETE /api/admin/oauth-providers[/:id]`
+- `POST/PUT/DELETE /api/admin/tool-catalog[/:id]`
+- `POST /api/admin/docker-images` — image management.
+
+These bypass workspace scope (deployment-admin gate). The wrapper layer's `caller.isDeploymentAdmin` predicate needs to exist (or inline the check until a second admin endpoint exists).
+
+**Users:**
+- `POST /api/users/invite` — sends invite email.
+- `POST /api/users/resend-invite` — re-sends.
+
+Touches NextAuth migration boundary (ADR-0002 unwritten). May want to wait for that ADR to land before designing the contract.
+
+**Out of Phase 2.5 (intentionally inline forever, not API surface):**
+
+- `POST /api/oauth/:provider/callback` — external OAuth callback, redirect-based protocol, not part of our typed contract.
+- `POST /api/triggers/webhook/[...path]` — external webhook ingestion, body shape is whoever-is-calling-us, validated per-trigger.
+- `POST /api/tickets` — external GitHub Issues bridge with its own rate limit; no Mediforce-domain meaning.
+
+**Open questions for Phase 2.5 design pass** (defer until Phase 2 ships):
+
+- Cross-namespace write (`copy`): does the wrapper support "two scopes at once" or do we drop to raw repo with explicit double-gate?
+- Cascade archive: soft-delete vs hard-delete + reference invalidation; per-version vs parent.
+- Deployment-admin predicate: lives on `CallerIdentity` directly, or as a separate `AdminScope` analog of `CallerScope`?
+- NextAuth boundary: do user-invite endpoints wait for ADR-0002?
+
+**Pause-safe**: yes — Phase 2 leaves Phase 2.5 routes inline; they keep working.
 
 ### Phase 3 — Complex flows
 
@@ -472,3 +749,62 @@ The migration is complete when:
 - [ ] A CLI / agent / MCP server can consume `@mediforce/platform-api/contract` + call the deployed API with the same type safety the UI enjoys
 
 Phases are independent; we can pause between any two and still have a working, tested product.
+
+## Captured for later — out of headless-migration scope
+
+Items surfaced during phase grilling that are real and worth doing, but
+explicitly outside the UI/API separation goal. Review this section when the
+migration is done — most of these become dedicated phases of their own.
+
+### Mutation audit emission (deferred during Phase 2 grilling, 2026-05-25)
+
+**Current state.** Inline routes for tasks/process-state mutations
+(`claim`, `complete`, `resolve`, `cancel`, `resume`) emit **zero** audit
+events today. Engine + container-worker emit audit through their own paths.
+HTTP-handler subset of mutations is the silent gap.
+
+**Why deferred.** Headless-migration goal is UI/API separation (typed
+contract, framework-free handlers). Audit emission is orthogonal:
+- It doesn't gate the migration's value.
+- Fixing it only on the HTTP-handler subset would be a half-fix — engine +
+  worker write the same entities and need the same pipeline. Half-fix would
+  ship inconsistency.
+- Phase 2 mutations at parity with status-quo (no emission) is honest, not
+  regressive.
+
+**Likely future shape (sketched, not committed).** Industry-standard for
+this problem is **repo-resident emission via a `MutationContext`** threaded
+into every raw mutation method on entity repositories. Wrappers
+(`Authorized<Entity>Repository`) build `MutationContext` from
+`CallerIdentity` and pass through; raw repos write entity + audit row
+together. Postgres-era (ADR-0001) gets free atomicity via transaction;
+Firestore-era is best-effort dual-write with documented gap. Pattern
+names: transactional outbox (Hohpe), audit log via repository decorator
+(Fowler PoEAA). Handler ergonomics: zero audit boilerplate, no chance of
+forgetting.
+
+**Why repo-resident and not handler-resident:**
+1. Repo is the only layer that sees **every** write path (HTTP, engine,
+   worker, future MCP). Handler-resident silently misses non-HTTP writers.
+2. Atomicity belongs to the persistence layer — only the repo can wrap
+   entity-write + audit-row-write in a single transaction.
+3. Audit-row-write is part of "how persistence happens", not "what the
+   user requested." Mixing it into handlers leaks infrastructure into
+   orchestration.
+
+**Rejected alternatives sketched during grilling:**
+- DB triggers (Postgres `AFTER UPDATE`). Free atomicity but action names
+  (`task.claimed` vs `task.cancelled`) depend on which method was called,
+  not detectable from row diff alone. Trigger sees "row changed" not "this
+  was a claim." Reject.
+- Event sourcing / domain events. Heavier infra than needed.
+- Adapter-orchestrated. Only covers HTTP path; misses engine + worker.
+
+**Interaction with ADR-0004.** §5 ("Wrappers never depend on other
+wrappers") was written for cross-domain entity composition (e.g. tasks
+wrapper not loading runs). Audit infrastructure is orthogonal and a
+reasonable reading of §5 doesn't reach it; the future audit ADR will
+either narrow §5 explicitly or supersede the relevant clause.
+
+**Action.** Dedicated audit-wiring phase post-migration, with its own ADR
+covering HTTP handlers + engine + worker uniformly. Don't pre-design here.
