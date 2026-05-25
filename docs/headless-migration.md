@@ -363,11 +363,13 @@ PR1 picks a true minimal mutation instead.
 **Files to touch:**
 - `packages/platform-api/src/errors.ts` — extend `HandlerError`
   (from [#450](https://github.com/Appsilon/mediforce/pull/450)) with
-  `code: ApiErrorCode` + `details?: unknown`, add the missing
-  subclasses (`UnauthorizedError`, `ValidationError`,
-  `PreconditionFailedError`, `ConflictError`, `RateLimitedError`).
-  Existing `NotFoundError` / `ForbiddenError` keep their names; their
-  constructors now also stash the code.
+  `code: ApiErrorCode` + `details?: unknown`. Existing
+  `NotFoundError` / `ForbiddenError` keep their names; their
+  constructors now also stash the code. Add
+  `PreconditionFailedError` for the claim handler's state-machine
+  throw. Other codes (unauthorized, validation, conflict,
+  rate_limited) stay subclass-less until first real throw site —
+  product code throws the base `HandlerError` directly.
 - `packages/platform-ui/src/lib/route-adapter.ts` — single
   `instanceof HandlerError` catch arm per ADR-0005 §4:
   envelope reads `err.code`, `err.message`, `err.details`. Sibling

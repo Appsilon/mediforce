@@ -114,8 +114,10 @@ export class PreconditionFailedError extends HandlerError {
     super('precondition_failed', message, details);
   }
 }
-// NotFoundError, ForbiddenError, UnauthorizedError, ValidationError,
-// ConflictError, RateLimitedError — same pattern.
+// NotFoundError and ForbiddenError already existed and now extend
+// the new base. Other codes (unauthorized, validation, conflict,
+// rate_limited) throw via the base `HandlerError` directly until the
+// first real throw site lands; that PR adds the subclass.
 ```
 
 Throw site:

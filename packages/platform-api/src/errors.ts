@@ -53,13 +53,12 @@ export class HandlerError extends Error {
   }
 }
 
-export class UnauthorizedError extends HandlerError {
-  constructor(message = 'Unauthorized', details?: unknown) {
-    super('unauthorized', message, details);
-    this.name = 'UnauthorizedError';
-  }
-}
-
+// Only the codes actually thrown in product code today get a subclass.
+// Other codes in `ApiErrorCode` (unauthorized, validation, conflict,
+// rate_limited) throw via the base `HandlerError` until the first
+// real throw site lands, at which point that code's subclass is added.
+// `internal` has no subclass on purpose — the adapter emits it for any
+// uncaught non-HandlerError (handlers don't throw it deliberately).
 export class ForbiddenError extends HandlerError {
   constructor(message = 'Forbidden', details?: unknown) {
     super('forbidden', message, details);
@@ -74,31 +73,10 @@ export class NotFoundError extends HandlerError {
   }
 }
 
-export class ValidationError extends HandlerError {
-  constructor(message = 'Invalid input', details?: unknown) {
-    super('validation', message, details);
-    this.name = 'ValidationError';
-  }
-}
-
 export class PreconditionFailedError extends HandlerError {
   constructor(message = 'Precondition failed', details?: unknown) {
     super('precondition_failed', message, details);
     this.name = 'PreconditionFailedError';
-  }
-}
-
-export class ConflictError extends HandlerError {
-  constructor(message = 'Conflict', details?: unknown) {
-    super('conflict', message, details);
-    this.name = 'ConflictError';
-  }
-}
-
-export class RateLimitedError extends HandlerError {
-  constructor(message = 'Rate limited', details?: unknown) {
-    super('rate_limited', message, details);
-    this.name = 'RateLimitedError';
   }
 }
 

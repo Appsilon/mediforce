@@ -2,14 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
-  ConflictError,
   ForbiddenError,
   HandlerError,
   NotFoundError,
   PreconditionFailedError,
-  RateLimitedError,
-  UnauthorizedError,
-  ValidationError,
   type ApiErrorCode,
 } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
@@ -111,27 +107,29 @@ describe('createRouteAdapter', () => {
   });
 
   describe('typed-error → envelope mapping (ADR-0005 §3)', () => {
-    const cases: ReadonlyArray<{
-      code: ApiErrorCode;
-      status: number;
-      throw: (message: string, details?: unknown) => HandlerError;
-    }> = [
-      { code: 'unauthorized', status: 401, throw: (m, d) => new UnauthorizedError(m, d) },
-      { code: 'forbidden', status: 403, throw: (m, d) => new ForbiddenError(m, d) },
-      { code: 'not_found', status: 404, throw: (m, d) => new NotFoundError(m, d) },
-      { code: 'validation', status: 400, throw: (m, d) => new ValidationError(m, d) },
-      { code: 'precondition_failed', status: 409, throw: (m, d) => new PreconditionFailedError(m, d) },
-      { code: 'conflict', status: 409, throw: (m, d) => new ConflictError(m, d) },
-      { code: 'rate_limited', status: 429, throw: (m, d) => new RateLimitedError(m, d) },
-      // No `internal` subclass — handlers don't throw it explicitly; the
-      // adapter emits it for any uncaught non-HandlerError. Verified by the
-      // "returns 500 with a generic envelope" test below.
+    // Every `ApiErrorCode` maps to its HTTP status via the §3 table,
+    // independent of whether a dedicated subclass exists. Throw the
+    // base `HandlerError` directly so the test stays decoupled from
+    // which subclasses happen to exist today.
+    // No `internal` case — handlers don't throw it explicitly; the
+    // adapter emits it for any uncaught non-HandlerError. Verified by
+    // the "returns 500 with a generic envelope" test below.
+    const cases: ReadonlyArray<{ code: ApiErrorCode; status: number }> = [
+      { code: 'unauthorized', status: 401 },
+      { code: 'forbidden', status: 403 },
+      { code: 'not_found', status: 404 },
+      { code: 'validation', status: 400 },
+      { code: 'precondition_failed', status: 409 },
+      { code: 'conflict', status: 409 },
+      { code: 'rate_limited', status: 429 },
     ];
 
-    for (const { code, status, throw: makeThrow } of cases) {
-      it(`maps ${code} subclass throw to HTTP ${status} with typed envelope`, async () => {
+    for (const { code, status } of cases) {
+      it(`maps HandlerError('${code}') to HTTP ${status} with typed envelope`, async () => {
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const handler = vi.fn().mockRejectedValue(makeThrow(`boom: ${code}`, { hint: 'detail' }));
+        const handler = vi
+          .fn()
+          .mockRejectedValue(new HandlerError(code, `boom: ${code}`, { hint: 'detail' }));
         const GET = createRouteAdapter(
           InputSchema,
           (req) => ({ name: req.nextUrl.searchParams.get('name') }),
@@ -148,6 +146,25 @@ describe('createRouteAdapter', () => {
         consoleError.mockRestore();
       });
     }
+  });
+
+  it('PreconditionFailedError subclass maps to 409 with `precondition_failed` code', async () => {
+    const handler = vi
+      .fn()
+      .mockRejectedValue(new PreconditionFailedError('Task not pending', { currentStatus: 'claimed' }));
+    const GET = createRouteAdapter(
+      InputSchema,
+      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+      handler,
+      { resolveCaller: stubCaller(), buildScope },
+    );
+
+    const res = await GET(makeRequest({ name: 'alice' }), undefined);
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: { code: 'precondition_failed', message: 'Task not pending', details: { currentStatus: 'claimed' } },
+    });
   });
 
   it('NotFoundError default message renders as { code: "not_found", message: "Not found" } at 404', async () => {
