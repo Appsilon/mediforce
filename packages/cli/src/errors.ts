@@ -1,4 +1,4 @@
-import { MediforceClientError } from '@mediforce/platform-api/client';
+import { ApiError } from '@mediforce/platform-api/client';
 import type { ErrorPayload } from './output.js';
 
 export interface FormatCliErrorInput {
@@ -20,8 +20,8 @@ export function formatCliError(
   err: unknown,
   input: FormatCliErrorInput = {},
 ): ErrorPayload {
-  if (err instanceof MediforceClientError) {
-    return formatMediforceClientError(err);
+  if (err instanceof ApiError) {
+    return formatApiError(err);
   }
 
   const systemError = findFetchSystemError(err);
@@ -45,7 +45,7 @@ export function formatCliError(
   return { error: String(err) };
 }
 
-function formatMediforceClientError(err: MediforceClientError): ErrorPayload {
+function formatApiError(err: ApiError): ErrorPayload {
   const payload: ErrorPayload = {
     error: err.message,
     status: err.status,
@@ -231,7 +231,7 @@ function findAbortError(err: unknown): unknown | null {
 }
 
 function looksLikeNonJson404(body: unknown): boolean {
-  // parseJsonOrThrow normalizes non-JSON 404 response bodies to {} in MediforceClientError.body.
+  // parseJsonOrThrow normalizes non-JSON 404 response bodies to {} in ApiError.body.
   return isRecord(body) && Object.keys(body).length === 0;
 }
 

@@ -51,6 +51,18 @@ export class HandlerError extends Error {
   get statusCode(): number {
     return httpStatusForApiErrorCode(this.code);
   }
+
+  // Plain object for JSON serialization — framework-free, so the adapter
+  // (which knows about NextResponse) can `NextResponse.json(err.toEnvelope(),
+  // { status: err.statusCode })` in one line. Mirrors Hono's HTTPException
+  // and NestJS's HttpException patterns: the throwable knows its wire shape.
+  toEnvelope(): z.infer<typeof TypedApiErrorEnvelopeSchema> {
+    const envelope: z.infer<typeof TypedApiErrorEnvelopeSchema> = {
+      error: { code: this.code, message: this.message },
+    };
+    if (this.details !== undefined) envelope.error.details = this.details;
+    return envelope;
+  }
 }
 
 // Only the codes actually thrown in product code today get a subclass.

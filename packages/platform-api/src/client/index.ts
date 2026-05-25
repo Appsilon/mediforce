@@ -127,11 +127,11 @@ import {
 import { ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors.js';
 
 // Re-export so SDK consumers reach for one path:
-//   import { Mediforce, MediforceClientError, type ApiErrorCode } from '@mediforce/platform-api/client';
+//   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
 // Server-side handlers throw `HandlerError` (or subclasses) imported from
 // `@mediforce/platform-api/errors`; the wire envelope is the only shared
 // surface, so the client just exposes `code`/`details` on
-// `MediforceClientError` directly.
+// `ApiError` directly.
 export { type ApiErrorCode } from '../errors.js';
 
 /**
@@ -181,7 +181,7 @@ export type ClientConfig =
 // parsed envelope fields (`code`, `details`) when the server returned the
 // ADR-0005 §1 typed envelope. `code` is `undefined` for legacy / network /
 // non-JSON responses.
-export class MediforceClientError extends Error {
+export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
@@ -190,7 +190,7 @@ export class MediforceClientError extends Error {
     public readonly details?: unknown,
   ) {
     super(message);
-    this.name = 'MediforceClientError';
+    this.name = 'ApiError';
   }
 }
 
@@ -684,7 +684,7 @@ async function parseJsonOrThrow(res: Response, context: string): Promise<unknown
   if (!res.ok) {
     const extracted = extractErrorEnvelope(body);
     const message = extracted.message ?? `${context} failed with status ${res.status}`;
-    throw new MediforceClientError(res.status, message, body, extracted.code, extracted.details);
+    throw new ApiError(res.status, message, body, extracted.code, extracted.details);
   }
   return body;
 }

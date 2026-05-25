@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Mediforce, MediforceClientError } from '../index.js';
+import { Mediforce, ApiError } from '../index.js';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { omitServerFields } from '../../contract/__tests__/_helpers.js';
 
@@ -64,7 +64,7 @@ describe('mediforce.workflows.register', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('throws MediforceClientError on non-2xx', async () => {
+  it('throws ApiError on non-2xx', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({ error: 'Validation failed' }, 400),
     );
@@ -77,8 +77,8 @@ describe('mediforce.workflows.register', () => {
       .register(body, { namespace: 'Appsilon' })
       .catch((err) => err);
 
-    expect(error).toBeInstanceOf(MediforceClientError);
-    expect((error as MediforceClientError).status).toBe(400);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(400);
   });
 });
 

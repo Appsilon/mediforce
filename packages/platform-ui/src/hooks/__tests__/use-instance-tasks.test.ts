@@ -6,7 +6,7 @@ import { buildHumanTask } from '@mediforce/platform-core/testing';
 const listMock = vi.fn<(...args: unknown[]) => Promise<{ tasks: HumanTask[] }>>();
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { tasks: { list: listMock } },
-  MediforceClientError: class MediforceClientError extends Error {},
+  ApiError: class ApiError extends Error {},
 }));
 
 const { useInstanceTasks } = await import('../use-instance-tasks');

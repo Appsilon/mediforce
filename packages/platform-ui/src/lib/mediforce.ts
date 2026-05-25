@@ -9,11 +9,11 @@
 // with `new Mediforce({ baseUrl, apiKey })` — same contract, same type
 // safety, different runtime.
 
-import { Mediforce, MediforceClientError } from '@mediforce/platform-api/client';
+import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import { getFirebaseIdToken } from './firebase-id-token';
 
 export const mediforce = new Mediforce({
   bearerToken: getFirebaseIdToken,
 });
 
-export { MediforceClientError };
+export { ApiError };

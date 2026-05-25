@@ -19,7 +19,7 @@ import {
 import { listTasks, claimTask } from '@mediforce/platform-api/handlers';
 import { ListTasksInputSchema, ClaimTaskInputSchema } from '@mediforce/platform-api/contract';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
-import { Mediforce, MediforceClientError } from '@mediforce/platform-api/client';
+import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
 import { createTestScope } from '@mediforce/platform-api/testing';
 
@@ -105,7 +105,7 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
 
 // Second integration scenario: `claim()` mutation. Covers PR1's specific
 // promise that a typed handler throw (`HandlerError` subclass) flows
-// end-to-end into a client-side `MediforceClientError` whose `code` /
+// end-to-end into a client-side `ApiError` whose `code` /
 // `details` fields carry the envelope contents.
 describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => {
   let humanTaskRepo: InMemoryHumanTaskRepository;
@@ -174,8 +174,8 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
 
     const err = await mediforce.tasks.claim({ taskId: 'task-1' }).catch((e: unknown) => e);
 
-    expect(err).toBeInstanceOf(MediforceClientError);
-    const clientErr = err as MediforceClientError;
+    expect(err).toBeInstanceOf(ApiError);
+    const clientErr = err as ApiError;
     expect(clientErr.status).toBe(409);
     expect(clientErr.code).toBe('precondition_failed');
     expect(clientErr.details).toMatchObject({
@@ -200,8 +200,8 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
       .claim({ taskId: 'task-foreign' })
       .catch((e: unknown) => e);
 
-    expect(err).toBeInstanceOf(MediforceClientError);
-    expect((err as MediforceClientError).status).toBe(404);
-    expect((err as MediforceClientError).code).toBe('not_found');
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(404);
+    expect((err as ApiError).code).toBe('not_found');
   });
 });

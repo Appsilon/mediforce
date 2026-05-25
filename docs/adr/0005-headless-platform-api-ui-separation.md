@@ -132,9 +132,9 @@ if (task.status !== 'claimed') {
 ```
 
 Client side (`@mediforce/platform-api/client`) exposes a single
-`MediforceClientError` (transport-aware: HTTP `status` + raw `body` +
-parsed `code` / `details` from the §1 envelope). No subclass mirror on
-the client today — every `catch` site in the UI currently does
+`ApiError` (transport-aware: HTTP `status` + raw `body` + parsed
+`code` / `details` from the §1 envelope). No subclass mirror on the
+client today — every `catch` site in the UI currently does
 `err instanceof Error ? err.message : 'fallback'`, so per-code
 discrimination would be wasted code → ctor mapping. See "future
 discrimination" note below.
@@ -149,16 +149,15 @@ Rejected: Result types (`Result<T, HandlerError>`). Throws + a single
 well-known base class is idiomatic in TS; result types add boilerplate
 at every call site.
 
-**Future-idea — shared client throwable.** When the first real
+**Future-idea — UI per-code narrowing.** When the first real
 per-code branch appears in UI code (`if (err.code === 'precondition_failed')`
-type pattern in a hook or component), revisit the asymmetry: rename
-`HandlerError` → `ApiError` (neutral name for both sides), reconstruct
-the matching subclass on the client from the envelope `code` via a
-small map, and expose it as `MediforceClientError.apiError`. UI could
-then do `if (clientErr.apiError instanceof PreconditionFailedError)`
-with full TS narrowing. Out of scope until the first concrete
-use-case exists — premature symmetry costs map-table maintenance for
-no payoff today.
+pattern in a hook or component), reconstruct the matching server-side
+`HandlerError` subclass on the client from the envelope `code` via a
+small map and expose it as a field on `ApiError`. UI could then do
+`if (clientErr.handlerError instanceof PreconditionFailedError)` with
+full TS narrowing. Out of scope until the first concrete use-case
+exists — premature symmetry costs map-table maintenance for no payoff
+today.
 
 #### 2a. Throw site
 

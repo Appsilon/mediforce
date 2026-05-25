@@ -635,8 +635,8 @@ Firebase is never imported by `platform-api/client` — the browser wrapper in `
 
 **Open questions to settle**:
 - Do we keep our own tiny async-hook helper (`useInstanceTasks` pattern — `useState` + `useEffect` + cancelled flag), or adopt an existing library (`@tanstack/react-query` / `swr`) that gives caching, dedup, stale-while-revalidate for free?
-- Error surface — today `MediforceClientError` (with `code`/`details`) is thrown from the client; hooks map it to `{ error }` state. Do we standardise an error boundary + toast pattern for failed API calls?
-- Shared client throwable — once the first real `if (err.code === 'X')` switch appears in UI, revisit ADR-0005 §2 "future-idea" note: rename `HandlerError` → `ApiError` (neutral name), reconstruct the matching subclass on the client from envelope `code` via a small map, and surface it as `MediforceClientError.apiError` so UI can do `if (clientErr.apiError instanceof PreconditionFailedError)` with full TS narrowing. Out of scope until a concrete use-case lands.
+- Error surface — today `ApiError` (with `code`/`details`) is thrown from the client; hooks map it to `{ error }` state. Do we standardise an error boundary + toast pattern for failed API calls?
+- UI per-code narrowing — once the first real `if (err.code === 'X')` switch appears in UI, revisit ADR-0005 §2 "future-idea" note: reconstruct the matching server-side `HandlerError` subclass on the client from envelope `code` via a small map and surface it as a field on `ApiError`, so UI can do `if (clientErr.handlerError instanceof PreconditionFailedError)` with full TS narrowing. Out of scope until a concrete use-case lands.
 
 ### Phase 5 — Delete `@/lib/platform-services` shim
 
@@ -697,7 +697,7 @@ Tests are the primary way we read and reason about this codebase. They have to b
 | 1 | **Contract** | Zod input/output invariants, refines, enums | Vitest | <50ms | `packages/platform-api/src/handlers/<domain>/__tests__/contract.test.ts` |
 | 2 | **Handler** | Pure handler behaviour against real in-memory repos | Vitest | <100ms | `packages/platform-api/src/handlers/<domain>/__tests__/<name>.test.ts` |
 | 3 | **Adapter** | `createRouteAdapter` wiring (400 / 500 / JSON serialisation) | Vitest | <200ms | `packages/platform-ui/src/lib/__tests__/route-adapter.test.ts` + sampled `src/app/api/**/__tests__/route.test.ts` |
-| 4 | **API client** | URL serialisation, input validation, response parsing, `MediforceClientError` shape | Vitest (mocked `apiFetch`) | <200ms | `packages/platform-ui/src/lib/__tests__/api-client.test.ts` |
+| 4 | **API client** | URL serialisation, input validation, response parsing, `ApiError` shape | Vitest (mocked `apiFetch`) | <200ms | `packages/platform-ui/src/lib/__tests__/api-client.test.ts` |
 | 5 | **Cross-layer integration** | Client ↔ adapter ↔ handler ↔ repo round-trip, no HTTP | Vitest (loopback `apiFetch`) | <500ms | `packages/platform-ui/src/test/api-integration.test.ts` |
 | 6 | **Hook** | Async state — loading/error/cancel/dep-change | Vitest + `@testing-library/react` `renderHook` | <500ms | `packages/platform-ui/src/hooks/__tests__/<name>.test.ts` |
 | 7 | **Component** | Non-trivial conditional rendering (forms, branches, error states) | Vitest + `@testing-library/react` | <500ms | colocated `*.test.tsx` (sparingly) |

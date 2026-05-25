@@ -1,4 +1,4 @@
-import { MediforceClientError } from '@mediforce/platform-api/client';
+import { ApiError } from '@mediforce/platform-api/client';
 import { describe, expect, it } from 'vitest';
 import { formatCliError } from '../errors.js';
 
@@ -67,7 +67,7 @@ describe('formatCliError', () => {
 
   it('adds API key hints for auth failures', () => {
     expect(
-      formatCliError(new MediforceClientError(401, 'Unauthorized', { error: 'Unauthorized' }), {
+      formatCliError(new ApiError(401, 'Unauthorized', { error: 'Unauthorized' }), {
         baseUrl: 'http://localhost:9003',
       }),
     ).toMatchObject({
@@ -76,7 +76,7 @@ describe('formatCliError', () => {
     });
 
     expect(
-      formatCliError(new MediforceClientError(403, 'Forbidden', { error: 'Forbidden' }), {
+      formatCliError(new ApiError(403, 'Forbidden', { error: 'Forbidden' }), {
         baseUrl: 'http://localhost:9003',
       }),
     ).toMatchObject({
@@ -86,7 +86,7 @@ describe('formatCliError', () => {
   });
 
   it('hints when a 404 looks like the base URL is not the API host', () => {
-    expect(formatCliError(new MediforceClientError(404, 'Not found', {}), { baseUrl: 'https://example.com' }))
+    expect(formatCliError(new ApiError(404, 'Not found', {}), { baseUrl: 'https://example.com' }))
       .toMatchObject({
         status: 404,
         hints: expect.arrayContaining([
