@@ -7,6 +7,11 @@ export interface WorkflowSecretsRepository {
     secrets: Record<string, string>,
   ): Promise<void>;
   deleteSecrets(namespace: string, workflowName: string): Promise<void>;
+  deleteSecret(
+    namespace: string,
+    workflowName: string,
+    key: string,
+  ): Promise<void>;
   upsertSecret(
     namespace: string,
     workflowName: string,

@@ -21,7 +21,9 @@ dist/
 minutes/*.html
 
 # service-account keys / runtime-mounted secrets
-secrets/
+/secrets/
+packages/*/secrets/
+apps/*/secrets/
 
 # claude
 .claude/settings.local.json

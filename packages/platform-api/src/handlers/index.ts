@@ -17,4 +17,8 @@ export { listPlugins } from './plugins/list-plugins.js';
 export { listRuns } from './runs/list-runs.js';
 export { getRun } from './runs/get-run.js';
 
+export { listSecretKeys } from './secrets/list-secret-keys.js';
+export { setSecret } from './secrets/set-secret.js';
+export { deleteSecret } from './secrets/delete-secret.js';
+
 export { listAdapter, getByIdAdapter } from './_generic.js';

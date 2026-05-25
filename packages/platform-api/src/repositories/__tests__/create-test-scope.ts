@@ -150,6 +150,9 @@ const stubWorkflowSecrets: WorkflowSecretsRepository = {
   async deleteSecrets() {
     /* no-op */
   },
+  async deleteSecret() {
+    /* no-op */
+  },
   async upsertSecret() {
     /* no-op */
   },
