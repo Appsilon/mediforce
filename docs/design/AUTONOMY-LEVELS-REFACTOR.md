@@ -24,8 +24,6 @@ Every workflow step has an `executor` type and, for agent steps, an optional `au
 
 **Cowork** is a separate executor type with its own session infrastructure (chat and voice-realtime modes). It opens an interactive human-agent workspace that produces a structured artifact before the step completes.
 
-In production, `L0`, `L1`, and `L2` are almost never used in real workflows. The cowork executor is actively used but lives outside the autonomy level model entirely.
-
 ---
 
 ## Problems with the Current Design
@@ -65,27 +63,27 @@ Replace the `executor` type + `autonomyLevel` pair with a single **control mode*
 
 | Mode | Label | Primary actor | Human role | Agent role |
 |------|-------|--------------|-----------|-----------|
-| 0 | **Manual** | Human | Does the work | None |
-| 1 | **Assist** | Human | Does the work | Provides a suggestion or draft alongside |
-| 2 | **Collaborate** | Both | Drives the session | Responds turn-by-turn in interactive session |
-| 3 | **Approve** | Agent | Reviews and gates the output | Completes the step |
-| 4 | **Autopilot** | Agent | Audit trail only | Completes the step |
+| 0 | **No agent** | Human | Does the work | None |
+| 1 | **Ghost** | Human | Does the work | Provides a suggestion or draft alongside |
+| 2 | **Cowork** | Both | Drives the session | Responds turn-by-turn in interactive session |
+| 3 | **Human review** | Agent | Reviews and gates the output | Completes the step |
+| 4 | **Full autonomy** | Agent | Audit trail only | Completes the step |
 
 ### The unifying axis: who is the primary actor?
 
 The progression from 0 to 4 is a clean handoff of responsibility from human to agent:
 
-- **0 (Manual)**: The agent has no role. This is a pure human task.
-- **1 (Assist)**: The human does the work. The agent fires once and provides a suggestion or draft that the human can use or ignore. The human completes the step.
-- **2 (Collaborate)**: Neither side is primary. The human and agent engage in an interactive session (the current cowork infrastructure) until a structured artifact is produced. The step completes when the human finalises the output.
-- **3 (Approve)**: The agent is primary. It completes the step and produces a result. The workflow pauses — the human reviews and either approves (workflow advances) or rejects.
-- **4 (Autopilot)**: The agent is primary. Its result is applied immediately. No human involvement in the step itself.
+- **0 (No agent)**: The agent has no role. This is a pure human task.
+- **1 (Ghost)**: The human does the work. The agent fires once and provides a suggestion or draft that the human can use or ignore. The human completes the step.
+- **2 (Cowork)**: Neither side is primary. The human and agent engage in an interactive session (the current cowork infrastructure) until a structured artifact is produced. The step completes when the human finalises the output.
+- **3 (Human review)**: The agent is primary. It completes the step and produces a result. The workflow pauses — the human reviews and either approves (workflow advances) or rejects.
+- **4 (Full autonomy)**: The agent is primary. Its result is applied immediately. No human involvement in the step itself.
 
 ### What gets removed
 
 - The `L0`, `L1`, `L2`, `L3`, `L4` enum and all labels derived from it.
-- The `cowork` executor type (absorbed into mode 2, Collaborate).
-- Human-executor `creation` step type (absorbed into mode 0, Manual).
+- The `cowork` executor type (absorbed into mode 2, Cowork).
+- Human-executor `creation` step type (absorbed into mode 0, No agent).
 - The separate `autonomyLevel` field on workflow steps — control mode replaces it entirely.
 
 ### What L0/L1/L2 become
@@ -106,7 +104,7 @@ This is a **UX and schema rename**, not a backend engine change.
 
 ### What does not change
 
-- **The Cowork session engine.** The chat and voice-realtime session infrastructure that powers the current `cowork` executor is not being modified. Mode 2 (Collaborate) is the same engine — it is only being brought under the unified `controlMode` axis rather than living in a separate `executor` enum. No cowork session logic, state machine, or API contract is touched.
+- **The Cowork session engine.** The chat and voice-realtime session infrastructure that powers the current `cowork` executor is not being modified. Mode 2 (Cowork) is the same engine — it is only being brought under the unified `controlMode` axis rather than living in a separate `executor` enum. No cowork session logic, state machine, or API contract is touched.
 - **The workflow engine's step execution logic.** The engine already branches on executor type and autonomy level to decide how to run a step. That branching logic stays in place; only the field names it reads will change, in sync with the schema migration.
 - **Agent runtime, plugin infrastructure, or any worker.** Nothing in `agent-runtime`, `container-worker`, or `workflow-engine` internals is being rewritten.
 
@@ -120,9 +118,9 @@ This is a **breaking change** to the workflow definition schema. Existing `workf
 
 | Current | Migrates to |
 |---------|-------------|
-| `executor: human` | Mode 0 — Manual |
-| `executor: agent, autonomyLevel: L3` | Mode 3 — Approve |
-| `executor: agent, autonomyLevel: L4` | Mode 4 — Autopilot |
-| `executor: cowork` | Mode 2 — Collaborate |
+| `executor: human` | Mode 0 — No agent |
+| `executor: agent, autonomyLevel: L3` | Mode 3 — Human review |
+| `executor: agent, autonomyLevel: L4` | Mode 4 — Full autonomy |
+| `executor: cowork` | Mode 2 — Cowork |
 
 A one-off migration script will rewrite stored workflow definition versions. Because versions are immutable in Firestore, migration will write new versions rather than mutating existing records.
