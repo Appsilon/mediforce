@@ -1,6 +1,6 @@
 import type { ClaimTaskInput, ClaimTaskOutput } from '../../contract/tasks.js';
 import type { CallerScope } from '../../repositories/index.js';
-import { ApiError } from '../../errors.js';
+import { ForbiddenError, PreconditionFailedError } from '../../errors.js';
 import { loadOr404 } from '../_helpers.js';
 
 // PR1 deviation from ADR-0005 §2a: state-machine precondition stays in the
@@ -11,8 +11,7 @@ export async function claimTask(
   scope: CallerScope,
 ): Promise<ClaimTaskOutput> {
   if (scope.caller.kind !== 'user') {
-    throw new ApiError(
-      'forbidden',
+    throw new ForbiddenError(
       'Cannot claim as system actor — claim requires an authenticated user',
     );
   }
@@ -21,8 +20,7 @@ export async function claimTask(
   const task = await loadOr404(scope.tasks.getById(input.taskId), 'Task not found');
 
   if (task.status !== 'pending') {
-    throw new ApiError(
-      'precondition_failed',
+    throw new PreconditionFailedError(
       `Cannot claim a ${task.status} task; current status: ${task.status}`,
       { taskId: input.taskId, currentStatus: task.status },
     );

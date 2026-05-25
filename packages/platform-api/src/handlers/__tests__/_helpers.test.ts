@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { loadOr404 } from '../_helpers.js';
-import { ApiError } from '../../errors.js';
+import { HandlerError, NotFoundError } from '../../errors.js';
 
 /**
  * Tests for the shared handler helpers. Right now `loadOr404` is the only
@@ -14,20 +14,18 @@ describe('loadOr404', () => {
     expect(result).toEqual({ id: 'x' });
   });
 
-  it('throws ApiError(`not_found`) with the supplied message when the lookup yields null', async () => {
+  it('throws NotFoundError with the supplied message when the lookup yields null', async () => {
     const err = await loadOr404(Promise.resolve(null as { id: string } | null), 'Task not found').catch(
       (e) => e,
     );
-    expect(err).toBeInstanceOf(ApiError);
-    expect((err as ApiError).code).toBe('not_found');
-    expect((err as ApiError).message).toBe('Task not found');
+    expect(err).toBeInstanceOf(NotFoundError);
+    expect(err).toBeInstanceOf(HandlerError);
+    expect((err as NotFoundError).code).toBe('not_found');
+    expect((err as NotFoundError).message).toBe('Task not found');
   });
 
-  it('uses ApiError so the new typed envelope is produced (not legacy NotFoundError)', async () => {
-    // Sanity check: new handlers throw the ADR-0005 typed error, so the
-    // adapter takes the `instanceof ApiError` arm — no `code` derivation
-    // from a legacy `statusCode`.
+  it('the thrown error is a NotFoundError subclass so the adapter takes the single HandlerError arm', async () => {
     const err = await loadOr404(Promise.resolve(null), 'missing').catch((e) => e);
-    expect((err as ApiError).name).toBe('ApiError');
+    expect((err as NotFoundError).name).toBe('NotFoundError');
   });
 });

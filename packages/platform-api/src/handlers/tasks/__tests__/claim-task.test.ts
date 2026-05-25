@@ -8,7 +8,12 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { claimTask } from '../claim-task.js';
-import { ApiError } from '../../../errors.js';
+import {
+  ForbiddenError,
+  HandlerError,
+  NotFoundError,
+  PreconditionFailedError,
+} from '../../../errors.js';
 import {
   createTestScope,
   userCaller,
@@ -105,7 +110,7 @@ describe('claimTask handler', () => {
   });
 
   describe('precondition failures', () => {
-    it('throws ApiError(`precondition_failed`) when the task is not pending', async () => {
+    it('throws PreconditionFailedError when the task is not pending', async () => {
       await humanTaskRepo.create(
         buildHumanTask({
           id: 'task-1',
@@ -123,14 +128,15 @@ describe('claimTask handler', () => {
 
       const err = await claimTask({ taskId: 'task-1' }, scope).catch((e) => e);
 
-      expect(err).toBeInstanceOf(ApiError);
-      expect((err as ApiError).code).toBe('precondition_failed');
-      expect((err as ApiError).message).toMatch(/claim|pending/i);
+      expect(err).toBeInstanceOf(PreconditionFailedError);
+      expect(err).toBeInstanceOf(HandlerError);
+      expect((err as PreconditionFailedError).code).toBe('precondition_failed');
+      expect((err as PreconditionFailedError).message).toMatch(/claim|pending/i);
     });
   });
 
   describe('not-found / foreign-workspace', () => {
-    it('throws ApiError(`not_found`) when the task does not exist', async () => {
+    it('throws NotFoundError when the task does not exist', async () => {
       const scope = createTestScope({
         humanTaskRepo,
         instanceRepo,
@@ -140,11 +146,11 @@ describe('claimTask handler', () => {
 
       const err = await claimTask({ taskId: 'task-missing' }, scope).catch((e) => e);
 
-      expect(err).toBeInstanceOf(ApiError);
-      expect((err as ApiError).code).toBe('not_found');
+      expect(err).toBeInstanceOf(NotFoundError);
+      expect((err as NotFoundError).code).toBe('not_found');
     });
 
-    it('throws ApiError(`not_found`) for a foreign-workspace task (anti-enum)', async () => {
+    it('throws NotFoundError for a foreign-workspace task (anti-enum)', async () => {
       // Task exists, but in a workspace the caller is not a member of.
       // Per ADR-0005 §3 / Phase 1 anti-enum, this surfaces as 404, not 403.
       await instanceRepo.create(buildProcessInstance({ id: 'inst-b', namespace: 'team-beta' }));
@@ -160,13 +166,13 @@ describe('claimTask handler', () => {
 
       const err = await claimTask({ taskId: 'task-foreign' }, scope).catch((e) => e);
 
-      expect(err).toBeInstanceOf(ApiError);
-      expect((err as ApiError).code).toBe('not_found');
+      expect(err).toBeInstanceOf(NotFoundError);
+      expect((err as NotFoundError).code).toBe('not_found');
     });
   });
 
   describe('caller-kind gate', () => {
-    it('throws ApiError(`forbidden`) for apiKey callers (no human to assign)', async () => {
+    it('throws ForbiddenError for apiKey callers (no human to assign)', async () => {
       // The auth carrier is the source of truth for the claimer's identity;
       // apiKey (system actor) has no `uid`, so it has nothing to assign.
       // The old inline route silently fell back to a magic 'api-user' string —
@@ -183,9 +189,9 @@ describe('claimTask handler', () => {
 
       const err = await claimTask({ taskId: 'task-1' }, scope).catch((e) => e);
 
-      expect(err).toBeInstanceOf(ApiError);
-      expect((err as ApiError).code).toBe('forbidden');
-      expect((err as ApiError).message).toMatch(/system actor|claim/i);
+      expect(err).toBeInstanceOf(ForbiddenError);
+      expect((err as ForbiddenError).code).toBe('forbidden');
+      expect((err as ForbiddenError).message).toMatch(/system actor|claim/i);
     });
   });
 });

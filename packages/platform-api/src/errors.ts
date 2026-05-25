@@ -1,28 +1,5 @@
 import { z } from 'zod';
 
-// ADR-0005 typed errors. `ApiError` is preferred for new handlers; the
-// `HandlerError` family stays as a coexistence bridge for Phase 1 throw sites.
-export class HandlerError extends Error {
-  constructor(public readonly statusCode: number, message: string) {
-    super(message);
-    this.name = 'HandlerError';
-  }
-}
-
-export class NotFoundError extends HandlerError {
-  constructor(message = 'Not found') {
-    super(404, message);
-    this.name = 'NotFoundError';
-  }
-}
-
-export class ForbiddenError extends HandlerError {
-  constructor(message = 'Forbidden') {
-    super(403, message);
-    this.name = 'ForbiddenError';
-  }
-}
-
 // Closed union of error codes. Zod is the source of truth so both the
 // adapter (output) and the client (input) parse against the same enum.
 export const ApiErrorCodeSchema = z.enum([
@@ -57,14 +34,71 @@ export const ApiErrorEnvelopeSchema = z.union([
   LegacyApiErrorEnvelopeSchema,
 ]);
 
-export class ApiError extends Error {
+// ADR-0005 typed errors (PR1.1-alt: single hierarchy). `HandlerError`
+// is the only throwable; subclasses give type-narrowed throw sites and
+// IDE autocomplete at zero wire cost (the envelope is the same single
+// shape regardless of subclass).
+export class HandlerError extends Error {
   constructor(
     public readonly code: ApiErrorCode,
     message: string,
     public readonly details?: unknown,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = 'HandlerError';
+  }
+
+  get statusCode(): number {
+    return httpStatusForApiErrorCode(this.code);
+  }
+}
+
+export class UnauthorizedError extends HandlerError {
+  constructor(message = 'Unauthorized', details?: unknown) {
+    super('unauthorized', message, details);
+    this.name = 'UnauthorizedError';
+  }
+}
+
+export class ForbiddenError extends HandlerError {
+  constructor(message = 'Forbidden', details?: unknown) {
+    super('forbidden', message, details);
+    this.name = 'ForbiddenError';
+  }
+}
+
+export class NotFoundError extends HandlerError {
+  constructor(message = 'Not found', details?: unknown) {
+    super('not_found', message, details);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class ValidationError extends HandlerError {
+  constructor(message = 'Invalid input', details?: unknown) {
+    super('validation', message, details);
+    this.name = 'ValidationError';
+  }
+}
+
+export class PreconditionFailedError extends HandlerError {
+  constructor(message = 'Precondition failed', details?: unknown) {
+    super('precondition_failed', message, details);
+    this.name = 'PreconditionFailedError';
+  }
+}
+
+export class ConflictError extends HandlerError {
+  constructor(message = 'Conflict', details?: unknown) {
+    super('conflict', message, details);
+    this.name = 'ConflictError';
+  }
+}
+
+export class RateLimitedError extends HandlerError {
+  constructor(message = 'Rate limited', details?: unknown) {
+    super('rate_limited', message, details);
+    this.name = 'RateLimitedError';
   }
 }
 
@@ -86,24 +120,5 @@ export function httpStatusForApiErrorCode(code: ApiErrorCode): number {
       return 429;
     case 'internal':
       return 500;
-  }
-}
-
-export function apiErrorCodeForStatus(statusCode: number): ApiErrorCode {
-  switch (statusCode) {
-    case 400:
-      return 'validation';
-    case 401:
-      return 'unauthorized';
-    case 403:
-      return 'forbidden';
-    case 404:
-      return 'not_found';
-    case 409:
-      return 'precondition_failed';
-    case 429:
-      return 'rate_limited';
-    default:
-      return 'internal';
   }
 }

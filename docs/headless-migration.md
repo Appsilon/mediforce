@@ -271,7 +271,7 @@ So Phase 2 narrows to **uniform lifecycle mutations** — same handler shape (lo
   as each endpoint moves; UI callers update inline (~3 components in
   Phase 2).
 
-- State-machine invariants surface as typed errors (`ApiError` with `code: 'precondition_failed'` → 409). See the **error contract** open question below.
+- State-machine invariants surface as typed errors (`PreconditionFailedError` → envelope `code: 'precondition_failed'` → 409). See the **error contract** open question below.
 - **Audit emission — bridge.** Today's Server Actions hand-roll audit
   (`auditRepo.append({...})` inline in each action). API routes don't
   emit. Deleting the actions during Phase 2 would erase the only existing
@@ -343,13 +343,25 @@ This tracker is the entry point for a fresh session picking up Phase 2.
 **Two PRs, sequential.** Pattern is unproven (wrapper layer has only
 served GETs); smallest endpoint first to validate it, then the rest.
 
-#### PR1 — `tasks/claim` migration + adapter `ApiError` extension + `loadOr404`
+#### PR1 — `tasks/claim` migration + adapter `HandlerError` arm + `loadOr404`
 
 **Scope.** Smallest pure state-transition mutation
 (`POST /api/tasks/:taskId/claim`) plus the `createRouteAdapter`
 extension every subsequent mutation depends on. No orchestration, no
-self-fetch, no new abstractions — proves the wrapper-layer + ApiError
-+ audit-bridge pattern end-to-end on one endpoint.
+self-fetch, no new abstractions — proves the wrapper-layer +
+`HandlerError` hierarchy + audit-bridge pattern end-to-end on one
+endpoint.
+
+**PR1.1 amendment (this branch, alternative to #494).** The original
+PR1 plan introduced a new `ApiError` class alongside the existing
+`HandlerError` hierarchy from [#450](https://github.com/Appsilon/mediforce/pull/450),
+creating two parallel error systems bridged by a two-arm adapter
+catch. PR1.1 collapses to a single hierarchy: `HandlerError` gains a
+`code: ApiErrorCode` field, one subclass per code
+(`NotFoundError`, `ForbiddenError`, `UnauthorizedError`,
+`ValidationError`, `PreconditionFailedError`, `ConflictError`,
+`RateLimitedError`), single adapter catch arm. See
+ADR-0005 §2 amendment for rationale.
 
 **Repick history (2026-05-25).** Originally scoped to `cron/heartbeat`.
 Repicked because cron-heartbeat is not operational — it scans cron
@@ -359,22 +371,22 @@ as `processes/run` and `processes/advance` which Phase 3 explicitly
 defers. Cron-heartbeat moves to Phase 3 with its orchestration siblings;
 PR1 picks a true minimal mutation instead.
 
-**Files to touch:**
-- `packages/platform-api/src/errors.ts` — add the `ApiError` class +
-  `ApiErrorCode` union. Existing `HandlerError` / `NotFoundError` /
-  `ForbiddenError` from [#482](https://github.com/Appsilon/mediforce/pull/482)
-  **stay** as a coexistence bridge — new code throws `ApiError`,
-  existing throws keep working, both produce the same envelope shape.
-  Migration of legacy throws to `ApiError` is incremental, not PR1
-  blocking.
-- `packages/platform-ui/src/lib/route-adapter.ts` — extend the catch
-  block with two arms per ADR-0005 §3/§4:
-  - `instanceof ApiError` → envelope with `err.code`.
-  - `instanceof HandlerError` → derive code from `statusCode`
-    (`404 → 'not_found'`, `403 → 'forbidden'`); same envelope shape.
+**Files to touch (PR1.1-amended):**
+- `packages/platform-api/src/errors.ts` — extend `HandlerError` with
+  `code: ApiErrorCode` + `details?: unknown` and add the missing
+  subclasses (`UnauthorizedError`, `ValidationError`,
+  `PreconditionFailedError`, `ConflictError`, `RateLimitedError`).
+  Existing `NotFoundError` / `ForbiddenError` from
+  [#482](https://github.com/Appsilon/mediforce/pull/482) keep their
+  names; their constructors now also stash the code. The original
+  parallel `ApiError` class is **not** introduced.
+- `packages/platform-ui/src/lib/route-adapter.ts` — single
+  `instanceof HandlerError` catch arm per ADR-0005 §4:
+  envelope reads `err.code`, `err.message`, `err.details`. Sibling
+  `instanceof ZodError` arm + `console.error` + 500 fallback.
 - `packages/platform-ui/src/lib/__tests__/route-adapter.test.ts` —
-  extend with tests per `ApiErrorCode` for status + envelope, plus
-  the `HandlerError` legacy-throw arm.
+  parametric coverage per `ApiErrorCode` via the matching subclass
+  throw + ZodError + unknown-error coverage.
 - `loadOr404` helper — extract per [#482](https://github.com/Appsilon/mediforce/pull/482)
   out-of-scope note ("third copy" rule reached for the
   `entity = await scope.X.getById(id); if (!entity) throw …` pattern).
@@ -426,14 +438,15 @@ through the loopback pattern.
 
 **Exit criteria:**
 - `POST /api/tasks/:taskId/claim` returns `{ task: HumanTask }` on
-  success; `403` + ApiError envelope for non-member; `404` + envelope
+  success; `403` + typed envelope for non-member; `404` + envelope
   for foreign-workspace task (anti-enum); `409` + envelope for task
   not in `pending` status.
 - Audit emission preserved bit-for-bit: AuditEvent rows produced by
   the migrated handler match what `claimTask` Server Action emitted
   (action `task.claimed`, same actor/description/snapshots/basis).
-- All `ApiError` codes + the `HandlerError` legacy arm mapped to
-  correct HTTP status in adapter tests.
+- All `ApiErrorCode` values map to correct HTTP status via the single
+  `HandlerError` adapter arm; covered parametrically in adapter tests
+  by throwing the matching subclass.
 - `api-boundaries.test.ts` + `no-raw-repo-imports.test.ts` pass.
 - Existing Phase 1 / Phase 1.5 GET endpoints retroactively return the
   new error envelope (`{ error: string }` → `{ error: { code, message } }`).
@@ -632,7 +645,7 @@ Firebase is never imported by `platform-api/client` — the browser wrapper in `
 
 **Open questions to settle**:
 - Do we keep our own tiny async-hook helper (`useInstanceTasks` pattern — `useState` + `useEffect` + cancelled flag), or adopt an existing library (`@tanstack/react-query` / `swr`) that gives caching, dedup, stale-while-revalidate for free?
-- Error surface — today `ApiError` is thrown from the client; hooks map it to `{ error }` state. Do we standardise an error boundary + toast pattern for failed API calls?
+- Error surface — today `MediforceClientError` (with `code`/`details`) is thrown from the client; hooks map it to `{ error }` state. Do we standardise an error boundary + toast pattern for failed API calls?
 
 ### Phase 5 — Delete `@/lib/platform-services` shim
 
@@ -693,7 +706,7 @@ Tests are the primary way we read and reason about this codebase. They have to b
 | 1 | **Contract** | Zod input/output invariants, refines, enums | Vitest | <50ms | `packages/platform-api/src/handlers/<domain>/__tests__/contract.test.ts` |
 | 2 | **Handler** | Pure handler behaviour against real in-memory repos | Vitest | <100ms | `packages/platform-api/src/handlers/<domain>/__tests__/<name>.test.ts` |
 | 3 | **Adapter** | `createRouteAdapter` wiring (400 / 500 / JSON serialisation) | Vitest | <200ms | `packages/platform-ui/src/lib/__tests__/route-adapter.test.ts` + sampled `src/app/api/**/__tests__/route.test.ts` |
-| 4 | **API client** | URL serialisation, input validation, response parsing, `ApiError` shape | Vitest (mocked `apiFetch`) | <200ms | `packages/platform-ui/src/lib/__tests__/api-client.test.ts` |
+| 4 | **API client** | URL serialisation, input validation, response parsing, `MediforceClientError` shape | Vitest (mocked `apiFetch`) | <200ms | `packages/platform-ui/src/lib/__tests__/api-client.test.ts` |
 | 5 | **Cross-layer integration** | Client ↔ adapter ↔ handler ↔ repo round-trip, no HTTP | Vitest (loopback `apiFetch`) | <500ms | `packages/platform-ui/src/test/api-integration.test.ts` |
 | 6 | **Hook** | Async state — loading/error/cancel/dep-change | Vitest + `@testing-library/react` `renderHook` | <500ms | `packages/platform-ui/src/hooks/__tests__/<name>.test.ts` |
 | 7 | **Component** | Non-trivial conditional rendering (forms, branches, error states) | Vitest + `@testing-library/react` | <500ms | colocated `*.test.tsx` (sparingly) |

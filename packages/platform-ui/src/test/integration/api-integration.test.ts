@@ -19,7 +19,7 @@ import {
 import { listTasks, claimTask } from '@mediforce/platform-api/handlers';
 import { ListTasksInputSchema, ClaimTaskInputSchema } from '@mediforce/platform-api/contract';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
-import { Mediforce, MediforceClientError, ApiError } from '@mediforce/platform-api/client';
+import { Mediforce, MediforceClientError } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
 import { createTestScope } from '@mediforce/platform-api/testing';
 
@@ -104,8 +104,9 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
 });
 
 // Second integration scenario: `claim()` mutation. Covers PR1's specific
-// promise that a typed handler throw flows end-to-end into a client-side
-// `MediforceClientError` whose composed `apiError` carries the envelope.
+// promise that a typed handler throw (`HandlerError` subclass) flows
+// end-to-end into a client-side `MediforceClientError` whose `code` /
+// `details` fields carry the envelope contents.
 describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => {
   let humanTaskRepo: InMemoryHumanTaskRepository;
   let instanceRepo: InMemoryProcessInstanceRepository;
@@ -162,7 +163,7 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
     expect(result.task.assignedUserId).toBe('u-claim-test');
   });
 
-  it('flows a typed `precondition_failed` ApiError from handler → adapter → client', async () => {
+  it('flows a typed `precondition_failed` envelope from handler → adapter → client', async () => {
     await humanTaskRepo.create(
       buildHumanTask({
         id: 'task-1',
@@ -176,8 +177,6 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
     expect(err).toBeInstanceOf(MediforceClientError);
     const clientErr = err as MediforceClientError;
     expect(clientErr.status).toBe(409);
-    // Composition: the server-side typed error is reconstructed on the client.
-    expect(clientErr.apiError).toBeInstanceOf(ApiError);
     expect(clientErr.code).toBe('precondition_failed');
     expect(clientErr.details).toMatchObject({
       taskId: 'task-1',

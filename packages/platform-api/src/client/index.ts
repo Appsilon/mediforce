@@ -124,12 +124,15 @@ import {
   type GetCoworkSessionByInstanceOutput,
   type ListPluginsOutput,
 } from '../contract/index.js';
-import { ApiError, ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors.js';
+import { ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors.js';
 
 // Re-export so SDK consumers reach for one path:
-//   import { Mediforce, MediforceClientError, ApiError } from '@mediforce/platform-api/client';
-// Server-side handlers continue to import `ApiError` from `/errors` (source).
-export { ApiError, type ApiErrorCode } from '../errors.js';
+//   import { Mediforce, MediforceClientError, type ApiErrorCode } from '@mediforce/platform-api/client';
+// Server-side handlers throw `HandlerError` (or subclasses) imported from
+// `@mediforce/platform-api/errors`; the wire envelope is the only shared
+// surface, so the client just exposes `code`/`details` on
+// `MediforceClientError` directly.
+export { type ApiErrorCode } from '../errors.js';
 
 /**
  * Typed client for the Mediforce API. Runtime-agnostic — works in the
@@ -174,28 +177,20 @@ export type ClientConfig =
   | (BaseClientConfig & { bearerToken: () => Promise<string | null>; apiKey?: never; fetch?: never })
   | (BaseClientConfig & { fetch: typeof fetch; apiKey?: never; bearerToken?: never });
 
-// Composition: the semantic typed error (`ApiError`) is shared between
-// server and client. `MediforceClientError` is the transport-aware wrapper —
-// adds HTTP `status` + raw `body`, holds the reconstructed `apiError` when
-// the envelope was typed (undefined for legacy / network / non-JSON
-// responses).
+// Transport-aware error wrapper. Holds HTTP `status` + raw `body` plus the
+// parsed envelope fields (`code`, `details`) when the server returned the
+// ADR-0005 §1 typed envelope. `code` is `undefined` for legacy / network /
+// non-JSON responses.
 export class MediforceClientError extends Error {
   constructor(
     public readonly status: number,
     message: string,
     public readonly body: unknown,
-    public readonly apiError?: ApiError,
+    public readonly code?: ApiErrorCode,
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'MediforceClientError';
-  }
-
-  get code(): ApiErrorCode | undefined {
-    return this.apiError?.code;
-  }
-
-  get details(): unknown {
-    return this.apiError?.details;
   }
 }
 
@@ -689,11 +684,7 @@ async function parseJsonOrThrow(res: Response, context: string): Promise<unknown
   if (!res.ok) {
     const extracted = extractErrorEnvelope(body);
     const message = extracted.message ?? `${context} failed with status ${res.status}`;
-    const apiError =
-      extracted.code !== undefined
-        ? new ApiError(extracted.code, message, extracted.details)
-        : undefined;
-    throw new MediforceClientError(res.status, message, body, apiError);
+    throw new MediforceClientError(res.status, message, body, extracted.code, extracted.details);
   }
   return body;
 }

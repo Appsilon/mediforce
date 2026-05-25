@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
-  ApiError,
   HandlerError,
-  apiErrorCodeForStatus,
   httpStatusForApiErrorCode,
   type ApiErrorCode,
 } from '@mediforce/platform-api/errors';
@@ -30,8 +28,9 @@ import { getPlatformServices } from './platform-services.js';
  *      Note: `ctx` is Next.js's `RouteContext` shape (`{ params: Promise<…> }`)
  *      for dynamic-segment routes, or `unknown` for flat routes.
  *   3. Handler — invoked with the parsed input and a `CallerScope`. Throws of
- *      type `HandlerError` (e.g. `NotFoundError`, `ForbiddenError`) map to
- *      their declared HTTP status. Anything else is a 500 (full error logged).
+ *      type `HandlerError` (or any subclass: `NotFoundError`, `ForbiddenError`,
+ *      `PreconditionFailedError`, etc.) map to the ADR-0005 §1 envelope using
+ *      `err.code`. Anything else is a 500 (full error logged).
  *
  * Auth note: middleware in `src/middleware.ts` already gates `/api/*` for
  * presence of credentials — that's the first line of defense and exists so
@@ -102,11 +101,8 @@ export function createRouteAdapter<
       const result = await handler(parsed.data as NarrowInput, scope);
       return NextResponse.json(result);
     } catch (err) {
-      if (err instanceof ApiError) {
-        return jsonError(err.code, err.message, err.details);
-      }
       if (err instanceof HandlerError) {
-        return jsonError(apiErrorCodeForStatus(err.statusCode), err.message);
+        return jsonError(err.code, err.message, err.details);
       }
       if (err instanceof z.ZodError) {
         return jsonError('validation', 'Invalid input', err.issues);

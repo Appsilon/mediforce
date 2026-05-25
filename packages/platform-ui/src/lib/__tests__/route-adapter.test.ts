@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ApiError, ForbiddenError, NotFoundError } from '@mediforce/platform-api/errors';
+import {
+  ConflictError,
+  ForbiddenError,
+  HandlerError,
+  NotFoundError,
+  PreconditionFailedError,
+  RateLimitedError,
+  UnauthorizedError,
+  ValidationError,
+  type ApiErrorCode,
+} from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import type { CallerScope } from '@mediforce/platform-api/repositories';
 import { createRouteAdapter } from '../route-adapter';
@@ -101,25 +111,27 @@ describe('createRouteAdapter', () => {
   });
 
   describe('typed-error → envelope mapping (ADR-0005 §3)', () => {
-    const cases: ReadonlyArray<{ code: string; status: number }> = [
-      { code: 'unauthorized', status: 401 },
-      { code: 'forbidden', status: 403 },
-      { code: 'not_found', status: 404 },
-      { code: 'validation', status: 400 },
-      { code: 'precondition_failed', status: 409 },
-      { code: 'conflict', status: 409 },
-      { code: 'rate_limited', status: 429 },
-      { code: 'internal', status: 500 },
+    const cases: ReadonlyArray<{
+      code: ApiErrorCode;
+      status: number;
+      throw: (message: string, details?: unknown) => HandlerError;
+    }> = [
+      { code: 'unauthorized', status: 401, throw: (m, d) => new UnauthorizedError(m, d) },
+      { code: 'forbidden', status: 403, throw: (m, d) => new ForbiddenError(m, d) },
+      { code: 'not_found', status: 404, throw: (m, d) => new NotFoundError(m, d) },
+      { code: 'validation', status: 400, throw: (m, d) => new ValidationError(m, d) },
+      { code: 'precondition_failed', status: 409, throw: (m, d) => new PreconditionFailedError(m, d) },
+      { code: 'conflict', status: 409, throw: (m, d) => new ConflictError(m, d) },
+      { code: 'rate_limited', status: 429, throw: (m, d) => new RateLimitedError(m, d) },
+      // No `internal` subclass — handlers don't throw it explicitly; the
+      // adapter emits it for any uncaught non-HandlerError. Verified by the
+      // "returns 500 with a generic envelope" test below.
     ];
 
-    for (const { code, status } of cases) {
-      it(`maps ApiError('${code}') to HTTP ${status} with typed envelope`, async () => {
+    for (const { code, status, throw: makeThrow } of cases) {
+      it(`maps ${code} subclass throw to HTTP ${status} with typed envelope`, async () => {
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const handler = vi
-          .fn()
-          .mockRejectedValue(
-            new ApiError(code as never, `boom: ${code}`, { hint: 'detail' }),
-          );
+        const handler = vi.fn().mockRejectedValue(makeThrow(`boom: ${code}`, { hint: 'detail' }));
         const GET = createRouteAdapter(
           InputSchema,
           (req) => ({ name: req.nextUrl.searchParams.get('name') }),
@@ -138,7 +150,7 @@ describe('createRouteAdapter', () => {
     }
   });
 
-  it('maps legacy NotFoundError → { code: "not_found", message } at 404', async () => {
+  it('NotFoundError default message renders as { code: "not_found", message: "Not found" } at 404', async () => {
     const handler = vi.fn().mockRejectedValue(new NotFoundError('Task not found'));
     const GET = createRouteAdapter(
       InputSchema,
@@ -155,7 +167,7 @@ describe('createRouteAdapter', () => {
     });
   });
 
-  it('maps legacy ForbiddenError → { code: "forbidden", message } at 403', async () => {
+  it('ForbiddenError with no message defaults to "Forbidden" at 403', async () => {
     const handler = vi.fn().mockRejectedValue(new ForbiddenError());
     const GET = createRouteAdapter(
       InputSchema,

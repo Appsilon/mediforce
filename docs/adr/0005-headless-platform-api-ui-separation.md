@@ -84,7 +84,13 @@ Field name `error` (not `status`) because HTTP status code (header)
 already says "this is an error class"; `status` collides with domain
 concepts (`task.status`, `run.status`).
 
-### 2. Typed errors: single `ApiError` class, code as string union
+### 2. Typed errors: `HandlerError` hierarchy with `code` field
+
+**Amended PR1.1 (this branch — alternative to #494):** the originally
+chosen single `ApiError` class is collapsed back into the existing
+`HandlerError` base, extended with a `code: ApiErrorCode` field, plus
+one subclass per code. Single hierarchy, single adapter catch arm,
+subclasses for server-side throw-site ergonomics.
 
 ```ts
 export type ApiErrorCode =
@@ -92,39 +98,61 @@ export type ApiErrorCode =
   | 'validation'   | 'precondition_failed' | 'conflict'
   | 'rate_limited' | 'internal';
 
-export class ApiError extends Error {
+export class HandlerError extends Error {
   constructor(
     readonly code: ApiErrorCode,
     message: string,
     readonly details?: unknown,
   ) { super(message); }
+
+  // Derived from `code` via the §3 table — no second source of truth.
+  get statusCode(): number { return httpStatusForApiErrorCode(this.code); }
 }
+
+export class PreconditionFailedError extends HandlerError {
+  constructor(message = 'Precondition failed', details?: unknown) {
+    super('precondition_failed', message, details);
+  }
+}
+// NotFoundError, ForbiddenError, UnauthorizedError, ValidationError,
+// ConflictError, RateLimitedError — same pattern.
 ```
 
 Throw site:
 
 ```ts
 if (task.status !== 'claimed') {
-  throw new ApiError(
-    'precondition_failed',
+  throw new PreconditionFailedError(
     `Task must be claimed before complete; current: ${task.status}`,
     { taskId, currentStatus: task.status },
   );
 }
 ```
 
-Chosen over a subclass hierarchy
-(`PreconditionFailedError extends ApiError`, etc.) because:
+Rationale for the amendment — the original §2 rejection of subclasses
+conflated wire format with throw-site ergonomics:
 
-- Subclasses don't cross the JSON wire. Server emits the same envelope
-  regardless of class.
-- Subclasses force a code → constructor mapping table on the client
-  side. Single class needs zero mapping (`throw new ApiError(body.error.code, body.error.message, body.error.details)`).
-- IDE narrowing on `instanceof ApiError && err.code === 'X'` is
-  equivalent to the subclass version.
-- ~50 LOC infrastructure total vs ~75 LOC + a third place of drift.
+- **"Subclasses don't cross the JSON wire" — true but irrelevant.** The
+  wire envelope is independent of throw-site class. Server emits the
+  same `{ error: { code, message, details? } }` shape regardless of
+  which subclass was thrown. Subclasses live server-side only.
+- **"Subclasses force a code → constructor mapping table on the client"
+  — false.** The server-side subclasses don't propagate to the client.
+  The client keeps a single class shape (`MediforceClientError` with
+  `code` / `details` fields parsed from the envelope). No mapping table
+  needed in either direction.
+- **`HandlerError` already existed** from PR #450. The original ADR
+  introduced a parallel `ApiError` without reading the existing
+  `errors.ts`, creating two ways to emit the same envelope. Drift
+  inevitable. PR1.1 collapses to one.
+- **Subclass throws narrow types at the call site** and give IDE
+  autocomplete at zero wire cost.
 
-Rejected: Result types (`Result<T, ApiError>`). Throws + a single
+Client side (`@mediforce/platform-api/client`) exposes a single
+`MediforceClientError` (transport-aware: HTTP `status` + raw `body` +
+parsed `code` / `details`). No `ApiError`, no subclass mirror.
+
+Rejected: Result types (`Result<T, HandlerError>`). Throws + a single
 well-known base class is idiomatic in TS; result types add boilerplate
 at every call site.
 
@@ -158,26 +186,37 @@ correct; client branches on `code`, not the status nuance between 409
 and 412). `forbidden` on mutations is 403 — anti-enum payoff lower
 because the caller already proved intent by issuing the write.
 
-### 4. Adapter extension: `ApiError` catch in `createRouteAdapter`
+### 4. Adapter extension: single `HandlerError` catch in `createRouteAdapter`
 
 No new `mutationAdapter` helper. Mutations use the same
-`createRouteAdapter` as reads, with an added `ApiError` catch:
+`createRouteAdapter` as reads, with a single typed-error catch arm
+(amended PR1.1 — was previously a two-arm coexistence bridge with
+`ApiError`):
 
 ```ts
 catch (err) {
-  if (err instanceof ApiError) return jsonError(err);
-  if (err instanceof z.ZodError) {
-    return jsonError(new ApiError('validation', 'Invalid input', err.issues));
+  if (err instanceof HandlerError) {
+    return jsonError(err.code, err.message, err.details);
   }
-  console.error(err);
-  return jsonError(new ApiError('internal', 'Internal error'));
+  if (err instanceof z.ZodError) {
+    return jsonError('validation', 'Invalid input', err.issues);
+  }
+  console.error('[route-adapter] handler error:', err);
+  return jsonError('internal', 'Internal error');
 }
 ```
 
-`jsonError(err)` reads `err.code` against §3's table and serializes the
-envelope from §1. ~30 LOC added to `route-adapter.ts`; benefits all
-existing Phase 1 GET endpoints retroactively (they get typed errors too
-without rewriting).
+`jsonError(code, message, details?)` derives HTTP status from `code` via
+§3's table and serializes the §1 envelope. Catch order is
+`HandlerError → ZodError → unknown`; `ZodError` is a sibling arm rather
+than wrapped into `ValidationError` so a Zod throw inside handler
+code (programmer error — backend payload failing internal parse) is
+distinguishable in the source from a deliberate domain
+`ValidationError` throw, even though both map to the same envelope.
+
+All existing Phase 1 GET endpoints inherit typed errors without
+rewriting (`NotFoundError` / `ForbiddenError` already throw from
+the wrapper layer and are subclasses of the new `HandlerError`).
 
 ### 5. Response shape: entity echo
 
@@ -357,8 +396,9 @@ These are domain methods on the wrapper, mirroring how
   cost (cookie session vs Bearer) and losing Zod contract + URL
   surface, for no benefit.
 - **`mutationAdapter` helper** distinct from `createRouteAdapter`.
-  Rejected — one adapter with an `ApiError` catch covers reads and
-  mutations; second helper adds vocabulary without behaviour change.
+  Rejected — one adapter with a single `HandlerError` catch covers
+  reads and mutations; second helper adds vocabulary without behaviour
+  change.
 - **Minimal-ack response shape** (`{ ok: true }`). Rejected — forces a
   refetch round trip and creates race windows where the client renders
   stale state. Industry standard is entity echo.
@@ -370,8 +410,9 @@ These are domain methods on the wrapper, mirroring how
 ## Consequences
 
 - Phase 2 mutation handlers share one signature
-  (`(input, scope) => Promise<output>`) and one error idiom (throw
-  `ApiError`). Phase 2.5 and Phase 3 mutations inherit unchanged.
+  (`(input, scope) => Promise<output>`) and one error idiom (throw a
+  `HandlerError` subclass — `NotFoundError`, `PreconditionFailedError`,
+  etc.). Phase 2.5 and Phase 3 mutations inherit unchanged.
 - `createRouteAdapter` becomes the single chokepoint for input parsing,
   scope construction, error mapping, and output serialization across
   reads and mutations.
