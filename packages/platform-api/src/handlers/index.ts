@@ -21,4 +21,6 @@ export { listSecretKeys } from './secrets/list-secret-keys.js';
 export { setSecret } from './secrets/set-secret.js';
 export { deleteSecret } from './secrets/delete-secret.js';
 
+export { getDockerInfo } from './system/get-docker-info.js';
+
 export { listAdapter, getByIdAdapter } from './_generic.js';
