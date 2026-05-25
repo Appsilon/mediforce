@@ -352,17 +352,6 @@ self-fetch, no new abstractions — proves the wrapper-layer +
 `HandlerError` hierarchy + audit-bridge pattern end-to-end on one
 endpoint.
 
-**PR1.1 amendment (this branch, alternative to #494).** The original
-PR1 plan introduced a new `ApiError` class alongside the existing
-`HandlerError` hierarchy from [#450](https://github.com/Appsilon/mediforce/pull/450),
-creating two parallel error systems bridged by a two-arm adapter
-catch. PR1.1 collapses to a single hierarchy: `HandlerError` gains a
-`code: ApiErrorCode` field, one subclass per code
-(`NotFoundError`, `ForbiddenError`, `UnauthorizedError`,
-`ValidationError`, `PreconditionFailedError`, `ConflictError`,
-`RateLimitedError`), single adapter catch arm. See
-ADR-0005 §2 amendment for rationale.
-
 **Repick history (2026-05-25).** Originally scoped to `cron/heartbeat`.
 Repicked because cron-heartbeat is not operational — it scans cron
 triggers, fires them, then **self-fetches** `/api/processes/:id/run` to
@@ -371,15 +360,14 @@ as `processes/run` and `processes/advance` which Phase 3 explicitly
 defers. Cron-heartbeat moves to Phase 3 with its orchestration siblings;
 PR1 picks a true minimal mutation instead.
 
-**Files to touch (PR1.1-amended):**
-- `packages/platform-api/src/errors.ts` — extend `HandlerError` with
-  `code: ApiErrorCode` + `details?: unknown` and add the missing
+**Files to touch:**
+- `packages/platform-api/src/errors.ts` — extend `HandlerError`
+  (from [#450](https://github.com/Appsilon/mediforce/pull/450)) with
+  `code: ApiErrorCode` + `details?: unknown`, add the missing
   subclasses (`UnauthorizedError`, `ValidationError`,
   `PreconditionFailedError`, `ConflictError`, `RateLimitedError`).
-  Existing `NotFoundError` / `ForbiddenError` from
-  [#482](https://github.com/Appsilon/mediforce/pull/482) keep their
-  names; their constructors now also stash the code. The original
-  parallel `ApiError` class is **not** introduced.
+  Existing `NotFoundError` / `ForbiddenError` keep their names; their
+  constructors now also stash the code.
 - `packages/platform-ui/src/lib/route-adapter.ts` — single
   `instanceof HandlerError` catch arm per ADR-0005 §4:
   envelope reads `err.code`, `err.message`, `err.details`. Sibling
@@ -646,6 +634,7 @@ Firebase is never imported by `platform-api/client` — the browser wrapper in `
 **Open questions to settle**:
 - Do we keep our own tiny async-hook helper (`useInstanceTasks` pattern — `useState` + `useEffect` + cancelled flag), or adopt an existing library (`@tanstack/react-query` / `swr`) that gives caching, dedup, stale-while-revalidate for free?
 - Error surface — today `MediforceClientError` (with `code`/`details`) is thrown from the client; hooks map it to `{ error }` state. Do we standardise an error boundary + toast pattern for failed API calls?
+- Shared client throwable — once the first real `if (err.code === 'X')` switch appears in UI, revisit ADR-0005 §2 "future-idea" note: rename `HandlerError` → `ApiError` (neutral name), reconstruct the matching subclass on the client from envelope `code` via a small map, and surface it as `MediforceClientError.apiError` so UI can do `if (clientErr.apiError instanceof PreconditionFailedError)` with full TS narrowing. Out of scope until a concrete use-case lands.
 
 ### Phase 5 — Delete `@/lib/platform-services` shim
 

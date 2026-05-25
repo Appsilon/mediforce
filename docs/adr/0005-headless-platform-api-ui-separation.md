@@ -86,11 +86,11 @@ concepts (`task.status`, `run.status`).
 
 ### 2. Typed errors: `HandlerError` hierarchy with `code` field
 
-**Amended PR1.1 (this branch — alternative to #494):** the originally
-chosen single `ApiError` class is collapsed back into the existing
-`HandlerError` base, extended with a `code: ApiErrorCode` field, plus
-one subclass per code. Single hierarchy, single adapter catch arm,
-subclasses for server-side throw-site ergonomics.
+Extend the existing `HandlerError` base (introduced in [#450](https://github.com/Appsilon/mediforce/pull/450))
+with a `code: ApiErrorCode` field and `details?: unknown`. One subclass
+per code — single hierarchy, single adapter catch arm, subclasses for
+server-side throw-site ergonomics (type-narrowed constructor + IDE
+autocomplete at zero wire cost).
 
 ```ts
 export type ApiErrorCode =
@@ -129,32 +129,34 @@ if (task.status !== 'claimed') {
 }
 ```
 
-Rationale for the amendment — the original §2 rejection of subclasses
-conflated wire format with throw-site ergonomics:
-
-- **"Subclasses don't cross the JSON wire" — true but irrelevant.** The
-  wire envelope is independent of throw-site class. Server emits the
-  same `{ error: { code, message, details? } }` shape regardless of
-  which subclass was thrown. Subclasses live server-side only.
-- **"Subclasses force a code → constructor mapping table on the client"
-  — false.** The server-side subclasses don't propagate to the client.
-  The client keeps a single class shape (`MediforceClientError` with
-  `code` / `details` fields parsed from the envelope). No mapping table
-  needed in either direction.
-- **`HandlerError` already existed** from PR #450. The original ADR
-  introduced a parallel `ApiError` without reading the existing
-  `errors.ts`, creating two ways to emit the same envelope. Drift
-  inevitable. PR1.1 collapses to one.
-- **Subclass throws narrow types at the call site** and give IDE
-  autocomplete at zero wire cost.
-
 Client side (`@mediforce/platform-api/client`) exposes a single
 `MediforceClientError` (transport-aware: HTTP `status` + raw `body` +
-parsed `code` / `details`). No `ApiError`, no subclass mirror.
+parsed `code` / `details` from the §1 envelope). No subclass mirror on
+the client today — every `catch` site in the UI currently does
+`err instanceof Error ? err.message : 'fallback'`, so per-code
+discrimination would be wasted code → ctor mapping. See "future
+discrimination" note below.
+
+Rejected: a parallel `ApiError` class alongside `HandlerError` (single
+flat class, no subclasses). Two throwables for the same envelope =
+inevitable drift; the subclass hierarchy already exists from
+[#450](https://github.com/Appsilon/mediforce/pull/450) and just needs
+the `code` field.
 
 Rejected: Result types (`Result<T, HandlerError>`). Throws + a single
 well-known base class is idiomatic in TS; result types add boilerplate
 at every call site.
+
+**Future-idea — shared client throwable.** When the first real
+per-code branch appears in UI code (`if (err.code === 'precondition_failed')`
+type pattern in a hook or component), revisit the asymmetry: rename
+`HandlerError` → `ApiError` (neutral name for both sides), reconstruct
+the matching subclass on the client from the envelope `code` via a
+small map, and expose it as `MediforceClientError.apiError`. UI could
+then do `if (clientErr.apiError instanceof PreconditionFailedError)`
+with full TS narrowing. Out of scope until the first concrete
+use-case exists — premature symmetry costs map-table maintenance for
+no payoff today.
 
 #### 2a. Throw site
 
@@ -189,9 +191,7 @@ because the caller already proved intent by issuing the write.
 ### 4. Adapter extension: single `HandlerError` catch in `createRouteAdapter`
 
 No new `mutationAdapter` helper. Mutations use the same
-`createRouteAdapter` as reads, with a single typed-error catch arm
-(amended PR1.1 — was previously a two-arm coexistence bridge with
-`ApiError`):
+`createRouteAdapter` as reads, with a single typed-error catch arm:
 
 ```ts
 catch (err) {
@@ -215,8 +215,9 @@ distinguishable in the source from a deliberate domain
 `ValidationError` throw, even though both map to the same envelope.
 
 All existing Phase 1 GET endpoints inherit typed errors without
-rewriting (`NotFoundError` / `ForbiddenError` already throw from
-the wrapper layer and are subclasses of the new `HandlerError`).
+rewriting (`NotFoundError` / `ForbiddenError` from
+[#450](https://github.com/Appsilon/mediforce/pull/450) are subclasses
+of `HandlerError` and now carry `code`/`details`).
 
 ### 5. Response shape: entity echo
 
