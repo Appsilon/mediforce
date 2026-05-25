@@ -30,7 +30,7 @@ test.describe('Workspace Selection Journey', () => {
 
     // Clear any stored default workspace so the picker is always shown
     await page.addInitScript(() => {
-      localStorage.removeItem('workspace-default-key');
+      localStorage.removeItem('alwaysNamespace');
     });
 
     await page.goto('/workspace-selection');
