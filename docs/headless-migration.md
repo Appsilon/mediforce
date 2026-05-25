@@ -233,7 +233,8 @@ So Phase 2 narrows to **uniform lifecycle mutations** — same handler shape (lo
 | `POST /api/tasks/:taskId/resolve` | tasks | scope.tasks.resolve(taskId, verdict) |
 | `POST /api/processes/:instanceId/cancel` | processes | scope.runs.cancel(id, reason) |
 | `POST /api/processes/:instanceId/resume` | processes | scope.runs.resume(id) |
-| `POST /api/cron/heartbeat` | cron | `caller.isSystemActor` bypass; no scope gate |
+
+(`POST /api/cron/heartbeat` was originally in this list — repicked to Phase 3 because the route self-fetches `/api/processes/:id/run` to kick the run loop, making it an orchestration endpoint rather than an operational ping. See PR1 tracker's "Repick history" note + Phase 3 below.)
 
 **Out of Phase 2 (moved to Phase 2.5 or Phase 3):**
 
@@ -341,20 +342,23 @@ This tracker is the entry point for a fresh session picking up Phase 2.
 **Two PRs, sequential.** Pattern is unproven (wrapper layer has only
 served GETs); smallest endpoint first to validate it, then the rest.
 
-#### PR1 — Cron heartbeat + adapter `ApiError` extension
+#### PR1 — `tasks/claim` migration + adapter `ApiError` extension + `loadOr404`
 
-**Scope.** One endpoint (`POST /api/cron/heartbeat`) plus the
-`createRouteAdapter` extension that every subsequent mutation depends
-on.
+**Scope.** Smallest pure state-transition mutation
+(`POST /api/tasks/:taskId/claim`) plus the `createRouteAdapter`
+extension every subsequent mutation depends on. No orchestration, no
+self-fetch, no new abstractions — proves the wrapper-layer + ApiError
++ audit-bridge pattern end-to-end on one endpoint.
+
+**Repick history (2026-05-25).** Originally scoped to `cron/heartbeat`.
+Repicked because cron-heartbeat is not operational — it scans cron
+triggers, fires them, then **self-fetches** `/api/processes/:id/run` to
+kick the run loop. That's fire-and-forget orchestration, same category
+as `processes/run` and `processes/advance` which Phase 3 explicitly
+defers. Cron-heartbeat moves to Phase 3 with its orchestration siblings;
+PR1 picks a true minimal mutation instead.
 
 **Files to touch:**
-- `packages/platform-api/src/contract/cron.ts` — new. `HeartbeatInputSchema`
-  (empty / trivial), `HeartbeatOutputSchema` (`{ ok, processedAt }`).
-- `packages/platform-api/src/handlers/cron/heartbeat.ts` — new. System-
-  actor bypass: `if (!scope.caller.isSystemActor) throw new ApiError('forbidden', ...)`.
-  No audit emission (`@no-audit` operational exemption per ADR-0005 §7).
-- `packages/platform-api/src/handlers/cron/__tests__/heartbeat.test.ts`
-  — new. Contract + handler tests against in-memory scope.
 - `packages/platform-api/src/errors.ts` — add the `ApiError` class +
   `ApiErrorCode` union. Existing `HandlerError` / `NotFoundError` /
   `ForbiddenError` from [#482](https://github.com/Appsilon/mediforce/pull/482)
@@ -367,44 +371,84 @@ on.
   - `instanceof ApiError` → envelope with `err.code`.
   - `instanceof HandlerError` → derive code from `statusCode`
     (`404 → 'not_found'`, `403 → 'forbidden'`); same envelope shape.
+- `packages/platform-ui/src/lib/__tests__/route-adapter.test.ts` —
+  extend with tests per `ApiErrorCode` for status + envelope, plus
+  the `HandlerError` legacy-throw arm.
 - `loadOr404` helper — extract per [#482](https://github.com/Appsilon/mediforce/pull/482)
   out-of-scope note ("third copy" rule reached for the
   `entity = await scope.X.getById(id); if (!entity) throw …` pattern).
   Lives in `packages/platform-api/src/handlers/_helpers.ts` (or
-  similar); used by `get-run` plus any new lookup-with-404 handler in
-  PR2.
-- `packages/platform-ui/src/lib/__tests__/route-adapter.test.ts` —
-  extend with tests for each code → status mapping.
-- `packages/platform-ui/src/app/api/cron/heartbeat/route.ts` —
-  replace inline handler with `createRouteAdapter` call.
+  similar); used by PR1's claim handler + future lookup-with-404 sites.
+- `packages/platform-api/src/contract/tasks.ts` — add
+  `ClaimTaskInputSchema` (`{ taskId: z.string().min(1) }`) and
+  `ClaimTaskOutputSchema` (`{ task: HumanTaskSchema }`). Export from
+  `contract/index.ts`.
+- `packages/platform-api/src/handlers/tasks/claim-task.ts` — new.
+  Handler: assert `scope.caller.userId`, call `scope.humanTasks.claim()`
+  (wrapper already exists), emit audit-bridge via
+  `scope.auditEvents.append({...})` — move the audit-emission code from
+  today's `claimTask` Server Action (`packages/platform-ui/src/app/actions/tasks.ts:43-59`),
+  do not author new audit shape.
+- `packages/platform-api/src/handlers/tasks/__tests__/claim-task.test.ts`
+  — contract + handler tests against in-memory scope.
+- `packages/platform-api/src/repositories/authorized-audit-event-repository.ts`
+  — add `append(event)` write method. Delegates to raw `auditRepo.append()`.
+  Update `__tests__/`.
+- `packages/platform-ui/src/app/api/tasks/[taskId]/claim/route.ts` —
+  replace inline handler with `createRouteAdapter` call. Path-param
+  `taskId` merged into input via the `inputFromReq` callback.
 - `packages/platform-api/src/client/mediforce.ts` — add
-  `mediforce.cron.heartbeat()` method.
+  `mediforce.tasks.claim(input)` method. Test it.
+- `packages/platform-ui/src/app/actions/tasks.ts` — **delete** the
+  `claimTask` function (only; leave `unclaimTask` and the four
+  `complete*` actions — they migrate in PR2).
+- `packages/platform-ui/src/components/tasks/claim-button.tsx` —
+  replace the dynamic `import('@/app/actions/tasks').then(({claimTask})...)`
+  with `mediforce.tasks.claim({taskId})`. **Leaves the unclaim path on
+  the Server Action** as an intentional temp state — PR2 deletes it
+  when adding the new `/unclaim` route.
 
-**Server Actions deleted:** none in this PR.
+**Server Actions deleted:** `claimTask` only.
 
-**New routes added:** none (heartbeat route already exists).
+**New routes added:** none (claim route already exists).
 
-**Test layers:** contract + handler + adapter + 1 cross-layer integration.
+**Mixed-state callout for PR description:** `claim-button.tsx` is
+temporarily split — claim goes through `apiClient`, unclaim goes
+through the existing Server Action. PR2 closes the loop by adding the
+`/unclaim` route, migrating unclaim, and deleting `unclaimTask`.
+
+**Test layers:** contract + handler + adapter + client method test +
+hook/component test for claim-button update + 1 cross-layer integration
+through the loopback pattern.
 
 **Exit criteria:**
-- `POST /api/cron/heartbeat` returns `{ ok: true, processedAt }` on
-  system-actor caller; `403` + ApiError envelope otherwise.
-- All `ApiError` codes mapped to correct HTTP status in adapter tests.
+- `POST /api/tasks/:taskId/claim` returns `{ task: HumanTask }` on
+  success; `403` + ApiError envelope for non-member; `404` + envelope
+  for foreign-workspace task (anti-enum); `409` + envelope for task
+  not in `pending` status.
+- Audit emission preserved bit-for-bit: AuditEvent rows produced by
+  the migrated handler match what `claimTask` Server Action emitted
+  (action `task.claimed`, same actor/description/snapshots/basis).
+- All `ApiError` codes + the `HandlerError` legacy arm mapped to
+  correct HTTP status in adapter tests.
 - `api-boundaries.test.ts` + `no-raw-repo-imports.test.ts` pass.
-- Existing GET endpoints retroactively return the new error envelope
-  (no regression — they previously returned `{ error: string }`; now
-  return `{ error: { code, message } }`; UI codemod `err.error` →
-  `err.error.message` lands same PR).
+- Existing Phase 1 / Phase 1.5 GET endpoints retroactively return the
+  new error envelope (`{ error: string }` → `{ error: { code, message } }`).
+  UI code reading `err.error` updated to `err.error.message`. Tests
+  asserting on string envelope updated mechanically.
+- `mediforce.tasks.claim()` round-trip green via cross-layer integration
+  test.
+- E2E journey involving claim still green.
 
-#### PR2 — Tasks + Process state lifecycle mutations
+#### PR2 — Remaining tasks + Process state lifecycle mutations
 
-**Scope.** Six endpoints + audit-bridge wiring + Server Action
-deletions.
+**Scope.** Five endpoints + audit-bridge wiring + Server Action
+deletions. `claim` already shipped in PR1, so PR2 closes the loop on
+tasks and migrates process state.
 
 Endpoints:
-- `POST /api/tasks/:taskId/claim` — migrate existing route.
-- `POST /api/tasks/:taskId/unclaim` — **new route** (no existing
-  route today; current functionality is Server Action only).
+- `POST /api/tasks/:taskId/unclaim` — **new route** (no existing route
+  today; current functionality is Server Action only).
 - `POST /api/tasks/:taskId/complete` — migrate. Body uses discriminated
   union over four kinds (`verdict | params | upload | assignment`)
   covering today's `completeTask`, `completeParamsTask`,
@@ -426,10 +470,11 @@ Endpoints:
 - `packages/platform-api/src/client/mediforce.ts` — add typed methods.
 
 **Server Actions deleted (move, don't add):**
-- `packages/platform-ui/src/app/actions/tasks.ts` — delete all six
-  (`claimTask`, `unclaimTask`, `completeTask`, `completeParamsTask`,
-  `completeUploadTask`, `completeAssignmentTask`). Move audit-emission
-  code into the corresponding handlers.
+- `packages/platform-ui/src/app/actions/tasks.ts` — delete the
+  remaining five (`unclaimTask`, `completeTask`, `completeParamsTask`,
+  `completeUploadTask`, `completeAssignmentTask`). `claimTask` already
+  deleted in PR1. Move audit-emission code into the corresponding
+  handlers. File ends up empty — delete it.
 - `packages/platform-ui/src/app/actions/processes.ts` — delete
   `cancelProcessRun` and `resumeProcessRun`. Move audit code. Leave
   `startWorkflowRun`, `retryFailedStep`, `archiveProcessRun`,
@@ -438,13 +483,12 @@ Endpoints:
 
 **UI callers to update:**
 - `packages/platform-ui/src/components/tasks/claim-button.tsx` —
-  replace `claimTask` / `unclaimTask` action imports with
-  `mediforce.tasks.claim()` / `mediforce.tasks.unclaim()`.
-- Components calling the other `complete*` actions — same pattern;
-  body shape becomes discriminated union (`{ kind: 'verdict', ... }`,
-  etc.).
+  replace `unclaimTask` action import with `mediforce.tasks.unclaim()`.
+  (Claim path already on `mediforce.tasks.claim()` from PR1.)
+- Components calling the `complete*` actions — replace with
+  `mediforce.tasks.complete({ kind: 'verdict' | ..., ... })`.
 - Process detail components calling `cancelProcessRun` /
-  `resumeProcessRun` — same.
+  `resumeProcessRun` — same pattern.
 
 **Repository layer additions:**
 - `HumanTaskRepository.unclaim(taskId, userId)` — new method on both
@@ -455,8 +499,6 @@ Endpoints:
   interface + in-memory + Firestore. `AuthorizedWorkflowRunRepository.cancel()`
   wrapper.
 - `ProcessInstanceRepository.resume(id)` — same.
-- `AuthorizedAuditEventRepository.append(event)` — new write method
-  on the wrapper (read-only today). Delegates to raw `auditRepo.append()`.
 
 **Test layers:** contract + handler + adapter + hook update + journey
 test for at least one tasks flow (claim → complete) and one process
@@ -542,6 +584,7 @@ Each of these needs its own design pass:
 
 - **Cowork streaming** (`POST /api/cowork/:id/chat`, `POST /api/cowork/:id/message`, `POST /api/cowork/:id/finalize`) — requires an SSE adapter between the pure handler and Next.js `ReadableStream`. Design question: does the handler yield events, or return an async iterator?
 - **Process execution** (`POST /api/processes/:id/run`, `POST /api/processes/:id/advance` with agent side-effects) — orchestrates `AgentRunner` + `WorkflowEngine`; handler becomes an orchestrator instead of a thin read. Decide on sync vs. queued execution.
+- **Cron heartbeat** (`POST /api/cron/heartbeat`) — added to Phase 3 (2026-05-25). Steps 1-3 (scan triggers / check due / fire) are clean handler work. Step 4 (self-fetch `/api/processes/:id/run` to kick the run loop) is the same orchestration kick `processes/run` and `processes/advance` need. Design the orchestration kick once, apply to all three.
 - **Server actions** in `src/app/actions/*.ts` — fold into handlers where sensible, keep Next.js-specific concerns (`revalidatePath`, `redirect`) in a thin action wrapper.
 
 **Pause-safe**: yes, but granularity is coarser — streaming and orchestration are each a PR of meaningful size.
@@ -554,6 +597,7 @@ Each of these needs its own design pass:
   The first is the cleanest functional style; the second is the most flexible for pre-existing code.
 - Orchestrator side-effects — `executeAgentStep` spawns Docker containers and writes audit events. Do we keep it as a handler (pure-ish, deps include `AgentRunner`) or promote it to a queue worker entrypoint?
 - Cowork finalize writes to multiple repos atomically today — do we need a transaction abstraction in the repo interfaces, or accept non-atomic writes with compensating actions?
+- **Orchestration kick mechanism** — today three call sites self-fetch via HTTP (`/api/processes/:id/run`): inline `cron/heartbeat` route, inline `tasks/complete` route post-completion, Server Actions in `processes.ts`. The pattern bypasses framework boundaries (`platform-api` handlers don't know own URL or API key). Three options: (a) `scope.system.runKicker(instanceId)` abstraction wired in `caller-scope.ts`; (b) push the kick inside `engine.startInstance()` so callers don't kick at all; (c) queue worker entrypoint replacing self-fetch with a real job dispatch. Decide once, apply to cron-heartbeat + processes/run + processes/advance + tasks/complete-then-advance.
 
 ### Phase 4 — Typed `apiClient` + first hook migration
 
