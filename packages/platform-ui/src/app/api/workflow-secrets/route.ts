@@ -1,105 +1,71 @@
-import { NextResponse } from 'next/server';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { listSecretKeys, setSecret, deleteSecret } from '@mediforce/platform-api/handlers';
 import {
-  SetSecretInputSchema,
   ListSecretKeysInputSchema,
+  SetSecretInputSchema,
   DeleteSecretInputSchema,
+  type ListSecretKeysInput,
+  type SetSecretInput,
+  type DeleteSecretInput,
 } from '@mediforce/platform-api/contract';
-import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, callerCanAccess } from '@/lib/api-auth';
 
-export async function GET(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
+/**
+ * GET /api/workflow-secrets?namespace=…&workflow=…
+ *
+ * Lists secret keys (never values). The `scope.workspaceSecrets` /
+ * `scope.workflowSecrets` wrappers soft-fail to `[]` for callers outside
+ * the workspace — a deliberate change from the legacy 403 (saves the UI
+ * from needing a forbidden branch).
+ */
+export const GET = createRouteAdapter<typeof ListSecretKeysInputSchema, ListSecretKeysInput>(
+  ListSecretKeysInputSchema,
+  (req) => {
+    const params = req.nextUrl.searchParams;
+    return {
+      namespace: params.get('namespace') ?? undefined,
+      workflow: params.get('workflow') ?? undefined,
+    };
+  },
+  listSecretKeys,
+);
 
-  const url = new URL(request.url);
-  const parsed = ListSecretKeysInputSchema.safeParse({
-    namespace: url.searchParams.get('namespace') ?? undefined,
-    workflow: url.searchParams.get('workflow') ?? undefined,
-  });
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues.map((i) => i.message).join('; ') },
-      { status: 400 },
-    );
-  }
+/**
+ * PUT /api/workflow-secrets?namespace=…&workflow=…  body: {key, value}
+ *
+ * Writes go through the wrapper, which throws `ForbiddenError` for non-
+ * members; the adapter maps that to 403.
+ */
+export const PUT = createRouteAdapter<typeof SetSecretInputSchema, SetSecretInput>(
+  SetSecretInputSchema,
+  async (req) => {
+    const params = req.nextUrl.searchParams;
+    let body: unknown = {};
+    try {
+      body = await req.json();
+    } catch {
+      // Empty body — let Zod validation report the missing fields.
+    }
+    return {
+      namespace: params.get('namespace') ?? undefined,
+      workflow: params.get('workflow') ?? undefined,
+      ...(typeof body === 'object' && body !== null ? body : {}),
+    };
+  },
+  setSecret,
+);
 
-  const { namespace, workflow } = parsed.data;
-  if (!callerCanAccess(caller, namespace)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const keys = workflow
-    ? await secretsRepo.getSecretKeys(namespace, workflow)
-    : await namespaceSecretsRepo.getSecretKeys(namespace);
-  return NextResponse.json({ keys });
-}
-
-export async function PUT(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const url = new URL(request.url);
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const parsed = SetSecretInputSchema.safeParse({
-    namespace: url.searchParams.get('namespace') ?? undefined,
-    workflow: url.searchParams.get('workflow') ?? undefined,
-    ...(typeof body === 'object' && body !== null ? body : {}),
-  });
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues.map((i) => i.message).join('; ') },
-      { status: 400 },
-    );
-  }
-
-  const { namespace, workflow, key, value } = parsed.data;
-  if (!callerCanAccess(caller, namespace)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  if (workflow) {
-    await secretsRepo.upsertSecret(namespace, workflow, key, value);
-  } else {
-    await namespaceSecretsRepo.upsertSecret(namespace, key, value);
-  }
-  return NextResponse.json({ ok: true });
-}
-
-export async function DELETE(request: Request): Promise<NextResponse> {
-  const { namespaceRepo, secretsRepo, namespaceSecretsRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const url = new URL(request.url);
-  const parsed = DeleteSecretInputSchema.safeParse({
-    namespace: url.searchParams.get('namespace') ?? undefined,
-    workflow: url.searchParams.get('workflow') ?? undefined,
-    key: url.searchParams.get('key') ?? undefined,
-  });
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues.map((i) => i.message).join('; ') },
-      { status: 400 },
-    );
-  }
-
-  const { namespace, workflow, key } = parsed.data;
-  if (!callerCanAccess(caller, namespace)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  if (workflow) {
-    await secretsRepo.deleteSecret(namespace, workflow, key);
-  } else {
-    await namespaceSecretsRepo.deleteSecret(namespace, key);
-  }
-  return NextResponse.json({ ok: true });
-}
+/**
+ * DELETE /api/workflow-secrets?namespace=…&workflow=…&key=…
+ */
+export const DELETE = createRouteAdapter<typeof DeleteSecretInputSchema, DeleteSecretInput>(
+  DeleteSecretInputSchema,
+  (req) => {
+    const params = req.nextUrl.searchParams;
+    return {
+      namespace: params.get('namespace') ?? undefined,
+      workflow: params.get('workflow') ?? undefined,
+      key: params.get('key') ?? undefined,
+    };
+  },
+  deleteSecret,
+);
