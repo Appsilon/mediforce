@@ -35,6 +35,15 @@ export class AuthorizedWorkflowSecretRepository extends AuthorizedScope {
     await this.raw.deleteSecrets(namespace, workflowName);
   };
 
+  deleteSecret = async (
+    namespace: string,
+    workflowName: string,
+    key: string,
+  ): Promise<void> => {
+    this.assertNamespaceWrite(namespace);
+    await this.raw.deleteSecret(namespace, workflowName, key);
+  };
+
   upsertSecret = async (
     namespace: string,
     workflowName: string,

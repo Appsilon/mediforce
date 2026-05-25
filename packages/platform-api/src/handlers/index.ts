@@ -14,4 +14,14 @@ export { getCoworkSessionByInstance } from './cowork/get-cowork-session-by-insta
 
 export { listPlugins } from './plugins/list-plugins.js';
 
+export { listRuns } from './runs/list-runs.js';
+export { getRun } from './runs/get-run.js';
+
+export { listSecretKeys } from './secrets/list-secret-keys.js';
+export { setSecret } from './secrets/set-secret.js';
+export { deleteSecret } from './secrets/delete-secret.js';
+
+export { getDockerInfo } from './system/get-docker-info.js';
+export { getOpenRouterCredits } from './system/get-openrouter-credits.js';
+
 export { listAdapter, getByIdAdapter } from './_generic.js';

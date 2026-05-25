@@ -29,6 +29,9 @@ export const RemoveImageOutputSchema = z.object({
   deleted: z.string(),
 });
 
+export const GetDockerInfoInputSchema = z.object({});
+export type GetDockerInfoInput = z.infer<typeof GetDockerInfoInputSchema>;
+
 export const OpenRouterCreditsInputSchema = z.object({
   namespace: z.string().min(1),
 });
