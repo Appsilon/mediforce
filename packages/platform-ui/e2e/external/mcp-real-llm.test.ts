@@ -91,7 +91,7 @@ vi.mock('@/lib/platform-services', () => ({
 }));
 
 import * as catalogRoute from '@/app/api/admin/tool-catalog/route';
-import * as mcpServerByNameRoute from '@/app/api/agent-definitions/[id]/mcp-servers/[name]/route';
+import * as mcpServerByNameRoute from '@/app/api/agents/[id]/mcp-servers/[name]/route';
 
 // ---- Fixtures -------------------------------------------------------
 
@@ -187,7 +187,7 @@ describe('MCP stdio roundtrip — L5 external sanity (no LLM required)', () => {
     const bindRes = await mcpServerByNameRoute.PUT(
       jsonRequest(
         'PUT',
-        `/api/agent-definitions/${COWORK_AGENT.id}/mcp-servers/echo`,
+        `/api/agents/${COWORK_AGENT.id}/mcp-servers/echo`,
         { type: 'stdio', catalogId: 'echo-mcp' },
       ),
       { params: Promise.resolve({ id: COWORK_AGENT.id, name: 'echo' }) },
@@ -245,7 +245,7 @@ describe.skipIf(!hasKey)('MCP real-LLM roundtrip — Tier 2 (manual, gated by OP
     const bindRes = await mcpServerByNameRoute.PUT(
       jsonRequest(
         'PUT',
-        `/api/agent-definitions/${COWORK_AGENT.id}/mcp-servers/echo`,
+        `/api/agents/${COWORK_AGENT.id}/mcp-servers/echo`,
         { type: 'stdio', catalogId: 'echo-mcp' },
       ),
       { params: Promise.resolve({ id: COWORK_AGENT.id, name: 'echo' }) },

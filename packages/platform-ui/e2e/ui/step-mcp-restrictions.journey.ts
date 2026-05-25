@@ -27,12 +27,12 @@ test.describe('Step MCP Restrictions Journey', () => {
     await expect(page.locator('[data-testid="step-editor"]')).toBeVisible({ timeout: 5_000 });
 
     // MCP Restrictions section appears with one server hydrated from
-    // /api/agent-definitions/mcp-test-agent/mcp-servers. Section titles in the
+    // /api/agents/mcp-test-agent/mcp-servers. Section titles in the
     // step editor render as styled <p> labels, not semantic headings.
     const sidePanel = page.locator('div.border-l');
     await expect(sidePanel.getByText('MCP Restrictions', { exact: true })).toBeVisible({ timeout: 10_000 });
     // The binding list hydrates after an API call to
-    // /api/agent-definitions/mcp-test-agent/mcp-servers. On cold compile this
+    // /api/agents/mcp-test-agent/mcp-servers. On cold compile this
     // route may take 15-20s to compile for the first time, so use a generous
     // timeout here.
     await expect(sidePanel.getByText('filesystem').first()).toBeVisible({ timeout: 30_000 });

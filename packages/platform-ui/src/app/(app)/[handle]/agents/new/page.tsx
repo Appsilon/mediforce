@@ -94,7 +94,7 @@ export default function NewAgentPage() {
         systemPrompt: prompt,
         skillFileNames,
       };
-      await apiFetch('/api/agent-definitions', {
+      await apiFetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

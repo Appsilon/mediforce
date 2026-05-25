@@ -4,16 +4,16 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { listAdapter } from '@mediforce/platform-api/handlers';
-import { ListAgentDefinitionsInputSchema } from '@mediforce/platform-api/contract';
+import { ListAgentsInputSchema } from '@mediforce/platform-api/contract';
 
 /**
- * GET /api/agent-definitions
+ * GET /api/agents
  *
  * List agent definitions visible to the caller. Workspace + visibility
  * filtering lives in `scope.agentDefinitions`.
  */
 export const GET = createRouteAdapter(
-  ListAgentDefinitionsInputSchema,
+  ListAgentsInputSchema,
   () => ({}),
   listAdapter('agents', (_input, scope) => scope.agentDefinitions.list()),
 );

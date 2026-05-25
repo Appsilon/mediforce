@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { AgentDefinitionSchema, UpdateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 
+/** Reserved for future filters (e.g. visibility, namespace). */
+export const ListAgentsInputSchema = z.object({});
+
 export const ListAgentsOutputSchema = z.object({
   agents: z.array(AgentDefinitionSchema),
 });
@@ -31,6 +34,7 @@ export const UpdateAgentOutputSchema = z.object({
   agent: AgentDefinitionSchema,
 });
 
+export type ListAgentsInput = z.infer<typeof ListAgentsInputSchema>;
 export type ListAgentsOutput = z.infer<typeof ListAgentsOutputSchema>;
 export type GetAgentInput = z.infer<typeof GetAgentInputSchema>;
 export type GetAgentOutput = z.infer<typeof GetAgentOutputSchema>;

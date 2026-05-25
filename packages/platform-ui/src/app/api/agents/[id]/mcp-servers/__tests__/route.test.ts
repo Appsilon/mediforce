@@ -45,7 +45,7 @@ const coworkAgent = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-describe('GET /api/agent-definitions/:id/mcp-servers', () => {
+describe('GET /api/agents/:id/mcp-servers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
@@ -54,7 +54,7 @@ describe('GET /api/agent-definitions/:id/mcp-servers', () => {
   it('[DATA] returns mcpServers for a cowork agent', async () => {
     mockAgentGetById.mockResolvedValue(coworkAgent);
 
-    const req = new NextRequest('http://localhost/api/agent-definitions/tealflow-cowork-chat/mcp-servers');
+    const req = new NextRequest('http://localhost/api/agents/tealflow-cowork-chat/mcp-servers');
     const res = await GET(req, { params: makeParams('tealflow-cowork-chat') });
     const json = await res.json();
 
@@ -65,7 +65,7 @@ describe('GET /api/agent-definitions/:id/mcp-servers', () => {
   it('[DATA] returns empty object when agent has no bindings', async () => {
     mockAgentGetById.mockResolvedValue({ ...coworkAgent, mcpServers: undefined });
 
-    const req = new NextRequest('http://localhost/api/agent-definitions/tealflow-cowork-chat/mcp-servers');
+    const req = new NextRequest('http://localhost/api/agents/tealflow-cowork-chat/mcp-servers');
     const res = await GET(req, { params: makeParams('tealflow-cowork-chat') });
     const json = await res.json();
 
@@ -76,7 +76,7 @@ describe('GET /api/agent-definitions/:id/mcp-servers', () => {
   it('[ERROR] 404 when agent does not exist', async () => {
     mockAgentGetById.mockResolvedValue(null);
 
-    const req = new NextRequest('http://localhost/api/agent-definitions/unknown/mcp-servers');
+    const req = new NextRequest('http://localhost/api/agents/unknown/mcp-servers');
     const res = await GET(req, { params: makeParams('unknown') });
 
     expect(res.status).toBe(404);
@@ -91,7 +91,7 @@ describe('GET /api/agent-definitions/:id/mcp-servers', () => {
     });
     mockAgentGetById.mockResolvedValue({ ...coworkAgent, namespace: 'test-ns' });
 
-    const req = new NextRequest('http://localhost/api/agent-definitions/tealflow-cowork-chat/mcp-servers');
+    const req = new NextRequest('http://localhost/api/agents/tealflow-cowork-chat/mcp-servers');
     const res = await GET(req, { params: makeParams('tealflow-cowork-chat') });
 
     expect(res.status).toBe(403);

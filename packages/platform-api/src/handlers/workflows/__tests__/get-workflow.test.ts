@@ -3,11 +3,11 @@ import {
   InMemoryProcessRepository,
   buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
-import { getWorkflowDefinition } from '../get-workflow-definition.js';
+import { getWorkflow } from '../get-workflow.js';
 import { NotFoundError } from '../../../errors.js';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
-describe('getWorkflowDefinition handler', () => {
+describe('getWorkflow handler', () => {
   let processRepo: InMemoryProcessRepository;
 
   beforeEach(() => {
@@ -26,7 +26,7 @@ describe('getWorkflowDefinition handler', () => {
     );
 
     const scope = createTestScope({ processRepo });
-    const result = await getWorkflowDefinition(
+    const result = await getWorkflow(
       { name: 'flow-a' },
       scope,
     );
@@ -43,7 +43,7 @@ describe('getWorkflowDefinition handler', () => {
     );
 
     const scope = createTestScope({ processRepo });
-    const result = await getWorkflowDefinition(
+    const result = await getWorkflow(
       { name: 'flow-a', version: 1 },
       scope,
     );
@@ -54,7 +54,7 @@ describe('getWorkflowDefinition handler', () => {
   it('throws NotFoundError when the name is unknown', async () => {
     const scope = createTestScope({ processRepo });
     await expect(
-      getWorkflowDefinition({ name: 'missing' }, scope),
+      getWorkflow({ name: 'missing' }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -65,7 +65,7 @@ describe('getWorkflowDefinition handler', () => {
 
     const scope = createTestScope({ processRepo });
     await expect(
-      getWorkflowDefinition({ name: 'flow-a', version: 99 }, scope),
+      getWorkflow({ name: 'flow-a', version: 99 }, scope),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -81,7 +81,7 @@ describe('getWorkflowDefinition handler', () => {
 
     const scope = createTestScope({ processRepo });
     await expect(
-      getWorkflowDefinition(
+      getWorkflow(
         { name: 'flow-a', namespace: 'team-beta' },
         scope,
       ),
@@ -99,7 +99,7 @@ describe('getWorkflowDefinition handler', () => {
     );
 
     const scope = createTestScope({ processRepo });
-    const result = await getWorkflowDefinition(
+    const result = await getWorkflow(
       { name: 'flow-a', namespace: 'team-alpha' },
       scope,
     );
@@ -122,7 +122,7 @@ describe('getWorkflowDefinition handler', () => {
       caller: userCaller('u-1', ['team-other']),
     });
 
-    const result = await getWorkflowDefinition(
+    const result = await getWorkflow(
       { name: 'flow-public', namespace: 'team-alpha' },
       scope,
     );
@@ -145,7 +145,7 @@ describe('getWorkflowDefinition handler', () => {
       caller: userCaller('u-1', ['team-alpha']),
     });
 
-    const result = await getWorkflowDefinition(
+    const result = await getWorkflow(
       { name: 'flow-private', namespace: 'team-alpha' },
       scope,
     );
@@ -172,7 +172,7 @@ describe('getWorkflowDefinition handler', () => {
     });
 
     await expect(
-      getWorkflowDefinition(
+      getWorkflow(
         { name: 'flow-private', namespace: 'team-alpha' },
         scope,
       ),

@@ -14,6 +14,7 @@ export {
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
   WorkflowDefinitionGroupSchema,
+  ListWorkflowsInputSchema,
   ListWorkflowsOutputSchema,
   GetWorkflowInputSchema,
   GetWorkflowOutputSchema,
@@ -21,6 +22,7 @@ export {
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
   type WorkflowDefinitionGroupSummary,
+  type ListWorkflowsInput,
   type ListWorkflowsOutput,
   type GetWorkflowInput,
   type GetWorkflowOutput,
@@ -59,6 +61,7 @@ export {
 } from './system.js';
 
 export {
+  ListAgentsInputSchema,
   ListAgentsOutputSchema,
   GetAgentInputSchema,
   GetAgentOutputSchema,
@@ -67,6 +70,7 @@ export {
   UpdateAgentInputSchema,
   UpdateAgentBodySchema,
   UpdateAgentOutputSchema,
+  type ListAgentsInput,
   type ListAgentsOutput,
   type GetAgentInput,
   type GetAgentOutput,
@@ -146,27 +150,6 @@ export {
   type StepEntryStatus,
   type StepExecutorType,
 } from './processes.js';
-
-export {
-  WorkflowDefinitionSummarySchema,
-  ListWorkflowDefinitionsInputSchema,
-  ListWorkflowDefinitionsOutputSchema,
-  ListAgentDefinitionsInputSchema,
-  ListAgentDefinitionsOutputSchema,
-  GetAgentDefinitionInputSchema,
-  GetAgentDefinitionOutputSchema,
-  GetWorkflowDefinitionInputSchema,
-  GetWorkflowDefinitionOutputSchema,
-  type WorkflowDefinitionSummary,
-  type ListWorkflowDefinitionsInput,
-  type ListWorkflowDefinitionsOutput,
-  type ListAgentDefinitionsInput,
-  type ListAgentDefinitionsOutput,
-  type GetAgentDefinitionInput,
-  type GetAgentDefinitionOutput,
-  type GetWorkflowDefinitionInput,
-  type GetWorkflowDefinitionOutput,
-} from './definitions.js';
 
 export {
   GetCoworkSessionInputSchema,

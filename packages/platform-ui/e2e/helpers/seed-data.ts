@@ -1057,7 +1057,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   // Top-level agentDefinitions collection — pre-seed `claude-code-agent` so the
   // agent MCP journey is deterministic. Without this, the page relies on the
   // fire-and-forget `seedBuiltinAgentDefinitions` in platform-services, which
-  // races with the first GET `/api/agent-definitions/:id` request.
+  // races with the first GET `/api/agents/:id` request.
   //
   // `mcp-test-agent` is a fixture consumed by step-mcp-restrictions.journey.ts —
   // it ships with one pre-bound stdio server so the Restrictions section has

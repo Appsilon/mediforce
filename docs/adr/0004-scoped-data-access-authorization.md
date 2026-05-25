@@ -302,3 +302,17 @@ visible to handlers.
   with default `scoped() ⇒ WHERE workspace IN caller.workspaces (or
   unrestricted when caller.isSystemActor)` and an opt-in `scopedTo(handle)`
   for URL-driven flows. Confirm before ADR-0001 implementation begins.
+
+---
+
+## Post-merge naming note (added 2026-05-25)
+
+Handler function names referenced in this ADR — `listAgentDefinitions`,
+`getAgentDefinition` (and the parallel `listWorkflowDefinitions`,
+`getWorkflowDefinition`) — refer to the legacy schema name
+`AgentDefinitionSchema`. The canonical glossary entry in CONTEXT.md is now
+**Agent** (Agents are not versioned today; the "Definition" suffix is a
+historical artifact). Rename of these handler functions, the schema, the
+repository (`AgentDefinitionRepository`), and the Postgres table is tracked
+in a follow-up PR. This ADR is not edited because it ships as immutable
+history of the architecture decision at the time of merge.

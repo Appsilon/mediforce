@@ -1,3 +1,6 @@
+// TODO: rename AgentDefinitionRepository → AgentRepository (and file).
+// Canonical glossary entry is `Agent` (CONTEXT.md). See CONTEXT.md
+// "Agent vs Agent Definition" flagged ambiguity.
 import type {
   AgentDefinition,
   CreateAgentDefinitionInput,

@@ -7,9 +7,9 @@ import {
 } from '../helpers/multi-namespace';
 
 /**
- * L3 API E2E for the two migrated agent-definitions endpoints:
- *   - GET /api/agent-definitions          → list, visibility-filtered per caller
- *   - GET /api/agent-definitions/[id]     → single, 404 anti-enum for private
+ * L3 API E2E for the two migrated agent endpoints:
+ *   - GET /api/agents          → list, visibility-filtered per caller
+ *   - GET /api/agents/[id]     → single, 404 anti-enum for private
  *
  * The seed has:
  *   - `claude-code-agent` (visibility: public, no namespace)
@@ -20,7 +20,7 @@ import {
  * public agent in the list and 404 on the private ones.
  */
 
-test.describe('GET /api/agent-definitions — API E2E', () => {
+test.describe('GET /api/agents — API E2E', () => {
   let callers: MultiNamespaceFixture;
 
   test.beforeAll(async () => {
@@ -28,7 +28,7 @@ test.describe('GET /api/agent-definitions — API E2E', () => {
   });
 
   test('list: api-key caller sees every seeded agent', async ({ request }) => {
-    const res = await request.get('/api/agent-definitions', {
+    const res = await request.get('/api/agents', {
       headers: apiKeyHeaders(),
     });
     expect(res.status(), await res.text()).toBe(200);
@@ -42,7 +42,7 @@ test.describe('GET /api/agent-definitions — API E2E', () => {
   });
 
   test('list: outsider user sees only public agents (not the `test`-private ones)', async ({ request }) => {
-    const res = await request.get('/api/agent-definitions', {
+    const res = await request.get('/api/agents', {
       headers: bearerHeaders(callers.outsider),
     });
     expect(res.status(), await res.text()).toBe(200);
@@ -56,14 +56,14 @@ test.describe('GET /api/agent-definitions — API E2E', () => {
   });
 
   test('single: outsider user → 404 on a private agent (anti-enum)', async ({ request }) => {
-    const res = await request.get('/api/agent-definitions/mcp-test-agent', {
+    const res = await request.get('/api/agents/mcp-test-agent', {
       headers: bearerHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
   });
 
   test('single: outsider user → 200 on a public agent', async ({ request }) => {
-    const res = await request.get('/api/agent-definitions/claude-code-agent', {
+    const res = await request.get('/api/agents/claude-code-agent', {
       headers: bearerHeaders(callers.outsider),
     });
     expect(res.status(), await res.text()).toBe(200);

@@ -47,7 +47,7 @@ describe('agent get command', () => {
     );
   });
 
-  it('GETs /api/agent-definitions/<id> and prints human-readable output', async () => {
+  it('GETs /api/agents/<id> and prints human-readable output', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({ agent: FAKE_AGENT }),
     );
@@ -59,7 +59,7 @@ describe('agent get command', () => {
     });
     expect(code).toBe(0);
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
-      'http://localhost:5555/api/agent-definitions/agent-1',
+      'http://localhost:5555/api/agents/agent-1',
     );
     const text = output.stdoutLines.join('\n');
     expect(text).toMatch(/Agent agent-1/);

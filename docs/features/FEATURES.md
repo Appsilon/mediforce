@@ -205,7 +205,7 @@ The cowork step editor includes an MCP Servers section where the agent's externa
 
 ### Workflow Editor — Step MCP Restrictions
 
-Agent steps show an MCP Restrictions panel listing every binding inherited from the step's agent definition (loaded live from `/api/agent-definitions/:id/mcp-servers`). For each binding the workflow author can toggle it off for this step or narrow its `allowedTools` via a deny list, and both overrides surface in the YAML under the step's `mcpRestrictions` block. This keeps agent-level bindings reusable while letting individual steps run with a tighter tool surface.
+Agent steps show an MCP Restrictions panel listing every binding inherited from the step's agent definition (loaded live from `/api/agents/:id/mcp-servers`). For each binding the workflow author can toggle it off for this step or narrow its `allowedTools` via a deny list, and both overrides surface in the YAML under the step's `mcpRestrictions` block. This keeps agent-level bindings reusable while letting individual steps run with a tighter tool surface.
 
 ![step-mcp-restrictions](step-mcp-restrictions.gif)
 
@@ -341,7 +341,7 @@ Registration form for new agent definitions. Fill in name, select foundation mod
 
 ### Agent MCP Bindings
 
-The agent detail page exposes an MCP Bindings section where authors attach tools to an agent. Stdio bindings pick a catalog entry and add an optional `allowedTools` allowlist; HTTP bindings take an inline URL plus optional allowlist — both are saved to the agent's `mcpBindings` array via `/api/agent-definitions/:id/mcp-servers/:name`. Deleting removes an individual binding, and a reload confirms HTTP bindings persist across sessions. Workflow steps consume these bindings as their baseline surface, which Step MCP Restrictions can further narrow.
+The agent detail page exposes an MCP Bindings section where authors attach tools to an agent. Stdio bindings pick a catalog entry and add an optional `allowedTools` allowlist; HTTP bindings take an inline URL plus optional allowlist — both are saved to the agent's `mcpBindings` array via `/api/agents/:id/mcp-servers/:name`. Deleting removes an individual binding, and a reload confirms HTTP bindings persist across sessions. Workflow steps consume these bindings as their baseline surface, which Step MCP Restrictions can further narrow.
 
 ![agent-mcp-bindings](agent-mcp-bindings.gif)
 
