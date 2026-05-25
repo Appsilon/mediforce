@@ -1,36 +1,22 @@
-import type { ProcessRepository } from '@mediforce/platform-core';
-import type { CallerIdentity } from '../../auth.js';
+import type { CallerScope } from '../../repositories/index.js';
 import type {
   ListWorkflowDefinitionsInput,
   ListWorkflowDefinitionsOutput,
   WorkflowDefinitionSummary,
 } from '../../contract/definitions.js';
 
-export interface ListWorkflowDefinitionsDeps {
-  processRepo: ProcessRepository;
-}
-
 /**
  * List workflow definitions visible to the caller, grouped by name with the
- * latest version pre-resolved.
- *
- * Visibility rules (preserved from the pre-migration route):
- *   - api-key callers see every group.
- *   - user callers see groups whose latest definition is either marked
- *     `visibility: 'public'` or owned by a namespace they're a member of.
- *   - groups whose latest version is missing (no resolvable definition)
- *     are dropped for user callers — there's nothing safe to show them.
- *
- * The optional `namespace` filter narrows the result further; it does NOT
- * grant access (caller must still be permitted to see the definition).
+ * latest version pre-resolved. The wrapper filters groups whose latest
+ * version the caller cannot see (private + foreign workspace). The optional
+ * `namespace` input narrows further but does not grant access.
  */
 export async function listWorkflowDefinitions(
   input: ListWorkflowDefinitionsInput,
-  deps: ListWorkflowDefinitionsDeps,
-  caller: CallerIdentity,
+  scope: CallerScope,
 ): Promise<ListWorkflowDefinitionsOutput> {
-  const { definitions } = await deps.processRepo.listWorkflowDefinitions(false);
-  const summaries: WorkflowDefinitionSummary[] = definitions.map((group) => {
+  const groups = await scope.workflowDefinitions.listGroups(false);
+  const summaries: WorkflowDefinitionSummary[] = groups.map((group) => {
     const latest = group.versions.find((v) => v.version === group.latestVersion) ?? null;
     return {
       namespace: group.namespace,
@@ -41,19 +27,10 @@ export async function listWorkflowDefinitions(
     };
   });
 
-  const visible =
-    caller.kind === 'apiKey'
-      ? summaries
-      : summaries.filter((item) => {
-          if (item.definition === null) return false;
-          if (item.definition.visibility === 'public') return true;
-          return caller.namespaces.has(item.definition.namespace);
-        });
-
   const filtered =
     input.namespace !== undefined
-      ? visible.filter((item) => item.namespace === input.namespace)
-      : visible;
+      ? summaries.filter((item) => item.namespace === input.namespace)
+      : summaries;
 
   return { definitions: filtered };
 }

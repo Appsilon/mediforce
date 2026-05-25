@@ -80,7 +80,7 @@ const httpBinding = { type: 'http', url: 'https://mcp.example.com/server' };
 describe('PUT /api/agent-definitions/:id/mcp-servers/:name', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
   });
 
   it('[DATA] creates a new stdio binding', async () => {
@@ -181,6 +181,7 @@ describe('PUT /api/agent-definitions/:id/mcp-servers/:name', () => {
       kind: 'user',
       uid: 'outsider',
       namespaces: new Set(['other-ns']),
+      isSystemActor: false,
     });
     mockAgentGetById.mockResolvedValue({ ...coworkAgent, namespace: 'test-ns' });
 
@@ -222,7 +223,7 @@ describe('PUT /api/agent-definitions/:id/mcp-servers/:name', () => {
 describe('DELETE /api/agent-definitions/:id/mcp-servers/:name', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
   });
 
   it('[DATA] removes an existing binding', async () => {

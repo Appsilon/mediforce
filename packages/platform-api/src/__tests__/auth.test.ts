@@ -7,11 +7,12 @@ import {
 } from '../auth.js';
 import { ForbiddenError } from '../errors.js';
 
-const apiKey: CallerIdentity = { kind: 'apiKey' };
+const apiKey: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 const userInNsA: CallerIdentity = {
   kind: 'user',
   uid: 'u-1',
   namespaces: new Set(['ns-a']),
+  isSystemActor: false,
 };
 
 // The full matrix (every kind x every namespace state) is exercised

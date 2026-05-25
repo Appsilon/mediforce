@@ -14,6 +14,11 @@ export * from './errors.js';
 // Import from `@mediforce/platform-api/auth`.
 export * from './auth.js';
 
+// Authorization wrapper layer (ADR-0004). Handlers receive a `CallerScope`
+// instead of raw repositories; every read/write is gated by caller workspace
+// membership. Import from `@mediforce/platform-api/repositories`.
+export * from './repositories/index.js';
+
 // Services (factory + seeding) intentionally NOT re-exported here — import from
 // `@mediforce/platform-api/services` so consumers of `/contract` or `/handlers`
 // never evaluate Firestore/Firebase-admin wiring transitively.

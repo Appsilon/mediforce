@@ -81,7 +81,7 @@ describe('InMemoryProcessRepository', () => {
       await repo.setDefaultWorkflowVersion('tenant-a', 'shared', 1);
       await repo.setDefaultWorkflowVersion('tenant-b', 'shared', 5);
 
-      const result = await repo.listWorkflowDefinitions(false);
+      const result = await repo.listAllWorkflowDefinitions(false);
 
       expect(result.definitions).toHaveLength(2);
       expect(result.definitions).toEqual(
@@ -102,7 +102,7 @@ describe('InMemoryProcessRepository', () => {
       await repo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'a', version: 2 }));
       await repo.saveWorkflowDefinition(buildWorkflowDefinition({ name: 'b', version: 1 }));
 
-      const result = await repo.listWorkflowDefinitions(false);
+      const result = await repo.listAllWorkflowDefinitions(false);
       expect(result.definitions).toHaveLength(2);
 
       const groupA = result.definitions.find((d) => d.name === 'a');
@@ -252,7 +252,7 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
       ],
     });
 
-    const result = await repo.listWorkflowDefinitions(false);
+    const result = await repo.listAllWorkflowDefinitions(false);
 
     expect(result.definitions).toHaveLength(2);
 
@@ -271,7 +271,7 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
     const repo = createFirestoreRepo();
     mockGet.mockResolvedValue({ exists: false, docs: [] });
 
-    const result = await repo.listWorkflowDefinitions(false);
+    const result = await repo.listAllWorkflowDefinitions(false);
     expect(result.definitions).toHaveLength(0);
   });
 
@@ -293,7 +293,7 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
       ],
     });
 
-    const result = await repo.listWorkflowDefinitions(false);
+    const result = await repo.listAllWorkflowDefinitions(false);
 
     expect(result.definitions).toHaveLength(1);
     expect(result.definitions[0].versions).toHaveLength(1);
@@ -313,7 +313,7 @@ describe('FirestoreProcessRepository - WorkflowDefinition', () => {
       ],
     });
 
-    const result = await repo.listWorkflowDefinitions(true);
+    const result = await repo.listAllWorkflowDefinitions(true);
 
     expect(result.definitions[0].versions).toHaveLength(2);
   });

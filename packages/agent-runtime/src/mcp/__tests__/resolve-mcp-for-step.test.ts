@@ -1,56 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  AgentDefinitionSchema,
   CatalogEntryNotFoundError,
   WorkflowStepSchema,
-  type AgentDefinition,
-  type AgentDefinitionRepository,
-  type CreateAgentDefinitionInput,
-  type UpdateAgentDefinitionInput,
   type WorkflowStep,
 } from '@mediforce/platform-core';
-import { InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
+import {
+  InMemoryAgentDefinitionRepository,
+  InMemoryToolCatalogRepository,
+} from '@mediforce/platform-core/testing';
 import {
   AgentDefinitionNotFoundError,
   resolveMcpForStep,
 } from '../resolve-mcp-for-step.js';
-
-class InMemoryAgentDefinitionRepository implements AgentDefinitionRepository {
-  private readonly byId = new Map<string, AgentDefinition>();
-
-  async create(_input: CreateAgentDefinitionInput): Promise<AgentDefinition> {
-    throw new Error('create() not needed for this test double');
-  }
-
-  async upsert(id: string, input: CreateAgentDefinitionInput): Promise<AgentDefinition> {
-    const now = new Date().toISOString();
-    const existing = this.byId.get(id);
-    const parsed = AgentDefinitionSchema.parse({
-      ...input,
-      id,
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    });
-    this.byId.set(id, parsed);
-    return parsed;
-  }
-
-  async getById(id: string): Promise<AgentDefinition | null> {
-    return this.byId.get(id) ?? null;
-  }
-
-  async list(): Promise<AgentDefinition[]> {
-    return [...this.byId.values()];
-  }
-
-  async update(_id: string, _input: UpdateAgentDefinitionInput): Promise<AgentDefinition> {
-    throw new Error('update() not needed for this test double');
-  }
-
-  async delete(id: string): Promise<void> {
-    this.byId.delete(id);
-  }
-}
 
 function makeStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
   return WorkflowStepSchema.parse({

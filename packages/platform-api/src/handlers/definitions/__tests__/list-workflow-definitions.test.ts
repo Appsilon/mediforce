@@ -4,9 +4,7 @@ import {
   buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
 import { listWorkflowDefinitions } from '../list-workflow-definitions.js';
-import type { CallerIdentity } from '../../../auth.js';
-
-const apiKey: CallerIdentity = { kind: 'apiKey' };
+import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope.js';
 
 describe('listWorkflowDefinitions handler', () => {
   let processRepo: InMemoryProcessRepository;
@@ -16,7 +14,8 @@ describe('listWorkflowDefinitions handler', () => {
   });
 
   it('returns { definitions: [] } when nothing is registered', async () => {
-    const result = await listWorkflowDefinitions({}, { processRepo }, apiKey);
+    const scope = createTestScope({ processRepo });
+    const result = await listWorkflowDefinitions({}, scope);
     expect(result.definitions).toEqual([]);
   });
 
@@ -31,7 +30,8 @@ describe('listWorkflowDefinitions handler', () => {
       buildWorkflowDefinition({ name: 'flow-b', version: 1 }),
     );
 
-    const result = await listWorkflowDefinitions({}, { processRepo }, apiKey);
+    const scope = createTestScope({ processRepo });
+    const result = await listWorkflowDefinitions({}, scope);
 
     expect(result.definitions).toHaveLength(2);
     const flowA = result.definitions.find((d) => d.name === 'flow-a');
@@ -50,7 +50,8 @@ describe('listWorkflowDefinitions handler', () => {
       buildWorkflowDefinition({ name: 'flow-a', version: 2 }),
     );
 
-    const result = await listWorkflowDefinitions({}, { processRepo }, apiKey);
+    const scope = createTestScope({ processRepo });
+    const result = await listWorkflowDefinitions({}, scope);
 
     expect(result.definitions).toHaveLength(1);
     expect(result.definitions[0]?.latestVersion).toBe(3);
@@ -86,7 +87,8 @@ describe('listWorkflowDefinitions handler', () => {
     });
 
     it('api-key callers see every group regardless of visibility', async () => {
-      const result = await listWorkflowDefinitions({}, { processRepo }, apiKey);
+      const scope = createTestScope({ processRepo });
+      const result = await listWorkflowDefinitions({}, scope);
       expect(result.definitions.map((d) => d.name).sort()).toEqual([
         'alpha-private',
         'beta-private',
@@ -95,13 +97,12 @@ describe('listWorkflowDefinitions handler', () => {
     });
 
     it('user callers see public + their-namespace workflows', async () => {
-      const userInAlpha: CallerIdentity = {
-        kind: 'user',
-        uid: 'u-1',
-        namespaces: new Set(['team-alpha']),
-      };
+      const scope = createTestScope({
+        processRepo,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
 
-      const result = await listWorkflowDefinitions({}, { processRepo }, userInAlpha);
+      const result = await listWorkflowDefinitions({}, scope);
 
       expect(result.definitions.map((d) => d.name).sort()).toEqual([
         'alpha-private',
@@ -110,28 +111,25 @@ describe('listWorkflowDefinitions handler', () => {
     });
 
     it('user callers without namespace overlap only see public workflows', async () => {
-      const stranger: CallerIdentity = {
-        kind: 'user',
-        uid: 'u-2',
-        namespaces: new Set(['team-gamma']),
-      };
+      const scope = createTestScope({
+        processRepo,
+        caller: userCaller('u-2', ['team-gamma']),
+      });
 
-      const result = await listWorkflowDefinitions({}, { processRepo }, stranger);
+      const result = await listWorkflowDefinitions({}, scope);
 
       expect(result.definitions.map((d) => d.name)).toEqual(['beta-public']);
     });
 
     it('respects the optional namespace filter while honouring visibility', async () => {
-      const userInAlpha: CallerIdentity = {
-        kind: 'user',
-        uid: 'u-1',
-        namespaces: new Set(['team-alpha']),
-      };
+      const scope = createTestScope({
+        processRepo,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
 
       const result = await listWorkflowDefinitions(
         { namespace: 'team-beta' },
-        { processRepo },
-        userInAlpha,
+        scope,
       );
 
       // team-alpha user can see team-beta's public workflow, scoped via filter.
@@ -139,10 +137,10 @@ describe('listWorkflowDefinitions handler', () => {
     });
 
     it('namespace filter applies for api-key callers too', async () => {
+      const scope = createTestScope({ processRepo });
       const result = await listWorkflowDefinitions(
         { namespace: 'team-alpha' },
-        { processRepo },
-        apiKey,
+        scope,
       );
 
       expect(result.definitions.map((d) => d.name)).toEqual(['alpha-private']);

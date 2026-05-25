@@ -3,22 +3,19 @@ import { CreateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
-import { listAgentDefinitions } from '@mediforce/platform-api/handlers';
+import { listAdapter } from '@mediforce/platform-api/handlers';
 import { ListAgentDefinitionsInputSchema } from '@mediforce/platform-api/contract';
 
 /**
  * GET /api/agent-definitions
  *
- * List agent definitions visible to the caller. Visibility + namespace
- * filtering is enforced inside the handler.
+ * List agent definitions visible to the caller. Workspace + visibility
+ * filtering lives in `scope.agentDefinitions`.
  */
 export const GET = createRouteAdapter(
   ListAgentDefinitionsInputSchema,
   () => ({}),
-  (input, caller) => {
-    const { agentDefinitionRepo } = getPlatformServices();
-    return listAgentDefinitions(input, { agentDefinitionRepo }, caller);
-  },
+  listAdapter('agents', (_input, scope) => scope.agentDefinitions.list()),
 );
 
 export async function POST(request: Request): Promise<NextResponse> {

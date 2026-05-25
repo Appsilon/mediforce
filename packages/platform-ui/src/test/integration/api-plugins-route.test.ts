@@ -25,7 +25,7 @@ vi.mock('../../lib/api-auth.js', async () => {
   );
   return {
     ...actual,
-    resolveCallerIdentity: async () => ({ kind: 'apiKey' as const }),
+    resolveCallerIdentity: async () => ({ kind: 'apiKey' as const, isSystemActor: true as const }),
   };
 });
 

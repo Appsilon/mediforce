@@ -80,8 +80,33 @@ export class FirestoreProcessRepository implements ProcessRepository {
     await docRef.set(cleaned);
   }
 
-  async listWorkflowDefinitions(
+  async listAllWorkflowDefinitions(
     includeArchived: boolean,
+  ): Promise<WorkflowDefinitionListResult> {
+    return this.fetchAndGroup(includeArchived, () => true);
+  }
+
+  async listWorkflowDefinitionsVisibleTo(
+    allowed: readonly string[],
+    includeArchived: boolean,
+  ): Promise<WorkflowDefinitionListResult> {
+    return this.fetchAndGroup(includeArchived, (group) => {
+      const latest = group.versions.find((v) => v.version === group.latestVersion);
+      if (latest === undefined) return false;
+      if (latest.visibility === 'public') return true;
+      return allowed.includes(latest.namespace);
+    });
+  }
+
+  private async fetchAndGroup(
+    includeArchived: boolean,
+    predicate: (group: {
+      namespace: string;
+      name: string;
+      versions: WorkflowDefinition[];
+      latestVersion: number;
+      defaultVersion: number | null;
+    }) => boolean,
   ): Promise<WorkflowDefinitionListResult> {
     const snapshot = await this.db
       .collection(this.workflowDefinitionsCollection)
@@ -112,7 +137,7 @@ export class FirestoreProcessRepository implements ProcessRepository {
       grouped.set(groupKey, existing);
     }
 
-    const definitions = await Promise.all(
+    const groups = await Promise.all(
       Array.from(grouped.entries()).map(async ([_groupKey, versions]) => {
         const name = versions[0].name;
         const namespace = versions[0].namespace;
@@ -122,7 +147,7 @@ export class FirestoreProcessRepository implements ProcessRepository {
       }),
     );
 
-    return { definitions };
+    return { definitions: groups.filter(predicate) };
   }
 
   async getDefaultWorkflowVersion(namespace: string, name: string): Promise<number | null> {

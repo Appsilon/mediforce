@@ -26,7 +26,7 @@ export async function resolveCallerIdentity(
   const apiKey = request.headers.get('X-Api-Key');
   const expectedKey = process.env.PLATFORM_API_KEY;
   if (apiKey && expectedKey && apiKey === expectedKey) {
-    return { kind: 'apiKey' };
+    return { kind: 'apiKey', isSystemActor: true };
   }
 
   const authHeader = request.headers.get('Authorization') ?? '';
@@ -44,7 +44,12 @@ export async function resolveCallerIdentity(
   }
 
   const namespaces = await namespaceRepo.getNamespacesByUser(uid);
-  return { kind: 'user', uid, namespaces: new Set(namespaces.map((ns) => ns.handle)) };
+  return {
+    kind: 'user',
+    uid,
+    namespaces: new Set(namespaces.map((ns) => ns.handle)),
+    isSystemActor: false,
+  };
 }
 
 /**
@@ -59,7 +64,7 @@ export function requireNamespaceAccess(
   caller: CallerIdentity,
   namespace: string | undefined,
 ): NextResponse | null {
-  if (caller.kind === 'apiKey') return null;
+  if (caller.isSystemActor) return null;
   if (!namespace) {
     return NextResponse.json({ error: 'Resource has no namespace' }, { status: 403 });
   }
@@ -77,6 +82,6 @@ export function filterByNamespace<T extends { namespace?: string }>(
   caller: CallerIdentity,
   items: T[],
 ): T[] {
-  if (caller.kind === 'apiKey') return items;
+  if (caller.isSystemActor) return items;
   return items.filter((item) => typeof item.namespace === 'string' && caller.namespaces.has(item.namespace));
 }

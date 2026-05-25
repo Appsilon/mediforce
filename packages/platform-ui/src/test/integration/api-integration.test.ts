@@ -2,9 +2,7 @@
 //
 // Cross-layer integration: `Mediforce` (client) → adapter → handler →
 // `InMemoryHumanTaskRepository`. Loopback fetch ties the layers together
-// in process — no HTTP, no `vi.mock` ceremony. Dependency injection at its
-// cleanest: pass the loopback to `new Mediforce({ fetch })` and the client
-// goes straight through the real adapter + handler.
+// in process — no HTTP, no `vi.mock` ceremony.
 //
 // Per-layer tests (contract, handler, adapter, Mediforce class) give fast,
 // focused feedback. This file is the representative round-trip — one
@@ -22,8 +20,9 @@ import { ListTasksInputSchema } from '@mediforce/platform-api/contract';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { Mediforce } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
+import { createTestScope } from '@mediforce/platform-api/testing';
 
-const apiKeyCaller: CallerIdentity = { kind: 'apiKey' };
+const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
 function loopbackFetch(
   route: (req: NextRequest) => Promise<Response>,
@@ -57,10 +56,14 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
           status: statuses.length > 0 ? statuses : undefined,
         };
       },
-      (input, caller) => listTasks(input, { humanTaskRepo, instanceRepo }, caller),
-      // Stub caller resolution so the test doesn't pull in Firebase Admin /
-      // env-gated services. The handler itself is what we're integrating.
-      { resolveCaller: async () => apiKeyCaller },
+      listTasks,
+      // Stub caller resolution + scope build so the test doesn't pull in
+      // Firebase Admin / env-gated services. The wrapper layer is exercised
+      // through `createTestScope` with the in-memory repos under test.
+      {
+        resolveCaller: async () => apiKeyCaller,
+        buildScope: (caller) => createTestScope({ caller, humanTaskRepo, instanceRepo }),
+      },
     );
 
     mediforce = new Mediforce({ fetch: loopbackFetch(route) });
@@ -87,10 +90,6 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
   });
 
   it('surfaces a 400 from the server when contracts drift (both filters set)', async () => {
-    // Drive the adapter directly with an input that passes field-level
-    // validation but fails the cross-field refine. Verifies the server's 400
-    // propagates — useful to lock in what happens if client-side validation
-    // were ever bypassed or drifted.
     const badRequest = new NextRequest(
       'http://localhost/api/tasks?instanceId=foo&role=reviewer',
     );

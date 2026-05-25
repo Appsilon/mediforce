@@ -35,7 +35,7 @@ describe('resolveCallerIdentity', () => {
       makeRequest({ 'X-Api-Key': 'test-api-key' }),
       fakeNamespaceRepo,
     );
-    expect(result).toEqual({ kind: 'apiKey' });
+    expect(result).toEqual({ kind: 'apiKey', isSystemActor: true });
   });
 
   it('returns 401 for missing auth', async () => {
@@ -73,6 +73,7 @@ describe('resolveCallerIdentity', () => {
       kind: 'user',
       uid: 'user-1',
       namespaces: new Set(['org-a', 'org-b']),
+      isSystemActor: false,
     });
   });
 
@@ -88,39 +89,39 @@ describe('resolveCallerIdentity', () => {
 
 describe('callerCanAccess', () => {
   it('apiKey can access any namespace', () => {
-    expect(callerCanAccess({ kind: 'apiKey' }, 'any-ns')).toBe(true);
+    expect(callerCanAccess({ kind: 'apiKey', isSystemActor: true }, 'any-ns')).toBe(true);
   });
 
   it('user can access own namespace', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['my-ns']) };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['my-ns']), isSystemActor: false };
     expect(callerCanAccess(caller, 'my-ns')).toBe(true);
   });
 
   it('user cannot access other namespace', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['my-ns']) };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['my-ns']), isSystemActor: false };
     expect(callerCanAccess(caller, 'other-ns')).toBe(false);
   });
 });
 
 describe('requireNamespaceAccess', () => {
   it('returns null for apiKey', () => {
-    expect(requireNamespaceAccess({ kind: 'apiKey' }, 'any')).toBeNull();
+    expect(requireNamespaceAccess({ kind: 'apiKey', isSystemActor: true }, 'any')).toBeNull();
   });
 
   it('returns null for member', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']) };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']), isSystemActor: false };
     expect(requireNamespaceAccess(caller, 'ns')).toBeNull();
   });
 
   it('returns 403 for non-member', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']) };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']), isSystemActor: false };
     const result = requireNamespaceAccess(caller, 'other-ns');
     expect(result).toBeInstanceOf(NextResponse);
     expect(result!.status).toBe(403);
   });
 
   it('returns 403 for undefined namespace', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']) };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']), isSystemActor: false };
     const result = requireNamespaceAccess(caller, undefined);
     expect(result).toBeInstanceOf(NextResponse);
     expect(result!.status).toBe(403);
@@ -135,11 +136,11 @@ describe('filterByNamespace', () => {
   ];
 
   it('apiKey returns all', () => {
-    expect(filterByNamespace({ kind: 'apiKey' }, items)).toEqual(items);
+    expect(filterByNamespace({ kind: 'apiKey', isSystemActor: true }, items)).toEqual(items);
   });
 
   it('user sees only own namespace', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['org-a']) };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['org-a']), isSystemActor: false };
     expect(filterByNamespace(caller, items)).toEqual([
       { namespace: 'org-a', name: 'wf-1' },
       { namespace: 'org-a', name: 'wf-3' },
@@ -147,7 +148,7 @@ describe('filterByNamespace', () => {
   });
 
   it('user with no matching namespace sees nothing', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['org-c']) };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['org-c']), isSystemActor: false };
     expect(filterByNamespace(caller, items)).toEqual([]);
   });
 });

@@ -40,10 +40,7 @@ export const GET = createRouteAdapter<
     if (namespaceParam !== null) input.namespace = namespaceParam;
     return input;
   },
-  (input, caller) => {
-    const { processRepo } = getPlatformServices();
-    return getWorkflowDefinition(input, { processRepo }, caller);
-  },
+  getWorkflowDefinition,
 );
 
 export async function PATCH(

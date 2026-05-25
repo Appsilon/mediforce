@@ -28,7 +28,7 @@ vi.mock('@/lib/platform-services', () => ({
 }));
 
 vi.mock('@/lib/api-auth', () => ({
-  resolveCallerIdentity: () => ({ kind: 'apiKey' }),
+  resolveCallerIdentity: () => ({ kind: 'apiKey', isSystemActor: true }),
   callerCanAccess: () => true,
 }));
 

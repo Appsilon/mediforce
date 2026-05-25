@@ -17,6 +17,12 @@ interface SkippedEntry {
   reason: string;
 }
 
+// TODO(ADR-0004 Phase 2 / PLAN-0004 §7): migrate this route to the
+// `(input, scope)` handler shape with a system-actor `CallerScope`. Today it
+// reaches raw `processRepo` / `cronTriggerStateRepo` / `cronTrigger` directly
+// — legitimate because cron heartbeat is deployment-global, but it's the one
+// counterexample to "no handler touches raw repos" and should move to
+// `@public-handler` + scope.system once the mutation wave lands.
 export async function POST(_req: NextRequest): Promise<NextResponse> {
   const { processRepo, cronTrigger, cronTriggerStateRepo } = getPlatformServices();
   const now = new Date();
@@ -24,7 +30,7 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
   const skipped: SkippedEntry[] = [];
 
   try {
-    const { definitions: definitionGroups } = await processRepo.listWorkflowDefinitions(false);
+    const { definitions: definitionGroups } = await processRepo.listAllWorkflowDefinitions(false);
 
     // Flatten to latest version of each definition that has at least one cron trigger.
     // Archived WDs are already filtered at the repo layer (includeArchived=false).

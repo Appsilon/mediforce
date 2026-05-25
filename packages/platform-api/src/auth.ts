@@ -14,13 +14,18 @@ import { ForbiddenError } from './errors.js';
  * from a `Request`.
  */
 export type CallerIdentity =
-  | { readonly kind: 'apiKey' }
-  | { readonly kind: 'user'; readonly uid: string; readonly namespaces: ReadonlySet<string> };
+  | { readonly kind: 'apiKey'; readonly isSystemActor: true }
+  | {
+      readonly kind: 'user';
+      readonly uid: string;
+      readonly namespaces: ReadonlySet<string>;
+      readonly isSystemActor: false;
+    };
 
 /**
  * Throw `ForbiddenError` unless the caller is allowed to touch resources in
- * `namespace`. API-key callers are unrestricted; user callers must have the
- * namespace in their membership set. Missing namespaces are treated as
+ * `namespace`. System-actor callers are unrestricted; user callers must have
+ * the namespace in their membership set. Missing namespaces are treated as
  * forbidden — every domain entity that's gated must carry its namespace.
  *
  * Handlers call this AFTER fetching the resource (so 404 still beats 403 for
@@ -30,7 +35,7 @@ export function assertNamespaceAccess(
   caller: CallerIdentity,
   namespace: string | undefined,
 ): void {
-  if (caller.kind === 'apiKey') return;
+  if (caller.isSystemActor) return;
   if (typeof namespace !== 'string' || namespace.length === 0) {
     throw new ForbiddenError('Resource has no namespace');
   }
@@ -39,8 +44,14 @@ export function assertNamespaceAccess(
   }
 }
 
+/**
+ * @deprecated ADR-0004 — handlers should reach data via `CallerScope` wrappers,
+ *   which enforce this gate at the call site. Remaining inline callers under
+ *   `platform-ui/src/app/api/**` are pre-Phase-2 routes that haven't migrated
+ *   yet; new code must not use this helper.
+ */
 export function callerCanAccess(caller: CallerIdentity, namespace: string | undefined): boolean {
-  if (caller.kind === 'apiKey') return true;
+  if (caller.isSystemActor) return true;
   if (typeof namespace !== 'string' || namespace.length === 0) return false;
   return caller.namespaces.has(namespace);
 }
@@ -49,12 +60,16 @@ export function callerCanAccess(caller: CallerIdentity, namespace: string | unde
  * Filter a list of entities to those the caller may see. Each entity supplies
  * its namespace via `namespaceOf` — keeps this helper agnostic of entity
  * shape (some store namespace at top level, some via a parent instance).
+ *
+ * @deprecated ADR-0004 — list/query methods on `Authorized<Entity>Repository`
+ *   filter at the storage layer (`*VisibleTo` / `*InNamespaces`). New code
+ *   must reach data through `CallerScope`, not via this post-filter.
  */
 export function filterByCaller<T>(
   items: readonly T[],
   caller: CallerIdentity,
   namespaceOf: (item: T) => string | undefined,
 ): T[] {
-  if (caller.kind === 'apiKey') return [...items];
+  if (caller.isSystemActor) return [...items];
   return items.filter((item) => callerCanAccess(caller, namespaceOf(item)));
 }

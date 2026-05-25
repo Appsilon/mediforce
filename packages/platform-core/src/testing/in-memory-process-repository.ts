@@ -33,9 +33,28 @@ export class InMemoryProcessRepository implements ProcessRepository {
     );
   }
 
-  async listWorkflowDefinitions(
+  async listAllWorkflowDefinitions(
     includeArchived: boolean,
   ): Promise<WorkflowDefinitionListResult> {
+    return this.buildListResult(includeArchived, () => true);
+  }
+
+  async listWorkflowDefinitionsVisibleTo(
+    allowed: readonly string[],
+    includeArchived: boolean,
+  ): Promise<WorkflowDefinitionListResult> {
+    return this.buildListResult(includeArchived, (group) => {
+      const latest = group.versions.find((v) => v.version === group.latestVersion);
+      if (latest === undefined) return false;
+      if (latest.visibility === 'public') return true;
+      return allowed.includes(latest.namespace);
+    });
+  }
+
+  private buildListResult(
+    includeArchived: boolean,
+    predicate: (group: WorkflowDefinitionGroup) => boolean,
+  ): WorkflowDefinitionListResult {
     const grouped = new Map<string, WorkflowDefinition[]>();
     for (const definition of this.workflowDefinitions.values()) {
       if (!includeArchived && definition.archived === true) continue;
@@ -44,8 +63,8 @@ export class InMemoryProcessRepository implements ProcessRepository {
       existing.push(definition);
       grouped.set(key, existing);
     }
-    const definitions: WorkflowDefinitionGroup[] = Array.from(grouped.entries()).map(
-      ([_key, versions]) => {
+    const definitions: WorkflowDefinitionGroup[] = Array.from(grouped.entries())
+      .map(([_key, versions]) => {
         const namespace = versions[0].namespace;
         const name = versions[0].name;
         return {
@@ -55,8 +74,8 @@ export class InMemoryProcessRepository implements ProcessRepository {
           latestVersion: Math.max(...versions.map((v) => v.version)),
           defaultVersion: this.workflowDefaults.get(`${namespace}:${name}`) ?? null,
         };
-      },
-    );
+      })
+      .filter(predicate);
     return { definitions };
   }
 

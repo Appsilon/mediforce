@@ -3,7 +3,7 @@ import { UpdateAgentDefinitionInputSchema } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess, type CallerIdentity } from '@/lib/api-auth';
-import { getAgentDefinition } from '@mediforce/platform-api/handlers';
+import { getByIdAdapter } from '@mediforce/platform-api/handlers';
 import { GetAgentDefinitionInputSchema } from '@mediforce/platform-api/contract';
 import type { GetAgentDefinitionInput } from '@mediforce/platform-api/contract';
 
@@ -12,7 +12,7 @@ interface RouteContext {
 }
 
 function canMutate(caller: CallerIdentity, agent: { namespace?: string }): NextResponse | null {
-  if (caller.kind === 'apiKey') return null;
+  if (caller.isSystemActor) return null;
   if (typeof agent.namespace !== 'string') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -34,10 +34,11 @@ export const GET = createRouteAdapter<
 >(
   GetAgentDefinitionInputSchema,
   async (_req, ctx) => ({ id: (await ctx.params).id }),
-  (input, caller) => {
-    const { agentDefinitionRepo } = getPlatformServices();
-    return getAgentDefinition(input, { agentDefinitionRepo }, caller);
-  },
+  getByIdAdapter(
+    (input, scope) => scope.agentDefinitions.getById(input.id),
+    (input) => `Agent definition ${input.id} not found`,
+    'agent',
+  ),
 );
 
 export async function PUT(

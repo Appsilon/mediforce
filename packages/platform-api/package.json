@@ -52,6 +52,20 @@
         "types": "./dist/client/index.d.ts",
         "default": "./dist/client/index.js"
       }
+    },
+    "./repositories": {
+      "import": {
+        "@mediforce/source": "./src/repositories/index.ts",
+        "types": "./dist/repositories/index.d.ts",
+        "default": "./dist/repositories/index.js"
+      }
+    },
+    "./testing": {
+      "import": {
+        "@mediforce/source": "./src/testing/index.ts",
+        "types": "./dist/testing/index.d.ts",
+        "default": "./dist/testing/index.js"
+      }
     }
   },
   "scripts": {

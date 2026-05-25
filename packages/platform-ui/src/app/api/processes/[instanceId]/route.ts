@@ -1,6 +1,5 @@
-import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
-import { getProcess } from '@mediforce/platform-api/handlers';
+import { getByIdAdapter } from '@mediforce/platform-api/handlers';
 import { GetProcessInputSchema } from '@mediforce/platform-api/contract';
 import type { GetProcessInput } from '@mediforce/platform-api/contract';
 
@@ -11,10 +10,8 @@ interface RouteContext {
 /**
  * GET /api/processes/:instanceId
  *
- * Returns the full process instance. Missing instances 404 via the handler's
- * `NotFoundError`. Namespace gating is enforced inside the handler (api-key
- * callers pass; user callers must be in the instance's namespace) and
- * surfaces as 403 via `ForbiddenError`.
+ * Returns the full process instance. Missing or cross-workspace 404 via the
+ * `scope.runs` wrapper.
  */
 export const GET = createRouteAdapter<
   typeof GetProcessInputSchema,
@@ -24,8 +21,8 @@ export const GET = createRouteAdapter<
 >(
   GetProcessInputSchema,
   async (_req, ctx) => ({ instanceId: (await ctx.params).instanceId }),
-  (input, caller) => {
-    const { instanceRepo } = getPlatformServices();
-    return getProcess(input, { instanceRepo }, caller);
-  },
+  getByIdAdapter(
+    (input, scope) => scope.runs.getById(input.instanceId),
+    (input) => `Process instance ${input.instanceId} not found`,
+  ),
 );

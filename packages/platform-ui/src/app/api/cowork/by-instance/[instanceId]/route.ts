@@ -1,4 +1,3 @@
-import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { getCoworkSessionByInstance } from '@mediforce/platform-api/handlers';
 import { GetCoworkSessionByInstanceInputSchema } from '@mediforce/platform-api/contract';
@@ -13,8 +12,7 @@ interface RouteContext {
  *
  * Returns the most recent active cowork session for a given process
  * instance. 404 when the instance is unknown or has no active session.
- * Namespace gating is enforced inside the handler (api-key callers pass; user
- * callers must be in the instance's namespace) and surfaces as 403.
+ * Workspace gating in `scope.coworkSessions` (gates on the parent run).
  */
 export const GET = createRouteAdapter<
   typeof GetCoworkSessionByInstanceInputSchema,
@@ -24,12 +22,5 @@ export const GET = createRouteAdapter<
 >(
   GetCoworkSessionByInstanceInputSchema,
   async (_req, ctx) => ({ instanceId: (await ctx.params).instanceId }),
-  (input, caller) => {
-    const { coworkSessionRepo, instanceRepo } = getPlatformServices();
-    return getCoworkSessionByInstance(
-      input,
-      { coworkSessionRepo, instanceRepo },
-      caller,
-    );
-  },
+  getCoworkSessionByInstance,
 );
