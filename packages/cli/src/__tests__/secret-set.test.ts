@@ -18,7 +18,7 @@ describe('secret set command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/Usage: mediforce secret set/);
+    expect(output.stdoutLines.join('\n')).toMatch(/USAGE mediforce secret set/);
   });
 
   it('sets secret via --value flag', async () => {
@@ -77,7 +77,7 @@ describe('secret set command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/Cannot use both/);
+    expect(output.stderrLines.join('\n')).toMatch(/mutually exclusive/);
   });
 
   it('exits 1 when stdin is empty', async () => {

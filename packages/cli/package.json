@@ -22,6 +22,7 @@
   "dependencies": {
     "@mediforce/platform-api": "workspace:*",
     "@mediforce/platform-core": "workspace:*",
+    "citty": "^0.2.2",
     "tsx": "^4.21.0",
     "zod": "^4.0.0"
   },

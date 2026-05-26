@@ -105,7 +105,7 @@ describe('run list command', () => {
     });
     expect(code).toBe(2);
     const allOutput = output.stderrLines.join('\n') + output.stdoutLines.join('\n');
-    expect(allOutput).toMatch(/Invalid status/i);
+    expect(allOutput).toMatch(/Invalid value for argument: --status/i);
   });
 
   it('prints "No runs found" for empty result', async () => {
@@ -145,6 +145,6 @@ describe('run list command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/Usage: mediforce run list/);
+    expect(output.stdoutLines.join('\n')).toMatch(/USAGE mediforce run list/);
   });
 });

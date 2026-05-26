@@ -1,22 +1,15 @@
 /**
  * `mediforce` CLI entrypoint.
  *
- * Subcommand dispatch is a single switch on `argv[2]/argv[3]` — keeps the
- * binary dependency-free (only `node:util`'s `parseArgs` for flags).
- *
- * Surface (MVP):
- *   mediforce workflow register --file <path> --namespace <ns> [...flags]
- *   mediforce workflow list                                    [...flags]
- *   mediforce run get <runId>                                  [...flags]
+ * Subcommand dispatch via a nested map: `branch -> leaf -> CommandFn`. The
+ * map drives both the help text (auto-generated from each `defineCommand`'s
+ * meta) and execution. Leaves are citty-wrapped commands from
+ * `./commands/*` — each already a `(input) => Promise<number>`.
  *
  * Exit codes:
  *   0 — success
  *   1 — operational failure (HTTP error, validation error, file not found)
  *   2 — usage error (unknown command, missing required flag)
- *
- * Commands are registered as `runCli` grows; this scaffold ships the help
- * text and unknown-command path. Per-command dispatch is wired in subsequent
- * commits as each command lands.
  */
 
 import { workflowRegisterCommand } from './commands/workflow-register.js';
@@ -29,7 +22,12 @@ import { runCancelCommand } from './commands/run-cancel.js';
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility.js';
 import { workflowCopyCommand } from './commands/workflow-copy.js';
-import { systemStatusCommand, systemImagesCommand, systemDiskCommand, systemRmiCommand } from './commands/system-status.js';
+import {
+  systemStatusCommand,
+  systemImagesCommand,
+  systemDiskCommand,
+  systemRmiCommand,
+} from './commands/system-status.js';
 import { systemCreditsCommand } from './commands/system-credits.js';
 import { agentListCommand } from './commands/agent-list.js';
 import { agentGetCommand } from './commands/agent-get.js';
@@ -41,6 +39,7 @@ import { modelSyncCommand } from './commands/model-sync.js';
 import { secretSetCommand } from './commands/secret-set.js';
 import { secretListCommand } from './commands/secret-list.js';
 import { secretDeleteCommand } from './commands/secret-delete.js';
+import { type CommandFn } from './define-command.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
 export interface RunCliInput {
@@ -49,247 +48,147 @@ export interface RunCliInput {
   output?: OutputSink;
 }
 
-const HELP = `Usage: mediforce <command> [options]
+interface LeafEntry {
+  description: string;
+  fn: CommandFn;
+}
 
-Commands:
-  workflow register --file <path> --namespace <ns>   Register a workflow definition
-  workflow list                                      List registered workflow definitions
-  workflow get <name> --namespace <ns>               Fetch a workflow definition
-  workflow set-visibility <name> --visibility <v>    Set workflow visibility (public|private)
-  workflow copy <name> --target-namespace <ns>       Copy workflow to another namespace
-  workflow archive <name> --version <n>|--all       Archive/unarchive workflow versions
-  agent list                                         List agent definitions
-  agent get <id>                                     Fetch an agent definition
-  agent delete <id>                                  Delete an agent definition
-  agent set-visibility <id> --visibility <v>         Set agent visibility (public|private)
-  model list                                         List models in registry
-  model get <id>                                     Fetch a model from registry
-  model sync                                         Sync models from OpenRouter
-  secret set --workflow <name> --namespace <ns> --key <key>  Set a secret
-  secret list --workflow <name> --namespace <ns>     List secret keys
-  secret delete --workflow <name> --namespace <ns> --key <key>  Delete a secret
-  run list                                           List recent runs
-  run start --workflow <name>                        Start a new run (manual trigger)
-  run get <runId>                                    Fetch a single run's status
-  run cancel <runId> [--reason <text>]               Cancel a running or paused run
-  system status                                      Docker infrastructure status
-  system images                                      List Docker images on host
-  system rmi <imageId>                               Remove a Docker image
-  system disk                                        Docker disk usage breakdown
-  system credits --namespace <ns>                    OpenRouter credit balance
+interface BranchEntry {
+  description: string;
+  leaves: Record<string, LeafEntry>;
+}
 
-Common flags:
-  --base-url <url>   API base URL (default: http://localhost:9003,
-                     or MEDIFORCE_BASE_URL env var)
-  --json             Emit JSON instead of human-readable output
-  --help, -h         Show this help text
+export const TREE: Record<string, BranchEntry> = {
+  workflow: {
+    description: 'Workflow definitions (register, list, get, copy, archive, visibility)',
+    leaves: {
+      register: { description: 'Register a workflow definition from a JSON file', fn: workflowRegisterCommand },
+      list: { description: 'List registered workflow definitions', fn: workflowListCommand },
+      get: { description: 'Fetch a workflow definition', fn: workflowGetCommand },
+      'set-visibility': { description: 'Set workflow visibility (public|private)', fn: workflowSetVisibilityCommand },
+      copy: { description: 'Copy workflow to another namespace', fn: workflowCopyCommand },
+      archive: { description: 'Archive/unarchive workflow versions', fn: workflowArchiveCommand },
+    },
+  },
+  run: {
+    description: 'Workflow runs (list, start, get, cancel)',
+    leaves: {
+      list: { description: 'List recent runs', fn: runListCommand },
+      start: { description: 'Start a new run (manual trigger)', fn: runStartCommand },
+      get: { description: "Fetch a single run's status", fn: runGetCommand },
+      cancel: { description: 'Cancel a running or paused run', fn: runCancelCommand },
+    },
+  },
+  agent: {
+    description: 'Agent definitions (list, get, delete, visibility)',
+    leaves: {
+      list: { description: 'List agent definitions', fn: agentListCommand },
+      get: { description: 'Fetch an agent definition', fn: agentGetCommand },
+      delete: { description: 'Delete an agent definition', fn: agentDeleteCommand },
+      'set-visibility': { description: 'Set agent visibility (public|private)', fn: agentSetVisibilityCommand },
+    },
+  },
+  model: {
+    description: 'Foundation model registry (list, get, sync)',
+    leaves: {
+      list: { description: 'List models in registry', fn: modelListCommand },
+      get: { description: 'Fetch a model from registry', fn: modelGetCommand },
+      sync: { description: 'Sync models from OpenRouter', fn: modelSyncCommand },
+    },
+  },
+  secret: {
+    description: 'Workflow secrets (set, list, delete)',
+    leaves: {
+      set: { description: 'Set a secret', fn: secretSetCommand },
+      list: { description: 'List secret keys', fn: secretListCommand },
+      delete: { description: 'Delete a secret', fn: secretDeleteCommand },
+    },
+  },
+  system: {
+    description: 'Docker infrastructure + OpenRouter credits',
+    leaves: {
+      status: { description: 'Full infrastructure status', fn: systemStatusCommand },
+      images: { description: 'List Docker images on the host', fn: systemImagesCommand },
+      rmi: { description: 'Remove a Docker image by ID or name:tag', fn: systemRmiCommand },
+      disk: { description: 'Docker disk usage breakdown', fn: systemDiskCommand },
+      credits: { description: 'OpenRouter credit balance for a workspace', fn: systemCreditsCommand },
+    },
+  },
+};
 
-Authentication:
-  Set MEDIFORCE_API_KEY (or PLATFORM_API_KEY) in the environment.
+function renderTopHelp(): string {
+  const lines: string[] = ['Usage: mediforce <command> <subcommand> [options]', '', 'Commands:'];
+  for (const [branch, def] of Object.entries(TREE)) {
+    lines.push(`  ${branch.padEnd(10)} ${def.description}`);
+  }
+  lines.push('');
+  lines.push('Common flags:');
+  lines.push('  --base-url <url>   API base URL (default: http://localhost:9003,');
+  lines.push('                     or MEDIFORCE_BASE_URL env var)');
+  lines.push('  --json             Emit JSON instead of human-readable output');
+  lines.push('  --help, -h         Show this help text');
+  lines.push('');
+  lines.push('Authentication:');
+  lines.push('  Set MEDIFORCE_API_KEY (or PLATFORM_API_KEY) in the environment.');
+  lines.push('');
+  lines.push('Run `mediforce <command> --help` for subcommands of a group.');
+  lines.push('Run `mediforce <command> <subcommand> --help` for command-specific flags.');
+  return lines.join('\n');
+}
 
-Output streams:
-  Success output and --json error payloads are written to stdout.
-  Human-mode error messages are written to stderr so success output
-  on stdout stays machine-parseable when piped.
-`;
-
-const WORKFLOW_HELP = `Usage: mediforce workflow <subcommand> [options]
-
-Subcommands:
-  register --file <path> --namespace <ns>   Register a workflow definition
-  list                                      List registered workflow definitions
-  get <name>                                Fetch a workflow definition
-  set-visibility <name> --visibility <v>    Set workflow visibility (public|private)
-  copy <name> --target-namespace <ns>        Copy workflow to another namespace
-  archive <name> --version <n>|--all        Archive/unarchive workflow versions
-
-Run \`mediforce workflow <subcommand> --help\` for subcommand-specific flags.
-`;
-
-const AGENT_HELP = `Usage: mediforce agent <subcommand> [options]
-
-Subcommands:
-  list                                      List agent definitions
-  get <id>                                  Fetch an agent definition
-  delete <id>                               Delete an agent definition
-  set-visibility <id> --visibility <v>      Set agent visibility
-
-Run \`mediforce agent <subcommand> --help\` for subcommand-specific flags.
-`;
-
-const MODEL_HELP = `Usage: mediforce model <subcommand> [options]
-
-Subcommands:
-  list                List models in registry
-  get <id>            Fetch a model from registry
-  sync                Sync models from OpenRouter
-
-Run \`mediforce model <subcommand> --help\` for subcommand-specific flags.
-`;
-
-const SECRET_HELP = `Usage: mediforce secret <subcommand> [options]
-
-Subcommands:
-  set --workflow <name> --namespace <ns> --key <key>     Set a secret
-  list --workflow <name> --namespace <ns>                List secret key names
-  delete --workflow <name> --namespace <ns> --key <key>  Delete a secret
-
-Run \`mediforce secret <subcommand> --help\` for subcommand-specific flags.
-`;
-
-const RUN_HELP = `Usage: mediforce run <subcommand> [options]
-
-Subcommands:
-  list                      List recent runs
-  start --workflow <name>   Start a new run (manual trigger)
-  get <runId>               Fetch a single run's status
-  cancel <runId>            Cancel a running or paused run
-
-Run \`mediforce run <subcommand> --help\` for subcommand-specific flags.
-`;
-
-const SYSTEM_HELP = `Usage: mediforce system <subcommand> [options]
-
-Subcommands:
-  status     Full infrastructure status (images + disk + connectivity)
-  images     List Docker images on the host
-  rmi <id>   Remove a Docker image by ID or name:tag
-  disk       Docker disk usage breakdown
-  credits    OpenRouter credit balance for a workspace
-
-Run \`mediforce system <subcommand> --help\` for subcommand-specific flags.
-`;
+function renderBranchHelp(branch: string, def: BranchEntry): string {
+  const lines: string[] = [`Usage: mediforce ${branch} <subcommand> [options]`, '', def.description, '', 'Subcommands:'];
+  const width = Math.max(...Object.keys(def.leaves).map((n) => n.length));
+  for (const [name, leaf] of Object.entries(def.leaves)) {
+    lines.push(`  ${name.padEnd(width)}  ${leaf.description}`);
+  }
+  lines.push('');
+  lines.push(`Run \`mediforce ${branch} <subcommand> --help\` for command-specific flags.`);
+  return lines.join('\n');
+}
 
 export async function runCli(input: RunCliInput): Promise<number> {
   const output = input.output ?? consoleOutput;
   const args = input.argv;
 
   if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
-    output.stdout(HELP);
+    output.stdout(renderTopHelp());
     return 0;
   }
 
-  const [command, subcommand, ...rest] = args;
+  const [branch, leaf, ...rest] = args;
+  const branchDef = branch !== undefined ? TREE[branch] : undefined;
 
-  // Namespace-only invocation (no subcommand): print the namespaced HELP and
-  // exit 2 instead of the generic `Unknown command: workflow undefined`.
-  if (command === 'workflow' && subcommand === undefined) {
-    output.stderr('mediforce workflow: missing subcommand');
+  if (branchDef === undefined) {
+    output.stderr(`Unknown command: ${branch ?? ''}`);
     output.stderr('');
-    output.stderr(WORKFLOW_HELP);
-    return 2;
-  }
-  if (command === 'agent' && subcommand === undefined) {
-    output.stderr('mediforce agent: missing subcommand');
-    output.stderr('');
-    output.stderr(AGENT_HELP);
-    return 2;
-  }
-  if (command === 'run' && subcommand === undefined) {
-    output.stderr('mediforce run: missing subcommand');
-    output.stderr('');
-    output.stderr(RUN_HELP);
-    return 2;
-  }
-  if (command === 'model' && subcommand === undefined) {
-    output.stderr('mediforce model: missing subcommand');
-    output.stderr('');
-    output.stderr(MODEL_HELP);
-    return 2;
-  }
-  if (command === 'secret' && subcommand === undefined) {
-    output.stderr('mediforce secret: missing subcommand');
-    output.stderr('');
-    output.stderr(SECRET_HELP);
-    return 2;
-  }
-  if (command === 'system' && subcommand === undefined) {
-    output.stderr('mediforce system: missing subcommand');
-    output.stderr('');
-    output.stderr(SYSTEM_HELP);
+    output.stderr(renderTopHelp());
     return 2;
   }
 
-  if (command === 'workflow' && subcommand === 'register') {
-    return workflowRegisterCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'workflow' && subcommand === 'list') {
-    return workflowListCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'workflow' && subcommand === 'get') {
-    return workflowGetCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'workflow' && subcommand === 'archive') {
-    return workflowArchiveCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'workflow' && subcommand === 'set-visibility') {
-    return workflowSetVisibilityCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'workflow' && subcommand === 'copy') {
-    return workflowCopyCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'agent' && subcommand === 'list') {
-    return agentListCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'agent' && subcommand === 'get') {
-    return agentGetCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'agent' && subcommand === 'delete') {
-    return agentDeleteCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'agent' && subcommand === 'set-visibility') {
-    return agentSetVisibilityCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'model' && subcommand === 'list') {
-    return modelListCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'model' && subcommand === 'get') {
-    return modelGetCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'model' && subcommand === 'sync') {
-    return modelSyncCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'run' && subcommand === 'list') {
-    return runListCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'run' && subcommand === 'get') {
-    return runGetCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'run' && subcommand === 'start') {
-    return runStartCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'run' && subcommand === 'cancel') {
-    return runCancelCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'secret' && subcommand === 'set') {
-    return secretSetCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'secret' && subcommand === 'list') {
-    return secretListCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'secret' && subcommand === 'delete') {
-    return secretDeleteCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'system' && subcommand === 'status') {
-    return systemStatusCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'system' && subcommand === 'images') {
-    return systemImagesCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'system' && subcommand === 'rmi') {
-    return systemRmiCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'system' && subcommand === 'disk') {
-    return systemDiskCommand({ argv: rest, env: input.env, output });
-  }
-  if (command === 'system' && subcommand === 'credits') {
-    return systemCreditsCommand({ argv: rest, env: input.env, output });
+  // `mediforce <branch> --help` → render the branch help on stdout, exit 0.
+  if (leaf === '--help' || leaf === '-h') {
+    output.stdout(renderBranchHelp(branch!, branchDef));
+    return 0;
   }
 
-  output.stderr(`Unknown command: ${[command, subcommand].filter(Boolean).join(' ')}`);
-  output.stderr('');
-  output.stderr(HELP);
-  return 2;
+  // `mediforce <branch>` with no leaf → render branch help on stderr, exit 2.
+  if (leaf === undefined) {
+    output.stderr(`mediforce ${branch!}: missing subcommand`);
+    output.stderr('');
+    output.stderr(renderBranchHelp(branch!, branchDef));
+    return 2;
+  }
+
+  const leafDef = branchDef.leaves[leaf];
+  if (leafDef === undefined) {
+    output.stderr(`Unknown command: ${branch!} ${leaf}`);
+    output.stderr('');
+    output.stderr(renderBranchHelp(branch!, branchDef));
+    return 2;
+  }
+
+  return leafDef.fn({ argv: rest, env: input.env, output });
 }
 
 // Direct execution: spawned by `bin/mediforce.cjs`.

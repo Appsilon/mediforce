@@ -31,7 +31,7 @@ describe('workflow register command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/--file is required/);
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required argument: --file/);
   });
 
   it('exits 2 with a useful error when --namespace is missing', async () => {
@@ -42,7 +42,7 @@ describe('workflow register command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/--namespace is required/);
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required argument: --namespace/);
   });
 
   it('exits 1 when the file is missing', async () => {

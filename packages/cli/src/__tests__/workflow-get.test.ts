@@ -29,7 +29,7 @@ describe('workflow get command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/Usage: mediforce workflow get/);
+    expect(output.stdoutLines.join('\n')).toMatch(/USAGE mediforce workflow get/);
   });
 
   it('exits 2 when <name> is missing', async () => {
@@ -40,7 +40,7 @@ describe('workflow get command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/<name> is required/);
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required positional argument: NAME/);
   });
 
   it('exits 2 when --namespace is missing', async () => {
@@ -51,7 +51,7 @@ describe('workflow get command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/--namespace is required/);
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required argument: --namespace/);
   });
 
   it('exits 2 for invalid --version (non-integer)', async () => {
