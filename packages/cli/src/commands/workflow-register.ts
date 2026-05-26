@@ -78,7 +78,11 @@ export const workflowRegisterCommand = defineCommand({
     let body: RegisterWorkflowInput;
     try {
       const parsedJson: unknown = JSON.parse(raw);
-      const result = RegisterWorkflowInputSchema.safeParse(parsedJson);
+      const withVisibilityOverride =
+        args.visibility !== undefined && parsedJson !== null && typeof parsedJson === 'object'
+          ? { ...(parsedJson as Record<string, unknown>), visibility: args.visibility }
+          : parsedJson;
+      const result = RegisterWorkflowInputSchema.safeParse(withVisibilityOverride);
       if (!result.success) {
         printError(
           output,
@@ -88,9 +92,6 @@ export const workflowRegisterCommand = defineCommand({
         return 1;
       }
       body = result.data;
-      if (args.visibility !== undefined) {
-        body = { ...body, visibility: args.visibility as 'public' | 'private' };
-      }
     } catch (err) {
       printError(output, { error: `Invalid JSON: ${String(err)}` }, jsonMode);
       return 1;

@@ -65,6 +65,18 @@ describe('citty defineCommand wrapper', () => {
     expect(parsed).toMatchObject({ status: 404 });
   });
 
+  it('exits 2 when given extra positional arguments', async () => {
+    const output = captureOutput();
+    const code = await trivial({
+      argv: ['w-1', 'extra-1', 'extra-2'],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+    expect(code).toBe(2);
+    const all = output.stderrLines.join('\n') + output.stdoutLines.join('\n');
+    expect(all).toMatch(/Unexpected positional arguments: extra-1 extra-2/);
+  });
+
   it('prints help and exits 0 on --help', async () => {
     const output = captureOutput();
     const code = await trivial({

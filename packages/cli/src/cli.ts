@@ -190,19 +190,3 @@ export async function runCli(input: RunCliInput): Promise<number> {
 
   return leafDef.fn({ argv: rest, env: input.env, output });
 }
-
-// Direct execution: spawned by `bin/mediforce.cjs`.
-const isDirectInvocation =
-  typeof process !== 'undefined' && import.meta.url === `file://${process.argv[1]}`;
-if (isDirectInvocation) {
-  runCli({ argv: process.argv.slice(2), env: process.env })
-    .then((code) => {
-      process.exit(code);
-    })
-    .catch((err: unknown) => {
-      // Any uncaught error inside a command path is treated as an operational
-      // failure — print to stderr and exit non-zero.
-      process.stderr.write(`mediforce: ${String(err)}\n`);
-      process.exit(1);
-    });
-}
