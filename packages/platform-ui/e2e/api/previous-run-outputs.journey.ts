@@ -99,7 +99,12 @@ test.describe('Previous run outputs — API E2E', () => {
         },
       });
       expect(triggerRes.status(), await triggerRes.text()).toBe(201);
-      const { run } = (await triggerRes.json()) as { run: { id: string } };
+      const triggerBody = (await triggerRes.json()) as Record<string, unknown>;
+      // ADR-0005 §5 entity-echo regression: response is `{ run: ... }` only.
+      // Pre-Phase-3 `{ instanceId, status }` top-level keys must NOT come back.
+      expect(triggerBody.instanceId).toBeUndefined();
+      expect(triggerBody.status).toBeUndefined();
+      const { run } = triggerBody as { run: { id: string } };
       const instanceId = run.id;
 
       const task = await pollUntil(
