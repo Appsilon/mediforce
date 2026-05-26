@@ -90,5 +90,25 @@ describe('workflow-designer', () => {
         expect(step.agent).toBeDefined();
       }
     });
+
+    it('runs every claude-code-agent step in the golden Docker image', () => {
+      const result = loadDefinition();
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      const claudeSteps = result.data.steps.filter(s => s.plugin === 'claude-code-agent');
+      expect(claudeSteps.length).toBeGreaterThan(0);
+      for (const step of claudeSteps) {
+        expect(step.agent?.image).toBe('mediforce-golden-image');
+      }
+    });
+
+    it('supplies Anthropic credentials to dockerized agents via workflow env', () => {
+      const result = loadDefinition();
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      expect(result.data.env?.ANTHROPIC_AUTH_TOKEN).toBe('{{OPENROUTER_API_KEY}}');
+    });
   });
 });

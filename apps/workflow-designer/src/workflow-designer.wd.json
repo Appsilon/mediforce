@@ -7,6 +7,12 @@
     { "name": "manual", "type": "manual" }
   ],
   "roles": ["workflow-designer"],
+  "env": {
+    "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_BASE_URL": "{{ANTHROPIC_BASE_URL}}",
+    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_API_KEY": ""
+  },
   "steps": [
     {
       "id": "choose-mode",
@@ -99,6 +105,7 @@
       "autonomyLevel": "L3",
       "plugin": "claude-code-agent",
       "agent": {
+        "image": "mediforce-golden-image",
         "skill": "generate-steps",
         "skillsDir": "apps/workflow-designer/plugins/workflow-designer/skills",
         "model": "sonnet",
@@ -143,6 +150,7 @@
       "autonomyLevel": "L3",
       "plugin": "claude-code-agent",
       "agent": {
+        "image": "mediforce-golden-image",
         "skill": "generate-execution-proposals",
         "skillsDir": "apps/workflow-designer/plugins/workflow-designer/skills",
         "model": "sonnet",
