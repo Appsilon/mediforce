@@ -67,6 +67,14 @@ COPY --from=builder /app/packages/platform-ui/public ./packages/platform-ui/publ
 # Not reliably picked up by Next.js output file tracing in this build, so copy explicitly.
 COPY --from=builder /app/data ./data
 
+# ADR-0001 — migration runner + Drizzle SQL files. Migrations are applied
+# by CMD below before server.js starts. Idempotent (drizzle's
+# `drizzle.__drizzle_migrations` ledger) so re-deploys without schema
+# changes are a no-op. STORAGE_BACKEND != 'postgres' makes the runner
+# exit 0 immediately.
+COPY --from=builder /app/packages/platform-infra/src/postgres/migrations ./packages/platform-infra/src/postgres/migrations
+COPY --from=builder /app/packages/platform-ui/scripts/migrate-postgres.mjs ./packages/platform-ui/scripts/migrate-postgres.mjs
+
 EXPOSE 3000
 
-CMD ["node", "packages/platform-ui/server.js"]
+CMD ["sh", "-c", "node packages/platform-ui/scripts/migrate-postgres.mjs && node packages/platform-ui/server.js"]

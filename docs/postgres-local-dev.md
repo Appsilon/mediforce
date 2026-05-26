@@ -31,10 +31,22 @@ DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce
 # DATABASE_POOL_MAX=10   # optional override; default 10
 ```
 
-Then `pnpm dev`. On boot, `instrumentation.ts` validates `DATABASE_URL` is
-set and calls `applyPostgresMigrations()` against the database. Migrations
-are idempotent (drizzle's `__drizzle_migrations` ledger), so every boot is
-safe.
+Apply migrations once (creates tables, registers them in drizzle's
+`__drizzle_migrations` ledger):
+
+```bash
+pnpm db:migrate
+```
+
+Then `pnpm dev`. The dev server does NOT auto-migrate — schema is an
+operator concern, not part of the app boot path. Re-run `pnpm db:migrate`
+any time you pull new migrations from main (it's idempotent — already-
+applied migrations are skipped via drizzle's ledger).
+
+> Docker production deploys are different: the platform-ui container's
+> CMD wraps `node packages/platform-ui/scripts/migrate-postgres.mjs && node server.js`,
+> so prod auto-applies pending migrations before the app starts. Local
+> dev runs outside Docker → manual `pnpm db:migrate`.
 
 Repositories that have been migrated to Postgres (see
 [PLAN-0001 §5.2](adr/PLAN-0001.md#52-build-order-postgres-implementations))
@@ -52,8 +64,8 @@ docker compose down -v                    # stop + delete named volumes
 docker compose up postgres -d             # fresh database
 ```
 
-On next `pnpm dev`, the migration runner re-creates every table from
-scratch.
+Re-run `pnpm db:migrate` to re-create the schema from scratch, then
+`pnpm dev`.
 
 ## Inspect migration state
 
@@ -84,20 +96,20 @@ DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce \
 ```
 
 drizzle-kit diffs schema-vs-existing-migrations and emits a new
-`NNNN_description.sql` plus a journal entry. Commit both. Restart the dev
-server and the migration applies automatically. See
+`NNNN_description.sql` plus a journal entry. Commit both. Re-run
+`pnpm db:migrate` to apply locally. See
 [PLAN-0001 §10.1](adr/PLAN-0001.md#101-migration-filename-rule) for the
 branch-collision rename rule.
 
-## Apply migrations by hand
-
-The app applies migrations at boot. To run them outside the app process
-(useful when debugging schema drift):
+## Migration commands (root scripts)
 
 ```bash
-DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce \
-  pnpm --filter @mediforce/platform-infra exec drizzle-kit migrate
+pnpm db:migrate     # apply pending migrations (idempotent)
+pnpm db:generate    # generate a new migration from schema diffs
 ```
+
+Both forward to `drizzle-kit` inside `packages/platform-infra`. Need
+`DATABASE_URL` in env (or the worktree's `packages/platform-infra/.env`).
 
 ## Run the parity tests
 
@@ -115,12 +127,10 @@ CI runs the same suite — see `.github/workflows/ci.yml`.
 ## Troubleshooting
 
 - **`DATABASE_URL is not set` at boot.** Check
-  `packages/platform-ui/.env.local`. `instrumentation.ts` validates the
-  pair `STORAGE_BACKEND=postgres` + non-empty `DATABASE_URL` before any
-  request lands.
-- **`relation "tool_catalog_entries" does not exist".** Migrations
-  didn't run. Confirm the boot log contains no migration error; reset the
-  volume (`docker compose down -v`) and restart.
+  `packages/platform-ui/.env.local`. `instrumentation.ts` refuses to boot
+  with `STORAGE_BACKEND=postgres` + missing `DATABASE_URL`.
+- **`relation "tool_catalog_entries" does not exist".** You forgot
+  `pnpm db:migrate`. Run it, then restart the dev server.
 - **Migration appears applied but the table is missing.** Likely a
   duplicate `idx` in `_journal.json` from a rebase — see
   [PLAN-0001 §10.1](adr/PLAN-0001.md#101-migration-filename-rule).
