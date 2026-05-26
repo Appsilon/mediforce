@@ -4,14 +4,8 @@ import type { CallerScope } from '../../repositories/index.js';
 import { PreconditionFailedError } from '../../errors.js';
 import { loadOr404 } from '../_helpers.js';
 
-/**
- * `POST /api/processes/:instanceId/steps/:stepId/retry`.
- *
- * Delegates the state-reset to `engine.retryStep` (which validates current
- * step + latest execution status and emits `step.retried`). On success the
- * handler emits a separate `instance.retried` audit at the processInstance
- * level — added in Phase 3 per ADR-0005 §7 — then fires the auto-runner.
- */
+// Engine emits `step.retried` (stepExecution-scoped); handler additionally
+// emits `instance.retried` for the processInstance-scoped audit lane.
 export async function retryStep(
   input: RetryStepInput,
   scope: CallerScope,

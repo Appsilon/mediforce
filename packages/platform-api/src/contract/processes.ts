@@ -130,13 +130,7 @@ export const CancelRunOutputSchema = z.object({
 export type CancelRunInput = z.infer<typeof CancelRunInputSchema>;
 export type CancelRunOutput = z.infer<typeof CancelRunOutputSchema>;
 
-// ---- POST /api/processes/:instanceId/resume ---------------------------------
-//
-// State transition: paused | failed → running. Entity echo per ADR-0005 §5.
-// URL keeps the legacy `processes/:instanceId` segment; adapter maps to
-// the contract field `runId`. The `failed` source state covers agent-
-// escalated and agent-paused recovery flows (UI banner button).
-
+// `failed` source state covers agent-escalated / agent-paused recovery.
 export const ResumeRunInputSchema = z.object({
   runId: z.string().min(1),
 });
@@ -147,13 +141,6 @@ export const ResumeRunOutputSchema = z.object({
 
 export type ResumeRunInput = z.infer<typeof ResumeRunInputSchema>;
 export type ResumeRunOutput = z.infer<typeof ResumeRunOutputSchema>;
-
-// ---- POST /api/processes/:instanceId/steps/:stepId/retry --------------------
-//
-// State reset: paused (with retry-able pause reason) | failed → running on the
-// same step. Engine emits `step.retried` (stepExecution-scoped); handler emits
-// `instance.retried` (processInstance-scoped) per ADR-0005 §7 Phase 3
-// additions. URL keeps the legacy `processes/:instanceId` segment.
 
 export const RetryStepInputSchema = z.object({
   runId: z.string().min(1),

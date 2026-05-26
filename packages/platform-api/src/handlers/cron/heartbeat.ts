@@ -9,20 +9,9 @@ import type {
 import type { CallerScope } from '../../repositories/index.js';
 import { ForbiddenError } from '../../errors.js';
 
-/**
- * `POST /api/cron/heartbeat`.
- *
- * Scans every workflow definition for cron triggers, fires those whose
- * schedule is due (lastTriggeredAt vs `now`), persists trigger state, and
- * kicks the auto-runner for each new instance. Skipped triggers (not due /
- * no schedule / invalid schedule) are returned in the response body and
- * console-logged, but NOT audited — per ADR-0005 §7 audit is a state-
- * change record, and a skip changes no state.
- *
- * Workspace scope: this endpoint is system-actor only. The handler reads
- * across every workspace's definitions; gating happens at the call site
- * (apiKey), not per row.
- */
+// System-actor only — reads across every workspace's definitions; gating
+// is by apiKey at the call site, not per row. Skipped triggers surface in
+// the response body + console.log but are NOT audited (no state change).
 export async function heartbeat(
   _input: HeartbeatInput,
   scope: CallerScope,
@@ -39,8 +28,6 @@ export async function heartbeat(
 
   const definitionGroups = await scope.workflowDefinitions.listGroups(false);
 
-  // Flatten to the latest version of each definition that has at least one
-  // cron trigger. Archived WDs are already filtered at the repo layer.
   const cronDefinitions = definitionGroups
     .map((group) => group.versions.find((v) => v.version === group.latestVersion))
     .filter((def): def is WorkflowDefinition => def !== undefined)

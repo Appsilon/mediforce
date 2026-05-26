@@ -1,16 +1,5 @@
-/**
- * Notify the runtime that an instance has been advanced and needs the
- * auto-runner to execute its current step.
- *
- * Fire-and-forget — `kick` resolves when the kick is dispatched, not when the
- * resulting run completes. Idempotent: if the runtime is already executing
- * this instance the kick is a no-op at the transport layer.
- *
- * Handlers reach this via `scope.system.runKicker.kick(instanceId)`. The
- * abstraction lets `WorkflowEngine` stay a pure state machine and lets a
- * future durable executor (queue, cron worker) swap one impl without
- * touching handlers — see ADR-0005 §7 / headless-migration Phase 3.
- */
+// Fire-and-forget. Resolves on dispatch, not on run completion. Idempotent
+// at the transport layer (already-running instance → no-op).
 export interface RunKicker {
   kick(instanceId: string, opts?: { readonly triggeredBy?: string }): Promise<void>;
 }
@@ -24,10 +13,6 @@ export interface NoopRunKicker extends RunKicker {
   readonly kicks: ReadonlyArray<KickRecord>;
 }
 
-/**
- * Test impl. Records every call on `kicks`; tests assert the array contents
- * to verify the handler kicked with the right id.
- */
 export function noopRunKicker(): NoopRunKicker {
   const kicks: KickRecord[] = [];
   return {
@@ -46,17 +31,8 @@ export interface HttpSelfFetchRunKickerConfig {
   readonly fetch?: typeof fetch;
 }
 
-/**
- * Production impl: self-fetches `POST /api/processes/:id/run` with the
- * platform API key. Encapsulates exactly today's pattern — `getAppBaseUrl()`
- * + `fetch(...)` + `X-Api-Key` header + `.catch(() => {})`. Errors are
- * intentionally swallowed: the kick is fire-and-forget; downstream auto-
- * runner failures show up in the run's own audit trail, not here.
- *
- * The `baseUrl` / `apiKey` getters are functions, not strings, so callers
- * can plug `getAppBaseUrl` (which reads env at call time and is overridable
- * by tests) without baking a startup-time URL into a module singleton.
- */
+// `baseUrl` / `apiKey` are getters so env reads happen at call time, not
+// module-load time (so tests / env overrides take effect).
 export function createHttpSelfFetchRunKicker(
   config: HttpSelfFetchRunKickerConfig,
 ): RunKicker {
@@ -74,7 +50,7 @@ export function createHttpSelfFetchRunKicker(
           body: JSON.stringify({ triggeredBy: opts?.triggeredBy ?? 'api-user' }),
         });
       } catch {
-        // fire-and-forget — see header comment.
+        // fire-and-forget
       }
     },
   };

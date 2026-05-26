@@ -7,12 +7,6 @@ interface RouteContext {
   params: Promise<{ instanceId: string; stepId: string }>;
 }
 
-/**
- * POST /api/processes/:instanceId/steps/:stepId/retry
- *
- * Delegates state reset to `engine.retryStep`; handler emits the
- * Phase 3 `instance.retried` audit and kicks the auto-runner.
- */
 export const POST = createRouteAdapter<
   typeof RetryStepInputSchema,
   RetryStepInput,

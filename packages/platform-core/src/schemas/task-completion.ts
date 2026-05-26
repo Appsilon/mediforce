@@ -1,17 +1,7 @@
 import { z } from 'zod';
 
-/**
- * Payload shape for completing a `HumanTask` (the body of
- * `POST /api/tasks/:taskId/complete`).
- *
- * Defined here in platform-core so both `workflow-engine` (which validates
- * + applies the payload) and `platform-api` (which exposes the HTTP
- * contract) can import the type without creating an upward dep cycle.
- *
- * Five variants, discriminated by `kind`. The variant MUST match the
- * task's UI component / params configuration; `WorkflowEngine.completeHumanTask`
- * raises `CompleteHumanTaskValidationError` otherwise.
- */
+// Lives in platform-core so workflow-engine + platform-api can share the
+// type without an upward dep cycle.
 
 export const AttachmentSchema = z.object({
   name: z.string().min(1),
@@ -35,10 +25,7 @@ export const TableEditorRowSchema = z.object({
   values: z.record(z.string(), z.unknown()),
 });
 
-// Per-variant objects are `.strict()` so a typo in a sibling field (e.g.
-// `selectedIndices` instead of `selectedIndex`) fails parse instead of
-// silently dropping. Keeps the wire contract tight; UI/client must send
-// exactly the documented shape.
+// .strict() so typos like `selectedIndices` fail parse instead of dropping.
 export const CompleteHumanTaskPayloadSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('verdict'),

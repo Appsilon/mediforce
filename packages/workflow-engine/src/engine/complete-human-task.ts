@@ -5,21 +5,8 @@ import type {
 } from '@mediforce/platform-core';
 import { CompleteHumanTaskValidationError } from './errors.js';
 
-/**
- * Pure validation + stepOutput-build helpers backing
- * `WorkflowEngine.completeHumanTask`.
- *
- * Split out from the engine class because the bodies are large, payload-
- * variant-specific, and free of repository / engine state — easy to unit-
- * test in isolation. The class method orchestrates persistence; these
- * functions decide *what* to write.
- *
- * Each `validate*` throws `CompleteHumanTaskValidationError` on failure and
- * returns `void` on success.
- *
- * Each `build*StepOutput` returns the `{ completionData, stepOutput }` pair
- * the engine then persists.
- */
+// Pure helpers backing engine.completeHumanTask. Split out so per-variant
+// validation + stepOutput shaping is unit-testable without engine wiring.
 
 interface StepOutputBundle {
   readonly completionData: Record<string, unknown>;
@@ -28,11 +15,6 @@ interface StepOutputBundle {
 
 export type TaskKind = 'verdict' | 'params' | 'upload' | 'assignment' | 'rows';
 
-/**
- * Resolve which payload variant the task expects based on its UI / params
- * config. Returns the `kind` literal so the caller can compare against
- * `payload.kind` and reject mismatches before any per-variant logic runs.
- */
 export function resolveTaskKind(task: HumanTask): TaskKind {
   const component = task.ui?.component;
   if (component === 'file-upload') return 'upload';
@@ -140,9 +122,7 @@ export function buildVerdictStepOutput(
     if (agentReviewData?.reviewType === 'agent_output_review') {
       const agentResult = agentOutput?.result as Record<string, unknown> | null | undefined;
 
-      // Reject approval when agent produced no output — preserves
-      // resolveTask's hard-fail guard so an empty agent run can't be
-      // accidentally rubber-stamped.
+      // Block rubber-stamping an empty agent run.
       if (
         verdict === 'approve' &&
         (agentResult === null ||
@@ -309,23 +289,12 @@ export function buildRowsStepOutput(
   };
 }
 
-// ── orchestration ────────────────────────────────────────────────────────────
-
 export interface CompletionShape {
   readonly completionData: Record<string, unknown>;
   readonly stepOutput: Record<string, unknown>;
   readonly isL3Revise: boolean;
 }
 
-/**
- * Validate + shape a `HumanTask` completion. Pure: takes the task and the
- * payload, returns `{ completionData, stepOutput, isL3Revise }`. The engine
- * method takes care of persistence.
- *
- * Throws `CompleteHumanTaskValidationError` on any per-variant validation
- * failure (verdict allowlist, requiresComment, file constraints,
- * selectedIndex range, agent-review empty-output guard).
- */
 export function shapeCompletion(
   task: HumanTask,
   payload: CompleteHumanTaskPayload,

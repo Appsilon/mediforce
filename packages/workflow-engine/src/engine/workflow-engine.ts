@@ -667,44 +667,16 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
-  /**
-   * Resolve a `HumanTask` and advance the parent run.
-   *
-   * Single code path for every task-completion shape (verdict / params /
-   * upload / assignment / rows). Auto-claims if the task is still pending,
-   * validates the payload against the task's runtime config, persists the
-   * completion, resumes the paused parent, and advances the step graph —
-   * unless this is an L3-revise verdict, in which case the step stays put
-   * so the auto-runner re-executes the agent with reviewer feedback.
-   *
-   * Audit emission lives in the calling handler per ADR-0005 §7 (handler-
-   * resident bridge). This method does not append `task.completed` or
-   * `process.resumed_after_task`; the engine still emits `task.created`
-   * from `advanceStep` when the next step is human.
-   *
-   * **Audit-ordering invariant (pre-existing, preserved by this migration).**
-   * State writes (task.complete + instance.update + advanceStep) execute
-   * BEFORE the calling handler appends `task.completed` /
-   * `process.resumed_after_task`. A crash between this method's return and
-   * the handler's audit append therefore leaves the run advanced with no
-   * row in `auditEvents`. The contract matches the pre-migration behaviour
-   * of `lib/resolve-task.ts`; durable audit guarantees are the job of the
-   * future audit-wiring phase (ADR-0005 §7 "Long-term direction") via the
-   * transactional-outbox repo decorator.
-   *
-   * Throws:
-   *   - `CompleteHumanTaskValidationError` — per-variant payload validation
-   *     failure (verdict allowlist, requiresComment, file constraints,
-   *     selectedIndex range, agent-review empty-output guard, kind/task
-   *     mismatch). Adapter maps to HTTP 400.
-   *   - `InvalidTransitionError` — task already completed/cancelled, parent
-   *     instance not paused. Adapter maps to HTTP 409.
-   *   - `ParentInstanceNotFoundError` — task references a missing instance.
-   *     Adapter maps to HTTP 404.
-   *   - `Error('Task ...not found')` — unknown taskId; adapter falls back to
-   *     500 unless the calling handler pre-loaded via the workspace-gated
-   *     wrapper (recommended).
-   */
+  // Resolve a HumanTask and advance the parent run. Auto-claims if pending,
+  // validates the payload against the task's runtime config, persists the
+  // completion, resumes the paused parent, and advances — unless this is an
+  // L3-revise verdict, in which case the step stays put so the auto-runner
+  // re-executes the agent with reviewer feedback.
+  //
+  // State writes (task complete + instance update + advanceStep) happen
+  // BEFORE the handler emits task.completed / process.resumed_after_task.
+  // A crash in that gap leaves the run advanced with no audit row; matches
+  // pre-migration behaviour of lib/resolve-task.ts.
   async completeHumanTask(
     taskId: string,
     payload: CompleteHumanTaskPayload,
@@ -730,8 +702,6 @@ export class WorkflowEngine {
       throw new InvalidTransitionError(task.status, 'completeHumanTask');
     }
 
-    // Auto-claim pending tasks so the actor is recorded on the task even
-    // if they skipped the explicit claim step.
     let resolvedTask: HumanTask = task;
     if (task.status === 'pending') {
       resolvedTask = await this.humanTaskRepository.claim(taskId, actorId);

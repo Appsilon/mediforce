@@ -1,20 +1,6 @@
 import { z } from 'zod';
 
-/**
- * `POST /api/cron/heartbeat`.
- *
- * Operational endpoint invoked by the deployment's scheduler (cron, k8s
- * job, manual `mediforce cron heartbeat`) to fan out cron-triggered runs
- * for any workflow whose schedule is due. Caller must be apiKey
- * (system actor) — handler enforces.
- *
- * Audit emission per ADR-0005 §7:
- *   - `cron.heartbeat` itself stays `@no-audit` (operational call, no
- *     entity mutation).
- *   - `cron.trigger.fired` emitted ONCE PER FIRED TRIGGER inside the
- *     handler. Skipped triggers are not audited (they change no state);
- *     skip reasons surface in the response body + `console.log`.
- */
+// Audit: `cron.trigger.fired` emitted per fired trigger; skips not audited.
 export const HeartbeatInputSchema = z.object({});
 
 export const TriggeredEntrySchema = z.object({

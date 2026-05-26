@@ -42,16 +42,9 @@ export class MaxIterationsExceededError extends Error {
   }
 }
 
-/**
- * Thrown by `WorkflowEngine.completeHumanTask` when the supplied payload
- * fails per-variant validation against the task's runtime config — verdict
- * not in allowlist, missing required comment, file count out of range, etc.
- *
- * Distinct from `InvalidTransitionError` (state) and Zod parse errors
- * (shape) — this is the kind that needs the task's own data to detect, so
- * neither schema validation nor pure state checking covers it. The route
- * adapter maps it to HTTP 400 (validation).
- */
+// Per-variant payload validation failure that needs the task's runtime
+// config to detect (verdict allowlist, requiresComment, file constraints).
+// Distinct from InvalidTransitionError (state) and Zod parse errors (shape).
 export class CompleteHumanTaskValidationError extends Error {
   override name = 'CompleteHumanTaskValidationError';
 
@@ -63,11 +56,7 @@ export class CompleteHumanTaskValidationError extends Error {
   }
 }
 
-/**
- * Raised by engine methods when the parent `ProcessInstance` referenced by a
- * `HumanTask` (or other child entity) does not exist. Lets handlers `instanceof`-
- * check and map to HTTP 404 instead of string-matching the message text.
- */
+// Typed so handlers can instanceof-check instead of string-matching err.message.
 export class ParentInstanceNotFoundError extends Error {
   override name = 'ParentInstanceNotFoundError';
 

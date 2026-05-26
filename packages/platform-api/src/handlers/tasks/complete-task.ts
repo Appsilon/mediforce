@@ -12,18 +12,6 @@ import {
 } from '../../errors.js';
 import { loadOr404 } from '../_helpers.js';
 
-/**
- * `POST /api/tasks/:taskId/complete`.
- *
- * Workspace gate via `scope.tasks.getById` (the wrapper layer returns null
- * for tasks outside the caller's namespaces); delegates state-machine work
- * to `engine.completeHumanTask`; emits two audit events
- * (`task.completed` + `process.resumed_after_task`) per ADR-0005 §7
- * handler-resident bridge; fires the auto-runner kick.
- *
- * Audit emission preserves the pre-migration shape exactly so existing
- * consumers (compliance trail, UI activity log) see no break.
- */
 export async function completeTask(
   input: CompleteTaskInput,
   scope: CallerScope,

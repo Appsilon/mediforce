@@ -3,19 +3,8 @@ import type { StartRunInput, StartRunOutput } from '../../contract/runs.js';
 import type { CallerScope } from '../../repositories/index.js';
 import { ForbiddenError, NotFoundError, HandlerError } from '../../errors.js';
 
-/**
- * `POST /api/processes`.
- *
- * Fires a manual trigger to create + start a new run for the named WD. The
- * engine emits `instance.created` (inside `createInstance`) and
- * `instance.started` (inside `startInstance`) — both via `manualTrigger.fireWorkflow`,
- * so the handler does NOT double-emit. After creation, the auto-runner is
- * kicked so the first step executes.
- *
- * Response is entity echo `{ run }` per ADR-0005 §5 — replaces the
- * pre-Phase-3 `{ instanceId, status }` shape (UI + CLI callers updated in
- * the same PR).
- */
+// Engine's createInstance + startInstance emit instance.created /
+// instance.started; handler does NOT double-emit.
 export async function startRun(
   input: StartRunInput,
   scope: CallerScope,
@@ -46,8 +35,6 @@ export async function startRun(
     );
   }
 
-  // Cross-check workspace membership for non-public definitions (mirrors
-  // the pre-migration `requireNamespaceAccess` gate).
   if (!scope.caller.isSystemActor && definition.visibility !== 'public') {
     if (!scope.caller.namespaces.has(definition.namespace)) {
       throw new ForbiddenError();

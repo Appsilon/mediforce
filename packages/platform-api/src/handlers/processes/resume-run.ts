@@ -3,16 +3,7 @@ import type { CallerScope } from '../../repositories/index.js';
 import { PreconditionFailedError } from '../../errors.js';
 import { loadOr404 } from '../_helpers.js';
 
-/**
- * `POST /api/processes/:instanceId/resume`.
- *
- * State transition `paused | failed → running`. Allowing `failed` here
- * covers the agent-escalated / agent-paused recovery flow surfaced by the
- * UI banner — same source-state set as the pre-migration inline route.
- * Audit emission via handler-resident bridge per ADR-0005 §7. The auto-
- * runner kick fires after the state flip so the run picks up where it
- * paused.
- */
+// `failed` source state covers agent-escalated / agent-paused recovery.
 export async function resumeRun(
   input: ResumeRunInput,
   scope: CallerScope,

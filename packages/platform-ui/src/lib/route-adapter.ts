@@ -118,8 +118,6 @@ function jsonErrorResponse(err: HandlerError): NextResponse {
   return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
 }
 
-// Module-singleton: one prod kicker per process. `baseUrl` / `apiKey` are
-// re-read on each `kick()` so env-var changes during test runs take effect.
 const prodRunKicker: RunKicker = createHttpSelfFetchRunKicker({
   baseUrl: getAppBaseUrl,
   apiKey: () => process.env.PLATFORM_API_KEY ?? '',

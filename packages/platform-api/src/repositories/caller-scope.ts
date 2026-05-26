@@ -102,11 +102,5 @@ export interface SystemServices {
    * (the writer is a handler that already passed the read-side gate).
    */
   readonly audit: AuditRepository;
-  /**
-   * Auto-runner kick — fire-and-forget notify that an instance's current
-   * step needs executing. Prod impl self-fetches `/api/processes/:id/run`;
-   * test impl records calls. See `runtime/run-kicker.ts` + ADR-0005 §7 /
-   * headless-migration Phase 3 for the abstraction's purpose.
-   */
   readonly runKicker: RunKicker;
 }
