@@ -431,10 +431,18 @@ These are domain methods on the wrapper, mirroring how
 - The API now has a documented, typed contract for failure modes that
   external consumers (CLI today; MCP / partners later) can rely on
   without string-matching.
-- Server Action deletion in Phase 2 removes 8 of 6 hand-rolled
-  mutations from `app/actions/`; remaining files cover Phase 2.5 /
-  Phase 3 scope and stay until their endpoints migrate. By end of
-  Phase 3 the `app/actions/` directory is empty or gone.
+- Phase 2 closes on two endpoints, not six: `tasks/claim` (PR1) +
+  `processes/cancel` (PR2). The remaining four (`tasks/complete` +
+  discriminated-union body, `tasks/resolve` deletion, `processes/resume`)
+  reclassified to Phase 3 because all three depend on the still-undecided
+  orchestration-kick mechanism (Phase 3 §"Orchestration kick mechanism"
+  open question). See [#499](https://github.com/Appsilon/mediforce/issues/499)
+  for the design pass that produced this narrowing. Server Actions
+  deleted in Phase 2: `claimTask` (PR1), `cancelProcessRun` (PR2),
+  `unclaimTask` (PR2 — dead-code cut, no API replacement). Remaining
+  files cover Phase 2.5 / Phase 3 scope and stay until their endpoints
+  migrate. By end of Phase 3 the `app/actions/` directory is empty or
+  gone.
 - Audit emission has a temporary handler-resident location for Phase 2;
   the audit-wiring phase relocates it to the repository boundary
   uniformly across HTTP, engine, and worker writers.
