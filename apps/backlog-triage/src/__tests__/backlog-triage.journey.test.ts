@@ -230,32 +230,48 @@ describe('backlog-triage journey', () => {
       vi.unstubAllGlobals();
     });
 
-    async function runInlineScript(
+    interface InlineScriptResult {
+      result: Record<string, unknown>;
+      exitCode: number;
+      files: Record<string, string>;
+    }
+
+    async function runInlineScriptFull(
       script: string,
       inputJson: Record<string, unknown>,
       env: Record<string, string>,
-    ): Promise<Record<string, unknown>> {
-      const fakeFs = {
-        readFileSync: () => JSON.stringify(inputJson),
-      };
-      let resultPayload: Record<string, unknown> = {};
-      const captureWrite = (_path: string, content: string): void => {
-        resultPayload = JSON.parse(content);
+    ): Promise<InlineScriptResult> {
+      const files: Record<string, string> = {};
+      let exitCode = 0;
+      const captureWrite = (path: string, content: string): void => {
+        files[String(path).replace(/^.*\//, '')] = content;
       };
       const stripImports = script.replace(/^import\s+\{[^}]+\}\s+from\s+'fs';?\s*\n?/m, '');
       const wrapped = `return (async () => {\n${stripImports}\n})();`;
       const fn = new Function('readFileSync', 'writeFileSync', 'process', 'fetch', wrapped);
       try {
         await fn(
-          fakeFs.readFileSync,
+          () => JSON.stringify(inputJson),
           captureWrite,
           { env, exit: (code: number) => { throw new ScriptExit(code); } },
           mockFetch,
         );
       } catch (err) {
-        if (!(err instanceof ScriptExit)) throw err;
+        if (err instanceof ScriptExit) exitCode = err.code;
+        else throw err;
       }
-      return resultPayload;
+      const result = files['result.json'] !== undefined
+        ? (JSON.parse(files['result.json']) as Record<string, unknown>)
+        : {};
+      return { result, exitCode, files };
+    }
+
+    async function runInlineScript(
+      script: string,
+      inputJson: Record<string, unknown>,
+      env: Record<string, string>,
+    ): Promise<Record<string, unknown>> {
+      return (await runInlineScriptFull(script, inputJson, env)).result;
     }
 
     it('check-tags carries the untagged issues forward as options (no presentation file)', async () => {
@@ -304,6 +320,32 @@ describe('backlog-triage journey', () => {
       expect(options).toHaveLength(1);
       expect(options[0].id).toBe('101');
       expect(options[0].label).toBe('#101 A');
+    });
+
+    it('fetch-backlog paginates past PRs to collect up to `limit` real issues', async () => {
+      const step = wd.steps.find((s) => s.id === 'fetch-backlog')!;
+      const script = step.agent!.inlineScript!;
+      // Page 1: 100 items — 60 issues + 40 PRs (PRs eat the per_page budget). Page 2: 1 more issue.
+      const page1 = Array.from({ length: 100 }, (_, k) =>
+        k < 60
+          ? { number: 1000 + k, title: `Issue ${k}`, labels: [], html_url: `https://gh/${k}`, assignee: null }
+          : { number: 2000 + k, title: `PR ${k}`, pull_request: {}, labels: [], html_url: `https://gh/pr${k}` },
+      );
+      const page2 = [{ number: 3001, title: 'Oldest in window', labels: [], html_url: 'https://gh/3001', assignee: null }];
+      mockFetch
+        .mockResolvedValueOnce(new Response(JSON.stringify(page1), { status: 200, headers: { 'content-type': 'application/json' } }))
+        .mockResolvedValueOnce(new Response(JSON.stringify(page2), { status: 200, headers: { 'content-type': 'application/json' } }));
+
+      const result = await runInlineScript(script, { repo: 'owner/repo', limit: 70 }, { GITHUB_TOKEN: 'ghp_xxx' });
+
+      // 60 issues on page 1 (< limit 70) → fetch page 2 → 61 issues total; page 2 short-circuits the loop.
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect((mockFetch.mock.calls[0][0] as URL).searchParams.get('page')).toBe('1');
+      expect((mockFetch.mock.calls[0][0] as URL).searchParams.get('per_page')).toBe('100');
+      expect((mockFetch.mock.calls[1][0] as URL).searchParams.get('page')).toBe('2');
+      const options = result.options as Array<Record<string, unknown>>;
+      expect(options).toHaveLength(61);
+      expect(options.every((o) => !String(o.label).includes('PR'))).toBe(true);
     });
 
     it('dispatch PATCHes GitHub for human assignments and POSTs Mediforce for agent assignments', async () => {
@@ -451,7 +493,7 @@ describe('backlog-triage journey', () => {
       expect(result.applied).toEqual([{ itemId: '7', labels: ['security', 'priority/P0'] }]);
     });
 
-    it('apply-tags records a per-row error on apply failure but continues', async () => {
+    it('apply-tags records a per-row error on apply failure but continues (partial = non-fatal, still surfaced)', async () => {
       const step = wd.steps.find((s) => s.id === 'apply-tags')!;
       const script = step.agent!.inlineScript!;
       mockFetch
@@ -462,7 +504,7 @@ describe('backlog-triage journey', () => {
         .mockResolvedValueOnce(new Response('{}', { status: 201 })) // create 'priority/P2' (row 102)
         .mockResolvedValueOnce(new Response('[]', { status: 200 })); // apply 102 → ok
 
-      const result = await runInlineScript(
+      const { result, exitCode, files } = await runInlineScriptFull(
         script,
         {
           repo: 'owner/repo',
@@ -478,15 +520,18 @@ describe('backlog-triage journey', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0].itemId).toBe('101');
       expect(result.applied).toEqual([{ itemId: '102', labels: ['tech-debt', 'priority/P2'] }]);
+      // Partial failure: step still succeeds, but the failure is surfaced in a presentation.
+      expect(exitCode).toBe(0);
+      expect(files['presentation.md']).toMatch(/1 applied, 1 failed/);
     });
 
-    it('apply-tags skips the add-labels POST when a label cannot be created (non-422)', async () => {
+    it('apply-tags fails the step (exit 1) and writes a presentation when every row fails', async () => {
       const step = wd.steps.find((s) => s.id === 'apply-tags')!;
       const script = step.agent!.inlineScript!;
-      // Only one call: the create POST fails with 403, so add-labels is never attempted.
+      // The create POST fails 403 → add-labels never attempted → the only row errors → total failure.
       mockFetch.mockResolvedValueOnce(new Response('forbidden', { status: 403, headers: { 'content-type': 'text/plain' } }));
 
-      const result = await runInlineScript(
+      const { result, exitCode, files } = await runInlineScriptFull(
         script,
         { repo: 'owner/repo', rows: [{ itemId: '9', values: { category: 'workflow', priority: 'P1' } }] },
         { GITHUB_TOKEN: 'ghp_xxx' },
@@ -498,6 +543,11 @@ describe('backlog-triage journey', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0].step).toBe('create-label');
       expect(result.applied).toEqual([]);
+      // Total failure → the step exits non-zero (red run, loop stops). The runner surfaces the
+      // first error from the log; it does NOT render a presentation on the failure path, so the
+      // script must not waste one there.
+      expect(exitCode).toBe(1);
+      expect(files['presentation.md']).toBeUndefined();
     });
   });
 });
