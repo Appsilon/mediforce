@@ -94,7 +94,7 @@ export async function register(): Promise<void> {
 }
 
 // ADR-0001 — Postgres migrations are NOT applied here. They run via
-// `packages/platform-ui/scripts/migrate-postgres.mjs`, invoked by the
+// `packages/platform-infra/scripts/migrate.mjs`, invoked by the
 // production Dockerfile's CMD before `server.js`. Local dev runs them
 // manually: `pnpm db:migrate`. See docs/postgres-local-dev.md.
 // Instrumentation-time migration was tried (commit cd540e85) but

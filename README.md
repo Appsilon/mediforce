@@ -129,12 +129,22 @@ Open `http://localhost:9007`. Use this to click through the UI without configuri
 | `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007. No cloud keys, no Docker, no Firebase project. |
 | `pnpm dev:no-docker` | Like `dev`, but agents run via host `claude` CLI instead of Docker. |
 | `pnpm dev:queue` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Requires Redis + worker running — see below. |
+| `pnpm dev:postgres` | One-command Postgres mode. Boots `postgres` + `redis` via docker compose, runs `pnpm db:migrate`, then starts the dev server with `STORAGE_BACKEND=postgres`. Idempotent — safe to re-run after pulling new migrations. |
 
 ### Postgres mode (ADR-0001)
 
 The new path. Bring up Postgres + Redis, point the app at them, set
 `STORAGE_BACKEND=postgres` to route migrated repositories through Postgres
 (today: `tool_catalog_entries`; more land per the [PLAN-0001 build order](docs/adr/PLAN-0001.md#52-build-order-postgres-implementations)).
+
+One command does all of the above:
+
+```bash
+pnpm dev:postgres                                  # docker compose up + migrate + dev
+```
+
+Manual equivalent if you need to wire your own env (e.g. point at an
+external Postgres):
 
 ```bash
 docker compose up postgres redis -d                # boot Postgres 16 + Redis
@@ -285,7 +295,7 @@ Add the matching GitHub secrets so the deploy script can render the host
 same shape Redis uses for `REDIS_PASSWORD`.
 
 The platform-ui container `CMD` wraps the app with
-[`scripts/migrate-postgres.mjs`](packages/platform-ui/scripts/migrate-postgres.mjs):
+[`packages/platform-infra/scripts/migrate.mjs`](packages/platform-infra/scripts/migrate.mjs):
 pending Drizzle migrations are applied before `server.js` starts (idempotent
 via drizzle's `drizzle.__drizzle_migrations` ledger). No separate migration
 step in the deploy pipeline.

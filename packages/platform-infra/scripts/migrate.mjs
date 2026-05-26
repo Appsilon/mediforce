@@ -30,12 +30,12 @@ if (typeof url !== 'string' || url.length === 0) {
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// In the runner stage of platform-ui's Dockerfile the migrations folder is
-// copied to `/app/packages/platform-infra/src/postgres/migrations` (see
-// Dockerfile §runner). This script lives at
-// `/app/packages/platform-ui/scripts/migrate-postgres.mjs`, so relative
-// resolution lands on the right directory.
-const migrationsFolder = resolve(__dirname, '..', '..', 'platform-infra', 'src', 'postgres', 'migrations');
+// Script lives at packages/platform-infra/scripts/migrate.mjs; the
+// migrations folder is a sibling under src/postgres/migrations. Same
+// path resolution works in source tree, runner-stage Docker layout
+// (Dockerfile copies both to /app/packages/platform-infra/...), and the
+// CI workspace.
+const migrationsFolder = resolve(__dirname, '..', 'src', 'postgres', 'migrations');
 
 const client = postgres(url, { max: 1, onnotice: () => {} });
 try {

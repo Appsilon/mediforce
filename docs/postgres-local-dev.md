@@ -44,7 +44,7 @@ any time you pull new migrations from main (it's idempotent — already-
 applied migrations are skipped via drizzle's ledger).
 
 > Docker production deploys are different: the platform-ui container's
-> CMD wraps `node packages/platform-ui/scripts/migrate-postgres.mjs && node server.js`,
+> CMD wraps `node packages/platform-infra/scripts/migrate.mjs && node server.js`,
 > so prod auto-applies pending migrations before the app starts. Local
 > dev runs outside Docker → manual `pnpm db:migrate`.
 
