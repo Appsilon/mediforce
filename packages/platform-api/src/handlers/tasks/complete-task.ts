@@ -11,7 +11,7 @@ import {
   NotFoundError,
   PreconditionFailedError,
 } from '../../errors.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
+import { actorFromCaller, emitAudit, loadOr404 } from '../_helpers.js';
 
 interface AuditFields {
   description: string;
@@ -103,8 +103,8 @@ export async function completeTask(
   );
   const auditActor = { ...actor, actorId };
 
-  await scope.system.audit.append({
-    ...auditActor,
+  await emitAudit(scope, {
+    actor: auditActor,
     action: 'task.completed',
     description,
     timestamp: now,
@@ -116,17 +116,15 @@ export async function completeTask(
     processInstanceId: updatedTask.processInstanceId,
   });
 
-  await scope.system.audit.append({
-    ...auditActor,
+  await emitAudit(scope, {
+    actor: auditActor,
     action: 'process.resumed_after_task',
     description: `Process '${updatedTask.processInstanceId}' resumed after resolving step '${resolvedStepId}'`,
-    timestamp: new Date().toISOString(),
     inputSnapshot: {
       taskId: input.taskId,
       processInstanceId: updatedTask.processInstanceId,
       stepId: resolvedStepId,
     },
-    outputSnapshot: {},
     basis: 'Task resolution triggered process advancement',
     entityType: 'processInstance',
     entityId: updatedTask.processInstanceId,

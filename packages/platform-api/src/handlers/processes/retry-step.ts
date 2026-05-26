@@ -2,7 +2,7 @@ import { InvalidTransitionError } from '@mediforce/workflow-engine';
 import type { RetryStepInput, RetryStepOutput } from '../../contract/processes.js';
 import type { CallerScope } from '../../repositories/index.js';
 import { PreconditionFailedError } from '../../errors.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
+import { actorFromCaller, emitAudit, loadOr404 } from '../_helpers.js';
 
 // Engine emits `step.retried` (stepExecution-scoped); handler additionally
 // emits `instance.retried` for the processInstance-scoped audit lane.
@@ -36,11 +36,10 @@ export async function retryStep(
     .filter((e) => e.stepId === input.stepId)
     .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
 
-  await scope.system.audit.append({
-    ...actor,
+  await emitAudit(scope, {
+    actor,
     action: 'instance.retried',
     description: `Retried failed step '${input.stepId}' on instance '${input.runId}'`,
-    timestamp: new Date().toISOString(),
     inputSnapshot: {
       instanceId: input.runId,
       stepId: input.stepId,

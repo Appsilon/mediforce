@@ -1,7 +1,7 @@
 import type { ResumeRunInput, ResumeRunOutput } from '../../contract/processes.js';
 import type { CallerScope } from '../../repositories/index.js';
 import { PreconditionFailedError } from '../../errors.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
+import { actorFromCaller, emitAudit, loadOr404 } from '../_helpers.js';
 
 // `failed` source state covers agent-escalated / agent-paused recovery.
 export async function resumeRun(
@@ -27,8 +27,8 @@ export async function resumeRun(
 
   const actor = actorFromCaller(scope);
 
-  await scope.system.audit.append({
-    ...actor,
+  await emitAudit(scope, {
+    actor,
     action: 'instance.resumed',
     description: `Process '${input.runId}' manually resumed via API`,
     timestamp: now,

@@ -230,7 +230,7 @@ describe('cancelRun handler', () => {
       await cancelRun({ runId: 'inst-a' }, scope);
 
       const events = await auditRepo.getByProcess('inst-a');
-      expect(events[0]!.actorId).toBe('api');
+      expect(events[0]!.actorId).toBe('api-user');
       expect(events[0]!.actorType).toBe('system');
     });
   });

@@ -1,7 +1,12 @@
 import type { CancelRunInput, CancelRunOutput } from '../../contract/processes.js';
 import type { CallerScope } from '../../repositories/index.js';
 import { PreconditionFailedError } from '../../errors.js';
-import { loadOr404 } from '../_helpers.js';
+import { emitAudit, loadOr404 } from '../_helpers.js';
+
+// `actorId` for system callers is `'api-user'` (the canonical default from
+// `actorFromCaller`); the prior `'api'` was an inconsistency vs every other
+// handler. UI-vs-CLI-vs-API cancellation channel is captured by #509 via a
+// separate field, not by actorId.
 
 const DEFAULT_REASON = 'Cancelled by user';
 
@@ -36,11 +41,7 @@ export async function cancelRun(
     updatedAt: now,
   });
 
-  const isUser = scope.caller.kind === 'user';
-  await scope.system.audit.append({
-    actorId: isUser ? scope.caller.uid : 'api',
-    actorType: isUser ? 'user' : 'system',
-    actorRole: 'operator',
+  await emitAudit(scope, {
     action: 'instance.cancelled',
     description: `Run cancelled by operator (was ${run.status}${run.currentStepId ? ` at step '${run.currentStepId}'` : ''})`,
     timestamp: now,

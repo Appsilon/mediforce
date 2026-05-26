@@ -8,6 +8,7 @@ import type {
 } from '../../contract/cron.js';
 import type { CallerScope } from '../../repositories/index.js';
 import { ForbiddenError } from '../../errors.js';
+import { emitAudit } from '../_helpers.js';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
 
@@ -90,10 +91,12 @@ export async function heartbeat(
         lastTriggeredAt: now.toISOString(),
       });
 
-      await scope.system.audit.append({
-        actorId: 'cron-heartbeat',
-        actorType: 'system',
-        actorRole: 'scheduler',
+      await emitAudit(scope, {
+        actor: {
+          actorId: 'cron-heartbeat',
+          actorType: 'system',
+          actorRole: 'scheduler',
+        },
         action: 'cron.trigger.fired',
         description: `Cron trigger '${trigger.name}' fired for '${def.name}' v${def.version}`,
         timestamp: now.toISOString(),
