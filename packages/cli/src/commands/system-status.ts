@@ -1,21 +1,6 @@
-import { parseArgs } from 'node:util';
-import { Mediforce } from '@mediforce/platform-api/client';
 import type { DockerInfoResponse } from '@mediforce/platform-api/contract';
-import { resolveBaseUrl, resolveConfig } from '../config.js';
-import { printJson, printError, type OutputSink } from '../output.js';
-import { formatCliError } from '../errors.js';
-
-interface CommandInput {
-  argv: string[];
-  env: Record<string, string | undefined>;
-  output: OutputSink;
-}
-
-const OPTIONS = {
-  'base-url': { type: 'string' },
-  json: { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const;
+import { defineCommand } from '../define-command.js';
+import { printJson, type OutputSink } from '../output.js';
 
 function padRight(str: string, len: number): string {
   return str.length >= len ? str : str + ' '.repeat(len - str.length);
@@ -43,179 +28,106 @@ function printDisk(output: OutputSink, data: Extract<DockerInfoResponse, { avail
   output.stdout(`${padRight('Build Cache', 20)} ${padLeft('—', 6)} ${padLeft('—', 7)} ${padLeft(disk.buildCache.size, 10)}`);
 }
 
-function parseFlags(input: CommandInput): { flags: { 'base-url'?: string; json?: boolean; help?: boolean } } | { error: string } {
-  try {
-    const parsed = parseArgs({ args: input.argv, options: OPTIONS, strict: true, allowPositionals: false });
-    return { flags: parsed.values };
-  } catch (err) {
-    return { error: String(err) };
-  }
-}
+const STATUS_HELP = 'Usage: mediforce system status [--base-url <url>] [--json] [--help]\n\nShow Docker infrastructure status: images, disk usage, and connectivity.\n';
+const IMAGES_HELP = 'Usage: mediforce system images [--base-url <url>] [--json] [--help]\n\nList Docker images available on the platform.\n';
+const DISK_HELP = 'Usage: mediforce system disk [--base-url <url>] [--json] [--help]\n\nShow Docker disk usage breakdown.\n';
+const RMI_HELP = 'Usage: mediforce system rmi <imageId> [--base-url <url>] [--json] [--help]\n\nRemove a Docker image by ID or name:tag.\n';
 
-function handleApiError(
-  err: unknown,
-  output: OutputSink,
-  jsonMode: boolean,
-  baseUrl: string,
-): number {
-  printError(output, formatCliError(err, { baseUrl, jsonMode }), jsonMode);
-  return 1;
-}
+const BASE_OPTIONS = {
+  'base-url': { type: 'string' },
+  json: { type: 'boolean' },
+  help: { type: 'boolean', short: 'h' },
+} as const;
 
-export async function systemStatusCommand(input: CommandInput): Promise<number> {
-  const result = parseFlags(input);
-  if ('error' in result) { input.output.stderr(`mediforce system status: ${result.error}`); return 2; }
-  const { flags } = result;
-
-  if (flags.help === true) {
-    input.output.stdout('Usage: mediforce system status [--base-url <url>] [--json] [--help]\n\nShow Docker infrastructure status: images, disk usage, and connectivity.\n');
-    return 0;
-  }
-
-  const jsonMode = flags.json === true;
-
-  try {
-    const config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
-    const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
+export const systemStatusCommand = defineCommand({
+  name: 'system status',
+  help: STATUS_HELP,
+  options: BASE_OPTIONS,
+  handler: async ({ mediforce, output, jsonMode }) => {
     const data = await mediforce.system.dockerInfo();
 
-    if (jsonMode) { printJson(input.output, data); return 0; }
-
-    if (data.available === false) {
-      input.output.stdout('Docker: unavailable (container-worker not reachable)');
+    if (jsonMode) {
+      printJson(output, data);
       return 0;
     }
 
-    input.output.stdout('Docker: connected\n');
-    printImages(input.output, data);
-    input.output.stdout('');
-    printDisk(input.output, data);
-    return 0;
-  } catch (err) {
-    return handleApiError(
-      err,
-      input.output,
-      jsonMode,
-      resolveBaseUrl({ flagBaseUrl: flags['base-url'], env: input.env }),
-    );
-  }
-}
-
-export async function systemImagesCommand(input: CommandInput): Promise<number> {
-  const result = parseFlags(input);
-  if ('error' in result) { input.output.stderr(`mediforce system images: ${result.error}`); return 2; }
-  const { flags } = result;
-
-  if (flags.help === true) {
-    input.output.stdout('Usage: mediforce system images [--base-url <url>] [--json] [--help]\n\nList Docker images available on the platform.\n');
-    return 0;
-  }
-
-  const jsonMode = flags.json === true;
-
-  try {
-    const config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
-    const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
-    const data = await mediforce.system.dockerInfo();
-
     if (data.available === false) {
-      if (jsonMode) { printJson(input.output, { images: [], available: false }); }
-      else { input.output.stdout('Docker unavailable — no images to show.'); }
+      output.stdout('Docker: unavailable (container-worker not reachable)');
       return 0;
     }
 
-    if (jsonMode) { printJson(input.output, { images: data.images }); return 0; }
-    printImages(input.output, data);
+    output.stdout('Docker: connected\n');
+    printImages(output, data);
+    output.stdout('');
+    printDisk(output, data);
     return 0;
-  } catch (err) {
-    return handleApiError(
-      err,
-      input.output,
-      jsonMode,
-      resolveBaseUrl({ flagBaseUrl: flags['base-url'], env: input.env }),
-    );
-  }
-}
+  },
+});
 
-export async function systemRmiCommand(input: CommandInput): Promise<number> {
-  let flags: { 'base-url'?: string; json?: boolean; help?: boolean };
-  let positionals: string[];
-  try {
-    const parsed = parseArgs({ args: input.argv, options: OPTIONS, strict: true, allowPositionals: true });
-    flags = parsed.values;
-    positionals = parsed.positionals;
-  } catch (err) {
-    input.output.stderr(`mediforce system rmi: ${String(err)}`);
-    return 2;
-  }
+export const systemImagesCommand = defineCommand({
+  name: 'system images',
+  help: IMAGES_HELP,
+  options: BASE_OPTIONS,
+  handler: async ({ mediforce, output, jsonMode }) => {
+    const data = await mediforce.system.dockerInfo();
 
-  if (flags.help === true) {
-    input.output.stdout('Usage: mediforce system rmi <imageId> [--base-url <url>] [--json] [--help]\n\nRemove a Docker image by ID or name:tag.\n');
+    if (data.available === false) {
+      if (jsonMode) {
+        printJson(output, { images: [], available: false });
+      } else {
+        output.stdout('Docker unavailable — no images to show.');
+      }
+      return 0;
+    }
+
+    if (jsonMode) {
+      printJson(output, { images: data.images });
+      return 0;
+    }
+    printImages(output, data);
     return 0;
-  }
+  },
+});
 
-  const imageId = positionals[0];
-  if (!imageId) {
-    input.output.stderr('mediforce system rmi: missing image ID');
-    input.output.stderr('Usage: mediforce system rmi <imageId>');
-    return 2;
-  }
+export const systemDiskCommand = defineCommand({
+  name: 'system disk',
+  help: DISK_HELP,
+  options: BASE_OPTIONS,
+  handler: async ({ mediforce, output, jsonMode }) => {
+    const data = await mediforce.system.dockerInfo();
 
-  const jsonMode = flags.json === true;
+    if (data.available === false) {
+      if (jsonMode) {
+        printJson(output, { disk: null, available: false });
+      } else {
+        output.stdout('Docker unavailable — no disk info to show.');
+      }
+      return 0;
+    }
 
-  try {
-    const config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
-    const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
+    if (jsonMode) {
+      printJson(output, { disk: data.disk });
+      return 0;
+    }
+    printDisk(output, data);
+    return 0;
+  },
+});
+
+export const systemRmiCommand = defineCommand({
+  name: 'system rmi',
+  help: RMI_HELP,
+  options: BASE_OPTIONS,
+  positionals: ['<imageId>'] as const,
+  handler: async ({ positionals, mediforce, output, jsonMode }) => {
+    const imageId = positionals[0]!;
     const result = await mediforce.system.removeImage(imageId);
 
     if (jsonMode) {
-      printJson(input.output, result);
+      printJson(output, result);
       return 0;
     }
-    input.output.stdout(`Deleted: ${result.deleted}`);
+    output.stdout(`Deleted: ${result.deleted}`);
     return 0;
-  } catch (err) {
-    return handleApiError(
-      err,
-      input.output,
-      jsonMode,
-      resolveBaseUrl({ flagBaseUrl: flags['base-url'], env: input.env }),
-    );
-  }
-}
-
-export async function systemDiskCommand(input: CommandInput): Promise<number> {
-  const result = parseFlags(input);
-  if ('error' in result) { input.output.stderr(`mediforce system disk: ${result.error}`); return 2; }
-  const { flags } = result;
-
-  if (flags.help === true) {
-    input.output.stdout('Usage: mediforce system disk [--base-url <url>] [--json] [--help]\n\nShow Docker disk usage breakdown.\n');
-    return 0;
-  }
-
-  const jsonMode = flags.json === true;
-
-  try {
-    const config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
-    const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
-    const data = await mediforce.system.dockerInfo();
-
-    if (data.available === false) {
-      if (jsonMode) { printJson(input.output, { disk: null, available: false }); }
-      else { input.output.stdout('Docker unavailable — no disk info to show.'); }
-      return 0;
-    }
-
-    if (jsonMode) { printJson(input.output, { disk: data.disk }); return 0; }
-    printDisk(input.output, data);
-    return 0;
-  } catch (err) {
-    return handleApiError(
-      err,
-      input.output,
-      jsonMode,
-      resolveBaseUrl({ flagBaseUrl: flags['base-url'], env: input.env }),
-    );
-  }
-}
+  },
+});

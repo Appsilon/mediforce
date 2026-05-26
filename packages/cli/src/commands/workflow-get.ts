@@ -1,15 +1,6 @@
-import { parseArgs } from 'node:util';
 import { writeFile } from 'node:fs/promises';
-import { Mediforce } from '@mediforce/platform-api/client';
-import { resolveConfig } from '../config.js';
-import { printJson, printError, type OutputSink } from '../output.js';
-import { formatCliError } from '../errors.js';
-
-interface CommandInput {
-  argv: string[];
-  env: Record<string, string | undefined>;
-  output: OutputSink;
-}
+import { defineCommand } from '../define-command.js';
+import { printError } from '../output.js';
 
 const HELP = `Usage: mediforce workflow get <name> --namespace <ns> [options]
 
@@ -31,92 +22,48 @@ Optional flags:
   --help, -h           Show this help text
 `;
 
-const GET_OPTIONS = {
-  namespace: { type: 'string' },
-  version: { type: 'string' },
-  output: { type: 'string' },
-  template: { type: 'boolean' },
-  'base-url': { type: 'string' },
-  json: { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const;
+export const workflowGetCommand = defineCommand({
+  name: 'workflow get',
+  help: HELP,
+  options: {
+    namespace: { type: 'string' },
+    version: { type: 'string' },
+    output: { type: 'string' },
+    template: { type: 'boolean' },
+    'base-url': { type: 'string' },
+    json: { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' },
+  } as const,
+  positionals: ['<name>'] as const,
+  handler: async ({ flags, positionals, mediforce, output, jsonMode }) => {
+    const name = positionals[0]!;
 
-export async function workflowGetCommand(input: CommandInput): Promise<number> {
-  let positionals: string[];
-  let flags: {
-    namespace?: string;
-    version?: string;
-    output?: string;
-    template?: boolean;
-    'base-url'?: string;
-    json?: boolean;
-    help?: boolean;
-  };
-  try {
-    const parsed = parseArgs({
-      args: input.argv,
-      options: GET_OPTIONS,
-      strict: true,
-      allowPositionals: true,
-    });
-    positionals = parsed.positionals;
-    flags = parsed.values;
-  } catch (err) {
-    input.output.stderr(`mediforce workflow get: ${String(err)}`);
-    input.output.stderr('');
-    input.output.stderr(HELP);
-    return 2;
-  }
+    const namespace = flags.namespace;
+    if (typeof namespace !== 'string' || namespace.length === 0) {
+      printError(output, { error: '--namespace is required' }, jsonMode);
+      return 2;
+    }
 
-  const jsonMode = flags.json === true;
+    const version =
+      flags.version !== undefined ? Number(flags.version) : undefined;
+    if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
+      printError(output, { error: `Invalid --version: ${flags.version}` }, jsonMode);
+      return 2;
+    }
 
-  if (flags.help === true) {
-    input.output.stdout(HELP);
-    return 0;
-  }
-
-  const name = positionals[0];
-  if (typeof name !== 'string' || name.length === 0) {
-    printError(input.output, { error: '<name> is required' }, jsonMode);
-    return 2;
-  }
-
-  const namespace = flags.namespace;
-  if (typeof namespace !== 'string' || namespace.length === 0) {
-    printError(input.output, { error: '--namespace is required' }, jsonMode);
-    return 2;
-  }
-
-  const version =
-    flags.version !== undefined ? Number(flags.version) : undefined;
-  if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
-    printError(input.output, { error: `Invalid --version: ${flags.version}` }, jsonMode);
-    return 2;
-  }
-
-  let config;
-  try {
-    config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
-  } catch (err) {
-    printError(input.output, { error: String(err) }, jsonMode);
-    return 2;
-  }
-
-  const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
-  try {
     const result = await mediforce.workflows.get({ name, namespace, version });
-    let output: unknown = result.definition;
+    let payload: unknown = result.definition;
 
     if (flags.template === true) {
       const { version: _v, createdAt: _c, namespace: _n, ...template } = result.definition;
-      output = template;
+      payload = template;
     }
 
-    const json = JSON.stringify(output, null, 2);
+    const json = JSON.stringify(payload, null, 2);
 
     if (typeof flags.output === 'string' && flags.output.length > 0) {
       await writeFile(flags.output, json + '\n', 'utf-8');
-      input.output.stdout(`Written to ${flags.output}`);
+      output.stdout(`Written to ${flags.output}`);
     } else {
       if (!jsonMode) {
         const def = result.definition;
@@ -124,15 +71,12 @@ export async function workflowGetCommand(input: CommandInput): Promise<number> {
         const transCount = Array.isArray(def.transitions) ? def.transitions.length : 0;
         const triggerCount = Array.isArray(def.triggers) ? def.triggers.length : 0;
         const visibility = def.visibility ?? 'private';
-        input.output.stdout(
+        output.stdout(
           `${def.name} v${String(def.version)} (namespace: ${def.namespace}, ${visibility}, ${String(stepCount)} steps, ${String(transCount)} transitions, ${String(triggerCount)} triggers)`,
         );
       }
-      input.output.stdout(json);
+      output.stdout(json);
     }
     return 0;
-  } catch (err) {
-    printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);
-    return 1;
-  }
-}
+  },
+});

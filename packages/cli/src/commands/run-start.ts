@@ -1,16 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { parseArgs } from 'node:util';
-import { Mediforce } from '@mediforce/platform-api/client';
-import { resolveConfig } from '../config.js';
-import { printJson, printError, type OutputSink } from '../output.js';
-import { formatCliError } from '../errors.js';
-
-interface CommandInput {
-  argv: string[];
-  env: Record<string, string | undefined>;
-  output: OutputSink;
-  stdin?: () => Promise<string>;
-}
+import { defineCommand } from '../define-command.js';
+import { printJson, printError } from '../output.js';
 
 const HELP = `Usage: mediforce run start --workflow <name> [options]
 
@@ -36,133 +26,92 @@ After start, follow the run with:
   mediforce run get <runId>
 `;
 
-const RUN_START_OPTIONS = {
-  workflow: { type: 'string' },
-  namespace: { type: 'string' },
-  version: { type: 'string' },
-  trigger: { type: 'string' },
-  'triggered-by': { type: 'string' },
-  input: { type: 'string' },
-  'input-file': { type: 'string' },
-  'base-url': { type: 'string' },
-  json: { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const;
-
-export async function runStartCommand(input: CommandInput): Promise<number> {
-  let flags: {
-    workflow?: string;
-    namespace?: string;
-    version?: string;
-    trigger?: string;
-    'triggered-by'?: string;
-    input?: string;
-    'input-file'?: string;
-    'base-url'?: string;
-    json?: boolean;
-    help?: boolean;
-  };
-  try {
-    const parsed = parseArgs({
-      args: input.argv,
-      options: RUN_START_OPTIONS,
-      strict: true,
-      allowPositionals: false,
-    });
-    flags = parsed.values;
-  } catch (err) {
-    input.output.stderr(`mediforce run start: ${String(err)}`);
-    input.output.stderr('');
-    input.output.stderr(HELP);
-    return 2;
-  }
-  const jsonMode = flags.json === true;
-
-  if (flags.help === true) {
-    input.output.stdout(HELP);
-    return 0;
-  }
-
-  if (typeof flags.workflow !== 'string' || flags.workflow.length === 0) {
-    printError(input.output, { error: '--workflow is required' }, jsonMode);
-    input.output.stderr('');
-    input.output.stderr(HELP);
-    return 2;
-  }
-
-  let definitionVersion: number | undefined;
-  if (typeof flags.version === 'string') {
-    const parsedVersion = Number.parseInt(flags.version, 10);
-    if (!Number.isInteger(parsedVersion) || parsedVersion <= 0) {
-      printError(
-        input.output,
-        { error: `--version must be a positive integer, got '${flags.version}'` },
-        jsonMode,
-      );
+export const runStartCommand = defineCommand({
+  name: 'run start',
+  help: HELP,
+  options: {
+    workflow: { type: 'string' },
+    namespace: { type: 'string' },
+    version: { type: 'string' },
+    trigger: { type: 'string' },
+    'triggered-by': { type: 'string' },
+    input: { type: 'string' },
+    'input-file': { type: 'string' },
+    'base-url': { type: 'string' },
+    json: { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' },
+  } as const,
+  handler: async ({ flags, mediforce, output, jsonMode, stdin }) => {
+    if (typeof flags.workflow !== 'string' || flags.workflow.length === 0) {
+      printError(output, { error: '--workflow is required' }, jsonMode);
+      output.stderr('');
+      output.stderr(HELP);
       return 2;
     }
-    definitionVersion = parsedVersion;
-  }
 
-  if (typeof flags.input === 'string' && typeof flags['input-file'] === 'string') {
-    printError(input.output, { error: 'Cannot use both --input and --input-file' }, jsonMode);
-    return 2;
-  }
-
-  let payload: Record<string, unknown> | undefined;
-  if (typeof flags.input === 'string') {
-    try {
-      payload = JSON.parse(flags.input) as Record<string, unknown>;
-    } catch {
-      printError(input.output, { error: `--input is not valid JSON: ${flags.input}` }, jsonMode);
-      return 2;
-    }
-    if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
-      printError(input.output, { error: '--input must be a JSON object' }, jsonMode);
-      return 2;
-    }
-  } else if (typeof flags['input-file'] === 'string') {
-    let raw: string;
-    if (flags['input-file'] === '-') {
-      if (!input.stdin) {
-        printError(input.output, { error: 'stdin not available' }, jsonMode);
-        return 2;
-      }
-      raw = await input.stdin();
-    } else {
-      try {
-        raw = await readFile(flags['input-file'], 'utf-8');
-      } catch (err) {
+    let definitionVersion: number | undefined;
+    if (typeof flags.version === 'string') {
+      const parsedVersion = Number.parseInt(flags.version, 10);
+      if (!Number.isInteger(parsedVersion) || parsedVersion <= 0) {
         printError(
-          input.output,
-          { error: `Cannot read --input-file '${flags['input-file']}': ${String(err)}` },
+          output,
+          { error: `--version must be a positive integer, got '${flags.version}'` },
           jsonMode,
         );
         return 2;
       }
+      definitionVersion = parsedVersion;
     }
-    try {
-      payload = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      printError(input.output, { error: `--input-file contains invalid JSON` }, jsonMode);
+
+    if (typeof flags.input === 'string' && typeof flags['input-file'] === 'string') {
+      printError(output, { error: 'Cannot use both --input and --input-file' }, jsonMode);
       return 2;
     }
-    if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
-      printError(input.output, { error: '--input-file must contain a JSON object' }, jsonMode);
-      return 2;
+
+    let payload: Record<string, unknown> | undefined;
+    if (typeof flags.input === 'string') {
+      try {
+        payload = JSON.parse(flags.input) as Record<string, unknown>;
+      } catch {
+        printError(output, { error: `--input is not valid JSON: ${flags.input}` }, jsonMode);
+        return 2;
+      }
+      if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+        printError(output, { error: '--input must be a JSON object' }, jsonMode);
+        return 2;
+      }
+    } else if (typeof flags['input-file'] === 'string') {
+      let raw: string;
+      if (flags['input-file'] === '-') {
+        if (!stdin) {
+          printError(output, { error: 'stdin not available' }, jsonMode);
+          return 2;
+        }
+        raw = await stdin();
+      } else {
+        try {
+          raw = await readFile(flags['input-file'], 'utf-8');
+        } catch (err) {
+          printError(
+            output,
+            { error: `Cannot read --input-file '${flags['input-file']}': ${String(err)}` },
+            jsonMode,
+          );
+          return 2;
+        }
+      }
+      try {
+        payload = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        printError(output, { error: `--input-file contains invalid JSON` }, jsonMode);
+        return 2;
+      }
+      if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+        printError(output, { error: '--input-file must contain a JSON object' }, jsonMode);
+        return 2;
+      }
     }
-  }
 
-  let config;
-  try {
-    config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
-  } catch (err) {
-    printError(input.output, { error: String(err) }, jsonMode);
-    return 2;
-  }
-
-  const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
-  try {
     const result = await mediforce.runs.start({
       namespace: flags.namespace,
       definitionName: flags.workflow,
@@ -172,17 +121,14 @@ export async function runStartCommand(input: CommandInput): Promise<number> {
       payload,
     });
     if (jsonMode) {
-      printJson(input.output, result);
+      printJson(output, result);
       return 0;
     }
-    input.output.stdout(`Run started`);
-    input.output.stdout(`  instanceId: ${result.instanceId}`);
-    input.output.stdout(`  status:     ${result.status}`);
-    input.output.stdout('');
-    input.output.stdout(`Follow with: mediforce run get ${result.instanceId}`);
+    output.stdout(`Run started`);
+    output.stdout(`  instanceId: ${result.instanceId}`);
+    output.stdout(`  status:     ${result.status}`);
+    output.stdout('');
+    output.stdout(`Follow with: mediforce run get ${result.instanceId}`);
     return 0;
-  } catch (err) {
-    printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);
-    return 1;
-  }
-}
+  },
+});

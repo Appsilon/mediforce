@@ -1,24 +1,15 @@
-import { parseArgs } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Mediforce } from '@mediforce/platform-api/client';
 import {
   RegisterWorkflowInputSchema,
   type RegisterWorkflowInput,
 } from '@mediforce/platform-api/contract';
 import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
-import { resolveConfig } from '../config.js';
+import { defineCommand } from '../define-command.js';
 import { printJson, printError, type OutputSink } from '../output.js';
-import { formatCliError } from '../errors.js';
 
 const execFileAsync = promisify(execFile);
-
-interface CommandInput {
-  argv: string[];
-  env: Record<string, string | undefined>;
-  output: OutputSink;
-}
 
 async function checkImageExists(image: string): Promise<boolean> {
   try {
@@ -73,158 +64,118 @@ Optional flags:
   --help, -h           Show this help text
 `;
 
-const REGISTER_OPTIONS = {
-  file: { type: 'string' },
-  namespace: { type: 'string' },
-  visibility: { type: 'string' },
-  'base-url': { type: 'string' },
-  'dry-run': { type: 'boolean' },
-  json: { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const;
+export const workflowRegisterCommand = defineCommand({
+  name: 'workflow register',
+  help: HELP,
+  options: {
+    file: { type: 'string' },
+    namespace: { type: 'string' },
+    visibility: { type: 'string' },
+    'base-url': { type: 'string' },
+    'dry-run': { type: 'boolean' },
+    json: { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' },
+  } as const,
+  skipClientWhen: (flags) => flags['dry-run'] === true,
+  handler: async ({ flags, mediforce, output, jsonMode }) => {
+    if (typeof flags.file !== 'string' || flags.file.length === 0) {
+      printError(output, { error: '--file is required' }, jsonMode);
+      return 2;
+    }
+    if (typeof flags.namespace !== 'string' || flags.namespace.length === 0) {
+      printError(output, { error: '--namespace is required' }, jsonMode);
+      return 2;
+    }
 
-export async function workflowRegisterCommand(input: CommandInput): Promise<number> {
-  let flags: {
-    file?: string;
-    namespace?: string;
-    visibility?: string;
-    'base-url'?: string;
-    'dry-run'?: boolean;
-    json?: boolean;
-    help?: boolean;
-  };
-  try {
-    const parsed = parseArgs({
-      args: input.argv,
-      options: REGISTER_OPTIONS,
-      strict: true,
-      allowPositionals: false,
-    });
-    flags = parsed.values;
-  } catch (err) {
-    input.output.stderr(`mediforce workflow register: ${String(err)}`);
-    input.output.stderr('');
-    input.output.stderr(HELP);
-    return 2;
-  }
-  const jsonMode = flags.json === true;
+    if (flags.visibility !== undefined && flags.visibility !== 'public' && flags.visibility !== 'private') {
+      printError(output, { error: '--visibility must be "public" or "private"' }, jsonMode);
+      return 2;
+    }
 
-  if (flags.help === true) {
-    input.output.stdout(HELP);
-    return 0;
-  }
-
-  if (typeof flags.file !== 'string' || flags.file.length === 0) {
-    printError(input.output, { error: '--file is required' }, jsonMode);
-    return 2;
-  }
-  if (typeof flags.namespace !== 'string' || flags.namespace.length === 0) {
-    printError(input.output, { error: '--namespace is required' }, jsonMode);
-    return 2;
-  }
-
-  if (flags.visibility !== undefined && flags.visibility !== 'public' && flags.visibility !== 'private') {
-    printError(input.output, { error: '--visibility must be "public" or "private"' }, jsonMode);
-    return 2;
-  }
-
-  let raw: string;
-  try {
-    raw = await readFile(flags.file, 'utf-8');
-  } catch (err) {
-    printError(
-      input.output,
-      { error: `Failed to read file: ${flags.file} — ${String(err)}` },
-      jsonMode,
-    );
-    return 1;
-  }
-
-  let body: RegisterWorkflowInput;
-  try {
-    const parsedJson: unknown = JSON.parse(raw);
-    const result = RegisterWorkflowInputSchema.safeParse(parsedJson);
-    if (!result.success) {
+    let raw: string;
+    try {
+      raw = await readFile(flags.file, 'utf-8');
+    } catch (err) {
       printError(
-        input.output,
-        {
-          error: 'Invalid workflow definition',
-          body: result.error.issues,
-        },
+        output,
+        { error: `Failed to read file: ${flags.file} — ${String(err)}` },
         jsonMode,
       );
       return 1;
     }
-    body = result.data;
-    if (flags.visibility !== undefined) {
-      body = { ...body, visibility: flags.visibility as 'public' | 'private' };
-    }
-  } catch (err) {
-    printError(input.output, { error: `Invalid JSON: ${String(err)}` }, jsonMode);
-    return 1;
-  }
 
-  if (flags['dry-run'] === true) {
-    // Mirror the server-side parse exactly so dry-run can never pass while a
-    // real POST would fail. The server applies `parseWorkflowDefinitionForCreation`
-    // (= WorkflowDefinitionBase.omit({version, createdAt}).superRefine(validateInputForNextRun))
-    // after injecting the namespace from the query string. We do the same here
-    // and emit the same `{ error: 'Validation failed', issues }` shape.
-    const serverParse = parseWorkflowDefinitionForCreation({
-      ...body,
-      namespace: flags.namespace,
-    });
-    if (!serverParse.success) {
-      printError(
-        input.output,
-        { error: 'Validation failed', body: serverParse.error.issues },
-        jsonMode,
-      );
+    let body: RegisterWorkflowInput;
+    try {
+      const parsedJson: unknown = JSON.parse(raw);
+      const result = RegisterWorkflowInputSchema.safeParse(parsedJson);
+      if (!result.success) {
+        printError(
+          output,
+          {
+            error: 'Invalid workflow definition',
+            body: result.error.issues,
+          },
+          jsonMode,
+        );
+        return 1;
+      }
+      body = result.data;
+      if (flags.visibility !== undefined) {
+        body = { ...body, visibility: flags.visibility as 'public' | 'private' };
+      }
+    } catch (err) {
+      printError(output, { error: `Invalid JSON: ${String(err)}` }, jsonMode);
       return 1;
     }
-    const summary = {
-      success: true,
-      dryRun: true,
-      name: body.name,
-      namespace: flags.namespace,
-      stepCount: body.steps.length,
-      transitionCount: body.transitions.length,
-      triggerCount: body.triggers.length,
-    };
-    if (jsonMode) {
-      printJson(input.output, summary);
-    } else {
-      input.output.stdout(
-        `[dry-run] OK — ${body.name} (namespace: ${flags.namespace}, ${String(body.steps.length)} steps, ${String(body.transitions.length)} transitions, ${String(body.triggers.length)} triggers)`,
-      );
+
+    if (flags['dry-run'] === true) {
+      // Mirror the server-side parse exactly so dry-run can never pass while a
+      // real POST would fail. The server applies `parseWorkflowDefinitionForCreation`
+      // (= WorkflowDefinitionBase.omit({version, createdAt}).superRefine(validateInputForNextRun))
+      // after injecting the namespace from the query string. We do the same here
+      // and emit the same `{ error: 'Validation failed', issues }` shape.
+      const serverParse = parseWorkflowDefinitionForCreation({
+        ...body,
+        namespace: flags.namespace,
+      });
+      if (!serverParse.success) {
+        printError(
+          output,
+          { error: 'Validation failed', body: serverParse.error.issues },
+          jsonMode,
+        );
+        return 1;
+      }
+      const summary = {
+        success: true,
+        dryRun: true,
+        name: body.name,
+        namespace: flags.namespace,
+        stepCount: body.steps.length,
+        transitionCount: body.transitions.length,
+        triggerCount: body.triggers.length,
+      };
+      if (jsonMode) {
+        printJson(output, summary);
+      } else {
+        output.stdout(
+          `[dry-run] OK — ${body.name} (namespace: ${flags.namespace}, ${String(body.steps.length)} steps, ${String(body.transitions.length)} transitions, ${String(body.triggers.length)} triggers)`,
+        );
+      }
+      return 0;
     }
-    return 0;
-  }
 
-  let config;
-  try {
-    config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
-  } catch (err) {
-    printError(input.output, { error: String(err) }, jsonMode);
-    return 2;
-  }
-
-  const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
-  try {
-    const result = await mediforce.workflows.register(body, {
+    const result = await mediforce!.workflows.register(body, {
       namespace: flags.namespace,
     });
     if (jsonMode) {
-      printJson(input.output, result);
+      printJson(output, result);
     } else {
-      input.output.stdout(
+      output.stdout(
         `Registered ${result.name} v${String(result.version)} (namespace: ${flags.namespace})`,
       );
     }
-    await warnMissingImages(body, input.output, jsonMode);
+    await warnMissingImages(body, output, jsonMode);
     return 0;
-  } catch (err) {
-    printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);
-    return 1;
-  }
-}
+  },
+});

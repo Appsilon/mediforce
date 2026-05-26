@@ -1,14 +1,5 @@
-import { parseArgs } from 'node:util';
-import { Mediforce } from '@mediforce/platform-api/client';
-import { resolveConfig } from '../config.js';
-import { printJson, printError, type OutputSink } from '../output.js';
-import { formatCliError } from '../errors.js';
-
-interface CommandInput {
-  argv: string[];
-  env: Record<string, string | undefined>;
-  output: OutputSink;
-}
+import { defineCommand } from '../define-command.js';
+import { printJson } from '../output.js';
 
 const HELP = `Usage: mediforce run get <runId> [options]
 
@@ -20,101 +11,43 @@ Optional flags:
   --help, -h           Show this help text
 `;
 
-const RUN_GET_OPTIONS = {
-  'base-url': { type: 'string' },
-  json: { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const;
-
-export async function runGetCommand(input: CommandInput): Promise<number> {
-  let flags: {
-    'base-url'?: string;
-    json?: boolean;
-    help?: boolean;
-  };
-  let positionals: string[];
-  try {
-    const parsed = parseArgs({
-      args: input.argv,
-      options: RUN_GET_OPTIONS,
-      strict: true,
-      allowPositionals: true,
-    });
-    flags = parsed.values;
-    positionals = parsed.positionals;
-  } catch (err) {
-    input.output.stderr(`mediforce run get: ${String(err)}`);
-    input.output.stderr('');
-    input.output.stderr(HELP);
-    return 2;
-  }
-  const jsonMode = flags.json === true;
-
-  if (flags.help === true) {
-    input.output.stdout(HELP);
-    return 0;
-  }
-
-  if (positionals.length === 0) {
-    printError(input.output, { error: 'runId is required' }, jsonMode);
-    input.output.stderr('');
-    input.output.stderr(HELP);
-    return 2;
-  }
-  if (positionals.length > 1) {
-    printError(
-      input.output,
-      { error: `Expected exactly one runId, got ${String(positionals.length)}` },
-      jsonMode,
-    );
-    input.output.stderr('');
-    input.output.stderr(HELP);
-    return 2;
-  }
-
-  const runId = positionals[0]!;
-
-  let config;
-  try {
-    config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
-  } catch (err) {
-    printError(input.output, { error: String(err) }, jsonMode);
-    return 2;
-  }
-
-  const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
-  try {
+export const runGetCommand = defineCommand({
+  name: 'run get',
+  help: HELP,
+  options: {
+    'base-url': { type: 'string' },
+    json: { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' },
+  } as const,
+  positionals: ['runId'] as const,
+  handler: async ({ positionals, mediforce, output, jsonMode, config }) => {
+    const runId = positionals[0]!;
     const result = await mediforce.runs.get({ runId });
     if (jsonMode) {
-      printJson(input.output, result);
+      printJson(output, result);
       return 0;
     }
-    input.output.stdout(`Run ${result.runId}`);
-    input.output.stdout(`  status:        ${result.status}`);
-    input.output.stdout(
-      `  currentStep:   ${result.currentStepId ?? '(none)'}`,
-    );
-    input.output.stdout(`  error:         ${result.error ?? '(none)'}`);
+    output.stdout(`Run ${result.runId}`);
+    output.stdout(`  status:        ${result.status}`);
+    output.stdout(`  currentStep:   ${result.currentStepId ?? '(none)'}`);
+    output.stdout(`  error:         ${result.error ?? '(none)'}`);
     if (
       typeof result.definitionNamespace === 'string' &&
       result.definitionNamespace.length > 0 &&
       typeof result.definitionName === 'string' &&
       result.definitionName.length > 0
     ) {
-      input.output.stdout(
+      output.stdout(
         `  url:           ${config.baseUrl}/${result.definitionNamespace}/workflows/${encodeURIComponent(result.definitionName)}/runs/${result.runId}`,
       );
     }
     if (result.totalCostUsd != null) {
       const isTerminal = result.status === 'completed' || result.status === 'failed';
-      input.output.stdout(`  cost:          $${result.totalCostUsd.toFixed(4)}${isTerminal ? '' : '+'}`);
+      output.stdout(`  cost:          $${result.totalCostUsd.toFixed(4)}${isTerminal ? '' : '+'}`);
     }
     if (result.finalOutput !== null && result.finalOutput !== undefined) {
-      input.output.stdout(`  finalOutput:   ${JSON.stringify(result.finalOutput)}`);
+      output.stdout(`  finalOutput:   ${JSON.stringify(result.finalOutput)}`);
     }
     return 0;
-  } catch (err) {
-    printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);
-    return 1;
-  }
-}
+  },
+});

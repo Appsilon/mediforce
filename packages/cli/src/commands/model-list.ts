@@ -1,14 +1,5 @@
-import { parseArgs } from 'node:util';
-import { Mediforce } from '@mediforce/platform-api/client';
-import { resolveConfig } from '../config.js';
-import { printJson, printError, type OutputSink } from '../output.js';
-import { formatCliError } from '../errors.js';
-
-interface CommandInput {
-  argv: string[];
-  env: Record<string, string | undefined>;
-  output: OutputSink;
-}
+import { defineCommand } from '../define-command.js';
+import { printJson } from '../output.js';
 
 const SORT_FIELDS = ['name', 'provider', 'context', 'price-in', 'price-out', 'popularity'] as const;
 type SortField = (typeof SORT_FIELDS)[number];
@@ -29,18 +20,6 @@ Optional flags:
   --help, -h               Show this help text
 `;
 
-const LIST_OPTIONS = {
-  provider: { type: 'string' },
-  tools: { type: 'boolean' },
-  vision: { type: 'boolean' },
-  'min-context': { type: 'string' },
-  sort: { type: 'string' },
-  desc: { type: 'boolean' },
-  'base-url': { type: 'string' },
-  json: { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const;
-
 function formatContext(tokens: number): string {
   if (tokens >= 1_000_000) return `${String(Math.round(tokens / 1_000_000))}M`;
   return `${String(Math.round(tokens / 1000))}K`;
@@ -59,49 +38,21 @@ function formatPrice(perToken: number): string {
   return `$${perMillion.toFixed(2)}/M`;
 }
 
-export async function modelListCommand(input: CommandInput): Promise<number> {
-  let flags: {
-    provider?: string;
-    tools?: boolean;
-    vision?: boolean;
-    'min-context'?: string;
-    sort?: string;
-    desc?: boolean;
-    'base-url'?: string;
-    json?: boolean;
-    help?: boolean;
-  };
-  try {
-    const parsed = parseArgs({
-      args: input.argv,
-      options: LIST_OPTIONS,
-      strict: true,
-      allowPositionals: false,
-    });
-    flags = parsed.values;
-  } catch (err) {
-    input.output.stderr(`mediforce model list: ${String(err)}`);
-    input.output.stderr('');
-    input.output.stderr(HELP);
-    return 2;
-  }
-  const jsonMode = flags.json === true;
-
-  if (flags.help === true) {
-    input.output.stdout(HELP);
-    return 0;
-  }
-
-  let config;
-  try {
-    config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
-  } catch (err) {
-    printError(input.output, { error: String(err) }, jsonMode);
-    return 2;
-  }
-
-  const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
-  try {
+export const modelListCommand = defineCommand({
+  name: 'model list',
+  help: HELP,
+  options: {
+    provider: { type: 'string' },
+    tools: { type: 'boolean' },
+    vision: { type: 'boolean' },
+    'min-context': { type: 'string' },
+    sort: { type: 'string' },
+    desc: { type: 'boolean' },
+    'base-url': { type: 'string' },
+    json: { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' },
+  } as const,
+  handler: async ({ flags, mediforce, output, jsonMode }) => {
     const result = await mediforce.models.list({
       provider: flags.provider,
       supportsTools: flags.tools,
@@ -109,16 +60,16 @@ export async function modelListCommand(input: CommandInput): Promise<number> {
       minContextLength: flags['min-context'] ? Number(flags['min-context']) : undefined,
     });
     if (jsonMode) {
-      printJson(input.output, result);
+      printJson(output, result);
       return 0;
     }
     if (result.models.length === 0) {
-      input.output.stdout('No models found. Run `mediforce model sync` to populate from OpenRouter.');
+      output.stdout('No models found. Run `mediforce model sync` to populate from OpenRouter.');
       return 0;
     }
     const sortField = (flags.sort ?? 'name') as SortField;
     if (!SORT_FIELDS.includes(sortField)) {
-      input.output.stderr(`Invalid --sort value: ${sortField}. Valid: ${SORT_FIELDS.join(', ')}`);
+      output.stderr(`Invalid --sort value: ${sortField}. Valid: ${SORT_FIELDS.join(', ')}`);
       return 2;
     }
     const descending = flags.desc === true;
@@ -135,20 +86,17 @@ export async function modelListCommand(input: CommandInput): Promise<number> {
       return descending ? -cmp : cmp;
     });
 
-    input.output.stdout(`Found ${String(models.length)} model(s):\n`);
-    input.output.stdout(`  ${'NAME'.padEnd(40)} ${'CONTEXT'.padStart(8)}  ${'PRICE-IN'.padStart(10)}  ${'PRICE-OUT'.padStart(10)}  ${'POPULARITY'.padStart(10)}  CAPS`);
-    input.output.stdout(`  ${'─'.repeat(40)} ${'─'.repeat(8)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(12)}`);
+    output.stdout(`Found ${String(models.length)} model(s):\n`);
+    output.stdout(`  ${'NAME'.padEnd(40)} ${'CONTEXT'.padStart(8)}  ${'PRICE-IN'.padStart(10)}  ${'PRICE-OUT'.padStart(10)}  ${'POPULARITY'.padStart(10)}  CAPS`);
+    output.stdout(`  ${'─'.repeat(40)} ${'─'.repeat(8)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(10)}  ${'─'.repeat(12)}`);
     for (const model of models) {
       const ctx = formatContext(model.contextLength);
       const inPrice = formatPrice(model.pricing.input);
       const outPrice = formatPrice(model.pricing.output);
       const caps = [model.supportsTools ? 'tools' : '', model.supportsVision ? 'vision' : ''].filter(Boolean).join(',');
       const rank = model.requestCount !== null ? formatRequests(model.requestCount) : '';
-      input.output.stdout(`  ${model.id.padEnd(40)} ${ctx.padStart(8)}  ${inPrice.padStart(10)}  ${outPrice.padStart(10)}  ${rank.padStart(10)}  ${caps}`);
+      output.stdout(`  ${model.id.padEnd(40)} ${ctx.padStart(8)}  ${inPrice.padStart(10)}  ${outPrice.padStart(10)}  ${rank.padStart(10)}  ${caps}`);
     }
     return 0;
-  } catch (err) {
-    printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);
-    return 1;
-  }
-}
+  },
+});

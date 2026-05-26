@@ -1,14 +1,5 @@
-import { parseArgs } from 'node:util';
-import { Mediforce } from '@mediforce/platform-api/client';
-import { resolveConfig } from '../config.js';
-import { printJson, printError, type OutputSink } from '../output.js';
-import { formatCliError } from '../errors.js';
-
-interface CommandInput {
-  argv: string[];
-  env: Record<string, string | undefined>;
-  output: OutputSink;
-}
+import { defineCommand } from '../define-command.js';
+import { printJson, printError } from '../output.js';
 
 const HELP = `Usage: mediforce workflow archive <name> [options]
 
@@ -33,84 +24,40 @@ Examples:
   mediforce workflow archive my-workflow --all
 `;
 
-const ARCHIVE_OPTIONS = {
-  version: { type: 'string' },
-  all: { type: 'boolean' },
-  unarchive: { type: 'boolean' },
-  'base-url': { type: 'string' },
-  json: { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const;
+export const workflowArchiveCommand = defineCommand({
+  name: 'workflow archive',
+  help: HELP,
+  options: {
+    version: { type: 'string' },
+    all: { type: 'boolean' },
+    unarchive: { type: 'boolean' },
+    'base-url': { type: 'string' },
+    json: { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' },
+  } as const,
+  positionals: ['<name>'] as const,
+  handler: async ({ flags, positionals, mediforce, output, jsonMode }) => {
+    const name = positionals[0]!;
+    const archived = flags.unarchive !== true;
 
-export async function workflowArchiveCommand(input: CommandInput): Promise<number> {
-  let positionals: string[];
-  let flags: {
-    version?: string;
-    all?: boolean;
-    unarchive?: boolean;
-    'base-url'?: string;
-    json?: boolean;
-    help?: boolean;
-  };
-  try {
-    const parsed = parseArgs({
-      args: input.argv,
-      options: ARCHIVE_OPTIONS,
-      strict: true,
-      allowPositionals: true,
-    });
-    positionals = parsed.positionals;
-    flags = parsed.values;
-  } catch (err) {
-    input.output.stderr(`mediforce workflow archive: ${String(err)}`);
-    input.output.stderr('');
-    input.output.stderr(HELP);
-    return 2;
-  }
+    if (flags.all !== true && flags.version === undefined) {
+      printError(output, { error: 'Either --version <n> or --all is required' }, jsonMode);
+      return 2;
+    }
 
-  const jsonMode = flags.json === true;
+    if (flags.all === true && flags.version !== undefined) {
+      printError(output, { error: '--version and --all are mutually exclusive' }, jsonMode);
+      return 2;
+    }
 
-  if (flags.help === true) {
-    input.output.stdout(HELP);
-    return 0;
-  }
+    const version = flags.version !== undefined ? Number(flags.version) : undefined;
+    if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
+      printError(output, { error: `Invalid --version: ${flags.version}` }, jsonMode);
+      return 2;
+    }
 
-  const name = positionals[0];
-  if (typeof name !== 'string' || name.length === 0) {
-    printError(input.output, { error: '<name> is required' }, jsonMode);
-    return 2;
-  }
+    const action = archived ? 'Archived' : 'Unarchived';
 
-  const archived = flags.unarchive !== true;
-
-  if (flags.all !== true && flags.version === undefined) {
-    printError(input.output, { error: 'Either --version <n> or --all is required' }, jsonMode);
-    return 2;
-  }
-
-  if (flags.all === true && flags.version !== undefined) {
-    printError(input.output, { error: '--version and --all are mutually exclusive' }, jsonMode);
-    return 2;
-  }
-
-  const version = flags.version !== undefined ? Number(flags.version) : undefined;
-  if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
-    printError(input.output, { error: `Invalid --version: ${flags.version}` }, jsonMode);
-    return 2;
-  }
-
-  let config;
-  try {
-    config = resolveConfig({ flagBaseUrl: flags['base-url'], env: input.env });
-  } catch (err) {
-    printError(input.output, { error: String(err) }, jsonMode);
-    return 2;
-  }
-
-  const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
-  const action = archived ? 'Archived' : 'Unarchived';
-
-  try {
     if (version !== undefined) {
       const result = await mediforce.workflows.archiveVersion({
         name,
@@ -118,21 +65,18 @@ export async function workflowArchiveCommand(input: CommandInput): Promise<numbe
         archived,
       });
       if (jsonMode) {
-        printJson(input.output, result);
+        printJson(output, result);
       } else {
-        input.output.stdout(`${action} ${name} v${String(version)}`);
+        output.stdout(`${action} ${name} v${String(version)}`);
       }
     } else {
       const result = await mediforce.workflows.archiveAll({ name, archived });
       if (jsonMode) {
-        printJson(input.output, result);
+        printJson(output, result);
       } else {
-        input.output.stdout(`${action} all versions of ${name}`);
+        output.stdout(`${action} all versions of ${name}`);
       }
     }
     return 0;
-  } catch (err) {
-    printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);
-    return 1;
-  }
-}
+  },
+});
