@@ -22,6 +22,20 @@
       "when": 1779838490675,
       "tag": "0002_mysterious_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779839109794,
+      "tag": "0003_clammy_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779839121294,
+      "tag": "0004_quick_molly_hayes",
+      "breakpoints": true
     }
   ]
 }

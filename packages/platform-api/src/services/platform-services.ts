@@ -18,6 +18,8 @@ import {
   PostgresToolCatalogRepository,
   PostgresNamespaceRepository,
   PostgresAuditRepository,
+  PostgresOAuthProviderRepository,
+  PostgresAgentOAuthTokenRepository,
   getSharedPostgresClient,
   getAdminFirestore,
   validateSecretsKey,
@@ -27,9 +29,11 @@ import {
   getAdminAuth,
 } from '@mediforce/platform-infra';
 import type {
+  AgentOAuthTokenRepository,
   AuditRepository,
   CronTriggerStateRepository,
   NamespaceRepository,
+  OAuthProviderRepository,
   ToolCatalogRepository,
 } from '@mediforce/platform-core';
 import {
@@ -82,8 +86,8 @@ export interface PlatformServices {
   cronTriggerStateRepo: CronTriggerStateRepository;
   toolCatalogRepo: ToolCatalogRepository;
   namespaceRepo: NamespaceRepository;
-  oauthProviderRepo: FirestoreOAuthProviderRepository;
-  agentOAuthTokenRepo: FirestoreAgentOAuthTokenRepository;
+  oauthProviderRepo: OAuthProviderRepository;
+  agentOAuthTokenRepo: AgentOAuthTokenRepository;
   modelRegistryRepo: FirestoreModelRegistryRepository;
   secretsRepo: FirestoreWorkflowSecretsRepository;
   namespaceSecretsRepo: FirestoreNamespaceSecretsRepository;
@@ -121,8 +125,14 @@ export function getPlatformServices(): PlatformServices {
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresNamespaceRepository(getSharedPostgresClient().db)
       : new FirestoreNamespaceRepository(db);
-  const oauthProviderRepo = new FirestoreOAuthProviderRepository(db);
-  const agentOAuthTokenRepo = new FirestoreAgentOAuthTokenRepository(db);
+  const oauthProviderRepo: OAuthProviderRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresOAuthProviderRepository(getSharedPostgresClient().db)
+      : new FirestoreOAuthProviderRepository(db);
+  const agentOAuthTokenRepo: AgentOAuthTokenRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresAgentOAuthTokenRepository(getSharedPostgresClient().db)
+      : new FirestoreAgentOAuthTokenRepository(db);
   const modelRegistryRepo = new FirestoreModelRegistryRepository(db);
   const secretsRepo = new FirestoreWorkflowSecretsRepository(db);
   const namespaceSecretsRepo = new FirestoreNamespaceSecretsRepository(db);
