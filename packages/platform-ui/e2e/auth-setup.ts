@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { test as setup } from '@playwright/test';
 import { TEST_ORG_HANDLE } from './helpers/constants';
 import { clearEmulators, createTestUser, seedCollection, seedSubcollection } from './helpers/emulator';
+import { seedPostgresNamespace } from './helpers/postgres-seed';
 import { buildSeedData } from './helpers/seed-data';
 
 /** Read the mock OAuth server's base URL that globalSetup wrote. Falls back
@@ -46,6 +47,12 @@ setup('authenticate and seed data', async ({ page }) => {
   await seedCollection('workflowDefinitions', data.workflowDefinitions);
   await seedCollection('namespaces', data.namespaces);
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
+  // ADR-0001 PR2: under STORAGE_BACKEND=postgres, the namespaceRepo at runtime
+  // reads from Postgres — mirror the namespace + members fixture there too so
+  // handlers like /api/admin/tool-catalog can resolve `?namespace=test`.
+  if (process.env.STORAGE_BACKEND === 'postgres') {
+    await seedPostgresNamespace(testUserId);
+  }
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'toolCatalog', data.toolCatalog);
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'oauthProviders', data.oauthProviders);
   await seedCollection('agentDefinitions', data.agentDefinitions);
