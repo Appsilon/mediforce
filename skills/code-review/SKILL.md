@@ -1,12 +1,12 @@
 ---
 name: code-review
-description: Review pull requests and code changes along three parallel axes — Standards (file-by-file conventions, dead code, DRY/KISS, comments), Spec (does it match the originating issue/PRD), and Big Picture (scope creep, removable features, duplicated mechanisms). Use when asked to review a PR, diff, branch, or specific files.
+description: Review pull requests, branches, or your own pre-PR diff along three parallel axes — Standards (file-by-file conventions, dead code, DRY/KISS, comments), Spec (does it match the originating issue/PRD), and Big Picture (scope creep, removable features, duplicated mechanisms). Use when asked to review a PR, diff, branch, specific files, or your own changes before shipping.
 allowed-tools: Bash, Read, Glob, Grep, Agent
 metadata:
-  version: "2.0"
+  version: "3.0"
   domain: development
   complexity: intermediate
-  tags: review, quality, security, architecture
+  tags: review, quality, security, architecture, pre-pr
 ---
 
 # Code Review
@@ -23,15 +23,38 @@ Three-axis review of a diff. Each axis runs as a **parallel sub-agent** so they 
 /code-review              # review current branch vs main
 /code-review 42           # review GitHub PR #42
 /code-review <ref>        # review HEAD vs arbitrary fixed point (SHA, branch, tag, main, HEAD~5)
+/code-review --self       # pre-PR self-review of your own current diff (adds pre-flight + SHIP/ITERATE verdict)
 ```
+
+## Self-review mode (`--self`)
+
+Triggered explicitly with `--self`, or implicitly when invoked via `/self-review`.
+
+**Hard rule — invoke as subagent if you wrote the code.** Reviewing your own work in the same context where you wrote it is unreliable — "I just wrote this, it must be good" assumptions carry over. The main thread MUST spawn a subagent and tell it to run this skill in self mode. The subagent treats the diff as if a stranger wrote it.
+
+Self-review adds **Step 0 (pre-flight)** and **Step 6 (SHIP/ITERATE verdict)** around the normal three-axis flow. Skip Step 0 + Step 6 in other modes.
+
+### Step 0 — Pre-flight (self-review only)
+
+Run in parallel:
+
+```bash
+pnpm typecheck
+pnpm test:affected
+```
+
+If either fails for a code reason — STOP, report. No point reviewing code that doesn't compile or pass affected tests.
+
+If a failure looks environmental (remote/emulator down, port collision, weird state), check `docs/knowledge-base/wiki/gotchas/` or invoke `/knowledge-base` before debugging. Distinguish "I broke this" from "the env is broken" before iterating.
 
 ## Process
 
 ### 1. Pin the fixed point
 
-- `/code-review` with no arg → fixed point = `main` (or repo default branch). Diff: `git diff main...HEAD`.
+- `/code-review` no arg → fixed point = `main` (or repo default). Diff: `git diff main...HEAD`.
 - `/code-review <number>` → fixed point = PR base. Diff: `gh pr diff <number>`. Capture title/body via `gh pr view <number>`.
 - `/code-review <ref>` → fixed point = ref. Diff: `git diff <ref>...HEAD` (three-dot, against merge-base).
+- `/code-review --self` → same as no arg (current branch vs main).
 
 Also capture commit list: `git log <fixed-point>..HEAD --oneline`.
 
@@ -45,7 +68,7 @@ Look in this order:
 
 ### 3. Identify standards sources
 
-Always include: `AGENTS.md`, `CLAUDE.md`, `docs/adr/` (architectural decisions are standards), `references/review-checklist.md` (this skill's checklist). Skip what tooling enforces (eslint, biome, tsconfig) — note their existence but don't re-check.
+Always include: `AGENTS.md`, `CLAUDE.md`, `docs/adr/`, `references/review-checklist.md`. Skip what tooling enforces (eslint, biome, tsconfig) — note their existence but don't re-check.
 
 ### 4. Spawn three sub-agents in parallel
 
@@ -84,7 +107,7 @@ If spec is missing: skip Spec, run Standards + Big Picture, note in final report
 
 Present three reports under `## Standards`, `## Spec`, `## Big Picture` headings, verbatim or lightly cleaned. Do **not** merge or rerank — axes are deliberately separate so one can't mask another.
 
-End with:
+End normal mode with:
 
 ```markdown
 ## Verdict
@@ -95,6 +118,69 @@ APPROVE / REQUEST CHANGES / NEEDS DISCUSSION
 - Spec: N findings (worst: …)
 - Big Picture: N questions (worst: …)
 ```
+
+### Step 6 — SHIP / ITERATE verdict (self-review only)
+
+Replace the normal verdict with one of:
+
+**SHIP** — only when ALL of:
+- typecheck: pass
+- test:affected: pass
+- Standards: zero blockers, zero "should fix"
+- Spec: nothing missing / wrong
+- Big Picture: no open questions you couldn't answer with certainty
+- Coverage exists at the right level: new endpoint → L3, new pure logic → L1, new UI journey → L4 with GIF
+- No finding waved away as "pre-existing" without git-blame evidence (see next section)
+
+```markdown
+## Verdict: SHIP
+
+- typecheck: pass
+- test:affected: pass (N tests)
+- diff: clean
+- coverage: <level> in <path>
+- Standards / Spec / Big Picture: no blockers
+
+Ready to commit / open PR.
+```
+
+**ITERATE** — everything else:
+
+```markdown
+## Verdict: ITERATE
+
+### Blockers
+- `file:line` — what's wrong, what to do
+
+### Should fix
+- `file:line` — what's wrong, what to do
+
+### Nice to have (optional)
+- `file:line` — suggestion
+
+Address blockers and re-run before shipping.
+```
+
+## The "pre-existing" excuse — treat as smell
+
+When a sub-agent (or the implementer) labels a finding "pre-existing, not introduced by this PR" — **do not auto-accept**. This is one of the most common cop-outs and often disguises:
+
+- Code the diff *touched* (same function, same file) but didn't fix while it was there.
+- Bugs the diff *exposed* or *propagated* further.
+- Issues the implementer noticed and chose to skip.
+
+**Hard verification before accepting a "pre-existing" claim:**
+
+1. `git blame <file> -L <line>,<line>` — was this line authored before the branch diverged? If the line itself is from the diff, it's not pre-existing, full stop.
+2. Even if the line is older: does the diff touch the same function / module / call path? If yes, the diff inherits responsibility — "while you're here, fix it" applies.
+3. Is the "pre-existing" issue something that would have been caught by the new standards / new test the diff adds? Then the diff should fix it consistently.
+4. Did the implementer *know* about it (commit messages, comments, conversation)? Knowing-and-skipping is a different category from didn't-notice.
+
+**Legitimate pre-existing**: line authored months ago, in a file the diff doesn't touch, surfaced only by an unrelated grep, with a real reason it can't be in scope (separate domain, risky refactor, would balloon the PR). Document why and ship — but **only after the above verification**, never on the implementer's word alone.
+
+Reject "pre-existing" claims phrased as: "this was already broken", "not my change", "unrelated", "out of scope" — without git evidence.
+
+In `--self` mode this is a hard gate: any finding waved away as pre-existing without `git blame` output forces ITERATE.
 
 ## Why three axes
 
@@ -112,4 +198,12 @@ Reporting separately stops one axis from masking another.
 - MUST NOT rubber-stamp — flag real issues, not just style preferences.
 - MUST include `file:line` references for every Standards / Spec finding.
 - Big Picture findings phrased as **questions to the user**, not assertions.
+- MUST verify every "pre-existing" claim with `git blame` before accepting it.
+- In `--self` mode: SHIP only when actually fixed; ITERATE if anything was waved away as pre-existing without git evidence.
 - If no findings in a category, omit that subsection.
+
+## What this skill does NOT do
+
+- Does NOT commit, push, or open a PR — main thread acts on findings.
+- Does NOT silently fix things — findings come back as text, main thread decides.
+- Does NOT run full `pnpm test:e2e` (browser, ~4min) — pre-merge gate, run once before opening PR. L3 `test:e2e:api` (~30s, no browser) IS in scope when the diff touches handlers/middleware in `--self` mode.
