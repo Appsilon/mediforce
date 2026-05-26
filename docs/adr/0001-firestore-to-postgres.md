@@ -124,7 +124,7 @@ Next.js' real boot hook and runs once per server start. Migrations apply
 inside Next.js.**
 Production: [`packages/platform-ui/Dockerfile`](../../packages/platform-ui/Dockerfile)
 wraps the container `CMD` with
-[`scripts/migrate-postgres.mjs`](../../packages/platform-ui/scripts/migrate-postgres.mjs):
+[`packages/platform-infra/scripts/migrate.mjs`](../../packages/platform-infra/scripts/migrate.mjs):
 the script applies pending Drizzle migrations, then exec's `server.js`.
 A first attempt routed migrations through Next.js `instrumentation.ts`,
 but Turbopack's instrumentation pipeline does not honour
