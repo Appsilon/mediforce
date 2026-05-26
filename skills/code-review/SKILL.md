@@ -20,21 +20,34 @@ Three-axis review of a diff. Each axis runs as a **parallel sub-agent** so they 
 ## Usage
 
 ```
-/code-review              # review current branch vs main
+/code-review              # review current branch vs main (auto-detects "self mode" → pre-flight + SHIP/ITERATE)
 /code-review 42           # review GitHub PR #42
 /code-review <ref>        # review HEAD vs arbitrary fixed point (SHA, branch, tag, main, HEAD~5)
-/code-review --self       # pre-PR self-review of your own current diff (adds pre-flight + SHIP/ITERATE verdict)
 ```
 
-## Self-review mode (`--self`)
+## Always-spawn rule — `--inline` is internal
 
-Triggered explicitly with `--self`, or implicitly when invoked via `/self-review`.
+`/code-review` from the main thread **always spawns a subagent** that runs `/code-review --inline [args]`. The subagent does the actual work and returns the report.
 
-**Hard rule — invoke as subagent if you wrote the code.** Reviewing your own work in the same context where you wrote it is unreliable — "I just wrote this, it must be good" assumptions carry over. The main thread MUST spawn a subagent and tell it to run this skill in self mode. The subagent treats the diff as if a stranger wrote it.
+```
+Main thread sees:   /code-review [args]
+Main thread does:   Spawn Agent(general-purpose) with prompt:
+                      "Run /code-review --inline [args]. Treat the diff as if a stranger wrote it.
+                       Verify every 'pre-existing' claim with git blame before accepting.
+                       Return the full report and verdict."
+Subagent runs:      /code-review --inline [args]   ← everything below this section
+```
 
-Self-review adds **Step 0 (pre-flight)** and **Step 6 (SHIP/ITERATE verdict)** around the normal three-axis flow. Skip Step 0 + Step 6 in other modes.
+Why: clean per-axis context, no "I just wrote this, it must be good" bias when reviewing own work, no pollution of main-thread context with diff details.
 
-### Step 0 — Pre-flight (self-review only)
+`--inline` is internal. **Users never type it.** If the skill is invoked without `--inline`, spawn a subagent and stop.
+
+## Mode auto-detection (inside `--inline`)
+
+- **No arg / `--inline` only** → **self mode**: own current branch vs main. Adds Step 0 (pre-flight: typecheck + test:affected) and Step 6 (SHIP/ITERATE verdict).
+- **PR number / ref arg** → **external review mode**: someone's PR or arbitrary commit range. Skip Step 0, use APPROVE / REQUEST CHANGES / NEEDS DISCUSSION verdict.
+
+### Step 0 — Pre-flight (self mode only)
 
 Run in parallel:
 
@@ -51,10 +64,9 @@ If a failure looks environmental (remote/emulator down, port collision, weird st
 
 ### 1. Pin the fixed point
 
-- `/code-review` no arg → fixed point = `main` (or repo default). Diff: `git diff main...HEAD`.
-- `/code-review <number>` → fixed point = PR base. Diff: `gh pr diff <number>`. Capture title/body via `gh pr view <number>`.
-- `/code-review <ref>` → fixed point = ref. Diff: `git diff <ref>...HEAD` (three-dot, against merge-base).
-- `/code-review --self` → same as no arg (current branch vs main).
+- `--inline` no further arg → self mode. Fixed point = `main` (or repo default). Diff: `git diff main...HEAD`.
+- `--inline <number>` → external review. Fixed point = PR base. Diff: `gh pr diff <number>`. Capture title/body via `gh pr view <number>`.
+- `--inline <ref>` → external review. Fixed point = ref. Diff: `git diff <ref>...HEAD` (three-dot, against merge-base).
 
 Also capture commit list: `git log <fixed-point>..HEAD --oneline`.
 
@@ -144,7 +156,7 @@ APPROVE / REQUEST CHANGES / NEEDS DISCUSSION
 - Big Picture: N questions (worst: …)
 ```
 
-### Step 6 — SHIP / ITERATE verdict (self-review only)
+### Step 6 — SHIP / ITERATE verdict (self mode only)
 
 Replace the normal verdict with one of:
 
@@ -205,7 +217,7 @@ When a sub-agent (or the implementer) labels a finding "pre-existing, not introd
 
 Reject "pre-existing" claims phrased as: "this was already broken", "not my change", "unrelated", "out of scope" — without git evidence.
 
-In `--self` mode this is a hard gate: any finding waved away as pre-existing without `git blame` output forces ITERATE.
+In self mode this is a hard gate: any finding waved away as pre-existing without `git blame` output forces ITERATE.
 
 ## Why three axes
 
@@ -224,11 +236,11 @@ Reporting separately stops one axis from masking another.
 - MUST include `file:line` references for every Standards / Spec finding.
 - Big Picture findings phrased as **questions to the user**, not assertions.
 - MUST verify every "pre-existing" claim with `git blame` before accepting it.
-- In `--self` mode: SHIP only when actually fixed; ITERATE if anything was waved away as pre-existing without git evidence.
+- In self mode: SHIP only when actually fixed; ITERATE if anything was waved away as pre-existing without git evidence.
 - If no findings in a category, omit that subsection.
 
 ## What this skill does NOT do
 
 - Does NOT commit, push, or open a PR — main thread acts on findings.
 - Does NOT silently fix things — findings come back as text, main thread decides.
-- Does NOT run full `pnpm test:e2e` (browser, ~4min) — pre-merge gate, run once before opening PR. L3 `test:e2e:api` (~30s, no browser) IS in scope when the diff touches handlers/middleware in `--self` mode.
+- Does NOT run full `pnpm test:e2e` (browser, ~4min) — pre-merge gate, run once before opening PR. L3 `test:e2e:api` (~30s, no browser) IS in scope when the diff touches handlers/middleware in self mode.
