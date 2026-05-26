@@ -91,7 +91,8 @@ returns a process-wide singleton (`postgres-js` pool + `drizzle` wrapper).
 Every PG-backed repository constructor takes the same `Database` handle.
 Rationale: per-repo pools would multiply — 14 planned repos × default
 `max=10` connections = 140, blowing past Postgres' default
-`max_connections=100`. One pool, sized once via `DATABASE_POOL_MAX`.
+`max_connections=100`. Pool size hardcoded in `client.ts` (no env knob —
+bump there if the deployment fans out).
 
 **2. Validate on both read and write in every repository.**
 [`PostgresToolCatalogRepository`](../../packages/platform-infra/src/postgres/repositories/tool-catalog-repository.ts)
@@ -132,10 +133,10 @@ but Turbopack's instrumentation pipeline does not honour
 escapes and duplicating `postgres` / `drizzle-orm` as `platform-ui`
 direct deps. The standalone-script approach drops the workarounds, keeps
 the Next.js boot path clean, and lets the same script run as an
-init-container if a future deployment goes multi-replica. Local dev runs
-the script manually via `pnpm db:migrate` (drizzle-kit CLI directly) —
-ADR-0001 keeps schema concerns explicit on the developer side, not
-hidden in `next dev`.
+init-container if a future deployment goes multi-replica. Local dev
+runs migrations via `pnpm dev:postgres` (wrapper around `pnpm db:migrate`
++ `pnpm dev`) or `pnpm db:migrate` directly — same drizzle-kit CLI under
+the hood, just different boot-wrappers.
 
 **5. Per-repo ternary routing inside `getPlatformServices()`, no separate
 backend factory.**

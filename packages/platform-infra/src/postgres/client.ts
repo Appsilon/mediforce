@@ -4,9 +4,13 @@ import * as schema from './schema/index.js';
 
 export type Database = PostgresJsDatabase<typeof schema>;
 
+/** Per-process connection cap. Keeps every PG-backed repository under
+ *  Postgres' default `max_connections=100`. Hardcoded — no env override
+ *  needed at our scale. Bump here if the deployment fans out. */
+const POOL_MAX = 10;
+
 export interface CreateDatabaseOptions {
   url?: string;
-  poolMax?: number;
   schema?: string;
 }
 
@@ -24,9 +28,8 @@ export function createPostgresClient(opts: CreateDatabaseOptions = {}): {
       'DATABASE_URL is not set. Set it before constructing a Postgres-backed repository.',
     );
   }
-  const poolMax = opts.poolMax ?? Number(process.env.DATABASE_POOL_MAX ?? '10');
   const client = postgres(url, {
-    max: poolMax,
+    max: POOL_MAX,
     onnotice: () => {},
     ...(opts.schema ? { connection: { search_path: opts.schema } } : {}),
   });

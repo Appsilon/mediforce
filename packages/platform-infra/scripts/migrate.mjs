@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// ADR-0001 — Apply pending Postgres migrations before the app starts.
-// Invoked by the production Dockerfile's CMD, runs once per container
-// start. Idempotent via drizzle's `drizzle.__drizzle_migrations` ledger,
-// so unchanged deployments are a no-op.
-//
-// Local dev does NOT run this automatically — see docs/postgres-local-dev.md
-// for the manual `pnpm db:migrate` flow.
+// ADR-0001 — Apply pending Postgres migrations.
+// Invocation paths:
+//   - Production Dockerfile CMD wraps this before server.js so prod
+//     containers self-migrate on start.
+//   - `pnpm dev:postgres` runs `pnpm db:migrate` (drizzle-kit CLI)
+//     before booting the dev server — same outcome, different runner.
+// Idempotent via drizzle's `drizzle.__drizzle_migrations` ledger, so
+// re-running is always safe.
 //
 // No-op when STORAGE_BACKEND != 'postgres'. Crashes the container start
 // (non-zero exit) on any migration failure — fail-stop is the right
