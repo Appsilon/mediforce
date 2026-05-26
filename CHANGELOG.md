@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Changed
+- workflow-designer & workflow-designer-2 agentic steps (`generate-steps`, `generate-execution-proposals`) now run in the `mediforce-golden-image` Docker container; Claude Code credentials are routed through OpenRouter via the workflow `env` block, since Docker steps don't inherit the host environment and must declare credentials explicitly ([#492](https://github.com/Appsilon/mediforce/pull/492)).
+
 ### Removed
 - Duplicate Python migration script `scripts/migrations/migrate_workflow_doc_ids.py` — superseded by the TypeScript `packages/platform-infra/scripts/migrate-workflow-namespacing.ts` which is the canonical version ([#424](https://github.com/Appsilon/mediforce/pull/424)).
 

@@ -7,6 +7,12 @@
     { "name": "manual", "type": "manual" }
   ],
   "roles": ["workflow-designer"],
+  "env": {
+    "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_BASE_URL": "{{ANTHROPIC_BASE_URL}}",
+    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_API_KEY": ""
+  },
   "steps": [
     {
       "id": "describe-idea",
@@ -82,6 +88,7 @@
       "autonomyLevel": "L3",
       "plugin": "claude-code-agent",
       "agent": {
+        "image": "mediforce-golden-image",
         "skill": "generate-execution-proposals",
         "skillsDir": "apps/workflow-designer-2/plugins/workflow-designer-2/skills",
         "model": "sonnet",
