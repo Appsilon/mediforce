@@ -22,6 +22,8 @@
     "test:external": "pnpm --filter @mediforce/platform-ui test:external",
     "seed": "pnpm --filter @mediforce/platform-ui seed:dev",
     "start": "pnpm --filter @mediforce/platform-ui start",
+    "db:migrate": "pnpm --filter @mediforce/platform-infra exec drizzle-kit migrate",
+    "db:generate": "pnpm --filter @mediforce/platform-infra exec drizzle-kit generate",
     "migrate:handles": "tsx scripts/migrate-user-handles.ts",
     "link:cli": "python3 scripts/link-cli.py"
   },

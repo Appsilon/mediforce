@@ -117,8 +117,25 @@ not module-top of `platform-services.ts`.**
 Next.js loads route modules lazily on first request; a module-top throw
 fires per-request, not at boot, which means missing env wouldn't surface
 until a user hits the affected route. `instrumentation.register()` is
-Next.js' real boot hook and runs once per server start. Same file also
-auto-applies pending Postgres migrations when `STORAGE_BACKEND=postgres`.
+Next.js' real boot hook and runs once per server start. Migrations apply
+*outside* the Next.js process — see Implementation pattern 6.
+
+**6. Migrations run as a separate process before app start, not from
+inside Next.js.**
+Production: [`packages/platform-ui/Dockerfile`](../../packages/platform-ui/Dockerfile)
+wraps the container `CMD` with
+[`scripts/migrate-postgres.mjs`](../../packages/platform-ui/scripts/migrate-postgres.mjs):
+the script applies pending Drizzle migrations, then exec's `server.js`.
+A first attempt routed migrations through Next.js `instrumentation.ts`,
+but Turbopack's instrumentation pipeline does not honour
+`transpilePackages` for workspace imports, which forced `@ts-expect-error`
+escapes and duplicating `postgres` / `drizzle-orm` as `platform-ui`
+direct deps. The standalone-script approach drops the workarounds, keeps
+the Next.js boot path clean, and lets the same script run as an
+init-container if a future deployment goes multi-replica. Local dev runs
+the script manually via `pnpm db:migrate` (drizzle-kit CLI directly) —
+ADR-0001 keeps schema concerns explicit on the developer side, not
+hidden in `next dev`.
 
 **5. Per-repo ternary routing inside `getPlatformServices()`, no separate
 backend factory.**

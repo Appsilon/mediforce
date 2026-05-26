@@ -141,8 +141,15 @@ docker compose up postgres redis -d                # boot Postgres 16 + Redis
 # in packages/platform-ui/.env.local:
 #   STORAGE_BACKEND=postgres
 #   DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce
-pnpm dev                                           # app auto-applies migrations at boot
+pnpm db:migrate                                    # apply Drizzle migrations once
+pnpm dev                                           # start the app
 ```
+
+`pnpm db:migrate` is idempotent — re-run after pulling new migrations
+from main. The dev server does NOT auto-migrate (schema is a deliberate
+operator step). Docker production deploys are different: the platform-ui
+container's `CMD` wraps migrate + server.js, so prod auto-applies pending
+migrations on boot — see [Staging / production ops](#staging--production-ops-postgres) below.
 
 Firebase Auth is still required (until [ADR-0002](docs/adr/) lands a NextAuth
 replacement); set the `NEXT_PUBLIC_FIREBASE_*` vars in `.env.local` as usual.
@@ -277,9 +284,11 @@ Add the matching GitHub secrets so the deploy script can render the host
 `POSTGRES_PASSWORD` from the host env via `docker-compose.prod.yml`, the
 same shape Redis uses for `REDIS_PASSWORD`.
 
-The platform-ui container auto-applies pending Drizzle migrations at boot
-(see [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md)); no
-separate migration step is needed in the deploy pipeline.
+The platform-ui container `CMD` wraps the app with
+[`scripts/migrate-postgres.mjs`](packages/platform-ui/scripts/migrate-postgres.mjs):
+pending Drizzle migrations are applied before `server.js` starts (idempotent
+via drizzle's `drizzle.__drizzle_migrations` ledger). No separate migration
+step in the deploy pipeline.
 
 ## Deep Dives
 
