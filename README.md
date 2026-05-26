@@ -290,9 +290,20 @@ Add the matching GitHub secrets so the deploy script can render the host
 - `STAGING_STORAGE_BACKEND` (optional override; otherwise the deploy keeps
   the default `firestore`)
 
-`docker-compose.staging.yml` does not need new entries — Postgres reads
-`POSTGRES_PASSWORD` from the host env via `docker-compose.prod.yml`, the
-same shape Redis uses for `REDIS_PASSWORD`.
+`docker-compose.staging.yml` overrides the Postgres volume to a host bind
+mount at `/var/lib/mediforce/postgres-data`. Effect: `docker compose down
+-v` cannot wipe staging data (the `-v` flag removes only Docker-managed
+volumes, never bind mounts). Removing data requires a deliberate `rm
+-rf` against the host path. Operator must create the directory once with
+the correct ownership before the first `up`:
+
+```bash
+sudo mkdir -p /var/lib/mediforce/postgres-data
+sudo chown -R 999:999 /var/lib/mediforce/postgres-data   # postgres-alpine UID
+```
+
+Local-dev `docker-compose.yml` keeps the named volume — `docker compose
+down -v` is a normal reset workflow on a developer machine.
 
 The platform-ui container `CMD` wraps the app with
 [`packages/platform-infra/scripts/migrate.mjs`](packages/platform-infra/scripts/migrate.mjs):

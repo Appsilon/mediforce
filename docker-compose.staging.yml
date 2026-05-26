@@ -32,3 +32,14 @@ services:
       - "3001"
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+
+  # ADR-0001 — bind mount Postgres data dir on staging so `docker compose
+  # down -v` does NOT wipe production data (named volumes would be).
+  # Operator can see the files in /var/lib/mediforce/postgres-data, back
+  # them up via `tar`, and only an explicit `rm -rf` removes the data.
+  # Host dir must exist with the right ownership before first `up`:
+  #   sudo mkdir -p /var/lib/mediforce/postgres-data
+  #   sudo chown -R 999:999 /var/lib/mediforce/postgres-data   # postgres-alpine UID
+  postgres:
+    volumes:
+      - /var/lib/mediforce/postgres-data:/var/lib/postgresql/data
