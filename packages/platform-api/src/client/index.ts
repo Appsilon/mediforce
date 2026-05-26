@@ -52,6 +52,14 @@ import {
   GetCoworkSessionOutputSchema,
   GetCoworkSessionByInstanceInputSchema,
   GetCoworkSessionByInstanceOutputSchema,
+  ChatCoworkSessionInputSchema,
+  ChatCoworkSessionOutputSchema,
+  FinalizeCoworkSessionInputSchema,
+  FinalizeCoworkSessionOutputSchema,
+  CreateVoiceEphemeralKeyInputSchema,
+  CreateVoiceEphemeralKeyOutputSchema,
+  SynthesizeVoiceArtifactInputSchema,
+  SynthesizeVoiceArtifactOutputSchema,
   ListPluginsOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
@@ -142,6 +150,14 @@ import {
   type GetCoworkSessionOutput,
   type GetCoworkSessionByInstanceInput,
   type GetCoworkSessionByInstanceOutput,
+  type ChatCoworkSessionInput,
+  type ChatCoworkSessionOutput,
+  type FinalizeCoworkSessionInput,
+  type FinalizeCoworkSessionOutput,
+  type CreateVoiceEphemeralKeyInput,
+  type CreateVoiceEphemeralKeyOutput,
+  type SynthesizeVoiceArtifactInput,
+  type SynthesizeVoiceArtifactOutput,
   type ListPluginsOutput,
 } from '../contract/index.js';
 // SDK consumers reach for one path:
@@ -231,6 +247,16 @@ export class Mediforce {
     getByInstance: (
       input: GetCoworkSessionByInstanceInput,
     ) => Promise<GetCoworkSessionByInstanceOutput>;
+    chat: (input: ChatCoworkSessionInput) => Promise<ChatCoworkSessionOutput>;
+    finalize: (
+      input: FinalizeCoworkSessionInput,
+    ) => Promise<FinalizeCoworkSessionOutput>;
+    voiceEphemeralKey: (
+      input: CreateVoiceEphemeralKeyInput,
+    ) => Promise<CreateVoiceEphemeralKeyOutput>;
+    voiceSynthesize: (
+      input: SynthesizeVoiceArtifactInput,
+    ) => Promise<SynthesizeVoiceArtifactOutput>;
   };
 
   readonly plugins: {
@@ -411,6 +437,46 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.cowork.getByInstance');
         return GetCoworkSessionByInstanceOutputSchema.parse(body);
+      },
+      chat: (input) => {
+        const v = ChatCoworkSessionInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/cowork/${encodeURIComponent(v.sessionId)}/chat`,
+          { message: v.message },
+          ChatCoworkSessionOutputSchema,
+          'mediforce.cowork.chat',
+        );
+      },
+      finalize: (input) => {
+        const v = FinalizeCoworkSessionInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/cowork/${encodeURIComponent(v.sessionId)}/finalize`,
+          { artifact: v.artifact },
+          FinalizeCoworkSessionOutputSchema,
+          'mediforce.cowork.finalize',
+        );
+      },
+      voiceEphemeralKey: (input) => {
+        const v = CreateVoiceEphemeralKeyInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/cowork/${encodeURIComponent(v.sessionId)}/voice/ephemeral-key`,
+          undefined,
+          CreateVoiceEphemeralKeyOutputSchema,
+          'mediforce.cowork.voiceEphemeralKey',
+        );
+      },
+      voiceSynthesize: (input) => {
+        const v = SynthesizeVoiceArtifactInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/cowork/${encodeURIComponent(v.sessionId)}/voice/synthesize`,
+          { transcript: v.transcript, comment: v.comment },
+          SynthesizeVoiceArtifactOutputSchema,
+          'mediforce.cowork.voiceSynthesize',
+        );
       },
     };
 
@@ -729,6 +795,34 @@ export class Mediforce {
     const base = this.config.baseUrl ?? '';
     const fetchImpl = this.config.fetch ?? globalThis.fetch;
     return fetchImpl(`${base}${path}`, { ...init, headers });
+  }
+
+  /**
+   * Mutation helper — `request(method, body)` → `parseJsonOrThrow` →
+   * `outputSchema.parse(body)`. Callsites pre-validate input via
+   * `<InputSchema>.parse` so `path` / `body` are typed; this helper covers
+   * everything past that. Single seam for the 16 mutation methods on this
+   * client. Currently applied to the four cowork mutations; the rest are
+   * tracked in #527.
+   *
+   * `body` is `undefined` for verb-only mutations (POST with no payload —
+   * e.g. `cowork.voiceEphemeralKey`, `tasks.claim`). When set, the helper
+   * attaches `Content-Type: application/json` and serializes.
+   */
+  private async sendJson<TOut>(
+    method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+    path: string,
+    body: Record<string, unknown> | undefined,
+    outputSchema: { parse: (b: unknown) => TOut },
+    ctx: string,
+  ): Promise<TOut> {
+    const init: RequestInit = { method };
+    if (body !== undefined) {
+      init.headers = { 'Content-Type': 'application/json' };
+      init.body = JSON.stringify(body);
+    }
+    const res = await this.request(path, init);
+    return outputSchema.parse(await parseJsonOrThrow(res, ctx));
   }
 
   private async buildAuthHeaders(): Promise<Record<string, string>> {

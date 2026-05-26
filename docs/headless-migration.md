@@ -706,24 +706,45 @@ interface RunKicker {
 - `processes` POST create idempotency — client-supplied key vs server-derived dedupe window. Inherits Phase 2.5 open question.
 - `tasks/complete` step-gate validation — handler loads parent run + WorkflowDefinition + walks step config to validate verdict payload. Cross-entity load is the first complex handler shape; pattern question.
 
-### Phase 3.1 — Cowork streaming (split from Phase 3 — 2026-05-26)
+### Phase 3.1 — Cowork endpoints migration (split from Phase 3 — 2026-05-26; scope crystallised 2026-05-26)
 
-Three endpoints. All stream SSE. All write to multiple repos. Orthogonal to the kick decision. Own design pass deferred — see the `/grill-with-docs` task spawned 2026-05-26.
+**Grill output (2026-05-26).** The original framing — "three SSE endpoints, design streaming abstraction" — was wrong on multiple counts:
 
-**In-scope:**
+- `/chat` is **non-streaming** today. JSON tool-loop, ≤10 MCP iterations, blocking. Not streaming.
+- `/message` SSE route is **dead code** — zero callers since original cowork PR `9f2774c6`. Delete.
+- `/finalize` JSON route is **dead code** — UI uses Server Action `finalizeSession` which duplicates the same logic.
+- Voice-realtime is browser↔OpenAI WebRTC direct. No platform streaming. Server Actions only mint ephemeral keys + synthesise post-transcript artifact (blocking JSON).
+- No surface that migrates in Phase 3.1 actually streams. No SSE adapter / handler-shape decision needs to land.
 
-- `POST /api/cowork/:sessionId/chat` — LLM streaming (assistant token-by-token).
-- `POST /api/cowork/:sessionId/message` — user message append + optional LLM response stream.
-- `POST /api/cowork/:sessionId/finalize` — locks session, writes artifact, may emit kick (which uses `scope.system.runKicker` from Phase 3 PR1). Multi-repo write; atomicity question.
+**Decision: pure parity migration. Smallest possible change. No streaming, no schema, no UX improvement.** See [`docs/adr/draft/cowork-streaming.md`](adr/draft/cowork-streaming.md) for full design rationale + trade-space considered.
 
-**Why split.** Streaming handler shape is its own design question (AsyncGenerator vs callback vs EventEmitter) with no overlap with the kick mechanism. Finalize is the only cowork endpoint that needs the kick — and it gets `runKicker` from Phase 3 PR1 for free.
+**Post-migration surface:**
 
-**Open questions (Phase 3.1 grill — not Phase 3):**
-- Streaming handler shape: `AsyncGenerator<Event>` (cleanest functional) vs `write(event)` callback (most flexible for existing code) vs `EventEmitter`-style subscribe.
-- SSE adapter — does it live in `createRouteAdapter` (one adapter, two response modes) or a sibling `createStreamingRouteAdapter`?
-- Multi-repo atomicity on finalize — transaction abstraction in repo interfaces vs compensating actions vs accept-the-gap (Firestore reality today).
-- Voice-realtime channel — does the WebRTC/OpenAI realtime path fit the same streaming abstraction or is it a separate sub-pattern?
-- Auth for long-lived streams — Firebase ID token expiry mid-stream; reconnect, refresh, or cap stream lifetime?
+| Endpoint | Method | Shape | Notes |
+|---|---|---|---|
+| `POST /api/cowork/:sessionId/chat` | POST | JSON | Existing tool-loop, moved to platform-api handler. Same shape. |
+| `POST /api/cowork/:sessionId/finalize` | POST | JSON | Migrated; consumes `scope.system.runKicker.kick` from Phase 3. Multi-repo writes stay best-effort. |
+| `POST /api/cowork/:sessionId/voice/ephemeral-key` | POST | JSON | New; replaces Server Action `createVoiceEphemeralKey`. |
+| `POST /api/cowork/:sessionId/voice/synthesize` | POST | JSON | New; replaces Server Action `synthesizeArtifact`. |
+| ~~`POST /api/cowork/:sessionId/message`~~ | — | — | **Deleted.** Dead code since `9f2774c6`. |
+| `app/actions/cowork.ts` | — | — | **Deleted entirely.** All four exports migrated. |
+
+Audit emission per handler via `scope.system.audit.append` (ADR-0005 §7 handler-resident bridge).
+
+**Side-effects of Phase 3.1 — repo-wide cleanups that landed in the same PR:**
+
+- `Mediforce.sendJson(method, path, body?, outputSchema, ctx)` helper introduced on the client class. Single seam for mutation methods — kills the `request + parseJsonOrThrow + outputSchema.parse` triple-decker that was duplicated across every POST/PATCH/DELETE. The four cowork mutations use it; the remaining 12 mutation methods (tasks, runs, agents, workflows, secrets, cron) refactor in [#527](https://github.com/Appsilon/mediforce/issues/527).
+- `services/openrouter-client.ts` introduced as the single OpenRouter HTTP seam. Used by `cowork/chat` (tool-loop call) and `cowork/voice-synthesize` (synthesis call). Repo-wide consolidation with `agent-runtime/llm-client.ts` and `system/get-openrouter-credits.ts` tracked in [#529](https://github.com/Appsilon/mediforce/issues/529).
+- `scope.workspaceSecrets.getRuntimeSecrets(namespace, workflowName)` — single seam for the "namespace defaults + workflow overrides" merge that every handler with a runtime LLM/HTTP call needs. Replaces the two-call merge in `cowork/chat` and `cowork/voice-synthesize`; `system/get-openrouter-credits` can adopt later.
+- `AuthorizedCoworkSessionRepository` extended with workspace-gated mutations (`addTurn`, `updateTurn`, `updateArtifact`, `finalize`) matching the `AuthorizedWorkflowRunRepository.update` gating pattern.
+
+**Deferred to follow-up issue [#516](https://github.com/Appsilon/mediforce/issues/516):**
+
+1. Streaming SSE overhaul (`/chat` → `/turn` SSE, handler shape, event vocab compatible with Claude Code / OpenCode CLI, placeholder turn pattern, `streamingTurnId` guard, AbortSignal cancellation).
+2. Client-side message queue UI (Open WebUI sessionStorage pattern).
+3. Transactional finalize (post-ADR-0001 Postgres transaction wrapper for multi-repo finalize writes).
+
+Multi-tab live sync intentionally excluded — no demand. ChatGPT and Claude.ai don't live-mirror multi-tab same-user; refresh-on-focus is the dominant pattern.
 
 ### Phase 4 — Typed `apiClient` + first hook migration
 

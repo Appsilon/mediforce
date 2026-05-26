@@ -7,7 +7,7 @@ import {
   Info, ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { sendMessage, finalizeSession } from '@/app/actions/cowork';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import type { CoworkSession, ConversationTurn, ProcessInstance } from '@mediforce/platform-core';
 import { ArtifactPanel } from './artifact-panel';
@@ -111,9 +111,9 @@ export function ChatCoworkView({
   handle,
   stepDescription,
 }: ChatCoworkViewProps) {
-  // Turns and artifact are driven by Firestore onSnapshot from the parent page.
-  // The server action delegates to the API route which writes turns directly to Firestore,
-  // including intermediate tool turns that appear in real-time.
+  // Turns + artifact stream in via Firestore onSnapshot on the parent page;
+  // the platform-api chat handler writes intermediate tool turns and the
+  // final agent turn straight to the repo so the UI sees them live.
   const turns = session.turns;
   const artifact = session.artifact;
 
@@ -157,13 +157,12 @@ export function ChatCoworkView({
     setSending(true);
 
     try {
-      const result = await sendMessage(session.id, message);
-
-      if (!result.success) {
-        setError(result.error ?? 'Failed to send message');
-      }
+      await mediforce.cowork.chat({ sessionId: session.id, message });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+      const fallback = err instanceof ApiError || err instanceof Error
+        ? err.message
+        : 'Failed to send message';
+      setError(fallback);
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -177,14 +176,12 @@ export function ChatCoworkView({
     setError(null);
 
     try {
-      const result = await finalizeSession(session.id, artifact);
-
-      if (!result.success) {
-        setError(result.error ?? 'Failed to finalize');
-        return;
-      }
+      await mediforce.cowork.finalize({ sessionId: session.id, artifact });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to finalize');
+      const fallback = err instanceof ApiError || err instanceof Error
+        ? err.message
+        : 'Failed to finalize';
+      setError(fallback);
     } finally {
       setFinalizing(false);
     }

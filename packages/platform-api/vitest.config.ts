@@ -28,6 +28,10 @@ export default defineConfig({
         __dirname,
         '../platform-infra/src/index.ts',
       ),
+      '@mediforce/mcp-client': path.resolve(
+        __dirname,
+        '../mcp-client/src/index.ts',
+      ),
     },
   },
 });
