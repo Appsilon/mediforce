@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getAdminAuth, type FirestoreNamespaceRepository } from '@mediforce/platform-infra';
+import { getAdminAuth } from '@mediforce/platform-infra';
+import type { NamespaceRepository } from '@mediforce/platform-core';
 
 /** Extract Firebase uid from the Authorization header. Returns either the uid
  *  string (on success) or a NextResponse the caller should return (401). */
@@ -44,7 +45,7 @@ export async function requireNamespaceFromQuery(
  *  leaking whether the namespace exists to non-members and keeps the
  *  error shape uniform with "agent not found" responses. */
 export async function requireNamespaceMembership(deps: {
-  namespaceRepo: FirestoreNamespaceRepository;
+  namespaceRepo: NamespaceRepository;
   namespace: string;
   uid: string;
 }): Promise<undefined | NextResponse> {

@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import {
-  type FirestoreNamespaceRepository,
-  getAdminAuth,
-} from '@mediforce/platform-infra';
+import { getAdminAuth } from '@mediforce/platform-infra';
 import {
   PublicOAuthProviderConfigSchema,
+  type NamespaceRepository,
   type OAuthProviderConfig,
   type PublicOAuthProviderConfig,
 } from '@mediforce/platform-core';
@@ -26,7 +24,7 @@ import {
  *  On success returns the namespace handle. */
 export async function requireAdminForNamespace(
   request: Request,
-  namespaceRepo: FirestoreNamespaceRepository,
+  namespaceRepo: NamespaceRepository,
 ): Promise<string | NextResponse> {
   const handle = new URL(request.url).searchParams.get('namespace');
   if (handle === null || handle.length === 0) {

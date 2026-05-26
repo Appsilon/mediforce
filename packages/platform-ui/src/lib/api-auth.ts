@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth } from '@mediforce/platform-infra';
-import type { FirestoreNamespaceRepository } from '@mediforce/platform-infra';
+import type { NamespaceRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 
 // Re-export the canonical type from platform-api so route handlers can import
@@ -21,7 +21,7 @@ export { callerCanAccess, assertNamespaceAccess, filterByCaller } from '@medifor
  */
 export async function resolveCallerIdentity(
   request: Request,
-  namespaceRepo: FirestoreNamespaceRepository,
+  namespaceRepo: NamespaceRepository,
 ): Promise<CallerIdentity | NextResponse> {
   const apiKey = request.headers.get('X-Api-Key');
   const expectedKey = process.env.PLATFORM_API_KEY;

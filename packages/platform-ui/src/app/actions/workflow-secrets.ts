@@ -3,7 +3,6 @@
 import {
   getAdminFirestore,
   FirestoreWorkflowSecretsRepository,
-  FirestoreNamespaceRepository,
 } from '@mediforce/platform-infra';
 import { getPlatformServices } from '@/lib/platform-services';
 
@@ -13,9 +12,7 @@ function getRepo() {
 }
 
 async function requireNamespaceMember(namespace: string, userId: string): Promise<void> {
-  getPlatformServices();
-  const db = getAdminFirestore();
-  const namespaceRepo = new FirestoreNamespaceRepository(db);
+  const { namespaceRepo } = getPlatformServices();
 
   // Check member doc first
   const member = await namespaceRepo.getMember(namespace, userId);

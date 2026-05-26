@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import type { FirestoreNamespaceRepository } from '@mediforce/platform-infra';
+import type { NamespaceRepository } from '@mediforce/platform-core';
 
 /** Returns the namespace handle on success, or a NextResponse to return to
  *  the client on failure (400 missing param, 404 namespace not found). */
 export async function resolveNamespaceFromQuery(
   request: Request,
-  namespaceRepo: FirestoreNamespaceRepository,
+  namespaceRepo: NamespaceRepository,
 ): Promise<string | NextResponse> {
   const handle = new URL(request.url).searchParams.get('namespace');
   if (handle === null || handle.length === 0) {
