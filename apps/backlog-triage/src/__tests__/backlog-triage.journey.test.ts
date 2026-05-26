@@ -479,6 +479,26 @@ describe('backlog-triage journey', () => {
       expect(errors[0].itemId).toBe('101');
       expect(result.applied).toEqual([{ itemId: '102', labels: ['tech-debt', 'priority/P2'] }]);
     });
+
+    it('apply-tags skips the add-labels POST when a label cannot be created (non-422)', async () => {
+      const step = wd.steps.find((s) => s.id === 'apply-tags')!;
+      const script = step.agent!.inlineScript!;
+      // Only one call: the create POST fails with 403, so add-labels is never attempted.
+      mockFetch.mockResolvedValueOnce(new Response('forbidden', { status: 403, headers: { 'content-type': 'text/plain' } }));
+
+      const result = await runInlineScript(
+        script,
+        { repo: 'owner/repo', rows: [{ itemId: '9', values: { category: 'workflow', priority: 'P1' } }] },
+        { GITHUB_TOKEN: 'ghp_xxx' },
+      );
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch.mock.calls[0][0]).toBe('https://api.github.com/repos/owner/repo/labels');
+      const errors = result.errors as Array<Record<string, unknown>>;
+      expect(errors).toHaveLength(1);
+      expect(errors[0].step).toBe('create-label');
+      expect(result.applied).toEqual([]);
+    });
   });
 });
 
