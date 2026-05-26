@@ -10,7 +10,7 @@ import {
   NotFoundError,
   PreconditionFailedError,
 } from '../../errors.js';
-import { loadOr404 } from '../_helpers.js';
+import { actorFromCaller, loadOr404 } from '../_helpers.js';
 
 export async function completeTask(
   input: CompleteTaskInput,
@@ -21,8 +21,12 @@ export async function completeTask(
     'Task not found',
   );
 
-  const isUser = scope.caller.kind === 'user';
-  const actorId = isUser ? scope.caller.uid : task.assignedUserId ?? 'api-user';
+  const actor = actorFromCaller(scope);
+  // Fall back to the task's prior assignee for apiKey callers so the audit
+  // trail reflects the human who claimed the task, not 'api-user'.
+  const actorId = scope.caller.kind === 'user'
+    ? actor.actorId
+    : task.assignedUserId ?? actor.actorId;
 
   let result;
   try {
@@ -77,10 +81,10 @@ export async function completeTask(
             : { verdict: input.payload.verdict }),
   };
 
+  const auditActor = { ...actor, actorId };
+
   await scope.system.audit.append({
-    actorId,
-    actorType: isUser ? 'user' : 'system',
-    actorRole: 'operator',
+    ...auditActor,
     action: 'task.completed',
     description,
     timestamp: now,
@@ -93,9 +97,7 @@ export async function completeTask(
   });
 
   await scope.system.audit.append({
-    actorId,
-    actorType: isUser ? 'user' : 'system',
-    actorRole: 'operator',
+    ...auditActor,
     action: 'process.resumed_after_task',
     description: `Process '${updatedTask.processInstanceId}' resumed after resolving step '${resolvedStepId}'`,
     timestamp: new Date().toISOString(),

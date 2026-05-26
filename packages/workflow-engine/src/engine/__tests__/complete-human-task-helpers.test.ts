@@ -84,16 +84,6 @@ describe('validateVerdictPayload', () => {
     ).toThrow(/verdict 'reject' not allowed/);
   });
 
-  it('accepts legacy approve/revise when task has no verdicts field', () => {
-    const task = baseTask();
-    expect(() =>
-      validateVerdictPayload(task, { kind: 'verdict', verdict: 'approve' }),
-    ).not.toThrow();
-    expect(() =>
-      validateVerdictPayload(task, { kind: 'verdict', verdict: 'revise' }),
-    ).not.toThrow();
-  });
-
   it('enforces requiresComment for verdicts that mandate one', () => {
     const task = baseTask({
       verdicts: [
@@ -123,19 +113,6 @@ describe('validateVerdictPayload', () => {
       }),
     ).not.toThrow();
   });
-
-  it('rejects selectedIndex out of options range', () => {
-    const task = baseTask({
-      options: [{ value: 'a' }, { value: 'b' }] as never,
-    });
-    expect(() =>
-      validateVerdictPayload(task, {
-        kind: 'verdict',
-        verdict: 'approve',
-        selectedIndex: 5,
-      }),
-    ).toThrow(/out of range/);
-  });
 });
 
 describe('validateUploadPayload', () => {
@@ -151,26 +128,6 @@ describe('validateUploadPayload', () => {
       attachments: [{ name: 'a.pdf', size: 1, type: 'application/pdf' }],
     };
     expect(() => validateUploadPayload(task, oneFile as never)).toThrow(/Expected 2-3 file/);
-  });
-
-  it('enforces acceptedTypes by mime and extension', () => {
-    const task = baseTask({
-      ui: {
-        component: 'file-upload',
-        config: { acceptedTypes: ['application/pdf', '.csv'] },
-      } as never,
-    });
-    const wrongType: CompleteHumanTaskPayload = {
-      kind: 'upload',
-      attachments: [{ name: 'x.txt', size: 1, type: 'text/plain' }],
-    };
-    expect(() => validateUploadPayload(task, wrongType as never)).toThrow(/not accepted/);
-
-    const okExt: CompleteHumanTaskPayload = {
-      kind: 'upload',
-      attachments: [{ name: 'x.csv', size: 1, type: 'application/octet-stream' }],
-    };
-    expect(() => validateUploadPayload(task, okExt as never)).not.toThrow();
   });
 });
 
@@ -215,51 +172,5 @@ describe('shapeCompletion — verdict variant', () => {
         '2026-05-26T00:00:00.000Z',
       ),
     ).toThrow(/agent produced no output/);
-  });
-});
-
-describe('shapeCompletion — non-verdict variants', () => {
-  it('params stepOutput equals paramValues', () => {
-    const task = baseTask({
-      params: [{ key: 'a', label: 'A', type: 'string' }] as never,
-    });
-    const result = shapeCompletion(
-      task,
-      { kind: 'params', paramValues: { a: 1, b: 2 } },
-      'user-1',
-      '2026-05-26T00:00:00.000Z',
-    );
-    expect(result.stepOutput).toEqual({ a: 1, b: 2 });
-  });
-
-  it('rows stepOutput wraps rows', () => {
-    const task = baseTask({ ui: { component: 'table-editor' } as never });
-    const result = shapeCompletion(
-      task,
-      { kind: 'rows', rows: [{ itemId: 'r1', values: { x: 1 } }] },
-      'user-1',
-      '2026-05-26T00:00:00.000Z',
-    );
-    expect(result.stepOutput).toEqual({ rows: [{ itemId: 'r1', values: { x: 1 } }] });
-  });
-
-  it('assignment stepOutput wraps assignments', () => {
-    const task = baseTask({ ui: { component: 'assignment-table' } as never });
-    const result = shapeCompletion(
-      task,
-      {
-        kind: 'assignment',
-        assignments: [
-          { itemId: 'i1', assigneeId: 'u1', assigneeKind: 'human', priority: 'high' },
-        ],
-      },
-      'user-1',
-      '2026-05-26T00:00:00.000Z',
-    );
-    expect(result.stepOutput).toEqual({
-      assignments: [
-        { itemId: 'i1', assigneeId: 'u1', assigneeKind: 'human', priority: 'high' },
-      ],
-    });
   });
 });

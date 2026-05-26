@@ -1,7 +1,7 @@
 import type { ResumeRunInput, ResumeRunOutput } from '../../contract/processes.js';
 import type { CallerScope } from '../../repositories/index.js';
 import { PreconditionFailedError } from '../../errors.js';
-import { loadOr404 } from '../_helpers.js';
+import { actorFromCaller, loadOr404 } from '../_helpers.js';
 
 // `failed` source state covers agent-escalated / agent-paused recovery.
 export async function resumeRun(
@@ -25,13 +25,10 @@ export async function resumeRun(
     updatedAt: now,
   });
 
-  const isUser = scope.caller.kind === 'user';
-  const actorId = isUser ? scope.caller.uid : 'api-user';
+  const actor = actorFromCaller(scope);
 
   await scope.system.audit.append({
-    actorId,
-    actorType: isUser ? 'user' : 'system',
-    actorRole: 'operator',
+    ...actor,
     action: 'instance.resumed',
     description: `Process '${input.runId}' manually resumed via API`,
     timestamp: now,
@@ -47,7 +44,7 @@ export async function resumeRun(
     processDefinitionVersion: run.definitionVersion,
   });
 
-  await scope.system.runKicker.kick(input.runId, { triggeredBy: actorId });
+  await scope.system.runKicker.kick(input.runId, { triggeredBy: actor.actorId });
 
   const updated = await loadOr404(scope.runs.getById(input.runId), 'Run not found');
   return { run: updated };

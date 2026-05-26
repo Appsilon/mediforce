@@ -667,16 +667,8 @@ export class WorkflowEngine {
     return this.loadInstance(instanceId);
   }
 
-  // Resolve a HumanTask and advance the parent run. Auto-claims if pending,
-  // validates the payload against the task's runtime config, persists the
-  // completion, resumes the paused parent, and advances — unless this is an
-  // L3-revise verdict, in which case the step stays put so the auto-runner
-  // re-executes the agent with reviewer feedback.
-  //
-  // State writes (task complete + instance update + advanceStep) happen
-  // BEFORE the handler emits task.completed / process.resumed_after_task.
-  // A crash in that gap leaves the run advanced with no audit row; matches
-  // pre-migration behaviour of lib/resolve-task.ts.
+  // L3-revise verdicts resume the instance but skip advanceStep so the
+  // auto-runner re-executes the agent with reviewer feedback.
   async completeHumanTask(
     taskId: string,
     payload: CompleteHumanTaskPayload,

@@ -2,7 +2,7 @@ import { InvalidTransitionError } from '@mediforce/workflow-engine';
 import type { RetryStepInput, RetryStepOutput } from '../../contract/processes.js';
 import type { CallerScope } from '../../repositories/index.js';
 import { PreconditionFailedError } from '../../errors.js';
-import { loadOr404 } from '../_helpers.js';
+import { actorFromCaller, loadOr404 } from '../_helpers.js';
 
 // Engine emits `step.retried` (stepExecution-scoped); handler additionally
 // emits `instance.retried` for the processInstance-scoped audit lane.
@@ -13,13 +13,12 @@ export async function retryStep(
   // Workspace gate up front — engine.retryStep loads via raw repo.
   await loadOr404(scope.runs.getById(input.runId), 'Run not found');
 
-  const isUser = scope.caller.kind === 'user';
-  const actorId = isUser ? scope.caller.uid : 'api-user';
+  const actor = actorFromCaller(scope);
 
   let updated;
   try {
     updated = await scope.system.engine.retryStep(input.runId, input.stepId, {
-      id: actorId,
+      id: actor.actorId,
       role: 'operator',
     });
   } catch (err) {
@@ -37,14 +36,11 @@ export async function retryStep(
     .filter((e) => e.stepId === input.stepId)
     .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
 
-  const now = new Date().toISOString();
   await scope.system.audit.append({
-    actorId,
-    actorType: isUser ? 'user' : 'system',
-    actorRole: 'operator',
+    ...actor,
     action: 'instance.retried',
     description: `Retried failed step '${input.stepId}' on instance '${input.runId}'`,
-    timestamp: now,
+    timestamp: new Date().toISOString(),
     inputSnapshot: {
       instanceId: input.runId,
       stepId: input.stepId,
@@ -63,7 +59,7 @@ export async function retryStep(
     processDefinitionVersion: updated.definitionVersion,
   });
 
-  await scope.system.runKicker.kick(input.runId, { triggeredBy: actorId });
+  await scope.system.runKicker.kick(input.runId, { triggeredBy: actor.actorId });
 
   return { run: updated };
 }

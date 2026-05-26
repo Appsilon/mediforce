@@ -1,4 +1,4 @@
-import type { Trigger, WorkflowDefinition } from '@mediforce/platform-core';
+import type { CronTriggerState, Trigger, WorkflowDefinition } from '@mediforce/platform-core';
 import { validateCronSchedule, isDue } from '@mediforce/workflow-engine';
 import type {
   HeartbeatInput,
@@ -8,6 +8,30 @@ import type {
 } from '../../contract/cron.js';
 import type { CallerScope } from '../../repositories/index.js';
 import { ForbiddenError } from '../../errors.js';
+
+type Evaluation = { fire: true } | { fire: false; reason: string };
+
+function evaluateTrigger(
+  trigger: Trigger,
+  state: CronTriggerState | null,
+  definitionCreatedAt: string | undefined,
+  now: Date,
+): Evaluation {
+  const schedule = trigger.schedule;
+  if (!schedule) return { fire: false, reason: 'No schedule defined' };
+
+  const validation = validateCronSchedule(schedule);
+  if (!validation.valid) return { fire: false, reason: `Invalid schedule: ${validation.error}` };
+
+  const lastTriggeredAt = state
+    ? new Date(state.lastTriggeredAt)
+    : definitionCreatedAt
+      ? new Date(definitionCreatedAt)
+      : undefined;
+  if (!isDue(schedule, now, lastTriggeredAt)) return { fire: false, reason: 'Not due' };
+
+  return { fire: true };
+}
 
 // System-actor only — reads across every workspace's definitions; gating
 // is by apiKey at the call site, not per row. Skipped triggers surface in
@@ -27,7 +51,6 @@ export async function heartbeat(
   const skipped: SkippedEntry[] = [];
 
   const definitionGroups = await scope.workflowDefinitions.listGroups(false);
-
   const cronDefinitions = definitionGroups
     .map((group) => group.versions.find((v) => v.version === group.latestVersion))
     .filter((def): def is WorkflowDefinition => def !== undefined)
@@ -37,33 +60,17 @@ export async function heartbeat(
     const cronTriggers = def.triggers.filter((t: Trigger) => t.type === 'cron');
 
     for (const trigger of cronTriggers) {
-      const schedule = trigger.schedule;
-      if (!schedule) {
-        const reason = 'No schedule defined';
-        skipped.push({ definitionName: def.name, definitionVersion: def.version, triggerName: trigger.name, reason });
-        console.log(`[cron-heartbeat] skip '${def.name}/${trigger.name}': ${reason}`);
-        continue;
-      }
-
-      const validation = validateCronSchedule(schedule);
-      if (!validation.valid) {
-        const reason = `Invalid schedule: ${validation.error}`;
-        skipped.push({ definitionName: def.name, definitionVersion: def.version, triggerName: trigger.name, reason });
-        console.log(`[cron-heartbeat] skip '${def.name}/${trigger.name}': ${reason}`);
-        continue;
-      }
-
       const state = await scope.cron.get(def.name, trigger.name);
-      const lastTriggeredAt = state
-        ? new Date(state.lastTriggeredAt)
-        : def.createdAt
-          ? new Date(def.createdAt)
-          : undefined;
+      const evaluation = evaluateTrigger(trigger, state, def.createdAt, now);
+      const entryHead = {
+        definitionName: def.name,
+        definitionVersion: def.version,
+        triggerName: trigger.name,
+      };
 
-      if (!isDue(schedule, now, lastTriggeredAt)) {
-        const reason = 'Not due';
-        skipped.push({ definitionName: def.name, definitionVersion: def.version, triggerName: trigger.name, reason });
-        console.log(`[cron-heartbeat] skip '${def.name}/${trigger.name}': ${reason}`);
+      if (!evaluation.fire) {
+        skipped.push({ ...entryHead, reason: evaluation.reason });
+        console.log(`[cron-heartbeat] skip '${def.name}/${trigger.name}': ${evaluation.reason}`);
         continue;
       }
 
@@ -73,10 +80,10 @@ export async function heartbeat(
         definitionVersion: def.version,
         triggerName: trigger.name,
         triggeredBy: 'cron-heartbeat',
-        payload: { schedule, firedAt: now.toISOString() },
+        payload: { schedule: trigger.schedule, firedAt: now.toISOString() },
       });
 
-      // Persist trigger state AFTER successful fire (at-least-once semantics).
+      // Persist state AFTER successful fire (at-least-once semantics).
       await scope.cron.set({
         definitionName: def.name,
         triggerName: trigger.name,
@@ -90,12 +97,7 @@ export async function heartbeat(
         action: 'cron.trigger.fired',
         description: `Cron trigger '${trigger.name}' fired for '${def.name}' v${def.version}`,
         timestamp: now.toISOString(),
-        inputSnapshot: {
-          triggerName: trigger.name,
-          definitionName: def.name,
-          definitionVersion: def.version,
-          schedule,
-        },
+        inputSnapshot: { ...entryHead, schedule: trigger.schedule },
         outputSnapshot: { instanceId: result.instanceId },
         basis: 'Cron trigger schedule due',
         entityType: 'processInstance',
@@ -104,16 +106,8 @@ export async function heartbeat(
         processDefinitionVersion: String(def.version),
       });
 
-      await scope.system.runKicker.kick(result.instanceId, {
-        triggeredBy: 'cron-heartbeat',
-      });
-
-      triggered.push({
-        definitionName: def.name,
-        definitionVersion: def.version,
-        triggerName: trigger.name,
-        instanceId: result.instanceId,
-      });
+      await scope.system.runKicker.kick(result.instanceId, { triggeredBy: 'cron-heartbeat' });
+      triggered.push({ ...entryHead, instanceId: result.instanceId });
     }
   }
 

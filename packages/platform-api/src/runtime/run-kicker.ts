@@ -1,5 +1,4 @@
-// Fire-and-forget. Resolves on dispatch, not on run completion. Idempotent
-// at the transport layer (already-running instance → no-op).
+// Fire-and-forget; idempotent at transport layer.
 export interface RunKicker {
   kick(instanceId: string, opts?: { readonly triggeredBy?: string }): Promise<void>;
 }
@@ -31,8 +30,7 @@ export interface HttpSelfFetchRunKickerConfig {
   readonly fetch?: typeof fetch;
 }
 
-// `baseUrl` / `apiKey` are getters so env reads happen at call time, not
-// module-load time (so tests / env overrides take effect).
+// Getters so env reads happen at call time, not module-load time.
 export function createHttpSelfFetchRunKicker(
   config: HttpSelfFetchRunKickerConfig,
 ): RunKicker {

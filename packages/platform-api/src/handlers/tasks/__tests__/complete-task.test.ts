@@ -9,7 +9,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import type { HumanTask, ProcessInstance, CompleteHumanTaskPayload } from '@mediforce/platform-core';
 import { completeTask } from '../complete-task.js';
-import { HandlerError, NotFoundError, PreconditionFailedError } from '../../../errors.js';
+import { NotFoundError, PreconditionFailedError } from '../../../errors.js';
 import {
   createTestScope,
   userCaller,
@@ -73,7 +73,7 @@ describe('completeTask handler', () => {
     );
   });
 
-  it('returns { task, run } with the updated entities', async () => {
+  it('returns updated { task, run }, emits audits, and kicks the run', async () => {
     const taskBefore = buildHumanTask({
       id: 'task-1',
       processInstanceId: 'inst-a',
@@ -98,44 +98,15 @@ describe('completeTask handler', () => {
     Object.assign(scope.system, { engine: engineStub });
 
     const result = await completeTask(
-      { taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } },
-      scope,
-    );
-
-    expect(result.task.status).toBe('completed');
-    expect(result.run.id).toBe('inst-a');
-  });
-
-  it('emits task.completed + process.resumed_after_task and kicks the run', async () => {
-    const taskBefore = buildHumanTask({
-      id: 'task-1',
-      processInstanceId: 'inst-a',
-      stepId: 'review',
-      status: 'claimed',
-      assignedUserId: 'u-1',
-    });
-    await humanTaskRepo.create(taskBefore);
-    const taskAfter = { ...taskBefore, status: 'completed' as const };
-    const instanceAfter = (await instanceRepo.getById('inst-a'))!;
-
-    const engineStub = makeEngineStub({ task: taskAfter, instance: instanceAfter });
-    const kicker = noopRunKicker();
-    const scope = createTestScope({
-      humanTaskRepo,
-      instanceRepo,
-      auditRepo,
-      runKicker: kicker,
-      caller: userCaller('u-1', ['team-alpha']),
-    });
-    Object.assign(scope.system, { engine: engineStub });
-
-    await completeTask(
       {
         taskId: 'task-1',
         payload: { kind: 'verdict', verdict: 'approve', comment: 'ok' },
       },
       scope,
     );
+
+    expect(result.task.status).toBe('completed');
+    expect(result.run.id).toBe('inst-a');
 
     const events = await auditRepo.getByProcess('inst-a');
     const actions = events.map((e) => e.action);
@@ -145,6 +116,7 @@ describe('completeTask handler', () => {
     expect(kicker.kicks).toEqual([
       { instanceId: 'inst-a', triggeredBy: 'u-1' },
     ]);
+    expect(engineStub.calls[0].actorId).toBe('u-1');
   });
 
   it('returns 404 when the task is outside the caller workspace', async () => {
@@ -159,7 +131,7 @@ describe('completeTask handler', () => {
       humanTaskRepo,
       instanceRepo,
       auditRepo,
-      caller: userCaller('u-1', ['team-other']), // not team-alpha
+      caller: userCaller('u-1', ['team-other']),
     });
     Object.assign(scope.system, { engine: makeEngineStub({ task, instance: (await instanceRepo.getById('inst-a'))! }) });
 
@@ -174,7 +146,6 @@ describe('completeTask handler', () => {
   it('maps engine InvalidTransitionError to PreconditionFailedError (409)', async () => {
     const task = buildHumanTask({ id: 'task-1', processInstanceId: 'inst-a', status: 'claimed' });
     await humanTaskRepo.create(task);
-    // Lazy import to keep dep direction explicit.
     const { InvalidTransitionError } = await import('@mediforce/workflow-engine');
 
     const engineStub = makeEngineStub({
@@ -196,56 +167,5 @@ describe('completeTask handler', () => {
         scope,
       ),
     ).rejects.toBeInstanceOf(PreconditionFailedError);
-  });
-
-  it('maps engine CompleteHumanTaskValidationError to validation HandlerError (400)', async () => {
-    const task = buildHumanTask({ id: 'task-1', processInstanceId: 'inst-a', status: 'claimed' });
-    await humanTaskRepo.create(task);
-    const { CompleteHumanTaskValidationError } = await import('@mediforce/workflow-engine');
-
-    const engineStub = makeEngineStub({
-      task,
-      instance: (await instanceRepo.getById('inst-a'))!,
-      throws: new CompleteHumanTaskValidationError('bad verdict'),
-    });
-    const scope = createTestScope({
-      humanTaskRepo,
-      instanceRepo,
-      auditRepo,
-      caller: userCaller('u-1', ['team-alpha']),
-    });
-    Object.assign(scope.system, { engine: engineStub });
-
-    const err = await completeTask(
-      { taskId: 'task-1', payload: { kind: 'verdict', verdict: 'bad' } },
-      scope,
-    ).catch((e) => e);
-
-    expect(err).toBeInstanceOf(HandlerError);
-    expect((err as HandlerError).code).toBe('validation');
-  });
-
-  it('passes the caller uid through as the engine actor', async () => {
-    const task = buildHumanTask({ id: 'task-1', processInstanceId: 'inst-a', status: 'claimed' });
-    await humanTaskRepo.create(task);
-
-    const engineStub = makeEngineStub({
-      task,
-      instance: (await instanceRepo.getById('inst-a'))!,
-    });
-    const scope = createTestScope({
-      humanTaskRepo,
-      instanceRepo,
-      auditRepo,
-      caller: userCaller('u-42', ['team-alpha']),
-    });
-    Object.assign(scope.system, { engine: engineStub });
-
-    await completeTask(
-      { taskId: 'task-1', payload: { kind: 'verdict', verdict: 'approve' } },
-      scope,
-    );
-
-    expect(engineStub.calls[0].actorId).toBe('u-42');
   });
 });

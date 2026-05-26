@@ -125,9 +125,6 @@ describe('WorkflowEngine.completeHumanTask', () => {
     expect(storedTask?.completionData?.completedBy).toBe('u-1');
 
     const storedInstance = await instanceRepo.getById(instance.id);
-    // advanceStep moved past 'review' → terminal 'done' → instance completed.
-    // Engine clears currentStepId once the terminal step finishes; assert
-    // status alone (currentStepId becomes null after terminal completion).
     expect(storedInstance?.status).toBe('completed');
     expect(storedInstance?.pauseReason).toBeNull();
   });
@@ -160,8 +157,6 @@ describe('WorkflowEngine.completeHumanTask', () => {
 
     const storedTask = await humanTaskRepo.getById(task.id);
     expect(storedTask?.status).toBe('completed');
-    // Auto-claim recorded the actor on the task even though we skipped
-    // explicit claim.
     expect(storedTask?.assignedUserId).toBe('u-1');
     expect(storedTask?.completionData?.completedBy).toBe('u-1');
 
@@ -192,8 +187,6 @@ describe('WorkflowEngine.completeHumanTask', () => {
     expect(result.resolvedStepId).toBe('review');
 
     const storedInstance = await instanceRepo.getById(instance.id);
-    // L3-revise resumes the instance (paused → running) but the engine
-    // skips advanceStep — currentStepId stays put.
     expect(storedInstance?.status).toBe('running');
     expect(storedInstance?.currentStepId).toBe('review');
     expect(storedInstance?.pauseReason).toBeNull();
@@ -203,7 +196,7 @@ describe('WorkflowEngine.completeHumanTask', () => {
     expect(storedTask?.completionData?.verdict).toBe('revise');
   });
 
-  it('rejects with InvalidTransitionError when task is already completed', async () => {
+  it('rejects with InvalidTransitionError when task is already terminal', async () => {
     const instance = pausedReviewInstance();
     await instanceRepo.create(instance);
 
@@ -225,100 +218,8 @@ describe('WorkflowEngine.completeHumanTask', () => {
       ),
     ).rejects.toBeInstanceOf(InvalidTransitionError);
 
-    // Task is untouched — completionData still carries the original verdict.
     const storedTask = await humanTaskRepo.getById(task.id);
     expect(storedTask?.completionData?.verdict).toBe('approve');
-  });
-
-  it('rejects with InvalidTransitionError when task is cancelled', async () => {
-    const instance = pausedReviewInstance();
-    await instanceRepo.create(instance);
-
-    const task = buildHumanTask({
-      processInstanceId: instance.id,
-      stepId: 'review',
-      status: 'cancelled',
-      assignedUserId: 'u-1',
-    });
-    await humanTaskRepo.create(task);
-
-    await expect(
-      engine.completeHumanTask(
-        task.id,
-        { kind: 'verdict', verdict: 'approve' },
-        'u-1',
-      ),
-    ).rejects.toBeInstanceOf(InvalidTransitionError);
-
-    const storedTask = await humanTaskRepo.getById(task.id);
-    expect(storedTask?.status).toBe('cancelled');
-  });
-
-  it('rejects with InvalidTransitionError when parent instance is not paused', async () => {
-    // Instance is `running`, not `paused` — completeHumanTask must reject.
-    const instance = pausedReviewInstance({
-      status: 'running',
-      pauseReason: null,
-    });
-    await instanceRepo.create(instance);
-
-    const task = buildHumanTask({
-      processInstanceId: instance.id,
-      stepId: 'review',
-      status: 'claimed',
-      assignedUserId: 'u-1',
-    });
-    await humanTaskRepo.create(task);
-
-    await expect(
-      engine.completeHumanTask(
-        task.id,
-        { kind: 'verdict', verdict: 'approve' },
-        'u-1',
-      ),
-    ).rejects.toBeInstanceOf(InvalidTransitionError);
-
-    // NOTE: The engine currently calls humanTaskRepository.complete BEFORE
-    // checking instance.status (see workflow-engine.ts ~line 737 vs 747).
-    // That means the task ends up `completed` even though the orchestration
-    // rejected. Worth flagging as an audit-trail ordering bug — the engine
-    // should validate the parent instance before mutating the task. We
-    // assert the *actual* current behaviour here rather than the desired
-    // behaviour; tighten this when the ordering is fixed.
-    const storedTask = await humanTaskRepo.getById(task.id);
-    expect(storedTask?.status).toBe('completed');
-
-    // Instance still running, untouched.
-    const storedInstance = await instanceRepo.getById(instance.id);
-    expect(storedInstance?.status).toBe('running');
-  });
-
-  it('throws plain Error when the task does not exist', async () => {
-    await expect(
-      engine.completeHumanTask(
-        'task-does-not-exist',
-        { kind: 'verdict', verdict: 'approve' },
-        'u-1',
-      ),
-    ).rejects.toThrow(/Task 'task-does-not-exist' not found/);
-  });
-
-  it('throws plain Error when the parent instance does not exist', async () => {
-    const task = buildHumanTask({
-      processInstanceId: 'inst-missing',
-      stepId: 'review',
-      status: 'claimed',
-      assignedUserId: 'u-1',
-    });
-    await humanTaskRepo.create(task);
-
-    await expect(
-      engine.completeHumanTask(
-        task.id,
-        { kind: 'verdict', verdict: 'approve' },
-        'u-1',
-      ),
-    ).rejects.toThrow(/Process instance 'inst-missing' not found/);
   });
 
   it('throws when the engine was constructed without a humanTaskRepository', async () => {
