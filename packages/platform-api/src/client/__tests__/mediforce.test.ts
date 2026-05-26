@@ -600,6 +600,43 @@ describe('Mediforce', () => {
     });
   });
 
+  describe('processes.cancel', () => {
+    it('POSTs to /api/processes/:instanceId/cancel and parses the entity envelope', async () => {
+      const run = buildProcessInstance({ id: 'inst-a', status: 'failed', error: 'Cancelled by user' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ run }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.processes.cancel({ instanceId: 'inst-a' });
+
+      expect(result.run.id).toBe('inst-a');
+      expect(result.run.status).toBe('failed');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/processes/inst-a/cancel`);
+      expect(fetchSpy.mock.calls[0]?.[1]?.method).toBe('POST');
+    });
+
+    it('forwards the reason in the request body when provided', async () => {
+      const run = buildProcessInstance({ id: 'inst-a', status: 'failed', error: 'Audit cleanup' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ run }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.processes.cancel({ instanceId: 'inst-a', reason: 'Audit cleanup' });
+
+      expect(fetchSpy.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({ reason: 'Audit cleanup' }));
+    });
+
+    it('rejects an empty instanceId before firing any request', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await expect(mediforce.processes.cancel({ instanceId: '' })).rejects.toThrow();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('error envelope back-compat (legacy `{ error: string }`)', () => {
     it('extracts the message from the legacy string envelope', async () => {
       // Some Phase 1 routes still throw plain HandlerError with a custom

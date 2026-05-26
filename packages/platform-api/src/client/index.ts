@@ -55,6 +55,8 @@ import {
   ListPluginsOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
+  CancelProcessInputSchema,
+  CancelProcessOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
@@ -118,6 +120,8 @@ import {
   type ListAuditEventsOutput,
   type GetProcessStepsInput,
   type GetProcessStepsOutput,
+  type CancelProcessInput,
+  type CancelProcessOutput,
   type GetCoworkSessionInput,
   type GetCoworkSessionOutput,
   type GetCoworkSessionByInstanceInput,
@@ -203,6 +207,7 @@ export class Mediforce {
     get: (input: GetProcessInput) => Promise<GetProcessOutput>;
     listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
     getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
+    cancel: (input: CancelProcessInput) => Promise<CancelProcessOutput>;
   };
 
   readonly cowork: {
@@ -351,6 +356,20 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.processes.getSteps');
         return GetProcessStepsOutputSchema.parse(body);
+      },
+      cancel: async (input) => {
+        const validated = CancelProcessInputSchema.parse(input);
+        const body = validated.reason !== undefined ? { reason: validated.reason } : {};
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.instanceId)}/cancel`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+        );
+        const parsed = await parseJsonOrThrow(res, 'mediforce.processes.cancel');
+        return CancelProcessOutputSchema.parse(parsed);
       },
     };
 
