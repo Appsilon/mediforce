@@ -147,3 +147,34 @@ export async function completeAssignmentTask(
     };
   }
 }
+
+// --------------------------------------------------------------------------
+// completeTableEditorTask — submit per-row cell values for a table-editor human
+// task. Downstream steps consume `stepOutput.rows`, each `{ itemId, values }`.
+// --------------------------------------------------------------------------
+interface TableEditorPayload {
+  rows: Array<{ itemId: string; values: Record<string, unknown> }>;
+}
+
+export async function completeTableEditorTask(
+  taskId: string,
+  payload: TableEditorPayload,
+  idToken: string = '',
+): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireUserId(idToken);
+  if ('error' in auth) return { success: false, error: auth.error };
+  const { uid } = auth;
+
+  try {
+    const result = await resolveTask(taskId, { rows: payload.rows }, uid);
+    if (isResolveError(result)) {
+      return { success: false, error: result.error };
+    }
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
+}

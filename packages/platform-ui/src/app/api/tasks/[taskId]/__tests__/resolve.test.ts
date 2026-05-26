@@ -855,3 +855,115 @@ describe('POST /api/tasks/:taskId/resolve — assignment-table', () => {
     expect(stepOutput.assignments).toEqual([]);
   });
 });
+
+// ---- Table editor resolution ----
+
+describe('POST /api/tasks/:taskId/resolve — table-editor', () => {
+  const claimedTableEditorTask = {
+    id: 'task-4',
+    processInstanceId: 'inst-1',
+    stepId: 'tag-issues',
+    assignedRole: 'reviewer',
+    assignedUserId: 'user-1',
+    status: 'claimed',
+    completionData: null,
+    ui: {
+      component: 'table-editor',
+      config: {
+        columns: [
+          { id: 'issue', kind: 'static', label: 'Issue', field: 'label' },
+          {
+            id: 'category',
+            kind: 'single-select',
+            label: 'Category',
+            allowEmpty: false,
+            options: [{ id: 'ux', label: 'UX' }],
+          },
+        ],
+      },
+    },
+    options: [
+      { id: '101', label: '#101' },
+      { id: '102', label: '#102' },
+    ],
+    createdAt: '2026-05-22T10:00:00Z',
+    updatedAt: '2026-05-22T10:00:00Z',
+  };
+
+  const validRows = [
+    { itemId: '101', values: { category: 'ux', priority: 'P1' } },
+    { itemId: '102', values: { category: 'tech-debt', priority: 'P2' } },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
+    mockInstanceGetById.mockResolvedValue(pausedInstance);
+    mockInstanceUpdate.mockResolvedValue(undefined);
+    mockAdvanceStep.mockResolvedValue(advancedInstance);
+    mockComplete.mockResolvedValue({ ...claimedTableEditorTask, status: 'completed' });
+  });
+
+  it('[DATA] resolves a table-editor task and passes rows to advanceStep', async () => {
+    mockGetById.mockResolvedValue(claimedTableEditorTask);
+    mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(advancedInstance);
+
+    const res = await POST(
+      makeRequest('task-4', { rows: validRows }),
+      { params: makeParams('task-4') },
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.ok).toBe(true);
+
+    const stepOutput = mockAdvanceStep.mock.calls[0][1] as Record<string, unknown>;
+    expect(stepOutput.rows).toEqual(validRows);
+    expect(stepOutput.verdict).toBeUndefined();
+  });
+
+  it('[DATA] completionData includes rows plus actor metadata', async () => {
+    mockGetById.mockResolvedValue(claimedTableEditorTask);
+    mockInstanceGetById
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(pausedInstance)
+      .mockResolvedValueOnce(advancedInstance);
+
+    await POST(
+      makeRequest('task-4', { rows: validRows }),
+      { params: makeParams('task-4') },
+    );
+
+    const completionArg = mockComplete.mock.calls[0][1] as Record<string, unknown>;
+    expect(completionArg.rows).toEqual(validRows);
+    expect(completionArg.completedBy).toBeDefined();
+    expect(completionArg.completedAt).toBeDefined();
+  });
+
+  it('[ERROR] returns 400 when rows missing', async () => {
+    mockGetById.mockResolvedValue(claimedTableEditorTask);
+
+    const res = await POST(
+      makeRequest('task-4', {}),
+      { params: makeParams('task-4') },
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('rows');
+  });
+
+  it('[ERROR] returns 400 when rows is not an array', async () => {
+    mockGetById.mockResolvedValue(claimedTableEditorTask);
+
+    const res = await POST(
+      makeRequest('task-4', { rows: 'nope' }),
+      { params: makeParams('task-4') },
+    );
+
+    expect(res.status).toBe(400);
+  });
+});
