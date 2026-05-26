@@ -156,10 +156,9 @@ pnpm dev                                           # start the app
 ```
 
 `pnpm db:migrate` is idempotent — re-run after pulling new migrations
-from main. The dev server does NOT auto-migrate (schema is a deliberate
-operator step). Docker production deploys are different: the platform-ui
-container's `CMD` wraps migrate + server.js, so prod auto-applies pending
-migrations on boot — see [Staging / production ops](#staging--production-ops-postgres) below.
+from main. Same script runs inside `pnpm dev:postgres` and inside the
+production Dockerfile's CMD, so dev and prod share the migration path.
+See [Staging / production ops](#staging--production-ops-postgres) below.
 
 Firebase Auth is still required (until [ADR-0002](docs/adr/) lands a NextAuth
 replacement); set the `NEXT_PUBLIC_FIREBASE_*` vars in `.env.local` as usual.
@@ -278,7 +277,6 @@ POSTGRES_PASSWORD=<strong, random>            # required when STORAGE_BACKEND=po
 # Optional (sensible defaults provided):
 POSTGRES_USER=mediforce
 POSTGRES_DB=mediforce
-DATABASE_POOL_MAX=10
 # Flip when ready to cut over (default firestore — keeps Postgres dormant):
 # STORAGE_BACKEND=postgres
 ```
