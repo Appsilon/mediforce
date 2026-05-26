@@ -55,8 +55,8 @@ import {
   ListPluginsOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
-  CancelProcessInputSchema,
-  CancelProcessOutputSchema,
+  CancelRunInputSchema,
+  CancelRunOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
@@ -120,8 +120,8 @@ import {
   type ListAuditEventsOutput,
   type GetProcessStepsInput,
   type GetProcessStepsOutput,
-  type CancelProcessInput,
-  type CancelProcessOutput,
+  type CancelRunInput,
+  type CancelRunOutput,
   type GetCoworkSessionInput,
   type GetCoworkSessionOutput,
   type GetCoworkSessionByInstanceInput,
@@ -207,7 +207,6 @@ export class Mediforce {
     get: (input: GetProcessInput) => Promise<GetProcessOutput>;
     listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
     getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
-    cancel: (input: CancelProcessInput) => Promise<CancelProcessOutput>;
   };
 
   readonly cowork: {
@@ -238,6 +237,7 @@ export class Mediforce {
     list: (input?: ListRunsInput) => Promise<ListRunsOutput>;
     get: (input: GetRunInput) => Promise<GetRunOutput>;
     start: (input: StartRunInput) => Promise<StartRunOutput>;
+    cancel: (input: CancelRunInput) => Promise<CancelRunOutput>;
   };
 
   readonly agents: {
@@ -356,20 +356,6 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.processes.getSteps');
         return GetProcessStepsOutputSchema.parse(body);
-      },
-      cancel: async (input) => {
-        const validated = CancelProcessInputSchema.parse(input);
-        const body = validated.reason !== undefined ? { reason: validated.reason } : {};
-        const res = await this.request(
-          `/api/processes/${encodeURIComponent(validated.instanceId)}/cancel`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          },
-        );
-        const parsed = await parseJsonOrThrow(res, 'mediforce.processes.cancel');
-        return CancelProcessOutputSchema.parse(parsed);
       },
     };
 
@@ -595,6 +581,20 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.runs.start');
         return StartRunOutputSchema.parse(body);
+      },
+      cancel: async (input) => {
+        const validated = CancelRunInputSchema.parse(input);
+        const body = validated.reason !== undefined ? { reason: validated.reason } : {};
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.runId)}/cancel`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+        );
+        const parsed = await parseJsonOrThrow(res, 'mediforce.runs.cancel');
+        return CancelRunOutputSchema.parse(parsed);
       },
     };
 

@@ -16,11 +16,11 @@ import {
   buildHumanTask,
   buildProcessInstance,
 } from '@mediforce/platform-core/testing';
-import { listTasks, claimTask, cancelProcess } from '@mediforce/platform-api/handlers';
+import { listTasks, claimTask, cancelRun } from '@mediforce/platform-api/handlers';
 import {
   ListTasksInputSchema,
   ClaimTaskInputSchema,
-  CancelProcessInputSchema,
+  CancelRunInputSchema,
 } from '@mediforce/platform-api/contract';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
@@ -210,10 +210,10 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
   });
 });
 
-// Third integration scenario: `processes.cancel` mutation (Phase 2 PR2).
+// Third integration scenario: `runs.cancel` mutation (Phase 2 PR2).
 // One round-trip exercising entity-echo response shape + typed envelope
 // surfacing — same loopback ceremony as claim above.
-describe('Mediforce client ↔ route-adapter ↔ cancelProcess (in-process)', () => {
+describe('Mediforce client ↔ route-adapter ↔ cancelRun (in-process)', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
   let humanTaskRepo: InMemoryHumanTaskRepository;
   let mediforce: Mediforce;
@@ -233,20 +233,17 @@ describe('Mediforce client ↔ route-adapter ↔ cancelProcess (in-process)', ()
     humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
 
     route = createRouteAdapter<
-      typeof CancelProcessInputSchema,
-      { instanceId: string; reason?: string },
+      typeof CancelRunInputSchema,
+      { runId: string; reason?: string },
       { run: unknown },
       { params: Promise<{ instanceId: string }> }
     >(
-      CancelProcessInputSchema,
-      async (req, ctx) => {
-        const { instanceId } = await ctx.params;
-        const raw = (await req.json().catch(() => ({}))) as { reason?: unknown };
-        const reason =
-          typeof raw.reason === 'string' && raw.reason.length > 0 ? raw.reason : undefined;
-        return { instanceId, ...(reason !== undefined ? { reason } : {}) };
-      },
-      cancelProcess,
+      CancelRunInputSchema,
+      async (req, ctx) => ({
+        runId: (await ctx.params).instanceId,
+        ...((await req.json().catch(() => ({}))) as Record<string, unknown>),
+      }),
+      cancelRun,
       {
         resolveCaller: async () => userCaller,
         buildScope: (caller) => createTestScope({ caller, instanceRepo, humanTaskRepo }),
@@ -270,7 +267,7 @@ describe('Mediforce client ↔ route-adapter ↔ cancelProcess (in-process)', ()
       buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'running' }),
     );
 
-    const result = await mediforce.processes.cancel({ instanceId: 'inst-a' });
+    const result = await mediforce.runs.cancel({ runId: 'inst-a' });
 
     expect(result.run.id).toBe('inst-a');
     expect(result.run.status).toBe('failed');
@@ -282,8 +279,8 @@ describe('Mediforce client ↔ route-adapter ↔ cancelProcess (in-process)', ()
       buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'failed' }),
     );
 
-    const err = await mediforce.processes
-      .cancel({ instanceId: 'inst-a' })
+    const err = await mediforce.runs
+      .cancel({ runId: 'inst-a' })
       .catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(ApiError);

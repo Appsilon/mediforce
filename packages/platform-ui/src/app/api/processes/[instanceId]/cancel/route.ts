@@ -1,7 +1,7 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
-import { cancelProcess } from '@mediforce/platform-api/handlers';
-import { CancelProcessInputSchema } from '@mediforce/platform-api/contract';
-import type { CancelProcessInput } from '@mediforce/platform-api/contract';
+import { cancelRun } from '@mediforce/platform-api/handlers';
+import { CancelRunInputSchema } from '@mediforce/platform-api/contract';
+import type { CancelRunInput } from '@mediforce/platform-api/contract';
 
 interface RouteContext {
   params: Promise<{ instanceId: string }>;
@@ -10,26 +10,25 @@ interface RouteContext {
 /**
  * POST /api/processes/:instanceId/cancel
  *
- * Body: { reason?: string }
- *
  * State transition (running | paused → failed). State-machine precondition,
- * workspace gating, and audit emission live in the handler (Phase 2 PR2 /
- * ADR-0005 §5/§7). Response is entity-echoed `{ run: WorkflowRun }` —
- * replaces the pre-migration `{ instanceId, status }` shape.
+ * workspace gating, and audit emission live in the handler (ADR-0005 §5/§7).
+ * Response is entity-echoed `{ run: WorkflowRun }` — replaces the
+ * pre-migration `{ instanceId, status }` shape.
+ *
+ * The URL path keeps the legacy `processes/:instanceId` segment until a
+ * coordinated URL rename phase; the adapter translates `params.instanceId`
+ * to the contract field `runId`.
  */
 export const POST = createRouteAdapter<
-  typeof CancelProcessInputSchema,
-  CancelProcessInput,
+  typeof CancelRunInputSchema,
+  CancelRunInput,
   unknown,
   RouteContext
 >(
-  CancelProcessInputSchema,
-  async (req, ctx) => {
-    const { instanceId } = await ctx.params;
-    const raw = (await req.json().catch(() => ({}))) as { reason?: unknown };
-    const reason =
-      typeof raw.reason === 'string' && raw.reason.length > 0 ? raw.reason : undefined;
-    return { instanceId, ...(reason !== undefined ? { reason } : {}) };
-  },
-  cancelProcess,
+  CancelRunInputSchema,
+  async (req, ctx) => ({
+    runId: (await ctx.params).instanceId,
+    ...((await req.json().catch(() => ({}))) as Record<string, unknown>),
+  }),
+  cancelRun,
 );

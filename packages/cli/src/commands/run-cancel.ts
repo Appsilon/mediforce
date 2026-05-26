@@ -87,8 +87,8 @@ export async function runCancelCommand(input: CommandInput): Promise<number> {
 
   const mediforce = new Mediforce({ apiKey: config.apiKey, baseUrl: config.baseUrl });
   try {
-    const result = await mediforce.processes.cancel({
-      instanceId: runId,
+    const result = await mediforce.runs.cancel({
+      runId,
       ...(flags.reason !== undefined ? { reason: flags.reason } : {}),
     });
     if (jsonMode) {

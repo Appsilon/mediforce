@@ -600,7 +600,7 @@ describe('Mediforce', () => {
     });
   });
 
-  describe('processes.cancel', () => {
+  describe('runs.cancel', () => {
     it('POSTs to /api/processes/:instanceId/cancel and parses the entity envelope', async () => {
       const run = buildProcessInstance({ id: 'inst-a', status: 'failed', error: 'Cancelled by user' });
       const fetchSpy = vi
@@ -608,7 +608,7 @@ describe('Mediforce', () => {
         .mockResolvedValue(jsonResponse({ run }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      const result = await mediforce.processes.cancel({ instanceId: 'inst-a' });
+      const result = await mediforce.runs.cancel({ runId: 'inst-a' });
 
       expect(result.run.id).toBe('inst-a');
       expect(result.run.status).toBe('failed');
@@ -623,16 +623,16 @@ describe('Mediforce', () => {
         .mockResolvedValue(jsonResponse({ run }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      await mediforce.processes.cancel({ instanceId: 'inst-a', reason: 'Audit cleanup' });
+      await mediforce.runs.cancel({ runId: 'inst-a', reason: 'Audit cleanup' });
 
       expect(fetchSpy.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({ reason: 'Audit cleanup' }));
     });
 
-    it('rejects an empty instanceId before firing any request', async () => {
+    it('rejects an empty runId before firing any request', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      await expect(mediforce.processes.cancel({ instanceId: '' })).rejects.toThrow();
+      await expect(mediforce.runs.cancel({ runId: '' })).rejects.toThrow();
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });

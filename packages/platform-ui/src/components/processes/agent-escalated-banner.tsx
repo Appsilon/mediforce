@@ -41,7 +41,7 @@ export function AgentEscalatedBanner({ instanceId, stepId }: AgentEscalatedBanne
     setCancelStatus('submitting');
     setCancelError(null);
     try {
-      await mediforce.processes.cancel({ instanceId });
+      await mediforce.runs.cancel({ runId: instanceId });
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Cancel failed';

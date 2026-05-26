@@ -148,7 +148,7 @@ export function ProcessDetail({
     setCancelStep(2);
     setCancelError(null);
     try {
-      await mediforce.processes.cancel({ instanceId: instance.id });
+      await mediforce.runs.cancel({ runId: instance.id });
       setCancelStep(0);
     } catch (err) {
       const message =
