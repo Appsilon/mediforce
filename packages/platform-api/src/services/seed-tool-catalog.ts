@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { FirestoreToolCatalogRepository } from '@mediforce/platform-infra';
-import type { ToolCatalogEntry } from '@mediforce/platform-core';
+import type { ToolCatalogEntry, ToolCatalogRepository } from '@mediforce/platform-core';
 import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
 
 /** Namespace → catalog entries to upsert at startup. Entries here are
@@ -17,7 +16,7 @@ import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// packages/platform-ui/src/lib -> repo root (4 levels up)
+// packages/platform-api/src/services -> repo root (4 levels up)
 const SEED_PATH = resolve(__dirname, '../../../../data/seeds/tool-catalog.json');
 
 function loadBuiltinCatalog(): Record<string, ToolCatalogEntry[]> {
@@ -32,7 +31,7 @@ function loadBuiltinCatalog(): Record<string, ToolCatalogEntry[]> {
 const BUILTIN_CATALOG = loadBuiltinCatalog();
 
 export async function seedBuiltinToolCatalog(
-  repo: FirestoreToolCatalogRepository,
+  repo: ToolCatalogRepository,
 ): Promise<void> {
   const tasks: Promise<unknown>[] = [];
   for (const [namespace, entries] of Object.entries(BUILTIN_CATALOG)) {
