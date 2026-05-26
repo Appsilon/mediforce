@@ -10,7 +10,9 @@ import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
-import { cancelProcessRun, archiveProcessRun } from '@/app/actions/processes';
+import { archiveProcessRun } from '@/app/actions/processes';
+import { mediforce } from '@/lib/mediforce';
+import { ApiError } from '@mediforce/platform-api/client';
 import { useActiveCoworkSession } from '@/hooks/use-tasks';
 import { useProcessInstance } from '@/hooks/use-process-instances';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
@@ -145,12 +147,14 @@ export function ProcessDetail({
   async function handleConfirmCancel() {
     setCancelStep(2);
     setCancelError(null);
-    const result = await cancelProcessRun(instance.id);
-    if (!result.success) {
-      setCancelError(result.error ?? 'Cancel failed');
-      setCancelStep(1);
-    } else {
+    try {
+      await mediforce.processes.cancel({ instanceId: instance.id });
       setCancelStep(0);
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Cancel failed';
+      setCancelError(message);
+      setCancelStep(1);
     }
   }
 
