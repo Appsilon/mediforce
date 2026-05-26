@@ -543,10 +543,11 @@ describe('backlog-triage journey', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0].step).toBe('create-label');
       expect(result.applied).toEqual([]);
-      // Total failure → the step exits non-zero (red run, loop stops) and surfaces a presentation.
+      // Total failure → the step exits non-zero (red run, loop stops). The runner surfaces the
+      // first error from the log; it does NOT render a presentation on the failure path, so the
+      // script must not waste one there.
       expect(exitCode).toBe(1);
-      expect(files['presentation.md']).toMatch(/label update\(s\) failed/);
-      expect(files['presentation.md']).toContain('#9');
+      expect(files['presentation.md']).toBeUndefined();
     });
   });
 });
