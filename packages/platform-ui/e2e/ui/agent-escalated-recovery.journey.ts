@@ -22,7 +22,7 @@ test.describe('Agent Escalated Recovery Journey', () => {
     await expect(cancelButton).toBeVisible();
     await showStep(page);
 
-    // Click "Cancel this run" — cancelProcess handler sets status=failed, error='Cancelled by user'
+    // Click "Cancel this run" — cancelProcessRun sets status=failed, error='Cancelled by user'
     await click(page, cancelButton);
 
     // Status badge flips to "Cancelled" (gray); AgentEscalatedBanner removed (instance no longer paused/agent_escalated)
