@@ -31,6 +31,7 @@ export { FirestoreToolCatalogRepository } from './firestore/tool-catalog-reposit
 export { PostgresToolCatalogRepository } from './postgres/repositories/tool-catalog-repository.js';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client.js';
 export type { Database } from './postgres/client.js';
+export { applyPostgresMigrations } from './postgres/migrator.js';
 export { FirestoreOAuthProviderRepository } from './firestore/oauth-provider-repository.js';
 export { FirestoreAgentOAuthTokenRepository } from './firestore/agent-oauth-token-repository.js';
 export { validateSecretsKey } from './crypto/secrets-cipher.js';

@@ -90,5 +90,40 @@ export async function register(): Promise<void> {
     // webpackIgnore works on import() in webpack 5; it does NOT work on require().
     const { existsSync } = await import(/* webpackIgnore: true */ 'node:fs');
     validateEnv(existsSync);
+
+    // ADR-0001 — auto-apply pending Postgres migrations at boot. Idempotent
+    // (drizzle's `drizzle.__drizzle_migrations` ledger), safe to run on every
+    // start while production is single-container per docker-compose.prod.yml.
+    // A multi-replica deployment will gate this behind a Postgres advisory
+    // lock in a follow-up ADR.
+    //
+    // The actual migration runner lives in `instrumentation-postgres.ts`
+    // next to this file. Pulling it in via dynamic import keeps the
+    // `postgres` and `drizzle-orm` modules off the bundle when the
+    // Postgres backend is disabled (the default until cutover). It also
+    // walls off Turbopack's instrumentation-pipeline quirks — that file
+    // uses absolute paths to the migrations folder and never crosses
+    // into `@mediforce/platform-infra`'s broader source tree.
+    if (process.env.STORAGE_BACKEND === 'postgres') {
+      try {
+        // Turbopack's instrumentation resolver rejects `.js` extensions on
+        // relative imports here but TS rejects `.ts` extensions without
+        // `allowImportingTsExtensions` (incompatible with `tsc -b` /
+        // `noEmit` at the workspace root). Pin the `.ts` extension and
+        // silence TS — the sibling module is still part of platform-ui's
+        // normal compilation so its own types are checked.
+        // @ts-expect-error TS5097: literal `.ts` extension intentional.
+        const { runBootMigrations } = await import('./instrumentation-postgres.ts');
+        await runBootMigrations();
+      } catch (err) {
+        const divider = '─'.repeat(60);
+        console.error(
+          `\n${divider}\n  FATAL: Postgres migrations failed at boot\n${divider}\n`,
+          err,
+          `\n${divider}\n  The server cannot start. Fix the database and restart.\n${divider}\n`,
+        );
+        process.exit(1);
+      }
+    }
   }
 }
