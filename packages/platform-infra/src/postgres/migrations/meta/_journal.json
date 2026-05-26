@@ -8,6 +8,13 @@
       "when": 1779804137346,
       "tag": "0000_tool_catalog_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779837240580,
+      "tag": "0001_loose_ultimo",
+      "breakpoints": true
     }
   ]
 }
