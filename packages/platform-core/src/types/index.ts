@@ -43,6 +43,7 @@ export type {
   Annotation,
   GitMetadata,
   TokenUsage,
+  Presentation,
   AgentOutputEnvelope,
 } from '../schemas/agent-output-envelope.js';
 

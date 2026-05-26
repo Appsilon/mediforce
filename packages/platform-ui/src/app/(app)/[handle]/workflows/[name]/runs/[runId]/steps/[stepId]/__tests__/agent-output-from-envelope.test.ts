@@ -45,13 +45,23 @@ describe('agentOutputFromEnvelope', () => {
     };
     const envelope = buildEnvelope({
       gitMetadata: git,
-      presentation: '<div>html</div>',
+      presentation: { kind: 'html', content: '<div>html</div>' },
     });
 
     const out = agentOutputFromEnvelope(envelope);
 
     expect(out.gitMetadata).toEqual(git);
-    expect(out.presentation).toBe('<div>html</div>');
+    expect(out.presentation).toEqual({ kind: 'html', content: '<div>html</div>' });
+  });
+
+  it('forwards a markdown presentation untouched', () => {
+    const envelope = buildEnvelope({
+      presentation: { kind: 'markdown', content: '## Status\n\n- done' },
+    });
+
+    const out = agentOutputFromEnvelope(envelope);
+
+    expect(out.presentation).toEqual({ kind: 'markdown', content: '## Status\n\n- done' });
   });
 
   it('passes tokenUsage through', () => {

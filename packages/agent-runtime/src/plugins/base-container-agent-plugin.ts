@@ -4,7 +4,7 @@ import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, type ContainerPluginInit } from './container-plugin.js';
@@ -99,7 +99,7 @@ export interface SpawnCliOptions {
 export interface SpawnDockerResult {
   cliOutput: string;
   gitMetadata: GitMetadata | null;
-  presentation: string | null;
+  presentation: Presentation | null;
   outputDir: string;
   /** Env var names injected into the process (for audit logging) */
   injectedEnvVars: string[];
@@ -524,10 +524,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *
    * Two-phase logic:
    * 1. Loop over known deliverable extensions, skipping INTERNAL_NAMES.
-   *    `presentation.html` is in INTERNAL_NAMES so it's skipped here.
-   * 2. Fallback: try `presentation.html` separately. It's excluded from the
-   *    loop because it's already read into spawnResult.presentation, but we
-   *    still need a persisted path so the Download Report button can serve it.
+   *    `presentation.{md,html}` are in INTERNAL_NAMES so they're skipped here.
+   * 2. Fallback: try `presentation.md` then `presentation.html` separately.
+   *    They are excluded from the loop because they're already read into
+   *    spawnResult.presentation, but we still need a persisted path so the
+   *    Download Report button can serve them.
    */
   protected async persistDeliverableFile(
     outputDir: string,
@@ -536,7 +537,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   ): Promise<string | null> {
     const INTERNAL_NAMES = new Set([
       'opencode.json', 'auth.json', 'prompt.txt', 'result.json',
-      'git-result.json', 'mock-result.json', 'presentation.html',
+      'git-result.json', 'mock-result.json',
+      'presentation.html', 'presentation.md',
     ]);
     const DELIVERABLE_EXTS = new Set(['.html', '.htm', '.pdf', '.csv', '.xlsx', '.md']);
 
@@ -565,17 +567,22 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
     }
 
-    // Also handle presentation.html (already read as spawnResult.presentation but path needed)
-    const presentationPath = join(outputDir, 'presentation.html');
-    try {
-      const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
-      await mkdir(destDir, { recursive: true });
-      const destPath = join(destDir, `${stepId}-presentation.html`);
-      await cp(presentationPath, destPath);
-      return destPath;
-    } catch {
-      return null;
+    // Also handle presentation.{md,html} — already read into
+    // spawnResult.presentation but a persisted path is needed for the
+    // Download Report button. Markdown wins on tie.
+    for (const filename of ['presentation.md', 'presentation.html']) {
+      const presentationPath = join(outputDir, filename);
+      try {
+        const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
+        await mkdir(destDir, { recursive: true });
+        const destPath = join(destDir, `${stepId}-${filename}`);
+        await cp(presentationPath, destPath);
+        return destPath;
+      } catch {
+        continue;
+      }
     }
+    return null;
   }
 
   /** Resolve the host path to the mock-fixtures directory for this step's plugin.
@@ -1406,13 +1413,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       agentImage: this.agentConfig.image,
     });
 
-    // Read presentation.html from local output directory
-    let localPresentation: string | null = null;
-    try {
-      localPresentation = await readFile(join(outputDir, 'presentation.html'), 'utf-8');
-    } catch {
-      // presentation.html is optional
-    }
+    const localPresentation = await readPresentation(outputDir);
 
     return { cliOutput, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
   }
@@ -1589,14 +1590,29 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       agentImage: this.agentConfig.image,
     });
 
-    // Read presentation.html from the output directory (optional agent-provided HTML view)
-    let presentation: string | null = null;
-    try {
-      presentation = await readFile(join(outputDir, 'presentation.html'), 'utf-8');
-    } catch {
-      // presentation.html is optional — agents may not produce one
-    }
+    const presentation = await readPresentation(outputDir);
 
     return { cliOutput, gitMetadata, presentation, outputDir, injectedEnvVars };
+  }
+}
+
+/** Read presentation.md (preferred) or presentation.html from the agent's
+ *  output directory. Returns null when neither file exists. Markdown wins
+ *  on tie — agents that want the iframe path must omit the .md file. */
+async function readPresentation(outputDir: string): Promise<Presentation | null> {
+  try {
+    return {
+      kind: 'markdown',
+      content: await readFile(join(outputDir, 'presentation.md'), 'utf-8'),
+    };
+  } catch {
+    try {
+      return {
+        kind: 'html',
+        content: await readFile(join(outputDir, 'presentation.html'), 'utf-8'),
+      };
+    } catch {
+      return null;
+    }
   }
 }

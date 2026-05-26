@@ -25,8 +25,9 @@
  *       (stepInput), `previous_run.json` (carry-over), `prompt.txt` (agent
  *       plugins), `script.<ext>` (inline script mode), `mcp-config.json`.
  *     - The container writes the result contract: `result.json`.
- *     - Host reads `result.json` + optional `presentation.html` + `git-result.json`
- *       (written by the host itself post-commit) after the container exits.
+ *     - Host reads `result.json` + optional `presentation.md` (preferred)
+ *       or `presentation.html` + `git-result.json` (written by the host
+ *       itself post-commit) after the container exits.
  *
  * ### Why separate
  *

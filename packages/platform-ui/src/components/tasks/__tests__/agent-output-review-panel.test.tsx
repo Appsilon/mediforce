@@ -23,7 +23,7 @@ function buildAgentOutput(overrides: Partial<AgentOutputData> = {}): AgentOutput
 describe('AgentOutputReviewPanel', () => {
   it('renders sandboxed iframe when presentation exists', () => {
     const agentOutput = buildAgentOutput({
-      presentation: '<div>Report</div>',
+      presentation: { kind: 'html', content: '<div>Report</div>' },
       result: { summary: 'test data' },
     });
 
@@ -36,7 +36,7 @@ describe('AgentOutputReviewPanel', () => {
 
   it('renders presentation even when structured result is empty', () => {
     const agentOutput = buildAgentOutput({
-      presentation: '<div>Presentation only</div>',
+      presentation: { kind: 'html', content: '<div>Presentation only</div>' },
       result: null,
     });
 
@@ -49,7 +49,7 @@ describe('AgentOutputReviewPanel', () => {
 
   it('iframe has sandbox="allow-scripts" (no allow-same-origin)', () => {
     const agentOutput = buildAgentOutput({
-      presentation: '<div>Content</div>',
+      presentation: { kind: 'html', content: '<div>Content</div>' },
       result: { key: 'value' },
     });
 
@@ -81,7 +81,7 @@ describe('AgentOutputReviewPanel', () => {
 
   it('raw data tabs still accessible when presentation is shown', () => {
     const agentOutput = buildAgentOutput({
-      presentation: '<p>Visual report</p>',
+      presentation: { kind: 'html', content: '<p>Visual report</p>' },
       result: { metric: 42 },
     });
 
@@ -98,7 +98,7 @@ describe('AgentOutputReviewPanel', () => {
   it('injects window.__data__ with result JSON into srcdoc', () => {
     const result = { drug: 'Keytruda', score: 0.95 };
     const agentOutput = buildAgentOutput({
-      presentation: '<div id="chart"></div>',
+      presentation: { kind: 'html', content: '<div id="chart"></div>' },
       result,
     });
 
@@ -114,7 +114,7 @@ describe('AgentOutputReviewPanel', () => {
 
   it('uses Tailwind v4 browser script in srcdoc', () => {
     const agentOutput = buildAgentOutput({
-      presentation: '<p>Report</p>',
+      presentation: { kind: 'html', content: '<p>Report</p>' },
       result: { ok: true },
     });
 
@@ -122,6 +122,20 @@ describe('AgentOutputReviewPanel', () => {
 
     const srcdoc = document.querySelector('iframe')!.getAttribute('srcdoc')!;
     expect(srcdoc).toContain('@tailwindcss/browser@4');
+  });
+
+  it('renders markdown presentations inline instead of in the iframe', () => {
+    const agentOutput = buildAgentOutput({
+      presentation: { kind: 'markdown', content: '# Heading\n\n- one\n- two' },
+      result: { ok: true },
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
+
+    // Markdown branch must not spawn the sandboxed iframe.
+    expect(document.querySelector('iframe')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Heading' })).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 
   it('renders escalation badge when escalationReason is set', () => {
@@ -286,7 +300,7 @@ describe('AgentOutputReviewPanel', () => {
   it('escapes closing script tags in result data', () => {
     const result = { html: '</script><script>alert(1)</script>' };
     const agentOutput = buildAgentOutput({
-      presentation: '<p>Test</p>',
+      presentation: { kind: 'html', content: '<p>Test</p>' },
       result,
     });
 

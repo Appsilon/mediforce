@@ -76,12 +76,13 @@ describe('backlog-triage', () => {
     }
   });
 
-  it('check-tags writes presentation.html when issues are missing tags', () => {
+  it('check-tags writes presentation.md when issues are missing tags', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'check-tags');
-    expect(step?.agent?.inlineScript).toMatch(/presentation\.html/);
+    expect(step?.agent?.inlineScript).toMatch(/presentation\.md/);
+    expect(step?.agent?.inlineScript).not.toMatch(/presentation\.html/);
     expect(step?.agent?.inlineScript).toMatch(/needsTagging/);
   });
 
