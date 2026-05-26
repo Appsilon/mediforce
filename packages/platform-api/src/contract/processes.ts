@@ -103,3 +103,29 @@ export type StepEntryStatus = z.infer<typeof StepEntryStatusSchema>;
 export type StepEntry = z.infer<typeof StepEntrySchema>;
 export type GetProcessStepsInput = z.infer<typeof GetProcessStepsInputSchema>;
 export type GetProcessStepsOutput = z.infer<typeof GetProcessStepsOutputSchema>;
+
+// ---- POST /api/processes/:instanceId/cancel ---------------------------------
+//
+// State transition: running | paused → failed. Entity echo per ADR-0005 §5.
+// `reason` defaults to "Cancelled by user" in the handler; that literal is
+// load-bearing — workflow-status.ts:82 gates on it to distinguish operator
+// cancellations from agent failures.
+//
+// Naming: contract symbols use `Run` per ADR-0001 vocabulary (canonical term
+// for the entity is `WorkflowRun`, short form `Run` everywhere on the API
+// surface — `GetRunInputSchema`, `StartRunInputSchema`, etc.). The URL path
+// `/api/processes/:instanceId/cancel` keeps the legacy `processes` segment
+// until a coordinated URL rename phase; the adapter maps `params.instanceId`
+// to the input field `runId`.
+
+export const CancelRunInputSchema = z.object({
+  runId: z.string().min(1),
+  reason: z.string().min(1).optional(),
+});
+
+export const CancelRunOutputSchema = z.object({
+  run: ProcessInstanceSchema,
+});
+
+export type CancelRunInput = z.infer<typeof CancelRunInputSchema>;
+export type CancelRunOutput = z.infer<typeof CancelRunOutputSchema>;

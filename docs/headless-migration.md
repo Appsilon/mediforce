@@ -224,23 +224,30 @@ Phase 1 ended with namespace authorization threaded **explicitly** through every
 
 So Phase 2 narrows to **uniform lifecycle mutations** — same handler shape (load → gate → state transition → write → audit), no cross-entity cascades, no special namespace semantics. The wider surface moves to **Phase 2.5**, planned against the lessons Phase 2 produces.
 
+**Final scope (rewritten 2026-05-26 after PR2 design pass — see [#499](https://github.com/Appsilon/mediforce/issues/499)):** narrowed further from the five-endpoint mid-phase scope to **two endpoints** — `claim` (PR1) and `cancel` (PR2). `complete`, `resume`, and `resolve` reclassified to Phase 3 because all three depend on the still-undecided orchestration-kick mechanism (fire-and-forget self-fetch to `/api/processes/:id/run` after state transition). Migrating them in Phase 2 would either pre-decide Phase 3 §"Orchestration kick mechanism" or ship handlers that know about HTTP/baseUrl/api-key. Neither is acceptable; defer.
+
 **In scope:**
 
-| Endpoint | Domain | Shape |
-|---|---|---|
-| `POST /api/tasks/:taskId/claim` | tasks | scope.tasks.claim(taskId, caller) |
-| `POST /api/tasks/:taskId/complete` | tasks | scope.tasks.complete(taskId, data) — validates against parent run's step gate |
-| `POST /api/tasks/:taskId/resolve` | tasks | scope.tasks.resolve(taskId, verdict) |
-| `POST /api/processes/:instanceId/cancel` | processes | scope.runs.cancel(id, reason) |
-| `POST /api/processes/:instanceId/resume` | processes | scope.runs.resume(id) |
+| Endpoint | Domain | PR | Shape |
+|---|---|---|---|
+| `POST /api/tasks/:taskId/claim` | tasks | PR1 ([#495](https://github.com/Appsilon/mediforce/pull/495)) | scope.tasks.claim(taskId, caller) — state-machine in handler |
+| `POST /api/processes/:instanceId/cancel` | processes | PR2 | scope.runs.update(id, {status:'failed', error, updatedAt}) — state-machine in handler |
 
 (`POST /api/cron/heartbeat` was originally in this list — repicked to Phase 3 because the route self-fetches `/api/processes/:id/run` to kick the run loop, making it an orchestration endpoint rather than an operational ping. See PR1 tracker's "Repick history" note + Phase 3 below.)
 
 **Out of Phase 2 (moved to Phase 2.5 or Phase 3):**
 
+- `POST /api/tasks/:taskId/complete` (+ four `complete*` variants — verdict/params/upload/assignment — collapsed into a discriminated-union body) → **Phase 3** — depends on orchestration-kick redesign (handler calls `engine.advanceStep` then fire-and-forget kicks `/api/processes/:id/run`).
+- `POST /api/tasks/:taskId/resolve` → **Phase 3** — UI-unused duplicate of `/complete` (E2E `previous-run-outputs.journey.ts` is the only caller); deletion bundles with the `/complete` discriminated-union landing.
+- `POST /api/processes/:instanceId/resume` → **Phase 3** — same orchestration-kick dependency as `/complete`.
 - `POST /api/processes` (create new run) → Phase 2.5 — workspace-write gate, trigger payload validation, idempotency design needed.
 - `POST /api/processes/:id/advance`, `POST /api/processes/:id/run`, `POST /api/processes/:id/steps/:stepId/retry` → **Phase 3** — orchestrates `WorkflowEngine` + `AgentRunner`, spawns Docker, fire-and-forget side effects. Needs its own design pass (sync vs queued execution).
 - All cowork (`chat`/`message`/`finalize`) → **Phase 3** — SSE adapter unsolved.
+
+**Dead-code cuts in PR2 (no API surface added):**
+
+- `UnclaimButton` + `unclaimTask` Server Action — zero callers in source tree, deleted outright. No `/api/tasks/:taskId/unclaim` route. If the operator-release-back-to-queue feature returns, it earns a new design pass at that time.
+- `cancelProcessRun` Server Action — deleted; UI moves to `mediforce.processes.cancel()`.
 
 **Already shipped (post-original-plan):** `POST /api/model-registry/sync`, `POST /api/model-registry/rankings`, `GET /api/model-registry`, `GET /api/model-registry/:id` — five model-registry endpoints landed under `packages/platform-api/src/handlers/models/` ahead of the formal Phase 2 plan because that domain was being touched anyway. Treat them as Phase 2 reference shape for future mutations.
 
@@ -446,92 +453,48 @@ through the loopback pattern.
   test.
 - E2E journey involving claim still green.
 
-#### PR2 — Remaining tasks + Process state lifecycle mutations
+#### PR2 — `processes/cancel` migration + dead-code cleanup (closes Phase 2)
 
-**Scope.** Five endpoints + audit-bridge wiring + Server Action
-deletions. `claim` already shipped in PR1, so PR2 closes the loop on
-tasks and migrates process state.
+**Scope (final — narrowed 2026-05-26 from the earlier five-endpoint plan; see [#499](https://github.com/Appsilon/mediforce/issues/499) for rationale).** One endpoint migrated, three Server Actions deleted, one dead UI component removed.
 
-Endpoints:
-- `POST /api/tasks/:taskId/unclaim` — **new route** (no existing route
-  today; current functionality is Server Action only).
-- `POST /api/tasks/:taskId/complete` — migrate. Body uses discriminated
-  union over four kinds (`verdict | params | upload | assignment`)
-  covering today's `completeTask`, `completeParamsTask`,
-  `completeUploadTask`, `completeAssignmentTask` Server Actions.
-- `POST /api/tasks/:taskId/resolve` — migrate.
+Endpoint:
 - `POST /api/processes/:instanceId/cancel` — migrate.
-- `POST /api/processes/:instanceId/resume` — migrate.
 
-**Files to touch (per endpoint):**
-- `packages/platform-api/src/contract/<tasks|processes>.ts` — add
-  input + output schemas (output reuses entity schemas per ADR-0005 §5).
-- `packages/platform-api/src/handlers/<tasks|processes>/<name>.ts` —
-  new handler. Calls `scope.X.method()`, emits audit via
-  `scope.system.audit.append({...})` (bridge per ADR-0005 §7).
-- `packages/platform-api/src/handlers/<tasks|processes>/__tests__/<name>.test.ts`
-  — contract + handler tests.
-- `packages/platform-ui/src/app/api/<path>/route.ts` — replace inline
-  with `createRouteAdapter`.
-- `packages/platform-api/src/client/mediforce.ts` — add typed methods.
+Reclassified to Phase 3 (orchestration-kick group):
+- `POST /api/tasks/:taskId/complete` (+ discriminated-union body collapsing `completeTask` / `completeParamsTask` / `completeUploadTask` / `completeAssignmentTask`).
+- `POST /api/tasks/:taskId/resolve` — UI-unused duplicate; deleted alongside `/complete`'s landing.
+- `POST /api/processes/:instanceId/resume`.
 
-**Server Actions deleted (move, don't add):**
-- `packages/platform-ui/src/app/actions/tasks.ts` — delete the
-  remaining five (`unclaimTask`, `completeTask`, `completeParamsTask`,
-  `completeUploadTask`, `completeAssignmentTask`). `claimTask` already
-  deleted in PR1. Move audit-emission code into the corresponding
-  handlers. File ends up empty — delete it.
-- `packages/platform-ui/src/app/actions/processes.ts` — delete
-  `cancelProcessRun` and `resumeProcessRun`. Move audit code. Leave
-  `startWorkflowRun`, `retryFailedStep`, `archiveProcessRun`,
-  `bulkCancelProcessRuns`, `bulkArchiveProcessRuns` in place
-  (Phase 2.5 / Phase 3 scope).
+These three depend on the orchestration-kick mechanism (fire-and-forget self-fetch to `/api/processes/:id/run` after state transition) whose design is deferred to Phase 3. Migrating them in PR2 would either pre-decide the kick or ship handlers leaking HTTP/baseUrl/api-key concerns.
 
-**UI callers to update:**
-- `packages/platform-ui/src/components/tasks/claim-button.tsx` —
-  replace `unclaimTask` action import with `mediforce.tasks.unclaim()`.
-  (Claim path already on `mediforce.tasks.claim()` from PR1.)
-- Components calling the `complete*` actions — replace with
-  `mediforce.tasks.complete({ kind: 'verdict' | ..., ... })`.
-- Process detail components calling `cancelProcessRun` /
-  `resumeProcessRun` — same pattern.
+Cut as dead code (no API surface added):
+- `UnclaimButton` (`claim-button.tsx`) + `unclaimTask` Server Action — neither was rendered or called anywhere in source. Deleted outright.
 
-**Repository layer additions:**
-- `HumanTaskRepository.unclaim(taskId, userId)` — new method on both
-  the interface and `InMemoryHumanTaskRepository` and the Firestore
-  impl. `AuthorizedHumanTaskRepository.unclaim()` wrapper passthrough
-  (calls `assertCanMutate` first like the existing `claim`).
-- `ProcessInstanceRepository.cancel(id, reason)` — new method on
-  interface + in-memory + Firestore. `AuthorizedWorkflowRunRepository.cancel()`
-  wrapper.
-- `ProcessInstanceRepository.resume(id)` — same.
+**Files touched:**
+- `packages/platform-api/src/contract/processes.ts` — `CancelRunInputSchema { runId, reason? }` / `CancelRunOutputSchema { run }` (output reuses `ProcessInstanceSchema` per ADR-0005 §5; contract symbols use `Run` per ADR-0001 vocabulary even though the underlying storage schema is still named `ProcessInstanceSchema`).
+- `packages/platform-api/src/handlers/processes/cancel-run.ts` — new handler. Reuses `scope.runs.update()` rather than introducing a dedicated wrapper method (matches PR1's "state-machine in handler" deviation; `ProcessInstanceRepository.cancel(id, reason)` from ADR-0005 §8 is deferred until a second mutation needs it). Audit action `instance.cancelled` matches workflow-engine's `instance.*` family + legacy `bulkCancelProcessRuns` emit.
+- `packages/platform-api/src/handlers/processes/__tests__/cancel-run.test.ts` — contract + handler tests against `createTestScope`.
+- `packages/platform-api/src/contract/__tests__/processes.test.ts` — contract schema unit tests.
+- `packages/platform-ui/src/app/api/processes/[instanceId]/cancel/route.ts` — replaced inline body with `createRouteAdapter`. URL path keeps the legacy `processes/:instanceId` segment until a coordinated URL rename phase; the adapter translates `params.instanceId` → `runId`.
+- `packages/platform-api/src/client/index.ts` — `mediforce.runs.cancel(input)` method (sits next to `runs.list/get/start`).
+- `packages/cli/src/commands/run-cancel.ts` — new CLI command `mediforce run cancel <runId> [--reason <text>]`.
+- `packages/platform-ui/src/components/processes/process-detail.tsx` — swap `cancelProcessRun` action call for `mediforce.runs.cancel({ runId })`.
+- `packages/platform-ui/src/components/processes/agent-escalated-banner.tsx` — same swap.
+- `packages/platform-ui/src/lib/workflow-status.ts` — comment-only update (the `'Cancelled by user'` literal gate stays; comment now points at the handler default).
 
-**Test layers:** contract + handler + adapter + hook update + journey
-test for at least one tasks flow (claim → complete) and one process
-flow (cancel).
+**Server Actions deleted (move-not-add for `cancelProcessRun` audit):**
+- `packages/platform-ui/src/app/actions/processes.ts` — `cancelProcessRun` deleted; audit payload moved into the cancel handler. Retains `startWorkflowRun`, `retryFailedStep`, `archiveProcessRun`, `bulkCancelProcessRuns`, `bulkArchiveProcessRuns` (Phase 2.5 / Phase 3 scope).
+- `packages/platform-ui/src/app/actions/tasks.ts` — `unclaimTask` deleted (dead code, no audit to preserve). Retains `completeTask`, `completeParamsTask`, `completeUploadTask`, `completeAssignmentTask` (move with `/complete` discriminated-union to Phase 3).
 
-**Exit criteria:**
-- All eight Server Actions deleted; `app/actions/tasks.ts` empty
-  (delete file); `app/actions/processes.ts` retains only the five
-  out-of-Phase-2 functions.
-- UI callers updated to use `mediforce` client; `apiFetch` direct
-  calls for these mutations removed.
-- Audit emission preserved (move-not-add): the AuditEvent rows
-  produced before and after Phase 2 are identical in actor/action/
-  description/snapshots for the eight migrated mutations.
-- `api-boundaries.test.ts` + `no-raw-repo-imports.test.ts` +
-  Phase 2 audit-coverage structural guard pass.
-- Discriminated-union `/complete` body validates all four variants
-  end-to-end (contract test).
-- E2E journey for claim→complete still green.
+**Test layers:** contract + handler + adapter (PR1 covers parametrically) + client method test + cross-layer integration round-trip (`api-integration.test.ts` extended) + existing E2E process-detail journey covers cancel button click.
 
-**Open questions to settle before starting** (carried forward + new):
-
-- **Error contract schema** (from Phase 1 gap list — now blocking). Mutations introduce 409 (precondition_failed), 412 (state-machine), 422 (validation-with-context). Today's `{ error: string }` shape can't carry a discriminant for the client. Proposal: `{ error: { code: 'precondition_failed' | 'not_found' | ..., message: string, details?: unknown } }`. Decide before any mutation handler ships.
-- **State-machine precondition encoding.** Two layers: contract refines (input shape — "verdict must be `approve`/`reject`") + repo-level typed errors (`TaskNotClaimedError`, `TaskAlreadyCompletedError`) that the adapter maps to 409 with the agreed error code. Stay out of Zod refines for cross-entity invariants.
-- **Server Actions vs API routes.** Many tasks/process mutations have parallel Server Actions in `src/app/actions/*.ts` for form posts (`revalidatePath`). Decide per endpoint: delete the action (UI moves to `apiClient.tasks.claim()` + manual revalidation), or keep the action as a thin wrapper around the handler. Default: delete unless `revalidatePath` is load-bearing.
-- **Idempotency keys.** Not needed for tasks/process-state mutations (each has a natural idempotency via target state — claiming an already-claimed task by you is a no-op, by someone else is 409). Revisit for `POST /api/processes` in Phase 2.5.
-- **`apiKey` god-mode rename (#448).** Cron heartbeat uses `caller.isSystemActor`. If #448 lands first, terminology stays clean; if not, document the alias and rename in follow-up.
+**Exit criteria (met):**
+- `POST /api/processes/:instanceId/cancel` returns `{ run: WorkflowRun }`; `404` for missing/foreign-workspace ids (anti-enum); `409 precondition_failed` for non-running/non-paused.
+- Audit emission preserved bit-for-bit (`instance.cancelled` event matches the prior Server Action shape — actor derived from `scope.caller`, default reason `'Cancelled by user'` literal unchanged, consistent with workflow-engine `instance.*` family).
+- `mediforce.runs.cancel()` available in browser (via `lib/mediforce`) + CLI + Node consumers.
+- `app/actions/processes.ts:cancelProcessRun` and `app/actions/tasks.ts:unclaimTask` deleted; UI callers (`process-detail.tsx`, `agent-escalated-banner.tsx`) moved to typed client.
+- `UnclaimButton` removed from `claim-button.tsx`; `ClaimButton` retained.
+- Phase 2 closed. Wrapper-layer mutation pattern proven on two state transitions of opposite shape (`claim`: pending→claimed, `cancel`: running/paused→failed).
 
 ### Phase 2.5 — Definitions, agents, admin, users
 

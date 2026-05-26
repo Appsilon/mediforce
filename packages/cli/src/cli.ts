@@ -25,6 +25,7 @@ import { workflowGetCommand } from './commands/workflow-get.js';
 import { runGetCommand } from './commands/run-get.js';
 import { runListCommand } from './commands/run-list.js';
 import { runStartCommand } from './commands/run-start.js';
+import { runCancelCommand } from './commands/run-cancel.js';
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility.js';
 import { workflowCopyCommand } from './commands/workflow-copy.js';
@@ -70,6 +71,7 @@ Commands:
   run list                                           List recent runs
   run start --workflow <name>                        Start a new run (manual trigger)
   run get <runId>                                    Fetch a single run's status
+  run cancel <runId> [--reason <text>]               Cancel a running or paused run
   system status                                      Docker infrastructure status
   system images                                      List Docker images on host
   system rmi <imageId>                               Remove a Docker image
@@ -141,6 +143,7 @@ Subcommands:
   list                      List recent runs
   start --workflow <name>   Start a new run (manual trigger)
   get <runId>               Fetch a single run's status
+  cancel <runId>            Cancel a running or paused run
 
 Run \`mediforce run <subcommand> --help\` for subcommand-specific flags.
 `;
@@ -254,6 +257,9 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'run' && subcommand === 'start') {
     return runStartCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'run' && subcommand === 'cancel') {
+    return runCancelCommand({ argv: rest, env: input.env, output });
   }
   if (command === 'secret' && subcommand === 'set') {
     return secretSetCommand({ argv: rest, env: input.env, output });

@@ -3,7 +3,9 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { RotateCw, XCircle, Check } from 'lucide-react';
-import { retryFailedStep, cancelProcessRun } from '@/app/actions/processes';
+import { retryFailedStep } from '@/app/actions/processes';
+import { mediforce } from '@/lib/mediforce';
+import { ApiError } from '@mediforce/platform-api/client';
 import { cn } from '@/lib/utils';
 
 interface AgentEscalatedBannerProps {
@@ -38,9 +40,12 @@ export function AgentEscalatedBanner({ instanceId, stepId }: AgentEscalatedBanne
   async function handleCancel() {
     setCancelStatus('submitting');
     setCancelError(null);
-    const result = await cancelProcessRun(instanceId);
-    if (!result.success) {
-      setCancelError(result.error ?? 'Cancel failed');
+    try {
+      await mediforce.runs.cancel({ runId: instanceId });
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Cancel failed';
+      setCancelError(message);
       setCancelStatus('idle');
       return;
     }

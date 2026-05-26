@@ -346,9 +346,21 @@ pattern, easy to find-and-delete during the audit-wiring phase.
 Closed action-name set for Phase 2 (extensible by amendment):
 
 - `task.claimed`, `task.unclaimed`, `task.completed`, `task.resolved`
-- `run.cancelled`, `run.resumed`
+- `instance.cancelled`, `instance.resumed`
 - `cron.heartbeat` (operational; `@no-audit` exemption — no entity
   mutation)
+
+**Naming note (amended 2026-05-26 after PR2 design pass).** The original
+draft used `run.*` here, forward-looking to ADR-0001's `runs` table
+rename. Phase 2 PR2 reverted to `instance.*` because every existing
+workflow-engine emit is `instance.*` (`instance.created/started/paused/
+resumed/aborted/completed`) and the legacy `bulkCancelProcessRuns`
+Server Action emits `instance.cancelled`. New audit lanes ship under
+the dominant prefix so audit consumers see one consistent family rather
+than a `run.*` / `instance.*` split during the migration window. A
+repo-wide `instance.*` → `run.*` (entity + action) rename ships as its
+own ADR pass, ideally bundled with the audit-wiring phase (repo-resident
+emission via `MutationContext`) since both touch every write path.
 
 ### 8. Wrapper layer additions for Phase 2
 
@@ -431,10 +443,18 @@ These are domain methods on the wrapper, mirroring how
 - The API now has a documented, typed contract for failure modes that
   external consumers (CLI today; MCP / partners later) can rely on
   without string-matching.
-- Server Action deletion in Phase 2 removes 8 of 6 hand-rolled
-  mutations from `app/actions/`; remaining files cover Phase 2.5 /
-  Phase 3 scope and stay until their endpoints migrate. By end of
-  Phase 3 the `app/actions/` directory is empty or gone.
+- Phase 2 closes on two endpoints, not six: `tasks/claim` (PR1) +
+  `processes/cancel` (PR2). The remaining four (`tasks/complete` +
+  discriminated-union body, `tasks/resolve` deletion, `processes/resume`)
+  reclassified to Phase 3 because all three depend on the still-undecided
+  orchestration-kick mechanism (Phase 3 §"Orchestration kick mechanism"
+  open question). See [#499](https://github.com/Appsilon/mediforce/issues/499)
+  for the design pass that produced this narrowing. Server Actions
+  deleted in Phase 2: `claimTask` (PR1), `cancelProcessRun` (PR2),
+  `unclaimTask` (PR2 — dead-code cut, no API replacement). Remaining
+  files cover Phase 2.5 / Phase 3 scope and stay until their endpoints
+  migrate. By end of Phase 3 the `app/actions/` directory is empty or
+  gone.
 - Audit emission has a temporary handler-resident location for Phase 2;
   the audit-wiring phase relocates it to the repository boundary
   uniformly across HTTP, engine, and worker writers.
