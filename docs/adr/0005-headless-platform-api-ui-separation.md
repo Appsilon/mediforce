@@ -107,6 +107,11 @@ export class HandlerError extends Error {
 
   // Derived from `code` via the §3 table — no second source of truth.
   get statusCode(): number { return httpStatusForApiErrorCode(this.code); }
+
+  // Plain object for JSON serialization — framework-free so the adapter
+  // can `NextResponse.json(err.toEnvelope(), { status: err.statusCode })`
+  // in one line (see §4).
+  toEnvelope(): ApiErrorEnvelope { /* { error: { code, message, details? } } */ }
 }
 
 export class PreconditionFailedError extends HandlerError {
@@ -192,28 +197,33 @@ because the caller already proved intent by issuing the write.
 ### 4. Adapter extension: single `HandlerError` catch in `createRouteAdapter`
 
 No new `mutationAdapter` helper. Mutations use the same
-`createRouteAdapter` as reads, with a single typed-error catch arm:
+`createRouteAdapter` as reads, with a single typed-error catch arm that
+delegates serialization to the class itself (`HandlerError.toEnvelope()`
+returns the §1 wire shape; `statusCode` getter derives from `code` via
+the §3 table — same pattern as Hono's `HTTPException` and NestJS's
+`HttpException`):
 
 ```ts
 catch (err) {
-  if (err instanceof HandlerError) {
-    return jsonError(err.code, err.message, err.details);
-  }
+  if (err instanceof HandlerError) return jsonErrorResponse(err);
   if (err instanceof z.ZodError) {
-    return jsonError('validation', 'Invalid input', err.issues);
+    return jsonErrorResponse(new HandlerError('validation', 'Invalid input', err.issues));
   }
   console.error('[route-adapter] handler error:', err);
-  return jsonError('internal', 'Internal error');
+  return jsonErrorResponse(new HandlerError('internal', 'Internal error'));
+}
+
+function jsonErrorResponse(err: HandlerError): NextResponse {
+  return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
 }
 ```
 
-`jsonError(code, message, details?)` derives HTTP status from `code` via
-§3's table and serializes the §1 envelope. Catch order is
-`HandlerError → ZodError → unknown`; `ZodError` is a sibling arm rather
-than wrapped into `ValidationError` so a Zod throw inside handler
-code (programmer error — backend payload failing internal parse) is
-distinguishable in the source from a deliberate domain
-`ValidationError` throw, even though both map to the same envelope.
+Catch order is `HandlerError → ZodError → unknown`; `ZodError` is a
+sibling arm rather than wrapped into a domain throw so a Zod throw
+inside handler code (programmer error — backend payload failing
+internal parse) is distinguishable in the source from a deliberate
+`new HandlerError('validation', ...)` throw, even though both map to
+the same envelope.
 
 All existing Phase 1 GET endpoints inherit typed errors without
 rewriting (`NotFoundError` / `ForbiddenError` from
