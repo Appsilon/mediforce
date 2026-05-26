@@ -343,12 +343,32 @@ audit infrastructure).
 **Phase 2 audit handler code** is throwaway bridge. Recognisable
 pattern, easy to find-and-delete during the audit-wiring phase.
 
-Closed action-name set for Phase 2 (extensible by amendment):
+Closed action-name set (extensible by amendment):
 
+**Phase 2 (shipped):**
 - `task.claimed`, `task.unclaimed`, `task.completed`, `task.resolved`
 - `instance.cancelled`, `instance.resumed`
 - `cron.heartbeat` (operational; `@no-audit` exemption — no entity
   mutation)
+
+**Phase 3 additions (amended 2026-05-26 after Phase 3 grilling):**
+- `instance.retried` — emitted by the migrated `processes/:id/steps/:stepId/retry`
+  handler. No prior engine emit covers this (retry is a handler-level
+  state reset + kick, not an engine state transition).
+- `cron.trigger.fired` — emitted per fired trigger inside the migrated
+  `cron/heartbeat` handler. Snapshot: `{ triggerName, definitionName,
+  definitionVersion, instanceId }`. `cron.heartbeat` itself stays
+  `@no-audit` (heartbeat call is operational; only the sub-events emit).
+
+**Phase 3 inherits (no new handler-bridge emit needed):**
+- `tasks/complete` migration → `task.completed` (already in set; same
+  shape as today's Server Action — move-not-add per ADR-0005 §7).
+- `processes/resume` migration → `instance.resumed` (already in set).
+- `processes` POST create migration → `instance.created` +
+  `instance.started` are emitted by `engine.createInstance` +
+  `engine.startInstance` respectively (`packages/workflow-engine/src/engine/workflow-engine.ts:125,371`).
+  Handler bridge does not double-emit; existing engine emits cover the
+  create path completely.
 
 **Naming note (amended 2026-05-26 after PR2 design pass).** The original
 draft used `run.*` here, forward-looking to ADR-0001's `runs` table
