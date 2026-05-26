@@ -46,7 +46,7 @@ export async function cancelRun(
     timestamp: now,
     inputSnapshot: { previousStatus: run.status, currentStepId: run.currentStepId },
     outputSnapshot: { status: 'failed', error: reason },
-    basis: 'User-initiated cancel via UI — double-confirm pattern',
+    basis: 'User-initiated cancel — double-confirm pattern',
     entityType: 'processInstance',
     entityId: input.runId,
     processInstanceId: input.runId,
