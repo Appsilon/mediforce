@@ -94,7 +94,7 @@ function applyCorsHeaders(res: NextResponse, origin: string, isAllowed: boolean)
   }
 }
 
-export async function middleware(req: NextRequest): Promise<NextResponse> {
+export async function proxy(req: NextRequest): Promise<NextResponse> {
   const origin = req.headers.get('origin') ?? '';
   const isAllowed = isOriginAllowed(origin);
 
