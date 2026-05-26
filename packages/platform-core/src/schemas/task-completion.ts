@@ -10,7 +10,7 @@ import { z } from 'zod';
  *
  * Five variants, discriminated by `kind`. The variant MUST match the
  * task's UI component / params configuration; `WorkflowEngine.completeHumanTask`
- * raises `CompleteHumanTaskKindMismatchError` otherwise.
+ * raises `CompleteHumanTaskValidationError` otherwise.
  */
 
 export const AttachmentSchema = z.object({
@@ -35,29 +35,33 @@ export const TableEditorRowSchema = z.object({
   values: z.record(z.string(), z.unknown()),
 });
 
+// Per-variant objects are `.strict()` so a typo in a sibling field (e.g.
+// `selectedIndices` instead of `selectedIndex`) fails parse instead of
+// silently dropping. Keeps the wire contract tight; UI/client must send
+// exactly the documented shape.
 export const CompleteHumanTaskPayloadSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('verdict'),
     verdict: z.string().min(1),
     comment: z.string().optional(),
     selectedIndex: z.number().int().nonnegative().optional(),
-  }),
+  }).strict(),
   z.object({
     kind: z.literal('params'),
     paramValues: z.record(z.string(), z.unknown()),
-  }),
+  }).strict(),
   z.object({
     kind: z.literal('upload'),
     attachments: z.array(AttachmentSchema).min(1),
-  }),
+  }).strict(),
   z.object({
     kind: z.literal('assignment'),
     assignments: z.array(AssignmentItemSchema).min(1),
-  }),
+  }).strict(),
   z.object({
     kind: z.literal('rows'),
     rows: z.array(TableEditorRowSchema).min(1),
-  }),
+  }).strict(),
 ]);
 
 export type Attachment = z.infer<typeof AttachmentSchema>;

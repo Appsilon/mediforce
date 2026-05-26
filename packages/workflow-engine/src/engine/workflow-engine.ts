@@ -21,7 +21,7 @@ import type { Selection, TaskVerdict } from '@mediforce/platform-core';
 import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts } from '@mediforce/platform-core';
 import { validateStepGraph } from '../graph/graph-validator.js';
 import { StepExecutor, type StepActor } from './step-executor.js';
-import { RoutingError, InvalidTransitionError } from './errors.js';
+import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors.js';
 import { ReviewTracker } from '../review/review-tracker.js';
 import { shapeCompletion } from './complete-human-task.js';
 
@@ -682,6 +682,16 @@ export class WorkflowEngine {
    * `process.resumed_after_task`; the engine still emits `task.created`
    * from `advanceStep` when the next step is human.
    *
+   * **Audit-ordering invariant (pre-existing, preserved by this migration).**
+   * State writes (task.complete + instance.update + advanceStep) execute
+   * BEFORE the calling handler appends `task.completed` /
+   * `process.resumed_after_task`. A crash between this method's return and
+   * the handler's audit append therefore leaves the run advanced with no
+   * row in `auditEvents`. The contract matches the pre-migration behaviour
+   * of `lib/resolve-task.ts`; durable audit guarantees are the job of the
+   * future audit-wiring phase (ADR-0005 §7 "Long-term direction") via the
+   * transactional-outbox repo decorator.
+   *
    * Throws:
    *   - `CompleteHumanTaskValidationError` — per-variant payload validation
    *     failure (verdict allowlist, requiresComment, file constraints,
@@ -689,8 +699,11 @@ export class WorkflowEngine {
    *     mismatch). Adapter maps to HTTP 400.
    *   - `InvalidTransitionError` — task already completed/cancelled, parent
    *     instance not paused. Adapter maps to HTTP 409.
-   *   - `Error` — task or parent instance not found. Adapter maps to 500
-   *     (handler should pre-load + 404 itself).
+   *   - `ParentInstanceNotFoundError` — task references a missing instance.
+   *     Adapter maps to HTTP 404.
+   *   - `Error('Task ...not found')` — unknown taskId; adapter falls back to
+   *     500 unless the calling handler pre-loaded via the workspace-gated
+   *     wrapper (recommended).
    */
   async completeHumanTask(
     taskId: string,
@@ -740,9 +753,7 @@ export class WorkflowEngine {
       resolvedTask.processInstanceId,
     );
     if (!instance) {
-      throw new Error(
-        `Process instance '${resolvedTask.processInstanceId}' not found`,
-      );
+      throw new ParentInstanceNotFoundError(resolvedTask.processInstanceId);
     }
     if (instance.status !== 'paused') {
       throw new InvalidTransitionError(instance.status, 'completeHumanTask');

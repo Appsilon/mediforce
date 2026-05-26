@@ -24,6 +24,7 @@ export {
   InvalidTransitionError,
   MaxIterationsExceededError,
   CompleteHumanTaskValidationError,
+  ParentInstanceNotFoundError,
 } from './engine/errors.js';
 
 export {

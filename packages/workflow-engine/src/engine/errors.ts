@@ -62,3 +62,16 @@ export class CompleteHumanTaskValidationError extends Error {
     super(message);
   }
 }
+
+/**
+ * Raised by engine methods when the parent `ProcessInstance` referenced by a
+ * `HumanTask` (or other child entity) does not exist. Lets handlers `instanceof`-
+ * check and map to HTTP 404 instead of string-matching the message text.
+ */
+export class ParentInstanceNotFoundError extends Error {
+  override name = 'ParentInstanceNotFoundError';
+
+  constructor(public readonly instanceId: string) {
+    super(`Process instance '${instanceId}' not found`);
+  }
+}

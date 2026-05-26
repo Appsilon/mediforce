@@ -1,4 +1,8 @@
-import { InvalidTransitionError, CompleteHumanTaskValidationError } from '@mediforce/workflow-engine';
+import {
+  InvalidTransitionError,
+  CompleteHumanTaskValidationError,
+  ParentInstanceNotFoundError,
+} from '@mediforce/workflow-engine';
 import type { CompleteTaskInput, CompleteTaskOutput } from '../../contract/tasks.js';
 import type { CallerScope } from '../../repositories/index.js';
 import {
@@ -49,7 +53,7 @@ export async function completeTask(
         operation: err.operation,
       });
     }
-    if (err instanceof Error && err.message.startsWith('Process instance')) {
+    if (err instanceof ParentInstanceNotFoundError) {
       throw new NotFoundError(err.message);
     }
     throw err;
