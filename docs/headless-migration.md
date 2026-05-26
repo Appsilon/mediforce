@@ -271,19 +271,20 @@ So Phase 2 narrows to **uniform lifecycle mutations** — same handler shape (lo
   as each endpoint moves; UI callers update inline (~3 components in
   Phase 2).
 
-- State-machine invariants surface as typed errors (`ApiError` with `code: 'precondition_failed'` → 409). See the **error contract** open question below.
+- State-machine invariants surface as typed errors (`PreconditionFailedError` → envelope `code: 'precondition_failed'` → 409). See the **error contract** open question below.
 - **Audit emission — bridge.** Today's Server Actions hand-roll audit
   (`auditRepo.append({...})` inline in each action). API routes don't
   emit. Deleting the actions during Phase 2 would erase the only existing
   audit coverage for these mutations. To avoid a compliance regression
   during the gap between Phase 2 and the future audit-wiring phase
   (see "Captured for later" below), each new Phase 2 mutation handler
-  emits audit inline via `scope.auditEvents.append({...})` — same shape
+  emits audit inline via `scope.system.audit.append({...})` — same shape
   as today's Server Action code, ~6 LOC per handler. This is throwaway
   bridge code: the audit-wiring phase rewrites to repo-resident
-  `MutationContext` and removes the handler-level emits. Add a `.append()`
-  method to `AuthorizedAuditEventRepository` (read-only today) to enable
-  this.
+  `MutationContext` and removes the handler-level emits. The raw audit
+  write surface lives on `scope.system.audit` (the existing trusted-
+  bypass lane that already holds `engine` / `agentRunner`), not on
+  `AuthorizedAuditEventRepository` — see ADR-0005 §7/§8 for why.
 
 **Server Action policy.** Per-endpoint judgement. Default: when migrating
 a mutation, delete the parallel Server Action; UI moves to
@@ -342,13 +343,14 @@ This tracker is the entry point for a fresh session picking up Phase 2.
 **Two PRs, sequential.** Pattern is unproven (wrapper layer has only
 served GETs); smallest endpoint first to validate it, then the rest.
 
-#### PR1 — `tasks/claim` migration + adapter `ApiError` extension + `loadOr404`
+#### PR1 — `tasks/claim` migration + adapter `HandlerError` arm + `loadOr404`
 
 **Scope.** Smallest pure state-transition mutation
 (`POST /api/tasks/:taskId/claim`) plus the `createRouteAdapter`
 extension every subsequent mutation depends on. No orchestration, no
-self-fetch, no new abstractions — proves the wrapper-layer + ApiError
-+ audit-bridge pattern end-to-end on one endpoint.
+self-fetch, no new abstractions — proves the wrapper-layer +
+`HandlerError` hierarchy + audit-bridge pattern end-to-end on one
+endpoint.
 
 **Repick history (2026-05-25).** Originally scoped to `cron/heartbeat`.
 Repicked because cron-heartbeat is not operational — it scans cron
@@ -359,21 +361,22 @@ defers. Cron-heartbeat moves to Phase 3 with its orchestration siblings;
 PR1 picks a true minimal mutation instead.
 
 **Files to touch:**
-- `packages/platform-api/src/errors.ts` — add the `ApiError` class +
-  `ApiErrorCode` union. Existing `HandlerError` / `NotFoundError` /
-  `ForbiddenError` from [#482](https://github.com/Appsilon/mediforce/pull/482)
-  **stay** as a coexistence bridge — new code throws `ApiError`,
-  existing throws keep working, both produce the same envelope shape.
-  Migration of legacy throws to `ApiError` is incremental, not PR1
-  blocking.
-- `packages/platform-ui/src/lib/route-adapter.ts` — extend the catch
-  block with two arms per ADR-0005 §3/§4:
-  - `instanceof ApiError` → envelope with `err.code`.
-  - `instanceof HandlerError` → derive code from `statusCode`
-    (`404 → 'not_found'`, `403 → 'forbidden'`); same envelope shape.
+- `packages/platform-api/src/errors.ts` — extend `HandlerError`
+  (from [#450](https://github.com/Appsilon/mediforce/pull/450)) with
+  `code: ApiErrorCode` + `details?: unknown`. Existing
+  `NotFoundError` / `ForbiddenError` keep their names; their
+  constructors now also stash the code. Add
+  `PreconditionFailedError` for the claim handler's state-machine
+  throw. Other codes (unauthorized, validation, conflict,
+  rate_limited) stay subclass-less until first real throw site —
+  product code throws the base `HandlerError` directly.
+- `packages/platform-ui/src/lib/route-adapter.ts` — single
+  `instanceof HandlerError` catch arm per ADR-0005 §4:
+  envelope reads `err.code`, `err.message`, `err.details`. Sibling
+  `instanceof ZodError` arm + `console.error` + 500 fallback.
 - `packages/platform-ui/src/lib/__tests__/route-adapter.test.ts` —
-  extend with tests per `ApiErrorCode` for status + envelope, plus
-  the `HandlerError` legacy-throw arm.
+  parametric coverage per `ApiErrorCode` via the matching subclass
+  throw + ZodError + unknown-error coverage.
 - `loadOr404` helper — extract per [#482](https://github.com/Appsilon/mediforce/pull/482)
   out-of-scope note ("third copy" rule reached for the
   `entity = await scope.X.getById(id); if (!entity) throw …` pattern).
@@ -386,14 +389,16 @@ PR1 picks a true minimal mutation instead.
 - `packages/platform-api/src/handlers/tasks/claim-task.ts` — new.
   Handler: assert `scope.caller.userId`, call `scope.humanTasks.claim()`
   (wrapper already exists), emit audit-bridge via
-  `scope.auditEvents.append({...})` — move the audit-emission code from
+  `scope.system.audit.append({...})` — move the audit-emission code from
   today's `claimTask` Server Action (`packages/platform-ui/src/app/actions/tasks.ts:43-59`),
   do not author new audit shape.
 - `packages/platform-api/src/handlers/tasks/__tests__/claim-task.test.ts`
   — contract + handler tests against in-memory scope.
-- `packages/platform-api/src/repositories/authorized-audit-event-repository.ts`
-  — add `append(event)` write method. Delegates to raw `auditRepo.append()`.
-  Update `__tests__/`.
+- `packages/platform-api/src/repositories/caller-scope.ts` — extend
+  `SystemServices` with `readonly audit: AuditRepository` (raw write
+  surface for the audit bridge per ADR-0005 §7). Wired in
+  `create-caller-scope.ts` from `services.auditRepo`.
+  `AuthorizedAuditEventRepository` stays read-only.
 - `packages/platform-ui/src/app/api/tasks/[taskId]/claim/route.ts` —
   replace inline handler with `createRouteAdapter` call. Path-param
   `taskId` merged into input via the `inputFromReq` callback.
@@ -423,14 +428,15 @@ through the loopback pattern.
 
 **Exit criteria:**
 - `POST /api/tasks/:taskId/claim` returns `{ task: HumanTask }` on
-  success; `403` + ApiError envelope for non-member; `404` + envelope
+  success; `403` + typed envelope for non-member; `404` + envelope
   for foreign-workspace task (anti-enum); `409` + envelope for task
   not in `pending` status.
 - Audit emission preserved bit-for-bit: AuditEvent rows produced by
   the migrated handler match what `claimTask` Server Action emitted
   (action `task.claimed`, same actor/description/snapshots/basis).
-- All `ApiError` codes + the `HandlerError` legacy arm mapped to
-  correct HTTP status in adapter tests.
+- All `ApiErrorCode` values map to correct HTTP status via the single
+  `HandlerError` adapter arm; covered parametrically in adapter tests
+  by throwing the matching subclass.
 - `api-boundaries.test.ts` + `no-raw-repo-imports.test.ts` pass.
 - Existing Phase 1 / Phase 1.5 GET endpoints retroactively return the
   new error envelope (`{ error: string }` → `{ error: { code, message } }`).
@@ -462,7 +468,7 @@ Endpoints:
   input + output schemas (output reuses entity schemas per ADR-0005 §5).
 - `packages/platform-api/src/handlers/<tasks|processes>/<name>.ts` —
   new handler. Calls `scope.X.method()`, emits audit via
-  `scope.auditEvents.append({...})` (bridge per ADR-0005 §7).
+  `scope.system.audit.append({...})` (bridge per ADR-0005 §7).
 - `packages/platform-api/src/handlers/<tasks|processes>/__tests__/<name>.test.ts`
   — contract + handler tests.
 - `packages/platform-ui/src/app/api/<path>/route.ts` — replace inline
@@ -629,7 +635,8 @@ Firebase is never imported by `platform-api/client` — the browser wrapper in `
 
 **Open questions to settle**:
 - Do we keep our own tiny async-hook helper (`useInstanceTasks` pattern — `useState` + `useEffect` + cancelled flag), or adopt an existing library (`@tanstack/react-query` / `swr`) that gives caching, dedup, stale-while-revalidate for free?
-- Error surface — today `ApiError` is thrown from the client; hooks map it to `{ error }` state. Do we standardise an error boundary + toast pattern for failed API calls?
+- Error surface — today `ApiError` (with `code`/`details`) is thrown from the client; hooks map it to `{ error }` state. Do we standardise an error boundary + toast pattern for failed API calls?
+- UI per-code narrowing — once the first real `if (err.code === 'X')` switch appears in UI, revisit ADR-0005 §2 "future-idea" note: reconstruct the matching server-side `HandlerError` subclass on the client from envelope `code` via a small map and surface it as a field on `ApiError`, so UI can do `if (clientErr.handlerError instanceof PreconditionFailedError)` with full TS narrowing. Out of scope until a concrete use-case lands.
 
 ### Phase 5 — Delete `@/lib/platform-services` shim
 

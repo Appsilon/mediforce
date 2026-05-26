@@ -1,4 +1,5 @@
 export { listTasks } from './tasks/list-tasks.js';
+export { claimTask } from './tasks/claim-task.js';
 export { listModels, type ListModelsDeps } from './models/list-models.js';
 export { getModel, type GetModelDeps } from './models/get-model.js';
 export { syncModels, type SyncModelsDeps } from './models/sync-models.js';

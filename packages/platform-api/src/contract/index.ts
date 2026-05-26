@@ -3,11 +3,15 @@ export {
   ListTasksOutputSchema,
   GetTaskInputSchema,
   GetTaskOutputSchema,
+  ClaimTaskInputSchema,
+  ClaimTaskOutputSchema,
   ACTIONABLE_STATUSES,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
   type GetTaskOutput,
+  type ClaimTaskInput,
+  type ClaimTaskOutput,
 } from './tasks.js';
 
 export {

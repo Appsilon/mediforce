@@ -381,7 +381,10 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                         setVisibilityOverride(newVisibility);
                       } else {
                         const body = await res.json().catch(() => null);
-                        alert(body?.error ?? 'Failed to update visibility');
+                        const msg = typeof body?.error === 'object' && body?.error !== null
+                          ? (body.error.message ?? 'Failed to update visibility')
+                          : (body?.error ?? 'Failed to update visibility');
+                        alert(msg);
                       }
                     } finally {
                       setTogglingVisibility(false);

@@ -124,6 +124,7 @@ export function createCallerScope(
       cronTrigger: services.cronTrigger,
       webhookRouter: services.webhookRouter,
       agentRunner: services.agentRunner,
+      audit: services.auditRepo,
     },
   };
 }
