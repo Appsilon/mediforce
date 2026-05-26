@@ -111,9 +111,9 @@ export function ChatCoworkView({
   handle,
   stepDescription,
 }: ChatCoworkViewProps) {
-  // Turns and artifact are driven by Firestore onSnapshot from the parent page.
-  // The server action delegates to the API route which writes turns directly to Firestore,
-  // including intermediate tool turns that appear in real-time.
+  // Turns + artifact stream in via Firestore onSnapshot on the parent page;
+  // the platform-api chat handler writes intermediate tool turns and the
+  // final agent turn straight to the repo so the UI sees them live.
   const turns = session.turns;
   const artifact = session.artifact;
 
