@@ -156,7 +156,7 @@ describe('backlog-triage journey', () => {
       expect(state?.variables?.assign).toEqual({ assignments });
     });
 
-    it('routes to tag-issues when check-tags reports needsTagging=true, then loops back to fetch-backlog on done verdict', async () => {
+    it('routes needsTagging=true → tag-issues (table-editor) → apply-tags → loops to fetch-backlog', async () => {
       const instance = await engine.createInstance(
         'appsilon', 'backlog-triage', 1, 'user-1', 'manual',
         { repo: 'owner/repo' },
@@ -166,10 +166,11 @@ describe('backlog-triage journey', () => {
       // fetch-backlog → check-tags
       await engine.advanceStep(instance.id, { options: fakeIssues, repo: 'owner/repo' }, triagerActor);
 
-      // check-tags reports untagged → routes to tag-issues (human)
+      // check-tags reports untagged AND carries the untagged issues forward as options
+      const untagged = [fakeIssues[0], fakeIssues[1]];
       await engine.advanceStep(
         instance.id,
-        { needsTagging: true, untaggedCount: 2, repo: 'owner/repo' },
+        { needsTagging: true, untaggedCount: 2, options: untagged, repo: 'owner/repo' },
         triagerActor,
       );
 
@@ -181,15 +182,35 @@ describe('backlog-triage journey', () => {
       expect(tasks).toHaveLength(1);
       const tagTask = tasks[0];
       expect(tagTask.stepId).toBe('tag-issues');
-      expect(tagTask.ui).toBeUndefined();
-      expect(tagTask.verdicts?.find((v) => v.key === 'done')).toBeDefined();
-      // No assignment-table or selection — tag-issues falls through to VerdictView via registry.
-      expect(tagTask.options).toBeUndefined();
+      expect(tagTask.ui?.component).toBe('table-editor');
+      // engine copies prevOutput.options onto the human task so the table has rows
+      expect(tagTask.options).toHaveLength(2);
+      const config = tagTask.ui?.config as Record<string, unknown>;
+      const columns = config.columns as Array<{ id: string; kind: string; allowEmpty?: boolean }>;
+      expect(columns.find((c) => c.id === 'category')?.allowEmpty).toBe(false);
+      expect(columns.some((c) => c.id === 'priority')).toBe(true);
 
-      // Reviewer submits "done" verdict — engine routes back to fetch-backlog per verdict target.
+      // Reviewer submits the table → engine routes to apply-tags (no verdict).
       await instanceRepo.update(instance.id, { status: 'running', pauseReason: null });
-      await engine.advanceStep(instance.id, { verdict: 'done' }, triagerActor);
+      await engine.advanceStep(
+        instance.id,
+        {
+          rows: [
+            { itemId: '101', values: { category: 'bug', priority: 'P1' } },
+            { itemId: '102', values: { category: 'enhancement', priority: 'P2' } },
+          ],
+        },
+        triagerActor,
+      );
+      state = await instanceRepo.getById(instance.id);
+      expect(state?.currentStepId).toBe('apply-tags');
 
+      // apply-tags output loops back to fetch-backlog for a fresh re-check.
+      await engine.advanceStep(
+        instance.id,
+        { applied: [{ itemId: '101', labels: ['bug', 'priority/P1'] }], errors: [], repo: 'owner/repo' },
+        triagerActor,
+      );
       state = await instanceRepo.getById(instance.id);
       expect(state?.currentStepId).toBe('fetch-backlog');
     });
@@ -237,42 +258,10 @@ describe('backlog-triage journey', () => {
       return resultPayload;
     }
 
-    /** Run an inline script that writes multiple distinct files (e.g.
-     *  result.json + presentation.md). Returns the raw content of each
-     *  written path keyed by basename — caller decides what to parse. */
-    async function runInlineScriptCapturingFiles(
-      script: string,
-      inputJson: Record<string, unknown>,
-      env: Record<string, string>,
-    ): Promise<Record<string, string>> {
-      const fakeFs = {
-        readFileSync: () => JSON.stringify(inputJson),
-      };
-      const files: Record<string, string> = {};
-      const captureWrite = (path: string, content: string): void => {
-        const base = path.replace(/^.*\//, '');
-        files[base] = content;
-      };
-      const stripImports = script.replace(/^import\s+\{[^}]+\}\s+from\s+'fs';?\s*\n?/m, '');
-      const wrapped = `return (async () => {\n${stripImports}\n})();`;
-      const fn = new Function('readFileSync', 'writeFileSync', 'process', 'fetch', wrapped);
-      try {
-        await fn(
-          fakeFs.readFileSync,
-          captureWrite,
-          { env, exit: (code: number) => { throw new ScriptExit(code); } },
-          mockFetch,
-        );
-      } catch (err) {
-        if (!(err instanceof ScriptExit)) throw err;
-      }
-      return files;
-    }
-
-    it('check-tags writes a markdown bullet list to presentation.md for untagged issues', async () => {
+    it('check-tags carries the untagged issues forward as options (no presentation file)', async () => {
       const step = wd.steps.find((s) => s.id === 'check-tags')!;
       const script = step.agent!.inlineScript!;
-      const files = await runInlineScriptCapturingFiles(
+      const result = await runInlineScript(
         script,
         {
           repo: 'owner/repo',
@@ -285,40 +274,10 @@ describe('backlog-triage journey', () => {
         {},
       );
 
-      const md = files['presentation.md'];
-      expect(md).toBeDefined();
-      expect(md).not.toBeUndefined();
-      // Result still reports the gate decision
-      const result = JSON.parse(files['result.json']);
       expect(result.needsTagging).toBe(true);
       expect(result.untaggedCount).toBe(2); // #101 and #103
-      // Heading + a markdown bullet per untagged issue
-      expect(md).toMatch(/##\s+2 issue\(s\) need a category tag/);
-      expect(md).toContain('- [#101 No labels](https://github.com/owner/repo/issues/101)');
-      expect(md).toContain('- [#103 Random tag](https://github.com/owner/repo/issues/103)');
-      // No HTML in the output — markdown is the new contract.
-      expect(md).not.toMatch(/<\/?\w+/);
-    });
-
-    it('check-tags escapes brackets in issue titles so [P0]-style labels render correctly', async () => {
-      // GitHub titles routinely contain bracketed prefixes. Without escaping
-      // both [ and ], CommonMark parses them as a phantom inner link and
-      // breaks the bullet's display label.
-      const step = wd.steps.find((s) => s.id === 'check-tags')!;
-      const script = step.agent!.inlineScript!;
-      const files = await runInlineScriptCapturingFiles(
-        script,
-        {
-          repo: 'owner/repo',
-          options: [
-            { id: '7', label: '#7 [P0] Login broken', href: 'https://github.com/owner/repo/issues/7', badges: [] },
-          ],
-        },
-        {},
-      );
-
-      const md = files['presentation.md'];
-      expect(md).toContain('- [#7 \\[P0\\] Login broken](https://github.com/owner/repo/issues/7)');
+      const options = result.options as Array<Record<string, unknown>>;
+      expect(options.map((o) => o.id)).toEqual(['101', '103']);
     });
 
     it('fetch-backlog GETs the repo issues endpoint with the auth header', async () => {
@@ -443,6 +402,82 @@ describe('backlog-triage journey', () => {
       expect(errors[0].kind).toBe('human');
       const agentRuns = result.agentRuns as Array<Record<string, unknown>>;
       expect(agentRuns).toHaveLength(1);
+    });
+
+    it('apply-tags create-if-missing then POSTs the category + priority labels to the issue', async () => {
+      const step = wd.steps.find((s) => s.id === 'apply-tags')!;
+      const script = step.agent!.inlineScript!;
+      mockFetch
+        .mockResolvedValueOnce(new Response('{}', { status: 201, headers: { 'content-type': 'application/json' } })) // create 'ux'
+        .mockResolvedValueOnce(new Response('{}', { status: 201, headers: { 'content-type': 'application/json' } })) // create 'priority/P1'
+        .mockResolvedValueOnce(new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } })); // apply to issue
+
+      const result = await runInlineScript(
+        script,
+        { repo: 'owner/repo', rows: [{ itemId: '101', values: { category: 'ux', priority: 'P1' } }] },
+        { GITHUB_TOKEN: 'ghp_xxx' },
+      );
+
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      const [createUrl, createInit] = mockFetch.mock.calls[0];
+      expect(createUrl).toBe('https://api.github.com/repos/owner/repo/labels');
+      expect((createInit as { method: string }).method).toBe('POST');
+      expect(JSON.parse((createInit as { body: string }).body)).toEqual({ name: 'ux', color: 'ededed' });
+
+      const [applyUrl, applyInit] = mockFetch.mock.calls[2];
+      expect(applyUrl).toBe('https://api.github.com/repos/owner/repo/issues/101/labels');
+      expect((applyInit as { headers: Record<string, string> }).headers.Authorization).toBe('Bearer ghp_xxx');
+      expect(JSON.parse((applyInit as { body: string }).body)).toEqual({ labels: ['ux', 'priority/P1'] });
+
+      expect(result.applied).toEqual([{ itemId: '101', labels: ['ux', 'priority/P1'] }]);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('apply-tags treats a 422 on label creation as already-exists and still applies', async () => {
+      const step = wd.steps.find((s) => s.id === 'apply-tags')!;
+      const script = step.agent!.inlineScript!;
+      mockFetch
+        .mockResolvedValueOnce(new Response('{"message":"already_exists"}', { status: 422, headers: { 'content-type': 'application/json' } })) // create 'security' → exists
+        .mockResolvedValueOnce(new Response('{}', { status: 201, headers: { 'content-type': 'application/json' } })) // create 'priority/P0'
+        .mockResolvedValueOnce(new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } })); // apply
+
+      const result = await runInlineScript(
+        script,
+        { repo: 'owner/repo', rows: [{ itemId: '7', values: { category: 'security', priority: 'P0' } }] },
+        { GITHUB_TOKEN: 'ghp_xxx' },
+      );
+
+      expect(result.errors).toEqual([]);
+      expect(result.applied).toEqual([{ itemId: '7', labels: ['security', 'priority/P0'] }]);
+    });
+
+    it('apply-tags records a per-row error on apply failure but continues', async () => {
+      const step = wd.steps.find((s) => s.id === 'apply-tags')!;
+      const script = step.agent!.inlineScript!;
+      mockFetch
+        .mockResolvedValueOnce(new Response('{}', { status: 201 })) // create 'ux' (row 101)
+        .mockResolvedValueOnce(new Response('{}', { status: 201 })) // create 'priority/P1' (row 101)
+        .mockResolvedValueOnce(new Response('nope', { status: 404, headers: { 'content-type': 'text/plain' } })) // apply 101 → fails
+        .mockResolvedValueOnce(new Response('{}', { status: 201 })) // create 'tech-debt' (row 102)
+        .mockResolvedValueOnce(new Response('{}', { status: 201 })) // create 'priority/P2' (row 102)
+        .mockResolvedValueOnce(new Response('[]', { status: 200 })); // apply 102 → ok
+
+      const result = await runInlineScript(
+        script,
+        {
+          repo: 'owner/repo',
+          rows: [
+            { itemId: '101', values: { category: 'ux', priority: 'P1' } },
+            { itemId: '102', values: { category: 'tech-debt', priority: 'P2' } },
+          ],
+        },
+        { GITHUB_TOKEN: 'ghp_xxx' },
+      );
+
+      const errors = result.errors as Array<Record<string, unknown>>;
+      expect(errors).toHaveLength(1);
+      expect(errors[0].itemId).toBe('101');
+      expect(result.applied).toEqual([{ itemId: '102', labels: ['tech-debt', 'priority/P2'] }]);
     });
   });
 });
