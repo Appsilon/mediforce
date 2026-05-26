@@ -106,14 +106,25 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
      - Heuristic: prompt-prep <30s AND task >2min → spawn. Otherwise
        main thread does it.
 
-7. **Style.** English everywhere. No `any` — Zod + `z.infer`. No one-letter
+7. **No new Server Actions.** Phase 2/3 of the headless-platform-API
+   migration is deleting `'use server'` files; do not introduce new ones.
+   Every new mutation lands as `(input, scope) => output` in
+   `packages/platform-api/src/handlers/` + a Zod contract + a route adapter
+   in `packages/platform-ui/src/app/api/`. UI calls via `mediforce.X.Y()`
+   from `@/lib/mediforce`; CLI / agents / tests reuse the same handler.
+   Server Actions can only be called from React over RPC — they fork the
+   contract from every other client. If a function genuinely needs
+   `revalidatePath` / form-action / `redirect` semantics, ask before
+   adding. See ADR-0005.
+
+8. **Style.** English everywhere. No `any` — Zod + `z.infer`. No one-letter
    names. Self-documenting code over comments; NEVER add docstrings/types/
    comments to code you didn't change. Explicit boolean comparisons. Scripts
    in Python, not bash. Native platform > third-party. First-principles >
    clever workarounds. Voice input: interpret intent. NEVER use the
    `AskUserQuestion` tool — write a/b/c/... in plain text.
 
-8. **Log it via `/add-changelog-entry`.** Every non-trivial PR appends a
+9. **Log it via `/add-changelog-entry`.** Every non-trivial PR appends a
    one-line bullet under `## [Unreleased]` in `CHANGELOG.md` using
    Keep-a-Changelog categories. Group several PRs covering one thing as a
    nested list. Skip only for trivial edits. Weekly cut is automated —
@@ -134,8 +145,9 @@ trigger phrases match the action you're about to take. List with
 3. CLI > REST. `/use-mediforce` first; add the command if missing.
 4. `/self-review` as a subagent before reporting done.
 5. Ask, don't sneak, when a capability is missing.
-6. Main thread = manager + lead architect. NEVER fg subagent or
+6. No new Server Actions. Headless handler + route adapter + `mediforce.X.Y()`.
+7. Main thread = manager + lead architect. NEVER fg subagent or
    non-trivial bash. Decompose, narrate, verify actual output.
-7. Log non-trivial changes via `/add-changelog-entry`.
+8. Log non-trivial changes via `/add-changelog-entry`.
 
 See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).

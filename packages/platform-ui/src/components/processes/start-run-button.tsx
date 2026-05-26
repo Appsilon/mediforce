@@ -7,7 +7,7 @@ import { Play, ChevronDown, Loader2, Check, AlertTriangle, X, CircleDot, KeyRoun
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
-import { startWorkflowRun } from '@/app/actions/processes';
+import { mediforce } from '@/lib/mediforce';
 import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretKeys } from '@/app/actions/namespace-secrets';
 import { useWorkflowSecretKeysContext } from '@/hooks/use-workflow-secret-keys';
@@ -154,19 +154,19 @@ export function StartRunButton({
 
     const payload = hasTriggerInput ? buildPayload() : undefined;
 
-    const result = await startWorkflowRun({
-      namespace: handle,
-      definitionName: workflowName,
-      definitionVersion: targetVersion,
-      triggeredBy: firebaseUser.uid,
-      payload,
-    });
-
-    if (result.success && result.instanceId) {
-      router.push(`/${handle}/workflows/${encodeURIComponent(workflowName)}/runs/${result.instanceId}`);
-    } else {
-      console.error('[StartRunButton] Failed to start run:', result.error);
-      setError(result.error ?? 'Failed to start run');
+    try {
+      const result = await mediforce.runs.start({
+        namespace: handle,
+        definitionName: workflowName,
+        definitionVersion: targetVersion,
+        triggerName: 'manual',
+        triggeredBy: firebaseUser.uid,
+        payload,
+      });
+      router.push(`/${handle}/workflows/${encodeURIComponent(workflowName)}/runs/${result.run.id}`);
+    } catch (err) {
+      console.error('[StartRunButton] Failed to start run:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start run');
       setStarting(false);
     }
   }

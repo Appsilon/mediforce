@@ -99,7 +99,13 @@ test.describe('Previous run outputs — API E2E', () => {
         },
       });
       expect(triggerRes.status(), await triggerRes.text()).toBe(201);
-      const { instanceId } = (await triggerRes.json()) as { instanceId: string };
+      const triggerBody = (await triggerRes.json()) as Record<string, unknown>;
+      // ADR-0005 §5 entity-echo regression: response is `{ run: ... }` only.
+      // Pre-Phase-3 `{ instanceId, status }` top-level keys must NOT come back.
+      expect(triggerBody.instanceId).toBeUndefined();
+      expect(triggerBody.status).toBeUndefined();
+      const { run } = triggerBody as { run: { id: string } };
+      const instanceId = run.id;
 
       const task = await pollUntil(
         async () => {
@@ -119,9 +125,9 @@ test.describe('Previous run outputs — API E2E', () => {
         { description: `pending task on set-next for ${instanceId}` },
       );
 
-      const submitRes = await request.post(`/api/tasks/${task.id}/resolve`, {
+      const submitRes = await request.post(`/api/tasks/${task.id}/complete`, {
         headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
-        data: { paramValues: { message: messageForNext } },
+        data: { kind: 'params', paramValues: { message: messageForNext } },
       });
       expect(submitRes.status(), await submitRes.text()).toBe(200);
 
@@ -170,7 +176,7 @@ test.describe('Previous run outputs — API E2E', () => {
       },
     });
     expect(run2Trigger.status(), await run2Trigger.text()).toBe(201);
-    const run2Id = (await run2Trigger.json()).instanceId as string;
+    const run2Id = ((await run2Trigger.json()).run as { id: string }).id;
 
     const run2Initial = await fetchInstance(run2Id);
     expect(run2Initial.previousRun).toEqual({ message: 'from run 1' });
@@ -194,9 +200,9 @@ test.describe('Previous run outputs — API E2E', () => {
       },
       { description: 'pending task on set-next for run 2' },
     );
-    await request.post(`/api/tasks/${run2Task.id}/resolve`, {
+    await request.post(`/api/tasks/${run2Task.id}/complete`, {
       headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },
-      data: { paramValues: { message: 'from run 2' } },
+      data: { kind: 'params', paramValues: { message: 'from run 2' } },
     });
     await pollUntil(
       async () => {
@@ -217,7 +223,7 @@ test.describe('Previous run outputs — API E2E', () => {
       },
     });
     expect(run3Trigger.status(), await run3Trigger.text()).toBe(201);
-    const run3Id = (await run3Trigger.json()).instanceId as string;
+    const run3Id = ((await run3Trigger.json()).run as { id: string }).id;
 
     const run3 = await fetchInstance(run3Id);
     expect(run3.previousRun).toEqual({ message: 'from run 2' });

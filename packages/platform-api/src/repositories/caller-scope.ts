@@ -12,6 +12,7 @@ import type {
   WorkflowEngine,
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
+import type { RunKicker } from '../runtime/run-kicker.js';
 import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
 import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
 import type { AuthorizedAgentRunRepository } from './authorized-agent-run-repository.js';
@@ -101,4 +102,5 @@ export interface SystemServices {
    * (the writer is a handler that already passed the read-side gate).
    */
   readonly audit: AuditRepository;
+  readonly runKicker: RunKicker;
 }

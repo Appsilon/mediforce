@@ -1,5 +1,18 @@
 import { z } from 'zod';
-import { HumanTaskSchema, HumanTaskStatusSchema, type HumanTaskStatus } from '@mediforce/platform-core';
+import {
+  HumanTaskSchema,
+  HumanTaskStatusSchema,
+  ProcessInstanceSchema,
+  CompleteHumanTaskPayloadSchema,
+  AttachmentSchema,
+  AssignmentItemSchema,
+  TableEditorRowSchema,
+  type HumanTaskStatus,
+  type Attachment,
+  type AssignmentItem,
+  type TableEditorRow,
+  type CompleteHumanTaskPayload,
+} from '@mediforce/platform-core';
 
 /**
  * Contract for `GET /api/tasks`.
@@ -86,3 +99,27 @@ export const ClaimTaskOutputSchema = z.object({
 
 export type ClaimTaskInput = z.infer<typeof ClaimTaskInputSchema>;
 export type ClaimTaskOutput = z.infer<typeof ClaimTaskOutputSchema>;
+
+// Payload schemas live in platform-core so workflow-engine can import them
+// without an upward dep on platform-api.
+export {
+  AttachmentSchema,
+  AssignmentItemSchema,
+  TableEditorRowSchema,
+  CompleteHumanTaskPayloadSchema as CompleteTaskPayloadSchema,
+};
+export type { Attachment, AssignmentItem, TableEditorRow };
+export type CompleteTaskPayload = CompleteHumanTaskPayload;
+
+export const CompleteTaskInputSchema = z.object({
+  taskId: z.string().min(1),
+  payload: CompleteHumanTaskPayloadSchema,
+});
+
+export const CompleteTaskOutputSchema = z.object({
+  task: HumanTaskSchema,
+  run: ProcessInstanceSchema,
+});
+
+export type CompleteTaskInput = z.infer<typeof CompleteTaskInputSchema>;
+export type CompleteTaskOutput = z.infer<typeof CompleteTaskOutputSchema>;

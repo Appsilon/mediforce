@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { InstanceStatusSchema } from '@mediforce/platform-core';
+import { InstanceStatusSchema, ProcessInstanceSchema } from '@mediforce/platform-core';
 
 /**
  * Contract for `GET /api/runs/<runId>`.
@@ -32,11 +32,7 @@ export const GetRunOutputSchema = z.object({
 export type GetRunInput = z.infer<typeof GetRunInputSchema>;
 export type GetRunOutput = z.infer<typeof GetRunOutputSchema>;
 
-/**
- * Contract for `POST /api/processes` — fires a manual trigger and creates
- * a new run for the named workflow definition. Server picks the latest
- * version when `definitionVersion` is omitted.
- */
+// Server picks latest version when definitionVersion omitted.
 export const StartRunInputSchema = z.object({
   namespace: z.string().min(1).optional(),
   definitionName: z.string().min(1),
@@ -47,8 +43,7 @@ export const StartRunInputSchema = z.object({
 });
 
 export const StartRunOutputSchema = z.object({
-  instanceId: z.string().min(1),
-  status: z.string().min(1),
+  run: ProcessInstanceSchema,
 });
 
 export type StartRunInput = z.infer<typeof StartRunInputSchema>;

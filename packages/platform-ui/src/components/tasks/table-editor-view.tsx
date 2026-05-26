@@ -4,8 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { AlertTriangle, Bot, CheckCircle, Loader2, User } from 'lucide-react';
-import { completeTableEditorTask } from '@/app/actions/tasks';
-import { useAuth } from '@/contexts/auth-context';
+import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { TaskBodyProps } from './task-body-registry';
@@ -71,10 +70,7 @@ export interface OutputRow {
   values: Record<string, CellValue>;
 }
 
-export type TableEditorSubmit = (
-  rows: OutputRow[],
-  idToken: string,
-) => Promise<{ success: boolean; error?: string }>;
+export type TableEditorSubmit = (rows: OutputRow[]) => Promise<void>;
 
 const PLACEHOLDER = '— pick —';
 
@@ -101,7 +97,12 @@ function TableEditorTaskForm({ task }: { task: TaskBodyProps['task'] }) {
   const emptyMessage = (config.emptyMessage as string | undefined) ?? 'No items';
 
   const onSubmit = React.useCallback<TableEditorSubmit>(
-    (rows, idToken) => completeTableEditorTask(task.id, { rows }, idToken),
+    async (rows) => {
+      await mediforce.tasks.complete({
+        taskId: task.id,
+        payload: { kind: 'rows', rows },
+      });
+    },
     [task.id],
   );
 
@@ -160,7 +161,6 @@ export function TableEditorForm({
   submitLabel = 'Submit',
   emptyMessage = 'No items',
 }: TableEditorFormProps) {
-  const { firebaseUser } = useAuth();
   const editable = React.useMemo(() => editableColumns(columns), [columns]);
 
   const [rows, setRows] = React.useState<Record<string, Record<string, CellValue>>>(() => {
@@ -221,12 +221,11 @@ export function TableEditorForm({
     setSubmitting(true);
     setError(null);
     const built = buildRows();
-    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-    const result = await onSubmit(built, idToken);
-    if (result.success) {
+    try {
+      await onSubmit(built);
       setSubmitted(built);
-    } else {
-      setError(result.error ?? 'Failed to submit');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit');
     }
     setSubmitting(false);
   }

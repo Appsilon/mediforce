@@ -143,7 +143,8 @@ test.describe('Docker-backed workspace E2E', () => {
       data: { namespace: TEST_ORG_HANDLE, definitionName: wdName, triggeredBy: 'e2e-docker-test' },
     });
     expect(triggerRes.status(), await triggerRes.text()).toBe(201);
-    const { instanceId } = (await triggerRes.json()) as { instanceId: string };
+    const { run } = (await triggerRes.json()) as { run: { id: string } };
+    const instanceId = run.id;
 
     // 3. Poll to terminal.
     const final = await pollUntilTerminal(request, instanceId);

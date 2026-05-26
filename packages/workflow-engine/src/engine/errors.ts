@@ -41,3 +41,26 @@ export class MaxIterationsExceededError extends Error {
     super(`Step '${stepId}' exceeded max iterations limit of ${limit}`);
   }
 }
+
+// Per-variant payload validation failure that needs the task's runtime
+// config to detect (verdict allowlist, requiresComment, file constraints).
+// Distinct from InvalidTransitionError (state) and Zod parse errors (shape).
+export class CompleteHumanTaskValidationError extends Error {
+  override name = 'CompleteHumanTaskValidationError';
+
+  constructor(
+    message: string,
+    public readonly details?: Record<string, unknown>,
+  ) {
+    super(message);
+  }
+}
+
+// Typed so handlers can instanceof-check instead of string-matching err.message.
+export class ParentInstanceNotFoundError extends Error {
+  override name = 'ParentInstanceNotFoundError';
+
+  constructor(public readonly instanceId: string) {
+    super(`Process instance '${instanceId}' not found`);
+  }
+}

@@ -176,10 +176,10 @@ export async function runStartCommand(input: CommandInput): Promise<number> {
       return 0;
     }
     input.output.stdout(`Run started`);
-    input.output.stdout(`  instanceId: ${result.instanceId}`);
-    input.output.stdout(`  status:     ${result.status}`);
+    input.output.stdout(`  instanceId: ${result.run.id}`);
+    input.output.stdout(`  status:     ${result.run.status}`);
     input.output.stdout('');
-    input.output.stdout(`Follow with: mediforce run get ${result.instanceId}`);
+    input.output.stdout(`Follow with: mediforce run get ${result.run.id}`);
     return 0;
   } catch (err) {
     printError(input.output, formatCliError(err, { baseUrl: config.baseUrl, jsonMode }), jsonMode);

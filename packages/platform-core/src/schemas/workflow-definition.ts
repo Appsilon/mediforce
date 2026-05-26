@@ -303,9 +303,10 @@ function validateInputForNextRun(
 }
 
 /**
- * L3 agent revision loop in `resolve-task.ts` (isL3Revise) keys off the
- * literal 'revise' verdict. Allowing custom verdicts on L3 steps would
- * silently break the loop. Lifting this is tracked in #391.
+ * L3 agent revision loop in workflow-engine's `complete-human-task.ts`
+ * (`isL3Revise`) keys off the literal 'revise' verdict. Allowing custom
+ * verdicts on L3 steps would silently break the loop. Lifting this is
+ * tracked in #391.
  */
 const L3_VERDICT_KEYS = ['approve', 'revise'] as const; // see #391 — lift this allowlist when isL3Revise generalises to a per-verdict loopBack flag
 

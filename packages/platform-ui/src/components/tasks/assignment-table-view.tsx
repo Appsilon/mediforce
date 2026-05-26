@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle } from 'lucide-react';
-import { completeAssignmentTask } from '@/app/actions/tasks';
+import { mediforce } from '@/lib/mediforce';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import {
   TableEditorForm,
@@ -99,8 +99,15 @@ function AssignmentTableForm({ task }: { task: TaskBodyProps['task'] }) {
   }, [assignees, priorities, defaultPriority, allowSkip, itemColumnLabel, noteField]);
 
   const onSubmit = React.useCallback<TableEditorSubmit>(
-    (rows, idToken) =>
-      completeAssignmentTask(task.id, { assignments: buildAssignments(rows, items, assignees) }, idToken),
+    async (rows) => {
+      await mediforce.tasks.complete({
+        taskId: task.id,
+        payload: {
+          kind: 'assignment',
+          assignments: buildAssignments(rows, items, assignees),
+        },
+      });
+    },
     [task.id, items, assignees],
   );
 

@@ -18,6 +18,7 @@ export default defineConfig({
       '@mediforce/platform-api/auth': resolve(__dirname, '../platform-api/src/auth.ts'),
       '@mediforce/platform-api/repositories': resolve(__dirname, '../platform-api/src/repositories/index.ts'),
       '@mediforce/platform-api/testing': resolve(__dirname, '../platform-api/src/testing/index.ts'),
+      '@mediforce/platform-api/runtime': resolve(__dirname, '../platform-api/src/runtime/index.ts'),
       '@mediforce/platform-api': resolve(__dirname, '../platform-api/src/index.ts'),
       '@mediforce/workflow-engine': resolve(__dirname, '../workflow-engine/src/index.ts'),
       '@mediforce/agent-runtime': resolve(__dirname, '../agent-runtime/src/index.ts'),

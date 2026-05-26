@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { RotateCw, XCircle, Check } from 'lucide-react';
-import { retryFailedStep } from '@/app/actions/processes';
 import { mediforce } from '@/lib/mediforce';
 import { ApiError } from '@mediforce/platform-api/client';
 import { cn } from '@/lib/utils';
@@ -27,9 +26,12 @@ export function AgentEscalatedBanner({ instanceId, stepId }: AgentEscalatedBanne
   async function handleRetry() {
     setRetryStatus('submitting');
     setRetryError(null);
-    const result = await retryFailedStep(instanceId, stepId);
-    if (!result.success) {
-      setRetryError(result.error ?? 'Retry failed');
+    try {
+      await mediforce.runs.retryStep({ runId: instanceId, stepId });
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Retry failed';
+      setRetryError(message);
       setRetryStatus('error');
       return;
     }

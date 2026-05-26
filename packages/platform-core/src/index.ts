@@ -88,6 +88,10 @@ export {
   defaultVerdictIntent,
   defaultVerdictLabel,
   defaultRequiresComment,
+  AttachmentSchema,
+  AssignmentItemSchema,
+  TableEditorRowSchema,
+  CompleteHumanTaskPayloadSchema,
 } from './schemas/index.js';
 
 // Types (re-exported from schemas for convenience)
@@ -172,6 +176,10 @@ export type {
   StepMcpRestrictionEntry,
   ToolCatalogEntry,
   TaskVerdict,
+  Attachment,
+  AssignmentItem,
+  TableEditorRow,
+  CompleteHumanTaskPayload,
 } from './schemas/index.js';
 
 // Interfaces (repository and service contracts)

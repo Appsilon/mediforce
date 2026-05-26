@@ -129,3 +129,27 @@ export const CancelRunOutputSchema = z.object({
 
 export type CancelRunInput = z.infer<typeof CancelRunInputSchema>;
 export type CancelRunOutput = z.infer<typeof CancelRunOutputSchema>;
+
+// `failed` source state covers agent-escalated / agent-paused recovery.
+export const ResumeRunInputSchema = z.object({
+  runId: z.string().min(1),
+});
+
+export const ResumeRunOutputSchema = z.object({
+  run: ProcessInstanceSchema,
+});
+
+export type ResumeRunInput = z.infer<typeof ResumeRunInputSchema>;
+export type ResumeRunOutput = z.infer<typeof ResumeRunOutputSchema>;
+
+export const RetryStepInputSchema = z.object({
+  runId: z.string().min(1),
+  stepId: z.string().min(1),
+});
+
+export const RetryStepOutputSchema = z.object({
+  run: ProcessInstanceSchema,
+});
+
+export type RetryStepInput = z.infer<typeof RetryStepInputSchema>;
+export type RetryStepOutput = z.infer<typeof RetryStepOutputSchema>;

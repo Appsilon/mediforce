@@ -3,8 +3,10 @@ import { z } from 'zod';
 import { HandlerError } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { createCallerScope, type CallerScope } from '@mediforce/platform-api/repositories';
+import { createHttpSelfFetchRunKicker, type RunKicker } from '@mediforce/platform-api/runtime';
 import { resolveCallerIdentity } from './api-auth.js';
 import { getPlatformServices } from './platform-services.js';
+import { getAppBaseUrl } from './app-base-url.js';
 
 /**
  * Wraps a pure handler (from `@mediforce/platform-api`) into a Next.js route.
@@ -116,8 +118,16 @@ function jsonErrorResponse(err: HandlerError): NextResponse {
   return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
 }
 
+const prodRunKicker: RunKicker = createHttpSelfFetchRunKicker({
+  baseUrl: getAppBaseUrl,
+  apiKey: () => process.env.PLATFORM_API_KEY ?? '',
+});
+
 function defaultBuildScope(caller: CallerIdentity): CallerScope {
-  return createCallerScope(getPlatformServices(), caller);
+  return createCallerScope(
+    { ...getPlatformServices(), runKicker: prodRunKicker },
+    caller,
+  );
 }
 
 async function defaultResolveCaller(req: NextRequest): Promise<CallerIdentity | NextResponse> {

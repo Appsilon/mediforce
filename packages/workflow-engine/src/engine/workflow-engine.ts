@@ -11,6 +11,7 @@ import type {
   NotificationTarget,
   HumanTaskRepository,
   HumanTask,
+  CompleteHumanTaskPayload,
   CoworkSessionRepository,
   UserDirectoryService,
   WorkflowDefinition,
@@ -20,8 +21,9 @@ import type { Selection, TaskVerdict } from '@mediforce/platform-core';
 import { RbacService, RbacError, normalizeSelection, buildTaskVerdicts } from '@mediforce/platform-core';
 import { validateStepGraph } from '../graph/graph-validator.js';
 import { StepExecutor, type StepActor } from './step-executor.js';
-import { RoutingError, InvalidTransitionError } from './errors.js';
+import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors.js';
 import { ReviewTracker } from '../review/review-tracker.js';
+import { shapeCompletion } from './complete-human-task.js';
 
 /**
  * Minimal shape of AgentRunResult needed by WorkflowEngine for handoff creation.
@@ -663,6 +665,87 @@ export class WorkflowEngine {
     });
 
     return this.loadInstance(instanceId);
+  }
+
+  // L3-revise verdicts resume the instance but skip advanceStep so the
+  // auto-runner re-executes the agent with reviewer feedback.
+  async completeHumanTask(
+    taskId: string,
+    payload: CompleteHumanTaskPayload,
+    actorId: string,
+  ): Promise<{
+    task: HumanTask;
+    instance: ProcessInstance;
+    stepOutput: Record<string, unknown>;
+    resolvedStepId: string;
+    isL3Revise: boolean;
+  }> {
+    if (!this.humanTaskRepository) {
+      throw new Error(
+        'completeHumanTask requires humanTaskRepository — engine was constructed without one',
+      );
+    }
+
+    const task = await this.humanTaskRepository.getById(taskId);
+    if (!task) {
+      throw new Error(`Task '${taskId}' not found`);
+    }
+    if (task.status === 'completed' || task.status === 'cancelled') {
+      throw new InvalidTransitionError(task.status, 'completeHumanTask');
+    }
+
+    let resolvedTask: HumanTask = task;
+    if (task.status === 'pending') {
+      resolvedTask = await this.humanTaskRepository.claim(taskId, actorId);
+    }
+
+    const effectiveActor = resolvedTask.assignedUserId ?? actorId;
+    const now = new Date().toISOString();
+
+    const { completionData, stepOutput, isL3Revise } = shapeCompletion(
+      resolvedTask,
+      payload,
+      effectiveActor,
+      now,
+    );
+
+    await this.humanTaskRepository.complete(taskId, completionData);
+
+    const instance = await this.instanceRepository.getById(
+      resolvedTask.processInstanceId,
+    );
+    if (!instance) {
+      throw new ParentInstanceNotFoundError(resolvedTask.processInstanceId);
+    }
+    if (instance.status !== 'paused') {
+      throw new InvalidTransitionError(instance.status, 'completeHumanTask');
+    }
+
+    await this.instanceRepository.update(resolvedTask.processInstanceId, {
+      status: 'running',
+      pauseReason: null,
+      updatedAt: now,
+    });
+
+    if (!isL3Revise) {
+      await this.advanceStep(resolvedTask.processInstanceId, stepOutput, {
+        id: effectiveActor,
+        role: 'human',
+      });
+    }
+
+    const updatedTask = await this.humanTaskRepository.getById(taskId);
+    const updatedInstance = await this.instanceRepository.getById(
+      resolvedTask.processInstanceId,
+    );
+
+    return {
+      task: updatedTask ?? resolvedTask,
+      instance: updatedInstance ?? instance,
+      stepOutput,
+      resolvedStepId: resolvedTask.stepId,
+      isL3Revise,
+    };
   }
 
   private async loadInstance(instanceId: string): Promise<ProcessInstance> {

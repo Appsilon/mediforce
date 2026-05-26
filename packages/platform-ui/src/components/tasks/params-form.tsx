@@ -4,8 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle, Loader2, Send } from 'lucide-react';
-import { completeParamsTask } from '@/app/actions/tasks';
-import { useAuth } from '@/contexts/auth-context';
+import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { ParamField } from '@/components/ui/param-field';
@@ -30,7 +29,6 @@ export function ParamsForm({
   onCompleted,
 }: ParamsFormProps) {
   const handle = useHandleFromPath();
-  const { firebaseUser } = useAuth();
   const [values, setValues] = React.useState<Record<string, unknown>>(() => {
     const initial: Record<string, unknown> = {};
     for (const param of params) {
@@ -74,14 +72,15 @@ export function ParamsForm({
       }
     }
 
-    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-    const result = await completeParamsTask(taskId, coerced, idToken);
-
-    if (result.success) {
+    try {
+      await mediforce.tasks.complete({
+        taskId,
+        payload: { kind: 'params', paramValues: coerced },
+      });
       setSubmitted({ values: coerced, timestamp: new Date().toISOString() });
       onCompleted?.();
-    } else {
-      setError(result.error ?? 'Failed to submit');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit');
     }
 
     setSubmitting(false);

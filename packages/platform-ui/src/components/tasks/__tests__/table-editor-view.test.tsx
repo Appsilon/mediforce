@@ -10,16 +10,18 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-vi.mock('@/contexts/auth-context', () => ({
-  useAuth: () => ({ firebaseUser: { getIdToken: vi.fn().mockResolvedValue('mock-id-token') } }),
+vi.mock('@/lib/mediforce', () => ({
+  mediforce: {
+    tasks: {
+      complete: vi.fn(async () => ({ task: {}, run: {} })),
+    },
+  },
 }));
 
-const mockCompleteTableEditorTask = vi.fn().mockResolvedValue({ success: true });
-vi.mock('@/app/actions/tasks', () => ({
-  completeTableEditorTask: (...args: unknown[]) => mockCompleteTableEditorTask(...args),
-}));
-
+import { mediforce } from '@/lib/mediforce';
 import { TableEditorView } from '../table-editor-view';
+
+const completeMock = vi.mocked(mediforce.tasks.complete);
 
 const CATEGORY_OPTIONS = [
   { id: 'ux', label: 'UX' },
@@ -161,17 +163,17 @@ describe('TableEditorView', () => {
 
     await user.click(screen.getByRole('button', { name: /apply tags/i }));
 
-    expect(mockCompleteTableEditorTask).toHaveBeenCalledTimes(1);
-    expect(mockCompleteTableEditorTask).toHaveBeenCalledWith(
-      expect.any(String),
-      {
+    expect(completeMock).toHaveBeenCalledTimes(1);
+    expect(completeMock).toHaveBeenCalledWith({
+      taskId: expect.any(String),
+      payload: {
+        kind: 'rows',
         rows: [
           { itemId: '601', values: { category: 'ux', priority: 'P1' } },
           { itemId: '602', values: { category: 'tech-debt', priority: 'P3' } },
         ],
       },
-      expect.any(String),
-    );
+    });
   });
 
   it('[CLICK] edits to a cell are reflected in the submitted values', async () => {
@@ -184,8 +186,9 @@ describe('TableEditorView', () => {
     await user.selectOptions(screen.getByLabelText(/priority/i), 'P0');
     await user.click(screen.getByRole('button', { name: /apply tags/i }));
 
-    const [, payload] = mockCompleteTableEditorTask.mock.calls[0];
-    expect((payload as { rows: { values: Record<string, unknown> }[] }).rows[0].values).toEqual({
+    const [input] = completeMock.mock.calls[0];
+    const payload = (input as { payload: { rows: { values: Record<string, unknown> }[] } }).payload;
+    expect(payload.rows[0].values).toEqual({
       category: 'security',
       priority: 'P0',
     });
@@ -204,8 +207,9 @@ describe('TableEditorView', () => {
     await user.type(screen.getByLabelText(/note/i), 'needs design input');
     await user.click(screen.getByRole('button', { name: /apply tags/i }));
 
-    const [, payload] = mockCompleteTableEditorTask.mock.calls[0];
-    expect((payload as { rows: { values: Record<string, unknown> }[] }).rows[0].values).toEqual({
+    const [input] = completeMock.mock.calls[0];
+    const payload = (input as { payload: { rows: { values: Record<string, unknown> }[] } }).payload;
+    expect(payload.rows[0].values).toEqual({
       note: 'needs design input',
     });
   });
@@ -233,8 +237,9 @@ describe('TableEditorView', () => {
     await user.click(screen.getByLabelText(/gamma/i));
     await user.click(screen.getByRole('button', { name: /apply tags/i }));
 
-    const [, payload] = mockCompleteTableEditorTask.mock.calls[0];
-    expect((payload as { rows: { values: Record<string, unknown> }[] }).rows[0].values).toEqual({
+    const [input] = completeMock.mock.calls[0];
+    const payload = (input as { payload: { rows: { values: Record<string, unknown> }[] } }).payload;
+    expect(payload.rows[0].values).toEqual({
       tags: ['a', 'c'],
     });
   });

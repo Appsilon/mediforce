@@ -23,7 +23,16 @@ export {
   RoutingError,
   InvalidTransitionError,
   MaxIterationsExceededError,
+  CompleteHumanTaskValidationError,
+  ParentInstanceNotFoundError,
 } from './engine/errors.js';
+
+export {
+  resolveTaskKind,
+  shapeCompletion,
+  type TaskKind,
+  type CompletionShape,
+} from './engine/complete-human-task.js';
 
 // Review
 export { ReviewTracker } from './review/review-tracker.js';

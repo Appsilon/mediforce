@@ -6,8 +6,7 @@ import { format } from 'date-fns';
 import { CheckCircle, FileText, Download, Loader2 } from 'lucide-react';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { FileUploadZone } from './file-upload-zone';
-import { completeUploadTask } from '@/app/actions/tasks';
-import { useAuth } from '@/contexts/auth-context';
+import { mediforce } from '@/lib/mediforce';
 import { storage } from '@/lib/firebase';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { TaskBodyProps } from './task-body-registry';
@@ -26,7 +25,6 @@ function formatFileSize(bytes: number): string {
 }
 
 export function FileUploadView({ task }: TaskBodyProps) {
-  const { firebaseUser } = useAuth();
   const [uploadComplete, setUploadComplete] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [uploading, setUploading] = React.useState(false);
@@ -83,12 +81,14 @@ export function FileUploadView({ task }: TaskBodyProps) {
         });
       }
 
-      const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-      const result = await completeUploadTask(task.id, uploadedFiles, idToken);
-      if (result.success) {
+      try {
+        await mediforce.tasks.complete({
+          taskId: task.id,
+          payload: { kind: 'upload', attachments: uploadedFiles },
+        });
         setUploadComplete(true);
-      } else {
-        setUploadError(result.error ?? 'Upload failed');
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : 'Upload failed');
       }
     } catch (err) {
       const fileIndex = uploadProgress.completed;
@@ -98,7 +98,7 @@ export function FileUploadView({ task }: TaskBodyProps) {
     } finally {
       setUploading(false);
     }
-  }, [task.id, firebaseUser, uploadProgress.completed]);
+  }, [task.id, uploadProgress.completed]);
 
   const isActionable = task.status === 'claimed' || task.status === 'pending';
   const isCompleted = task.status === 'completed';
