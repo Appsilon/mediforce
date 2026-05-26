@@ -79,8 +79,10 @@ export function getWorkflowStatus(instance: {
   }
 
   if (instance.status === 'failed') {
-    // cancelProcessRun sets error='Cancelled by user' — string match is the cheapest gate here;
-    // this value is written by cancelProcessRun and must not change without updating this check.
+    // cancelProcess handler sets error='Cancelled by user' (default reason);
+    // string match is the cheapest gate. The default reason in
+    // packages/platform-api/src/handlers/processes/cancel-process.ts must not
+    // change without updating this check.
     if (error === 'Cancelled by user') {
       return { displayStatus: 'cancelled', reason: 'Cancelled by user', rawReason: null, isRetryable: false, hasDedicatedBanner: false };
     }

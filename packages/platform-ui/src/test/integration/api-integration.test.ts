@@ -16,8 +16,12 @@ import {
   buildHumanTask,
   buildProcessInstance,
 } from '@mediforce/platform-core/testing';
-import { listTasks, claimTask } from '@mediforce/platform-api/handlers';
-import { ListTasksInputSchema, ClaimTaskInputSchema } from '@mediforce/platform-api/contract';
+import { listTasks, claimTask, cancelRun } from '@mediforce/platform-api/handlers';
+import {
+  ListTasksInputSchema,
+  ClaimTaskInputSchema,
+  CancelRunInputSchema,
+} from '@mediforce/platform-api/contract';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
@@ -203,5 +207,84 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(404);
     expect((err as ApiError).code).toBe('not_found');
+  });
+});
+
+// Third integration scenario: `runs.cancel` mutation. One round-trip
+// exercising entity-echo response shape + typed envelope surfacing — same
+// loopback ceremony as claim above.
+describe('Mediforce client ↔ route-adapter ↔ cancelRun (in-process)', () => {
+  let instanceRepo: InMemoryProcessInstanceRepository;
+  let humanTaskRepo: InMemoryHumanTaskRepository;
+  let mediforce: Mediforce;
+  let route: (
+    req: NextRequest,
+    ctx: { params: Promise<{ instanceId: string }> },
+  ) => Promise<Response>;
+  const userCaller: CallerIdentity = {
+    kind: 'user',
+    uid: 'u-cancel-test',
+    namespaces: new Set(['team-alpha']),
+    isSystemActor: false,
+  };
+
+  beforeEach(() => {
+    instanceRepo = new InMemoryProcessInstanceRepository();
+    humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
+
+    route = createRouteAdapter<
+      typeof CancelRunInputSchema,
+      { runId: string; reason?: string },
+      { run: unknown },
+      { params: Promise<{ instanceId: string }> }
+    >(
+      CancelRunInputSchema,
+      async (req, ctx) => ({
+        runId: (await ctx.params).instanceId,
+        ...((await req.json().catch(() => ({}))) as Record<string, unknown>),
+      }),
+      cancelRun,
+      {
+        resolveCaller: async () => userCaller,
+        buildScope: (caller) => createTestScope({ caller, instanceRepo, humanTaskRepo }),
+      },
+    );
+
+    mediforce = new Mediforce({
+      fetch: async (input, init) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        const instanceId = url.match(/\/api\/processes\/([^/]+)\/cancel/)?.[1] ?? '';
+        const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
+        return route(new NextRequest(absolute, init), {
+          params: Promise.resolve({ instanceId: decodeURIComponent(instanceId) }),
+        });
+      },
+    });
+  });
+
+  it('round-trips cancel → returns the entity in `failed` state with the reason persisted', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'running' }),
+    );
+
+    const result = await mediforce.runs.cancel({ runId: 'inst-a' });
+
+    expect(result.run.id).toBe('inst-a');
+    expect(result.run.status).toBe('failed');
+    expect(result.run.error).toBe('Cancelled by user');
+  });
+
+  it('flows a typed `precondition_failed` envelope for an already-failed run', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha', status: 'failed' }),
+    );
+
+    const err = await mediforce.runs
+      .cancel({ runId: 'inst-a' })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(409);
+    expect((err as ApiError).code).toBe('precondition_failed');
   });
 });
