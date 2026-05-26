@@ -19,6 +19,7 @@
  * commits as each command lands.
  */
 
+import { diagramCommand } from './commands/diagram.js';
 import { workflowRegisterCommand } from './commands/workflow-register.js';
 import { workflowListCommand } from './commands/workflow-list.js';
 import { workflowGetCommand } from './commands/workflow-get.js';
@@ -75,6 +76,7 @@ Commands:
   system rmi <imageId>                               Remove a Docker image
   system disk                                        Docker disk usage breakdown
   system credits --namespace <ns>                    OpenRouter credit balance
+  diagram --file <path>                              Generate a PNG workflow diagram
 
 Common flags:
   --base-url <url>   API base URL (default: http://localhost:9003,
@@ -278,6 +280,9 @@ export async function runCli(input: RunCliInput): Promise<number> {
   }
   if (command === 'system' && subcommand === 'credits') {
     return systemCreditsCommand({ argv: rest, env: input.env, output });
+  }
+  if (command === 'diagram') {
+    return diagramCommand({ argv: [subcommand, ...rest].filter(Boolean), env: input.env, output });
   }
 
   output.stderr(`Unknown command: ${[command, subcommand].filter(Boolean).join(' ')}`);
