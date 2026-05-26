@@ -1,42 +1,35 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { cancelProcess } from '@mediforce/platform-api/handlers';
+import { CancelProcessInputSchema } from '@mediforce/platform-api/contract';
+import type { CancelProcessInput } from '@mediforce/platform-api/contract';
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ instanceId: string }> },
-): Promise<NextResponse> {
-  try {
-    const { instanceId } = await params;
-    const { instanceRepo, namespaceRepo } = getPlatformServices();
-
-    const caller = await resolveCallerIdentity(req, namespaceRepo);
-    if (caller instanceof NextResponse) return caller;
-
-    const instance = await instanceRepo.getById(instanceId);
-    if (!instance) {
-      return NextResponse.json({ error: 'Instance not found' }, { status: 404 });
-    }
-
-    const denied = requireNamespaceAccess(caller, instance.namespace);
-    if (denied) return denied;
-
-    if (instance.status !== 'running' && instance.status !== 'paused') {
-      return NextResponse.json(
-        { error: `Cannot cancel instance in status '${instance.status}'` },
-        { status: 409 },
-      );
-    }
-
-    await instanceRepo.update(instanceId, {
-      status: 'failed',
-      error: 'Cancelled by user',
-      updatedAt: new Date().toISOString(),
-    });
-
-    return NextResponse.json({ instanceId, status: 'failed' });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+interface RouteContext {
+  params: Promise<{ instanceId: string }>;
 }
+
+/**
+ * POST /api/processes/:instanceId/cancel
+ *
+ * Body: { reason?: string }
+ *
+ * State transition (running | paused → failed). State-machine precondition,
+ * workspace gating, and audit emission live in the handler (Phase 2 PR2 /
+ * ADR-0005 §5/§7). Response is entity-echoed `{ run: WorkflowRun }` —
+ * replaces the pre-migration `{ instanceId, status }` shape.
+ */
+export const POST = createRouteAdapter<
+  typeof CancelProcessInputSchema,
+  CancelProcessInput,
+  unknown,
+  RouteContext
+>(
+  CancelProcessInputSchema,
+  async (req, ctx) => {
+    const { instanceId } = await ctx.params;
+    const raw = (await req.json().catch(() => ({}))) as { reason?: unknown };
+    const reason =
+      typeof raw.reason === 'string' && raw.reason.length > 0 ? raw.reason : undefined;
+    return { instanceId, ...(reason !== undefined ? { reason } : {}) };
+  },
+  cancelProcess,
+);
