@@ -124,15 +124,13 @@ import {
   type GetCoworkSessionByInstanceOutput,
   type ListPluginsOutput,
 } from '../contract/index.js';
-import { ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors.js';
-
-// Re-export so SDK consumers reach for one path:
+// SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
 // Server-side handlers throw `HandlerError` (or subclasses) imported from
 // `@mediforce/platform-api/errors`; the wire envelope is the only shared
-// surface, so the client just exposes `code`/`details` on
-// `ApiError` directly.
-export { type ApiErrorCode } from '../errors.js';
+// surface, so the client just exposes `code`/`details` on `ApiError` directly.
+import { ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors.js';
+export type { ApiErrorCode };
 
 /**
  * Typed client for the Mediforce API. Runtime-agnostic — works in the
