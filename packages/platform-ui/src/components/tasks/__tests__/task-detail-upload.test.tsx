@@ -57,7 +57,6 @@ vi.mock('@/app/actions/tasks', () => ({
   completeUploadTask: (...args: unknown[]) => mockCompleteUploadTask(...args),
   completeTask: vi.fn().mockResolvedValue({ success: true }),
   completeParamsTask: vi.fn().mockResolvedValue({ success: true }),
-  unclaimTask: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 import { TaskDetail } from '../task-detail';
