@@ -1,4 +1,4 @@
-import type { HumanTask, ProcessInstance } from '@mediforce/platform-core';
+import type { HumanTask, ProcessInstance, Presentation } from '@mediforce/platform-core';
 
 /** Format a stepId into a human-readable title. */
 export function formatStepName(stepId: string): string {
@@ -91,9 +91,30 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
     estimatedCostUsd: typeof agentOutput.estimatedCostUsd === 'number' ? agentOutput.estimatedCostUsd : null,
     tokenUsage,
     gitMetadata,
-    presentation: typeof agentOutput.presentation === 'string' ? agentOutput.presentation : null,
+    presentation: normalizePresentation(agentOutput.presentation),
     escalationReason: normalizedEscalation,
   };
+}
+
+/** Map a stored `presentation` field into the discriminated shape the UI
+ *  branches on. Legacy Firestore rows have `presentation: string` (always
+ *  HTML); newer rows carry `{kind, content}`. Unknown shapes return null
+ *  so the UI silently drops malformed data instead of crashing. */
+export function normalizePresentation(value: unknown): Presentation | null {
+  if (typeof value === 'string') {
+    return value.length > 0 ? { kind: 'html', content: value } : null;
+  }
+  if (value !== null && typeof value === 'object') {
+    const candidate = value as { kind?: unknown; content?: unknown };
+    if (
+      (candidate.kind === 'markdown' || candidate.kind === 'html') &&
+      typeof candidate.content === 'string' &&
+      candidate.content.length > 0
+    ) {
+      return { kind: candidate.kind, content: candidate.content };
+    }
+  }
+  return null;
 }
 
 /** Find agent output from the closest preceding sibling task for the same step.
@@ -141,6 +162,6 @@ export interface AgentOutputData {
   estimatedCostUsd: number | null;
   tokenUsage: TokenUsageData | null;
   gitMetadata: GitMetadataData | null;
-  presentation: string | null;
+  presentation: Presentation | null;
   escalationReason: EscalationReason;
 }

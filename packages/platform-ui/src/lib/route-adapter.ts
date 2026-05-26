@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { HandlerError } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
+import { createCallerScope, type CallerScope } from '@mediforce/platform-api/repositories';
 import { resolveCallerIdentity } from './api-auth.js';
 import { getPlatformServices } from './platform-services.js';
 
@@ -22,9 +23,10 @@ import { getPlatformServices } from './platform-services.js';
  *      schema validates it. Failure → 400 with the first issue's message.
  *      Note: `ctx` is Next.js's `RouteContext` shape (`{ params: Promise<…> }`)
  *      for dynamic-segment routes, or `unknown` for flat routes.
- *   3. Handler — invoked with the parsed input and the caller. Throws of type
- *      `HandlerError` (e.g. `NotFoundError`, `ForbiddenError`) map to their
- *      declared HTTP status. Anything else is a 500 (full error logged).
+ *   3. Handler — invoked with the parsed input and a `CallerScope`. Throws of
+ *      type `HandlerError` (or any subclass: `NotFoundError`, `ForbiddenError`,
+ *      `PreconditionFailedError`, etc.) map to the ADR-0005 §1 envelope using
+ *      `err.code`. Anything else is a 500 (full error logged).
  *
  * Auth note: middleware in `src/middleware.ts` already gates `/api/*` for
  * presence of credentials — that's the first line of defense and exists so
@@ -32,8 +34,9 @@ import { getPlatformServices } from './platform-services.js';
  * resolution step is what turns those credentials into a typed
  * `CallerIdentity` for namespace policy. Both run today; do not remove either.
  *
- * Test seam: pass `options.resolveCaller` to bypass real Firebase /
- * Firestore in unit tests. Production code never sets it.
+ * Test seams: pass `options.resolveCaller` to bypass real Firebase /
+ * Firestore auth, or `options.buildScope` to substitute a stub scope without
+ * spinning up services. Production code never sets either.
  *
  * The `NarrowInput` generic defaults to `z.infer<InputSchema>`. Pass it
  * explicitly when the handler expects a narrower type than the schema's
@@ -44,11 +47,13 @@ import { getPlatformServices } from './platform-services.js';
 export interface RouteAdapterOptions {
   /** Override caller resolution. Default reads from request headers. */
   readonly resolveCaller?: (req: NextRequest) => Promise<CallerIdentity | NextResponse>;
+  /** Override scope construction. Default wires the platform's real services. */
+  readonly buildScope?: (caller: CallerIdentity) => CallerScope;
 }
 
 export type RouteHandler<Input, Output> = (
   input: Input,
-  caller: CallerIdentity,
+  scope: CallerScope,
 ) => Promise<Output>;
 
 export function createRouteAdapter<
@@ -63,6 +68,7 @@ export function createRouteAdapter<
   options: RouteAdapterOptions = {},
 ): (req: NextRequest, ctx: Ctx) => Promise<NextResponse> {
   const resolveCaller = options.resolveCaller ?? defaultResolveCaller;
+  const buildScope = options.buildScope ?? defaultBuildScope;
 
   return async (req, ctx) => {
     const callerOrResponse = await resolveCaller(req);
@@ -74,28 +80,44 @@ export function createRouteAdapter<
       raw = await inputFromRequest(req, ctx);
     } catch (err) {
       console.error('[route-adapter] inputFromRequest error:', err);
-      return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+      return jsonErrorResponse(new HandlerError('validation', 'Invalid input'));
     }
 
     const parsed = inputSchema.safeParse(raw);
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
-        { status: 400 },
+      return jsonErrorResponse(
+        new HandlerError(
+          'validation',
+          parsed.error.issues[0]?.message ?? 'Invalid input',
+          parsed.error.issues,
+        ),
       );
     }
 
     try {
-      const result = await handler(parsed.data as NarrowInput, caller);
+      const scope = buildScope(caller);
+      const result = await handler(parsed.data as NarrowInput, scope);
       return NextResponse.json(result);
     } catch (err) {
-      if (err instanceof HandlerError) {
-        return NextResponse.json({ error: err.message }, { status: err.statusCode });
+      if (err instanceof HandlerError) return jsonErrorResponse(err);
+      if (err instanceof z.ZodError) {
+        return jsonErrorResponse(new HandlerError('validation', 'Invalid input', err.issues));
       }
       console.error('[route-adapter] handler error:', err);
-      return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+      return jsonErrorResponse(new HandlerError('internal', 'Internal error'));
     }
   };
+}
+
+// `HandlerError.toEnvelope()` is the ADR-0005 §1 wire shape; `statusCode` is
+// derived from `code` via the §3 table inside the class. This adapter is the
+// only place that turns a HandlerError into an HTTP response.
+function jsonErrorResponse(err: HandlerError): NextResponse {
+  return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
+}
+
+function defaultBuildScope(caller: CallerIdentity): CallerScope {
+  return createCallerScope(getPlatformServices(), caller);
 }
 
 async function defaultResolveCaller(req: NextRequest): Promise<CallerIdentity | NextResponse> {

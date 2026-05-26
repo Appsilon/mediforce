@@ -215,7 +215,7 @@ function AgentCatalog({ handle }: { handle: string }) {
         if (!res.ok) throw new Error(`Failed to fetch plugins: ${res.status}`);
         return res.json() as Promise<{ plugins: AgentEntry[] }>;
       }),
-      apiFetch('/api/agent-definitions').then((res) => {
+      apiFetch('/api/agents').then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch agent definitions: ${res.status}`);
         return res.json() as Promise<{ agents: AgentDefinition[] }>;
       }),

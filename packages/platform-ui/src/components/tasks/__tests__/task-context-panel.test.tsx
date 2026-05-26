@@ -416,6 +416,71 @@ describe('TaskContextPanel', () => {
     expect(parseInt(iframe.style.height, 10)).toBe(800);
   });
 
+  it('renders a markdown presentation inline (no iframe) when agentOutput.presentation.kind is markdown', async () => {
+    const execution = buildExecution({
+      output: { summary: 'OK' },
+      agentOutput: {
+        confidence: null,
+        confidence_rationale: null,
+        reasoning: null,
+        model: null,
+        duration_ms: null,
+        gitMetadata: null,
+        presentation: { kind: 'markdown', content: '## Status\n\n- one\n- two' },
+      },
+    });
+    setSubcollection([execution]);
+
+    render(
+      <TaskContextPanel
+        processInstanceId="inst-1"
+        stepId="human-review"
+      />,
+    );
+    await expandPanel();
+    await activateReportTab();
+
+    // Markdown branch renders inline. The iframe path is reserved for HTML.
+    expect(document.querySelector('iframe')).toBeNull();
+    expect(screen.getByRole('heading', { level: 2, name: 'Status' })).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('renders a markdown presentation when agentOutput.presentation arrives as a structured object', async () => {
+    // Markdown presentations live under `agentOutput.presentation`, not
+    // `output.presentation` (scripts that write Markdown emit the structured
+    // shape via the plugin). Confirm the panel reads from the right field.
+    const execution = buildExecution({
+      output: null,
+      agentOutput: {
+        confidence: null,
+        confidence_rationale: null,
+        reasoning: null,
+        model: null,
+        duration_ms: null,
+        gitMetadata: null,
+        presentation: {
+          kind: 'markdown',
+          content: '[issue 42](https://example.test/42)',
+        },
+      },
+    });
+    setSubcollection([execution]);
+
+    render(
+      <TaskContextPanel
+        processInstanceId="inst-1"
+        stepId="human-review"
+      />,
+    );
+    await expandPanel();
+    await activateReportTab();
+
+    const link = screen.getByRole('link', { name: 'issue 42' });
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+  });
+
   it('iframe srcdoc neutralises Tailwind viewport-height classes to avoid feedback growth', async () => {
     const execution = buildExecution({
       output: { presentation: '<div class="min-h-screen">vh content</div>' },

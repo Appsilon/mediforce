@@ -2,14 +2,10 @@
 
 import * as React from 'react';
 import { Loader2 } from 'lucide-react';
-import { claimTask } from '@/app/actions/tasks';
 import { useAuth } from '@/contexts/auth-context';
+import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 
-/**
- * One-click claim button. No confirmation dialog (per user decision).
- * Calls the claimTask server action directly on click.
- */
 export function ClaimButton({
   taskId,
   fullWidth = false,
@@ -21,7 +17,6 @@ export function ClaimButton({
   variant?: 'default' | 'inline';
   onClaimed?: () => void;
 }) {
-  const { firebaseUser } = useAuth();
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -29,13 +24,8 @@ export function ClaimButton({
     setPending(true);
     setError(null);
     try {
-      const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-      const result = await claimTask(taskId, idToken);
-      if (result.success) {
-        onClaimed?.();
-      } else {
-        setError(result.error ?? 'Failed to claim task');
-      }
+      await mediforce.tasks.claim({ taskId });
+      onClaimed?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to claim task');
     } finally {

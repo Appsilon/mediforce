@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TokenUsageSchema } from './agent-output-envelope.js';
+import { PresentationSchema, TokenUsageSchema } from './agent-output-envelope.js';
 
 export const StepExecutionStatusSchema = z.enum([
   'pending',
@@ -38,7 +38,12 @@ export const AgentOutputSnapshotSchema = z.object({
   deliverableFile: z.string().nullable().optional(),
   tokenUsage: TokenUsageSchema.optional(),
   estimatedCostUsd: z.number().optional(),
-  presentation: z.string().nullable().optional(),
+  presentation: z.union([z.string(), PresentationSchema])
+    .transform((value) =>
+      typeof value === 'string' ? { kind: 'html' as const, content: value } : value,
+    )
+    .nullable()
+    .optional(),
 });
 
 export const StepExecutionSchema = z.object({

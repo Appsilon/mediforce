@@ -5,6 +5,7 @@ import {
   GetTaskOutputSchema,
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
+  ListWorkflowsInputSchema,
   ListWorkflowsOutputSchema,
   GetWorkflowInputSchema,
   GetWorkflowOutputSchema,
@@ -26,6 +27,7 @@ import {
   RemoveImageOutputSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
+  ListAgentsInputSchema,
   ListAgentsOutputSchema,
   GetAgentInputSchema,
   GetAgentOutputSchema,
@@ -46,25 +48,23 @@ import {
   ListAuditEventsOutputSchema,
   GetProcessStepsInputSchema,
   GetProcessStepsOutputSchema,
-  ListWorkflowDefinitionsInputSchema,
-  ListWorkflowDefinitionsOutputSchema,
-  ListAgentDefinitionsOutputSchema,
-  GetAgentDefinitionInputSchema,
-  GetAgentDefinitionOutputSchema,
-  GetWorkflowDefinitionInputSchema,
-  GetWorkflowDefinitionOutputSchema,
   GetCoworkSessionInputSchema,
   GetCoworkSessionOutputSchema,
   GetCoworkSessionByInstanceInputSchema,
   GetCoworkSessionByInstanceOutputSchema,
   ListPluginsOutputSchema,
+  ClaimTaskInputSchema,
+  ClaimTaskOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
   type GetTaskOutput,
+  type ClaimTaskInput,
+  type ClaimTaskOutput,
   type RegisterWorkflowInput,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
+  type ListWorkflowsInput,
   type ListWorkflowsOutput,
   type GetWorkflowInput,
   type GetWorkflowOutput,
@@ -87,6 +87,7 @@ import {
   type RemoveImageOutput,
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
+  type ListAgentsInput,
   type ListAgentsOutput,
   type GetAgentInput,
   type GetAgentOutput,
@@ -117,19 +118,19 @@ import {
   type ListAuditEventsOutput,
   type GetProcessStepsInput,
   type GetProcessStepsOutput,
-  type ListWorkflowDefinitionsInput,
-  type ListWorkflowDefinitionsOutput,
-  type ListAgentDefinitionsOutput,
-  type GetAgentDefinitionInput,
-  type GetAgentDefinitionOutput,
-  type GetWorkflowDefinitionInput,
-  type GetWorkflowDefinitionOutput,
   type GetCoworkSessionInput,
   type GetCoworkSessionOutput,
   type GetCoworkSessionByInstanceInput,
   type GetCoworkSessionByInstanceOutput,
   type ListPluginsOutput,
 } from '../contract/index.js';
+// SDK consumers reach for one path:
+//   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
+// Server-side handlers throw `HandlerError` (or subclasses) imported from
+// `@mediforce/platform-api/errors`; the wire envelope is the only shared
+// surface, so the client just exposes `code`/`details` on `ApiError` directly.
+import { ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors.js';
+export type { ApiErrorCode };
 
 /**
  * Typed client for the Mediforce API. Runtime-agnostic — works in the
@@ -174,11 +175,17 @@ export type ClientConfig =
   | (BaseClientConfig & { bearerToken: () => Promise<string | null>; apiKey?: never; fetch?: never })
   | (BaseClientConfig & { fetch: typeof fetch; apiKey?: never; bearerToken?: never });
 
+// Transport-aware error wrapper. Holds HTTP `status` + raw `body` plus the
+// parsed envelope fields (`code`, `details`) when the server returned the
+// ADR-0005 §1 typed envelope. `code` is `undefined` for legacy / network /
+// non-JSON responses.
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
     public readonly body: unknown,
+    public readonly code?: ApiErrorCode,
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -189,22 +196,13 @@ export class Mediforce {
   readonly tasks: {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
+    claim: (input: ClaimTaskInput) => Promise<ClaimTaskOutput>;
   };
 
   readonly processes: {
     get: (input: GetProcessInput) => Promise<GetProcessOutput>;
     listAuditEvents: (input: ListAuditEventsInput) => Promise<ListAuditEventsOutput>;
     getSteps: (input: GetProcessStepsInput) => Promise<GetProcessStepsOutput>;
-  };
-
-  readonly workflowDefinitions: {
-    list: (input?: ListWorkflowDefinitionsInput) => Promise<ListWorkflowDefinitionsOutput>;
-    get: (input: GetWorkflowDefinitionInput) => Promise<GetWorkflowDefinitionOutput>;
-  };
-
-  readonly agentDefinitions: {
-    list: () => Promise<ListAgentDefinitionsOutput>;
-    get: (input: GetAgentDefinitionInput) => Promise<GetAgentDefinitionOutput>;
   };
 
   readonly cowork: {
@@ -223,7 +221,7 @@ export class Mediforce {
       input: RegisterWorkflowInput,
       options: RegisterWorkflowOptions,
     ) => Promise<RegisterWorkflowOutput>;
-    list: () => Promise<ListWorkflowsOutput>;
+    list: (input?: ListWorkflowsInput) => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
     archiveVersion: (input: ArchiveVersionInput) => Promise<ArchiveVersionOutput>;
     archiveAll: (input: ArchiveAllInput) => Promise<ArchiveAllOutput>;
@@ -238,7 +236,7 @@ export class Mediforce {
   };
 
   readonly agents: {
-    list: () => Promise<ListAgentsOutput>;
+    list: (input?: ListAgentsInput) => Promise<ListAgentsOutput>;
     get: (input: GetAgentInput) => Promise<GetAgentOutput>;
     delete: (input: DeleteAgentInput) => Promise<DeleteAgentOutput>;
     update: (input: UpdateAgentInput, body: UpdateAgentBody) => Promise<UpdateAgentOutput>;
@@ -318,6 +316,15 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.get');
         return GetTaskOutputSchema.parse(body);
       },
+      claim: async (input) => {
+        const validated = ClaimTaskInputSchema.parse(input);
+        const res = await this.request(
+          `/api/tasks/${encodeURIComponent(validated.taskId)}/claim`,
+          { method: 'POST' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.tasks.claim');
+        return ClaimTaskOutputSchema.parse(body);
+      },
     };
 
     this.processes = {
@@ -344,46 +351,6 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.processes.getSteps');
         return GetProcessStepsOutputSchema.parse(body);
-      },
-    };
-
-    this.workflowDefinitions = {
-      list: async (input) => {
-        const validated = input ? ListWorkflowDefinitionsInputSchema.parse(input) : undefined;
-        const qs = validated
-          ? toSearchParams({ namespace: validated.namespace })
-          : '';
-        const res = await this.request(`/api/workflow-definitions${qs}`);
-        const body = await parseJsonOrThrow(res, 'mediforce.workflowDefinitions.list');
-        return ListWorkflowDefinitionsOutputSchema.parse(body);
-      },
-      get: async (input) => {
-        const validated = GetWorkflowDefinitionInputSchema.parse(input);
-        const qs = toSearchParams({
-          version: validated.version !== undefined ? String(validated.version) : undefined,
-          namespace: validated.namespace,
-        });
-        const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
-        );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflowDefinitions.get');
-        return GetWorkflowDefinitionOutputSchema.parse(body);
-      },
-    };
-
-    this.agentDefinitions = {
-      list: async () => {
-        const res = await this.request('/api/agent-definitions');
-        const body = await parseJsonOrThrow(res, 'mediforce.agentDefinitions.list');
-        return ListAgentDefinitionsOutputSchema.parse(body);
-      },
-      get: async (input) => {
-        const validated = GetAgentDefinitionInputSchema.parse(input);
-        const res = await this.request(
-          `/api/agent-definitions/${encodeURIComponent(validated.id)}`,
-        );
-        const body = await parseJsonOrThrow(res, 'mediforce.agentDefinitions.get');
-        return GetAgentDefinitionOutputSchema.parse(body);
       },
     };
 
@@ -432,16 +399,20 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.register');
         return RegisterWorkflowOutputSchema.parse(body);
       },
-      list: async () => {
-        const res = await this.request('/api/workflow-definitions');
+      list: async (input) => {
+        const validated = input ? ListWorkflowsInputSchema.parse(input) : undefined;
+        const qs = validated
+          ? toSearchParams({ namespace: validated.namespace })
+          : '';
+        const res = await this.request(`/api/workflow-definitions${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.list');
         return ListWorkflowsOutputSchema.parse(body);
       },
       get: async (input) => {
         const validated = GetWorkflowInputSchema.parse(input);
         const qs = toSearchParams({
-          namespace: validated.namespace,
           version: validated.version !== undefined ? String(validated.version) : undefined,
+          namespace: validated.namespace,
         });
         const res = await this.request(
           `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
@@ -509,14 +480,14 @@ export class Mediforce {
 
     this.agents = {
       list: async () => {
-        const res = await this.request('/api/agent-definitions');
+        const res = await this.request('/api/agents');
         const body = await parseJsonOrThrow(res, 'mediforce.agents.list');
         return ListAgentsOutputSchema.parse(body);
       },
       get: async (input) => {
         const validated = GetAgentInputSchema.parse(input);
         const res = await this.request(
-          `/api/agent-definitions/${encodeURIComponent(validated.id)}`,
+          `/api/agents/${encodeURIComponent(validated.id)}`,
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agents.get');
         return GetAgentOutputSchema.parse(body);
@@ -524,7 +495,7 @@ export class Mediforce {
       delete: async (input) => {
         const validated = DeleteAgentInputSchema.parse(input);
         const res = await this.request(
-          `/api/agent-definitions/${encodeURIComponent(validated.id)}`,
+          `/api/agents/${encodeURIComponent(validated.id)}`,
           { method: 'DELETE' },
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agents.delete');
@@ -534,7 +505,7 @@ export class Mediforce {
         const validatedInput = UpdateAgentInputSchema.parse(input);
         const validatedBody = UpdateAgentBodySchema.parse(updateBody);
         const res = await this.request(
-          `/api/agent-definitions/${encodeURIComponent(validatedInput.id)}`,
+          `/api/agents/${encodeURIComponent(validatedInput.id)}`,
           {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -709,11 +680,34 @@ function toSearchParams(
 async function parseJsonOrThrow(res: Response, context: string): Promise<unknown> {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message =
-      typeof body === 'object' && body !== null && 'error' in body
-        ? String((body as { error: unknown }).error)
-        : `${context} failed with status ${res.status}`;
-    throw new ApiError(res.status, message, body);
+    const extracted = extractErrorEnvelope(body);
+    const message = extracted.message ?? `${context} failed with status ${res.status}`;
+    throw new ApiError(res.status, message, body, extracted.code, extracted.details);
   }
   return body;
+}
+
+/**
+ * Pull the error message out of the response body. Supports both shapes:
+ *   - ADR-0005 §1 typed envelope: `{ error: { code, message, details? } }`
+ *   - Legacy string envelope: `{ error: string }` (Phase 1 routes that
+ *     haven't migrated to the typed adapter yet).
+ *
+ * The legacy branch will go away when every route is on `createRouteAdapter`,
+ * but until then both must round-trip cleanly through the client.
+ *
+ * The `code` cast is honest for known codes — unknown server codes (version
+ * drift) flow through as `ApiErrorCode` strings the client doesn't recognise.
+ * Callers comparing `err.code === 'not_found'` simply miss; they don't crash.
+ */
+function extractErrorEnvelope(body: unknown): {
+  message?: string;
+  code?: ApiErrorCode;
+  details?: unknown;
+} {
+  const parsed = ApiErrorEnvelopeSchema.safeParse(body);
+  if (!parsed.success) return {};
+  const { error } = parsed.data;
+  if (typeof error === 'string') return { message: error };
+  return { message: error.message, code: error.code as ApiErrorCode, details: error.details };
 }

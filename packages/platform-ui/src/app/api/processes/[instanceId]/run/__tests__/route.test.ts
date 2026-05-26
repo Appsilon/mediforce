@@ -111,7 +111,7 @@ const workflowDefinition = {
 describe('POST /api/processes/[instanceId]/run', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
     afterCallback = null;
     mockHumanTaskGetByInstanceId.mockResolvedValue([]);
   });
@@ -444,6 +444,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
         kind: 'user',
         uid: 'outsider',
         namespaces: new Set(['other-ns']),
+        isSystemActor: false,
       });
       mockInstanceGetById.mockResolvedValue({
         id: 'inst-1',

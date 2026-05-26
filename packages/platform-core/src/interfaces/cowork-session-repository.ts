@@ -1,11 +1,24 @@
 import type { CoworkSession, ConversationTurn } from '../schemas/cowork-session.js';
 
+/**
+ * Storage-layer authorization (ADR-0004): cowork sessions have no namespace
+ * field — workspace is reached via the parent `ProcessInstance`.
+ */
 export interface CoworkSessionRepository {
   create(session: CoworkSession): Promise<CoworkSession>;
+
   getById(sessionId: string): Promise<CoworkSession | null>;
+  getByIdInNamespaces(sessionId: string, allowed: readonly string[]): Promise<CoworkSession | null>;
+
   getByInstanceId(instanceId: string): Promise<CoworkSession[]>;
+
   /** Find the most recent active cowork session for a process instance, or null. */
   findMostRecentActive(instanceId: string): Promise<CoworkSession | null>;
+  findMostRecentActiveInNamespaces(
+    instanceId: string,
+    allowed: readonly string[],
+  ): Promise<CoworkSession | null>;
+
   addTurn(sessionId: string, turn: ConversationTurn): Promise<CoworkSession>;
   /**
    * Update an existing turn in place by id. Used to transition a tool turn from

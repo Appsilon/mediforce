@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { AgentOutputData } from '@/components/tasks/task-utils';
 import { buildSrcdoc, clampIframeHeight, isIframeResizeMessage } from '@/components/tasks/iframe-helpers';
+import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { apiFetch } from '@/lib/api-fetch';
 import { formatCostUsd, formatDuration } from '@/lib/format';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
@@ -56,11 +57,11 @@ export function AgentOutputDisplay({
   instanceId,
   onContentLoaded,
 }: AgentOutputDisplayProps) {
-  const presentationHtml =
-    typeof agentOutput.presentation === 'string' && agentOutput.presentation.length > 0
-      ? agentOutput.presentation
-      : null;
-  const hasPresentation = presentationHtml !== null;
+  const presentation = agentOutput.presentation;
+  const hasPresentation = presentation !== null;
+  // Iframe path is only used for the HTML branch. Markdown renders inline
+  // via MarkdownPresentation and ignores the iframe resize/theme dance.
+  const needsIframe = presentation?.kind === 'html';
   const result = agentOutput.result ?? {};
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = React.useState(300);
@@ -68,7 +69,7 @@ export function AgentOutputDisplay({
   const isDark = resolvedTheme === 'dark';
 
   React.useEffect(() => {
-    if (!hasPresentation) return;
+    if (!needsIframe) return;
     const handler = (event: MessageEvent) => {
       if (
         isIframeResizeMessage(event.data) &&
@@ -83,13 +84,13 @@ export function AgentOutputDisplay({
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [hasPresentation]);
+  }, [needsIframe]);
 
   // Sync theme changes to iframe
   React.useEffect(() => {
-    if (!hasPresentation) return;
+    if (!needsIframe) return;
     iframeRef.current?.contentWindow?.postMessage({ type: 'theme', dark: isDark }, '*');
-  }, [isDark, hasPresentation]);
+  }, [isDark, needsIframe]);
 
   const hasResult = agentOutput.result !== null && Object.keys(agentOutput.result).length > 0;
   const hasContent = hasResult || hasPresentation;
@@ -184,15 +185,19 @@ export function AgentOutputDisplay({
           ))}
         </Tabs.List>
 
-        {presentationHtml !== null && (
+        {presentation !== null && (
           <Tabs.Content value="presentation" className="p-4">
-            <iframe
-              ref={iframeRef}
-              srcDoc={buildSrcdoc(presentationHtml, agentOutput.result, isDark)}
-              sandbox="allow-scripts"
-              style={{ width: '100%', height: iframeHeight, border: 'none' }}
-              title="Agent presentation"
-            />
+            {presentation.kind === 'markdown' ? (
+              <MarkdownPresentation content={presentation.content} />
+            ) : (
+              <iframe
+                ref={iframeRef}
+                srcDoc={buildSrcdoc(presentation.content, agentOutput.result, isDark)}
+                sandbox="allow-scripts"
+                style={{ width: '100%', height: iframeHeight, border: 'none' }}
+                title="Agent presentation"
+              />
+            )}
           </Tabs.Content>
         )}
 

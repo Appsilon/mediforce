@@ -5,11 +5,13 @@ import * as Collapsible from '@radix-ui/react-collapsible';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useTheme } from 'next-themes';
 import { ChevronDown, Code, FileText, MonitorPlay } from 'lucide-react';
-import type { StepExecution } from '@mediforce/platform-core';
+import type { Presentation, StepExecution } from '@mediforce/platform-core';
 import { useSubcollection } from '@/hooks/use-process-instances';
 import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 import { buildSrcdoc, clampIframeHeight, isIframeResizeMessage } from './iframe-helpers';
+import { MarkdownPresentation } from './markdown-presentation';
+import { normalizePresentation } from './task-utils';
 
 interface TaskContextPanelProps {
   processInstanceId: string;
@@ -59,7 +61,7 @@ export function TaskContextPanel({
       .filter((e) =>
         e.stepId !== stepId &&
         e.status === 'completed' &&
-        (e.output !== null || (typeof e.agentOutput?.presentation === 'string' && e.agentOutput.presentation.length > 0)) &&
+        (e.output !== null || normalizePresentation(e.agentOutput?.presentation) !== null) &&
         new Date(e.startedAt).getTime() <= currentStepStart,
       )
       .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
@@ -70,7 +72,7 @@ export function TaskContextPanel({
     previousStepOutput !== null &&
     (
       previousStepOutput.output !== null ||
-      (typeof previousStepOutput.agentOutput?.presentation === 'string' && previousStepOutput.agentOutput.presentation.length > 0)
+      normalizePresentation(previousStepOutput.agentOutput?.presentation) !== null
     );
 
   // Notify parent about content availability
@@ -124,7 +126,7 @@ export function TaskContextPanel({
             rawOutput={output}
             instanceId={processInstanceId}
             previousStepId={previousStep.stepId}
-            agentPresentation={previousStep.agentOutput?.presentation ?? null}
+            agentPresentation={normalizePresentation(previousStep.agentOutput?.presentation)}
           />
         </Collapsible.Content>
       </div>
@@ -137,7 +139,7 @@ interface PreviousStepOutputTabsProps {
   rawOutput: unknown;
   instanceId: string;
   previousStepId: string;
-  agentPresentation: string | null;
+  agentPresentation: Presentation | null;
 }
 
 function PreviousStepOutputTabs({
@@ -147,13 +149,15 @@ function PreviousStepOutputTabs({
   previousStepId,
   agentPresentation,
 }: PreviousStepOutputTabsProps) {
-  const inlinePresentation =
-    typeof agentPresentation === 'string' && agentPresentation.length > 0
-      ? agentPresentation
-      : output !== null && typeof output.presentation === 'string' && output.presentation.length > 0
-        ? output.presentation
-        : null;
+  // Inline presentation prefers the agentOutput field (structured); falls
+  // back to a string under `output.presentation` from legacy script outputs.
+  const inlinePresentation: Presentation | null = agentPresentation
+    ?? (output !== null && typeof output.presentation === 'string' && output.presentation.length > 0
+      ? { kind: 'html', content: output.presentation }
+      : null);
 
+  // htmlReportPath is the legacy "fetch report from a written file" contract
+  // (used by landing-zone). Always HTML — markdown reports inline directly.
   const htmlReportPath =
     output !== null && typeof output.htmlReportPath === 'string' && output.htmlReportPath.length > 0
       ? output.htmlReportPath
@@ -201,7 +205,10 @@ function PreviousStepOutputTabs({
     };
   }, [reportMode, instanceId, previousStepId]);
 
-  const presentationHtml = inlinePresentation ?? fetchedReport;
+  // Resolved presentation: inline structured payload wins; otherwise a
+  // fetched file becomes an HTML payload.
+  const resolvedPresentation: Presentation | null = inlinePresentation
+    ?? (fetchedReport !== null ? { kind: 'html', content: fetchedReport } : null);
   const showReportTab = reportMode !== null;
 
   return (
@@ -231,7 +238,7 @@ function PreviousStepOutputTabs({
       {showReportTab && (
         <Tabs.Content value="report" className="p-4">
           <ReportPane
-            html={presentationHtml}
+            presentation={resolvedPresentation}
             loading={reportLoading}
             error={reportError}
             result={output}
@@ -259,17 +266,19 @@ function PreviousStepOutputTabs({
 }
 
 interface ReportPaneProps {
-  html: string | null;
+  presentation: Presentation | null;
   loading: boolean;
   error: string | null;
   result: Record<string, unknown> | null;
 }
 
-function ReportPane({ html, loading, error, result }: ReportPaneProps) {
+function ReportPane({ presentation, loading, error, result }: ReportPaneProps) {
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = React.useState(300);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+
+  const html = presentation?.kind === 'html' ? presentation.content : null;
 
   // Listen for resize messages from the iframe
   React.useEffect(() => {
@@ -310,7 +319,7 @@ function ReportPane({ html, loading, error, result }: ReportPaneProps) {
     );
   }
 
-  if (error !== null && html === null) {
+  if (error !== null && presentation === null) {
     return (
       <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
         Report file not available — see Summary tab.
@@ -318,7 +327,7 @@ function ReportPane({ html, loading, error, result }: ReportPaneProps) {
     );
   }
 
-  if (html === null) {
+  if (presentation === null) {
     return (
       <div className="text-sm text-muted-foreground">
         No report content.
@@ -326,10 +335,14 @@ function ReportPane({ html, loading, error, result }: ReportPaneProps) {
     );
   }
 
+  if (presentation.kind === 'markdown') {
+    return <MarkdownPresentation content={presentation.content} />;
+  }
+
   return (
     <iframe
       ref={iframeRef}
-      srcDoc={buildSrcdoc(html, result, isDark)}
+      srcDoc={buildSrcdoc(presentation.content, result, isDark)}
       sandbox="allow-scripts"
       style={{ width: '100%', height: iframeHeight, border: 'none' }}
       title="Previous step report"

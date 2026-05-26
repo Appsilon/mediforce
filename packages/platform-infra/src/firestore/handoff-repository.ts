@@ -3,13 +3,17 @@ import {
   HandoffEntitySchema,
   type HandoffEntity,
   type HandoffRepository,
+  type ProcessInstanceRepository,
   handoffTypeRegistry,
 } from '@mediforce/platform-core';
 
 export class FirestoreHandoffRepository implements HandoffRepository {
   private readonly collectionName = 'handoffEntities';
 
-  constructor(private readonly db: Firestore) {}
+  constructor(
+    private readonly db: Firestore,
+    private readonly parents: ProcessInstanceRepository,
+  ) {}
 
   async create(entity: HandoffEntity): Promise<HandoffEntity> {
     await this.db.collection(this.collectionName).doc(entity.id).set(entity);
@@ -22,7 +26,18 @@ export class FirestoreHandoffRepository implements HandoffRepository {
     return HandoffEntitySchema.parse(snap.data());
   }
 
-  async getByRole(role: string): Promise<HandoffEntity[]> {
+  async getByIdInNamespaces(
+    entityId: string,
+    allowed: readonly string[],
+  ): Promise<HandoffEntity | null> {
+    const entity = await this.getById(entityId);
+    if (entity === null) return null;
+    const parent = await this.parents.getById(entity.processInstanceId);
+    if (!parent || typeof parent.namespace !== 'string') return null;
+    return allowed.includes(parent.namespace) ? entity : null;
+  }
+
+  async getByRoleAll(role: string): Promise<HandoffEntity[]> {
     const snap = await this.db
       .collection(this.collectionName)
       .where('assignedRole', '==', role)
@@ -31,12 +46,30 @@ export class FirestoreHandoffRepository implements HandoffRepository {
     return snap.docs.map((d) => HandoffEntitySchema.parse(d.data()));
   }
 
+  async getByRoleInNamespaces(
+    role: string,
+    allowed: readonly string[],
+  ): Promise<HandoffEntity[]> {
+    const rows = await this.getByRoleAll(role);
+    return this.filterByParentNamespace(rows, allowed);
+  }
+
   async getByInstanceId(instanceId: string): Promise<HandoffEntity[]> {
     const snap = await this.db
       .collection(this.collectionName)
       .where('processInstanceId', '==', instanceId)
       .get();
     return snap.docs.map((d) => HandoffEntitySchema.parse(d.data()));
+  }
+
+  async getByInstanceIdInNamespaces(
+    instanceId: string,
+    allowed: readonly string[],
+  ): Promise<HandoffEntity[]> {
+    const parent = await this.parents.getById(instanceId);
+    if (!parent || typeof parent.namespace !== 'string') return [];
+    if (!allowed.includes(parent.namespace)) return [];
+    return this.getByInstanceId(instanceId);
   }
 
   async claim(entityId: string, userId: string): Promise<HandoffEntity> {
@@ -84,5 +117,24 @@ export class FirestoreHandoffRepository implements HandoffRepository {
       .doc(entityId)
       .update({ status: 'resolved', resolution, resolvedAt: now, updatedAt: now });
     return (await this.getById(entityId))!;
+  }
+
+  private async filterByParentNamespace<T extends { processInstanceId: string }>(
+    rows: T[],
+    allowed: readonly string[],
+  ): Promise<T[]> {
+    if (rows.length === 0) return [];
+    const instanceIds = [...new Set(rows.map((r) => r.processInstanceId))];
+    const namespaceById = new Map<string, string | undefined>();
+    await Promise.all(
+      instanceIds.map(async (id) => {
+        const parent = await this.parents.getById(id);
+        namespaceById.set(id, parent?.namespace);
+      }),
+    );
+    return rows.filter((r) => {
+      const ns = namespaceById.get(r.processInstanceId);
+      return typeof ns === 'string' && allowed.includes(ns);
+    });
   }
 }

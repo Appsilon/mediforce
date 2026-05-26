@@ -1,6 +1,5 @@
-import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
-import { getCoworkSession } from '@mediforce/platform-api/handlers';
+import { getByIdAdapter } from '@mediforce/platform-api/handlers';
 import { GetCoworkSessionInputSchema } from '@mediforce/platform-api/contract';
 import type { GetCoworkSessionInput } from '@mediforce/platform-api/contract';
 
@@ -12,10 +11,7 @@ interface RouteContext {
  * GET /api/cowork/:sessionId
  *
  * Returns the cowork session including conversation history and current
- * artifact. Missing sessions 404 via the handler's `NotFoundError`. Namespace
- * gating is enforced inside the handler (api-key callers pass; user callers
- * must be in the parent instance's namespace) and surfaces as 403 via
- * `ForbiddenError`.
+ * artifact. Missing/cross-workspace sessions 404 via `scope.coworkSessions`.
  */
 export const GET = createRouteAdapter<
   typeof GetCoworkSessionInputSchema,
@@ -25,8 +21,8 @@ export const GET = createRouteAdapter<
 >(
   GetCoworkSessionInputSchema,
   async (_req, ctx) => ({ sessionId: (await ctx.params).sessionId }),
-  (input, caller) => {
-    const { coworkSessionRepo, instanceRepo } = getPlatformServices();
-    return getCoworkSession(input, { coworkSessionRepo, instanceRepo }, caller);
-  },
+  getByIdAdapter(
+    (input, scope) => scope.coworkSessions.getById(input.sessionId),
+    (input) => `Cowork session ${input.sessionId} not found`,
+  ),
 );

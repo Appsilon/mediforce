@@ -36,6 +36,42 @@
 - [ ] Explicit boolean comparisons (`=== true`, not just truthy)
 - [ ] Scripts are Python, not bash
 
+## 5a. DRY / KISS — file-by-file, hunk-by-hunk
+
+- [ ] No duplicated logic — same code shape repeated ≥3 times → extract.
+- [ ] No premature abstractions — single-caller wrappers, "future-proof" layers that solve nothing now.
+- [ ] No needless indirection — pass-through functions, re-exports of re-exports, config objects with one field.
+- [ ] Each hunk is a *sensible* change — not a copy-paste of the adjacent file with one symbol renamed.
+- [ ] No half-implemented branches, dangling TODOs, or scaffolding left from intermediate steps.
+
+## 5b. Dead code & removal candidates
+
+- [ ] Grep every new export — is it actually called? If not, delete.
+- [ ] Grep every *removed* function — are call sites also gone? Stale references = bug.
+- [ ] When the diff replaces feature A with feature B: is A actually deleted in this PR, or left rotting?
+- [ ] Flag features/endpoints/UI elements that look obsolete now that the new code lands — **ask the user** before deleting.
+- [ ] Old fixtures / mock data / dead config keys removed alongside the code that used them.
+
+## 5c. Reuse existing repo mechanisms
+
+- [ ] HTTP from browser → `@/lib/use-mediforce` / `apiFetch`, never raw `fetch`.
+- [ ] Server-to-server → `Mediforce` client / `mediforce` CLI, never curl REST.
+- [ ] Validation → existing Zod schemas in `platform-core`, not new ad-hoc shapes.
+- [ ] Auth / tenancy / repo access → existing helpers, not hand-rolled.
+- [ ] UI primitives → existing components / shadcn / sonner, not bespoke divs reimplementing what we have.
+- [ ] Background work → BullMQ via `container-worker`, not setTimeout / setInterval.
+- [ ] Workflow / agent orchestration → `workflow-engine` + `agent-runtime` primitives, not parallel implementations.
+- [ ] Before approving any new helper: did you grep for an existing one? Note the search you ran.
+
+## 5d. Comment quality
+
+- [ ] Comments explain **why** — non-obvious constraints, invariants, gotchas, links to incidents/ADRs.
+- [ ] No comments that restate the code (`// increment i`).
+- [ ] No flowery / multi-paragraph prose where one line suffices.
+- [ ] No docstrings added to code the diff didn't change.
+- [ ] Self-documenting code wins: prefer a better name over a comment.
+- [ ] No "Added for X flow" / "Used by Y" / issue-number comments — that belongs in the PR description.
+
 ## 6. Testing
 
 - [ ] New behavior has unit tests (colocated `__tests__/` or `*.test.ts`)

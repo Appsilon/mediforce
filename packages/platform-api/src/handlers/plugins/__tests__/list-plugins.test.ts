@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
-import { listPlugins, type PluginRegistryView } from '../list-plugins.js';
-import type { CallerIdentity } from '../../../auth.js';
+import { listPlugins } from '../list-plugins.js';
+import { createTestScope } from '../../../repositories/__tests__/create-test-scope.js';
 
 /**
  * Handler is pure: it forwards whatever the registry's `list()` returns,
@@ -10,11 +10,9 @@ import type { CallerIdentity } from '../../../auth.js';
  * `PluginRegistry`, only on its structural shape.
  */
 
-const apiKey: CallerIdentity = { kind: 'apiKey' };
-
 function stubRegistry(
   entries: ReadonlyArray<{ name: string; metadata?: PluginCapabilityMetadata }>,
-): PluginRegistryView {
+): { list: () => ReadonlyArray<{ name: string; metadata?: PluginCapabilityMetadata }> } {
   return { list: () => entries };
 }
 
@@ -32,7 +30,8 @@ describe('listPlugins handler', () => {
       { name: 'legacy-plugin' },
     ]);
 
-    const result = await listPlugins({}, { pluginRegistry: registry }, apiKey);
+    const scope = createTestScope({ pluginRegistry: registry });
+    const result = await listPlugins({}, scope);
 
     expect(result).toEqual({
       plugins: [
@@ -43,10 +42,10 @@ describe('listPlugins handler', () => {
   });
 
   it('returns an empty list when no plugins are registered', async () => {
+    const scope = createTestScope({ pluginRegistry: stubRegistry([]) });
     const result = await listPlugins(
       {},
-      { pluginRegistry: stubRegistry([]) },
-      apiKey,
+      scope,
     );
     expect(result).toEqual({ plugins: [] });
   });

@@ -3,10 +3,11 @@ import {
   NamespaceMemberSchema,
   type Namespace,
   type NamespaceMember,
+  type NamespaceRepository,
 } from '@mediforce/platform-core';
 import type { Firestore } from 'firebase-admin/firestore';
 
-export class FirestoreNamespaceRepository {
+export class FirestoreNamespaceRepository implements NamespaceRepository {
   private readonly namespacesCollection = 'namespaces';
   private readonly membersSubcollection = 'members';
 

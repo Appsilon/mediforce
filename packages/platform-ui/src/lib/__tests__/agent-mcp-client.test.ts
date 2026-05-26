@@ -42,7 +42,7 @@ describe('agent-mcp-client', () => {
       const result = await listAgentBindings('tealflow-cowork-chat');
 
       expect(mockApiFetch).toHaveBeenCalledWith(
-        '/api/agent-definitions/tealflow-cowork-chat/mcp-servers',
+        '/api/agents/tealflow-cowork-chat/mcp-servers',
       );
       expect(result).toEqual({ github: stdioBinding });
     });
@@ -53,7 +53,7 @@ describe('agent-mcp-client', () => {
       await listAgentBindings('has spaces/id');
 
       expect(mockApiFetch).toHaveBeenCalledWith(
-        '/api/agent-definitions/has%20spaces%2Fid/mcp-servers',
+        '/api/agents/has%20spaces%2Fid/mcp-servers',
       );
     });
 
@@ -73,7 +73,7 @@ describe('agent-mcp-client', () => {
       const result = await putAgentBinding('agent-1', 'github', stdioBinding);
 
       expect(mockApiFetch).toHaveBeenCalledWith(
-        '/api/agent-definitions/agent-1/mcp-servers/github',
+        '/api/agents/agent-1/mcp-servers/github',
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -91,7 +91,7 @@ describe('agent-mcp-client', () => {
       const result = await putAgentBinding('agent-1', 'remote', httpBinding);
 
       expect(mockApiFetch).toHaveBeenCalledWith(
-        '/api/agent-definitions/agent-1/mcp-servers/remote',
+        '/api/agents/agent-1/mcp-servers/remote',
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -119,7 +119,7 @@ describe('agent-mcp-client', () => {
       const result = await deleteAgentBinding('agent-1', 'github');
 
       expect(mockApiFetch).toHaveBeenCalledWith(
-        '/api/agent-definitions/agent-1/mcp-servers/github',
+        '/api/agents/agent-1/mcp-servers/github',
         { method: 'DELETE' },
       );
       expect(result).toEqual({});

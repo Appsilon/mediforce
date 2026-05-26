@@ -77,7 +77,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    apiFetch(`/api/agent-definitions/${id}`)
+    apiFetch(`/api/agents/${id}`)
       .then((res) => {
         if (res.status === 404) {
           setNotFound(true);
@@ -174,7 +174,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         skillFileNames: [...existingSkillPaths, ...uploadedPaths],
         visibility,
       };
-      await apiFetch(`/api/agent-definitions/${id}`, {
+      await apiFetch(`/api/agents/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

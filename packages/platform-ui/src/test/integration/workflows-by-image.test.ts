@@ -13,7 +13,7 @@ const fake = vi.hoisted(() => {
       ],
     },
     processRepo: {
-      listWorkflowDefinitions: async () => {
+      listAllWorkflowDefinitions: async () => {
         const grouped = new Map<string, WorkflowDefinition[]>();
         for (const d of definitions) {
           const key = `${d.namespace}:${d.name}`;

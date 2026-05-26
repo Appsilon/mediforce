@@ -1,0 +1,160 @@
+{
+  "name": "backlog-triage",
+  "namespace": "appsilon",
+  "title": "Backlog Triage",
+  "description": "Fetches open GitHub issues, has an LLM propose initial assignments to humans or AI workflows, lets a person edit assignments in a table, then assigns humans on GitHub and spawns Mediforce runs for AI delegations.",
+  "preamble": "## Domain Context\nThis workflow operates on a software-engineering backlog (GitHub issues + team roster). Treat issue titles/bodies and assignee names as technical content. No domain-specific hedging.",
+  "env": {
+    "GITHUB_TOKEN": "{{GITHUB_TOKEN}}",
+    "PLATFORM_API_KEY": "{{PLATFORM_API_KEY}}",
+    "APP_BASE_URL": "{{APP_BASE_URL}}"
+  },
+  "roles": ["triager"],
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "triggerInput": [
+    {
+      "name": "repo",
+      "type": "string",
+      "required": true,
+      "default": "appsilon/mediforce",
+      "description": "owner/repo to triage (e.g. appsilon/mediforce)"
+    },
+    {
+      "name": "labelFilter",
+      "type": "string",
+      "required": false,
+      "description": "Optional comma-separated GitHub label filter"
+    },
+    {
+      "name": "limit",
+      "type": "number",
+      "required": false,
+      "default": 20,
+      "description": "Max issues to fetch (LLM input scales linearly; default keeps the agent step fast)"
+    },
+    {
+      "name": "sprintDays",
+      "type": "number",
+      "required": false,
+      "default": 5,
+      "description": "Working days in this sprint. Per-human capacity hint for the LLM when proposing assignments."
+    }
+  ],
+  "steps": [
+    {
+      "id": "fetch-backlog",
+      "name": "Fetch backlog",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Fetch open issues from GitHub via REST. Skip pull requests. Emits an options array keyed by issue id.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const repo = input.repo;\n  const labelFilter = input.labelFilter;\n  const limit = Math.max(1, Math.min(100, Number(input.limit) || 20));\n  const token = process.env.GITHUB_TOKEN;\n  if (!repo) { console.error('repo trigger param is required'); process.exit(1); }\n  if (!/^[\\w.-]+\\/[\\w.-]+$/.test(repo)) { console.error(`invalid repo format: '${repo}' (expected owner/name)`); process.exit(1); }\n  if (!token) { console.error('GITHUB_TOKEN secret not set on workflow'); process.exit(1); }\n  const url = new URL(`https://api.github.com/repos/${repo}/issues`);\n  url.searchParams.set('state', 'open');\n  url.searchParams.set('per_page', String(limit));\n  if (labelFilter) url.searchParams.set('labels', labelFilter);\n  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });\n  if (!res.ok) { const body = await res.text(); console.error(`GitHub ${res.status} ${res.statusText}: ${body.slice(0,500)}`); process.exit(1); }\n  const issues = await res.json();\n  const onlyIssues = issues.filter((i) => !i.pull_request).slice(0, limit);\n  const options = onlyIssues.map((i) => {\n    const labels = (i.labels || []).map((l) => typeof l === 'string' ? l : l.name);\n    return {\n      id: String(i.number),\n      label: `#${i.number} ${i.title}`,\n      sublabel: labels.join(', '),\n      href: i.html_url,\n      badges: labels,\n      currentAssignee: i.assignee?.login,\n      raw: { issueNumber: i.number, title: i.title, labels, currentAssignee: i.assignee?.login, url: i.html_url },\n    };\n  });\n  console.log(`Fetched ${options.length} open issue(s) from ${repo} (limit=${limit})`);\n  writeFileSync('/output/result.json', JSON.stringify({ options, repo, summary: `Fetched ${options.length} open issue(s) from ${repo}` }));\n} catch (err) {\n  console.error('fetch-backlog crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "check-tags",
+      "name": "Check category tags",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Gate: every issue must carry at least one category label (ux, tech-debt, infra, security, product, workflow, engine, bug, enhancement). When any are missing, routes to a human task that shows a clickable list and waits for the product owner to tag them on GitHub.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const options = input.options || [];\n  const repo = input.repo;\n  const CATEGORIES = ['ux', 'tech-debt', 'infra', 'security', 'product', 'workflow', 'engine', 'bug', 'enhancement'];\n  const categorySet = new Set(CATEGORIES.map((s) => s.toLowerCase()));\n  const untagged = options.filter((o) => {\n    const labels = (o.badges || o.raw?.labels || []).map((l) => String(l).toLowerCase());\n    return !labels.some((l) => categorySet.has(l));\n  });\n  const needsTagging = untagged.length > 0;\n  if (needsTagging) {\n    const escMd = (s) => String(s ?? '').replace(/[\\[\\]]/g, '\\\\$&');\n    const bullets = untagged.map((o) => {\n      const meta = (o.badges || []).length > 0 ? ` _(${(o.badges || []).join(', ')})_` : ' _no labels_';\n      return `- [${escMd(o.label)}](${o.href})${meta}`;\n    }).join('\\n');\n    const md = `## ${untagged.length} issue(s) need a category tag\\n\\nOpen each on GitHub and add at least one of: \\`${CATEGORIES.join('\\`, \\`')}\\`. Then submit below — the workflow will re-fetch and re-check.\\n\\n${bullets}\\n`;\n    writeFileSync('/output/presentation.md', md);\n    writeFileSync('/output/result.json', JSON.stringify({ needsTagging: true, untaggedCount: untagged.length, repo, summary: `${untagged.length} of ${options.length} issue(s) need a category tag` }));\n    console.log(`check-tags: ${untagged.length}/${options.length} untagged — routing to tag-issues`);\n  } else {\n    writeFileSync('/output/result.json', JSON.stringify({ needsTagging: false, options, repo, summary: `All ${options.length} issue(s) carry a category tag` }));\n    console.log(`check-tags: all ${options.length} tagged — routing to propose-assignments`);\n  }\n} catch (err) {\n  console.error('check-tags crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "tag-issues",
+      "name": "Tag missing issues on GitHub",
+      "type": "review",
+      "executor": "human",
+      "allowedRoles": ["triager"],
+      "description": "The previous step listed issues lacking a category label. Open each, add a category tag on GitHub, then submit below — the workflow re-fetches and re-checks. Loops until every issue is tagged.",
+      "verdicts": {
+        "done": { "target": "fetch-backlog", "label": "I've tagged them — re-check", "intent": "success" }
+      }
+    },
+    {
+      "id": "propose-assignments",
+      "name": "Propose initial assignments",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L4",
+      "description": "LLM enriches each issue with a suggested assignee, priority, and one-sentence rationale.",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "model": "sonnet",
+        "timeoutMinutes": 15,
+        "prompt": "# Propose Backlog Assignments\n\nYou are triaging a GitHub backlog into a sprint plan. The previous step (`check-tags`) confirmed every issue carries a category label. Your job: for each issue suggest one assignee plus a priority and a one-sentence rationale. A human reviews your suggestions next.\n\n## Input\n\nRead `/output/input.json`. The previous step's output is merged at the top level. You will find:\n\n- `options[]` — issues. Each item has `id`, `label`, `sublabel`, `href`, `badges` (the category labels), `currentAssignee`, `raw.issueNumber`, `raw.title`, `raw.labels`. **No full body** — work from title + labels. If you genuinely need an issue's body, note that in `suggestion.note` and the reviewer will fetch it.\n- `repo` — owner/repo.\n- `sprintDays` — working days in this sprint (default 5). Use it as per-human capacity.\n\n## Available assignees\n\nUse **exactly** one of these ids per issue (no other names, no invented ids):\n\n- `filip` — human, fullstack\n- `marek` — human, product-owner\n- `marcin` — human, fullstack\n- `vedha` — human, fullstack\n- `fullstack-on-issue` — AI agent workflow, autonomous fullstack work on a single issue\n\n## Sprint capacity (read this carefully)\n\nEach human has `sprintDays` working days. Rough sizing: P0/P1 issue ≈ 1-3 days, P2 ≈ 0.5-1 day, P3 ≈ 0.25 day. Don't overload one person past their capacity.\n\n**AI-agent ceiling**: every `fullstack-on-issue` assignment spawns a child workflow whose output a human will have to review. Reviewer is the bottleneck, not the agent. Cap `fullstack-on-issue` at **≤5 per sprint** — beyond that the reviewer queue tips.\n\nPrefer humans for issues that need product judgment, design taste, cross-team coordination. Delegate to `fullstack-on-issue` when the issue is purely technical, has clear acceptance criteria, and a junior dev could ship it in <1 day.\n\n## Heuristics for assignee/priority choice\n\n1. If `currentAssignee` matches one of the ids above, prefer that person (continuity).\n2. Map labels to skills: `bug`, `infra`, `engine` → fullstack; `product`, `ux` → marek (product-owner); `security` → fullstack with explicit `note` flagging it.\n3. Priority by signal in label + title: blocker/regression/security → P0/P1; enhancement/feature → P2; tech-debt/refactor → P3.\n\n## Output contract\n\nWrite `/output/result.json` with the SAME `options` array shape, but add a `suggestion` field to each entry:\n\n```json\n{\n  \"options\": [\n    {\n      \"id\": \"123\",\n      \"label\": \"#123 ...\",\n      \"sublabel\": \"...\",\n      \"href\": \"...\",\n      \"badges\": [\"...\"],\n      \"currentAssignee\": \"...\",\n      \"raw\": { \"issueNumber\": 123, \"title\": \"...\", \"labels\": [\"...\"] },\n      \"suggestion\": { \"assigneeId\": \"filip\", \"priority\": \"P1\", \"note\": \"one sentence why\" }\n    }\n  ],\n  \"repo\": \"<copy from input>\"\n}\n```\n\nRules:\n\n- Preserve every input issue. Do not drop any.\n- Do not add issues that weren't in the input.\n- `suggestion.assigneeId` must exactly match one of the ids listed above.\n- `suggestion.priority` must be one of `P0`, `P1`, `P2`, `P3`.\n- `suggestion.note` is one short sentence — optional.\n- Output strict JSON only — no markdown, no commentary outside the result file."
+      }
+    },
+    {
+      "id": "assign",
+      "name": "Assign",
+      "type": "creation",
+      "executor": "human",
+      "allowedRoles": ["triager"],
+      "description": "Human triager reviews each suggestion, edits assignee/priority/note as needed, and confirms.",
+      "ui": {
+        "component": "assignment-table",
+        "config": {
+          "assignees": [
+            { "id": "filip", "label": "Filip", "kind": "human", "role": "fullstack" },
+            { "id": "marek", "label": "Marek", "kind": "human", "role": "product-owner" },
+            { "id": "marcin", "label": "Marcin", "kind": "human", "role": "fullstack" },
+            { "id": "vedha", "label": "Vedha", "kind": "human", "role": "fullstack" },
+            { "id": "fullstack-on-issue", "label": "Fullstack agent", "kind": "agent" }
+          ],
+          "priorities": ["P0", "P1", "P2", "P3"],
+          "defaultPriority": "P2",
+          "allowSkip": true,
+          "submitLabel": "Dispatch",
+          "itemColumnLabel": "Issue"
+        }
+      }
+    },
+    {
+      "id": "dispatch",
+      "name": "Dispatch",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "For human-assigned issues: POST the priority label and the assignee to GitHub (both additive — leaves existing category labels and existing assignees untouched). For agent-assigned issues: POST the Mediforce process-start API. Per-assignment errors are logged but do not fail the step.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const assignments = input.assignments || [];\n  const repo = input.repo || input.steps?.['fetch-backlog']?.repo;\n  const token = process.env.GITHUB_TOKEN;\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const baseUrl = process.env.APP_BASE_URL;\n  if (repo && !/^[\\w.-]+\\/[\\w.-]+$/.test(repo)) { console.error(`invalid repo format: '${repo}'`); process.exit(1); }\n  const humanAssignments = [];\n  const agentRuns = [];\n  const errors = [];\n  const ghHeaders = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' };\n  for (const a of assignments) {\n    const issueNumber = a.raw?.issueNumber ?? Number(a.itemId);\n    try {\n      if (a.assigneeKind === 'human') {\n        if (!repo || !token) { errors.push({ itemId: a.itemId, kind: 'human', message: 'repo or GITHUB_TOKEN missing' }); continue; }\n        const labelsRes = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/labels`, {\n          method: 'POST', headers: ghHeaders,\n          body: JSON.stringify({ labels: [`priority/${a.priority}`] }),\n        });\n        if (!labelsRes.ok) { const body = await labelsRes.text(); errors.push({ itemId: a.itemId, kind: 'human', step: 'add-label', message: `GitHub POST /labels ${labelsRes.status}: ${body.slice(0,200)}` }); continue; }\n        const assigneesRes = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/assignees`, {\n          method: 'POST', headers: ghHeaders,\n          body: JSON.stringify({ assignees: [a.assigneeId] }),\n        });\n        if (!assigneesRes.ok) { const body = await assigneesRes.text(); errors.push({ itemId: a.itemId, kind: 'human', step: 'add-assignee', message: `GitHub POST /assignees ${assigneesRes.status}: ${body.slice(0,200)}` }); continue; }\n        humanAssignments.push({ issueNumber, assignee: a.assigneeId, priority: a.priority });\n      } else if (a.assigneeKind === 'agent') {\n        if (!apiKey || !baseUrl) { errors.push({ itemId: a.itemId, kind: 'agent', message: 'PLATFORM_API_KEY or APP_BASE_URL missing' }); continue; }\n        const res = await fetch(`${baseUrl}/api/processes`, {\n          method: 'POST',\n          headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },\n          body: JSON.stringify({ definitionName: a.assigneeId, triggerName: 'manual', triggeredBy: 'backlog-triage', payload: { issueNumber } }),\n        });\n        const body = res.headers.get('content-type')?.includes('json') ? await res.json() : { error: await res.text() };\n        if (!res.ok) { errors.push({ itemId: a.itemId, kind: 'agent', message: `Mediforce POST ${res.status}: ${body.error || ''}` }); }\n        else { agentRuns.push({ issueNumber, workflowId: a.assigneeId, runId: body.instanceId, url: `${baseUrl}/runs/${body.instanceId}` }); }\n      }\n    } catch (err) {\n      errors.push({ itemId: a.itemId, kind: a.assigneeKind, message: String(err?.message ?? err) });\n    }\n  }\n  console.log(`Dispatched ${humanAssignments.length} human(s), ${agentRuns.length} agent run(s), ${errors.length} error(s)`);\n  writeFileSync('/output/result.json', JSON.stringify({ humanAssignments, agentRuns, errors, summary: `Dispatched ${humanAssignments.length} human(s), ${agentRuns.length} agent run(s), ${errors.length} error(s)` }));\n} catch (err) {\n  console.error('dispatch crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "report",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Workflow complete. Inspect dispatch step output for human assignments, spawned agent runs, and per-item errors."
+    }
+  ],
+  "transitions": [
+    { "from": "fetch-backlog", "to": "check-tags" },
+    { "from": "check-tags", "to": "tag-issues", "when": "output.needsTagging == true" },
+    { "from": "check-tags", "to": "propose-assignments", "when": "output.needsTagging == false" },
+    { "from": "propose-assignments", "to": "assign" },
+    { "from": "assign", "to": "dispatch" },
+    { "from": "dispatch", "to": "report" }
+  ]
+}

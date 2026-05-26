@@ -31,16 +31,17 @@ import { GET } from '../route';
 
 // ---- GET /api/tasks/:taskId wiring smoke ----
 //
-// Handler behaviour (404s, cross-namespace, claim/complete logic) is covered by:
-//   - L2 handler tests in packages/platform-api/src/handlers/tasks/__tests__/
+// Workspace gating + anti-enum 404 live in scope.tasks (wrapper). Behaviour
+// coverage:
+//   - L1 wrapper in packages/platform-api/src/repositories/__tests__/
 //   - L3 API E2E in packages/platform-ui/e2e/api/tasks-get.journey.ts
 //   - Adapter pipeline in packages/platform-ui/src/lib/__tests__/route-adapter.test.ts
-// This file only verifies the route is wired to the right handler.
+// This file only verifies the route is wired to getByIdAdapter on scope.tasks.
 
 describe('GET /api/tasks/:taskId', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey' });
+    mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
   });
 
   it('returns task by id (wiring smoke)', async () => {

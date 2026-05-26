@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, type ContainerPluginInit } from './container-plugin.js';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin.js';
@@ -326,13 +326,24 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         result = { raw: containerOutput };
       }
 
-      // Read presentation.html if the script wrote one — surfaces in the
-      // review-step iframe via the agentOutput.presentation field.
-      let presentation: string | null = null;
+      // Read presentation.md or presentation.html if the script wrote one.
+      // Markdown wins on tie — safer surface, cheaper to author. HTML stays
+      // available for cases that genuinely need JS / iframe interactivity.
+      let presentation: Presentation | null = null;
       try {
-        presentation = await readFile(join(outputDir, 'presentation.html'), 'utf-8');
+        presentation = {
+          kind: 'markdown',
+          content: await readFile(join(outputDir, 'presentation.md'), 'utf-8'),
+        };
       } catch {
-        // No presentation file — fine
+        try {
+          presentation = {
+            kind: 'html',
+            content: await readFile(join(outputDir, 'presentation.html'), 'utf-8'),
+          };
+        } catch {
+          // No presentation file — fine
+        }
       }
 
       const durationMs = Date.now() - startTime;

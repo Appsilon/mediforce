@@ -2,9 +2,7 @@
 //
 // Cross-layer integration: `Mediforce` (client) → adapter → handler →
 // `InMemoryHumanTaskRepository`. Loopback fetch ties the layers together
-// in process — no HTTP, no `vi.mock` ceremony. Dependency injection at its
-// cleanest: pass the loopback to `new Mediforce({ fetch })` and the client
-// goes straight through the real adapter + handler.
+// in process — no HTTP, no `vi.mock` ceremony.
 //
 // Per-layer tests (contract, handler, adapter, Mediforce class) give fast,
 // focused feedback. This file is the representative round-trip — one
@@ -16,14 +14,16 @@ import {
   InMemoryHumanTaskRepository,
   InMemoryProcessInstanceRepository,
   buildHumanTask,
+  buildProcessInstance,
 } from '@mediforce/platform-core/testing';
-import { listTasks } from '@mediforce/platform-api/handlers';
-import { ListTasksInputSchema } from '@mediforce/platform-api/contract';
+import { listTasks, claimTask } from '@mediforce/platform-api/handlers';
+import { ListTasksInputSchema, ClaimTaskInputSchema } from '@mediforce/platform-api/contract';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
-import { Mediforce } from '@mediforce/platform-api/client';
+import { Mediforce, ApiError } from '@mediforce/platform-api/client';
 import { createRouteAdapter } from '../../lib/route-adapter';
+import { createTestScope } from '@mediforce/platform-api/testing';
 
-const apiKeyCaller: CallerIdentity = { kind: 'apiKey' };
+const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 
 function loopbackFetch(
   route: (req: NextRequest) => Promise<Response>,
@@ -57,10 +57,14 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
           status: statuses.length > 0 ? statuses : undefined,
         };
       },
-      (input, caller) => listTasks(input, { humanTaskRepo, instanceRepo }, caller),
-      // Stub caller resolution so the test doesn't pull in Firebase Admin /
-      // env-gated services. The handler itself is what we're integrating.
-      { resolveCaller: async () => apiKeyCaller },
+      listTasks,
+      // Stub caller resolution + scope build so the test doesn't pull in
+      // Firebase Admin / env-gated services. The wrapper layer is exercised
+      // through `createTestScope` with the in-memory repos under test.
+      {
+        resolveCaller: async () => apiKeyCaller,
+        buildScope: (caller) => createTestScope({ caller, humanTaskRepo, instanceRepo }),
+      },
     );
 
     mediforce = new Mediforce({ fetch: loopbackFetch(route) });
@@ -87,10 +91,6 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
   });
 
   it('surfaces a 400 from the server when contracts drift (both filters set)', async () => {
-    // Drive the adapter directly with an input that passes field-level
-    // validation but fails the cross-field refine. Verifies the server's 400
-    // propagates — useful to lock in what happens if client-side validation
-    // were ever bypassed or drifted.
     const badRequest = new NextRequest(
       'http://localhost/api/tasks?instanceId=foo&role=reviewer',
     );
@@ -98,6 +98,110 @@ describe('Mediforce client ↔ route-adapter ↔ listTasks (in-process)', () => 
 
     expect(response.status).toBe(400);
     const body = await response.json();
-    expect(body.error).toMatch(/exactly one of/i);
+    expect(body.error.code).toBe('validation');
+    expect(body.error.message).toMatch(/exactly one of/i);
+  });
+});
+
+// Second integration scenario: `claim()` mutation. Covers PR1's specific
+// promise that a typed handler throw (`HandlerError` subclass) flows
+// end-to-end into a client-side `ApiError` whose `code` /
+// `details` fields carry the envelope contents.
+describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => {
+  let humanTaskRepo: InMemoryHumanTaskRepository;
+  let instanceRepo: InMemoryProcessInstanceRepository;
+  let mediforce: Mediforce;
+  let route: (req: NextRequest, ctx: { params: Promise<{ taskId: string }> }) => Promise<Response>;
+  const userCaller: CallerIdentity = {
+    kind: 'user',
+    uid: 'u-claim-test',
+    namespaces: new Set(['team-alpha']),
+    isSystemActor: false,
+  };
+
+  beforeEach(async () => {
+    instanceRepo = new InMemoryProcessInstanceRepository();
+    humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }),
+    );
+
+    route = createRouteAdapter<typeof ClaimTaskInputSchema, { taskId: string }, { task: unknown }, { params: Promise<{ taskId: string }> }>(
+      ClaimTaskInputSchema,
+      async (_req, ctx) => ({ taskId: (await ctx.params).taskId }),
+      claimTask,
+      {
+        resolveCaller: async () => userCaller,
+        buildScope: (caller) => createTestScope({ caller, humanTaskRepo, instanceRepo }),
+      },
+    );
+
+    mediforce = new Mediforce({
+      fetch: async (input, init) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        const taskId = url.match(/\/api\/tasks\/([^/]+)\/claim/)?.[1] ?? '';
+        const absolute = url.startsWith('http') ? url : `http://localhost${url}`;
+        return route(new NextRequest(absolute, init), {
+          params: Promise.resolve({ taskId: decodeURIComponent(taskId) }),
+        });
+      },
+    });
+  });
+
+  it('round-trips claim → returns the entity in `claimed` state with the caller uid', async () => {
+    await humanTaskRepo.create(
+      buildHumanTask({
+        id: 'task-1',
+        processInstanceId: 'inst-a',
+        status: 'pending',
+      }),
+    );
+
+    const result = await mediforce.tasks.claim({ taskId: 'task-1' });
+
+    expect(result.task.status).toBe('claimed');
+    expect(result.task.assignedUserId).toBe('u-claim-test');
+  });
+
+  it('flows a typed `precondition_failed` envelope from handler → adapter → client', async () => {
+    await humanTaskRepo.create(
+      buildHumanTask({
+        id: 'task-1',
+        processInstanceId: 'inst-a',
+        status: 'completed',
+      }),
+    );
+
+    const err = await mediforce.tasks.claim({ taskId: 'task-1' }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    const clientErr = err as ApiError;
+    expect(clientErr.status).toBe(409);
+    expect(clientErr.code).toBe('precondition_failed');
+    expect(clientErr.details).toMatchObject({
+      taskId: 'task-1',
+      currentStatus: 'completed',
+    });
+  });
+
+  it('returns 404 (anti-enum) for a task in a workspace the caller does not belong to', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'inst-foreign', namespace: 'team-beta' }),
+    );
+    await humanTaskRepo.create(
+      buildHumanTask({
+        id: 'task-foreign',
+        processInstanceId: 'inst-foreign',
+        status: 'pending',
+      }),
+    );
+
+    const err = await mediforce.tasks
+      .claim({ taskId: 'task-foreign' })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(404);
+    expect((err as ApiError).code).toBe('not_found');
   });
 });
