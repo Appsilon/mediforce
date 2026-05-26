@@ -17,6 +17,7 @@ import {
   FirestoreNamespaceSecretsRepository,
   PostgresToolCatalogRepository,
   PostgresNamespaceRepository,
+  PostgresAuditRepository,
   getSharedPostgresClient,
   getAdminFirestore,
   validateSecretsKey,
@@ -26,6 +27,7 @@ import {
   getAdminAuth,
 } from '@mediforce/platform-infra';
 import type {
+  AuditRepository,
   CronTriggerStateRepository,
   NamespaceRepository,
   ToolCatalogRepository,
@@ -71,7 +73,7 @@ export interface PlatformServices {
   llmClient: OpenRouterLlmClient;
   processRepo: FirestoreProcessRepository;
   instanceRepo: FirestoreProcessInstanceRepository;
-  auditRepo: FirestoreAuditRepository;
+  auditRepo: AuditRepository;
   agentRunRepo: FirestoreAgentRunRepository;
   humanTaskRepo: FirestoreHumanTaskRepository;
   handoffRepo: FirestoreHandoffRepository;
@@ -101,7 +103,10 @@ export function getPlatformServices(): PlatformServices {
   // Indirect-namespace repos depend on instanceRepo for parent-run namespace
   // resolution inside the namespace-scoped read variants (ADR-0004 §"Storage-
   // layer filter, today").
-  const auditRepo = new FirestoreAuditRepository(db, instanceRepo);
+  const auditRepo: AuditRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresAuditRepository(getSharedPostgresClient().db, instanceRepo)
+      : new FirestoreAuditRepository(db, instanceRepo);
   const agentRunRepo = new FirestoreAgentRunRepository(db, instanceRepo);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db, instanceRepo);
   const handoffRepo = new FirestoreHandoffRepository(db, instanceRepo);

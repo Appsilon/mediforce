@@ -15,6 +15,13 @@
       "when": 1779837240580,
       "tag": "0001_loose_ultimo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779838490675,
+      "tag": "0002_mysterious_glorian",
+      "breakpoints": true
     }
   ]
 }

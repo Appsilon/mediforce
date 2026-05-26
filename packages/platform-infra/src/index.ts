@@ -30,6 +30,7 @@ export { FirestoreCronTriggerStateRepository } from './firestore/cron-trigger-st
 export { FirestoreToolCatalogRepository } from './firestore/tool-catalog-repository.js';
 export { PostgresToolCatalogRepository } from './postgres/repositories/tool-catalog-repository.js';
 export { PostgresNamespaceRepository } from './postgres/repositories/namespace-repository.js';
+export { PostgresAuditRepository } from './postgres/repositories/audit-repository.js';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client.js';
 export type { Database } from './postgres/client.js';
 export { FirestoreOAuthProviderRepository } from './firestore/oauth-provider-repository.js';

@@ -1,9 +1,13 @@
-import type { AuditRepository, AuditEvent } from '../index.js';
+import { AuditEventSchema, type AuditEvent } from '../schemas/audit-event.js';
+import type { AuditRepository } from '../interfaces/audit-repository.js';
 import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository.js';
 
 /**
  * In-memory implementation of AuditRepository for testing.
  * Stores events in an array, simulates serverTimestamp with current time.
+ *
+ * Mirrors the Firestore + Postgres backends — every write parses through
+ * Zod (parity with both real backends, ADR-0001 Implementation pattern 2).
  *
  * Namespace-scoped read (`getByProcessInNamespaces`) resolves the parent
  * run's namespace via the injected `ProcessInstanceRepository`. Tests that
@@ -17,10 +21,10 @@ export class InMemoryAuditRepository implements AuditRepository {
   async append(
     event: Omit<AuditEvent, 'serverTimestamp'>,
   ): Promise<AuditEvent> {
-    const completeEvent: AuditEvent = {
+    const completeEvent = AuditEventSchema.parse({
       ...event,
       serverTimestamp: new Date().toISOString(),
-    };
+    });
 
     this.events.push(completeEvent);
     return completeEvent;
@@ -38,7 +42,7 @@ export class InMemoryAuditRepository implements AuditRepository {
   async getByProcess(processInstanceId: string): Promise<AuditEvent[]> {
     return this.events
       .filter((e) => e.processInstanceId === processInstanceId)
-      .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   }
 
   async getByProcessInNamespaces(
