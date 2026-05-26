@@ -38,6 +38,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 ### Removed
 - Duplicate Python migration script `scripts/migrations/migrate_workflow_doc_ids.py` — superseded by the TypeScript `packages/platform-infra/scripts/migrate-workflow-namespacing.ts` which is the canonical version ([#424](https://github.com/Appsilon/mediforce/pull/424)).
 
+### Added
+- `packages/cli/src/__tests__/bin-shim.test.ts` — spawn-based smoke test that runs the real `bin/mediforce.cjs` shim through `tsx` and asserts exit codes + stderr/stdout for `--help`, a missing positional, and an unknown command. Catches regressions (ESM resolution, `tsx` loader, bin shim entry resolution) that the in-process `runCli` suite cannot.
+
 ### Fixed
 - `check-gif-freshness.py` now evaluates the net PR diff vs base instead of summing per-commit diffs. Add-then-revert within the same PR no longer trips the GIF freshness check (regression surfaced on [#481](https://github.com/Appsilon/mediforce/pull/481)).
 - PR #172 rebase polish: presentation-only agent outputs now render in review surfaces, report iframes escape stringify fallback data and block network exfiltration with CSP, and local script execution no longer inherits the full server environment.
