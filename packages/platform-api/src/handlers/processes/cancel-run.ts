@@ -5,15 +5,12 @@ import { loadOr404 } from '../_helpers.js';
 
 const DEFAULT_REASON = 'Cancelled by user';
 
-// Reuses scope.runs.update() rather than introducing a dedicated cancel
-// method on the wrapper/repo (ADR-0005 §8 leaves that for a later pattern
-// pass; PR1 set the precedent of keeping state-machine throws in the
-// handler — see claim-task.ts).
+// Reuses scope.runs.update() rather than a dedicated wrapper cancel method
+// (state-machine throw stays in the handler, mirroring claim-task.ts).
 //
-// Audit action stays `instance.cancelled` to match workflow-engine's
+// Audit action `instance.cancelled` aligns with workflow-engine's
 // `instance.*` family (instance.created/started/paused/resumed/aborted/
-// completed) and the legacy bulkCancelProcessRuns emit. A repo-wide
-// `instance.*`/`process.*` → `run.*` rename ships as its own ADR pass.
+// completed). A repo-wide `instance.*` → `run.*` rename is its own pass.
 export async function cancelRun(
   input: CancelRunInput,
   scope: CallerScope,

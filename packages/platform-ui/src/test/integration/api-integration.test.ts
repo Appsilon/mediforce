@@ -210,9 +210,9 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
   });
 });
 
-// Third integration scenario: `runs.cancel` mutation (Phase 2 PR2).
-// One round-trip exercising entity-echo response shape + typed envelope
-// surfacing — same loopback ceremony as claim above.
+// Third integration scenario: `runs.cancel` mutation. One round-trip
+// exercising entity-echo response shape + typed envelope surfacing — same
+// loopback ceremony as claim above.
 describe('Mediforce client ↔ route-adapter ↔ cancelRun (in-process)', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
   let humanTaskRepo: InMemoryHumanTaskRepository;
