@@ -20,31 +20,16 @@ Three-axis review of a diff. Each axis runs as a **parallel sub-agent** so they 
 ## Usage
 
 ```
-/code-review              # review current branch vs main (auto-detects "self mode" → pre-flight + SHIP/ITERATE)
+/code-review              # review current branch vs main (auto self mode → pre-flight + SHIP/ITERATE)
 /code-review 42           # review GitHub PR #42
 /code-review <ref>        # review HEAD vs arbitrary fixed point (SHA, branch, tag, main, HEAD~5)
 ```
 
-## Always-spawn rule — `--inline` is internal
+Runs inline — does the actual work, no auto-spawn. If you wrote the code in this conversation, use `/self-review` instead — it spawns a subagent first so the review gets a clean context.
 
-`/code-review` from the main thread **always spawns a subagent** that runs `/code-review --inline [args]`. The subagent does the actual work and returns the report.
+## Mode auto-detection
 
-```
-Main thread sees:   /code-review [args]
-Main thread does:   Spawn Agent(general-purpose) with prompt:
-                      "Run /code-review --inline [args]. Treat the diff as if a stranger wrote it.
-                       Verify every 'pre-existing' claim with git blame before accepting.
-                       Return the full report and verdict."
-Subagent runs:      /code-review --inline [args]   ← everything below this section
-```
-
-Why: clean per-axis context, no "I just wrote this, it must be good" bias when reviewing own work, no pollution of main-thread context with diff details.
-
-`--inline` is internal. **Users never type it.** If the skill is invoked without `--inline`, spawn a subagent and stop.
-
-## Mode auto-detection (inside `--inline`)
-
-- **No arg / `--inline` only** → **self mode**: own current branch vs main. Adds Step 0 (pre-flight: typecheck + test:affected) and Step 6 (SHIP/ITERATE verdict).
+- **No arg** → **self mode**: own current branch vs main. Adds Step 0 (pre-flight: typecheck + test:affected) and Step 6 (SHIP/ITERATE verdict).
 - **PR number / ref arg** → **external review mode**: someone's PR or arbitrary commit range. Skip Step 0, use APPROVE / REQUEST CHANGES / NEEDS DISCUSSION verdict.
 
 ### Step 0 — Pre-flight (self mode only)
@@ -64,9 +49,9 @@ If a failure looks environmental (remote/emulator down, port collision, weird st
 
 ### 1. Pin the fixed point
 
-- `--inline` no further arg → self mode. Fixed point = `main` (or repo default). Diff: `git diff main...HEAD`.
-- `--inline <number>` → external review. Fixed point = PR base. Diff: `gh pr diff <number>`. Capture title/body via `gh pr view <number>`.
-- `--inline <ref>` → external review. Fixed point = ref. Diff: `git diff <ref>...HEAD` (three-dot, against merge-base).
+- No arg → self mode. Fixed point = `main` (or repo default). Diff: `git diff main...HEAD`.
+- `<number>` → external review. Fixed point = PR base. Diff: `gh pr diff <number>`. Capture title/body via `gh pr view <number>`.
+- `<ref>` → external review. Fixed point = ref. Diff: `git diff <ref>...HEAD` (three-dot, against merge-base).
 
 Also capture commit list: `git log <fixed-point>..HEAD --oneline`.
 

@@ -1,7 +1,7 @@
 ---
 name: self-review
-description: Final check on your own changes before reporting a task done, opening a PR, or asking for review. Alias for `/code-review` with no args — which already spawns a subagent, auto-detects self mode, runs pre-flight + three-axis review, and returns SHIP / ITERATE. Triggers include "self review", "review my changes", "check my diff", "ready to commit", "ready for PR", "I'm done", "before I ship".
-allowed-tools: Bash, Read, Glob, Grep, Agent
+description: Final check on your own changes before reporting a task done, opening a PR, or asking for review. Spawns a subagent that runs `/code-review` on the current branch — clean context, no "I just wrote this, it must be good" bias. Returns SHIP / ITERATE verdict. Triggers include "self review", "review my changes", "check my diff", "ready to commit", "ready for PR", "I'm done", "before I ship".
+allowed-tools: Agent
 metadata:
   version: "3.0"
   domain: development
@@ -11,13 +11,16 @@ metadata:
 
 # Self-Review
 
-Alias for `/code-review` (no args). Run that. It already:
+Spawn a subagent. Have it run `/code-review` on the current branch. Return the verdict.
 
-- Always spawns a subagent (clean context — no "I just wrote this, it must be good" bias).
-- Auto-detects self mode when called with no args (own current branch vs main).
-- Runs pre-flight (`pnpm typecheck` + `pnpm test:affected`).
-- Runs the three-axis review (Standards / Spec / Big Picture).
-- Applies the `git blame` gate on every "pre-existing" excuse.
-- Returns SHIP / ITERATE verdict.
+```
+Agent (general-purpose) prompt:
+  Run /code-review on the current branch (no args → auto self mode).
+  Treat the diff as if a stranger wrote it.
+  Verify every "pre-existing" claim with git blame before accepting it.
+  Return the full three-axis report + SHIP / ITERATE verdict.
+```
 
-See `.claude/skills/code-review/SKILL.md` for the full spec.
+That's it. Why a subagent: reviewing your own work in the same context where you wrote it is unreliable — "I just wrote this, it must be good" assumptions don't carry to an outside reader. A fresh context reviews honestly.
+
+All review logic lives in `.claude/skills/code-review/SKILL.md`: pre-flight (`pnpm typecheck` + `pnpm test:affected`), three-axis review (Standards / Spec / Big Picture), `git blame` gate on "pre-existing" excuses, SHIP / ITERATE verdict.
