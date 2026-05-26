@@ -647,10 +647,25 @@ interface RunKicker {
 
 **Test impl decision — `noopRunKicker` only.** `createTestScope` gets `noopRunKicker` (spy-friendly: assertion = "was kicked with X"). `syncRunKicker` (in-process execute) deferred — no current test needs post-kick state assertion, and `api-integration.test.ts` loopback pattern is non-streaming round-trip only. Add later when a concrete use case lands.
 
-**Open questions to settle during Phase 3 (non-blocking for the PR):**
-- `tasks/complete` discriminated-union shape — single contract endpoint with `{ kind: 'verdict' | 'params' | 'upload' | 'assignment', ... }` body vs four sibling endpoints. Today: four server actions, one route. Lean: single endpoint matches today's route + collapses the action surface.
-- `cron/heartbeat` audit emission — today emits zero audit (just returns triggered/skipped). After-migration: emit per-fired-trigger audit via the bridge, or stay silent? Aligns with the cron-heartbeat exemption listed in ADR-0005 §7.
-- `processes` POST create response shape — today returns `{ instanceId, status, message }`. Per ADR-0005 §5 carve-outs: `201 Created` + `{ run: WorkflowRun }`. UI callers update inline.
+**Decisions locked during grilling (2026-05-26):**
+
+- **`tasks/complete` shape — one endpoint with discriminated-union body.** Today is already one route (`/api/tasks/:taskId/complete`) accepting four payload shapes; lib (`resolveTask`) is one function taking a union; audit action is one (`task.completed`); side effects identical. The four variants differ only in payload shape determined by `step.ui` / `step.params` / `step.selection` config — client already knows which to send by reading the task's GET. Splitting into four sibling endpoints would give false signals ("these are different operations") for what's conceptually one. Industry alignment: Stripe `POST /v1/payment_intents/:id/confirm` (discriminator `payment_method.type`) — same pattern. Contract:
+
+  ```ts
+  const CompleteTaskInputSchema = z.object({
+    taskId: z.string().min(1),
+    payload: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('verdict'), verdict: z.enum(['approve', 'revise']), comment: z.string().optional() }),
+      z.object({ kind: z.literal('params'), paramValues: z.record(z.string(), z.unknown()) }),
+      z.object({ kind: z.literal('upload'), attachments: z.array(AttachmentSchema) }),
+      z.object({ kind: z.literal('assignment'), assignments: z.array(AssignmentSchema) }),
+    ]),
+  });
+  ```
+
+- **`cron/heartbeat` audit emission — emit per fired trigger.** Action `cron.trigger.fired`, basis `'Cron trigger schedule due'`, snapshot `{ triggerName, definitionName, definitionVersion, instanceId }`. Extends the ADR-0005 §7 closed action set alongside the existing `cron.heartbeat` exemption (heartbeat itself stays `@no-audit` — only the fired-trigger sub-events emit).
+
+- **`processes` POST create response shape — ADR-0005 §5 entity echo.** `201 Created` + `{ run: WorkflowRun }`. Today's `{ instanceId, status, message }` is bespoke drift. The breaking change is migrated in the same PR (UI callers swap `result.instanceId` → `result.run.id`; CLI command updates inline). Rejecting carve-outs preserves ADR uniformity — first endpoint that breaks §5 opens the door for every endpoint to break it.
 
 **Decision — `/api/processes/:instanceId/advance`.** Investigate user-facing surface before committing to migrate. If only `engine` and tests call it, leave inline forever (internal API, not headless contract).
 
