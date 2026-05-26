@@ -7,7 +7,7 @@ export { updateRankings, type UpdateRankingsDeps } from './models/update-ranking
 
 export { listAuditEvents } from './processes/list-audit-events.js';
 export { getProcessSteps } from './processes/get-process-steps.js';
-export { cancelProcess } from './processes/cancel-process.js';
+export { cancelRun } from './processes/cancel-run.js';
 
 export { listWorkflows } from './workflows/list-workflows.js';
 export { getWorkflow } from './workflows/get-workflow.js';

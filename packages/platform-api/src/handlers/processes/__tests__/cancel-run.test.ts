@@ -5,7 +5,7 @@ import {
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import { cancelProcess } from '../cancel-process.js';
+import { cancelRun } from '../cancel-run.js';
 import {
   HandlerError,
   NotFoundError,
@@ -16,7 +16,7 @@ import {
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope.js';
 
-describe('cancelProcess handler', () => {
+describe('cancelRun handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
   let auditRepo: InMemoryAuditRepository;
 
@@ -41,7 +41,7 @@ describe('cancelProcess handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const result = await cancelProcess({ instanceId: 'inst-a' }, scope);
+      const result = await cancelRun({ runId: 'inst-a' }, scope);
 
       expect(result.run.id).toBe('inst-a');
       expect(result.run.status).toBe('failed');
@@ -62,7 +62,7 @@ describe('cancelProcess handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const result = await cancelProcess({ instanceId: 'inst-paused' }, scope);
+      const result = await cancelRun({ runId: 'inst-paused' }, scope);
 
       expect(result.run.status).toBe('failed');
     });
@@ -83,7 +83,7 @@ describe('cancelProcess handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const err = await cancelProcess({ instanceId: 'inst-a' }, scope).catch((e) => e);
+      const err = await cancelRun({ runId: 'inst-a' }, scope).catch((e) => e);
 
       expect(err).toBeInstanceOf(PreconditionFailedError);
       expect(err).toBeInstanceOf(HandlerError);
@@ -105,7 +105,7 @@ describe('cancelProcess handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const err = await cancelProcess({ instanceId: 'inst-a' }, scope).catch((e) => e);
+      const err = await cancelRun({ runId: 'inst-a' }, scope).catch((e) => e);
 
       expect(err).toBeInstanceOf(PreconditionFailedError);
       expect((err as PreconditionFailedError).code).toBe('precondition_failed');
@@ -120,7 +120,7 @@ describe('cancelProcess handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const err = await cancelProcess({ instanceId: 'inst-missing' }, scope).catch((e) => e);
+      const err = await cancelRun({ runId: 'inst-missing' }, scope).catch((e) => e);
 
       expect(err).toBeInstanceOf(NotFoundError);
       expect((err as NotFoundError).code).toBe('not_found');
@@ -142,7 +142,7 @@ describe('cancelProcess handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const err = await cancelProcess({ instanceId: 'inst-foreign' }, scope).catch((e) => e);
+      const err = await cancelRun({ runId: 'inst-foreign' }, scope).catch((e) => e);
 
       expect(err).toBeInstanceOf(NotFoundError);
       expect((err as NotFoundError).code).toBe('not_found');
@@ -150,7 +150,7 @@ describe('cancelProcess handler', () => {
   });
 
   describe('audit emission', () => {
-    it('emits a `process.cancelled` audit event with actor, snapshots, basis', async () => {
+    it('emits an `instance.cancelled` audit event with actor, snapshots, basis', async () => {
       await instanceRepo.create(
         buildProcessInstance({
           id: 'inst-a',
@@ -166,12 +166,12 @@ describe('cancelProcess handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      await cancelProcess({ instanceId: 'inst-a' }, scope);
+      await cancelRun({ runId: 'inst-a' }, scope);
 
       const events = await auditRepo.getByProcess('inst-a');
       expect(events).toHaveLength(1);
       const event = events[0]!;
-      expect(event.action).toBe('process.cancelled');
+      expect(event.action).toBe('instance.cancelled');
       expect(event.actorId).toBe('u-1');
       expect(event.actorType).toBe('user');
       expect(event.entityType).toBe('processInstance');
@@ -203,8 +203,8 @@ describe('cancelProcess handler', () => {
         caller: userCaller('u-1', ['team-alpha']),
       });
 
-      const result = await cancelProcess(
-        { instanceId: 'inst-a', reason: 'Audit cleanup' },
+      const result = await cancelRun(
+        { runId: 'inst-a', reason: 'Audit cleanup' },
         scope,
       );
 
@@ -227,7 +227,7 @@ describe('cancelProcess handler', () => {
         // default caller is apiKey
       });
 
-      await cancelProcess({ instanceId: 'inst-a' }, scope);
+      await cancelRun({ runId: 'inst-a' }, scope);
 
       const events = await auditRepo.getByProcess('inst-a');
       expect(events[0]!.actorId).toBe('api');
