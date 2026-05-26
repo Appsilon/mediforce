@@ -13,7 +13,7 @@ complexity estimates because of medical vocabulary.
 packages/
   platform-core/    Zod schemas, repo interfaces, in-memory test doubles
   platform-api/     Contract + framework-free handlers
-  platform-infra/   Firestore, Firebase Auth, SendGrid
+  platform-infra/   Firestore + Postgres (ADR-0001 transition), Firebase Auth, SendGrid
   platform-ui/      Next.js 15 App Router (dev :9003, e2e :9007)
   workflow-engine/  Engine, transitions, expression DSL
   agent-runtime/    PluginRegistry, AgentRunner, Docker spawn
@@ -44,7 +44,7 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    the lowest level that gives real signal before implementation. `/new-test`
    picks the level (L1 unit / L2 integration / L3 API E2E / L4 UI / L5
    external), scaffolds the file, and walks RED → GREEN. Product features
-   MUST land at **L3** (proves Firestore + middleware + auth). For L4 UI
+   MUST land at **L3** (proves storage backend + middleware + auth). For L4 UI
    journeys with a GIF deliverable, use `/e2e-test`.
 
    **Don't test infra/tooling/workflow code.** CI scripts, build glue, dev
