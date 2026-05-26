@@ -24,6 +24,7 @@ import type {
   WorkflowEngine,
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
+import type { RunKicker } from '../runtime/run-kicker.js';
 import type { CallerScope } from './caller-scope.js';
 import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
 import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
@@ -67,6 +68,7 @@ export interface CallerScopeServices {
   readonly cronTrigger: CronTrigger;
   readonly webhookRouter: WebhookRouter;
   readonly agentRunner: AgentRunner;
+  readonly runKicker: RunKicker;
 }
 
 /**
@@ -125,6 +127,7 @@ export function createCallerScope(
       webhookRouter: services.webhookRouter,
       agentRunner: services.agentRunner,
       audit: services.auditRepo,
+      runKicker: services.runKicker,
     },
   };
 }

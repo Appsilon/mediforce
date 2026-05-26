@@ -28,6 +28,7 @@ import type {
 import type { CallerIdentity } from '../../auth.js';
 import type { CallerScope } from '../caller-scope.js';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope.js';
+import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker.js';
 
 class InMemoryAgentRunRepository implements AgentRunRepository {
   private readonly byId = new Map<string, AgentRun>();
@@ -193,6 +194,7 @@ export interface TestScopeOverrides {
   readonly modelRegistryRepo?: ModelRegistryRepository;
   readonly secretsRepo?: WorkflowSecretsRepository;
   readonly namespaceSecretsRepo?: NamespaceSecretsRepository;
+  readonly runKicker?: RunKicker;
 }
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
@@ -237,6 +239,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     cronTrigger: null as unknown as CallerScopeServices['cronTrigger'],
     webhookRouter: null as unknown as CallerScopeServices['webhookRouter'],
     agentRunner: null as unknown as CallerScopeServices['agentRunner'],
+    runKicker: overrides.runKicker ?? noopRunKicker(),
   };
   return createCallerScope(services, caller);
 }

@@ -66,6 +66,13 @@
         "types": "./dist/testing/index.d.ts",
         "default": "./dist/testing/index.js"
       }
+    },
+    "./runtime": {
+      "import": {
+        "@mediforce/source": "./src/runtime/index.ts",
+        "types": "./dist/runtime/index.d.ts",
+        "default": "./dist/runtime/index.js"
+      }
     }
   },
   "scripts": {

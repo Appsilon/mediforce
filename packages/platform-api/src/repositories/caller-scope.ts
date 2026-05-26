@@ -12,6 +12,7 @@ import type {
   WorkflowEngine,
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
+import type { RunKicker } from '../runtime/run-kicker.js';
 import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
 import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
 import type { AuthorizedAgentRunRepository } from './authorized-agent-run-repository.js';
@@ -101,4 +102,11 @@ export interface SystemServices {
    * (the writer is a handler that already passed the read-side gate).
    */
   readonly audit: AuditRepository;
+  /**
+   * Auto-runner kick — fire-and-forget notify that an instance's current
+   * step needs executing. Prod impl self-fetches `/api/processes/:id/run`;
+   * test impl records calls. See `runtime/run-kicker.ts` + ADR-0005 §7 /
+   * headless-migration Phase 3 for the abstraction's purpose.
+   */
+  readonly runKicker: RunKicker;
 }
