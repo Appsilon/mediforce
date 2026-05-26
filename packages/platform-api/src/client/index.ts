@@ -53,10 +53,14 @@ import {
   GetCoworkSessionByInstanceInputSchema,
   GetCoworkSessionByInstanceOutputSchema,
   ListPluginsOutputSchema,
+  ClaimTaskInputSchema,
+  ClaimTaskOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
   type GetTaskOutput,
+  type ClaimTaskInput,
+  type ClaimTaskOutput,
   type RegisterWorkflowInput,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
@@ -120,6 +124,13 @@ import {
   type GetCoworkSessionByInstanceOutput,
   type ListPluginsOutput,
 } from '../contract/index.js';
+// SDK consumers reach for one path:
+//   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
+// Server-side handlers throw `HandlerError` (or subclasses) imported from
+// `@mediforce/platform-api/errors`; the wire envelope is the only shared
+// surface, so the client just exposes `code`/`details` on `ApiError` directly.
+import { ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors.js';
+export type { ApiErrorCode };
 
 /**
  * Typed client for the Mediforce API. Runtime-agnostic — works in the
@@ -164,11 +175,17 @@ export type ClientConfig =
   | (BaseClientConfig & { bearerToken: () => Promise<string | null>; apiKey?: never; fetch?: never })
   | (BaseClientConfig & { fetch: typeof fetch; apiKey?: never; bearerToken?: never });
 
+// Transport-aware error wrapper. Holds HTTP `status` + raw `body` plus the
+// parsed envelope fields (`code`, `details`) when the server returned the
+// ADR-0005 §1 typed envelope. `code` is `undefined` for legacy / network /
+// non-JSON responses.
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
     public readonly body: unknown,
+    public readonly code?: ApiErrorCode,
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -179,6 +196,7 @@ export class Mediforce {
   readonly tasks: {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
+    claim: (input: ClaimTaskInput) => Promise<ClaimTaskOutput>;
   };
 
   readonly processes: {
@@ -297,6 +315,15 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.get');
         return GetTaskOutputSchema.parse(body);
+      },
+      claim: async (input) => {
+        const validated = ClaimTaskInputSchema.parse(input);
+        const res = await this.request(
+          `/api/tasks/${encodeURIComponent(validated.taskId)}/claim`,
+          { method: 'POST' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.tasks.claim');
+        return ClaimTaskOutputSchema.parse(body);
       },
     };
 
@@ -653,11 +680,34 @@ function toSearchParams(
 async function parseJsonOrThrow(res: Response, context: string): Promise<unknown> {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message =
-      typeof body === 'object' && body !== null && 'error' in body
-        ? String((body as { error: unknown }).error)
-        : `${context} failed with status ${res.status}`;
-    throw new ApiError(res.status, message, body);
+    const extracted = extractErrorEnvelope(body);
+    const message = extracted.message ?? `${context} failed with status ${res.status}`;
+    throw new ApiError(res.status, message, body, extracted.code, extracted.details);
   }
   return body;
+}
+
+/**
+ * Pull the error message out of the response body. Supports both shapes:
+ *   - ADR-0005 §1 typed envelope: `{ error: { code, message, details? } }`
+ *   - Legacy string envelope: `{ error: string }` (Phase 1 routes that
+ *     haven't migrated to the typed adapter yet).
+ *
+ * The legacy branch will go away when every route is on `createRouteAdapter`,
+ * but until then both must round-trip cleanly through the client.
+ *
+ * The `code` cast is honest for known codes — unknown server codes (version
+ * drift) flow through as `ApiErrorCode` strings the client doesn't recognise.
+ * Callers comparing `err.code === 'not_found'` simply miss; they don't crash.
+ */
+function extractErrorEnvelope(body: unknown): {
+  message?: string;
+  code?: ApiErrorCode;
+  details?: unknown;
+} {
+  const parsed = ApiErrorEnvelopeSchema.safeParse(body);
+  if (!parsed.success) return {};
+  const { error } = parsed.data;
+  if (typeof error === 'string') return { message: error };
+  return { message: error.message, code: error.code as ApiErrorCode, details: error.details };
 }

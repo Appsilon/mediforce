@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { HandlerError } from '@mediforce/platform-api/errors';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 import { createCallerScope, type CallerScope } from '@mediforce/platform-api/repositories';
@@ -24,8 +24,9 @@ import { getPlatformServices } from './platform-services.js';
  *      Note: `ctx` is Next.js's `RouteContext` shape (`{ params: Promise<…> }`)
  *      for dynamic-segment routes, or `unknown` for flat routes.
  *   3. Handler — invoked with the parsed input and a `CallerScope`. Throws of
- *      type `HandlerError` (e.g. `NotFoundError`, `ForbiddenError`) map to
- *      their declared HTTP status. Anything else is a 500 (full error logged).
+ *      type `HandlerError` (or any subclass: `NotFoundError`, `ForbiddenError`,
+ *      `PreconditionFailedError`, etc.) map to the ADR-0005 §1 envelope using
+ *      `err.code`. Anything else is a 500 (full error logged).
  *
  * Auth note: middleware in `src/middleware.ts` already gates `/api/*` for
  * presence of credentials — that's the first line of defense and exists so
@@ -79,14 +80,17 @@ export function createRouteAdapter<
       raw = await inputFromRequest(req, ctx);
     } catch (err) {
       console.error('[route-adapter] inputFromRequest error:', err);
-      return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+      return jsonErrorResponse(new HandlerError('validation', 'Invalid input'));
     }
 
     const parsed = inputSchema.safeParse(raw);
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
-        { status: 400 },
+      return jsonErrorResponse(
+        new HandlerError(
+          'validation',
+          parsed.error.issues[0]?.message ?? 'Invalid input',
+          parsed.error.issues,
+        ),
       );
     }
 
@@ -95,13 +99,21 @@ export function createRouteAdapter<
       const result = await handler(parsed.data as NarrowInput, scope);
       return NextResponse.json(result);
     } catch (err) {
-      if (err instanceof HandlerError) {
-        return NextResponse.json({ error: err.message }, { status: err.statusCode });
+      if (err instanceof HandlerError) return jsonErrorResponse(err);
+      if (err instanceof z.ZodError) {
+        return jsonErrorResponse(new HandlerError('validation', 'Invalid input', err.issues));
       }
       console.error('[route-adapter] handler error:', err);
-      return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+      return jsonErrorResponse(new HandlerError('internal', 'Internal error'));
     }
   };
+}
+
+// `HandlerError.toEnvelope()` is the ADR-0005 §1 wire shape; `statusCode` is
+// derived from `code` via the §3 table inside the class. This adapter is the
+// only place that turns a HandlerError into an HTTP response.
+function jsonErrorResponse(err: HandlerError): NextResponse {
+  return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
 }
 
 function defaultBuildScope(caller: CallerIdentity): CallerScope {

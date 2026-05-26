@@ -57,8 +57,9 @@ test.describe('GET /api/processes/* — API E2E', () => {
       headers: apiKeyHeaders(),
     });
     expect(res.status()).toBe(404);
-    const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/not found/i);
+    const body = await res.json() as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('not_found');
+    expect(body.error.message).toMatch(/not found/i);
   });
 
   test('audit: response is wrapped as { events: [...] }', async ({ request }) => {

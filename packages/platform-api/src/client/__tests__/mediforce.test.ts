@@ -530,6 +530,97 @@ describe('Mediforce', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('tasks.claim', () => {
+    it('POSTs to /api/tasks/:taskId/claim and parses the entity envelope', async () => {
+      const task = buildHumanTask({
+        id: 'task-1',
+        status: 'claimed',
+        assignedUserId: 'u-1',
+      });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ task }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const result = await mediforce.tasks.claim({ taskId: 'task-1' });
+
+      expect(result.task.id).toBe('task-1');
+      expect(result.task.status).toBe('claimed');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${TEST_BASE_URL}/api/tasks/task-1/claim`);
+      expect(fetchSpy.mock.calls[0]?.[1]?.method).toBe('POST');
+    });
+
+    it('URL-encodes the taskId path segment', async () => {
+      const task = buildHumanTask({ id: 'task 1/2', status: 'claimed', assignedUserId: 'u-1' });
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ task }));
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await mediforce.tasks.claim({ taskId: 'task 1/2' });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `${TEST_BASE_URL}/api/tasks/task%201%2F2/claim`,
+      );
+    });
+
+    it('rejects an empty taskId before firing any request', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      await expect(mediforce.tasks.claim({ taskId: '' })).rejects.toThrow();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('throws ApiError with envelope code/message/details on a typed 409', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse(
+          {
+            error: {
+              code: 'precondition_failed',
+              message: 'Cannot claim a claimed task',
+              details: { taskId: 'task-1', currentStatus: 'claimed' },
+            },
+          },
+          409,
+        ),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const err = (await mediforce.tasks
+        .claim({ taskId: 'task-1' })
+        .catch((e) => e)) as ApiError;
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect(err.status).toBe(409);
+      expect(err.message).toBe('Cannot claim a claimed task');
+      expect(err.code).toBe('precondition_failed');
+      expect(err.details).toEqual({ taskId: 'task-1', currentStatus: 'claimed' });
+    });
+  });
+
+  describe('error envelope back-compat (legacy `{ error: string }`)', () => {
+    it('extracts the message from the legacy string envelope', async () => {
+      // Some Phase 1 routes still throw plain HandlerError with a custom
+      // shape, and the legacy 5xx surface (`{ error: <string> }`) hasn't
+      // been migrated. The client must tolerate both shapes during the
+      // transition.
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse({ error: 'Legacy failure mode' }, 500),
+      );
+
+      const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
+      const err = (await mediforce.tasks
+        .list({ instanceId: 'inst-a' })
+        .catch((e) => e)) as ApiError;
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect(err.status).toBe(500);
+      expect(err.message).toBe('Legacy failure mode');
+      expect(err.code).toBeUndefined();
+    });
+  });
 });
 
 // Type-level assertion — ClientConfig accepts only the documented options.

@@ -84,7 +84,13 @@ Field name `error` (not `status`) because HTTP status code (header)
 already says "this is an error class"; `status` collides with domain
 concepts (`task.status`, `run.status`).
 
-### 2. Typed errors: single `ApiError` class, code as string union
+### 2. Typed errors: `HandlerError` hierarchy with `code` field
+
+Extend the existing `HandlerError` base (introduced in [#450](https://github.com/Appsilon/mediforce/pull/450))
+with a `code: ApiErrorCode` field and `details?: unknown`. One subclass
+per code — single hierarchy, single adapter catch arm, subclasses for
+server-side throw-site ergonomics (type-narrowed constructor + IDE
+autocomplete at zero wire cost).
 
 ```ts
 export type ApiErrorCode =
@@ -92,41 +98,71 @@ export type ApiErrorCode =
   | 'validation'   | 'precondition_failed' | 'conflict'
   | 'rate_limited' | 'internal';
 
-export class ApiError extends Error {
+export class HandlerError extends Error {
   constructor(
     readonly code: ApiErrorCode,
     message: string,
     readonly details?: unknown,
   ) { super(message); }
+
+  // Derived from `code` via the §3 table — no second source of truth.
+  get statusCode(): number { return httpStatusForApiErrorCode(this.code); }
+
+  // Plain object for JSON serialization — framework-free so the adapter
+  // can `NextResponse.json(err.toEnvelope(), { status: err.statusCode })`
+  // in one line (see §4).
+  toEnvelope(): ApiErrorEnvelope { /* { error: { code, message, details? } } */ }
 }
+
+export class PreconditionFailedError extends HandlerError {
+  constructor(message = 'Precondition failed', details?: unknown) {
+    super('precondition_failed', message, details);
+  }
+}
+// NotFoundError and ForbiddenError already existed and now extend
+// the new base. Other codes (unauthorized, validation, conflict,
+// rate_limited) throw via the base `HandlerError` directly until the
+// first real throw site lands; that PR adds the subclass.
 ```
 
 Throw site:
 
 ```ts
 if (task.status !== 'claimed') {
-  throw new ApiError(
-    'precondition_failed',
+  throw new PreconditionFailedError(
     `Task must be claimed before complete; current: ${task.status}`,
     { taskId, currentStatus: task.status },
   );
 }
 ```
 
-Chosen over a subclass hierarchy
-(`PreconditionFailedError extends ApiError`, etc.) because:
+Client side (`@mediforce/platform-api/client`) exposes a single
+`ApiError` (transport-aware: HTTP `status` + raw `body` + parsed
+`code` / `details` from the §1 envelope). No subclass mirror on the
+client today — every `catch` site in the UI currently does
+`err instanceof Error ? err.message : 'fallback'`, so per-code
+discrimination would be wasted code → ctor mapping. See "future
+discrimination" note below.
 
-- Subclasses don't cross the JSON wire. Server emits the same envelope
-  regardless of class.
-- Subclasses force a code → constructor mapping table on the client
-  side. Single class needs zero mapping (`throw new ApiError(body.error.code, body.error.message, body.error.details)`).
-- IDE narrowing on `instanceof ApiError && err.code === 'X'` is
-  equivalent to the subclass version.
-- ~50 LOC infrastructure total vs ~75 LOC + a third place of drift.
+Rejected: a parallel `ApiError` class alongside `HandlerError` (single
+flat class, no subclasses). Two throwables for the same envelope =
+inevitable drift; the subclass hierarchy already exists from
+[#450](https://github.com/Appsilon/mediforce/pull/450) and just needs
+the `code` field.
 
-Rejected: Result types (`Result<T, ApiError>`). Throws + a single
+Rejected: Result types (`Result<T, HandlerError>`). Throws + a single
 well-known base class is idiomatic in TS; result types add boilerplate
 at every call site.
+
+**Future-idea — UI per-code narrowing.** When the first real
+per-code branch appears in UI code (`if (err.code === 'precondition_failed')`
+pattern in a hook or component), reconstruct the matching server-side
+`HandlerError` subclass on the client from the envelope `code` via a
+small map and expose it as a field on `ApiError`. UI could then do
+`if (clientErr.handlerError instanceof PreconditionFailedError)` with
+full TS narrowing. Out of scope until the first concrete use-case
+exists — premature symmetry costs map-table maintenance for no payoff
+today.
 
 #### 2a. Throw site
 
@@ -158,26 +194,41 @@ correct; client branches on `code`, not the status nuance between 409
 and 412). `forbidden` on mutations is 403 — anti-enum payoff lower
 because the caller already proved intent by issuing the write.
 
-### 4. Adapter extension: `ApiError` catch in `createRouteAdapter`
+### 4. Adapter extension: single `HandlerError` catch in `createRouteAdapter`
 
 No new `mutationAdapter` helper. Mutations use the same
-`createRouteAdapter` as reads, with an added `ApiError` catch:
+`createRouteAdapter` as reads, with a single typed-error catch arm that
+delegates serialization to the class itself (`HandlerError.toEnvelope()`
+returns the §1 wire shape; `statusCode` getter derives from `code` via
+the §3 table — same pattern as Hono's `HTTPException` and NestJS's
+`HttpException`):
 
 ```ts
 catch (err) {
-  if (err instanceof ApiError) return jsonError(err);
+  if (err instanceof HandlerError) return jsonErrorResponse(err);
   if (err instanceof z.ZodError) {
-    return jsonError(new ApiError('validation', 'Invalid input', err.issues));
+    return jsonErrorResponse(new HandlerError('validation', 'Invalid input', err.issues));
   }
-  console.error(err);
-  return jsonError(new ApiError('internal', 'Internal error'));
+  console.error('[route-adapter] handler error:', err);
+  return jsonErrorResponse(new HandlerError('internal', 'Internal error'));
+}
+
+function jsonErrorResponse(err: HandlerError): NextResponse {
+  return NextResponse.json(err.toEnvelope(), { status: err.statusCode });
 }
 ```
 
-`jsonError(err)` reads `err.code` against §3's table and serializes the
-envelope from §1. ~30 LOC added to `route-adapter.ts`; benefits all
-existing Phase 1 GET endpoints retroactively (they get typed errors too
-without rewriting).
+Catch order is `HandlerError → ZodError → unknown`; `ZodError` is a
+sibling arm rather than wrapped into a domain throw so a Zod throw
+inside handler code (programmer error — backend payload failing
+internal parse) is distinguishable in the source from a deliberate
+`new HandlerError('validation', ...)` throw, even though both map to
+the same envelope.
+
+All existing Phase 1 GET endpoints inherit typed errors without
+rewriting (`NotFoundError` / `ForbiddenError` from
+[#450](https://github.com/Appsilon/mediforce/pull/450) are subclasses
+of `HandlerError` and now carry `code`/`details`).
 
 ### 5. Response shape: entity echo
 
@@ -254,11 +305,16 @@ Phase 2 deletes the actions; without a bridge, audit coverage on these
 mutations would silently regress.
 
 **Phase 2 bridge:** each migrated mutation handler emits audit inline
-via `scope.auditEvents.append({...})` — same shape as today's Server
+via `scope.system.audit.append({...})` — same shape as today's Server
 Action code, ~6 LOC per handler. Net-zero LOC if the existing emission
-code is moved (not added) from action to handler. Required addition:
-`.append()` method on `AuthorizedAuditEventRepository` (read-only
-today).
+code is moved (not added) from action to handler. The raw write surface
+lives on `scope.system.audit` (existing trusted-bypass lane that already
+holds `engine` / `agentRunner` / `manualTrigger`), not on the Authorized
+wrapper. Reason: `Authorized*Repository` semantics promise per-method
+workspace gating; `append` would not gate (writer trusted by-construction —
+the handler just loaded the parent through a gated wrapper). Putting it
+on `scope.system` makes the trust explicit and groups it with the other
+god-mode-by-design handles.
 
 **Long-term direction (separate audit-wiring phase, post-headless-
 migration):** audit emission moves to the **persistence boundary
@@ -302,8 +358,14 @@ Closed action-name set for Phase 2 (extensible by amendment):
 - `HumanTaskRepository.unclaim(taskId, userId)` + wrapper passthrough
   (no method today; current `unclaimTask` Server Action writes Firestore
   directly).
-- `AuthorizedAuditEventRepository.append(event)` — write-side method
-  (read-only today).
+
+Raw audit-write surface lives on `scope.system.audit` (existing
+trusted-bypass lane), not on the Authorized wrapper. Reason:
+`Authorized*Repository` semantics promise per-method gating; `append`
+would not gate (writer trusted by-construction). Putting it on
+`scope.system` makes the trust explicit and aligns with where `engine` /
+`agentRunner` already live. `AuthorizedAuditEventRepository` stays
+read-only.
 
 `AuthorizedWorkflowRunRepository` has `getById` / `list` / `update` only.
 Phase 2 adds:
@@ -333,14 +395,22 @@ These are domain methods on the wrapper, mirroring how
   — same gap as adapter-orchestrated. Acceptable as Phase 2 bridge
   only because the existing Server Action emission is being moved
   rather than newly introduced.
+- **`.append()` on `AuthorizedAuditEventRepository`** as the write
+  surface during the bridge. Rejected — `Authorized*Repository` names
+  a contract ("every method gates on caller's workspace membership"),
+  and `append` does not gate. Putting it there forces a misleading
+  doc-comment on every read of the file. Raw write goes on
+  `scope.system.audit` instead, next to the other trusted-bypass
+  handles (`engine`, `agentRunner`, `manualTrigger`).
 - **Keep Server Actions alongside the API.** Rejected — empirical:
   today's actions use zero Server Action features. They are API-route-
   shaped code in a Server Action costume, paying the auth-bifurcation
   cost (cookie session vs Bearer) and losing Zod contract + URL
   surface, for no benefit.
 - **`mutationAdapter` helper** distinct from `createRouteAdapter`.
-  Rejected — one adapter with an `ApiError` catch covers reads and
-  mutations; second helper adds vocabulary without behaviour change.
+  Rejected — one adapter with a single `HandlerError` catch covers
+  reads and mutations; second helper adds vocabulary without behaviour
+  change.
 - **Minimal-ack response shape** (`{ ok: true }`). Rejected — forces a
   refetch round trip and creates race windows where the client renders
   stale state. Industry standard is entity echo.
@@ -352,8 +422,9 @@ These are domain methods on the wrapper, mirroring how
 ## Consequences
 
 - Phase 2 mutation handlers share one signature
-  (`(input, scope) => Promise<output>`) and one error idiom (throw
-  `ApiError`). Phase 2.5 and Phase 3 mutations inherit unchanged.
+  (`(input, scope) => Promise<output>`) and one error idiom (throw a
+  `HandlerError` subclass — `NotFoundError`, `PreconditionFailedError`,
+  etc.). Phase 2.5 and Phase 3 mutations inherit unchanged.
 - `createRouteAdapter` becomes the single chokepoint for input parsing,
   scope construction, error mapping, and output serialization across
   reads and mutations.

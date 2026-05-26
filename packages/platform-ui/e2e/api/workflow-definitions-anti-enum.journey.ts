@@ -43,8 +43,9 @@ test.describe('GET /api/workflow-definitions/[name] — visibility 404', () => {
       { headers: bearerHeaders(callers.outsider) },
     );
     expect(res.status()).toBe(404);
-    const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/not found/i);
+    const body = await res.json() as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('not_found');
+    expect(body.error.message).toMatch(/not found/i);
   });
 
   test('nonexistent WD name → 404 (same shape as visibility denial)', async ({ request }) => {

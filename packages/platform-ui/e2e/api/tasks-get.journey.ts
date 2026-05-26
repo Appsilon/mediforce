@@ -48,8 +48,9 @@ test.describe('GET /api/tasks/[taskId] — API E2E', () => {
       headers: bearerHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
-    const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/not found/i);
+    const body = await res.json() as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('not_found');
+    expect(body.error.message).toMatch(/not found/i);
   });
 
   test('non-existent task id returns the same 404 (indistinguishable from cross-namespace)', async ({ request }) => {
@@ -57,7 +58,8 @@ test.describe('GET /api/tasks/[taskId] — API E2E', () => {
       headers: bearerHeaders(callers.outsider),
     });
     expect(res.status()).toBe(404);
-    const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/not found/i);
+    const body = await res.json() as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('not_found');
+    expect(body.error.message).toMatch(/not found/i);
   });
 });
