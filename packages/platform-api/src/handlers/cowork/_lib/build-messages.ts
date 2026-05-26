@@ -1,20 +1,12 @@
 import type { CoworkSession } from '@mediforce/platform-core';
 import type { McpToolDefinition } from '@mediforce/mcp-client';
+import type { OpenRouterChatMessage } from '../../../services/openrouter-client.js';
 
 /**
  * Message format compatible with OpenRouter / OpenAI chat completions API.
+ * Alias of the generic shape in `services/openrouter-client.ts`.
  */
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
-  tool_call_id?: string;
-  /** Tool calls made by the assistant (for multi-turn tool use) */
-  tool_calls?: Array<{
-    id: string;
-    type: 'function';
-    function: { name: string; arguments: string };
-  }>;
-}
+export type ChatMessage = OpenRouterChatMessage;
 
 /**
  * Tool definition for the update_artifact tool.

@@ -438,56 +438,45 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.cowork.getByInstance');
         return GetCoworkSessionByInstanceOutputSchema.parse(body);
       },
-      chat: async (input) => {
-        const validated = ChatCoworkSessionInputSchema.parse(input);
-        const res = await this.request(
-          `/api/cowork/${encodeURIComponent(validated.sessionId)}/chat`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: validated.message }),
-          },
+      chat: (input) => {
+        const v = ChatCoworkSessionInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/cowork/${encodeURIComponent(v.sessionId)}/chat`,
+          { message: v.message },
+          ChatCoworkSessionOutputSchema,
+          'mediforce.cowork.chat',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.cowork.chat');
-        return ChatCoworkSessionOutputSchema.parse(body);
       },
-      finalize: async (input) => {
-        const validated = FinalizeCoworkSessionInputSchema.parse(input);
-        const res = await this.request(
-          `/api/cowork/${encodeURIComponent(validated.sessionId)}/finalize`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ artifact: validated.artifact }),
-          },
+      finalize: (input) => {
+        const v = FinalizeCoworkSessionInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/cowork/${encodeURIComponent(v.sessionId)}/finalize`,
+          { artifact: v.artifact },
+          FinalizeCoworkSessionOutputSchema,
+          'mediforce.cowork.finalize',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.cowork.finalize');
-        return FinalizeCoworkSessionOutputSchema.parse(body);
       },
-      voiceEphemeralKey: async (input) => {
-        const validated = CreateVoiceEphemeralKeyInputSchema.parse(input);
-        const res = await this.request(
-          `/api/cowork/${encodeURIComponent(validated.sessionId)}/voice/ephemeral-key`,
-          { method: 'POST' },
+      voiceEphemeralKey: (input) => {
+        const v = CreateVoiceEphemeralKeyInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/cowork/${encodeURIComponent(v.sessionId)}/voice/ephemeral-key`,
+          undefined,
+          CreateVoiceEphemeralKeyOutputSchema,
+          'mediforce.cowork.voiceEphemeralKey',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.cowork.voiceEphemeralKey');
-        return CreateVoiceEphemeralKeyOutputSchema.parse(body);
       },
-      voiceSynthesize: async (input) => {
-        const validated = SynthesizeVoiceArtifactInputSchema.parse(input);
-        const res = await this.request(
-          `/api/cowork/${encodeURIComponent(validated.sessionId)}/voice/synthesize`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              transcript: validated.transcript,
-              comment: validated.comment,
-            }),
-          },
+      voiceSynthesize: (input) => {
+        const v = SynthesizeVoiceArtifactInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/cowork/${encodeURIComponent(v.sessionId)}/voice/synthesize`,
+          { transcript: v.transcript, comment: v.comment },
+          SynthesizeVoiceArtifactOutputSchema,
+          'mediforce.cowork.voiceSynthesize',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.cowork.voiceSynthesize');
-        return SynthesizeVoiceArtifactOutputSchema.parse(body);
       },
     };
 
@@ -806,6 +795,34 @@ export class Mediforce {
     const base = this.config.baseUrl ?? '';
     const fetchImpl = this.config.fetch ?? globalThis.fetch;
     return fetchImpl(`${base}${path}`, { ...init, headers });
+  }
+
+  /**
+   * Mutation helper — `request(method, body)` → `parseJsonOrThrow` →
+   * `outputSchema.parse(body)`. Callsites pre-validate input via
+   * `<InputSchema>.parse` so `path` / `body` are typed; this helper covers
+   * everything past that. Single seam for the 16 mutation methods on this
+   * client. Currently applied to the four cowork mutations; the rest are
+   * tracked in #527.
+   *
+   * `body` is `undefined` for verb-only mutations (POST with no payload —
+   * e.g. `cowork.voiceEphemeralKey`, `tasks.claim`). When set, the helper
+   * attaches `Content-Type: application/json` and serializes.
+   */
+  private async sendJson<TOut>(
+    method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+    path: string,
+    body: Record<string, unknown> | undefined,
+    outputSchema: { parse: (b: unknown) => TOut },
+    ctx: string,
+  ): Promise<TOut> {
+    const init: RequestInit = { method };
+    if (body !== undefined) {
+      init.headers = { 'Content-Type': 'application/json' };
+      init.body = JSON.stringify(body);
+    }
+    const res = await this.request(path, init);
+    return outputSchema.parse(await parseJsonOrThrow(res, ctx));
   }
 
   private async buildAuthHeaders(): Promise<Record<string, string>> {

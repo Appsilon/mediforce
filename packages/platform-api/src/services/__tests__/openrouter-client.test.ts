@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { callOpenRouter } from '../openrouter.js';
+import { callOpenRouter } from '../openrouter-client.js';
 
 describe('callOpenRouter', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
@@ -31,12 +31,12 @@ describe('callOpenRouter', () => {
       ),
     );
 
-    const result = await callOpenRouter(
-      'model-x',
-      [{ role: 'user', content: 'hi' }],
-      [],
-      'key-abc',
-    );
+    const result = await callOpenRouter({
+      model: 'model-x',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [],
+      apiKey: 'key-abc',
+    });
 
     expect(result.content).toBe('hello');
     expect(result.toolCalls).toHaveLength(1);
@@ -49,17 +49,56 @@ describe('callOpenRouter', () => {
     });
   });
 
+  it('omits tools from the request body when not provided', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), {
+        status: 200,
+      }),
+    );
+
+    await callOpenRouter({
+      model: 'model-x',
+      messages: [{ role: 'user', content: 'hi' }],
+      apiKey: 'key-abc',
+    });
+
+    const init = fetchSpy.mock.calls[0]![1] as RequestInit;
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect('tools' in body).toBe(false);
+  });
+
+  it('honors temperature + maxTokens overrides', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), {
+        status: 200,
+      }),
+    );
+
+    await callOpenRouter({
+      model: 'm',
+      messages: [{ role: 'user', content: 'hi' }],
+      apiKey: 'k',
+      temperature: 0.3,
+      maxTokens: 1024,
+    });
+
+    const body = JSON.parse(
+      (fetchSpy.mock.calls[0]![1] as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect(body.temperature).toBe(0.3);
+    expect(body.max_tokens).toBe(1024);
+  });
+
   it('returns empty content + empty toolCalls when the model omits them', async () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ choices: [{ message: {} }] }), { status: 200 }),
     );
 
-    const result = await callOpenRouter(
-      'model-x',
-      [{ role: 'user', content: 'hi' }],
-      [],
-      'key-abc',
-    );
+    const result = await callOpenRouter({
+      model: 'model-x',
+      messages: [{ role: 'user', content: 'hi' }],
+      apiKey: 'key-abc',
+    });
     expect(result.content).toBe('');
     expect(result.toolCalls).toEqual([]);
   });
@@ -70,7 +109,11 @@ describe('callOpenRouter', () => {
     );
 
     await expect(
-      callOpenRouter('model-x', [{ role: 'user', content: 'hi' }], [], 'key-abc'),
+      callOpenRouter({
+        model: 'model-x',
+        messages: [{ role: 'user', content: 'hi' }],
+        apiKey: 'key-abc',
+      }),
     ).rejects.toThrow(/Model API error 500/);
   });
 });
