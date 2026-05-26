@@ -4,8 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle, MessageSquare, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
-import { completeTask } from '@/app/actions/tasks';
-import { useAuth } from '@/contexts/auth-context';
+import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
@@ -31,7 +30,6 @@ export function SelectionForm({
   onCompleted,
 }: SelectionFormProps) {
   const handle = useHandleFromPath();
-  const { firebaseUser } = useAuth();
   const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
   const [mode, setMode] = React.useState<'select' | 'revise' | null>(null);
   const [comment, setComment] = React.useState('');
@@ -44,10 +42,11 @@ export function SelectionForm({
     setSubmitting(true);
     setError(null);
 
-    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-    const result = await completeTask(taskId, 'approve', '', selectedIndex, idToken);
-
-    if (result.success) {
+    try {
+      await mediforce.tasks.complete({
+        taskId,
+        payload: { kind: 'verdict', verdict: 'approve', comment: '', selectedIndex },
+      });
       const selected = options[selectedIndex];
       setSubmitted({
         verdict: 'approve',
@@ -57,8 +56,8 @@ export function SelectionForm({
         timestamp: new Date().toISOString(),
       });
       onCompleted?.();
-    } else {
-      setError(result.error ?? 'Failed to submit');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit');
     }
     setSubmitting(false);
   }
@@ -68,18 +67,19 @@ export function SelectionForm({
     setSubmitting(true);
     setError(null);
 
-    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-    const result = await completeTask(taskId, 'revise', comment.trim(), undefined, idToken);
-
-    if (result.success) {
+    try {
+      await mediforce.tasks.complete({
+        taskId,
+        payload: { kind: 'verdict', verdict: 'revise', comment: comment.trim() },
+      });
       setSubmitted({
         verdict: 'revise',
         comment: comment.trim(),
         timestamp: new Date().toISOString(),
       });
       onCompleted?.();
-    } else {
-      setError(result.error ?? 'Failed to submit');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit');
     }
     setSubmitting(false);
   }

@@ -3,13 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { TaskVerdict } from '@mediforce/platform-core';
 
-const mockCompleteTask = vi.fn();
-vi.mock('@/app/actions/tasks', () => ({
-  completeTask: (...args: unknown[]) => mockCompleteTask(...args),
-}));
-
-vi.mock('@/contexts/auth-context', () => ({
-  useAuth: () => ({ firebaseUser: { getIdToken: () => Promise.resolve('test-token') } }),
+vi.mock('@/lib/mediforce', () => ({
+  mediforce: {
+    tasks: {
+      complete: vi.fn(async () => ({ task: {}, run: {} })),
+    },
+  },
 }));
 
 // useHandleFromPath is called by the post-submit confirmation view; mocked
@@ -18,12 +17,15 @@ vi.mock('@/hooks/use-handle-from-path', () => ({
   useHandleFromPath: () => 'test-ns',
 }));
 
+import { mediforce } from '@/lib/mediforce';
 import { VerdictForm, VerdictConfirmationReadOnly } from '../verdict-form';
+
+const completeMock = vi.mocked(mediforce.tasks.complete);
 
 describe('VerdictForm (single-click GitHub flow)', () => {
   beforeEach(() => {
-    mockCompleteTask.mockReset();
-    mockCompleteTask.mockResolvedValue({ success: true });
+    completeMock.mockReset();
+    completeMock.mockResolvedValue({ task: {}, run: {} } as never);
   });
 
   it('renders the legacy two-button UI when verdicts prop is undefined', () => {
@@ -60,8 +62,11 @@ describe('VerdictForm (single-click GitHub flow)', () => {
     render(<VerdictForm taskId="t1" disabled={false} verdicts={verdicts} />);
     await user.click(screen.getByRole('button', { name: /Accept delivery/ }));
 
-    await waitFor(() => expect(mockCompleteTask).toHaveBeenCalledTimes(1));
-    expect(mockCompleteTask).toHaveBeenCalledWith('t1', 'accept', '', undefined, 'test-token');
+    await waitFor(() => expect(completeMock).toHaveBeenCalledTimes(1));
+    expect(completeMock).toHaveBeenCalledWith({
+      taskId: 't1',
+      payload: { kind: 'verdict', verdict: 'accept', comment: '' },
+    });
   });
 
   it('disables a requiresComment verdict button until a comment is typed', async () => {
@@ -78,8 +83,11 @@ describe('VerdictForm (single-click GitHub flow)', () => {
     expect(rejectBtn).not.toBeDisabled();
 
     await user.click(rejectBtn);
-    await waitFor(() => expect(mockCompleteTask).toHaveBeenCalledTimes(1));
-    expect(mockCompleteTask).toHaveBeenCalledWith('t1', 'reject', 'broken manifest', undefined, 'test-token');
+    await waitFor(() => expect(completeMock).toHaveBeenCalledTimes(1));
+    expect(completeMock).toHaveBeenCalledWith({
+      taskId: 't1',
+      payload: { kind: 'verdict', verdict: 'reject', comment: 'broken manifest' },
+    });
   });
 
   it('passes the typed comment with a non-required verdict when present', async () => {
@@ -92,8 +100,11 @@ describe('VerdictForm (single-click GitHub flow)', () => {
     await user.type(screen.getByRole('textbox'), 'looks good');
     await user.click(screen.getByRole('button', { name: /Approve/ }));
 
-    await waitFor(() => expect(mockCompleteTask).toHaveBeenCalledTimes(1));
-    expect(mockCompleteTask).toHaveBeenCalledWith('t1', 'approve', 'looks good', undefined, 'test-token');
+    await waitFor(() => expect(completeMock).toHaveBeenCalledTimes(1));
+    expect(completeMock).toHaveBeenCalledWith({
+      taskId: 't1',
+      payload: { kind: 'verdict', verdict: 'approve', comment: 'looks good' },
+    });
   });
 });
 

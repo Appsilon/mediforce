@@ -51,15 +51,21 @@ vi.mock('@/contexts/auth-context', () => ({
   useAuth: () => ({ firebaseUser: { getIdToken: vi.fn().mockResolvedValue('mock-id-token') } }),
 }));
 
-// Mock server actions (all consolidated in tasks.ts)
-const mockCompleteUploadTask = vi.fn().mockResolvedValue({ success: true });
-vi.mock('@/app/actions/tasks', () => ({
-  completeUploadTask: (...args: unknown[]) => mockCompleteUploadTask(...args),
-  completeTask: vi.fn().mockResolvedValue({ success: true }),
-  completeParamsTask: vi.fn().mockResolvedValue({ success: true }),
+// Mock typed mediforce client
+vi.mock('@/lib/mediforce', () => ({
+  mediforce: {
+    tasks: {
+      complete: vi.fn(async () => ({ task: {}, run: {} })),
+      list: vi.fn(async () => ({ tasks: [] })),
+      get: vi.fn(async (input: { taskId: string }) => ({ id: input.taskId })),
+    },
+  },
 }));
 
+import { mediforce } from '@/lib/mediforce';
 import { TaskDetail } from '../task-detail';
+
+const completeMock = vi.mocked(mediforce.tasks.complete);
 
 function createUploadTask(overrides?: Partial<HumanTask>): HumanTask {
   return buildHumanTask({
@@ -215,12 +221,14 @@ describe('TaskDetail — file upload integration', () => {
     const uploadButton = screen.getByRole('button', { name: /upload/i });
     await user.click(uploadButton);
 
-    expect(mockCompleteUploadTask).toHaveBeenCalledTimes(1);
-    expect(mockCompleteUploadTask).toHaveBeenCalledWith(
-      task.id,
-      [expect.objectContaining({ name: 'protocol.pdf', downloadUrl: 'https://storage.example.com/file.pdf' })],
-      expect.any(String),
-    );
+    expect(completeMock).toHaveBeenCalledTimes(1);
+    expect(completeMock).toHaveBeenCalledWith({
+      taskId: task.id,
+      payload: {
+        kind: 'upload',
+        attachments: [expect.objectContaining({ name: 'protocol.pdf', downloadUrl: 'https://storage.example.com/file.pdf' })],
+      },
+    });
   });
 
   it('[RENDER] shows completion state after successful upload', async () => {
@@ -266,7 +274,7 @@ describe('TaskDetail — file upload integration', () => {
   });
 
   it('[ERROR] shows error when upload fails', async () => {
-    mockCompleteUploadTask.mockResolvedValueOnce({ success: false, error: 'Storage error' });
+    completeMock.mockRejectedValueOnce(new Error('Storage error'));
     const user = userEvent.setup();
     const task = createUploadTask();
 

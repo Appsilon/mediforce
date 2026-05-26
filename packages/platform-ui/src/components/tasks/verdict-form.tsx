@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle, MessageSquare, Loader2, XCircle, Circle } from 'lucide-react';
 import type { TaskVerdict } from '@mediforce/platform-core';
-import { completeTask } from '@/app/actions/tasks';
-import { useAuth } from '@/contexts/auth-context';
+import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
@@ -49,7 +48,6 @@ export function VerdictForm({
   verdicts,
   onCompleted,
 }: VerdictFormProps) {
-  const { firebaseUser } = useAuth();
   const resolved = verdicts && verdicts.length > 0 ? verdicts : LEGACY_VERDICTS;
   const [comment, setComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState<string | null>(null);
@@ -66,10 +64,11 @@ export function VerdictForm({
     setSubmitting(cfg.key);
     setError(null);
 
-    const idToken = firebaseUser ? await firebaseUser.getIdToken() : '';
-    const result = await completeTask(taskId, cfg.key, trimmedComment, undefined, idToken);
-
-    if (result.success) {
+    try {
+      await mediforce.tasks.complete({
+        taskId,
+        payload: { kind: 'verdict', verdict: cfg.key, comment: trimmedComment },
+      });
       setSubmittedData({
         verdict: cfg.key,
         intent: cfg.intent,
@@ -79,8 +78,8 @@ export function VerdictForm({
       });
       setSubmitted(true);
       onCompleted?.();
-    } else {
-      setError(result.error ?? 'Failed to submit verdict');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit verdict');
       setSubmitting(null);
     }
   }

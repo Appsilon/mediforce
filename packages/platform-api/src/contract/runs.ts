@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { InstanceStatusSchema } from '@mediforce/platform-core';
+import { InstanceStatusSchema, ProcessInstanceSchema } from '@mediforce/platform-core';
 
 /**
  * Contract for `GET /api/runs/<runId>`.
@@ -36,6 +36,10 @@ export type GetRunOutput = z.infer<typeof GetRunOutputSchema>;
  * Contract for `POST /api/processes` — fires a manual trigger and creates
  * a new run for the named workflow definition. Server picks the latest
  * version when `definitionVersion` is omitted.
+ *
+ * Response is the post-creation entity echo per ADR-0005 §5 (`{ run }`).
+ * This replaces the pre-Phase-3 `{ instanceId, status }` shape; UI and
+ * CLI callers swap to `result.run.id` / `result.run.status`.
  */
 export const StartRunInputSchema = z.object({
   namespace: z.string().min(1).optional(),
@@ -47,8 +51,7 @@ export const StartRunInputSchema = z.object({
 });
 
 export const StartRunOutputSchema = z.object({
-  instanceId: z.string().min(1),
-  status: z.string().min(1),
+  run: ProcessInstanceSchema,
 });
 
 export type StartRunInput = z.infer<typeof StartRunInputSchema>;

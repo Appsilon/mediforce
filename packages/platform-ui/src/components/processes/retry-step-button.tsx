@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { RotateCw, Check } from 'lucide-react';
-import { retryFailedStep } from '@/app/actions/processes';
+import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 
 interface RetryStepButtonProps {
@@ -24,10 +24,10 @@ export function RetryStepButton({ instanceId, stepId }: RetryStepButtonProps) {
     setStatus('submitting');
     setError(null);
 
-    const result = await retryFailedStep(instanceId, stepId);
-
-    if (!result.success) {
-      setError(result.error ?? 'Retry failed');
+    try {
+      await mediforce.runs.retryStep({ runId: instanceId, stepId });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Retry failed');
       setStatus('error');
       return;
     }

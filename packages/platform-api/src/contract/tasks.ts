@@ -1,5 +1,18 @@
 import { z } from 'zod';
-import { HumanTaskSchema, HumanTaskStatusSchema, type HumanTaskStatus } from '@mediforce/platform-core';
+import {
+  HumanTaskSchema,
+  HumanTaskStatusSchema,
+  ProcessInstanceSchema,
+  CompleteHumanTaskPayloadSchema,
+  AttachmentSchema,
+  AssignmentItemSchema,
+  TableEditorRowSchema,
+  type HumanTaskStatus,
+  type Attachment,
+  type AssignmentItem,
+  type TableEditorRow,
+  type CompleteHumanTaskPayload,
+} from '@mediforce/platform-core';
 
 /**
  * Contract for `GET /api/tasks`.
@@ -86,3 +99,57 @@ export const ClaimTaskOutputSchema = z.object({
 
 export type ClaimTaskInput = z.infer<typeof ClaimTaskInputSchema>;
 export type ClaimTaskOutput = z.infer<typeof ClaimTaskOutputSchema>;
+
+/**
+ * Contract for `POST /api/tasks/:taskId/complete`.
+ *
+ * Single endpoint accepting one of five payload shapes via a discriminated
+ * union on `kind`. The variant must match the task's UI component / params
+ * configuration; the engine validates the match and returns
+ * `precondition_failed` on mismatch.
+ *
+ * Variants (decided 2026-05-26):
+ *   - `verdict`     — review/decision tasks with optional `comment` and
+ *                     `selectedIndex` (for n-of options). The set of valid
+ *                     verdicts is per-task (`task.verdicts`), with the
+ *                     legacy `approve | revise` fallback for older tasks.
+ *   - `params`      — params-form tasks; `paramValues` keyed by `task.params[i].key`.
+ *   - `upload`      — file-upload tasks; `attachments` constrained by
+ *                     `task.ui.config.{minFiles,maxFiles,acceptedTypes}`.
+ *   - `assignment`  — assignment-table tasks; one entry per item.
+ *   - `rows`        — table-editor tasks; one row per item, free-form values.
+ *
+ * Discriminator field `kind` follows the codebase convention (operation /
+ * payload variants); `type` is reserved for protocol/external variants.
+ *
+ * Response is the post-completion entity echo per ADR-0005 §5 —
+ * `{ task, run }` covers both sides of the state transition (task →
+ * completed, run → running, advanced to next step or paused if next step is
+ * human).
+ */
+
+// Payload schemas live in `@mediforce/platform-core` so `workflow-engine`
+// (which validates them inside `engine.completeHumanTask`) can import them
+// without an upward dep on platform-api. Re-exported here for clients of
+// `@mediforce/platform-api/contract` that only need the HTTP shape.
+export {
+  AttachmentSchema,
+  AssignmentItemSchema,
+  TableEditorRowSchema,
+  CompleteHumanTaskPayloadSchema as CompleteTaskPayloadSchema,
+};
+export type { Attachment, AssignmentItem, TableEditorRow };
+export type CompleteTaskPayload = CompleteHumanTaskPayload;
+
+export const CompleteTaskInputSchema = z.object({
+  taskId: z.string().min(1),
+  payload: CompleteHumanTaskPayloadSchema,
+});
+
+export const CompleteTaskOutputSchema = z.object({
+  task: HumanTaskSchema,
+  run: ProcessInstanceSchema,
+});
+
+export type CompleteTaskInput = z.infer<typeof CompleteTaskInputSchema>;
+export type CompleteTaskOutput = z.infer<typeof CompleteTaskOutputSchema>;

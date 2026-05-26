@@ -359,6 +359,12 @@ Closed action-name set (extensible by amendment):
   `cron/heartbeat` handler. Snapshot: `{ triggerName, definitionName,
   definitionVersion, instanceId }`. `cron.heartbeat` itself stays
   `@no-audit` (heartbeat call is operational; only the sub-events emit).
+- `process.resumed_after_task` — emitted by the migrated `tasks/complete`
+  handler after the parent instance is flipped from paused back to running.
+  Distinct from `instance.resumed` (operator-initiated manual resume); this
+  one specifically marks "advancement after a task verdict / params /
+  upload / assignment / rows completion." Preserves the pre-migration
+  emission from `lib/resolve-task.ts` — move-not-add per §7.
 
 **Phase 3 inherits (no new handler-bridge emit needed):**
 - `tasks/complete` migration → `task.completed` (already in set; same

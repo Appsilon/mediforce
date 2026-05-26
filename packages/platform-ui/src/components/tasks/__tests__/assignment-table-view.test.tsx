@@ -10,16 +10,18 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-vi.mock('@/contexts/auth-context', () => ({
-  useAuth: () => ({ firebaseUser: { getIdToken: vi.fn().mockResolvedValue('mock-id-token') } }),
+vi.mock('@/lib/mediforce', () => ({
+  mediforce: {
+    tasks: {
+      complete: vi.fn(async () => ({ task: {}, run: {} })),
+    },
+  },
 }));
 
-const mockCompleteAssignmentTask = vi.fn().mockResolvedValue({ success: true });
-vi.mock('@/app/actions/tasks', () => ({
-  completeAssignmentTask: (...args: unknown[]) => mockCompleteAssignmentTask(...args),
-}));
-
+import { mediforce } from '@/lib/mediforce';
 import { AssignmentTableView } from '../assignment-table-view';
+
+const completeMock = vi.mocked(mediforce.tasks.complete);
 
 function buildAssignmentTask(overrides: {
   items?: Record<string, unknown>[];
@@ -155,10 +157,11 @@ describe('AssignmentTableView', () => {
 
     await user.click(screen.getByRole('button', { name: /submit|confirm/i }));
 
-    expect(mockCompleteAssignmentTask).toHaveBeenCalledTimes(1);
-    expect(mockCompleteAssignmentTask).toHaveBeenCalledWith(
-      task.id,
-      {
+    expect(completeMock).toHaveBeenCalledTimes(1);
+    expect(completeMock).toHaveBeenCalledWith({
+      taskId: task.id,
+      payload: {
+        kind: 'assignment',
         assignments: [
           {
             itemId: '401',
@@ -177,8 +180,7 @@ describe('AssignmentTableView', () => {
           },
         ],
       },
-      expect.any(String),
-    );
+    });
   });
 
   it('[CLICK] excludes skipped rows from assignments', async () => {
@@ -196,10 +198,11 @@ describe('AssignmentTableView', () => {
 
     await user.click(screen.getByRole('button', { name: /submit|confirm/i }));
 
-    expect(mockCompleteAssignmentTask).toHaveBeenCalledTimes(1);
-    const [, payload] = mockCompleteAssignmentTask.mock.calls[0];
-    expect((payload as { assignments: unknown[] }).assignments).toHaveLength(1);
-    expect((payload as { assignments: { itemId: string }[] }).assignments[0].itemId).toBe('501');
+    expect(completeMock).toHaveBeenCalledTimes(1);
+    const [input] = completeMock.mock.calls[0];
+    const payload = (input as { payload: { assignments: { itemId: string }[] } }).payload;
+    expect(payload.assignments).toHaveLength(1);
+    expect(payload.assignments[0].itemId).toBe('501');
   });
 
   it('[RENDER] completed task shows confirmation summary', () => {

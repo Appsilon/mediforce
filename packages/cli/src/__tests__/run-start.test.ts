@@ -8,6 +8,32 @@ beforeEach(() => {
 
 const BASE_ENV = { MEDIFORCE_API_KEY: 'k' };
 
+// Minimal ProcessInstance shape — entity-echo response per ADR-0005 §5.
+// Replaces the pre-Phase-3 `{ instanceId, status }` mock shape.
+function mkRun(id: string, status = 'running'): { run: Record<string, unknown> } {
+  return {
+    run: {
+      id,
+      definitionName: 'my-wf',
+      definitionVersion: '1',
+      status,
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: '2026-05-26T00:00:00.000Z',
+      updatedAt: '2026-05-26T00:00:00.000Z',
+      createdBy: 'test',
+      pauseReason: null,
+      error: null,
+      assignedRoles: [],
+      deleted: false,
+      archived: false,
+      namespace: 'test',
+    },
+  };
+}
+
 describe('run start command', () => {
   it('prints help on --help and exits 0', async () => {
     const output = captureOutput();
@@ -27,7 +53,7 @@ describe('run start command', () => {
 
   it('starts a run without payload', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ instanceId: 'inst-1', status: 'running' }),
+      jsonResponse(mkRun('inst-1')),
     );
     const output = captureOutput();
     const code = await runStartCommand({
@@ -43,7 +69,7 @@ describe('run start command', () => {
 
   it('passes --namespace to the start run request body', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ instanceId: 'inst-ns', status: 'running' }),
+      jsonResponse(mkRun('inst-ns')),
     );
     const output = captureOutput();
     const code = await runStartCommand({
@@ -59,7 +85,7 @@ describe('run start command', () => {
 
   it('passes inline --input JSON as payload', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ instanceId: 'inst-2', status: 'running' }),
+      jsonResponse(mkRun('inst-2')),
     );
     const output = captureOutput();
     const code = await runStartCommand({
@@ -122,7 +148,7 @@ describe('run start command', () => {
 
   it('reads payload from stdin via --input-file -', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ instanceId: 'inst-3', status: 'running' }),
+      jsonResponse(mkRun('inst-3')),
     );
     const output = captureOutput();
     const code = await runStartCommand({
@@ -163,7 +189,7 @@ describe('run start command', () => {
 
   it('outputs JSON on --json flag', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ instanceId: 'inst-4', status: 'running' }),
+      jsonResponse(mkRun('inst-4')),
     );
     const output = captureOutput();
     const code = await runStartCommand({
@@ -173,6 +199,6 @@ describe('run start command', () => {
     });
     expect(code).toBe(0);
     const parsed = JSON.parse(output.stdoutLines[0]!);
-    expect(parsed.instanceId).toBe('inst-4');
+    expect(parsed.run.id).toBe('inst-4');
   });
 });

@@ -249,3 +249,14 @@ export {
   type UpdateModelRegistryEntryInput,
   type UpdateRankingsInput,
 } from './model-registry.js';
+
+export {
+  AttachmentSchema,
+  AssignmentItemSchema,
+  TableEditorRowSchema,
+  CompleteHumanTaskPayloadSchema,
+  type Attachment,
+  type AssignmentItem,
+  type TableEditorRow,
+  type CompleteHumanTaskPayload,
+} from './task-completion.js';

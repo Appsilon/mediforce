@@ -41,3 +41,24 @@ export class MaxIterationsExceededError extends Error {
     super(`Step '${stepId}' exceeded max iterations limit of ${limit}`);
   }
 }
+
+/**
+ * Thrown by `WorkflowEngine.completeHumanTask` when the supplied payload
+ * fails per-variant validation against the task's runtime config — verdict
+ * not in allowlist, missing required comment, file count out of range, etc.
+ *
+ * Distinct from `InvalidTransitionError` (state) and Zod parse errors
+ * (shape) — this is the kind that needs the task's own data to detect, so
+ * neither schema validation nor pure state checking covers it. The route
+ * adapter maps it to HTTP 400 (validation).
+ */
+export class CompleteHumanTaskValidationError extends Error {
+  override name = 'CompleteHumanTaskValidationError';
+
+  constructor(
+    message: string,
+    public readonly details?: Record<string, unknown>,
+  ) {
+    super(message);
+  }
+}

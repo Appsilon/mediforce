@@ -55,14 +55,24 @@ import {
   ListPluginsOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
+  CompleteTaskInputSchema,
+  CompleteTaskOutputSchema,
   CancelRunInputSchema,
   CancelRunOutputSchema,
+  ResumeRunInputSchema,
+  ResumeRunOutputSchema,
+  RetryStepInputSchema,
+  RetryStepOutputSchema,
+  HeartbeatInputSchema,
+  HeartbeatOutputSchema,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
   type GetTaskOutput,
   type ClaimTaskInput,
   type ClaimTaskOutput,
+  type CompleteTaskInput,
+  type CompleteTaskOutput,
   type RegisterWorkflowInput,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
@@ -122,6 +132,12 @@ import {
   type GetProcessStepsOutput,
   type CancelRunInput,
   type CancelRunOutput,
+  type ResumeRunInput,
+  type ResumeRunOutput,
+  type RetryStepInput,
+  type RetryStepOutput,
+  type HeartbeatInput,
+  type HeartbeatOutput,
   type GetCoworkSessionInput,
   type GetCoworkSessionOutput,
   type GetCoworkSessionByInstanceInput,
@@ -201,6 +217,7 @@ export class Mediforce {
     list: (input: ListTasksInput) => Promise<ListTasksOutput>;
     get: (input: GetTaskInput) => Promise<GetTaskOutput>;
     claim: (input: ClaimTaskInput) => Promise<ClaimTaskOutput>;
+    complete: (input: CompleteTaskInput) => Promise<CompleteTaskOutput>;
   };
 
   readonly processes: {
@@ -238,6 +255,8 @@ export class Mediforce {
     get: (input: GetRunInput) => Promise<GetRunOutput>;
     start: (input: StartRunInput) => Promise<StartRunOutput>;
     cancel: (input: CancelRunInput) => Promise<CancelRunOutput>;
+    resume: (input: ResumeRunInput) => Promise<ResumeRunOutput>;
+    retryStep: (input: RetryStepInput) => Promise<RetryStepOutput>;
   };
 
   readonly agents: {
@@ -263,6 +282,10 @@ export class Mediforce {
     dockerInfo: () => Promise<DockerInfoResponse>;
     removeImage: (imageId: string) => Promise<RemoveImageOutput>;
     credits: (input: OpenRouterCreditsInput) => Promise<OpenRouterCreditsOutput>;
+  };
+
+  readonly cron: {
+    heartbeat: (input?: HeartbeatInput) => Promise<HeartbeatOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -329,6 +352,19 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.tasks.claim');
         return ClaimTaskOutputSchema.parse(body);
+      },
+      complete: async (input) => {
+        const validated = CompleteTaskInputSchema.parse(input);
+        const res = await this.request(
+          `/api/tasks/${encodeURIComponent(validated.taskId)}/complete`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(validated.payload),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.tasks.complete');
+        return CompleteTaskOutputSchema.parse(body);
       },
     };
 
@@ -596,6 +632,24 @@ export class Mediforce {
         const parsed = await parseJsonOrThrow(res, 'mediforce.runs.cancel');
         return CancelRunOutputSchema.parse(parsed);
       },
+      resume: async (input) => {
+        const validated = ResumeRunInputSchema.parse(input);
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.runId)}/resume`,
+          { method: 'POST' },
+        );
+        const parsed = await parseJsonOrThrow(res, 'mediforce.runs.resume');
+        return ResumeRunOutputSchema.parse(parsed);
+      },
+      retryStep: async (input) => {
+        const validated = RetryStepInputSchema.parse(input);
+        const res = await this.request(
+          `/api/processes/${encodeURIComponent(validated.runId)}/steps/${encodeURIComponent(validated.stepId)}/retry`,
+          { method: 'POST' },
+        );
+        const parsed = await parseJsonOrThrow(res, 'mediforce.runs.retryStep');
+        return RetryStepOutputSchema.parse(parsed);
+      },
     };
 
     this.secrets = {
@@ -653,6 +707,15 @@ export class Mediforce {
         const res = await this.request(`/api/system/openrouter-credits${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.system.credits');
         return OpenRouterCreditsOutputSchema.parse(body);
+      },
+    };
+
+    this.cron = {
+      heartbeat: async (input) => {
+        HeartbeatInputSchema.parse(input ?? {});
+        const res = await this.request('/api/cron/heartbeat', { method: 'POST' });
+        const body = await parseJsonOrThrow(res, 'mediforce.cron.heartbeat');
+        return HeartbeatOutputSchema.parse(body);
       },
     };
   }

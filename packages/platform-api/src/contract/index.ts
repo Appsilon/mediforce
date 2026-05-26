@@ -5,6 +5,12 @@ export {
   GetTaskOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
+  CompleteTaskInputSchema,
+  CompleteTaskOutputSchema,
+  CompleteTaskPayloadSchema,
+  AttachmentSchema,
+  AssignmentItemSchema,
+  TableEditorRowSchema,
   ACTIONABLE_STATUSES,
   type ListTasksInput,
   type ListTasksOutput,
@@ -12,6 +18,12 @@ export {
   type GetTaskOutput,
   type ClaimTaskInput,
   type ClaimTaskOutput,
+  type CompleteTaskInput,
+  type CompleteTaskOutput,
+  type CompleteTaskPayload,
+  type Attachment,
+  type AssignmentItem,
+  type TableEditorRow,
 } from './tasks.js';
 
 export {
@@ -148,6 +160,10 @@ export {
   StepExecutorTypeSchema,
   CancelRunInputSchema,
   CancelRunOutputSchema,
+  ResumeRunInputSchema,
+  ResumeRunOutputSchema,
+  RetryStepInputSchema,
+  RetryStepOutputSchema,
   type GetProcessInput,
   type GetProcessOutput,
   type ListAuditEventsInput,
@@ -159,6 +175,10 @@ export {
   type StepExecutorType,
   type CancelRunInput,
   type CancelRunOutput,
+  type ResumeRunInput,
+  type ResumeRunOutput,
+  type RetryStepInput,
+  type RetryStepOutput,
 } from './processes.js';
 
 export {
@@ -180,3 +200,14 @@ export {
   type ListPluginsOutput,
   type PluginSummary,
 } from './plugins.js';
+
+export {
+  HeartbeatInputSchema,
+  HeartbeatOutputSchema,
+  TriggeredEntrySchema,
+  SkippedEntrySchema,
+  type HeartbeatInput,
+  type HeartbeatOutput,
+  type TriggeredEntry,
+  type SkippedEntry,
+} from './cron.js';
