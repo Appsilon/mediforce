@@ -21,11 +21,11 @@ describe('backlog-triage', () => {
     expect(result.success).toBe(true);
   });
 
-  it('has exactly one terminal step and seven total', () => {
+  it('has exactly one terminal step and eight total', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.steps).toHaveLength(7);
+    expect(result.data.steps).toHaveLength(8);
     expect(result.data.steps.filter((s) => s.type === 'terminal')).toHaveLength(1);
   });
 
@@ -66,7 +66,7 @@ describe('backlog-triage', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
-    for (const stepId of ['fetch-backlog', 'check-tags', 'dispatch']) {
+    for (const stepId of ['fetch-backlog', 'check-tags', 'dispatch', 'apply-tags']) {
       const step = result.data.steps.find((s) => s.id === stepId);
       expect(step?.executor).toBe('script');
       expect(step?.plugin).toBe('script-container');
@@ -76,24 +76,42 @@ describe('backlog-triage', () => {
     }
   });
 
-  it('check-tags writes presentation.md when issues are missing tags', () => {
+  it('check-tags carries untagged issues forward as options and writes no presentation file', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'check-tags');
-    expect(step?.agent?.inlineScript).toMatch(/presentation\.md/);
-    expect(step?.agent?.inlineScript).not.toMatch(/presentation\.html/);
+    expect(step?.agent?.inlineScript).toMatch(/options: untagged/);
+    expect(step?.agent?.inlineScript).not.toMatch(/presentation\./);
     expect(step?.agent?.inlineScript).toMatch(/needsTagging/);
   });
 
-  it('tag-issues human step has a single Done verdict looping back to fetch-backlog', () => {
+  it('tag-issues is a human table-editor step (category + priority) with no verdict', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'tag-issues');
     expect(step?.executor).toBe('human');
-    expect(step?.ui).toBeUndefined();
-    expect(step?.verdicts?.done?.target).toBe('fetch-backlog');
+    expect(step?.ui?.component).toBe('table-editor');
+    expect(step?.verdicts).toBeUndefined();
+    const config = step?.ui?.config as Record<string, unknown>;
+    const columns = config.columns as Array<{ id: string; kind: string; allowEmpty?: boolean }>;
+    expect(columns.find((c) => c.id === 'category')?.kind).toBe('single-select');
+    expect(columns.find((c) => c.id === 'category')?.allowEmpty).toBe(false);
+    expect(columns.some((c) => c.id === 'priority')).toBe(true);
+  });
+
+  it('tag-issues → apply-tags → fetch-backlog forms the tagging loop', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const t = (from: string, to: string) =>
+      result.data.transitions.some((tr) => tr.from === from && tr.to === to);
+    expect(t('tag-issues', 'apply-tags')).toBe(true);
+    expect(t('apply-tags', 'fetch-backlog')).toBe(true);
+    const applyTags = result.data.steps.find((s) => s.id === 'apply-tags');
+    expect(applyTags?.executor).toBe('script');
+    expect(applyTags?.agent?.inlineScript).toMatch(/issues\/\$\{itemId\}\/labels/);
   });
 
   it('propose-assignments is an L4 agent step that mentions sprintDays + AI-bottleneck guidance', () => {

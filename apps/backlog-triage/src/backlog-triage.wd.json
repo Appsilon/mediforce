@@ -68,18 +68,54 @@
       "agent": {
         "image": "mediforce-golden-image:latest",
         "runtime": "javascript",
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const options = input.options || [];\n  const repo = input.repo;\n  const CATEGORIES = ['ux', 'tech-debt', 'infra', 'security', 'product', 'workflow', 'engine', 'bug', 'enhancement'];\n  const categorySet = new Set(CATEGORIES.map((s) => s.toLowerCase()));\n  const untagged = options.filter((o) => {\n    const labels = (o.badges || o.raw?.labels || []).map((l) => String(l).toLowerCase());\n    return !labels.some((l) => categorySet.has(l));\n  });\n  const needsTagging = untagged.length > 0;\n  if (needsTagging) {\n    const escMd = (s) => String(s ?? '').replace(/[\\[\\]]/g, '\\\\$&');\n    const bullets = untagged.map((o) => {\n      const meta = (o.badges || []).length > 0 ? ` _(${(o.badges || []).join(', ')})_` : ' _no labels_';\n      return `- [${escMd(o.label)}](${o.href})${meta}`;\n    }).join('\\n');\n    const md = `## ${untagged.length} issue(s) need a category tag\\n\\nOpen each on GitHub and add at least one of: \\`${CATEGORIES.join('\\`, \\`')}\\`. Then submit below — the workflow will re-fetch and re-check.\\n\\n${bullets}\\n`;\n    writeFileSync('/output/presentation.md', md);\n    writeFileSync('/output/result.json', JSON.stringify({ needsTagging: true, untaggedCount: untagged.length, repo, summary: `${untagged.length} of ${options.length} issue(s) need a category tag` }));\n    console.log(`check-tags: ${untagged.length}/${options.length} untagged — routing to tag-issues`);\n  } else {\n    writeFileSync('/output/result.json', JSON.stringify({ needsTagging: false, options, repo, summary: `All ${options.length} issue(s) carry a category tag` }));\n    console.log(`check-tags: all ${options.length} tagged — routing to propose-assignments`);\n  }\n} catch (err) {\n  console.error('check-tags crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const options = input.options || [];\n  const repo = input.repo;\n  const CATEGORIES = ['ux', 'tech-debt', 'infra', 'security', 'product', 'workflow', 'engine', 'bug', 'enhancement'];\n  const categorySet = new Set(CATEGORIES.map((s) => s.toLowerCase()));\n  const untagged = options.filter((o) => {\n    const labels = (o.badges || o.raw?.labels || []).map((l) => String(l).toLowerCase());\n    return !labels.some((l) => categorySet.has(l));\n  });\n  const needsTagging = untagged.length > 0;\n  if (needsTagging) {\n    writeFileSync('/output/result.json', JSON.stringify({ needsTagging: true, untaggedCount: untagged.length, options: untagged, repo, summary: `${untagged.length} of ${options.length} issue(s) need a category tag` }));\n    console.log(`check-tags: ${untagged.length}/${options.length} untagged — routing to tag-issues`);\n  } else {\n    writeFileSync('/output/result.json', JSON.stringify({ needsTagging: false, options, repo, summary: `All ${options.length} issue(s) carry a category tag` }));\n    console.log(`check-tags: all ${options.length} tagged — routing to propose-assignments`);\n  }\n} catch (err) {\n  console.error('check-tags crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
       }
     },
     {
       "id": "tag-issues",
-      "name": "Tag missing issues on GitHub",
-      "type": "review",
+      "name": "Tag issues",
+      "type": "creation",
       "executor": "human",
       "allowedRoles": ["triager"],
-      "description": "The previous step listed issues lacking a category label. Open each, add a category tag on GitHub, then submit below — the workflow re-fetches and re-checks. Loops until every issue is tagged.",
-      "verdicts": {
-        "done": { "target": "fetch-backlog", "label": "I've tagged them — re-check", "intent": "success" }
+      "description": "Reviewer picks a category (and a priority hint) for each untagged issue in a table, then submits. The next step applies the labels on GitHub via the API and the workflow loops back to re-fetch and re-check — no GitHub round-trip for the reviewer.",
+      "ui": {
+        "component": "table-editor",
+        "config": {
+          "submitLabel": "Apply tags",
+          "columns": [
+            { "id": "issue", "kind": "static", "label": "Issue", "field": "label", "link": true },
+            { "id": "existing", "kind": "static", "label": "Existing labels", "field": "badges" },
+            {
+              "id": "category",
+              "kind": "single-select",
+              "label": "Category",
+              "allowEmpty": false,
+              "options": [
+                { "id": "ux", "label": "UX" },
+                { "id": "tech-debt", "label": "Tech debt" },
+                { "id": "infra", "label": "Infra" },
+                { "id": "security", "label": "Security" },
+                { "id": "product", "label": "Product" },
+                { "id": "workflow", "label": "Workflow" },
+                { "id": "engine", "label": "Engine" },
+                { "id": "bug", "label": "Bug" },
+                { "id": "enhancement", "label": "Enhancement" }
+              ]
+            },
+            {
+              "id": "priority",
+              "kind": "single-select",
+              "label": "Priority",
+              "default": "P2",
+              "options": [
+                { "id": "P0", "label": "P0" },
+                { "id": "P1", "label": "P1" },
+                { "id": "P2", "label": "P2" },
+                { "id": "P3", "label": "P3" }
+              ]
+            }
+          ]
+        }
       }
     },
     {
@@ -142,6 +178,20 @@
       }
     },
     {
+      "id": "apply-tags",
+      "name": "Apply tags on GitHub",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Reads the submitted rows and POSTs each issue's category + priority/<P> labels to GitHub, creating any label the repo lacks first (201/422 both mean it exists). Per-row errors accumulate; the step exits 0 with errors[] so the loop re-presents any that failed.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const rows = input.rows || [];\n  const repo = input.repo || input.steps?.['fetch-backlog']?.repo;\n  const token = process.env.GITHUB_TOKEN;\n  if (repo && !/^[\\w.-]+\\/[\\w.-]+$/.test(repo)) { console.error(`invalid repo format: '${repo}'`); process.exit(1); }\n  const ghHeaders = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' };\n  const applied = [];\n  const errors = [];\n  const ensured = new Set();\n  for (const row of rows) {\n    const itemId = row.itemId;\n    const values = row.values || {};\n    const labels = [];\n    if (values.category) labels.push(String(values.category));\n    if (values.priority) labels.push(`priority/${values.priority}`);\n    try {\n      if (!repo || !token) { errors.push({ itemId, message: 'repo or GITHUB_TOKEN missing' }); continue; }\n      if (labels.length === 0) { errors.push({ itemId, message: 'no category/priority selected' }); continue; }\n      let createFailed = false;\n      for (const label of labels) {\n        if (ensured.has(label)) continue;\n        const createRes = await fetch(`https://api.github.com/repos/${repo}/labels`, {\n          method: 'POST', headers: ghHeaders,\n          body: JSON.stringify({ name: label, color: 'ededed' }),\n        });\n        if (createRes.ok || createRes.status === 422) { ensured.add(label); }\n        else { const body = await createRes.text(); errors.push({ itemId, label, step: 'create-label', message: `GitHub POST /labels ${createRes.status}: ${body.slice(0,200)}` }); createFailed = true; break; }\n      }\n      if (createFailed) continue;\n      const res = await fetch(`https://api.github.com/repos/${repo}/issues/${itemId}/labels`, {\n        method: 'POST', headers: ghHeaders,\n        body: JSON.stringify({ labels }),\n      });\n      if (!res.ok) { const body = await res.text(); errors.push({ itemId, step: 'add-labels', message: `GitHub POST /labels ${res.status}: ${body.slice(0,200)}` }); continue; }\n      applied.push({ itemId, labels });\n    } catch (err) {\n      errors.push({ itemId, message: String(err?.message ?? err) });\n    }\n  }\n  console.log(`Applied tags to ${applied.length} issue(s), ${errors.length} error(s)`);\n  writeFileSync('/output/result.json', JSON.stringify({ applied, errors, repo, summary: `Applied tags to ${applied.length} issue(s), ${errors.length} error(s)` }));\n} catch (err) {\n  console.error('apply-tags crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
       "id": "report",
       "name": "Done",
       "type": "terminal",
@@ -153,6 +203,8 @@
     { "from": "fetch-backlog", "to": "check-tags" },
     { "from": "check-tags", "to": "tag-issues", "when": "output.needsTagging == true" },
     { "from": "check-tags", "to": "propose-assignments", "when": "output.needsTagging == false" },
+    { "from": "tag-issues", "to": "apply-tags" },
+    { "from": "apply-tags", "to": "fetch-backlog" },
     { "from": "propose-assignments", "to": "assign" },
     { "from": "assign", "to": "dispatch" },
     { "from": "dispatch", "to": "report" }
