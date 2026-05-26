@@ -11,16 +11,4 @@ metadata:
 
 # Self-Review
 
-Spawn a subagent. Have it run `/code-review` on the current branch. Return the verdict.
-
-```
-Agent (general-purpose) prompt:
-  Run /code-review on the current branch (no args → auto self mode).
-  Treat the diff as if a stranger wrote it.
-  Verify every "pre-existing" claim with git blame before accepting it.
-  Return the full three-axis report + SHIP / ITERATE verdict.
-```
-
-That's it. Why a subagent: reviewing your own work in the same context where you wrote it is unreliable — "I just wrote this, it must be good" assumptions don't carry to an outside reader. A fresh context reviews honestly.
-
-All review logic lives in `.claude/skills/code-review/SKILL.md`: pre-flight (`pnpm typecheck` + `pnpm test:affected`), three-axis review (Standards / Spec / Big Picture), `git blame` gate on "pre-existing" excuses, SHIP / ITERATE verdict.
+Spawn a subagent (general-purpose) and tell it to run `/code-review` on the current branch — fresh context reviews honestly.
