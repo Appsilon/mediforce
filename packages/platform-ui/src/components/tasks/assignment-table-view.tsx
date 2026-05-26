@@ -66,7 +66,9 @@ function AssignmentTableForm({ task }: { task: TaskBodyProps['task'] }) {
 
   const columns = React.useMemo<ColumnSpec[]>(() => {
     const cols: ColumnSpec[] = [
-      { id: 'item', kind: 'static', label: itemColumnLabel, field: 'label' },
+      { id: 'item', kind: 'static', label: itemColumnLabel, field: 'label', link: true },
+      { id: 'labels', kind: 'static', label: 'Labels', field: 'badges' },
+      { id: 'current', kind: 'static', label: 'Current', field: 'currentAssignee' },
       {
         id: 'assigneeId',
         kind: 'single-select',

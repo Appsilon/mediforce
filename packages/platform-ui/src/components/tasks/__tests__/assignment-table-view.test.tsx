@@ -67,6 +67,23 @@ describe('AssignmentTableView', () => {
     expect(screen.getByText('#102 Add CSV export')).toBeInTheDocument();
   });
 
+  it('[RENDER] surfaces existing labels and current assignee from item fields', () => {
+    const task = buildAssignmentTask({
+      items: [{
+        id: '110',
+        label: '#110 Triage me',
+        badges: ['bug', 'ux'],
+        currentAssignee: 'marek',
+        raw: { issueNumber: 110 },
+      }],
+    });
+    render(<AssignmentTableView task={task} />);
+
+    expect(screen.getByText('bug')).toBeInTheDocument();
+    expect(screen.getByText('ux')).toBeInTheDocument();
+    expect(screen.getByText('marek')).toBeInTheDocument();
+  });
+
   it('[RENDER] assignee dropdown lists all configured assignees', () => {
     const task = buildAssignmentTask();
     render(<AssignmentTableView task={task} />);

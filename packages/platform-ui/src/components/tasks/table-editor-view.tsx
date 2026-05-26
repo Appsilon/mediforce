@@ -27,6 +27,7 @@ export interface StaticColumn {
   kind: 'static';
   label: string;
   field: string;
+  link?: boolean;
 }
 
 export interface SingleSelectColumn {
@@ -134,17 +135,18 @@ function editableColumns(columns: ColumnSpec[]): Exclude<ColumnSpec, StaticColum
   return columns.filter((c) => c.kind !== 'static') as Exclude<ColumnSpec, StaticColumn>[];
 }
 
+function hasOption(options: SelectOption[], id: unknown): boolean {
+  return typeof id === 'string' && options.some((o) => o.id === id);
+}
+
 function initialCellValue(column: Exclude<ColumnSpec, StaticColumn>, item: ItemRow): CellValue {
   const suggested = item.suggestion?.[column.id];
   if (column.kind === 'single-select') {
-    if (typeof suggested === 'string' && suggested.length > 0 && column.options.some((o) => o.id === suggested)) {
-      return suggested;
-    }
-    return column.default ?? '';
+    return hasOption(column.options, suggested) ? (suggested as string) : (column.default ?? '');
   }
   if (column.kind === 'multi-select') {
     if (Array.isArray(suggested)) {
-      return suggested.filter((s): s is string => typeof s === 'string' && column.options.some((o) => o.id === s));
+      return suggested.filter((s): s is string => hasOption(column.options, s));
     }
     return column.default ?? [];
   }
@@ -181,7 +183,7 @@ export function TableEditorForm({
       for (const column of editable) {
         if (column.kind !== 'single-select') continue;
         const suggested = item.suggestion?.[column.id];
-        if (typeof suggested === 'string' && suggested.length > 0 && !column.options.some((o) => o.id === suggested)) {
+        if (typeof suggested === 'string' && suggested.length > 0 && !hasOption(column.options, suggested)) {
           (out[item.id] ??= {})[column.id] = suggested;
         }
       }
@@ -318,7 +320,7 @@ interface CellProps {
 
 function Cell({ column, item, itemLabel, value, invalidSuggestion, disabled, onChange }: CellProps) {
   if (column.kind === 'static') {
-    return <StaticCell field={item[column.field]} href={item.href} />;
+    return <StaticCell field={item[column.field]} href={item.href} link={column.link === true} />;
   }
 
   if (column.kind === 'text') {
@@ -405,7 +407,7 @@ function Cell({ column, item, itemLabel, value, invalidSuggestion, disabled, onC
   );
 }
 
-function StaticCell({ field, href }: { field: unknown; href: string | undefined }) {
+function StaticCell({ field, href, link }: { field: unknown; href: string | undefined; link: boolean }) {
   if (Array.isArray(field)) {
     if (field.length === 0) {
       return <span className="text-xs text-muted-foreground">—</span>;
@@ -421,7 +423,7 @@ function StaticCell({ field, href }: { field: unknown; href: string | undefined 
     );
   }
   const text = field === undefined || field === null ? '' : String(field);
-  if (href !== undefined && text.length > 0) {
+  if (link && href !== undefined && text.length > 0) {
     return (
       <a href={href} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">
         {text}

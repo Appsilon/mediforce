@@ -52,7 +52,7 @@ function buildTableEditorTask(overrides: {
     { id: '102', label: '#102 Add CSV export', badges: ['enhancement', 'ux'], suggestion: { category: 'tech-debt', priority: 'P3' } },
   ];
   const columns = overrides.columns ?? [
-    { id: 'issue', kind: 'static', label: 'Issue', field: 'label' },
+    { id: 'issue', kind: 'static', label: 'Issue', field: 'label', link: true },
     { id: 'existing', kind: 'static', label: 'Existing labels', field: 'badges' },
     { id: 'category', kind: 'single-select', label: 'Category', allowEmpty: false, options: CATEGORY_OPTIONS },
     { id: 'priority', kind: 'single-select', label: 'Priority', default: 'P2', options: PRIORITY_OPTIONS },
