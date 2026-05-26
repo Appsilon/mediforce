@@ -651,6 +651,8 @@ interface RunKicker {
 
 - **`tasks/complete` shape — one endpoint with discriminated-union body.** Today is already one route (`/api/tasks/:taskId/complete`) accepting four payload shapes; lib (`resolveTask`) is one function taking a union; audit action is one (`task.completed`); side effects identical. The four variants differ only in payload shape determined by `step.ui` / `step.params` / `step.selection` config — client already knows which to send by reading the task's GET. Splitting into four sibling endpoints would give false signals ("these are different operations") for what's conceptually one. Industry alignment: Stripe `POST /v1/payment_intents/:id/confirm` (discriminator `payment_method.type`) — same pattern. Contract:
 
+  Discriminator field: `kind` — matches codebase convention (`ActionConfigSchema.kind`, `PresentationSchema.kind` for operation/payload variants; `type` is reserved for protocol/external variants like `HttpAuthConfigSchema.type` / `AgentMcpBindingSchema.type`).
+
   ```ts
   const CompleteTaskInputSchema = z.object({
     taskId: z.string().min(1),
@@ -663,9 +665,35 @@ interface RunKicker {
   });
   ```
 
-- **`cron/heartbeat` audit emission — emit per fired trigger.** Action `cron.trigger.fired`, basis `'Cron trigger schedule due'`, snapshot `{ triggerName, definitionName, definitionVersion, instanceId }`. Extends the ADR-0005 §7 closed action set alongside the existing `cron.heartbeat` exemption (heartbeat itself stays `@no-audit` — only the fired-trigger sub-events emit).
+- **`cron/heartbeat` audit emission — ONLY `cron.trigger.fired`, NOT skipped.** Audit is a state-change record (pharma compliance trail), not an evaluation log. Skipping a not-due trigger changes no state and has no compliance significance — same logic that exempts the heartbeat call itself (`cron.heartbeat` stays `@no-audit`). The HTTP response already returns `{ triggered, skipped }` for debug visibility; skips also `console.log`. Audit row spam math: N cron WDs × 96 beats/day × ~95% skip rate would produce hundreds of "nothing happened" rows/day for nothing. Engine convention is "emit only on state change" — cron-heartbeat follows it. Snapshot:
+  - `action: 'cron.trigger.fired'`
+  - `inputSnapshot: { triggerName, definitionName, definitionVersion, schedule }`
+  - `outputSnapshot: { instanceId }`
+  - `basis: 'Cron trigger schedule due'`
+  - `entityType: 'processInstance'`, `entityId: result.instanceId`, `processInstanceId: result.instanceId`
 
 - **`processes` POST create response shape — ADR-0005 §5 entity echo.** `201 Created` + `{ run: WorkflowRun }`. Today's `{ instanceId, status, message }` is bespoke drift. The breaking change is migrated in the same PR (UI callers swap `result.instanceId` → `result.run.id`; CLI command updates inline). Rejecting carve-outs preserves ADR uniformity — first endpoint that breaks §5 opens the door for every endpoint to break it.
+
+- **`instance.retried` audit snapshot — matches engine emit pattern.** Same shape as engine.ts `instance.*` emits (`inputSnapshot` = what triggered, `outputSnapshot` = what changed, `description` = verb sentence, `basis` = short why).
+
+  ```ts
+  await scope.system.audit.append({
+    actorId: scope.caller.userId ?? 'api-user',
+    actorType: 'user',
+    actorRole: scope.caller.role ?? 'operator',
+    action: 'instance.retried',
+    description: `Retried failed step '${stepId}' on instance '${instanceId}'`,
+    timestamp: new Date().toISOString(),
+    inputSnapshot: { instanceId, stepId, previousExecutionId, previousError },
+    outputSnapshot: { resetTo: 'running', currentStepId: stepId, newExecutionId },
+    basis: 'User requested retry of failed step via API',
+    entityType: 'processInstance',
+    entityId: instanceId,
+    processInstanceId: instanceId,
+  });
+  ```
+
+- **`unclaimTask` endpoint — NOT added.** PR501 deleted `unclaimTask` Server Action + `UnclaimButton` component as dead code (zero source callers). Phase 3 does not introduce a `POST /api/tasks/:taskId/unclaim` endpoint. If a future use case lands, opens its own ticket.
 
 **Decision — `/api/processes/:instanceId/advance`.** Investigate user-facing surface before committing to migrate. If only `engine` and tests call it, leave inline forever (internal API, not headless contract).
 
