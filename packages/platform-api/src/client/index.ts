@@ -52,6 +52,14 @@ import {
   GetCoworkSessionOutputSchema,
   GetCoworkSessionByInstanceInputSchema,
   GetCoworkSessionByInstanceOutputSchema,
+  ChatCoworkSessionInputSchema,
+  ChatCoworkSessionOutputSchema,
+  FinalizeCoworkSessionInputSchema,
+  FinalizeCoworkSessionOutputSchema,
+  CreateVoiceEphemeralKeyInputSchema,
+  CreateVoiceEphemeralKeyOutputSchema,
+  SynthesizeVoiceArtifactInputSchema,
+  SynthesizeVoiceArtifactOutputSchema,
   ListPluginsOutputSchema,
   ClaimTaskInputSchema,
   ClaimTaskOutputSchema,
@@ -142,6 +150,14 @@ import {
   type GetCoworkSessionOutput,
   type GetCoworkSessionByInstanceInput,
   type GetCoworkSessionByInstanceOutput,
+  type ChatCoworkSessionInput,
+  type ChatCoworkSessionOutput,
+  type FinalizeCoworkSessionInput,
+  type FinalizeCoworkSessionOutput,
+  type CreateVoiceEphemeralKeyInput,
+  type CreateVoiceEphemeralKeyOutput,
+  type SynthesizeVoiceArtifactInput,
+  type SynthesizeVoiceArtifactOutput,
   type ListPluginsOutput,
 } from '../contract/index.js';
 // SDK consumers reach for one path:
@@ -231,6 +247,16 @@ export class Mediforce {
     getByInstance: (
       input: GetCoworkSessionByInstanceInput,
     ) => Promise<GetCoworkSessionByInstanceOutput>;
+    chat: (input: ChatCoworkSessionInput) => Promise<ChatCoworkSessionOutput>;
+    finalize: (
+      input: FinalizeCoworkSessionInput,
+    ) => Promise<FinalizeCoworkSessionOutput>;
+    voiceEphemeralKey: (
+      input: CreateVoiceEphemeralKeyInput,
+    ) => Promise<CreateVoiceEphemeralKeyOutput>;
+    voiceSynthesize: (
+      input: SynthesizeVoiceArtifactInput,
+    ) => Promise<SynthesizeVoiceArtifactOutput>;
   };
 
   readonly plugins: {
@@ -411,6 +437,57 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.cowork.getByInstance');
         return GetCoworkSessionByInstanceOutputSchema.parse(body);
+      },
+      chat: async (input) => {
+        const validated = ChatCoworkSessionInputSchema.parse(input);
+        const res = await this.request(
+          `/api/cowork/${encodeURIComponent(validated.sessionId)}/chat`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: validated.message }),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.cowork.chat');
+        return ChatCoworkSessionOutputSchema.parse(body);
+      },
+      finalize: async (input) => {
+        const validated = FinalizeCoworkSessionInputSchema.parse(input);
+        const res = await this.request(
+          `/api/cowork/${encodeURIComponent(validated.sessionId)}/finalize`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ artifact: validated.artifact }),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.cowork.finalize');
+        return FinalizeCoworkSessionOutputSchema.parse(body);
+      },
+      voiceEphemeralKey: async (input) => {
+        const validated = CreateVoiceEphemeralKeyInputSchema.parse(input);
+        const res = await this.request(
+          `/api/cowork/${encodeURIComponent(validated.sessionId)}/voice/ephemeral-key`,
+          { method: 'POST' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.cowork.voiceEphemeralKey');
+        return CreateVoiceEphemeralKeyOutputSchema.parse(body);
+      },
+      voiceSynthesize: async (input) => {
+        const validated = SynthesizeVoiceArtifactInputSchema.parse(input);
+        const res = await this.request(
+          `/api/cowork/${encodeURIComponent(validated.sessionId)}/voice/synthesize`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              transcript: validated.transcript,
+              comment: validated.comment,
+            }),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.cowork.voiceSynthesize');
+        return SynthesizeVoiceArtifactOutputSchema.parse(body);
       },
     };
 

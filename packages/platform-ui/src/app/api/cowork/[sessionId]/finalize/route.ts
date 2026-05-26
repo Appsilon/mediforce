@@ -1,118 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getPlatformServices, getAppBaseUrl } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import type { NextRequest } from 'next/server';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { finalizeCoworkSession } from '@mediforce/platform-api/handlers';
+import { FinalizeCoworkSessionInputSchema } from '@mediforce/platform-api/contract';
+import type { FinalizeCoworkSessionInput } from '@mediforce/platform-api/contract';
+
+interface RouteContext {
+  params: Promise<{ sessionId: string }>;
+}
 
 /**
  * POST /api/cowork/:sessionId/finalize
  *
- * Finalizes a cowork session: validates artifact, marks session finalized,
- * resumes the process instance, advances workflow, and triggers auto-runner.
- *
- * Body: { artifact: Record<string, unknown> }
+ * Finalizes the session: persists artifact, resumes the paused instance,
+ * advances the workflow with the artifact as step output, and kicks the
+ * runner via `scope.system.runKicker`. Multi-repo writes are best-effort.
  */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> },
-): Promise<NextResponse> {
-  const { sessionId } = await params;
-  const { coworkSessionRepo, instanceRepo, auditRepo, engine, namespaceRepo } = getPlatformServices();
-
-  const caller = await resolveCallerIdentity(req, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const session = await coworkSessionRepo.getById(sessionId);
-  if (!session) {
-    return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-  }
-
-  const nsInstance = await instanceRepo.getById(session.processInstanceId);
-  const denied = requireNamespaceAccess(caller, nsInstance?.namespace);
-  if (denied) return denied;
-
-  if (session.status !== 'active') {
-    return NextResponse.json(
-      { error: `Cannot finalize a ${session.status} session` },
-      { status: 409 },
-    );
-  }
-
-  const body = await req.json() as { artifact?: Record<string, unknown> };
-  const artifact = body.artifact;
-
-  if (!artifact || typeof artifact !== 'object') {
-    return NextResponse.json(
-      { error: 'artifact object required in body' },
-      { status: 400 },
-    );
-  }
-
-  // Finalize the session
-  await coworkSessionRepo.finalize(sessionId, artifact);
-
-  const now = new Date().toISOString();
-
-  await auditRepo.append({
-    actorId: 'api-user',
-    actorType: 'user',
-    actorRole: 'operator',
-    action: 'cowork.session.finalized',
-    description: `Cowork session '${sessionId}' finalized for step '${session.stepId}'`,
-    timestamp: now,
-    inputSnapshot: { sessionId, stepId: session.stepId },
-    outputSnapshot: { artifactKeys: Object.keys(artifact) },
-    basis: 'Cowork session finalized via API',
-    entityType: 'coworkSession',
-    entityId: sessionId,
-    processInstanceId: session.processInstanceId,
-  });
-
-  // Resume paused process
-  const instance = await instanceRepo.getById(session.processInstanceId);
-  if (!instance) {
-    return NextResponse.json(
-      { error: `Process instance '${session.processInstanceId}' not found` },
-      { status: 404 },
-    );
-  }
-
-  if (instance.status !== 'paused') {
-    return NextResponse.json(
-      { error: `Process instance is '${instance.status}', expected 'paused'` },
-      { status: 409 },
-    );
-  }
-
-  await instanceRepo.update(session.processInstanceId, {
-    status: 'running',
-    pauseReason: null,
-    updatedAt: now,
-  });
-
-  // Advance to next step with artifact as step output
-  await engine.advanceStep(session.processInstanceId, artifact, {
-    id: 'api-user',
-    role: 'human',
-  });
-
-  // Trigger auto-runner for subsequent steps
-  const appUrl = getAppBaseUrl();
-  fetch(`${appUrl}/api/processes/${session.processInstanceId}/run`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Api-Key': process.env.PLATFORM_API_KEY ?? '',
-    },
-    body: JSON.stringify({ triggeredBy: 'cowork-finalize' }),
-  }).catch(() => {});
-
-  const updatedInstance = await instanceRepo.getById(session.processInstanceId);
-
-  return NextResponse.json({
-    ok: true,
-    sessionId,
-    resolvedStepId: session.stepId,
-    processInstanceId: session.processInstanceId,
-    nextStepId: updatedInstance?.currentStepId ?? null,
-    status: updatedInstance?.status ?? 'unknown',
-  });
-}
+export const POST = createRouteAdapter<
+  typeof FinalizeCoworkSessionInputSchema,
+  FinalizeCoworkSessionInput,
+  unknown,
+  RouteContext
+>(
+  FinalizeCoworkSessionInputSchema,
+  async (req: NextRequest, ctx) => {
+    const { sessionId } = await ctx.params;
+    const body = (await req.json().catch(() => ({}))) as { artifact?: unknown };
+    return { sessionId, artifact: body.artifact };
+  },
+  finalizeCoworkSession,
+);

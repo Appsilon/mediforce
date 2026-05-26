@@ -82,6 +82,7 @@
   "dependencies": {
     "@mediforce/agent-runtime": "workspace:*",
     "@mediforce/core-actions": "workspace:*",
+    "@mediforce/mcp-client": "workspace:*",
     "@mediforce/platform-core": "workspace:*",
     "@mediforce/platform-infra": "workspace:*",
     "@mediforce/workflow-engine": "workspace:*",

@@ -16,6 +16,10 @@ export { listWorkflows } from './workflows/list-workflows.js';
 export { getWorkflow } from './workflows/get-workflow.js';
 
 export { getCoworkSessionByInstance } from './cowork/get-cowork-session-by-instance.js';
+export { chatCoworkSession } from './cowork/chat.js';
+export { finalizeCoworkSession } from './cowork/finalize.js';
+export { createVoiceEphemeralKey } from './cowork/voice-ephemeral-key.js';
+export { synthesizeVoiceArtifact } from './cowork/voice-synthesize.js';
 
 export { listPlugins } from './plugins/list-plugins.js';
 

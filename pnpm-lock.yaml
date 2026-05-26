@@ -221,6 +221,9 @@ importers:
       '@mediforce/core-actions':
         specifier: workspace:*
         version: link:../core-actions
+      '@mediforce/mcp-client':
+        specifier: workspace:*
+        version: link:../mcp-client
       '@mediforce/platform-core':
         specifier: workspace:*
         version: link:../platform-core
