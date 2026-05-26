@@ -66,9 +66,34 @@ Look in this order:
 3. PR description itself (when reviewing a PR).
 4. If nothing found, ask user. If they say there isn't one, **Spec** sub-agent skips and reports "no spec available".
 
-### 3. Identify standards sources
+### 3. Standards sources — fixed list
 
-Always include: `AGENTS.md`, `CLAUDE.md`, `docs/adr/`, `references/review-checklist.md`. Skip what tooling enforces (eslint, biome, tsconfig) — note their existence but don't re-check.
+Don't rediscover these every run. Always pass this exact list to the Standards sub-agent:
+
+**Required:**
+- `AGENTS.md` — top-level rules: KISS-first, test-first (`/new-test`), CLI > REST (`/use-mediforce`), no `any`, English everywhere, no docstrings on un-changed code, explicit boolean comparisons, Python scripts, main-thread = manager.
+- `CLAUDE.md` — entrypoint (currently `@AGENTS.md`).
+- `.claude/skills/code-review/references/review-checklist.md` — 9-section checklist including DRY/KISS (5a), dead code (5b), reuse repo mechanisms (5c), comment quality (5d).
+- `docs/adr/` — every accepted ADR is a binding standard. Currently:
+  - `docs/adr/0001-firestore-to-postgres.md` — data layer direction.
+  - `docs/adr/0004-scoped-data-access-authorization.md` — authz model.
+  - `docs/adr/0005-headless-platform-api-ui-separation.md` — package boundaries.
+- `docs/architecture.md` — package graph + dependency direction.
+- `docs/api-architecture.md` — handler / contract / repo layering inside `platform-api`.
+- `docs/development.md` — local dev conventions.
+- `docs/E2E-STRATEGY.md` — L1–L5 test-level model (`/new-test` enforces).
+- `docs/knowledge-base/wiki/STYLE.md` — wiki/docs style.
+- `docs/knowledge-base/wiki/gotchas/` — known environmental pitfalls; consult before debugging weird failures.
+
+**Skip** (tooling already enforces): `eslint.config.*`, `biome.json`, `tsconfig.json`, `.editorconfig`, `prettier.config.*`. Note their existence in the sub-agent prompt but don't re-check what tooling checks.
+
+**Reuse-targets cheat sheet** (for checklist section 5c — sub-agent should grep before flagging):
+- HTTP from browser → `@/lib/use-mediforce` / `apiFetch`.
+- Server-to-server → `Mediforce` client (`packages/cli`) or `pnpm exec mediforce`.
+- Validation → existing Zod schemas in `packages/platform-core`.
+- Background work → BullMQ via `packages/container-worker`.
+- Workflow / agent orchestration → `packages/workflow-engine` + `packages/agent-runtime`.
+- UI primitives → existing components / shadcn / sonner.
 
 ### 4. Spawn three sub-agents in parallel
 
@@ -76,7 +101,7 @@ Single message, three `Agent` tool calls, `general-purpose` subagent. Each promp
 
 **Standards sub-agent prompt** (file-by-file, low-level):
 
-> Read `AGENTS.md`, `CLAUDE.md`, and `.claude/skills/code-review/references/review-checklist.md`. Walk the diff **file by file, hunk by hunk**. For each changed file report:
+> Read the fixed standards list from step 3 (paste it in — `AGENTS.md`, `CLAUDE.md`, `.claude/skills/code-review/references/review-checklist.md`, every file under `docs/adr/`, `docs/architecture.md`, `docs/api-architecture.md`, `docs/development.md`, `docs/E2E-STRATEGY.md`, `docs/knowledge-base/wiki/STYLE.md`). Use the reuse-targets cheat sheet from step 3 when checking 5c. Walk the diff **file by file, hunk by hunk**. For each changed file report:
 > - Convention violations (cite the rule: file + line of the standard).
 > - **Dead code** — functions/exports/files not referenced anywhere. Grep to verify.
 > - **DRY/KISS violations** — duplicated logic, unnecessary abstraction, layers that solve nothing.
