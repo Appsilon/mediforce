@@ -70,11 +70,8 @@ async function loadSynthesisContext(
     throw new HandlerError('validation', 'Cannot resolve workspace for this session');
   }
 
-  const [nsSecrets, wfSecrets] = await Promise.all([
-    scope.workspaceSecrets.getSecrets(namespace),
-    scope.workflowSecrets.getSecrets(namespace, workflowName),
-  ]);
-  const openRouterKey = { ...nsSecrets, ...wfSecrets }['OPENROUTER_API_KEY'];
+  const secrets = await scope.workspaceSecrets.getRuntimeSecrets(namespace, workflowName);
+  const openRouterKey = secrets['OPENROUTER_API_KEY'];
   if (!openRouterKey) {
     throw new HandlerError(
       'validation',

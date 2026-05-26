@@ -735,6 +735,7 @@ Audit emission per handler via `scope.system.audit.append` (ADR-0005 §7 handler
 
 - `Mediforce.sendJson(method, path, body?, outputSchema, ctx)` helper introduced on the client class. Single seam for mutation methods — kills the `request + parseJsonOrThrow + outputSchema.parse` triple-decker that was duplicated across every POST/PATCH/DELETE. The four cowork mutations use it; the remaining 12 mutation methods (tasks, runs, agents, workflows, secrets, cron) refactor in [#527](https://github.com/Appsilon/mediforce/issues/527).
 - `services/openrouter-client.ts` introduced as the single OpenRouter HTTP seam. Used by `cowork/chat` (tool-loop call) and `cowork/voice-synthesize` (synthesis call). Repo-wide consolidation with `agent-runtime/llm-client.ts` and `system/get-openrouter-credits.ts` tracked in [#529](https://github.com/Appsilon/mediforce/issues/529).
+- `scope.workspaceSecrets.getRuntimeSecrets(namespace, workflowName)` — single seam for the "namespace defaults + workflow overrides" merge that every handler with a runtime LLM/HTTP call needs. Replaces the two-call merge in `cowork/chat` and `cowork/voice-synthesize`; `system/get-openrouter-credits` can adopt later.
 - `AuthorizedCoworkSessionRepository` extended with workspace-gated mutations (`addTurn`, `updateTurn`, `updateArtifact`, `finalize`) matching the `AuthorizedWorkflowRunRepository.update` gating pattern.
 
 **Deferred to follow-up issue [#516](https://github.com/Appsilon/mediforce/issues/516):**

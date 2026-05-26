@@ -112,6 +112,7 @@ export function createCallerScope(
     workspaceSecrets: new AuthorizedWorkspaceSecretRepository(
       caller,
       services.namespaceSecretsRepo,
+      services.secretsRepo,
     ),
     workflowSecrets: new AuthorizedWorkflowSecretRepository(caller, services.secretsRepo),
 
