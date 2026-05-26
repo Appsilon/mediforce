@@ -159,6 +159,7 @@ export function StartRunButton({
         namespace: handle,
         definitionName: workflowName,
         definitionVersion: targetVersion,
+        triggerName: 'manual',
         triggeredBy: firebaseUser.uid,
         payload,
       });
