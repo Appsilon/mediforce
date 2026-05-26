@@ -5,6 +5,7 @@ import { SelectionView } from './selection-view';
 import { ParamsView } from './params-view';
 import { VerdictView } from './verdict-view';
 import { AssignmentTableView } from './assignment-table-view';
+import { TableEditorView } from './table-editor-view';
 
 export interface TaskBodyProps {
   task: HumanTask;
@@ -19,6 +20,7 @@ export interface TaskBodyEntry {
 const REGISTRY: Record<string, TaskBodyEntry> = {
   'file-upload': { Component: FileUploadView, hidesContextPanel: true },
   'assignment-table': { Component: AssignmentTableView, hidesContextPanel: true },
+  'table-editor': { Component: TableEditorView, hidesContextPanel: true },
 };
 
 export function resolveTaskBody(task: HumanTask): TaskBodyEntry {

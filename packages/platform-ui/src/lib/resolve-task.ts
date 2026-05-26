@@ -66,6 +66,7 @@ export async function resolveTask(
   const actorId = resolvedTask.assignedUserId ?? userId ?? 'api-user';
   const isFileUpload = resolvedTask.ui?.component === 'file-upload';
   const isAssignmentTable = resolvedTask.ui?.component === 'assignment-table';
+  const isTableEditor = resolvedTask.ui?.component === 'table-editor';
   const isParamsTask =
     Array.isArray(resolvedTask.params) && resolvedTask.params.length > 0;
 
@@ -79,6 +80,13 @@ export async function resolveTask(
     if (!Array.isArray(body.assignments)) {
       return {
         error: 'assignments array required for assignment-table task',
+        httpStatus: 400,
+      };
+    }
+  } else if (isTableEditor) {
+    if (!Array.isArray(body.rows)) {
+      return {
+        error: 'rows array required for table-editor task',
         httpStatus: 400,
       };
     }
@@ -152,6 +160,10 @@ export async function resolveTask(
     const assignments = body.assignments as Array<Record<string, unknown>>;
     completionData = { assignments, completedBy: actorId, completedAt: now };
     stepOutput = { assignments };
+  } else if (isTableEditor) {
+    const rows = body.rows as Array<Record<string, unknown>>;
+    completionData = { rows, completedBy: actorId, completedAt: now };
+    stepOutput = { rows };
   } else if (isParamsTask) {
     const paramValues = body.paramValues as Record<string, unknown>;
     completionData = { paramValues, completedBy: actorId, completedAt: now };
@@ -275,9 +287,11 @@ export async function resolveTask(
       ? `Task '${taskId}' resolved with ${(body.attachments as Attachment[]).length} file(s) for step '${resolvedTask.stepId}'`
       : isAssignmentTable
         ? `Task '${taskId}' resolved with ${(body.assignments as unknown[]).length} assignment(s) for step '${resolvedTask.stepId}'`
-        : isParamsTask
-          ? `Task '${taskId}' resolved with param values for step '${resolvedTask.stepId}'`
-          : `Task '${taskId}' resolved with verdict '${body.verdict}' for step '${resolvedTask.stepId}'`,
+        : isTableEditor
+          ? `Task '${taskId}' resolved with ${(body.rows as unknown[]).length} row(s) for step '${resolvedTask.stepId}'`
+          : isParamsTask
+            ? `Task '${taskId}' resolved with param values for step '${resolvedTask.stepId}'`
+            : `Task '${taskId}' resolved with verdict '${body.verdict}' for step '${resolvedTask.stepId}'`,
     timestamp: now,
     inputSnapshot: {
       taskId,
@@ -286,13 +300,15 @@ export async function resolveTask(
         ? { fileCount: (body.attachments as Attachment[]).length }
         : isAssignmentTable
           ? { assignmentCount: (body.assignments as unknown[]).length }
-          : isParamsTask
-            ? {
-                paramKeys: Object.keys(
-                  body.paramValues as Record<string, unknown>,
-                ),
-              }
-            : { verdict: body.verdict }),
+          : isTableEditor
+            ? { rowCount: (body.rows as unknown[]).length }
+            : isParamsTask
+              ? {
+                  paramKeys: Object.keys(
+                    body.paramValues as Record<string, unknown>,
+                  ),
+                }
+              : { verdict: body.verdict }),
     },
     outputSnapshot: { status: 'completed', completionData },
     basis: 'Task resolved via API',
