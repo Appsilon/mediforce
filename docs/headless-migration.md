@@ -623,18 +623,24 @@ interface RunKicker {
 | `app/actions/processes.ts:startWorkflowRun` | fire-and-forget | Phase 3 (folds into POST create handler) |
 | `app/actions/processes.ts:retryFailedStep` | fire-and-forget | Phase 3 (folds into retry handler) |
 
-**PR sequencing (proposed):**
+**PR sequencing — one PR.** Mediforce convention from Phase 1 (#450, 10 GETs) and Phase 1.5 (#482, 7 endpoints): land the whole shape in one reviewable PR rather than dribble a phase across six. Smaller PRs were rejected during grilling — pattern is uniform across these mutations (kick + audit + entity echo + state transition), so iterating endpoint-by-endpoint produces churn without learning.
 
-| PR | Scope | Why this order |
-|---|---|---|
-| PR1 | `RunKicker` interface + `scope.system.runKicker` wiring in `caller-scope.ts` + prod impl (`httpSelfFetchRunKicker`) + test impls + retrofit all 8 self-fetch sites to call `scope.system.runKicker.kick()` instead of inline `fetch`. **No endpoint migrated yet.** Pure abstraction-extraction PR. | Smallest possible step that proves the abstraction. Every site stays inline route; only the kick line changes. Reversible. |
-| PR2 | `tasks/resolve` + `processes/resume` + `processes/steps/:stepId/retry` — three lowest-risk reclassified-to-Phase-3 endpoints, all uniform "state-transition + kick". | First real handler migrations using the abstraction. Three at once because shape identical; rejects pattern early if wrong. (If `resolve` is confirmed UI-unused, delete instead of migrate.) |
-| PR3 | `cron/heartbeat` migration. Trigger-scan logic + N kicks. | First multi-kick handler. |
-| PR4 | `processes` POST create. Idempotency + trigger-payload validation + create-then-kick. | Brings in idempotency design (deferred from Phase 2.5). |
-| PR5 | `tasks/complete` with discriminated-union body collapsing four `completeTask*` server actions. Cross-entity step-gate check. | Biggest handler; last because it benefits from every prior PR's lesson. |
-| PR6 | Remaining `app/actions/*.ts` cleanup. Verify `app/actions/processes.ts` + `app/actions/cowork.ts` + `app/actions/{tasks,definitions,namespace-secrets,workflow-secrets}.ts` are empty/deletable. | Net cleanup; flushes the migrate-policy default. |
+**Single PR scope:**
+- `RunKicker` interface + `scope.system.runKicker` wiring in `caller-scope.ts` + prod impl (`httpSelfFetchRunKicker`) + test impl (`noopRunKicker`, plus `syncRunKicker` if integration tests need post-kick assertion).
+- All 8 self-fetch sites retrofitted to `scope.system.runKicker.kick()` — those that get migrated to handlers do it inline; those that don't (`/api/processes/:id/run` itself stays inline) just swap the kick line.
+- Migrate every in-scope endpoint to the headless handler shape: `tasks/complete` (4-variant discriminated union), `tasks/resolve` (or delete if UI-unused — verify first), `processes/resume`, `processes/steps/:stepId/retry`, `cron/heartbeat`, `processes` POST create.
+- Add `mediforce.X.Y()` typed client methods + CLI commands for each.
+- Delete the matching server actions per ADR-0005 §6 (move-not-add for audit emission). Confirm `app/actions/tasks.ts` empty (delete file); `app/actions/processes.ts` retains only `archiveProcessRun` + `bulkCancelProcessRuns` + `bulkArchiveProcessRuns` (Phase 2.5 scope).
+- Wrapper-layer additions on `AuthorizedHumanTaskRepository` / `AuthorizedWorkflowRunRepository` as each endpoint needs them.
 
-6 PRs, ~3-4 weeks. Pause-safe between each.
+**Estimated size:** ~1.5-2 weeks of work, large diff (~2-3k LOC like #450). Single review pass.
+
+**Pause-safe within the PR:** no. Once it lands, it lands as a whole. Inside the working branch, each endpoint migration is a clean commit so reviewers can read them sequentially.
+
+**Pre-PR audits (run before opening the branch):**
+- `processes/:instanceId/advance` — grep callers. If only `engine` + tests, leave inline forever (drops from scope).
+- `tasks/resolve` — confirm "UI-unused duplicate" claim from PR501 body. If true, delete (no migration); if false, migrate with the rest.
+- `app/actions/cowork.ts` features — confirm zero Server Action features used (form action / revalidatePath / redirect). Affects whether cleanup happens here or in Phase 3.1.
 
 **Decision — `/api/processes/:instanceId/advance`.** Investigate user-facing surface before committing to migrate. If only `engine` and tests call it, leave inline forever (internal API, not headless contract).
 
