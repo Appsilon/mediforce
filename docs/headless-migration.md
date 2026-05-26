@@ -471,14 +471,14 @@ Cut as dead code (no API surface added):
 - `UnclaimButton` (`claim-button.tsx`) + `unclaimTask` Server Action — neither was rendered or called anywhere in source. Deleted outright.
 
 **Files touched:**
-- `packages/platform-api/src/contract/processes.ts` — `CancelProcessInputSchema` / `CancelProcessOutputSchema` (output reuses `ProcessInstanceSchema` per ADR-0005 §5).
-- `packages/platform-api/src/handlers/processes/cancel-process.ts` — new handler. Reuses `scope.runs.update()` rather than introducing a dedicated wrapper method (matches PR1's "state-machine in handler" deviation; `ProcessInstanceRepository.cancel(id, reason)` from ADR-0005 §8 is deferred until a second mutation needs it).
-- `packages/platform-api/src/handlers/processes/__tests__/cancel-process.test.ts` — contract + handler tests against `createTestScope`.
+- `packages/platform-api/src/contract/processes.ts` — `CancelRunInputSchema { runId, reason? }` / `CancelRunOutputSchema { run }` (output reuses `ProcessInstanceSchema` per ADR-0005 §5; contract symbols use `Run` per ADR-0001 vocabulary even though the underlying storage schema is still named `ProcessInstanceSchema`).
+- `packages/platform-api/src/handlers/processes/cancel-run.ts` — new handler. Reuses `scope.runs.update()` rather than introducing a dedicated wrapper method (matches PR1's "state-machine in handler" deviation; `ProcessInstanceRepository.cancel(id, reason)` from ADR-0005 §8 is deferred until a second mutation needs it). Audit action `instance.cancelled` matches workflow-engine's `instance.*` family + legacy `bulkCancelProcessRuns` emit.
+- `packages/platform-api/src/handlers/processes/__tests__/cancel-run.test.ts` — contract + handler tests against `createTestScope`.
 - `packages/platform-api/src/contract/__tests__/processes.test.ts` — contract schema unit tests.
-- `packages/platform-ui/src/app/api/processes/[instanceId]/cancel/route.ts` — replaced inline body with `createRouteAdapter`.
-- `packages/platform-api/src/client/index.ts` — `mediforce.processes.cancel(input)` method.
+- `packages/platform-ui/src/app/api/processes/[instanceId]/cancel/route.ts` — replaced inline body with `createRouteAdapter`. URL path keeps the legacy `processes/:instanceId` segment until a coordinated URL rename phase; the adapter translates `params.instanceId` → `runId`.
+- `packages/platform-api/src/client/index.ts` — `mediforce.runs.cancel(input)` method (sits next to `runs.list/get/start`).
 - `packages/cli/src/commands/run-cancel.ts` — new CLI command `mediforce run cancel <runId> [--reason <text>]`.
-- `packages/platform-ui/src/components/processes/process-detail.tsx` — swap `cancelProcessRun` action call for `mediforce.processes.cancel()`.
+- `packages/platform-ui/src/components/processes/process-detail.tsx` — swap `cancelProcessRun` action call for `mediforce.runs.cancel({ runId })`.
 - `packages/platform-ui/src/components/processes/agent-escalated-banner.tsx` — same swap.
 - `packages/platform-ui/src/lib/workflow-status.ts` — comment-only update (the `'Cancelled by user'` literal gate stays; comment now points at the handler default).
 
@@ -490,8 +490,8 @@ Cut as dead code (no API surface added):
 
 **Exit criteria (met):**
 - `POST /api/processes/:instanceId/cancel` returns `{ run: WorkflowRun }`; `404` for missing/foreign-workspace ids (anti-enum); `409 precondition_failed` for non-running/non-paused.
-- Audit emission preserved bit-for-bit (`process.cancelled` event matches the prior Server Action shape — actor derived from `scope.caller`, default reason `'Cancelled by user'` literal unchanged).
-- `mediforce.processes.cancel()` available in browser (via `lib/mediforce`) + CLI + Node consumers.
+- Audit emission preserved bit-for-bit (`instance.cancelled` event matches the prior Server Action shape — actor derived from `scope.caller`, default reason `'Cancelled by user'` literal unchanged, consistent with workflow-engine `instance.*` family).
+- `mediforce.runs.cancel()` available in browser (via `lib/mediforce`) + CLI + Node consumers.
 - `app/actions/processes.ts:cancelProcessRun` and `app/actions/tasks.ts:unclaimTask` deleted; UI callers (`process-detail.tsx`, `agent-escalated-banner.tsx`) moved to typed client.
 - `UnclaimButton` removed from `claim-button.tsx`; `ClaimButton` retained.
 - Phase 2 closed. Wrapper-layer mutation pattern proven on two state transitions of opposite shape (`claim`: pending→claimed, `cancel`: running/paused→failed).

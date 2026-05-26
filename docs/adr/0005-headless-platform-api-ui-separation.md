@@ -346,9 +346,21 @@ pattern, easy to find-and-delete during the audit-wiring phase.
 Closed action-name set for Phase 2 (extensible by amendment):
 
 - `task.claimed`, `task.unclaimed`, `task.completed`, `task.resolved`
-- `run.cancelled`, `run.resumed`
+- `instance.cancelled`, `instance.resumed`
 - `cron.heartbeat` (operational; `@no-audit` exemption — no entity
   mutation)
+
+**Naming note (amended 2026-05-26 after PR2 design pass).** The original
+draft used `run.*` here, forward-looking to ADR-0001's `runs` table
+rename. Phase 2 PR2 reverted to `instance.*` because every existing
+workflow-engine emit is `instance.*` (`instance.created/started/paused/
+resumed/aborted/completed`) and the legacy `bulkCancelProcessRuns`
+Server Action emits `instance.cancelled`. New audit lanes ship under
+the dominant prefix so audit consumers see one consistent family rather
+than a `run.*` / `instance.*` split during the migration window. A
+repo-wide `instance.*` → `run.*` (entity + action) rename ships as its
+own ADR pass, ideally bundled with the audit-wiring phase (repo-resident
+emission via `MutationContext`) since both touch every write path.
 
 ### 8. Wrapper layer additions for Phase 2
 
