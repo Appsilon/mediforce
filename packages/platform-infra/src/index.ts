@@ -29,6 +29,7 @@ export { FirestoreCoworkSessionRepository } from './firestore/cowork-session-rep
 export { FirestoreCronTriggerStateRepository } from './firestore/cron-trigger-state-repository.js';
 export { FirestoreToolCatalogRepository } from './firestore/tool-catalog-repository.js';
 export { PostgresToolCatalogRepository } from './postgres/repositories/tool-catalog-repository.js';
+export { PostgresNamespaceRepository } from './postgres/repositories/namespace-repository.js';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client.js';
 export type { Database } from './postgres/client.js';
 export { FirestoreOAuthProviderRepository } from './firestore/oauth-provider-repository.js';

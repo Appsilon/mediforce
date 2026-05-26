@@ -16,6 +16,7 @@ import {
   FirestoreWorkflowSecretsRepository,
   FirestoreNamespaceSecretsRepository,
   PostgresToolCatalogRepository,
+  PostgresNamespaceRepository,
   getSharedPostgresClient,
   getAdminFirestore,
   validateSecretsKey,
@@ -26,6 +27,7 @@ import {
 } from '@mediforce/platform-infra';
 import type {
   CronTriggerStateRepository,
+  NamespaceRepository,
   ToolCatalogRepository,
 } from '@mediforce/platform-core';
 import {
@@ -77,7 +79,7 @@ export interface PlatformServices {
   coworkSessionRepo: FirestoreCoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
   toolCatalogRepo: ToolCatalogRepository;
-  namespaceRepo: FirestoreNamespaceRepository;
+  namespaceRepo: NamespaceRepository;
   oauthProviderRepo: FirestoreOAuthProviderRepository;
   agentOAuthTokenRepo: FirestoreAgentOAuthTokenRepository;
   modelRegistryRepo: FirestoreModelRegistryRepository;
@@ -110,7 +112,10 @@ export function getPlatformServices(): PlatformServices {
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresToolCatalogRepository(getSharedPostgresClient().db)
       : new FirestoreToolCatalogRepository(db);
-  const namespaceRepo = new FirestoreNamespaceRepository(db);
+  const namespaceRepo: NamespaceRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresNamespaceRepository(getSharedPostgresClient().db)
+      : new FirestoreNamespaceRepository(db);
   const oauthProviderRepo = new FirestoreOAuthProviderRepository(db);
   const agentOAuthTokenRepo = new FirestoreAgentOAuthTokenRepository(db);
   const modelRegistryRepo = new FirestoreModelRegistryRepository(db);

@@ -20,7 +20,7 @@ CREATE TABLE "workspaces" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_workspace_workspaces_handle_fk" FOREIGN KEY ("workspace") REFERENCES "public"."workspaces"("handle") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_workspace_workspaces_handle_fk" FOREIGN KEY ("workspace") REFERENCES "workspaces"("handle") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "workspace_members_uid_idx" ON "workspace_members" USING btree ("uid");--> statement-breakpoint
 CREATE TRIGGER workspaces_set_updated_at
 	BEFORE UPDATE ON workspaces
