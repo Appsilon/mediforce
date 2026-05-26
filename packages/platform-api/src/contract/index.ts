@@ -146,6 +146,8 @@ export {
   StepEntrySchema,
   StepEntryStatusSchema,
   StepExecutorTypeSchema,
+  CancelProcessInputSchema,
+  CancelProcessOutputSchema,
   type GetProcessInput,
   type GetProcessOutput,
   type ListAuditEventsInput,
@@ -155,6 +157,8 @@ export {
   type StepEntry,
   type StepEntryStatus,
   type StepExecutorType,
+  type CancelProcessInput,
+  type CancelProcessOutput,
 } from './processes.js';
 
 export {

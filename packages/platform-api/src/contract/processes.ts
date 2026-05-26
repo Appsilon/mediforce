@@ -103,3 +103,22 @@ export type StepEntryStatus = z.infer<typeof StepEntryStatusSchema>;
 export type StepEntry = z.infer<typeof StepEntrySchema>;
 export type GetProcessStepsInput = z.infer<typeof GetProcessStepsInputSchema>;
 export type GetProcessStepsOutput = z.infer<typeof GetProcessStepsOutputSchema>;
+
+// ---- POST /api/processes/:instanceId/cancel ---------------------------------
+//
+// State transition: running | paused → failed. Entity echo per ADR-0005 §5.
+// `reason` defaults to "Cancelled by user" in the handler; that literal is
+// load-bearing — workflow-status.ts:82 gates on it to distinguish operator
+// cancellations from agent failures.
+
+export const CancelProcessInputSchema = z.object({
+  instanceId: z.string().min(1),
+  reason: z.string().min(1).optional(),
+});
+
+export const CancelProcessOutputSchema = z.object({
+  run: ProcessInstanceSchema,
+});
+
+export type CancelProcessInput = z.infer<typeof CancelProcessInputSchema>;
+export type CancelProcessOutput = z.infer<typeof CancelProcessOutputSchema>;
