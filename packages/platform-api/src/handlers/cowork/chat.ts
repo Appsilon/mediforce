@@ -58,10 +58,6 @@ export async function chatCoworkSession(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Preflight — load session + instance + secrets, validate state
-// ---------------------------------------------------------------------------
-
 interface ChatContext {
   readonly session: CoworkSession;
   readonly openRouterKey: string;
@@ -113,10 +109,6 @@ async function loadChatContext(
   };
 }
 
-// ---------------------------------------------------------------------------
-// MCP lifecycle — connect / disconnect
-// ---------------------------------------------------------------------------
-
 interface McpHandle {
   readonly manager: McpClientManager;
   readonly tools: McpToolDefinition[];
@@ -133,10 +125,6 @@ async function connectMcp(session: CoworkSession): Promise<McpHandle | null> {
     throw new HandlerError('internal', `Failed to connect to MCP servers: ${message}`);
   }
 }
-
-// ---------------------------------------------------------------------------
-// Turn factories + persistence helper
-// ---------------------------------------------------------------------------
 
 function humanTurn(content: string): ConversationTurn {
   return {
@@ -187,11 +175,6 @@ async function addTurn(
   await scope.coworkSessions.addTurn(sessionId, turn);
   return turn.id;
 }
-
-// ---------------------------------------------------------------------------
-// Tool loop — iterate ≤MAX, separate artifact-update vs MCP calls, terminate
-// when the LLM produces no MCP tool calls.
-// ---------------------------------------------------------------------------
 
 interface ToolLoopArgs {
   readonly scope: CallerScope;
@@ -244,10 +227,13 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
     }
 
     if (mcpCalls.length === 0) break;
+    // mcpCalls non-empty implies the LLM picked at least one MCP tool, which
+    // can only happen when `tools` included MCP entries (`mcp !== null`).
+    if (mcp === null) break;
 
     messages.push(assistantMessage(agentText, response.toolCalls));
     for (const call of mcpCalls) {
-      const summary = await executeMcpTool(scope, ctx.session.id, mcp!, call, messages);
+      const summary = await executeMcpTool(scope, ctx.session.id, mcp, call, messages);
       toolCallSummaries.push(summary);
     }
   }
@@ -269,10 +255,6 @@ function assistantMessage(
     })),
   };
 }
-
-// ---------------------------------------------------------------------------
-// Single tool execution — persist running turn → call MCP → update turn
-// ---------------------------------------------------------------------------
 
 async function executeMcpTool(
   scope: CallerScope,
@@ -314,11 +296,8 @@ function parseToolArgs(raw: string): Record<string, unknown> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Artifact update — parse the LLM's `update_artifact` tool call payload.
-// Malformed payloads are skipped (parity with the pre-migration route).
-// ---------------------------------------------------------------------------
-
+// Malformed `update_artifact` payloads are skipped (parity with the
+// pre-migration route — `null` here means "ignore, keep going").
 function applyArtifactUpdate(
   call: OpenRouterToolCall,
 ): Record<string, unknown> | null {

@@ -15,10 +15,6 @@ const DEFAULT_SYNTHESIS_MODEL = 'anthropic/claude-sonnet-4';
 const SYNTHESIS_TEMPERATURE = 0.3;
 const SYNTHESIS_MAX_TOKENS = 4096;
 
-/**
- * Convert a completed voice transcript into a structured artifact and
- * persist the parsed conversation turns onto the session.
- */
 export async function synthesizeVoiceArtifact(
   input: SynthesizeVoiceArtifactInput,
   scope: CallerScope,
@@ -32,10 +28,6 @@ export async function synthesizeVoiceArtifact(
 
   return { artifact };
 }
-
-// ---------------------------------------------------------------------------
-// Preflight — load session + instance + secrets, validate state
-// ---------------------------------------------------------------------------
 
 interface SynthesisContext {
   readonly session: CoworkSession;
@@ -86,10 +78,6 @@ async function loadSynthesisContext(
   };
 }
 
-// ---------------------------------------------------------------------------
-// LLM call — single blocking JSON-mode synthesis
-// ---------------------------------------------------------------------------
-
 async function callSynthesisLlm(
   ctx: SynthesisContext,
   transcript: string,
@@ -121,10 +109,8 @@ async function callSynthesisLlm(
   return response.content;
 }
 
-// ---------------------------------------------------------------------------
-// Parse synthesized JSON — try direct parse, then fence-extract fallback
-// ---------------------------------------------------------------------------
-
+// Models occasionally wrap JSON in prose; fall back to extracting the first
+// balanced-looking `{...}` block before giving up.
 function parseSynthesisJson(rawContent: string): Record<string, unknown> {
   try {
     return JSON.parse(rawContent) as Record<string, unknown>;
@@ -140,10 +126,6 @@ function parseSynthesisJson(rawContent: string): Record<string, unknown> {
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Persist transcript turns onto the session
-// ---------------------------------------------------------------------------
 
 async function persistTranscriptTurns(
   scope: CallerScope,
@@ -198,10 +180,6 @@ function parseTranscriptTurns(transcript: string): ConversationTurn[] {
 
   return turns;
 }
-
-// ---------------------------------------------------------------------------
-// Synthesis system prompt — detailed to produce high-quality WorkflowDefinitions
-// ---------------------------------------------------------------------------
 
 const SYNTHESIS_SYSTEM_PROMPT = `You are an expert Mediforce workflow synthesizer. Given a voice conversation transcript, produce a complete, detailed WorkflowDefinition JSON.
 
