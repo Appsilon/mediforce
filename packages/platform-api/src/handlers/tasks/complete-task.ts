@@ -3,6 +3,7 @@ import {
   CompleteHumanTaskValidationError,
   ParentInstanceNotFoundError,
 } from '@mediforce/workflow-engine';
+import type { CompleteHumanTaskPayload } from '@mediforce/platform-core';
 import type { CompleteTaskInput, CompleteTaskOutput } from '../../contract/tasks.js';
 import type { CallerScope } from '../../repositories/index.js';
 import {
@@ -11,6 +12,46 @@ import {
   PreconditionFailedError,
 } from '../../errors.js';
 import { actorFromCaller, loadOr404 } from '../_helpers.js';
+
+interface AuditFields {
+  description: string;
+  inputSnapshot: Record<string, unknown>;
+}
+
+function auditFieldsFor(
+  payload: CompleteHumanTaskPayload,
+  taskId: string,
+  stepId: string,
+): AuditFields {
+  const head = `Task '${taskId}' resolved`;
+  switch (payload.kind) {
+    case 'upload':
+      return {
+        description: `${head} with ${payload.attachments.length} file(s) for step '${stepId}'`,
+        inputSnapshot: { taskId, stepId, fileCount: payload.attachments.length },
+      };
+    case 'assignment':
+      return {
+        description: `${head} with ${payload.assignments.length} assignment(s) for step '${stepId}'`,
+        inputSnapshot: { taskId, stepId, assignmentCount: payload.assignments.length },
+      };
+    case 'rows':
+      return {
+        description: `${head} with ${payload.rows.length} row(s) for step '${stepId}'`,
+        inputSnapshot: { taskId, stepId, rowCount: payload.rows.length },
+      };
+    case 'params':
+      return {
+        description: `${head} with param values for step '${stepId}'`,
+        inputSnapshot: { taskId, stepId, paramKeys: Object.keys(payload.paramValues) },
+      };
+    case 'verdict':
+      return {
+        description: `${head} with verdict '${payload.verdict}' for step '${stepId}'`,
+        inputSnapshot: { taskId, stepId, verdict: payload.verdict },
+      };
+  }
+}
 
 export async function completeTask(
   input: CompleteTaskInput,
@@ -53,34 +94,13 @@ export async function completeTask(
 
   const { task: updatedTask, instance: updatedInstance, resolvedStepId } = result;
   const now = new Date().toISOString();
-
   const completionData =
     (updatedTask.completionData as Record<string, unknown> | null) ?? {};
-  const payloadKind = input.payload.kind;
-  const description =
-    payloadKind === 'upload'
-      ? `Task '${input.taskId}' resolved with ${input.payload.attachments.length} file(s) for step '${resolvedStepId}'`
-      : payloadKind === 'assignment'
-        ? `Task '${input.taskId}' resolved with ${input.payload.assignments.length} assignment(s) for step '${resolvedStepId}'`
-        : payloadKind === 'rows'
-          ? `Task '${input.taskId}' resolved with ${input.payload.rows.length} row(s) for step '${resolvedStepId}'`
-          : payloadKind === 'params'
-            ? `Task '${input.taskId}' resolved with param values for step '${resolvedStepId}'`
-            : `Task '${input.taskId}' resolved with verdict '${input.payload.verdict}' for step '${resolvedStepId}'`;
-  const inputSnapshot: Record<string, unknown> = {
-    taskId: input.taskId,
-    stepId: resolvedStepId,
-    ...(payloadKind === 'upload'
-      ? { fileCount: input.payload.attachments.length }
-      : payloadKind === 'assignment'
-        ? { assignmentCount: input.payload.assignments.length }
-        : payloadKind === 'rows'
-          ? { rowCount: input.payload.rows.length }
-          : payloadKind === 'params'
-            ? { paramKeys: Object.keys(input.payload.paramValues) }
-            : { verdict: input.payload.verdict }),
-  };
-
+  const { description, inputSnapshot } = auditFieldsFor(
+    input.payload,
+    input.taskId,
+    resolvedStepId,
+  );
   const auditActor = { ...actor, actorId };
 
   await scope.system.audit.append({
