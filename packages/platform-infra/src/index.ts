@@ -28,6 +28,9 @@ export { FirestoreNamespaceSecretsRepository } from './firestore/namespace-secre
 export { FirestoreCoworkSessionRepository } from './firestore/cowork-session-repository.js';
 export { FirestoreCronTriggerStateRepository } from './firestore/cron-trigger-state-repository.js';
 export { FirestoreToolCatalogRepository } from './firestore/tool-catalog-repository.js';
+export { PostgresToolCatalogRepository } from './postgres/repositories/tool-catalog-repository.js';
+export { createPostgresClient, getSharedPostgresClient } from './postgres/client.js';
+export type { Database } from './postgres/client.js';
 export { FirestoreOAuthProviderRepository } from './firestore/oauth-provider-repository.js';
 export { FirestoreAgentOAuthTokenRepository } from './firestore/agent-oauth-token-repository.js';
 export { validateSecretsKey } from './crypto/secrets-cipher.js';

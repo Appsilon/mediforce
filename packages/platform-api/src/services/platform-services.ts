@@ -16,6 +16,8 @@ import {
   FirestoreWorkflowSecretsRepository,
   FirestoreNamespaceSecretsRepository,
   FirebaseInviteService,
+  PostgresToolCatalogRepository,
+  getSharedPostgresClient,
   getAdminFirestore,
   validateSecretsKey,
   createMailgunSender,
@@ -38,7 +40,10 @@ import type {
   SendInviteEmailInput,
   SendWorkspaceNotificationEmailInput,
 } from './invite-notification.js';
-import type { CronTriggerStateRepository } from '@mediforce/platform-core';
+import type {
+  CronTriggerStateRepository,
+  ToolCatalogRepository,
+} from '@mediforce/platform-core';
 import {
   WorkflowEngine,
   ManualTrigger,
@@ -88,7 +93,7 @@ export interface PlatformServices {
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
   coworkSessionRepo: FirestoreCoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
-  toolCatalogRepo: FirestoreToolCatalogRepository;
+  toolCatalogRepo: ToolCatalogRepository;
   namespaceRepo: FirestoreNamespaceRepository;
   oauthProviderRepo: FirestoreOAuthProviderRepository;
   agentOAuthTokenRepo: FirestoreAgentOAuthTokenRepository;
@@ -236,7 +241,10 @@ export function getPlatformServices(): PlatformServices {
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
   const coworkSessionRepo = new FirestoreCoworkSessionRepository(db, instanceRepo);
   const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
-  const toolCatalogRepo = new FirestoreToolCatalogRepository(db);
+  const toolCatalogRepo: ToolCatalogRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresToolCatalogRepository(getSharedPostgresClient().db)
+      : new FirestoreToolCatalogRepository(db);
   const namespaceRepo = new FirestoreNamespaceRepository(db);
   const oauthProviderRepo = new FirestoreOAuthProviderRepository(db);
   const agentOAuthTokenRepo = new FirestoreAgentOAuthTokenRepository(db);
