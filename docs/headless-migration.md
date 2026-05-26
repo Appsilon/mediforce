@@ -547,26 +547,124 @@ Touches NextAuth migration boundary (ADR-0002 unwritten). May want to wait for t
 
 **Pause-safe**: yes — Phase 2 leaves Phase 2.5 routes inline; they keep working.
 
-### Phase 3 — Complex flows
+### Phase 3 — Kick-driven mutations (split from prior Phase 3 — 2026-05-26)
 
-Each of these needs its own design pass:
+**Split rationale (2026-05-26, post-PR501 grilling).** The pre-2026-05-26 Phase 3 bundled three orthogonal problems:
+1. Reclassified state-transition mutations that need an orchestration kick (`tasks/complete`, `tasks/resolve`, `processes/resume`).
+2. Streaming response shape (cowork chat/message/finalize SSE).
+3. Run executor durability (queue migration of the `/api/processes/:id/run` auto-runner loop).
 
-- **Cowork streaming** (`POST /api/cowork/:id/chat`, `POST /api/cowork/:id/message`, `POST /api/cowork/:id/finalize`) — requires an SSE adapter between the pure handler and Next.js `ReadableStream`. Design question: does the handler yield events, or return an async iterator?
-- **Process execution** (`POST /api/processes/:id/run`, `POST /api/processes/:id/advance` with agent side-effects) — orchestrates `AgentRunner` + `WorkflowEngine`; handler becomes an orchestrator instead of a thin read. Decide on sync vs. queued execution.
-- **Cron heartbeat** (`POST /api/cron/heartbeat`) — added to Phase 3 (2026-05-25). Steps 1-3 (scan triggers / check due / fire) are clean handler work. Step 4 (self-fetch `/api/processes/:id/run` to kick the run loop) is the same orchestration kick `processes/run` and `processes/advance` need. Design the orchestration kick once, apply to all three.
-- **Server actions** in `src/app/actions/*.ts` — fold into handlers where sensible, keep Next.js-specific concerns (`revalidatePath`, `redirect`) in a thin action wrapper.
+Each is a separate design pass with different risk and different reviewers. Bundling forced the streaming decision to wait on the kick decision and vice versa. Split:
 
-**Pause-safe**: yes, but granularity is coarser — streaming and orchestration are each a PR of meaningful size.
+- **Phase 3** (this section) — kick mechanism + reclassified mutations + cron-heartbeat + retry + processes-create + remaining `app/actions/*.ts` cleanup.
+- **Phase 3.1** (below) — Cowork SSE x3. Own grill session, own streaming-adapter design.
+- **Future ADR (not a phase)** — BullMQ-based run executor. Replaces self-fetch kick + relocates auto-runner loop out of Next.js `after()`. Triggered only after Phase 3 proves the `runKicker` abstraction. Out of headless-migration scope (concerns runtime durability, not API surface).
 
-**Open questions to settle before starting**:
-- Streaming handler shape — pick one:
-  - `AsyncGenerator<Event>` returned from handler; adapter wraps in `ReadableStream`.
-  - Handler takes a `write(event)` callback; adapter provides one that writes to the response.
-  - Handler returns an `EventEmitter`-style object; adapter subscribes.
-  The first is the cleanest functional style; the second is the most flexible for pre-existing code.
-- Orchestrator side-effects — `executeAgentStep` spawns Docker containers and writes audit events. Do we keep it as a handler (pure-ish, deps include `AgentRunner`) or promote it to a queue worker entrypoint?
-- Cowork finalize writes to multiple repos atomically today — do we need a transaction abstraction in the repo interfaces, or accept non-atomic writes with compensating actions?
-- **Orchestration kick mechanism** — today three call sites self-fetch via HTTP (`/api/processes/:id/run`): inline `cron/heartbeat` route, inline `tasks/complete` route post-completion, Server Actions in `processes.ts`. The pattern bypasses framework boundaries (`platform-api` handlers don't know own URL or API key). Three options: (a) `scope.system.runKicker(instanceId)` abstraction wired in `caller-scope.ts`; (b) push the kick inside `engine.startInstance()` so callers don't kick at all; (c) queue worker entrypoint replacing self-fetch with a real job dispatch. Decide once, apply to cron-heartbeat + processes/run + processes/advance + tasks/complete-then-advance.
+**In-scope endpoints:**
+
+| Endpoint | Source | Notes |
+|---|---|---|
+| `POST /api/tasks/:taskId/complete` | reclassified PR501 | Discriminated-union body (4 variants: verdict/params/upload/assignment); cross-entity check (parent run step gate); biggest endpoint. |
+| `POST /api/tasks/:taskId/resolve` | reclassified PR501 | UI-unused duplicate per PR501 body. Verify, then either migrate or delete outright. |
+| `POST /api/processes/:instanceId/resume` | reclassified PR501 | Pure state transition; pattern mirrors `cancel`. |
+| `POST /api/processes/:instanceId/steps/:stepId/retry` | original Phase 3 | State reset + kick. Shape similar to `resume`. |
+| `POST /api/cron/heartbeat` | repicked from Phase 2 PR1 | Trigger-scan logic clean; N kicks per heartbeat (one per due trigger). |
+| `POST /api/processes` (create) | moved from Phase 2.5 | Idempotency design + trigger-payload validation against definition input schema; create + kick in one handler. |
+
+**Out of Phase 3 scope (intentional):**
+
+- `POST /api/processes/:instanceId/run` — internal auto-runner endpoint. **Not migrated in Phase 3.** Stays as-is (600-LOC inline route + Next.js `after()` loop + in-memory `runLocks` Set). Becomes "kicked endpoint" called via the new abstraction. Migration covered by the future BullMQ executor ADR.
+- `POST /api/processes/:instanceId/advance` — investigate first; may be internal-only (called by engine) and never user-facing, in which case it stays inline forever.
+- Cowork SSE → **Phase 3.1**.
+- Run executor queue migration → future ADR.
+
+**Decision — Orchestration kick mechanism: `scope.system.runKicker` abstraction.**
+
+The kick is the gating dependency for every reclassified handler. Settled on the `runKicker` abstraction (option (a) from the prior open-questions list) for Phase 3, with explicit fwd-compat to a queue-based executor later.
+
+**What it is.** A single-method interface threaded through `CallerScope.system`:
+
+```ts
+interface RunKicker {
+  /**
+   * Notify the runtime that this instance has been advanced and needs the
+   * auto-runner to execute its current step. Fire-and-forget — returns when
+   * the kick is dispatched, not when the run completes. Idempotent: if the
+   * runtime is already executing this instance, the kick is a no-op
+   * (200/409 on the underlying transport, swallowed).
+   */
+  kick(instanceId: string, opts?: { triggeredBy?: string }): Promise<void>;
+}
+```
+
+**Production impl (`httpSelfFetchRunKicker`).** Encapsulates exactly today's pattern — `getAppBaseUrl()` + `fetch(/api/processes/:id/run)` + `X-Api-Key` header + `.catch(() => {})`. One place, not eight.
+
+**Test impl (`noopRunKicker` / `syncRunKicker`).** No-op for unit/handler tests; in-process synchronous execute for cross-layer integration tests that want to assert the kicked state.
+
+**Why this is right for Phase 3.**
+- Headless cel: handlers framework-free (no `getAppBaseUrl`, no `PLATFORM_API_KEY`, no `fetch`). ✅
+- Pause-safe: per-endpoint migration; remaining inline routes still call the same kick. ✅
+- Zero behaviour change: prod impl is bit-for-bit today's self-fetch. ✅
+- Workaround stays a workaround **under** the abstraction; future BullMQ migration swaps one impl, handlers untouched. ✅
+- Engine stays pure state-machine; no runtime concern leaks into `workflow-engine`. ✅
+
+**What it does NOT solve (deferred to BullMQ ADR):** crash safety (`after()` dies with worker), distributed lock (`runLocks` per-process), retry / DLQ / observability, multi-worker race ("two Next.js workers run two parallel loops"). Today's prod = single VPS, single worker — pattern works **until** we scale out.
+
+**Self-fetch sites today (kicks of `/api/processes/:id/run`) — 8:**
+
+| Site | Style | Migrates in PR |
+|---|---|---|
+| `api/cron/heartbeat/route.ts` | `await` (blocks until 202) | Phase 3 |
+| `api/tasks/[taskId]/complete/route.ts` | fire-and-forget | Phase 3 |
+| `api/processes/[instanceId]/resume/route.ts` | fire-and-forget | Phase 3 |
+| `api/processes/route.ts` (POST create) | fire-and-forget | Phase 3 |
+| `api/processes/[instanceId]/steps/[stepId]/retry/route.ts` | fire-and-forget | Phase 3 |
+| `app/actions/cowork.ts` (cowork finalize) | fire-and-forget | Phase 3.1 |
+| `app/actions/processes.ts:startWorkflowRun` | fire-and-forget | Phase 3 (folds into POST create handler) |
+| `app/actions/processes.ts:retryFailedStep` | fire-and-forget | Phase 3 (folds into retry handler) |
+
+**PR sequencing (proposed):**
+
+| PR | Scope | Why this order |
+|---|---|---|
+| PR1 | `RunKicker` interface + `scope.system.runKicker` wiring in `caller-scope.ts` + prod impl (`httpSelfFetchRunKicker`) + test impls + retrofit all 8 self-fetch sites to call `scope.system.runKicker.kick()` instead of inline `fetch`. **No endpoint migrated yet.** Pure abstraction-extraction PR. | Smallest possible step that proves the abstraction. Every site stays inline route; only the kick line changes. Reversible. |
+| PR2 | `tasks/resolve` + `processes/resume` + `processes/steps/:stepId/retry` — three lowest-risk reclassified-to-Phase-3 endpoints, all uniform "state-transition + kick". | First real handler migrations using the abstraction. Three at once because shape identical; rejects pattern early if wrong. (If `resolve` is confirmed UI-unused, delete instead of migrate.) |
+| PR3 | `cron/heartbeat` migration. Trigger-scan logic + N kicks. | First multi-kick handler. |
+| PR4 | `processes` POST create. Idempotency + trigger-payload validation + create-then-kick. | Brings in idempotency design (deferred from Phase 2.5). |
+| PR5 | `tasks/complete` with discriminated-union body collapsing four `completeTask*` server actions. Cross-entity step-gate check. | Biggest handler; last because it benefits from every prior PR's lesson. |
+| PR6 | Remaining `app/actions/*.ts` cleanup. Verify `app/actions/processes.ts` + `app/actions/cowork.ts` + `app/actions/{tasks,definitions,namespace-secrets,workflow-secrets}.ts` are empty/deletable. | Net cleanup; flushes the migrate-policy default. |
+
+6 PRs, ~3-4 weeks. Pause-safe between each.
+
+**Decision — `/api/processes/:instanceId/advance`.** Investigate user-facing surface before committing to migrate. If only `engine` and tests call it, leave inline forever (internal API, not headless contract).
+
+**Decision — Server Action policy on cowork+processes leftovers.** Per ADR-0005 §6: default delete on migrate. `app/actions/cowork.ts` deletion deferred to Phase 3.1 (its endpoints stream).
+
+**Open questions to settle during Phase 3 (non-blocking for PR1):**
+- Test impl ergonomics — `noopRunKicker` enough for handler tests, or do we want `syncRunKicker` (executes loop in-process) for cross-layer integration coverage? Adds complexity to the test scope but lets us assert post-kick state.
+- `tasks/resolve` — confirm UI-unused; if so, delete in PR2 rather than migrate.
+- `processes/advance` user-facing? Audit callers; decide migrate vs leave inline.
+- `processes` POST create idempotency — client-supplied key vs server-derived dedupe window. Inherits Phase 2.5 open question.
+- `tasks/complete` step-gate validation — handler loads parent run + WorkflowDefinition + walks step config to validate verdict payload. Cross-entity load is the first complex handler shape; pattern question.
+
+### Phase 3.1 — Cowork streaming (split from Phase 3 — 2026-05-26)
+
+Three endpoints. All stream SSE. All write to multiple repos. Orthogonal to the kick decision. Own design pass deferred — see the `/grill-with-docs` task spawned 2026-05-26.
+
+**In-scope:**
+
+- `POST /api/cowork/:sessionId/chat` — LLM streaming (assistant token-by-token).
+- `POST /api/cowork/:sessionId/message` — user message append + optional LLM response stream.
+- `POST /api/cowork/:sessionId/finalize` — locks session, writes artifact, may emit kick (which uses `scope.system.runKicker` from Phase 3 PR1). Multi-repo write; atomicity question.
+
+**Why split.** Streaming handler shape is its own design question (AsyncGenerator vs callback vs EventEmitter) with no overlap with the kick mechanism. Finalize is the only cowork endpoint that needs the kick — and it gets `runKicker` from Phase 3 PR1 for free.
+
+**Open questions (Phase 3.1 grill — not Phase 3):**
+- Streaming handler shape: `AsyncGenerator<Event>` (cleanest functional) vs `write(event)` callback (most flexible for existing code) vs `EventEmitter`-style subscribe.
+- SSE adapter — does it live in `createRouteAdapter` (one adapter, two response modes) or a sibling `createStreamingRouteAdapter`?
+- Multi-repo atomicity on finalize — transaction abstraction in repo interfaces vs compensating actions vs accept-the-gap (Firestore reality today).
+- Voice-realtime channel — does the WebRTC/OpenAI realtime path fit the same streaming abstraction or is it a separate sub-pattern?
+- Auth for long-lived streams — Firebase ID token expiry mid-stream; reconnect, refresh, or cap stream lifetime?
 
 ### Phase 4 — Typed `apiClient` + first hook migration
 
@@ -801,6 +899,37 @@ contract gets written.
   (stays inline).
 - `DELETE /api/admin/docker-images` — mutation + deployment-admin
   auth; folds into Phase 2.5 admin bullet rather than Phase 1.8.
+
+### Run executor durability — BullMQ-based queue (deferred during Phase 3 grilling, 2026-05-26)
+
+**Current state.** `/api/processes/:instanceId/run` is a 600-LOC inline Next.js route running the auto-runner loop in `after()`. Eight call sites self-fetch this URL after state-changing mutations to wake the executor. In-memory `runLocks: Set<string>` per process provides at-most-once execution per instance. Pattern works on a single-worker VPS deployment (today's prod + staging).
+
+**Workarounds it accumulates.**
+- `runLocks` per-process only — multi-worker = parallel loops (race). Comment in source acknowledges and points to "Firestore transaction or Redis" as the proper fix.
+- `after()` dies with worker — crash mid-loop leaves instance "running" with nobody executing. Cron-heartbeat is the de facto recovery (next 15-min beat re-detects + re-kicks).
+- No retry / DLQ / observability — `fetch().catch(() => {})` swallows failures.
+- `isStuckLoop` / `MAX_SAME_STEP_ITERATIONS` — workaround for the lack of idempotent dispatch; a real queue provides iteration tracking for free.
+- Boundary violation — every kicker has to know `getAppBaseUrl()` + `PLATFORM_API_KEY`. Phase 3 hides this behind `scope.system.runKicker` but the workaround stays under the abstraction.
+
+**Why deferred from Phase 3.** Headless-migration goal is API surface (typed contract, framework-free handlers). Run executor durability is a different concern (runtime/ops/durability). Fixing it during Phase 3 would:
+- Force a "Redis required for dev default" decision mid-migration.
+- Mix architectural changes (queue migration, executor relocation outside `after()`) with mechanical changes (handler shape migration). Different reviewers, different risk profiles.
+- Block all reclassified mutation migrations on a much larger design.
+
+**Likely future shape (sketched, not committed).** Mediforce already runs BullMQ in prod + staging via `@mediforce/container-worker` (today: Docker container job dispatch only, gated by `REDIS_URL`). The future ADR extends this:
+- New queue `mediforce-instance-runs` with payload `{ instanceId, triggeredBy }`. Fire-and-forget (no `waitUntilFinished` — unlike today's Docker queue which is sync RPC).
+- Producer = `scope.system.runKicker.kick()` swaps impl from `httpSelfFetchRunKicker` to `queueRunKicker`. Handlers untouched.
+- Consumer = `container-worker` (or sibling worker process) runs the auto-runner loop. Relocates `executeAgentStep` + dependencies outside the Next.js context. Crash → BullMQ retries. Distributed lock = BullMQ consumer group.
+- `/api/processes/:instanceId/run` either becomes a thin enqueue wrapper or is deleted entirely.
+
+**Open questions for the ADR (not pre-decided here).**
+- Sync RPC `waitUntilFinished` (today's Docker queue) vs fire-and-forget (right for the kick). Different semantics, may need different queue config.
+- Default `pnpm dev` — keep Redis opt-in (status quo) and ship a fallback in-process kicker, or make Redis a hard dev dependency? Affects developer onboarding friction.
+- Multi-tenant scale-out — does one worker process suffice, or do we need consumer-group scaling matched to instance throughput?
+- Cron-heartbeat — does it stay as Next.js HTTP route triggered externally, or become a BullMQ `repeat` job?
+- BullMQ vs Temporal — Temporal evaluated separately (see Temporal-migration research spawn 2026-05-26). Going with BullMQ for this ADR unless the Temporal research concludes otherwise.
+
+**Action.** Dedicated ADR drafted post-Phase 3, after the `runKicker` abstraction has shipped and proven the swap-impl-only migration path. Grill session spawned 2026-05-26.
 
 ### Mutation audit emission (deferred during Phase 2 grilling, 2026-05-25)
 
