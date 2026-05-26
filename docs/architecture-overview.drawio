@@ -1,0 +1,143 @@
+<mxGraphModel dx="1341" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="1">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=24;fontStyle=1;fontColor=#1a1a2e;" value="Mediforce — Application Overview" vertex="1">
+      <mxGeometry height="36" width="800" x="300" y="24" as="geometry"/>
+    </mxCell>
+    <mxCell id="subtitle" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=13;fontColor=#555555;" value="Workflow + Agent Orchestration Platform for Pharma" vertex="1">
+      <mxGeometry height="22" width="800" x="300" y="56" as="geometry"/>
+    </mxCell>
+
+    <!-- Actors -->
+    <mxCell id="actor-human" parent="1" style="shape=mxgraph.basic.person;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;align=center;" value="Pharma Scientist" vertex="1">
+      <mxGeometry height="100" width="80" x="60" y="220" as="geometry"/>
+    </mxCell>
+    <mxCell id="actor-ci" parent="1" style="shape=mxgraph.basic.person;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;align=center;" value="DevOps / CI" vertex="1">
+      <mxGeometry height="100" width="80" x="60" y="440" as="geometry"/>
+    </mxCell>
+    <mxCell id="actor-ext" parent="1" style="rounded=1;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;align=center;" value="External System" vertex="1">
+      <mxGeometry height="50" width="100" x="50" y="620" as="geometry"/>
+    </mxCell>
+
+    <!-- Clients -->
+    <mxCell id="ui" parent="1" style="rounded=1;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;align=center;arcSize=8;" value="&lt;b&gt;Web App&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;Next.js 15 · :9003&lt;/font&gt;" vertex="1">
+      <mxGeometry height="70" width="180" x="220" y="220" as="geometry"/>
+    </mxCell>
+    <mxCell id="cli" parent="1" style="rounded=1;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;align=center;arcSize=8;" value="&lt;b&gt;CLI&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;mediforce &lt;cmd&gt;&lt;/font&gt;" vertex="1">
+      <mxGeometry height="70" width="180" x="220" y="450" as="geometry"/>
+    </mxCell>
+
+    <!-- Platform API -->
+    <mxCell id="platform" parent="1" style="rounded=1;html=1;fillColor=#0050ef;strokeColor=#003cbf;fontColor=#ffffff;fontSize=14;align=center;arcSize=8;" value="&lt;b&gt;Platform API&lt;/b&gt;&lt;br/&gt;&lt;font color='#ccddff' style='font-size:10px'&gt;Framework-free handlers&lt;br/&gt;Firebase JWT · API Key auth&lt;/font&gt;" vertex="1">
+      <mxGeometry height="80" width="200" x="470" y="330" as="geometry"/>
+    </mxCell>
+
+    <!-- Workflow Engine -->
+    <mxCell id="wfe" parent="1" style="rounded=1;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;align=center;arcSize=8;" value="&lt;b&gt;Workflow Engine&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;Steps · Transitions · Triggers&lt;br/&gt;Manual · Webhook · Cron&lt;/font&gt;" vertex="1">
+      <mxGeometry height="80" width="200" x="470" y="480" as="geometry"/>
+    </mxCell>
+
+    <!-- Human-in-the-Loop -->
+    <mxCell id="hitl" parent="1" style="rounded=1;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;align=center;arcSize=8;" value="&lt;b&gt;Human-in-the-Loop&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;Tasks · Review · Handoffs&lt;br/&gt;L1 Observe → L4 Autonomous&lt;/font&gt;" vertex="1">
+      <mxGeometry height="80" width="200" x="350" y="620" as="geometry"/>
+    </mxCell>
+
+    <!-- Agent Runtime -->
+    <mxCell id="agents" parent="1" style="rounded=1;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;align=center;arcSize=8;" value="&lt;b&gt;Agent Runtime&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;Claude Code · OpenCode · Scripts&lt;br/&gt;Docker · MCP tools · OAuth&lt;/font&gt;" vertex="1">
+      <mxGeometry height="80" width="200" x="610" y="620" as="geometry"/>
+    </mxCell>
+
+    <!-- Firestore -->
+    <mxCell id="firestore" parent="1" style="shape=cylinder3;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;align=center;" value="&lt;b&gt;Firestore&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;Processes · Tasks · Agents&lt;br/&gt;Audit trail · Secrets (AES)&lt;/font&gt;" vertex="1">
+      <mxGeometry height="100" width="160" x="760" y="310" as="geometry"/>
+    </mxCell>
+
+    <!-- External services -->
+    <mxCell id="firebase" parent="1" style="rounded=1;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=center;" value="&lt;b&gt;Firebase Auth&lt;/b&gt;" vertex="1">
+      <mxGeometry height="50" width="150" x="990" y="200" as="geometry"/>
+    </mxCell>
+    <mxCell id="openrouter" parent="1" style="rounded=1;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=center;" value="&lt;b&gt;OpenRouter&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;Claude · GPT-4 · Gemini&lt;/font&gt;" vertex="1">
+      <mxGeometry height="60" width="150" x="990" y="310" as="geometry"/>
+    </mxCell>
+    <mxCell id="redis" parent="1" style="rounded=1;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=center;" value="&lt;b&gt;Redis&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;BullMQ job queue&lt;/font&gt;" vertex="1">
+      <mxGeometry height="55" width="150" x="990" y="430" as="geometry"/>
+    </mxCell>
+    <mxCell id="docker" parent="1" style="rounded=1;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=center;" value="&lt;b&gt;Docker&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;Agent containers&lt;/font&gt;" vertex="1">
+      <mxGeometry height="55" width="150" x="990" y="545" as="geometry"/>
+    </mxCell>
+    <mxCell id="mailgun" parent="1" style="rounded=1;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=center;" value="&lt;b&gt;Mailgun&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;Task email notifications&lt;/font&gt;" vertex="1">
+      <mxGeometry height="55" width="150" x="990" y="660" as="geometry"/>
+    </mxCell>
+
+    <!-- Domain Apps -->
+    <mxCell id="apps" parent="1" style="rounded=1;html=1;fillColor=#fde8e4;strokeColor=#d94f3d;fontSize=13;align=center;arcSize=8;" value="&lt;b&gt;Domain Apps&lt;/b&gt;&lt;br/&gt;&lt;font style='font-size:10px'&gt;landing-zone · protocol-to-tfl&lt;br/&gt;tealflow · workflow-designer&lt;/font&gt;" vertex="1">
+      <mxGeometry height="80" width="200" x="470" y="760" as="geometry"/>
+    </mxCell>
+
+    <!-- Edges -->
+    <mxCell id="e-human-ui" edge="1" parent="1" source="actor-human" target="ui" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="browser">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-ci-cli" edge="1" parent="1" source="actor-ci" target="cli" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="terminal">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-ext-platform" edge="1" parent="1" source="actor-ext" target="platform" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;dashed=1;" value="webhook / cron">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-ui-platform" edge="1" parent="1" source="ui" target="platform" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" value="HTTP">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-cli-platform" edge="1" parent="1" source="cli" target="platform" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" value="REST (API key)">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-platform-wfe" edge="1" parent="1" source="platform" target="wfe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="orchestrate">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-platform-db" edge="1" parent="1" source="platform" target="firestore" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="read / write">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-wfe-hitl" edge="1" parent="1" source="wfe" target="hitl" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="human step">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-wfe-agents" edge="1" parent="1" source="wfe" target="agents" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="agent step">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-hitl-wfe" edge="1" parent="1" source="hitl" target="wfe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.2;entryY=1;entryDx=0;entryDy=0;" value="approve / reject">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-agents-wfe" edge="1" parent="1" source="agents" target="wfe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.8;entryY=1;entryDx=0;entryDy=0;" value="result / handoff">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-agents-or" edge="1" parent="1" source="agents" target="openrouter" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="LLM calls">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-agents-redis" edge="1" parent="1" source="agents" target="redis" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=1;exitY=0.6;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="Docker jobs">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-redis-docker" edge="1" parent="1" source="redis" target="docker" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="spawn containers">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-hitl-mailgun" edge="1" parent="1" source="hitl" target="mailgun" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="notify reviewer">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-db-fbauth" edge="1" parent="1" source="firestore" target="firebase" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="auth tokens">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-wfe-db" edge="1" parent="1" source="wfe" target="firestore" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.8;entryDx=0;entryDy=0;" value="persist state">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-apps-wfe" edge="1" parent="1" source="apps" target="wfe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" value=".wd.json + Docker images">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-ui-db" edge="1" parent="1" source="ui" target="firestore" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;dashed=1;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.2;entryDx=0;entryDy=0;" value="onSnapshot() realtime">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="720" y="234"/>
+          <mxPoint x="720" y="330"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+  </root>
+</mxGraphModel>

@@ -1,0 +1,397 @@
+<mxfile host="app.diagrams.net" agent="Claude Code">
+  <diagram id="mediforce-arch" name="Mediforce Architecture">
+    <mxGraphModel dx="1341" dy="924" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#1a1a2e;" value="Mediforce Platform — Full Architecture" vertex="1">
+          <mxGeometry height="40" width="720" x="600" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-bg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" value="" vertex="1">
+          <mxGeometry height="170" width="200" x="1680" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontStyle=1;fontSize=11;" value="Legend" vertex="1">
+          <mxGeometry height="20" width="200" x="1680" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="TypeScript Package" vertex="1">
+          <mxGeometry height="24" width="180" x="1690" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="External Service" vertex="1">
+          <mxGeometry height="24" width="180" x="1690" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" parent="1" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" value="Infrastructure / Runtime" vertex="1">
+          <mxGeometry height="24" width="180" x="1690" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" parent="1" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" value="Data Store" vertex="1">
+          <mxGeometry height="24" width="180" x="1690" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" parent="1" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" value="User / Actor" vertex="1">
+          <mxGeometry height="24" width="180" x="1690" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-actors" parent="1" style="swimlane;startSize=28;fillColor=#fff9e6;strokeColor=#d6b656;fontStyle=1;fontSize=13;" value="Actors" vertex="1">
+          <mxGeometry height="240" width="300" x="40" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-pharma" parent="zone-actors" style="shape=mxgraph.basic.person;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="Pharma Scientist / &#xa;Reviewer&#xa;(Human)" vertex="1">
+          <mxGeometry height="80" width="80" x="10" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-pharma-label" parent="zone-actors" style="text;html=1;fontSize=9;align=left;" value="⬤ Browser: localhost:9003&#xa;⬤ Firebase Auth (JWT)" vertex="1">
+          <mxGeometry height="40" width="185" x="100" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-devops" parent="zone-actors" style="shape=mxgraph.basic.person;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="DevOps / CI&#xa;(Server-to-Server)" vertex="1">
+          <mxGeometry height="80" width="80" x="10" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-devops-label" parent="zone-actors" style="text;html=1;fontSize=9;align=left;" value="⬤ CLI: mediforce &lt;cmd&gt;&#xa;⬤ Auth: X-Api-Key header" vertex="1">
+          <mxGeometry height="40" width="185" x="100" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-ui" parent="1" style="swimlane;startSize=28;fillColor=#e8f4fd;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;" value="Frontend — platform-ui (Next.js 15 App Router)" vertex="1">
+          <mxGeometry height="580" width="520" x="380" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-env" parent="zone-ui" style="text;html=1;fontSize=9;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;" value="DEV: localhost:9003  |  MOCK: localhost:9007  |  PROD: :3000 (behind Caddy)" vertex="1">
+          <mxGeometry height="22" width="500" x="10" y="32" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-pages" parent="zone-ui" style="swimlane;startSize=22;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="React Pages (App Router)" vertex="1">
+          <mxGeometry height="150" width="500" x="10" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-p1" parent="ui-pages" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Workflow Dashboard" vertex="1">
+          <mxGeometry height="28" width="140" x="10" y="28" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-p2" parent="ui-pages" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Process Monitor" vertex="1">
+          <mxGeometry height="28" width="140" x="160" y="28" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-p3" parent="ui-pages" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Task Management" vertex="1">
+          <mxGeometry height="28" width="140" x="310" y="28" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-p4" parent="ui-pages" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Agent Catalog" vertex="1">
+          <mxGeometry height="28" width="140" x="10" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-p5" parent="ui-pages" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Workflow Editor (CodeMirror)" vertex="1">
+          <mxGeometry height="28" width="140" x="160" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-p6" parent="ui-pages" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Admin / Reports" vertex="1">
+          <mxGeometry height="28" width="140" x="310" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-p7" parent="ui-pages" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Cowork Session (Voice/Chat)" vertex="1">
+          <mxGeometry height="28" width="200" x="10" y="104" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-p8" parent="ui-pages" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Auth Pages (Firebase UI)" vertex="1">
+          <mxGeometry height="28" width="240" x="220" y="104" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-apiroutes" parent="zone-ui" style="swimlane;startSize=22;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="Next.js API Routes  (/app/api/*)" vertex="1">
+          <mxGeometry height="200" width="500" x="10" y="222" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-r1" parent="ui-apiroutes" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;" value="POST /api/workflow-definitions&#xa;GET  /api/workflow-definitions/:name" vertex="1">
+          <mxGeometry height="38" width="230" x="10" y="28" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-r2" parent="ui-apiroutes" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;" value="POST /api/runs&#xa;GET  /api/runs&#xa;GET  /api/processes/:id" vertex="1">
+          <mxGeometry height="38" width="230" x="250" y="28" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-r3" parent="ui-apiroutes" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;" value="GET  /api/tasks&#xa;GET  /api/tasks/:id&#xa;POST /api/tasks/:id" vertex="1">
+          <mxGeometry height="38" width="230" x="10" y="76" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-r4" parent="ui-apiroutes" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;" value="GET  /api/agents&#xa;GET  /api/model-registry&#xa;POST /api/system/docker-info" vertex="1">
+          <mxGeometry height="38" width="230" x="250" y="76" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-r5" parent="ui-apiroutes" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;" value="POST /api/triggers/webhook/:ns/:wf/:path&#xa;POST /api/cron/heartbeat" vertex="1">
+          <mxGeometry height="38" width="230" x="10" y="124" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-r6" parent="ui-apiroutes" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;" value="POST /api/admin/oauth-providers&#xa;POST /api/users/invite&#xa;POST /api/cowork" vertex="1">
+          <mxGeometry height="38" width="230" x="250" y="124" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-r7" parent="ui-apiroutes" style="text;html=1;fontSize=9;align=center;fillColor=#ffe6cc;strokeColor=#d79b00;" value="Auth middleware: Firebase JWT or X-Api-Key → CallerIdentity" vertex="1">
+          <mxGeometry height="22" width="470" x="10" y="168" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-lib" parent="zone-ui" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=center;" value="Client Lib: @/lib/use-mediforce → apiFetch (never raw fetch)" vertex="1">
+          <mxGeometry height="28" width="500" x="10" y="432" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-realtime" parent="zone-ui" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=center;" value="Firestore real-time subscriptions (onSnapshot) for live process/task updates" vertex="1">
+          <mxGeometry height="28" width="500" x="10" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-devmode" parent="zone-ui" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;align=center;" value="dev:mock → port 9007, mocked agents, Firebase emulator seeded data" vertex="1">
+          <mxGeometry height="22" width="500" x="10" y="508" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-devmode2" parent="zone-ui" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;align=center;" value="dev:queue → REDIS_URL set → jobs via container-worker  |  dev:no-docker → spawn claude CLI directly" vertex="1">
+          <mxGeometry height="22" width="500" x="10" y="536" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-cli" parent="1" style="swimlane;startSize=28;fillColor=#e8f4fd;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;" value="CLI — @mediforce/cli" vertex="1">
+          <mxGeometry height="280" width="300" x="40" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="cli-env" parent="zone-cli" style="text;html=1;fontSize=9;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;" value="Env: MEDIFORCE_API_KEY + MEDIFORCE_BASE_URL" vertex="1">
+          <mxGeometry height="22" width="280" x="10" y="32" as="geometry" />
+        </mxCell>
+        <mxCell id="cli-cmds" parent="zone-cli" style="swimlane;startSize=20;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Commands" vertex="1">
+          <mxGeometry height="200" width="280" x="10" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="cli-c1" parent="cli-cmds" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="workflow register / list / get" vertex="1">
+          <mxGeometry height="22" width="260" x="10" y="24" as="geometry" />
+        </mxCell>
+        <mxCell id="cli-c2" parent="cli-cmds" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="run start / get / list" vertex="1">
+          <mxGeometry height="22" width="260" x="10" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="cli-c3" parent="cli-cmds" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="secret set (namespace-scoped)" vertex="1">
+          <mxGeometry height="22" width="260" x="10" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="cli-c4" parent="cli-cmds" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="agent list / get" vertex="1">
+          <mxGeometry height="22" width="260" x="10" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="cli-c5" parent="cli-cmds" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="system status / credits" vertex="1">
+          <mxGeometry height="22" width="260" x="10" y="136" as="geometry" />
+        </mxCell>
+        <mxCell id="cli-c6" parent="cli-cmds" style="text;html=1;fontSize=9;align=center;fillColor=#ffe6cc;strokeColor=#d79b00;" value="Uses: @mediforce/platform-api client" vertex="1">
+          <mxGeometry height="22" width="260" x="10" y="164" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-api" parent="1" style="swimlane;startSize=28;fillColor=#e8f4fd;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;" value="API Layer — @mediforce/platform-api (framework-free handlers)" vertex="1">
+          <mxGeometry height="260" width="460" x="940" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="api-contract" parent="zone-api" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="contract/ — Zod request/response schemas for all endpoints" vertex="1">
+          <mxGeometry height="26" width="440" x="10" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="api-auth" parent="zone-api" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;" value="auth.ts — CallerIdentity: { apiKey } | { firebaseUser, namespaces }   +   namespace access control" vertex="1">
+          <mxGeometry height="26" width="440" x="10" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="api-handlers" parent="zone-api" style="swimlane;startSize=20;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="handlers/ (pure functions: (input, deps) → Promise&lt;output&gt;, no HTTP)" vertex="1">
+          <mxGeometry height="140" width="440" x="10" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="api-h1" parent="api-handlers" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="registerWorkflow&#xa;listWorkflows&#xa;getWorkflow" vertex="1">
+          <mxGeometry height="52" width="130" x="10" y="24" as="geometry" />
+        </mxCell>
+        <mxCell id="api-h2" parent="api-handlers" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="startRun&#xa;getRun&#xa;listRuns" vertex="1">
+          <mxGeometry height="52" width="130" x="150" y="24" as="geometry" />
+        </mxCell>
+        <mxCell id="api-h3" parent="api-handlers" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="listTasks&#xa;getTask&#xa;updateTask (verdict)" vertex="1">
+          <mxGeometry height="52" width="140" x="290" y="24" as="geometry" />
+        </mxCell>
+        <mxCell id="api-h4" parent="api-handlers" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="listAgents / getAgent&#xa;listModels / syncModels" vertex="1">
+          <mxGeometry height="42" width="130" x="10" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="api-h5" parent="api-handlers" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="getProcess&#xa;listAuditEvents&#xa;getProcessSteps" vertex="1">
+          <mxGeometry height="42" width="130" x="150" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="api-h6" parent="api-handlers" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="systemHealth&#xa;dockerInfo&#xa;openRouterCredits" vertex="1">
+          <mxGeometry height="42" width="140" x="290" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-core" parent="1" style="swimlane;startSize=28;fillColor=#e8f4fd;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;" value="Domain — @mediforce/platform-core" vertex="1">
+          <mxGeometry height="220" width="460" x="940" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="core-schemas" parent="zone-core" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="Zod schemas: WorkflowDefinition, ProcessInstance, Step, HumanTask, AgentRun, Handoff, Namespace, Audit…" vertex="1">
+          <mxGeometry height="28" width="440" x="10" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="core-repos" parent="zone-core" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="Repository interfaces (abstract): IProcessRepo, IInstanceRepo, IHumanTaskRepo, IAgentRunRepo, IAuditRepo, INamespaceRepo, ISecretsRepo, IOAuthRepo…" vertex="1">
+          <mxGeometry height="38" width="440" x="10" y="68" as="geometry" />
+        </mxCell>
+        <mxCell id="core-other" parent="zone-core" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" value="YAML workflow parser  |  MCP config resolution  |  RBAC service  |  HandoffRegistry  |  In-memory test doubles" vertex="1">
+          <mxGeometry height="28" width="440" x="10" y="112" as="geometry" />
+        </mxCell>
+        <mxCell id="core-autonomy" parent="zone-core" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" value="Autonomy levels: L1 Observer · L2 Advisor · L3 Drafter · L4 Executor" vertex="1">
+          <mxGeometry height="28" width="440" x="10" y="148" as="geometry" />
+        </mxCell>
+        <mxCell id="core-nodeps" parent="zone-core" style="text;html=1;fontSize=9;align=center;fontStyle=2;" value="No external runtime deps (zod + yaml only)" vertex="1">
+          <mxGeometry height="22" width="440" x="10" y="182" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-infra" parent="1" style="swimlane;startSize=28;fillColor=#e8f4fd;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;" value="Infra — @mediforce/platform-infra  (Firebase/Firestore implementations)" vertex="1">
+          <mxGeometry height="240" width="460" x="940" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-fs" parent="zone-infra" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;" value="FirestoreProcessRepository&#xa;FirestoreProcessInstanceRepository&#xa;FirestoreHumanTaskRepository&#xa;FirestoreAgentRunRepository&#xa;FirestoreAuditRepository" vertex="1">
+          <mxGeometry height="80" width="215" x="10" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-other" parent="zone-infra" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;" value="FirestoreNamespaceRepository&#xa;FirestoreWorkflowSecretsRepository&#xa;FirestoreOAuthProviderRepository&#xa;FirebaseAuthService&#xa;MailgunNotificationService" vertex="1">
+          <mxGeometry height="80" width="215" x="235" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-crypto" parent="zone-infra" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;" value="secrets-cipher.ts — AES encryption for workflow + namespace secrets (SECRETS_ENCRYPTION_KEY env)" vertex="1">
+          <mxGeometry height="26" width="440" x="10" y="122" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-ext" parent="zone-infra" style="text;html=1;fontSize=9;align=center;fillColor=#d5e8d4;strokeColor=#82b366;" value="→ Firebase Admin SDK (auth + Firestore)   →  Mailgun API  (MAILGUN_API_KEY)" vertex="1">
+          <mxGeometry height="22" width="440" x="10" y="155" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-cols" parent="zone-infra" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;" value="Firestore collections: processes · processInstances · processInstances/{id}/stepExecutions · humanTasks · agentRuns · audit · namespaces · namespaceSecrets · workflowSecrets · oauthProviders · agentOAuthTokens · agentEventLogs" vertex="1">
+          <mxGeometry height="42" width="440" x="10" y="183" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-wfe" parent="1" style="swimlane;startSize=28;fillColor=#e8f4fd;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;" value="@mediforce/workflow-engine" vertex="1">
+          <mxGeometry height="200" width="520" x="380" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="wfe-engine" parent="zone-wfe" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="WorkflowEngine&#xa;createInstance()&#xa;advanceInstance()&#xa;resolveTransitions()" vertex="1">
+          <mxGeometry height="70" width="160" x="10" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="wfe-step" parent="zone-wfe" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="StepExecutor&#xa;executeStep(step, ctx)&#xa;→ agent | human | script | cowork" vertex="1">
+          <mxGeometry height="70" width="160" x="180" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="wfe-review" parent="zone-wfe" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="ReviewTracker&#xa;pending → approved&#xa;→ rejected → sent-back" vertex="1">
+          <mxGeometry height="70" width="155" x="350" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="wfe-triggers" parent="zone-wfe" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;" value="Triggers: ManualTrigger · WebhookTrigger · CronTrigger — WebhookRouter" vertex="1">
+          <mxGeometry height="26" width="500" x="10" y="114" as="geometry" />
+        </mxCell>
+        <mxCell id="wfe-expr" parent="zone-wfe" style="text;html=1;fontSize=9;align=center;" value="Expression DSL: interpolates ${variable} in step configs for transition routing" vertex="1">
+          <mxGeometry height="22" width="500" x="10" y="148" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-agentrt" parent="1" style="swimlane;startSize=28;fillColor=#e8f4fd;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;" value="@mediforce/agent-runtime" vertex="1">
+          <mxGeometry height="260" width="460" x="940" y="840" as="geometry" />
+        </mxCell>
+        <mxCell id="agentrt-runner" parent="zone-agentrt" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="AgentRunner&#xa;runWithWorkflowStep()&#xa;fallback logic (timeout /&#xa;low-confidence / error)" vertex="1">
+          <mxGeometry height="80" width="160" x="10" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="agentrt-registry" parent="zone-agentrt" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="PluginRegistry&#xa;ClaudeCodeAgentPlugin&#xa;OpenCodeAgentPlugin&#xa;ScriptContainerPlugin&#xa;MockClaudeCodePlugin" vertex="1">
+          <mxGeometry height="80" width="140" x="180" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="agentrt-evts" parent="zone-agentrt" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="FirestoreAgentEventLog&#xa;Firestore: agentEventLogs&#xa;/{instanceId}/{stepId}/*&#xa;Full stdout/event stream" vertex="1">
+          <mxGeometry height="80" width="120" x="330" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="agentrt-llm" parent="zone-agentrt" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;" value="OpenRouterLlmClient → openrouter.ai (OPENROUTER_API_KEY)  — supports Claude, GPT-4, Gemini, etc." vertex="1">
+          <mxGeometry height="26" width="440" x="10" y="124" as="geometry" />
+        </mxCell>
+        <mxCell id="agentrt-mcp" parent="zone-agentrt" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;" value="MCP support — Model Context Protocol tool servers attached per-agent (skills, CLI tools, APIs)" vertex="1">
+          <mxGeometry height="26" width="440" x="10" y="156" as="geometry" />
+        </mxCell>
+        <mxCell id="agentrt-oauth" parent="zone-agentrt" style="text;html=1;fontSize=9;align=center;" value="OAuth integration: token refresh + state signing (agentOAuthTokens in Firestore)" vertex="1">
+          <mxGeometry height="22" width="440" x="10" y="188" as="geometry" />
+        </mxCell>
+        <mxCell id="agentrt-dockermode" parent="zone-agentrt" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;" value="Docker mode (REDIS_URL set): → enqueue DockerJob to Redis  |  No-Docker mode: spawn claude/opencode CLI directly" vertex="1">
+          <mxGeometry height="28" width="440" x="10" y="218" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-cw" parent="1" style="swimlane;startSize=28;fillColor=#fff3e0;strokeColor=#d79b00;fontStyle=1;fontSize=13;" value="@mediforce/container-worker  (BullMQ Worker)" vertex="1">
+          <mxGeometry height="200" width="520" x="380" y="920" as="geometry" />
+        </mxCell>
+        <mxCell id="cw-env" parent="zone-cw" style="text;html=1;fontSize=9;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;" value="Activated by: REDIS_URL=redis://localhost:6379  |  HTTP health: :3001" vertex="1">
+          <mxGeometry height="22" width="500" x="10" y="32" as="geometry" />
+        </mxCell>
+        <mxCell id="cw-queue" parent="zone-cw" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" value="Listens on BullMQ queue: mediforce-queue&#xa;Pulls DockerJob { image, command, args, env, workspace }" vertex="1">
+          <mxGeometry height="56" width="240" x="10" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="cw-docker" parent="zone-cw" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" value="Spawns: docker run&#xa;  -v &lt;workspace&gt;&#xa;  -e ENV_VARS&#xa;  &lt;image&gt; &lt;command&gt;&#xa;Captures stdout/stderr" vertex="1">
+          <mxGeometry height="70" width="150" x="260" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="cw-result" parent="zone-cw" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" value="Collects /output files&#xa;Emits result back to queue&#xa;→ AgentRunner picks up" vertex="1">
+          <mxGeometry height="70" width="90" x="420" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="cw-images" parent="zone-cw" style="text;html=1;fontSize=9;align=center;" value="Docker images: mediforce-agent:* · python/r scripts · example-agent · apps/* containers" vertex="1">
+          <mxGeometry height="22" width="500" x="10" y="142" as="geometry" />
+        </mxCell>
+        <mxCell id="cw-bullboard" parent="zone-cw" style="text;html=1;fontSize=9;align=center;fillColor=#ffe6cc;strokeColor=#d79b00;" value="bull-board UI: localhost:3100  (queue inspection, job retries)" vertex="1">
+          <mxGeometry height="22" width="500" x="10" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-ext" parent="1" style="swimlane;startSize=28;fillColor=#e8f9e8;strokeColor=#82b366;fontStyle=1;fontSize=13;" value="External Services" vertex="1">
+          <mxGeometry height="560" width="240" x="1440" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-firebase" parent="zone-ext" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="Firebase&#xa;(Auth + Firestore + Storage)&#xa;NEXT_PUBLIC_FIREBASE_*&#xa;FIREBASE_SERVICE_ACCOUNT" vertex="1">
+          <mxGeometry height="60" width="220" x="10" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-mailgun" parent="zone-ext" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="Mailgun&#xa;(Email notifications)&#xa;MAILGUN_API_KEY&#xa;MAILGUN_DOMAIN" vertex="1">
+          <mxGeometry height="55" width="220" x="10" y="104" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-openrouter" parent="zone-ext" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="OpenRouter&#xa;(LLM inference)&#xa;OPENROUTER_API_KEY&#xa;Models: Claude, GPT-4, Gemini…" vertex="1">
+          <mxGeometry height="60" width="220" x="10" y="169" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-redis" parent="zone-ext" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="Redis&#xa;(BullMQ backing store)&#xa;REDIS_URL&#xa;:6379" vertex="1">
+          <mxGeometry height="50" width="220" x="10" y="239" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-docker" parent="zone-ext" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="Docker Daemon&#xa;(Container execution)&#xa;/var/run/docker.sock&#xa;Images per workflow app" vertex="1">
+          <mxGeometry height="55" width="220" x="10" y="299" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-github" parent="zone-ext" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="GitHub&#xa;(Agent workspaces)&#xa;GITHUB_TOKEN&#xa;(injected per workflow env)" vertex="1">
+          <mxGeometry height="50" width="220" x="10" y="364" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-sftp" parent="zone-ext" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" value="SFTP&#xa;(Clinical data delivery)&#xa;landing-zone app&#xa;Python script step" vertex="1">
+          <mxGeometry height="50" width="220" x="10" y="424" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-caddy" parent="zone-ext" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" value="Caddy (Prod Reverse Proxy)&#xa;:80 / :443 → :3000&#xa;HTTPS termination" vertex="1">
+          <mxGeometry height="50" width="220" x="10" y="484" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-apps" parent="1" style="swimlane;startSize=28;fillColor=#fdf3f0;strokeColor=#d94f3d;fontStyle=1;fontSize=13;" value="Domain Apps (apps/)" vertex="1">
+          <mxGeometry height="240" width="300" x="40" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="app-lz" parent="zone-apps" style="rounded=1;fillColor=#fde8e4;strokeColor=#d94f3d;fontSize=10;" value="landing-zone&#xa;CDISC validation + SFTP polling" vertex="1">
+          <mxGeometry height="36" width="280" x="10" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="app-p2t" parent="zone-apps" style="rounded=1;fillColor=#fde8e4;strokeColor=#d94f3d;fontSize=10;" value="protocol-to-tfl&#xa;Protocol → TFL mapping" vertex="1">
+          <mxGeometry height="36" width="280" x="10" y="76" as="geometry" />
+        </mxCell>
+        <mxCell id="app-wd" parent="zone-apps" style="rounded=1;fillColor=#fde8e4;strokeColor=#d94f3d;fontSize=10;" value="workflow-designer&#xa;Visual builder for .wd.json" vertex="1">
+          <mxGeometry height="36" width="280" x="10" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="app-teal" parent="zone-apps" style="rounded=1;fillColor=#fde8e4;strokeColor=#d94f3d;fontSize=10;" value="tealflow / tealflow-cowork&#xa;Example + CoworkSession workflow" vertex="1">
+          <mxGeometry height="36" width="280" x="10" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="app-desc" parent="zone-apps" style="text;html=1;fontSize=9;align=center;" value="Each app: .wd.json · container/Dockerfile · plugins/ · scripts/" vertex="1">
+          <mxGeometry height="22" width="280" x="10" y="202" as="geometry" />
+        </mxCell>
+        <mxCell id="e-actor-ui" edge="1" parent="1" source="zone-actors" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="zone-ui" value="HTTPS browser">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-actor-cli" edge="1" parent="1" source="zone-actors" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="zone-cli" value="terminal">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-cli-ui" edge="1" parent="1" source="zone-cli" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;dashed=1;" target="zone-ui" value="REST (X-Api-Key)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ui-api" edge="1" parent="1" source="zone-ui" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="zone-api" value="dependency injection">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-api-core" edge="1" parent="1" source="zone-api" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="zone-core" value="schemas + interfaces">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-api-infra" edge="1" parent="1" source="zone-api" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="zone-infra" value="repo impls">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-api-wfe" edge="1" parent="1" source="zone-api" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="zone-wfe" value="startRun → createInstance">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-wfe-agentrt" edge="1" parent="1" source="zone-wfe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="zone-agentrt" value="executeStep (agent type)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-wfe-infra" edge="1" parent="1" source="zone-wfe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;dashed=1;" target="zone-infra" value="HumanTask + Audit writes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-agentrt-cw" edge="1" parent="1" source="zone-agentrt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="zone-cw" value="DockerJob → Redis queue">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-agentrt-or" edge="1" parent="1" source="zone-agentrt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="ext-openrouter" value="LLM inference">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-agentrt-infra" edge="1" parent="1" source="zone-agentrt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;dashed=1;" target="zone-infra" value="agentEventLogs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-cw-docker" edge="1" parent="1" source="zone-cw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="ext-docker" value="docker run">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-cw-redis" edge="1" parent="1" source="zone-cw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="ext-redis" value="BullMQ subscribe">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-infra-firebase" edge="1" parent="1" source="zone-infra" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="ext-firebase" value="Admin SDK">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-infra-mailgun" edge="1" parent="1" source="zone-infra" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="ext-mailgun" value="email notify">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ui-firebase" edge="1" parent="1" source="zone-ui" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;dashed=1;" target="ext-firebase" value="client SDK (onSnapshot)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-apps-wfe" edge="1" parent="1" source="zone-apps" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;dashed=1;" target="zone-wfe" value=".wd.json definitions">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-apps-cw" edge="1" parent="1" source="zone-apps" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;dashed=1;" target="zone-cw" value="container/Dockerfile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-infra-core" edge="1" parent="1" source="zone-infra" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=9;" target="zone-core" value="implements interfaces">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-label" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontStyle=1;fontSize=12;" value="Key Data Flows" vertex="1">
+          <mxGeometry height="24" width="200" x="20" y="1120" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-1" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9;align=left;" value="① Workflow Registration: CLI/UI → POST /api/workflow-definitions → registerWorkflow handler → FirestoreProcessRepository → Firestore /processes/{ns}/{name}/{ver}" vertex="1">
+          <mxGeometry height="30" width="860" x="20" y="1148" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-2" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9;align=left;" value="② Run Start: UI &#39;Start Run&#39; → POST /api/runs → startRun handler → WorkflowEngine.createInstance() → StepExecutor.executeStep() → (branch: agent→AgentRunner→Plugin→Docker/CLI | human→HumanTask→email | script→Docker)" vertex="1">
+          <mxGeometry height="30" width="1400" x="20" y="1184" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-3" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9;align=left;" value="③ Human Review Loop: HumanTask created → Mailgun email → User sees task in UI → submits verdict (approve/reject/send-back) → POST /api/tasks/:id → ReviewTracker → WorkflowEngine advances" vertex="1">
+          <mxGeometry height="30" width="1400" x="20" y="1220" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-4" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9;align=left;" value="④ Docker Agent Execution: AgentRunner → enqueue DockerJob to Redis → container-worker picks up → docker run &lt;image&gt; → collect /output → emit result to queue → AgentRunner collects → apply fallback logic → step complete" vertex="1">
+          <mxGeometry height="30" width="1400" x="20" y="1256" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-5" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9;align=left;" value="⑤ Real-time UI updates: Firestore onSnapshot subscriptions in React → live process status, task list, agent event log (no polling needed)" vertex="1">
+          <mxGeometry height="30" width="860" x="20" y="1292" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
