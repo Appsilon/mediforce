@@ -317,31 +317,54 @@ on `scope.system` makes the trust explicit and groups it with the other
 god-mode-by-design handles.
 
 **Long-term direction (separate audit-wiring phase, post-headless-
-migration):** audit emission moves to the **persistence boundary
-(repository)** via a `MutationContext` threaded into every raw
-mutation method. Industry-standard transactional outbox pattern
-(Hohpe EIP, Fowler PoEAA audit-log-via-repository-decorator).
-Reasons:
+migration) — OPEN, not pre-decided.** The handler-resident bridge is a
+known intermediate. Three candidate end-states have been raised; the
+audit-wiring phase will design and pick one (or a layered combination).
+This ADR deliberately does not prescribe a single answer because each
+layer has different tradeoffs that need their own grilling:
 
-1. Repo is the only layer that sees every write path (HTTP handlers,
-   `WorkflowEngine`, `AgentRunner`, `container-worker`, future MCP).
-   Handler-resident silently misses non-HTTP writers — known gap.
-2. Atomicity belongs to the persistence layer. Postgres
-   ([ADR-0001](./0001-firestore-to-postgres.md)) makes entity-write +
-   audit-row-write transactional for free. Firestore era is best-effort
-   dual-write with documented gap.
-3. Audit-row-write is part of "how persistence happens", not "what the
-   user requested." Mixing it into handlers leaks infrastructure into
-   orchestration.
+- **Repository-resident emit** (`MutationContext` threaded into every raw
+  mutation method; transactional outbox pattern — Hohpe EIP, Fowler
+  PoEAA). Pro: every write path audited uniformly, atomicity free under
+  Postgres ([ADR-0001](./0001-firestore-to-postgres.md)). Con: repo sees
+  raw rows, not business intent ("user clicked Cancel via UI" vs "bulk
+  cancel batch" vs "auto-cancel on cleanup" all look the same at row
+  level). Needs caller to push intent down as context.
+- **Engine-resident emit.** `WorkflowEngine` already emits 7 internal
+  lifecycle events today (`instance.created/started/paused/resumed`,
+  `step.retried`, `task.created`, `rbac.access_denied`); engine is the
+  state-machine source of truth. Pro: natural fit for state-transition
+  audit; HTTP handler / CLI / future MCP / agent-runner all get audit
+  for free. Con: engine needs caller actor + intent passed through
+  (today's `StepActor { id, role }` shape is undersized; basis text
+  varies per call site for the same state transition).
+- **Layered emit with explicit mapping.** Engine emits state-machine
+  events, repository emits raw-write trace, handler may add HTTP-level
+  context. Reader maps these into a single business-event view. Pro:
+  cleanest separation; nothing duplicated. Con: most surface area to
+  design + reader complexity.
 
-This is captured in
-[`headless-migration.md` §"Captured for later"](../headless-migration.md);
-when that phase ships, this ADR partially supersedes ADR-0004 §5
-(narrowing "wrappers never depend on other wrappers" to exclude
-audit infrastructure).
+What the audit-wiring phase needs to settle:
 
-**Phase 2 audit handler code** is throwaway bridge. Recognisable
-pattern, easy to find-and-delete during the audit-wiring phase.
+1. Which layers may emit, and what each is responsible for (state vs.
+   row vs. intent).
+2. How "basis" (compliance: *why*) flows from the call site to the emit
+   point — today it varies per call site for the same mechanic.
+3. Whether the closed action-name set (below) collapses to one event
+   per business action or stays as today's overlapping multi-emit set
+   (`instance.resumed` is already double-emitted by `engine.resumeInstance`
+   and the manual-resume handler — that's a symptom, not an end state).
+4. Atomicity guarantees (transactional outbox vs. best-effort dual-write
+   under Firestore vs. Postgres).
+
+`MutationContext` at the repo boundary is one viable answer, not the
+only one. The handler-resident bridge stays until the audit-wiring
+phase ships.
+
+**Phase 2/3 audit handler code** is intermediate. The "move, not add"
+rule (per-handler 6 LOC mirroring the pre-migration Server Action) keeps
+the bridge minimal and recognisable so the audit-wiring phase can
+find-and-replace it wherever it lands.
 
 Closed action-name set (extensible by amendment):
 
