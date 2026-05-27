@@ -20,6 +20,7 @@ import {
   PostgresAuditRepository,
   PostgresOAuthProviderRepository,
   PostgresAgentOAuthTokenRepository,
+  PostgresCronTriggerStateRepository,
   getSharedPostgresClient,
   getAdminFirestore,
   validateSecretsKey,
@@ -116,7 +117,10 @@ export function getPlatformServices(): PlatformServices {
   const handoffRepo = new FirestoreHandoffRepository(db, instanceRepo);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
   const coworkSessionRepo = new FirestoreCoworkSessionRepository(db, instanceRepo);
-  const cronTriggerStateRepo = new FirestoreCronTriggerStateRepository(db);
+  const cronTriggerStateRepo: CronTriggerStateRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresCronTriggerStateRepository(getSharedPostgresClient().db)
+      : new FirestoreCronTriggerStateRepository(db);
   const toolCatalogRepo: ToolCatalogRepository =
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresToolCatalogRepository(getSharedPostgresClient().db)
