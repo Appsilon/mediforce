@@ -21,6 +21,14 @@ const INSTANCE_ID = 'proc-cowork-paused';
 const MISSING_INSTANCE_ID = 'proc-does-not-exist-yyy';
 
 test.describe('GET /api/cowork/* — API E2E', () => {
+  // ADR-0001 PR2: depends on Firestore-seeded cowork session
+  // ('proc-cowork-paused' + SESSION_ID). Postgres seed parity ships with
+  // §5.2 #9 (process-instance + fixture mirror extension).
+  test.skip(
+    process.env.STORAGE_BACKEND === 'postgres',
+    'Requires Firestore-seeded cowork_sessions; Postgres seed parity ships with §5.2 #9',
+  );
+
   let callers: MultiNamespaceFixture;
 
   test.beforeAll(async () => {
