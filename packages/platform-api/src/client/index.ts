@@ -131,10 +131,14 @@ import {
   ListNamespaceMembersOutputSchema,
   InviteUserInputSchema,
   InviteUserOutputSchema,
+  ResendInviteInputSchema,
+  ResendInviteOutputSchema,
   type ListNamespaceMembersInput,
   type ListNamespaceMembersOutput,
   type InviteUserInput,
   type InviteUserOutput,
+  type ResendInviteInput,
+  type ResendInviteOutput,
   DeleteDockerImageInputSchema,
   DeleteDockerImageOutputSchema,
   type DeleteDockerImageInput,
@@ -494,6 +498,7 @@ export class Mediforce {
   readonly users: {
     listMembers: (input: ListNamespaceMembersInput) => Promise<ListNamespaceMembersOutput>;
     invite: (input: InviteUserInput) => Promise<InviteUserOutput>;
+    resendInvite: (input: ResendInviteInput) => Promise<ResendInviteOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -1284,6 +1289,16 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.users.invite');
         return InviteUserOutputSchema.parse(body);
+      },
+      resendInvite: async (input) => {
+        const validated = ResendInviteInputSchema.parse(input);
+        const res = await this.request('/api/users/resend-invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.users.resendInvite');
+        return ResendInviteOutputSchema.parse(body);
       },
     };
   }

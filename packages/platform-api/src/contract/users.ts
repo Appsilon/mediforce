@@ -39,3 +39,21 @@ export const InviteUserOutputSchema = z.object({
 
 export type InviteUserInput = z.infer<typeof InviteUserInputSchema>;
 export type InviteUserOutput = z.infer<typeof InviteUserOutputSchema>;
+
+export const ResendInviteInputSchema = z.object({
+  uid: z.string().min(1),
+  namespaceHandle: z
+    .string()
+    .min(1)
+    .regex(/^[a-z0-9-]+$/, 'namespaceHandle must be lowercase alphanumeric with hyphens only'),
+});
+
+export const ResendInviteOutputSchema = z.object({
+  uid: z.string(),
+  email: z.string(),
+  temporaryPassword: z.string(),
+  emailSent: z.boolean(),
+});
+
+export type ResendInviteInput = z.infer<typeof ResendInviteInputSchema>;
+export type ResendInviteOutput = z.infer<typeof ResendInviteOutputSchema>;

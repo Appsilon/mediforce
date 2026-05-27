@@ -368,9 +368,13 @@ export {
   NamespaceMemberWithAuthSchema,
   InviteUserInputSchema,
   InviteUserOutputSchema,
+  ResendInviteInputSchema,
+  ResendInviteOutputSchema,
   type ListNamespaceMembersInput,
   type ListNamespaceMembersOutput,
   type NamespaceMemberWithAuth,
   type InviteUserInput,
   type InviteUserOutput,
+  type ResendInviteInput,
+  type ResendInviteOutput,
 } from './users.js';

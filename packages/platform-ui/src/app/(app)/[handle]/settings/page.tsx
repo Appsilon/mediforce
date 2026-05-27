@@ -25,7 +25,6 @@ import {
   Users,
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
@@ -343,18 +342,15 @@ export default function WorkspaceConfigPage() {
     setResendResult(null);
     setResendingUid(memberUid);
     try {
-      const res = await apiFetch('/api/users/resend-invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: memberUid, namespaceHandle: handle }),
+      const data = await mediforce.users.resendInvite({
+        uid: memberUid,
+        namespaceHandle: handle,
       });
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setError(data.error ?? 'Failed to resend invite.');
-        return;
-      }
-      const data = (await res.json()) as { email: string; temporaryPassword: string; emailSent: boolean };
-      setResendResult({ email: data.email, temporaryPassword: data.temporaryPassword, emailSent: data.emailSent });
+      setResendResult({
+        email: data.email,
+        temporaryPassword: data.temporaryPassword,
+        emailSent: data.emailSent,
+      });
       void fetchLastSignIn();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to resend invite.');
