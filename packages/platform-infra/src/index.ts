@@ -36,6 +36,7 @@ export { PostgresAgentOAuthTokenRepository } from './postgres/repositories/agent
 export { PostgresCronTriggerStateRepository } from './postgres/repositories/cron-trigger-state-repository.js';
 export { PostgresAgentRunRepository } from './postgres/repositories/agent-run-repository.js';
 export { PostgresHumanTaskRepository } from './postgres/repositories/human-task-repository.js';
+export { PostgresHandoffRepository } from './postgres/repositories/handoff-repository.js';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client.js';
 export type { Database } from './postgres/client.js';
 export { FirestoreOAuthProviderRepository } from './firestore/oauth-provider-repository.js';
