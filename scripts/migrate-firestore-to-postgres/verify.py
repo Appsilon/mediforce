@@ -30,6 +30,10 @@ LOG = logging.getLogger("verify")
 #     - 'id'          : Postgres pk is text and equals Firestore doc id
 #     - 'composite'   : pk is (namespace,name,version) etc; passed via field map
 #     - 'no_verify'   : table inserted with new uuids; skip diff (count only)
+#     - 'count_only'  : sub-collection — count via collection_group; no diff
+#
+# Sub-collection rows use a leading 'cg:' prefix on the collection name to
+# signal `collection_group` counting in count_firestore.
 TABLES: list[tuple[str, str, str]] = [
     ("namespaces", "workspaces", "handle"),
     ("agentDefinitions", "agents", "id"),
@@ -37,16 +41,27 @@ TABLES: list[tuple[str, str, str]] = [
     ("workflowDefinitions", "workflow_definitions", "composite_wd"),
     ("workflowMeta", "workflow_meta", "composite_wm"),
     ("processInstances", "process_instances", "id"),
+    ("cg:stepExecutions", "step_executions", "id"),
+    ("cg:agentEvents", "agent_events", "id"),
     ("auditEvents", "audit_events", "no_verify"),
     ("agentRuns", "agent_runs", "no_verify"),
     ("humanTasks", "human_tasks", "no_verify"),
     ("handoffEntities", "handoff_entities", "no_verify"),
     ("coworkSessions", "cowork_sessions", "id"),
+    ("cg:turns", "cowork_turns", "count_only"),
+    ("cg:members", "workspace_members", "count_only"),
+    ("cg:namespaceSecrets", "namespace_secrets", "count_only"),
+    ("cg:workflowSecrets", "workflow_secrets", "count_only"),
+    ("cg:toolCatalog", "tool_catalog_entries", "count_only"),
+    ("cg:oauthProviders", "oauth_providers", "count_only"),
+    ("cg:agentOAuthTokens", "agent_oauth_tokens", "count_only"),
     ("cronTriggerState", "cron_trigger_state", "composite_cron"),
 ]
 
 
 def count_firestore(fs: Any, collection: str) -> int:
+    if collection.startswith("cg:"):
+        return sum(1 for _ in fs.collection_group(collection[3:]).stream())
     return sum(1 for _ in fs.collection(collection).stream())
 
 
@@ -120,6 +135,16 @@ FIELD_MAPS: dict[str, dict[str, str]] = {
         "status": "status",
         "agent": "agent",
     },
+    "cg:stepExecutions": {
+        "stepId": "step_id",
+        "status": "status",
+        "iterationNumber": "iteration_number",
+    },
+    "cg:agentEvents": {
+        "stepId": "step_id",
+        "type": "type",
+        "sequence": "sequence",
+    },
     "cronTriggerState": {"lastTriggeredAt": "last_triggered_at"},
 }
 
@@ -131,12 +156,17 @@ def sample_diff(
     (sampled, mismatched, error_messages)."""
     if lookup == "no_verify":
         return 0, 0, ["skipped: table inserted with synthetic UUIDs, no natural key"]
+    if lookup == "count_only":
+        return 0, 0, ["skipped: count-only sub-collection (composite/synthetic PK)"]
 
     field_map = FIELD_MAPS.get(collection, {})
     if not field_map:
         return 0, 0, [f"skipped: no FIELD_MAPS entry for {collection}"]
 
-    all_docs = list(fs.collection(collection).stream())
+    if collection.startswith("cg:"):
+        all_docs = list(fs.collection_group(collection[3:]).stream())
+    else:
+        all_docs = list(fs.collection(collection).stream())
     if not all_docs:
         return 0, 0, []
     picked = random.sample(all_docs, min(sample, len(all_docs)))
