@@ -90,6 +90,21 @@ describe('createRouteAdapter', () => {
     );
   });
 
+  it('emits the configured successStatus (e.g. 201) on a successful handler', async () => {
+    const handler = vi.fn().mockResolvedValue({ id: 'agent-1' });
+    const POST = createRouteAdapter(
+      InputSchema,
+      (req) => ({ name: req.nextUrl.searchParams.get('name') }),
+      handler,
+      { resolveCaller: stubCaller(), buildScope, successStatus: 201 },
+    );
+
+    const res = await POST(makeRequest({ name: 'alice' }), undefined);
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ id: 'agent-1' });
+  });
+
   it('short-circuits with the 401 response returned by resolveCaller', async () => {
     const handler = vi.fn();
     const unauthorized = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
