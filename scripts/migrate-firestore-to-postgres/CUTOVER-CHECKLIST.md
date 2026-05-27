@@ -106,9 +106,19 @@ Common bug surfaces flagged by the code review (look hard at these):
 
 ## 3. Idempotency (~5 min)
 
+Idempotent for tables with natural keys (`workspaces`, `agents`,
+`process_instances`, `cowork_sessions`, etc.) — `ON CONFLICT DO NOTHING`
+swallows the re-insert.
+
+Tables with synthetic uuid PKs are **not** idempotent:
+`audit_events`, `agent_runs`, `human_tasks`, `handoff_entities`. Re-running
+duplicates rows. To re-run, `TRUNCATE` those tables first.
+
 - [ ] Re-run `main.py` against now-populated Postgres without `--only`
-- [ ] Counts in `migration.json` must NOT increase (ON CONFLICT DO NOTHING)
-- [ ] No errors. Re-running is safe.
+- [ ] Counts in `migration.json` for natural-key tables must NOT increase
+- [ ] No errors
+- [ ] If a uuid-PK table needs a re-run: `TRUNCATE <table>;` first, then
+      `--only=<table>`
 
 ## 4. Smoke test under Postgres backend (~15 min)
 

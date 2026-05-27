@@ -69,9 +69,13 @@ Firestore read access on the source project.
 
 ## Idempotency
 
-Every INSERT uses `ON CONFLICT DO NOTHING`. Re-running the script is safe:
-already-inserted rows are skipped, and the per-table `skipped` counter in
-`migration_log.json` records the dedup count.
+Idempotent for tables with natural keys — INSERTs there use
+`ON CONFLICT DO NOTHING`, already-inserted rows are skipped, and the
+per-table `skipped` counter in `migration_log.json` records the dedup count.
+
+Tables with synthetic uuid PKs (`audit_events`, `agent_runs`, `human_tasks`,
+`handoff_entities`) are **not** idempotent — re-running duplicates rows. To
+re-run, `TRUNCATE` those tables first.
 
 ## Mapping
 
