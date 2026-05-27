@@ -161,6 +161,8 @@ export {
   HttpActionConfigSchema,
   ReshapeActionConfigSchema,
   EmailActionConfigSchema,
+  SpawnTargetSchema,
+  SpawnActionConfigSchema,
   ActionConfigSchema,
   validateInputForNextRun,
   validateExecutorAndTriggers,
@@ -182,6 +184,8 @@ export {
   type HttpActionConfig,
   type ReshapeActionConfig,
   type EmailActionConfig,
+  type SpawnTargetConfig,
+  type SpawnActionConfig,
   type ActionConfig,
 } from './workflow-definition.js';
 

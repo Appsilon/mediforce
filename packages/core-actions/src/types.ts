@@ -3,6 +3,7 @@ import type {
   HttpActionConfig,
   ReshapeActionConfig,
   EmailActionConfig,
+  SpawnActionConfig,
 } from '@mediforce/platform-core';
 
 /** Sources available to interpolation in action configs.
@@ -22,6 +23,7 @@ export interface InterpolationSources {
   steps: Record<string, unknown>;
   variables: Record<string, unknown>;
   secrets: Record<string, string>;
+  item?: unknown;
 }
 
 /** Per-step context passed to every action handler. The runtime fills this
@@ -31,6 +33,8 @@ export interface ActionContext {
   stepId: string;
   /** Process instance id — handlers may stash extra audit data via this. */
   processInstanceId: string;
+  /** Namespace of the parent workflow instance. Used by spawn action. */
+  namespace?: string;
   /** Sources for interpolation. The handler is free to walk these manually
    *  for advanced cases (path access into nested objects). */
   sources: InterpolationSources;
@@ -54,6 +58,7 @@ export type ActionHandler<TConfig> = (
 export type HttpActionHandler = ActionHandler<HttpActionConfig>;
 export type ReshapeActionHandler = ActionHandler<ReshapeActionConfig>;
 export type EmailActionHandler = ActionHandler<EmailActionConfig>;
+export type SpawnActionHandler = ActionHandler<SpawnActionConfig>;
 
 export type AnyActionHandler = ActionHandler<unknown>;
 

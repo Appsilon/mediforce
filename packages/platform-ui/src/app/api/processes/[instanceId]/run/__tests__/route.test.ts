@@ -19,12 +19,18 @@ vi.mock('next/server', async (importOriginal) => {
 const mockInstanceGetById = vi.fn();
 const mockInstanceUpdate = vi.fn();
 const mockInstanceAddStepExecution = vi.fn();
+const mockInstanceUpdateStepExecution = vi.fn();
 const mockAuditAppend = vi.fn();
 const mockGetWorkflowDefinition = vi.fn();
 const mockGetProcessDefinition = vi.fn();
 const mockGetProcessConfig = vi.fn();
+const mockGetLatestWorkflowVersion = vi.fn();
 const mockHumanTaskCreate = vi.fn();
 const mockHumanTaskGetByInstanceId = vi.fn();
+const mockFireWorkflow = vi.fn();
+const mockAdvanceStep = vi.fn();
+
+const mockActionDispatch = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -32,12 +38,14 @@ vi.mock('@/lib/platform-services', () => ({
       getById: mockInstanceGetById,
       update: mockInstanceUpdate,
       addStepExecution: mockInstanceAddStepExecution,
+      updateStepExecution: mockInstanceUpdateStepExecution,
       getStepExecutions: vi.fn().mockResolvedValue([]),
     },
     processRepo: {
       getWorkflowDefinition: mockGetWorkflowDefinition,
       getProcessDefinition: mockGetProcessDefinition,
       getProcessConfig: mockGetProcessConfig,
+      getLatestWorkflowVersion: mockGetLatestWorkflowVersion,
     },
     auditRepo: { append: mockAuditAppend },
     humanTaskRepo: {
@@ -45,6 +53,8 @@ vi.mock('@/lib/platform-services', () => ({
       getByInstanceId: mockHumanTaskGetByInstanceId,
     },
     namespaceRepo: {},
+    actionRegistry: { dispatch: mockActionDispatch },
+    engine: { advanceStep: (...args: unknown[]) => mockAdvanceStep(...args) },
   }),
 }));
 
@@ -417,6 +427,118 @@ describe('POST /api/processes/[instanceId]/run', () => {
         status: 'paused',
         pauseReason: 'waiting_for_human',
       }));
+    });
+  });
+
+  describe('action executor: spawn fan-out', () => {
+    const spawnWorkflow = {
+      name: 'team-pulse',
+      version: 1,
+      namespace: 'test-ns',
+      steps: [
+        {
+          id: 'dispatch',
+          name: 'Dispatch',
+          type: 'creation',
+          executor: 'action',
+          action: {
+            kind: 'spawn',
+            config: {
+              forEach: '${steps.prepare.teamMembers}',
+              targets: {
+                definitionName: 'gather-perspective',
+                payload: { userId: '${item.userId}', email: '${item.email}' },
+              },
+              continueOnSpawnError: true,
+            },
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'dispatch', to: 'done' }],
+    };
+
+    it('[DATA] spawn action dispatches one child workflow per forEach item', async () => {
+      const teamMembers = [
+        { userId: 'alice', email: 'alice@test.com' },
+        { userId: 'bob', email: 'bob@test.com' },
+        { userId: 'carol', email: 'carol@test.com' },
+      ];
+
+      let callCount = 0;
+      mockInstanceGetById.mockImplementation(() => {
+        callCount++;
+        if (callCount <= 2) {
+          return Promise.resolve({
+            id: 'inst-1', namespace: 'test-ns', definitionName: 'team-pulse', definitionVersion: '1',
+            status: 'running', currentStepId: 'dispatch', configName: undefined,
+            variables: { prepare: { teamMembers } },
+            triggerPayload: {},
+          });
+        }
+        return Promise.resolve({
+          id: 'inst-1', namespace: 'test-ns', definitionName: 'team-pulse', definitionVersion: '1',
+          status: 'completed', currentStepId: null, configName: undefined,
+          variables: { prepare: { teamMembers }, dispatch: { spawnedCount: 3 } },
+          triggerPayload: {},
+        });
+      });
+
+      mockGetWorkflowDefinition.mockResolvedValue(spawnWorkflow);
+
+      const spawnOutput = {
+        spawned: [
+          { instanceId: 'child-1', definitionName: 'gather-perspective', definitionVersion: 2, status: 'created', itemIndex: 0 },
+          { instanceId: 'child-2', definitionName: 'gather-perspective', definitionVersion: 2, status: 'created', itemIndex: 1 },
+          { instanceId: 'child-3', definitionName: 'gather-perspective', definitionVersion: 2, status: 'created', itemIndex: 2 },
+        ],
+        errors: [],
+        spawnedCount: 3,
+        errorCount: 0,
+      };
+      mockActionDispatch.mockResolvedValue(spawnOutput);
+      mockAdvanceStep.mockResolvedValue({ id: 'inst-1', status: 'completed' });
+
+      const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
+
+      expect(mockActionDispatch).toHaveBeenCalledTimes(1);
+      expect(mockActionDispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'spawn',
+          config: expect.objectContaining({
+            forEach: '${steps.prepare.teamMembers}',
+            targets: expect.objectContaining({ definitionName: 'gather-perspective' }),
+          }),
+        }),
+        expect.objectContaining({
+          stepId: 'dispatch',
+          processInstanceId: 'inst-1',
+          namespace: 'test-ns',
+          sources: expect.objectContaining({
+            steps: expect.objectContaining({
+              prepare: expect.objectContaining({ teamMembers }),
+            }),
+          }),
+        }),
+      );
+
+      expect(mockInstanceUpdateStepExecution).toHaveBeenCalledWith(
+        'inst-1',
+        expect.any(String),
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({ spawnedCount: 3, errorCount: 0 }),
+        }),
+      );
+
+      expect(mockAdvanceStep).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({ spawnedCount: 3 }),
+        expect.objectContaining({ id: 'auto-runner' }),
+      );
     });
   });
 

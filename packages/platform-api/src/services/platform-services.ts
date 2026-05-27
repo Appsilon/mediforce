@@ -42,6 +42,7 @@ import {
   ActionRegistry,
   httpActionHandler,
   reshapeActionHandler,
+  createSpawnActionHandler,
   createEmailActionHandler,
 } from '@mediforce/core-actions';
 import { WebhookRouter } from '@mediforce/workflow-engine';
@@ -185,9 +186,12 @@ export function getPlatformServices(): PlatformServices {
     agentRunRepo,
   );
 
+  const manualTrigger = new ManualTrigger(engine, processRepo);
+
   const actionRegistry = new ActionRegistry();
   actionRegistry.register('http', httpActionHandler);
   actionRegistry.register('reshape', reshapeActionHandler);
+  actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo));
   if (mailgunSender) {
     actionRegistry.register('email', createEmailActionHandler(mailgunSender));
   }
@@ -196,7 +200,7 @@ export function getPlatformServices(): PlatformServices {
 
   services = {
     engine,
-    manualTrigger: new ManualTrigger(engine, processRepo),
+    manualTrigger,
     cronTrigger: new CronTrigger(engine),
     webhookRouter,
     actionRegistry,

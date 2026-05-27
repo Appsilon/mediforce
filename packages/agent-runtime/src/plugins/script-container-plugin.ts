@@ -1,4 +1,4 @@
-import { readFile, mkdtemp, writeFile, rm, realpath, mkdir, appendFile } from 'node:fs/promises';
+import { readFile, mkdtemp, writeFile, rm, realpath, mkdir, appendFile, stat } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
