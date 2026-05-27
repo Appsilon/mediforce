@@ -50,5 +50,6 @@ export { getAdminAuth, getAdminFirestore } from './auth/firebase-admin-init.js';
 export { FirebaseInviteService } from './auth/firebase-invite-service.js';
 export { backfillInstanceNamespaces } from './migrations/backfill-instance-namespaces.js';
 export { FirestoreModelRegistryRepository } from './firestore/model-registry-repository.js';
+export { PostgresModelRegistryRepository } from './postgres/repositories/model-registry-repository.js';
 export { syncFromOpenRouter } from './sync/openrouter-sync.js';
 

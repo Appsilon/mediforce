@@ -15,6 +15,7 @@ import {
   FirestoreOAuthProviderRepository,
   FirestoreAgentOAuthTokenRepository,
   FirestoreModelRegistryRepository,
+  PostgresModelRegistryRepository,
   FirestoreWorkflowSecretsRepository,
   FirestoreNamespaceSecretsRepository,
   PostgresToolCatalogRepository,
@@ -45,6 +46,7 @@ import type {
   CronTriggerStateRepository,
   HandoffRepository,
   HumanTaskRepository,
+  ModelRegistryRepository,
   NamespaceRepository,
   OAuthProviderRepository,
   ProcessInstanceRepository,
@@ -103,7 +105,7 @@ export interface PlatformServices {
   namespaceRepo: NamespaceRepository;
   oauthProviderRepo: OAuthProviderRepository;
   agentOAuthTokenRepo: AgentOAuthTokenRepository;
-  modelRegistryRepo: FirestoreModelRegistryRepository;
+  modelRegistryRepo: ModelRegistryRepository;
   secretsRepo: FirestoreWorkflowSecretsRepository;
   namespaceSecretsRepo: FirestoreNamespaceSecretsRepository;
 }
@@ -172,7 +174,10 @@ export function getPlatformServices(): PlatformServices {
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresAgentOAuthTokenRepository(getSharedPostgresClient().db)
       : new FirestoreAgentOAuthTokenRepository(db);
-  const modelRegistryRepo = new FirestoreModelRegistryRepository(db);
+  const modelRegistryRepo: ModelRegistryRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresModelRegistryRepository(getSharedPostgresClient().db)
+      : new FirestoreModelRegistryRepository(db);
   const secretsRepo = new FirestoreWorkflowSecretsRepository(db);
   const namespaceSecretsRepo = new FirestoreNamespaceSecretsRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
