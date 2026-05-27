@@ -291,6 +291,7 @@ export {
   InMemoryCronTriggerStateRepository,
   InMemoryOAuthProviderRepository,
   InMemoryAgentOAuthTokenRepository,
+  InMemoryAgentRunRepository,
   // Test factories
   buildProcessDefinition,
   buildProcessInstance,

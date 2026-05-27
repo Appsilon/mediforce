@@ -21,6 +21,7 @@ import {
   PostgresOAuthProviderRepository,
   PostgresAgentOAuthTokenRepository,
   PostgresCronTriggerStateRepository,
+  PostgresAgentRunRepository,
   getSharedPostgresClient,
   getAdminFirestore,
   validateSecretsKey,
@@ -31,6 +32,7 @@ import {
 } from '@mediforce/platform-infra';
 import type {
   AgentOAuthTokenRepository,
+  AgentRunRepository,
   AuditRepository,
   CronTriggerStateRepository,
   NamespaceRepository,
@@ -79,7 +81,7 @@ export interface PlatformServices {
   processRepo: FirestoreProcessRepository;
   instanceRepo: FirestoreProcessInstanceRepository;
   auditRepo: AuditRepository;
-  agentRunRepo: FirestoreAgentRunRepository;
+  agentRunRepo: AgentRunRepository;
   humanTaskRepo: FirestoreHumanTaskRepository;
   handoffRepo: FirestoreHandoffRepository;
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
@@ -112,7 +114,10 @@ export function getPlatformServices(): PlatformServices {
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresAuditRepository(getSharedPostgresClient().db, instanceRepo)
       : new FirestoreAuditRepository(db, instanceRepo);
-  const agentRunRepo = new FirestoreAgentRunRepository(db, instanceRepo);
+  const agentRunRepo: AgentRunRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresAgentRunRepository(getSharedPostgresClient().db, instanceRepo)
+      : new FirestoreAgentRunRepository(db, instanceRepo);
   const humanTaskRepo = new FirestoreHumanTaskRepository(db, instanceRepo);
   const handoffRepo = new FirestoreHandoffRepository(db, instanceRepo);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);

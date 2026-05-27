@@ -43,6 +43,13 @@
       "when": 1779839200000,
       "tag": "0005_cron_trigger_state",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779840247402,
+      "tag": "0006_wakeful_dark_beast",
+      "breakpoints": true
     }
   ]
 }

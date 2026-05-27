@@ -12,6 +12,7 @@ export { InMemoryOAuthProviderRepository } from './in-memory-oauth-provider-repo
 export { InMemoryAgentOAuthTokenRepository } from './in-memory-agent-oauth-token-repository.js';
 export { InMemoryAgentDefinitionRepository } from './in-memory-agent-definition-repository.js';
 export { InMemoryNamespaceRepository } from './in-memory-namespace-repository.js';
+export { InMemoryAgentRunRepository } from './in-memory-agent-run-repository.js';
 
 // Test factories
 export {
