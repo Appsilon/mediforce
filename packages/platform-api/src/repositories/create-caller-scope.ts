@@ -25,6 +25,7 @@ import type {
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
 import type { RunKicker } from '../runtime/run-kicker.js';
+import type { DockerImageDeleter } from '../services/docker-image-deleter.js';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification.js';
 import type { CallerScope } from './caller-scope.js';
 import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
@@ -72,6 +73,7 @@ export interface CallerScopeServices {
   readonly runKicker: RunKicker;
   readonly inviteService: InviteService | null;
   readonly inviteNotificationService: InviteNotificationService | null;
+  readonly dockerImageDeleter: DockerImageDeleter | null;
 }
 
 /**
@@ -134,6 +136,7 @@ export function createCallerScope(
       runKicker: services.runKicker,
       inviteService: services.inviteService,
       inviteNotificationService: services.inviteNotificationService,
+      dockerImageDeleter: services.dockerImageDeleter,
     },
   };
 }

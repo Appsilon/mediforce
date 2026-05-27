@@ -333,6 +333,13 @@ export {
 } from './oauth-providers.js';
 
 export {
+  DeleteDockerImageInputSchema,
+  DeleteDockerImageOutputSchema,
+  type DeleteDockerImageInput,
+  type DeleteDockerImageOutput,
+} from './docker-images.js';
+
+export {
   ListToolCatalogEntriesInputSchema,
   ListToolCatalogEntriesOutputSchema,
   GetToolCatalogEntryInputSchema,

@@ -69,6 +69,8 @@ export { saveWorkflowSecrets } from './secrets/save-workflow-secrets.js';
 export { getDockerInfo } from './system/get-docker-info.js';
 export { getOpenRouterCredits } from './system/get-openrouter-credits.js';
 
+export { deleteDockerImage } from './docker-images/delete-image.js';
+
 export { listOAuthProviders } from './oauth-providers/list-providers.js';
 export { getOAuthProvider } from './oauth-providers/get-provider.js';
 export { createOAuthProvider } from './oauth-providers/create-provider.js';

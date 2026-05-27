@@ -24,6 +24,12 @@ import {
   getAdminAuth,
 } from '@mediforce/platform-infra';
 import type { SendEmailFn } from '@mediforce/platform-core';
+import {
+  ContainerWorkerImageDeleter,
+  LocalDockerImageDeleter,
+  isLocalAgentMode,
+  type DockerImageDeleter,
+} from './docker-image-deleter.js';
 import { sendInviteEmail, sendWorkspaceNotificationEmail } from './invite-emails.js';
 import type {
   InviteNotificationService,
@@ -92,6 +98,7 @@ export interface PlatformServices {
   inviteService: InviteService;
   /** `null` when Mailgun env vars are unset (email disabled). */
   inviteNotificationService: InviteNotificationService | null;
+  dockerImageDeleter: DockerImageDeleter;
 }
 
 /**
@@ -309,6 +316,13 @@ export function getPlatformServices(): PlatformServices {
     ? new MailgunInviteNotificationService(mailgunSender)
     : null;
 
+  const dockerImageDeleter: DockerImageDeleter = isLocalAgentMode()
+    ? new LocalDockerImageDeleter()
+    : new ContainerWorkerImageDeleter(
+        process.env.CONTAINER_WORKER_URL ?? 'http://container-worker:3001',
+        process.env.CONTAINER_WORKER_SECRET,
+      );
+
   services = {
     engine,
     manualTrigger,
@@ -336,6 +350,7 @@ export function getPlatformServices(): PlatformServices {
     namespaceSecretsRepo,
     inviteService,
     inviteNotificationService,
+    dockerImageDeleter,
   };
 
   if (!seedingStarted) {

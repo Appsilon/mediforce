@@ -127,6 +127,10 @@ import {
   UpdateToolCatalogEntryOutputSchema,
   DeleteToolCatalogEntryInputSchema,
   DeleteToolCatalogEntryOutputSchema,
+  DeleteDockerImageInputSchema,
+  DeleteDockerImageOutputSchema,
+  type DeleteDockerImageInput,
+  type DeleteDockerImageOutput,
   type ListOAuthProvidersInput,
   type ListOAuthProvidersOutput,
   type GetOAuthProviderInput,
@@ -465,6 +469,10 @@ export class Mediforce {
     create: (input: CreateOAuthProviderInputApi) => Promise<CreateOAuthProviderOutput>;
     update: (input: UpdateOAuthProviderInputApi) => Promise<UpdateOAuthProviderOutput>;
     delete: (input: DeleteOAuthProviderInput) => Promise<DeleteOAuthProviderOutput>;
+  };
+
+  readonly dockerImages: {
+    delete: (input: DeleteDockerImageInput) => Promise<DeleteDockerImageOutput>;
   };
 
   readonly toolCatalog: {
@@ -1174,6 +1182,19 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.delete');
         return DeleteOAuthProviderOutputSchema.parse(body);
+      },
+    };
+
+    this.dockerImages = {
+      delete: async (input) => {
+        const validated = DeleteDockerImageInputSchema.parse(input);
+        const res = await this.request('/api/admin/docker-images', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId: validated.imageId }),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.dockerImages.delete');
+        return DeleteDockerImageOutputSchema.parse(body);
       },
     };
 

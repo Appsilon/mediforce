@@ -29,6 +29,7 @@ import type { CallerIdentity } from '../../auth.js';
 import type { CallerScope } from '../caller-scope.js';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope.js';
 import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker.js';
+import type { DockerImageDeleter } from '../../services/docker-image-deleter.js';
 import type { InviteNotificationService, InviteService } from '../../services/invite-notification.js';
 
 class InMemoryAgentRunRepository implements AgentRunRepository {
@@ -201,6 +202,7 @@ export interface TestScopeOverrides {
   readonly runKicker?: RunKicker;
   readonly inviteService?: InviteService | null;
   readonly inviteNotificationService?: InviteNotificationService | null;
+  readonly dockerImageDeleter?: DockerImageDeleter | null;
 }
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
@@ -248,6 +250,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     runKicker: overrides.runKicker ?? noopRunKicker(),
     inviteService: overrides.inviteService ?? null,
     inviteNotificationService: overrides.inviteNotificationService ?? null,
+    dockerImageDeleter: overrides.dockerImageDeleter ?? null,
   };
   return createCallerScope(services, caller);
 }

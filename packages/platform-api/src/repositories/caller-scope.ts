@@ -13,6 +13,7 @@ import type {
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
 import type { RunKicker } from '../runtime/run-kicker.js';
+import type { DockerImageDeleter } from '../services/docker-image-deleter.js';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification.js';
 import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
 import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
@@ -116,4 +117,11 @@ export interface SystemServices {
    * temporary password (matching today's behavior).
    */
   readonly inviteNotificationService: InviteNotificationService | null;
+  /**
+   * Docker image deletion port — local-`docker rmi` or container-worker proxy,
+   * picked at wiring time. `null` for handlers tests that don't exercise the
+   * delete-image flow; the handler throws `PreconditionFailedError` in that
+   * case.
+   */
+  readonly dockerImageDeleter: DockerImageDeleter | null;
 }
