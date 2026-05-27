@@ -36,4 +36,23 @@ describe('deleteAgent handler', () => {
     const err = await deleteAgent({ id: 'missing' }, scope).catch((e) => e);
     expect(err).toBeInstanceOf(NotFoundError);
   });
+
+  it('deleteAgent throws NotFoundError for a non-system member on a namespace-less public agent', async () => {
+    const created = await agentDefinitionRepo.create({
+      kind: 'plugin',
+      name: 'Claude Code',
+      iconName: 'Bot',
+      description: 'd',
+      foundationModel: 'm',
+      systemPrompt: 'p',
+      inputDescription: 'i',
+      outputDescription: 'o',
+      skillFileNames: [],
+      namespace: undefined,
+      visibility: 'public',
+    });
+    const scope = buildScope(['team-alpha']);
+    const err = await deleteAgent({ id: created.id }, scope).catch((e) => e);
+    expect(err).toBeInstanceOf(NotFoundError);
+  });
 });

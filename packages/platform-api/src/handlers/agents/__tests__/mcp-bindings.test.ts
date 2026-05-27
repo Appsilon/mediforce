@@ -56,6 +56,55 @@ describe('agent MCP binding handlers', () => {
     expect(Object.keys(mcpServers)).toContain('github');
   });
 
+  it('upsertAgentMcpBinding succeeds for a non-system caller on a namespace-less agent', async () => {
+    const created = await agentDefinitionRepo.create({
+      kind: 'plugin',
+      name: 'Claude Code',
+      iconName: 'Bot',
+      description: 'd',
+      foundationModel: 'm',
+      systemPrompt: 'p',
+      inputDescription: 'i',
+      outputDescription: 'o',
+      skillFileNames: [],
+      namespace: undefined,
+      visibility: 'public',
+    });
+    const scope = buildScope(['team-alpha']);
+    const { mcpServers } = await upsertAgentMcpBinding(
+      {
+        id: created.id,
+        name: 'github',
+        binding: { type: 'http', url: 'https://example.com' },
+      },
+      scope,
+    );
+    expect(Object.keys(mcpServers)).toContain('github');
+  });
+
+  it('deleteAgentMcpBinding succeeds for a non-system caller on a namespace-less agent', async () => {
+    const created = await agentDefinitionRepo.create({
+      kind: 'plugin',
+      name: 'Claude Code',
+      iconName: 'Bot',
+      description: 'd',
+      foundationModel: 'm',
+      systemPrompt: 'p',
+      inputDescription: 'i',
+      outputDescription: 'o',
+      skillFileNames: [],
+      namespace: undefined,
+      visibility: 'public',
+      mcpServers: { github: { type: 'http', url: 'https://example.com' } },
+    });
+    const scope = buildScope(['team-alpha']);
+    const { mcpServers } = await deleteAgentMcpBinding(
+      { id: created.id, name: 'github' },
+      scope,
+    );
+    expect(Object.keys(mcpServers)).not.toContain('github');
+  });
+
   it('deleteAgentMcpBinding removes binding', async () => {
     const created = await agentDefinitionRepo.create({
       kind: 'plugin',

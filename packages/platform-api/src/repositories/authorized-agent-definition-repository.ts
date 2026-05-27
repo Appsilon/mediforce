@@ -1,6 +1,7 @@
 import type {
   AgentDefinition,
   AgentDefinitionRepository,
+  AgentMcpBindingMap,
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
 } from '@mediforce/platform-core';
@@ -56,6 +57,26 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
     if (existing === null) throw new NotFoundError();
     this.assertWriteOrThrowNotFound(existing.namespace);
     return this.raw.update(id, input);
+  };
+
+  /**
+   * MCP-binding writes follow the legacy `mcp-servers` route contract, which is
+   * deliberately looser than `update`/`delete`: a namespace-less (platform-global)
+   * agent carries no caller-side write gate, so members may manage tool bindings
+   * on public platform agents. Namespaced agents still require workspace
+   * membership, with anti-enum NotFound for non-members.
+   */
+  updateMcpServers = async (id: string, mcpServers: AgentMcpBindingMap): Promise<AgentDefinition> => {
+    const existing = await this.raw.getById(id);
+    if (existing === null) throw new NotFoundError();
+    if (
+      !this.caller.isSystemActor &&
+      typeof existing.namespace === 'string' &&
+      !this.caller.namespaces.has(existing.namespace)
+    ) {
+      throw new NotFoundError();
+    }
+    return this.raw.update(id, { mcpServers });
   };
 
   delete = async (id: string): Promise<void> => {

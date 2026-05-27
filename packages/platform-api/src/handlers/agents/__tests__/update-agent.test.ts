@@ -52,4 +52,26 @@ describe('updateAgent handler', () => {
     ).catch((e) => e);
     expect(err).toBeInstanceOf(NotFoundError);
   });
+
+  it('updateAgent throws NotFoundError for a non-system member on a namespace-less public agent', async () => {
+    const created = await agentDefinitionRepo.create({
+      kind: 'plugin',
+      name: 'Claude Code',
+      iconName: 'Bot',
+      description: 'd',
+      foundationModel: 'm',
+      systemPrompt: 'p',
+      inputDescription: 'i',
+      outputDescription: 'o',
+      skillFileNames: [],
+      namespace: undefined,
+      visibility: 'public',
+    });
+    const scope = buildScope(['team-alpha']);
+    const err = await updateAgent(
+      { id: created.id, body: { description: 'changed' } },
+      scope,
+    ).catch((e) => e);
+    expect(err).toBeInstanceOf(NotFoundError);
+  });
 });
