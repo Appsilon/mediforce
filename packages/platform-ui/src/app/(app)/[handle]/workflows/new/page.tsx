@@ -127,7 +127,7 @@ export default function NewWorkflowPage() {
           steps,
           transitions: mergedTransitions,
           triggers: [{ type: 'manual', name: 'start' }],
-        } as never,
+        },
         { namespace: effectiveNamespace },
       );
       setSaveState({ status: 'saved', name: result.name });
