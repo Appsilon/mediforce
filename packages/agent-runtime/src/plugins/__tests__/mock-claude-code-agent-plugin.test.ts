@@ -10,6 +10,7 @@ describe('MockClaudeCodeAgentPlugin', () => {
     const context = {
       stepId: 'verify-data-quality',
       processInstanceId: 'run-1',
+      runNamespace: 'test',
       definitionVersion: '1',
       stepInput: {},
       autonomyLevel: 'L2',

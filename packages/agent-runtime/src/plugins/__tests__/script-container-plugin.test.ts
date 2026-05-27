@@ -4,8 +4,9 @@ import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
-import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
+import type { AgentContext, WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/agent-plugin.js';
 import type { ProcessConfig } from '@mediforce/platform-core';
+import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { ScriptContainerPlugin } from '../script-container-plugin.js';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager.js';
 
@@ -421,6 +422,44 @@ describe('ScriptContainerPlugin', () => {
         if (events[i].type === 'assistant') lastAssistantIdx = i;
       }
       expect(lastAssistantIdx).toBeLessThan(lastIdx);
+    });
+
+    it('[DATA] injects MEDIFORCE_RUN_NAMESPACE env from the run namespace (WorkflowAgentContext)', async () => {
+      const context: WorkflowAgentContext = {
+        stepId: 'register',
+        processInstanceId: 'pi-acme',
+        runNamespace: 'acme',
+        definitionVersion: '1',
+        stepInput: {},
+        autonomyLevel: 'L4',
+        workflowDefinition: buildWorkflowDefinition({
+          name: 'workflow-designer',
+          version: 1,
+          namespace: 'appsilon',
+          steps: [],
+          transitions: [],
+        }),
+        step: {
+          id: 'register',
+          name: 'Register',
+          type: 'creation',
+          executor: 'script',
+          agent: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
+        },
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+      };
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockSpawnSuccess(createMockChild());
+
+      await plugin.run(emit);
+
+      const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+      // The run's namespace (acme) — NOT the WD's home namespace (appsilon) —
+      // is what steps act on. Register scripts read it to target the right org.
+      expect(dockerArgs).toContain('MEDIFORCE_RUN_NAMESPACE=acme');
     });
 
     it('[DATA] writes input.json to the output directory', async () => {
