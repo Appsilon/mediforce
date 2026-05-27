@@ -23,6 +23,15 @@ describe('isRunActiveForArchive', () => {
     expect(isRunActiveForArchive(inactive)).toBe(false);
   });
 
+  it('treats waiting_for_timer paused runs as active (maps to in_progress, will resume)', () => {
+    const run = buildProcessInstance({
+      id: 'a',
+      status: 'paused',
+      pauseReason: 'waiting_for_timer',
+    });
+    expect(isRunActiveForArchive(run)).toBe(true);
+  });
+
   it('terminal statuses are not active', () => {
     expect(isRunActiveForArchive(buildProcessInstance({ id: 'a', status: 'completed' }))).toBe(false);
     expect(isRunActiveForArchive(buildProcessInstance({ id: 'a', status: 'failed' }))).toBe(false);

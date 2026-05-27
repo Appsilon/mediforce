@@ -9,6 +9,9 @@ const ACTIVE_PAUSE_REASONS = new Set([
   'waiting_for_human',
   'awaiting_agent_approval',
   'cowork_in_progress',
+  // `getWorkflowStatus` maps `waiting_for_timer` to `in_progress`, so it counts
+  // as active and cannot be archived (the run will resume on its own).
+  'waiting_for_timer',
   'agent_escalated',
   'agent_paused',
 ]);
