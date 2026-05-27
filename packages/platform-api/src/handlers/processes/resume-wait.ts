@@ -71,19 +71,25 @@ export async function resumeWait(
 
   const actor = actorFromCaller(scope, 'scheduler');
 
-  await scope.system.audit.append({
-    ...actor,
-    action: 'instance.wait.resumed',
-    description: `Wait action resumed for '${input.runId}' (reason: ${resumeReason}, waited ${waitedSeconds}s)`,
-    timestamp: now.toISOString(),
-    inputSnapshot: { stepId: waitMeta.stepId, resumeAt: waitMeta.resumeAt, condition: waitMeta.condition },
-    outputSnapshot: waitOutput,
-    basis: `Timer expired or condition met: ${resumeReason}`,
-    entityType: 'processInstance',
-    entityId: input.runId,
-    processInstanceId: input.runId,
-    processDefinitionVersion: run.definitionVersion,
-  });
+  // Audit + kick are best-effort — state update already committed above.
+  // Don't let a secondary failure (audit write, kick POST) mask a successful resume.
+  try {
+    await scope.system.audit.append({
+      ...actor,
+      action: 'instance.wait.resumed',
+      description: `Wait action resumed for '${input.runId}' (reason: ${resumeReason}, waited ${waitedSeconds}s)`,
+      timestamp: now.toISOString(),
+      inputSnapshot: { stepId: waitMeta.stepId, resumeAt: waitMeta.resumeAt, condition: waitMeta.condition },
+      outputSnapshot: waitOutput,
+      basis: `Timer expired or condition met: ${resumeReason}`,
+      entityType: 'processInstance',
+      entityId: input.runId,
+      processInstanceId: input.runId,
+      processDefinitionVersion: run.definitionVersion,
+    });
+  } catch (err) {
+    console.error(`[resume-wait] Audit write failed for '${input.runId}':`, err);
+  }
 
   await scope.system.runKicker.kick(input.runId, { triggeredBy: actor.actorId });
 
