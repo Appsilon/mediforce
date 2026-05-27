@@ -4,6 +4,7 @@ import type {
   CronTriggerStateRepository,
   ModelRegistryRepository,
   NamespaceRepository,
+  UserDirectoryService,
 } from '@mediforce/platform-core';
 import type {
   CronTrigger,
@@ -13,6 +14,8 @@ import type {
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
 import type { RunKicker } from '../runtime/run-kicker.js';
+import type { DockerImagesService } from '../services/docker-images-service.js';
+import type { InviteNotificationService, InviteService } from '../services/invite-notification.js';
 import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
 import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
 import type { AuthorizedAgentRunRepository } from './authorized-agent-run-repository.js';
@@ -103,4 +106,30 @@ export interface SystemServices {
    */
   readonly audit: AuditRepository;
   readonly runKicker: RunKicker;
+  /**
+   * Invite-flow surface (Firebase Auth user creation + password reset). `null`
+   * when not wired; handlers throw `PreconditionFailedError` in that case so
+   * tests can run without a Firebase Admin SDK.
+   */
+  readonly inviteService: InviteService | null;
+  /**
+   * Invite/workspace email surface. `null` when Mailgun env vars are unset —
+   * handlers detect that and skip email delivery while still returning the
+   * temporary password (matching today's behavior).
+   */
+  readonly inviteNotificationService: InviteNotificationService | null;
+  /**
+   * Docker image deletion port — local-`docker rmi` or container-worker proxy,
+   * picked at wiring time. `null` for handlers tests that don't exercise the
+   * delete-image flow; the handler throws `PreconditionFailedError` in that
+   * case.
+   */
+  readonly dockerImages: DockerImagesService | null;
+  /**
+   * Directory lookup for Firebase Auth user metadata (email, lastSignInTime).
+   * `null` when not configured — handlers that consume it (e.g.
+   * `listNamespaceMembers`) degrade gracefully by returning null fields per
+   * member rather than failing the whole response.
+   */
+  readonly userDirectory: UserDirectoryService | null;
 }

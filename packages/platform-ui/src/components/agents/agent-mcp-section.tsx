@@ -9,7 +9,7 @@ import {
   listAgentBindings,
   putAgentBinding,
 } from '@/lib/agent-mcp-client';
-import { listCatalogEntries } from '@/lib/mcp-admin-client';
+import { mediforce } from '@/lib/mediforce';
 import { AgentMcpBindingForm } from './agent-mcp-binding-form';
 import { OAuthConnectionStatus } from './oauth-connection-status';
 
@@ -37,7 +37,10 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
     try {
       const [serverBindings, catalogEntries] = await Promise.all([
         listAgentBindings(agentId),
-        listCatalogEntries(handle).catch(() => [] as ToolCatalogEntry[]),
+        mediforce.toolCatalog
+          .list({ namespace: handle })
+          .then((res) => res.entries)
+          .catch(() => [] as ToolCatalogEntry[]),
       ]);
       setBindings(serverBindings);
       setCatalog(catalogEntries);

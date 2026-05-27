@@ -41,7 +41,7 @@ describe('createRouteAdapter', () => {
     vi.restoreAllMocks();
   });
 
-  // Auth pipeline: middleware (`src/middleware.ts`) first gates `/api/*` for
+  // Auth pipeline: proxy (`src/proxy.ts`) first gates `/api/*` for
   // presence of credentials. The adapter then resolves those credentials into
   // a typed `CallerIdentity`, builds a per-request `CallerScope` from the
   // platform services, and threads it into the handler. Tests stub both
@@ -71,6 +71,7 @@ describe('createRouteAdapter', () => {
       kind: 'user',
       uid: 'u1',
       namespaces: new Set(['ns-a']),
+      namespaceRoles: new Map([['ns-a', 'member']]),
       isSystemActor: false,
     };
     const GET = createRouteAdapter(
@@ -104,6 +105,7 @@ describe('createRouteAdapter', () => {
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({ id: 'agent-1' });
   });
+
 
   it('short-circuits with the 401 response returned by resolveCaller', async () => {
     const handler = vi.fn();

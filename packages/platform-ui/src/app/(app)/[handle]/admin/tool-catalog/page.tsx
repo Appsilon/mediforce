@@ -6,12 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Plus } from 'lucide-react';
 import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core';
 import { apiFetch } from '@/lib/api-fetch';
-import {
-  createCatalogEntry,
-  deleteCatalogEntry,
-  listCatalogEntries,
-  updateCatalogEntry,
-} from '@/lib/mcp-admin-client';
+import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { CatalogList } from '@/components/admin/tool-catalog/catalog-list';
 import { CatalogForm } from '@/components/admin/tool-catalog/catalog-form';
@@ -47,7 +42,7 @@ export default function AdminToolCatalogPage() {
     setListError(null);
     try {
       const [fetched, agentRes] = await Promise.all([
-        listCatalogEntries(handle),
+        mediforce.toolCatalog.list({ namespace: handle }).then((res) => res.entries),
         apiFetch('/api/agents').then(async (res) =>
           res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
         ),
@@ -102,9 +97,9 @@ export default function AdminToolCatalogPage() {
       try {
         if (mode.kind === 'edit') {
           const { id, ...patch } = entry;
-          await updateCatalogEntry(handle, id, patch);
+          await mediforce.toolCatalog.update({ namespace: handle, id, ...patch });
         } else {
-          await createCatalogEntry(handle, entry);
+          await mediforce.toolCatalog.create({ namespace: handle, ...entry });
           const qs = new URLSearchParams(search.toString());
           qs.set('id', entry.id);
           router.replace(`/${handle}/admin/tool-catalog?${qs.toString()}`);
@@ -143,7 +138,7 @@ export default function AdminToolCatalogPage() {
     setMode({ kind: 'idle' });
     setDeleteTarget(null);
     try {
-      await deleteCatalogEntry(handle, target.id);
+      await mediforce.toolCatalog.delete({ namespace: handle, id: target.id });
     } catch (err: unknown) {
       setListError(err instanceof Error ? err.message : 'Delete failed.');
     }

@@ -22,8 +22,20 @@ export class FirestoreAuditRepository implements AuditRepository {
   ): Promise<AuditEvent> {
     const colRef = this.db.collection(this.collectionName);
 
+    // Real Firestore rejects undefined values with
+    // "Cannot use undefined as a Firestore value". Optional fields on
+    // AuditEvent (`processInstanceId`, `stepId`, ...) and on handlers'
+    // `inputSnapshot` payloads (`args`, etc.) routinely arrive as
+    // undefined when omitted; scrub them so the in-memory and Firestore
+    // paths agree on representation. Null is preserved.
+    //
+    // Strip only the user-supplied event; FieldValue.serverTimestamp() is
+    // a class-instance sentinel that the SDK recognises by identity. A
+    // recursive strip that walks every object would rebuild the sentinel
+    // as a plain object — Firestore would then write a regular Map and the
+    // read-back `.toDate()` call would fail.
     const docRef = await colRef.add({
-      ...event,
+      ...(stripUndefined(event) as Record<string, unknown>),
       serverTimestamp: FieldValue.serverTimestamp(),
     });
 
@@ -110,4 +122,26 @@ export class FirestoreAuditRepository implements AuditRepository {
         data.processDefinitionVersion as string | undefined,
     };
   }
+}
+
+function stripUndefined(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => stripUndefined(v))
+      .filter((v): v is unknown => v !== undefined);
+  }
+  // Only recurse into plain `{}` objects. Class instances (FieldValue,
+  // Timestamp, Date, GeoPoint, ...) are SDK sentinels Firestore identifies
+  // by identity; rebuilding them as plain objects breaks the write.
+  if (typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const stripped = stripUndefined(v);
+      if (stripped !== undefined) out[k] = stripped;
+    }
+    return out;
+  }
+  return value;
 }

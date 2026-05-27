@@ -1,3 +1,9 @@
+/**
+ * HTML + text bodies for the two invite-flow emails. Pure functions over
+ * `SendEmailFn` — kept framework-free so the Mailgun-backed
+ * `InviteNotificationService` adapter can delegate without forming a
+ * `platform-api → platform-ui` dependency edge.
+ */
 import type { SendEmailFn } from '@mediforce/platform-core';
 
 function escapeHtml(value: string): string {

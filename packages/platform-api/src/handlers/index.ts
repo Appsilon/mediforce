@@ -69,4 +69,22 @@ export { saveWorkflowSecrets } from './secrets/save-workflow-secrets.js';
 export { getDockerInfo } from './system/get-docker-info.js';
 export { getOpenRouterCredits } from './system/get-openrouter-credits.js';
 
+export { deleteDockerImage } from './docker-images/delete-image.js';
+
+export { listOAuthProviders } from './oauth-providers/list-providers.js';
+export { getOAuthProvider } from './oauth-providers/get-provider.js';
+export { createOAuthProvider } from './oauth-providers/create-provider.js';
+export { updateOAuthProvider } from './oauth-providers/update-provider.js';
+export { deleteOAuthProvider } from './oauth-providers/delete-provider.js';
+
+export { listNamespaceMembers } from './users/list-members.js';
+export { inviteUser } from './users/invite-user.js';
+export { resendInvite } from './users/resend-invite.js';
+
+export { listToolCatalogEntries } from './tool-catalog/list-entries.js';
+export { getToolCatalogEntry } from './tool-catalog/get-entry.js';
+export { createToolCatalogEntry } from './tool-catalog/create-entry.js';
+export { updateToolCatalogEntry } from './tool-catalog/update-entry.js';
+export { deleteToolCatalogEntry } from './tool-catalog/delete-entry.js';
+
 export { listAdapter, getByIdAdapter } from './_generic.js';

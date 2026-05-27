@@ -120,6 +120,7 @@ describe('Mediforce client ↔ route-adapter ↔ claimTask (in-process)', () => 
     kind: 'user',
     uid: 'u-claim-test',
     namespaces: new Set(['team-alpha']),
+    namespaceRoles: new Map([['team-alpha', 'member']]),
     isSystemActor: false,
   };
 
@@ -225,6 +226,7 @@ describe('Mediforce client ↔ route-adapter ↔ cancelRun (in-process)', () => 
     kind: 'user',
     uid: 'u-cancel-test',
     namespaces: new Set(['team-alpha']),
+    namespaceRoles: new Map([['team-alpha', 'member']]),
     isSystemActor: false,
   };
 

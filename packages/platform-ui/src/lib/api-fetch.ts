@@ -2,7 +2,7 @@ import { getFirebaseIdToken } from './firebase-id-token';
 
 /**
  * Client-side fetch wrapper that attaches the current user's Firebase ID token
- * as `Authorization: Bearer <token>` so middleware.ts can authenticate the
+ * as `Authorization: Bearer <token>` so proxy.ts can authenticate the
  * request without requiring the server-only PLATFORM_API_KEY.
  *
  * Use this for browser-initiated calls to internal `/api/*` routes that have

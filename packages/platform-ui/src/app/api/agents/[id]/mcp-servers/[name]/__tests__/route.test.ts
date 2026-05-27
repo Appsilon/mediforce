@@ -186,6 +186,7 @@ describe('PUT /api/agents/:id/mcp-servers/:name', () => {
       kind: 'user',
       uid: 'outsider',
       namespaces: new Set(['other-ns']),
+      namespaceRoles: new Map([['other-ns', 'member']]),
       isSystemActor: false,
     });
     mockAgentGetByIdVisibleTo.mockResolvedValue(null);

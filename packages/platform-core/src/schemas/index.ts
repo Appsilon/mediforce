@@ -218,9 +218,11 @@ export {
   NamespaceTypeSchema,
   NamespaceSchema,
   NamespaceMemberSchema,
+  NamespaceMembershipSchema,
   type NamespaceType,
   type Namespace,
   type NamespaceMember,
+  type NamespaceMembership,
 } from './namespace.js';
 
 export {

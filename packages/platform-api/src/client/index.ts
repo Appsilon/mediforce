@@ -32,7 +32,6 @@ import {
   TransferWorkflowInputSchema,
   TransferWorkflowOutputSchema,
   DockerInfoResponseSchema,
-  RemoveImageOutputSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
   ListAgentsInputSchema,
@@ -107,6 +106,62 @@ import {
   BulkRunOutputSchema,
   HeartbeatInputSchema,
   HeartbeatOutputSchema,
+  ListOAuthProvidersInputSchema,
+  ListOAuthProvidersOutputSchema,
+  GetOAuthProviderInputSchema,
+  GetOAuthProviderOutputSchema,
+  CreateOAuthProviderInputApiSchema,
+  CreateOAuthProviderOutputSchema,
+  UpdateOAuthProviderInputApiSchema,
+  UpdateOAuthProviderOutputSchema,
+  DeleteOAuthProviderInputSchema,
+  DeleteOAuthProviderOutputSchema,
+  ListToolCatalogEntriesInputSchema,
+  ListToolCatalogEntriesOutputSchema,
+  GetToolCatalogEntryInputSchema,
+  GetToolCatalogEntryOutputSchema,
+  CreateToolCatalogEntryInputApiSchema,
+  CreateToolCatalogEntryOutputSchema,
+  UpdateToolCatalogEntryInputApiSchema,
+  UpdateToolCatalogEntryOutputSchema,
+  DeleteToolCatalogEntryInputSchema,
+  DeleteToolCatalogEntryOutputSchema,
+  ListNamespaceMembersInputSchema,
+  ListNamespaceMembersOutputSchema,
+  InviteUserInputSchema,
+  InviteUserOutputSchema,
+  ResendInviteInputSchema,
+  ResendInviteOutputSchema,
+  type ListNamespaceMembersInput,
+  type ListNamespaceMembersOutput,
+  type InviteUserInput,
+  type InviteUserOutput,
+  type ResendInviteInput,
+  type ResendInviteOutput,
+  DeleteDockerImageInputSchema,
+  DeleteDockerImageOutputSchema,
+  type DeleteDockerImageInput,
+  type DeleteDockerImageOutput,
+  type ListOAuthProvidersInput,
+  type ListOAuthProvidersOutput,
+  type GetOAuthProviderInput,
+  type GetOAuthProviderOutput,
+  type CreateOAuthProviderInputApi,
+  type CreateOAuthProviderOutput,
+  type UpdateOAuthProviderInputApi,
+  type UpdateOAuthProviderOutput,
+  type DeleteOAuthProviderInput,
+  type DeleteOAuthProviderOutput,
+  type ListToolCatalogEntriesInput,
+  type ListToolCatalogEntriesOutput,
+  type GetToolCatalogEntryInput,
+  type GetToolCatalogEntryOutput,
+  type CreateToolCatalogEntryInputApi,
+  type CreateToolCatalogEntryOutput,
+  type UpdateToolCatalogEntryInputApi,
+  type UpdateToolCatalogEntryOutput,
+  type DeleteToolCatalogEntryInput,
+  type DeleteToolCatalogEntryOutput,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
@@ -146,7 +201,6 @@ import {
   type ListRunsInput,
   type ListRunsOutput,
   type DockerInfoResponse,
-  type RemoveImageOutput,
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
   type ListAgentsInput,
@@ -411,12 +465,37 @@ export class Mediforce {
 
   readonly system: {
     dockerInfo: () => Promise<DockerInfoResponse>;
-    removeImage: (imageId: string) => Promise<RemoveImageOutput>;
     credits: (input: OpenRouterCreditsInput) => Promise<OpenRouterCreditsOutput>;
   };
 
   readonly cron: {
     heartbeat: (input?: HeartbeatInput) => Promise<HeartbeatOutput>;
+  };
+
+  readonly oauthProviders: {
+    list: (input: ListOAuthProvidersInput) => Promise<ListOAuthProvidersOutput>;
+    get: (input: GetOAuthProviderInput) => Promise<GetOAuthProviderOutput>;
+    create: (input: CreateOAuthProviderInputApi) => Promise<CreateOAuthProviderOutput>;
+    update: (input: UpdateOAuthProviderInputApi) => Promise<UpdateOAuthProviderOutput>;
+    delete: (input: DeleteOAuthProviderInput) => Promise<DeleteOAuthProviderOutput>;
+  };
+
+  readonly dockerImages: {
+    delete: (input: DeleteDockerImageInput) => Promise<DeleteDockerImageOutput>;
+  };
+
+  readonly toolCatalog: {
+    list: (input: ListToolCatalogEntriesInput) => Promise<ListToolCatalogEntriesOutput>;
+    get: (input: GetToolCatalogEntryInput) => Promise<GetToolCatalogEntryOutput>;
+    create: (input: CreateToolCatalogEntryInputApi) => Promise<CreateToolCatalogEntryOutput>;
+    update: (input: UpdateToolCatalogEntryInputApi) => Promise<UpdateToolCatalogEntryOutput>;
+    delete: (input: DeleteToolCatalogEntryInput) => Promise<DeleteToolCatalogEntryOutput>;
+  };
+
+  readonly users: {
+    listMembers: (input: ListNamespaceMembersInput) => Promise<ListNamespaceMembersOutput>;
+    invite: (input: InviteUserInput) => Promise<InviteUserOutput>;
+    resendInvite: (input: ResendInviteInput) => Promise<ResendInviteOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -1038,15 +1117,6 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.system.dockerInfo');
         return DockerInfoResponseSchema.parse(body);
       },
-      removeImage: async (imageId: string) => {
-        const res = await this.request('/api/admin/docker-images', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageId }),
-        });
-        const body = await parseJsonOrThrow(res, 'mediforce.system.removeImage');
-        return RemoveImageOutputSchema.parse(body);
-      },
       credits: async (input: OpenRouterCreditsInput) => {
         const validated = OpenRouterCreditsInputSchema.parse(input);
         const qs = toSearchParams({ namespace: validated.namespace });
@@ -1062,6 +1132,161 @@ export class Mediforce {
         const res = await this.request('/api/cron/heartbeat', { method: 'POST' });
         const body = await parseJsonOrThrow(res, 'mediforce.cron.heartbeat');
         return HeartbeatOutputSchema.parse(body);
+      },
+    };
+
+    this.oauthProviders = {
+      list: async (input) => {
+        const validated = ListOAuthProvidersInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/admin/oauth-providers${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.list');
+        return ListOAuthProvidersOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetOAuthProviderInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/oauth-providers/${encodeURIComponent(validated.id)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.get');
+        return GetOAuthProviderOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateOAuthProviderInputApiSchema.parse(input);
+        const { namespace, ...createBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/admin/oauth-providers${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.create');
+        return CreateOAuthProviderOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const validated = UpdateOAuthProviderInputApiSchema.parse(input);
+        const { namespace, id, ...patch } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(
+          `/api/admin/oauth-providers/${encodeURIComponent(id)}${qs}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.update');
+        return UpdateOAuthProviderOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteOAuthProviderInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/oauth-providers/${encodeURIComponent(validated.id)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.delete');
+        return DeleteOAuthProviderOutputSchema.parse(body);
+      },
+    };
+
+    this.dockerImages = {
+      delete: async (input) => {
+        const validated = DeleteDockerImageInputSchema.parse(input);
+        const res = await this.request('/api/admin/docker-images', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId: validated.imageId }),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.dockerImages.delete');
+        return DeleteDockerImageOutputSchema.parse(body);
+      },
+    };
+
+    this.toolCatalog = {
+      list: async (input) => {
+        const validated = ListToolCatalogEntriesInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/admin/tool-catalog${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.list');
+        return ListToolCatalogEntriesOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetToolCatalogEntryInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/tool-catalog/${encodeURIComponent(validated.id)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.get');
+        return GetToolCatalogEntryOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateToolCatalogEntryInputApiSchema.parse(input);
+        const { namespace, ...createBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/admin/tool-catalog${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.create');
+        return CreateToolCatalogEntryOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const validated = UpdateToolCatalogEntryInputApiSchema.parse(input);
+        const { namespace, id, ...patch } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(
+          `/api/admin/tool-catalog/${encodeURIComponent(id)}${qs}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.update');
+        return UpdateToolCatalogEntryOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteToolCatalogEntryInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/tool-catalog/${encodeURIComponent(validated.id)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.delete');
+        return DeleteToolCatalogEntryOutputSchema.parse(body);
+      },
+    };
+
+    this.users = {
+      listMembers: async (input) => {
+        const validated = ListNamespaceMembersInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/users/members${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.users.listMembers');
+        return ListNamespaceMembersOutputSchema.parse(body);
+      },
+      invite: async (input) => {
+        const validated = InviteUserInputSchema.parse(input);
+        const res = await this.request('/api/users/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.users.invite');
+        return InviteUserOutputSchema.parse(body);
+      },
+      resendInvite: async (input) => {
+        const validated = ResendInviteInputSchema.parse(input);
+        const res = await this.request('/api/users/resend-invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.users.resendInvite');
+        return ResendInviteOutputSchema.parse(body);
       },
     };
   }

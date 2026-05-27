@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   assertNamespaceAccess,
+  assertCallerCanAdminDockerImages,
+  assertCallerIsNamespaceAdmin,
   callerCanAccess,
   filterByCaller,
   type CallerIdentity,
@@ -12,6 +14,7 @@ const userInNsA: CallerIdentity = {
   kind: 'user',
   uid: 'u-1',
   namespaces: new Set(['ns-a']),
+  namespaceRoles: new Map([['ns-a', 'member']]),
   isSystemActor: false,
 };
 
@@ -67,5 +70,75 @@ describe('filterByCaller', () => {
   it('keeps only entities in namespaces the user can access (sad path drops the rest)', () => {
     const result = filterByCaller(items, userInNsA, (i) => i.namespace);
     expect(result.map((i) => i.id)).toEqual(['1']);
+  });
+});
+
+describe('assertCallerIsNamespaceAdmin', () => {
+  function user(roles: ReadonlyArray<readonly [string, 'owner' | 'admin' | 'member']>): CallerIdentity {
+    return {
+      kind: 'user',
+      uid: 'u',
+      namespaces: new Set(roles.map(([handle]) => handle)),
+      namespaceRoles: new Map(roles),
+      isSystemActor: false,
+    };
+  }
+
+  it('bypasses for apiKey callers (trusted infra)', () => {
+    expect(() => assertCallerIsNamespaceAdmin(apiKey, 'ns-a')).not.toThrow();
+  });
+
+  it('allows users with owner role', () => {
+    expect(() => assertCallerIsNamespaceAdmin(user([['ns-a', 'owner']]), 'ns-a')).not.toThrow();
+  });
+
+  it('allows users with admin role', () => {
+    expect(() => assertCallerIsNamespaceAdmin(user([['ns-a', 'admin']]), 'ns-a')).not.toThrow();
+  });
+
+  it('throws ForbiddenError for users with only member role', () => {
+    expect(() => assertCallerIsNamespaceAdmin(user([['ns-a', 'member']]), 'ns-a')).toThrow(ForbiddenError);
+  });
+
+  it('throws ForbiddenError for users with no role in the namespace', () => {
+    expect(() => assertCallerIsNamespaceAdmin(user([['ns-a', 'admin']]), 'ns-b')).toThrow(ForbiddenError);
+  });
+});
+
+describe('assertCallerCanAdminDockerImages', () => {
+  function user(roles: ReadonlyArray<readonly [string, 'owner' | 'admin' | 'member']>): CallerIdentity {
+    return {
+      kind: 'user',
+      uid: 'u',
+      namespaces: new Set(roles.map(([handle]) => handle)),
+      namespaceRoles: new Map(roles),
+      isSystemActor: false,
+    };
+  }
+
+  it('bypasses for apiKey callers', () => {
+    expect(() => assertCallerCanAdminDockerImages(apiKey)).not.toThrow();
+  });
+
+  it('allows a user who is owner in any namespace', () => {
+    expect(() =>
+      assertCallerCanAdminDockerImages(user([['ns-a', 'member'], ['ns-b', 'owner']])),
+    ).not.toThrow();
+  });
+
+  it('allows a user who is admin in any namespace', () => {
+    expect(() =>
+      assertCallerCanAdminDockerImages(user([['ns-a', 'admin']])),
+    ).not.toThrow();
+  });
+
+  it('rejects a user who is only member everywhere', () => {
+    expect(() =>
+      assertCallerCanAdminDockerImages(user([['ns-a', 'member'], ['ns-b', 'member']])),
+    ).toThrow(ForbiddenError);
+  });
+
+  it('rejects a user with no memberships at all', () => {
+    expect(() => assertCallerCanAdminDockerImages(user([]))).toThrow(ForbiddenError);
   });
 });

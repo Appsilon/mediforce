@@ -7,7 +7,7 @@ import type { AgentOAuthToken } from '@mediforce/platform-core';
 const mockVerifyIdToken = vi.fn();
 const mockTokenListByAgent = vi.fn();
 const mockGetMember = vi.fn();
-const mockGetNamespacesByUser = vi.fn();
+const mockGetMembershipsForUser = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
@@ -18,7 +18,7 @@ vi.mock('@/lib/platform-services', () => ({
     agentOAuthTokenRepo: { listByAgent: mockTokenListByAgent },
     namespaceRepo: {
       getMember: mockGetMember,
-      getNamespacesByUser: mockGetNamespacesByUser,
+      getMembershipsForUser: mockGetMembershipsForUser,
     },
   }),
 }));
@@ -72,7 +72,7 @@ describe('GET /api/agents/:id/oauth', () => {
     vi.clearAllMocks();
     mockVerifyIdToken.mockResolvedValue({ uid: 'uid-1' });
     mockGetMember.mockResolvedValue(memberAppsilon);
-    mockGetNamespacesByUser.mockResolvedValue([{ handle: 'appsilon' }]);
+    mockGetMembershipsForUser.mockResolvedValue([{ handle: 'appsilon', role: 'member' as const }]);
   });
 
   it('[DATA] returns tokens with public fields only (no access/refresh tokens)', async () => {
@@ -158,7 +158,7 @@ describe('GET /api/agents/:id/oauth', () => {
   });
 
   it('[ISOLATION] queries scoped to the requested namespace + agent', async () => {
-    mockGetNamespacesByUser.mockResolvedValue([{ handle: 'other-ns' }]);
+    mockGetMembershipsForUser.mockResolvedValue([{ handle: 'other-ns', role: 'member' as const }]);
     mockTokenListByAgent.mockResolvedValue([]);
 
     await GET(
@@ -183,13 +183,13 @@ describe('GET /api/agents/:id/oauth', () => {
     expect(mockTokenListByAgent).not.toHaveBeenCalled();
   });
 
-  it('[AUTHZ] membership is read once from getNamespacesByUser per request', async () => {
+  it('[AUTHZ] membership is read once from getMembershipsForUser per request', async () => {
     mockTokenListByAgent.mockResolvedValue([]);
 
     await GET(
       makeGetRequest('agent-1', 'appsilon'),
       { params: makeParams('agent-1') },
     );
-    expect(mockGetNamespacesByUser).toHaveBeenCalledWith('uid-1');
+    expect(mockGetMembershipsForUser).toHaveBeenCalledWith('uid-1');
   });
 });

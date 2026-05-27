@@ -81,7 +81,7 @@ export const systemRmiCommand = defineCommand({
     },
   },
   async run({ args, output, mediforce, jsonMode }) {
-    const result = await mediforce.system.removeImage(args.imageId);
+    const result = await mediforce.dockerImages.delete({ imageId: args.imageId });
     if (jsonMode) {
       printJson(output, result);
       return 0;

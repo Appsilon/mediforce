@@ -35,6 +35,16 @@ const fake = vi.hoisted(() => {
         }
         return result;
       },
+      getMembershipsForUser: async (uid: string) => {
+        const out: Array<{ handle: string; role: 'owner' | 'admin' | 'member' }> = [];
+        for (const [handle, byUid] of members.entries()) {
+          const member = byUid.get(uid) as
+            | { role: 'owner' | 'admin' | 'member' }
+            | undefined;
+          if (member) out.push({ handle, role: member.role });
+        }
+        return out;
+      },
     },
     agentDefinitionRepo: {
       getById: async (id: string) => agents.get(id) ?? null,
@@ -44,6 +54,13 @@ const fake = vi.hoisted(() => {
     },
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    auditRepo: {
+      append: async () => undefined,
+      getByEntity: async () => [],
+      getByProcess: async () => [],
+      getByProcessInNamespaces: async () => [],
+      getByActor: async () => [],
+    },
   };
 
   return {

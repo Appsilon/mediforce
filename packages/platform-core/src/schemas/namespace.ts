@@ -21,6 +21,12 @@ export const NamespaceMemberSchema = z.object({
   joinedAt: z.string().datetime(),
 });
 
+export const NamespaceMembershipSchema = z.object({
+  handle: z.string().min(1),
+  role: z.enum(['owner', 'admin', 'member']),
+});
+
 export type NamespaceType = z.infer<typeof NamespaceTypeSchema>;
 export type Namespace = z.infer<typeof NamespaceSchema>;
 export type NamespaceMember = z.infer<typeof NamespaceMemberSchema>;
+export type NamespaceMembership = z.infer<typeof NamespaceMembershipSchema>;

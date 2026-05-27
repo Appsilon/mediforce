@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Server, HardDrive, Container, AlertTriangle, ArrowUpDown, Trash2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { cn } from '@/lib/utils';
@@ -75,18 +76,13 @@ export default function AdminInfrastructurePage() {
     setDeletingId(imageId);
     setDeleteError(null);
     try {
-      const res = await apiFetch('/api/admin/docker-images', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageId }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'Unknown error' }));
-        setDeleteError(data.error ?? `Failed to delete (${res.status})`);
-      }
+      await mediforce.dockerImages.delete({ imageId });
       refresh();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Failed to delete image');
+      const message = err instanceof ApiError
+        ? err.message
+        : err instanceof Error ? err.message : 'Failed to delete image';
+      setDeleteError(message);
       refresh();
     } finally {
       setDeletingId(null);
