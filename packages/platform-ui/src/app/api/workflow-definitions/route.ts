@@ -39,4 +39,5 @@ export const POST = createRouteAdapter<
     return { ...body, namespace: namespace ?? undefined };
   },
   registerWorkflow,
+  { successStatus: 201 },
 );
