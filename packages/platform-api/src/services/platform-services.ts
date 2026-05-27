@@ -22,6 +22,7 @@ import {
   PostgresAgentOAuthTokenRepository,
   PostgresCronTriggerStateRepository,
   PostgresAgentRunRepository,
+  PostgresHumanTaskRepository,
   getSharedPostgresClient,
   getAdminFirestore,
   validateSecretsKey,
@@ -35,6 +36,7 @@ import type {
   AgentRunRepository,
   AuditRepository,
   CronTriggerStateRepository,
+  HumanTaskRepository,
   NamespaceRepository,
   OAuthProviderRepository,
   ToolCatalogRepository,
@@ -82,7 +84,7 @@ export interface PlatformServices {
   instanceRepo: FirestoreProcessInstanceRepository;
   auditRepo: AuditRepository;
   agentRunRepo: AgentRunRepository;
-  humanTaskRepo: FirestoreHumanTaskRepository;
+  humanTaskRepo: HumanTaskRepository;
   handoffRepo: FirestoreHandoffRepository;
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
   coworkSessionRepo: FirestoreCoworkSessionRepository;
@@ -118,7 +120,10 @@ export function getPlatformServices(): PlatformServices {
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresAgentRunRepository(getSharedPostgresClient().db, instanceRepo)
       : new FirestoreAgentRunRepository(db, instanceRepo);
-  const humanTaskRepo = new FirestoreHumanTaskRepository(db, instanceRepo);
+  const humanTaskRepo: HumanTaskRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresHumanTaskRepository(getSharedPostgresClient().db, instanceRepo)
+      : new FirestoreHumanTaskRepository(db, instanceRepo);
   const handoffRepo = new FirestoreHandoffRepository(db, instanceRepo);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
   const coworkSessionRepo = new FirestoreCoworkSessionRepository(db, instanceRepo);
