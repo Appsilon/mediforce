@@ -603,13 +603,13 @@ export class Mediforce {
           );
         }
         const qs = toSearchParams({ namespace });
-        const res = await this.request(`/api/workflow-definitions${qs}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(validatedInput),
-        });
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.register');
-        return RegisterWorkflowOutputSchema.parse(body);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions${qs}`,
+          { ...validatedInput } as Record<string, unknown>,
+          RegisterWorkflowOutputSchema,
+          'mediforce.workflows.register',
+        );
       },
       list: async (input) => {
         const validated = input ? ListWorkflowsInputSchema.parse(input) : undefined;
@@ -632,47 +632,38 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.get');
         return GetWorkflowOutputSchema.parse(body);
       },
-      archiveVersion: async (input, options) => {
+      archiveVersion: (input, options) => {
         const validated = ArchiveVersionInputSchema.parse(input);
         const qs = toSearchParams({ namespace: options.namespace });
-        const res = await this.request(
+        return this.sendJson(
+          'POST',
           `/api/workflow-definitions/${encodeURIComponent(validated.name)}/versions/${validated.version}/archive${qs}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ archived: validated.archived }),
-          },
+          { archived: validated.archived },
+          ArchiveVersionOutputSchema,
+          'mediforce.workflows.archiveVersion',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.archiveVersion');
-        return ArchiveVersionOutputSchema.parse(body);
       },
-      archiveAll: async (input, options) => {
+      archiveAll: (input, options) => {
         const validated = ArchiveAllInputSchema.parse(input);
         const qs = toSearchParams({ namespace: options.namespace });
-        const res = await this.request(
+        return this.sendJson(
+          'POST',
           `/api/workflow-definitions/${encodeURIComponent(validated.name)}/archive${qs}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ archived: validated.archived }),
-          },
+          { archived: validated.archived },
+          ArchiveAllOutputSchema,
+          'mediforce.workflows.archiveAll',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.archiveAll');
-        return ArchiveAllOutputSchema.parse(body);
       },
-      setVisibility: async (input, options) => {
+      setVisibility: (input, options) => {
         const validated = SetVisibilityInputSchema.parse(input);
         const qs = toSearchParams({ namespace: options.namespace });
-        const res = await this.request(
+        return this.sendJson(
+          'PATCH',
           `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ visibility: validated.visibility }),
-          },
+          { visibility: validated.visibility },
+          SetVisibilityOutputSchema,
+          'mediforce.workflows.setVisibility',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.setVisibility');
-        return SetVisibilityOutputSchema.parse(body);
       },
       setDefaultVersion: (input) => {
         const v = SetDefaultVersionInputSchema.parse(input);
@@ -714,7 +705,7 @@ export class Mediforce {
           'mediforce.workflows.transferNamespace',
         );
       },
-      copy: async (input, options) => {
+      copy: (input, options) => {
         const validated = CopyWorkflowInputSchema.parse(input);
         const qs = toSearchParams({
           targetNamespace: options.targetNamespace,
@@ -723,16 +714,13 @@ export class Mediforce {
         const reqBody: Record<string, unknown> = {};
         if (validated.version !== undefined) reqBody.version = validated.version;
         if (validated.targetName !== undefined) reqBody.targetName = validated.targetName;
-        const res = await this.request(
+        return this.sendJson(
+          'POST',
           `/api/workflow-definitions/${encodeURIComponent(validated.name)}/copy${qs}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(reqBody),
-          },
+          reqBody,
+          CopyWorkflowOutputSchema,
+          'mediforce.workflows.copy',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.workflows.copy');
-        return CopyWorkflowOutputSchema.parse(body);
       },
     };
 
@@ -759,19 +747,16 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.agents.delete');
         return DeleteAgentOutputSchema.parse(body);
       },
-      update: async (input, updateBody) => {
+      update: (input, updateBody) => {
         const validatedInput = UpdateAgentInputSchema.parse(input);
         const validatedBody = UpdateAgentBodySchema.parse(updateBody);
-        const res = await this.request(
+        return this.sendJson(
+          'PUT',
           `/api/agents/${encodeURIComponent(validatedInput.id)}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(validatedBody),
-          },
+          validatedBody as Record<string, unknown>,
+          UpdateAgentOutputSchema,
+          'mediforce.agents.update',
         );
-        const body = await parseJsonOrThrow(res, 'mediforce.agents.update');
-        return UpdateAgentOutputSchema.parse(body);
       },
       create: (input) => {
         const v = CreateAgentInputSchema.parse(input);
@@ -1031,19 +1016,19 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.workflowSecrets.values');
         return GetWorkflowSecretsFullOutputSchema.parse(body);
       },
-      save: async (input) => {
+      save: (input) => {
         const validated = SaveWorkflowSecretsInputSchema.parse(input);
         const qs = toSearchParams({
           namespace: validated.namespace,
           workflow: validated.workflow,
         });
-        const res = await this.request(`/api/workflow-secrets/values${qs}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ secrets: validated.secrets }),
-        });
-        const body = await parseJsonOrThrow(res, 'mediforce.workflowSecrets.save');
-        return SaveWorkflowSecretsOutputSchema.parse(body);
+        return this.sendJson(
+          'PUT',
+          `/api/workflow-secrets/values${qs}`,
+          { secrets: validated.secrets },
+          SaveWorkflowSecretsOutputSchema,
+          'mediforce.workflowSecrets.save',
+        );
       },
     };
 
@@ -1096,9 +1081,7 @@ export class Mediforce {
    * Mutation helper — `request(method, body)` → `parseJsonOrThrow` →
    * `outputSchema.parse(body)`. Callsites pre-validate input via
    * `<InputSchema>.parse` so `path` / `body` are typed; this helper covers
-   * everything past that. Single seam for the 16 mutation methods on this
-   * client. Currently applied to the four cowork mutations; the rest are
-   * tracked in #527.
+   * everything past that, giving the mutation methods a single shared seam.
    *
    * `body` is `undefined` for verb-only mutations (POST with no payload —
    * e.g. `cowork.voiceEphemeralKey`, `tasks.claim`). When set, the helper
