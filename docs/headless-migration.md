@@ -1073,9 +1073,29 @@ choice + reasoning.
 
 | Option | Trade-off |
 |---|---|
-| **SWR** | Small. Stale-while-revalidate + focus-refetch + dedup out of box. Fits ADR-0001 §5's "lists move to polling 2-10s". No mutation-invalidation primitive. |
+| **SWR** | Small. Stale-while-revalidate + focus-refetch + dedup out of box. Fits ADR-0001 §5's "lists move to polling 2-10s". No mutation-invalidation primitive. Standard pick in Next.js ecosystem. |
 | **@tanstack/react-query** | Heavier. Covers mutation invalidation, which post-Phase 4 the UI starts to need (`mediforce.X.create` → invalidate relevant lists). |
-| **Custom helper** | Extend today's `useInstanceTasks` (`useState` + `useEffect` + cancelled flag). Smallest dep footprint; loses dedup + cache. |
+| **Custom helper** | Extend today's `useInstanceTasks` (`useState` + `useEffect` + cancelled flag). Smallest dep footprint; loses dedup + cache. Good fit if most hooks end up one-shot per the live-by-default-fallacy table above. |
+
+**Sane defaults if SWR / react-query picked** — Mediforce single-VPS
+Postgres after ADR-0001 means we have to think about query rate. Default
+config should be:
+
+- `refreshInterval: 0` — polling **off by default**; explicit override
+  per-hook only on the "truly live" list.
+- `revalidateOnFocus: false` — most data isn't time-critical; the user
+  refreshing the tab is the trigger.
+- `dedupingInterval: 1000` — multiple components asking for the same
+  resource within 1s = one request.
+- Conditional fetching for terminal states (e.g. completed runs) — pass
+  `null` key to skip; the polling is wasted on data that won't change.
+
+Postgres-load math at default-polling-off: a list-view tab with 3 live
+hooks × 1s polling = 3 RPS. 10 users × 3 tabs × that load = 90 RPS — well
+under Postgres single-VPS capacity for workspace-indexed `(workspace,
+status, created_at desc)` partial-index lookups. The risk only shows up
+if defaults flip to "polling on for every hook"; the policy above
+prevents that.
 
 **Client shape** — runtime-agnostic, Stripe-style. `Mediforce` class with
 exactly one of three config fields at construction:
@@ -1089,6 +1109,25 @@ Firebase is never imported by `platform-api/client`. Browser wrapper
 `getFirebaseIdToken()` (in `lib/firebase-id-token.ts`), which lazily imports
 Firebase Auth and reads `auth.currentUser.getIdToken()`. Same helper backs
 `apiFetch` — every browser call produces byte-identical auth headers.
+
+**Live-by-default fallacy — most hooks don't actually need live updates.**
+
+Today's hooks use `onSnapshot` not because UX requires live — because
+Firestore gave it for free. Audit each consumer before defaulting to
+polling: a lot of them are fine as one-shot fetch on mount, with manual
+refresh / focus-refetch / mutation-invalidate as the freshness mechanism.
+
+| Truly live (operator notices delay) | Live-by-accident (Firestore default; one-shot fetch is fine) |
+|---|---|
+| Active task list — new tasks appear from agents | Settings page |
+| Running process status — current step indicator | Namespace metadata / role |
+| Agent run page — log lines mid-execution | Workflow / agent definitions list |
+| Cowork chat turns — tool-call bubbles during blocking POST | Audit history |
+| Monitoring dashboard counts | User membership lists |
+| | Archived items |
+
+Default policy: **one-shot on mount, no polling**. Add polling only to the
+left-column hooks. Saves Postgres load + simplifies error surface.
 
 **Migration principle — preserve, don't upgrade.**
 
