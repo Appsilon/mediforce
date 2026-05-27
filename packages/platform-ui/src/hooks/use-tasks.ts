@@ -5,7 +5,7 @@ import { where, orderBy } from 'firebase/firestore';
 import type { HumanTask, CoworkSession } from '@mediforce/platform-core';
 import { useCollection } from './use-collection';
 
-export function useMyTasks(assignedRole: string | null) {
+export function useMyTasks(assignedRole: string | null, currentUserId?: string | null) {
   const constraints = useMemo(
     () =>
       assignedRole
@@ -23,11 +23,20 @@ export function useMyTasks(assignedRole: string | null) {
   const filtered = useMemo(
     () => {
       const notDeleted = data.filter((task) => !task.deleted);
+      // A task with an assignedUserId is scoped to its owner — only that user
+      // sees it. Unassigned (null) tasks stay visible to everyone with the
+      // role. When no currentUserId is supplied (overview widgets), skip the
+      // scoping and show the role-wide queue.
+      const mine = currentUserId
+        ? notDeleted.filter(
+            (task) => task.assignedUserId === null || task.assignedUserId === currentUserId,
+          )
+        : notDeleted;
       return assignedRole
-        ? notDeleted
-        : notDeleted.filter((task) => task.status !== 'completed');
+        ? mine
+        : mine.filter((task) => task.status !== 'completed');
     },
-    [data, assignedRole],
+    [data, assignedRole, currentUserId],
   );
 
   return { data: filtered, loading, error };
