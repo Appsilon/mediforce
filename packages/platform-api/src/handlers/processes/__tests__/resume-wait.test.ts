@@ -12,19 +12,6 @@ import {
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope.js';
 import { noopRunKicker } from '../../../runtime/run-kicker.js';
-import type { CallerScope } from '../../../repositories/caller-scope.js';
-
-function scopeWithEngine(base: CallerScope): CallerScope {
-  return {
-    ...base,
-    system: {
-      ...base.system,
-      engine: {
-        advanceStep: vi.fn().mockResolvedValue({}),
-      } as unknown as CallerScope['system']['engine'],
-    },
-  };
-}
 
 describe('resumeWait handler', () => {
   let instanceRepo: InMemoryProcessInstanceRepository;
@@ -53,13 +40,13 @@ describe('resumeWait handler', () => {
     );
 
     const kicker = noopRunKicker();
-    const baseScope = createTestScope({
+    const scope = createTestScope({
       instanceRepo,
       auditRepo,
       runKicker: kicker,
       caller: userCaller('u-1', ['team-alpha']),
     });
-    const scope = scopeWithEngine(baseScope);
+
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T13:00:00.000Z'));
@@ -97,12 +84,12 @@ describe('resumeWait handler', () => {
       }),
     );
 
-    const baseScope = createTestScope({
+    const scope = createTestScope({
       instanceRepo,
       auditRepo,
       caller: userCaller('u-1', ['team-alpha']),
     });
-    const scope = scopeWithEngine(baseScope);
+
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T15:00:00.000Z'));
@@ -137,13 +124,13 @@ describe('resumeWait handler', () => {
     );
 
     const kicker = noopRunKicker();
-    const baseScope = createTestScope({
+    const scope = createTestScope({
       instanceRepo,
       auditRepo,
       runKicker: kicker,
       caller: userCaller('u-1', ['team-alpha']),
     });
-    const scope = scopeWithEngine(baseScope);
+
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T13:00:00.000Z'));
@@ -177,13 +164,13 @@ describe('resumeWait handler', () => {
     );
 
     const kicker = noopRunKicker();
-    const baseScope = createTestScope({
+    const scope = createTestScope({
       instanceRepo,
       auditRepo,
       runKicker: kicker,
       caller: userCaller('u-1', ['team-alpha']),
     });
-    const scope = scopeWithEngine(baseScope);
+
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
@@ -211,12 +198,12 @@ describe('resumeWait handler', () => {
       }),
     );
 
-    const baseScope = createTestScope({
+    const scope = createTestScope({
       instanceRepo,
       auditRepo,
       caller: userCaller('u-1', ['team-alpha']),
     });
-    const scope = scopeWithEngine(baseScope);
+
 
     await expect(
       resumeWait({ runId: 'inst-running' }, scope),
@@ -233,12 +220,12 @@ describe('resumeWait handler', () => {
       }),
     );
 
-    const baseScope = createTestScope({
+    const scope = createTestScope({
       instanceRepo,
       auditRepo,
       caller: userCaller('u-1', ['team-alpha']),
     });
-    const scope = scopeWithEngine(baseScope);
+
 
     await expect(
       resumeWait({ runId: 'inst-human' }, scope),

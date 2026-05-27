@@ -381,6 +381,18 @@ export async function POST(
             }
 
             const { actionRegistry, engine } = getPlatformServices();
+
+            // Wait actions: if resumeWait already wrote the step output, skip dispatch
+            if (currentStep.action.kind === 'wait') {
+              const preResolved = instance.variables[instance.currentStepId] as Record<string, unknown> | undefined;
+              if (preResolved?.resumeReason) {
+                console.log(`[auto-runner] Wait step '${instance.currentStepId}' already resolved (${preResolved.resumeReason}) — advancing`);
+                await engine.advanceStep(instanceId, preResolved, { id: 'auto-runner', role: 'system' });
+                stepsExecuted++;
+                continue;
+              }
+            }
+
             console.log(`[auto-runner] Executing action step '${instance.currentStepId}' (kind: ${currentStep.action.kind}) on instance '${instanceId}'`);
 
             const previousStepId = workflowDefinition.transitions.find(

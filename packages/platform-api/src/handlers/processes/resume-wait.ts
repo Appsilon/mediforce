@@ -2,7 +2,7 @@ import { evaluateExpression } from '@mediforce/workflow-engine';
 import type { ResumeWaitInput, ResumeWaitOutput } from '../../contract/processes.js';
 import type { CallerScope } from '../../repositories/index.js';
 import { PreconditionFailedError } from '../../errors.js';
-import { loadOr404 } from '../_helpers.js';
+import { actorFromCaller, loadOr404 } from '../_helpers.js';
 
 interface WaitMetadata {
   stepId: string;
@@ -69,16 +69,10 @@ export async function resumeWait(
     updatedAt: now.toISOString(),
   });
 
-  await scope.system.engine.advanceStep(
-    input.runId,
-    waitOutput,
-    { id: 'timer-resume', role: 'system' },
-  );
+  const actor = actorFromCaller(scope, 'scheduler');
 
   await scope.system.audit.append({
-    actorId: 'timer-resume',
-    actorType: 'system',
-    actorRole: 'scheduler',
+    ...actor,
     action: 'instance.wait.resumed',
     description: `Wait action resumed for '${input.runId}' (reason: ${resumeReason}, waited ${waitedSeconds}s)`,
     timestamp: now.toISOString(),
@@ -91,7 +85,7 @@ export async function resumeWait(
     processDefinitionVersion: run.definitionVersion,
   });
 
-  await scope.system.runKicker.kick(input.runId, { triggeredBy: 'timer-resume' });
+  await scope.system.runKicker.kick(input.runId, { triggeredBy: actor.actorId });
 
   return { resumed: true, resumeReason };
 }
