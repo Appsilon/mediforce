@@ -1,126 +1,73 @@
 # Autonomy Levels Refactor
 
-**Status**: Proposed  
+**Status**: Accepted  
 **Author**: Paweł Przytuła  
 **Date**: 2026-05-07
 
 ---
 
+## Scope
+
+This is a **UI-only refactor.** No schema changes, no migration.
+
+The fields `executor` and `autonomyLevel` on workflow steps remain exactly as they are in `platform-core`. `controlMode` is a UI concept only — it is never written to the schema.
+
+---
+
 ## Current State
 
-Every workflow step has an `executor` type and, for agent steps, an optional `autonomyLevel`:
+Every workflow step carries an `executor` type and, for agent steps, an optional `autonomyLevel`:
 
-**Executor types** (`human | agent | script | cowork | action`)
+**Executor types:** `human | agent | script | cowork | action`
 
-**Autonomy levels for agent steps** (`L0 | L1 | L2 | L3 | L4`):
+**Autonomy levels for agent steps:** `L0 | L1 | L2 | L3 | L4`
 
-| Level | Badge label | Runtime behaviour |
-|-------|-------------|------------------|
-| L0 | Observer | Agent runs silently; output not surfaced to workflow |
-| L1 | Shadow | Output stored for comparison only; not shown in workflow |
-| L2 | Annotator | Annotations written to event log; human still decides |
-| L3 | Advisor | Agent recommends; workflow pauses for human approval |
-| L4 | Autopilot | Agent result applied directly; workflow continues |
-
-**Cowork** is a separate executor type with its own session infrastructure (chat and voice-realtime modes). It opens an interactive human-agent workspace that produces a structured artifact before the step completes.
+The current step editor surfaces these raw schema values directly to the user. The combination of "step type" + "executor" that opens the editor is confusing, and the L0–L4 labels carry no inherent meaning for workflow designers.
 
 ---
 
-## Problems with the Current Design
+## New Wizard Flow
 
-### 1. L0–L4 labels are opaque to users
+The step editor is replaced by a three-step wizard.
 
-The numeric labels carry no inherent meaning. A workflow designer configuring a step has to remember what each number means, and different parts of the UI use different label sets for the same levels ("L2 — Auto if confident" vs "L2 — Supervised" vs "Annotator"), which adds to the confusion.
+**Step 1 — Pick a control mode** (replaces the current "step type + executor" combo)
 
-### 2. Three invisible levels are too fine-grained
+**Step 2 — Mode-specific configuration**
 
-L0, L1, and L2 all result in the same outcome from the workflow's perspective: nothing changes, the human still decides. The differences between them (whether the output is stored, and where) are instrumentation concerns, not workflow design decisions. Presenting them as first-class modes clutters the model without adding value for the workflow author.
-
-### 3. The axis conflates two orthogonal concerns
-
-The L0–L4 scale mixes two distinct questions:
-
-- *When does the human see the result?* (L0: never, L1: in logs, L2: as annotation)
-- *Can the human block the workflow from advancing?* (L3: yes, L4: no)
-
-Merging these into a single opaque progression made the levels hard to reason about.
-
-### 4. Cowork is orphaned from the autonomy model
-
-Cowork is the most human-controlled form of agent involvement — the human steers every turn of the conversation — yet it sits in a completely separate `executor` enum, disconnected from the L0–L4 scale. This forces workflow authors to think about two separate configuration axes when really they are answering a single question: *how much control does the human have over this step?*
-
-### 5. The human step type is implicit
-
-There is no explicit "no agent" step type. A human step is simply an agent step with L0, or a step with no agent configuration at all. This makes the default case — a plain human task — harder to express and understand.
+**Step 3 — Pick a step type** (`creation` or `decision`)
 
 ---
 
-## Proposed Solution
+## Control Modes
 
-Replace the `executor` type + `autonomyLevel` pair with a single **control mode** that unifies both concepts into one axis. Remove `cowork` as a separate executor type.
+| Mode | Label | Schema mapping |
+|------|-------|---------------|
+| 0 | No agent | `executor: 'human'` OR `executor: 'script'` OR `executor: 'action'` |
+| 1 | Ghost | `executor: 'agent', autonomyLevel: 'L2'` |
+| 2 | Cowork | `executor: 'cowork'` |
+| 3 | Human review | `executor: 'agent', autonomyLevel: 'L3'` |
+| 4 | Full autonomy | `executor: 'agent', autonomyLevel: 'L4'` |
 
-### New control modes
-
-| Mode | Label | Primary actor | Human role | Agent role |
-|------|-------|--------------|-----------|-----------|
-| 0 | **No agent** | Human | Does the work | None |
-| 1 | **Ghost** | Human | Does the work | Provides a suggestion or draft alongside |
-| 2 | **Cowork** | Both | Drives the session | Responds turn-by-turn in interactive session |
-| 3 | **Human review** | Agent | Reviews and gates the output | Completes the step |
-| 4 | **Full autonomy** | Agent | Audit trail only | Completes the step |
-
-### The unifying axis: who is the primary actor?
-
-The progression from 0 to 4 is a clean handoff of responsibility from human to agent:
-
-- **0 (No agent)**: The agent has no role. This is a pure human task.
-- **1 (Ghost)**: The human does the work. The agent fires once and provides a suggestion or draft that the human can use or ignore. The human completes the step.
-- **2 (Cowork)**: Neither side is primary. The human and agent engage in an interactive session (the current cowork infrastructure) until a structured artifact is produced. The step completes when the human finalises the output.
-- **3 (Human review)**: The agent is primary. It completes the step and produces a result. The workflow pauses — the human reviews and either approves (workflow advances) or rejects.
-- **4 (Full autonomy)**: The agent is primary. Its result is applied immediately. No human involvement in the step itself.
-
-### What gets removed
-
-- The `L0`, `L1`, `L2`, `L3`, `L4` enum and all labels derived from it.
-- The `cowork` executor type (absorbed into mode 2, Cowork).
-- Human-executor `creation` step type (absorbed into mode 0, No agent).
-- The separate `autonomyLevel` field on workflow steps — control mode replaces it entirely.
-
-### What L0/L1/L2 become
-
-The silent-observer and shadow behaviours (current L0–L2) were developer instrumentation, not workflow concepts. If this capability is still needed, it should be expressed as a **debug flag** on any mode — separate from the control model, not part of it. This is out of scope for this refactor.
+The word "executor" is never shown to users in the new flow.
 
 ---
 
-## Scope: What This Refactor Does and Does Not Change
+## Mode-Specific Configuration (Step 2)
 
-This is a **UX and schema rename**, not a backend engine change.
-
-### What changes
-
-- The names and structure of values in workflow definition schemas (e.g. `executor`, `autonomyLevel` → `controlMode`).
-- UI labels, badge text, and any frontend component that renders the current level identifiers.
-- The Firestore migration script that rewrites stored workflow definitions to use the new field names.
-
-### What does not change
-
-- **The Cowork session engine.** The chat and voice-realtime session infrastructure that powers the current `cowork` executor is not being modified. Mode 2 (Cowork) is the same engine — it is only being brought under the unified `controlMode` axis rather than living in a separate `executor` enum. No cowork session logic, state machine, or API contract is touched.
-- **The workflow engine's step execution logic.** The engine already branches on executor type and autonomy level to decide how to run a step. That branching logic stays in place; only the field names it reads will change, in sync with the schema migration.
-- **Agent runtime, plugin infrastructure, or any worker.** Nothing in `agent-runtime`, `container-worker`, or `workflow-engine` internals is being rewritten.
-
-If you maintain any code that reads `executor === 'cowork'` or `autonomyLevel`, the migration section below documents the exact rename. No other change is required.
+- **Mode 0:** "How is this step executed?" → human / script / action (sets `executor` field)
+- **Modes 1, 3, 4:** Agent picker (sets `agentId`)
+- **Mode 2:** Cowork type picker — chat or voice-realtime
 
 ---
 
-## Migration
+## Step Type Picker (Step 3)
 
-This is a **breaking change** to the workflow definition schema. Existing `workflowDefinitions` in Firestore will need to be migrated. Given that production workflows use almost exclusively `L3`, `L4`, and `cowork`, the mapping is straightforward:
+Only `creation` and `decision` are offered when creating new steps. `review` is retained in the schema for backward compatibility but is not available in the wizard. `terminal` is auto-managed by the designer and never appears in the picker.
 
-| Current | Migrates to |
-|---------|-------------|
-| `executor: human` | Mode 0 — No agent |
-| `executor: agent, autonomyLevel: L3` | Mode 3 — Human review |
-| `executor: agent, autonomyLevel: L4` | Mode 4 — Full autonomy |
-| `executor: cowork` | Mode 2 — Cowork |
+---
 
-A one-off migration script will rewrite stored workflow definition versions. Because versions are immutable in Firestore, migration will write new versions rather than mutating existing records.
+## L0 and L1
+
+L0 and L1 are not exposed in any wizard UI. They are instrumentation flags for developer use only, set via raw JSON. This surface is out of scope for this refactor.
+
+If a stored step has `autonomyLevel: 'L0'` or `'L1'`, the wizard silently displays it as Mode 0. No warning is shown. Because control mode is never written back to the schema, the stored value is unchanged.
