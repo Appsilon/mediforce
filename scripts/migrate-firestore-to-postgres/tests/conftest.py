@@ -20,6 +20,28 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 
+# Stub out heavy runtime deps so tests don't require firebase-admin/psycopg2
+# to be installed locally. The scripts only use these for live connections,
+# which we never make in tests.
+def _stub_module(name: str, **attrs: Any) -> None:
+    if name in sys.modules:
+        return
+    mod = MagicMock()
+    for k, v in attrs.items():
+        setattr(mod, k, v)
+    sys.modules[name] = mod
+
+
+_stub_module("firebase_admin")
+_stub_module("firebase_admin.credentials")
+_stub_module("firebase_admin.firestore")
+_stub_module("psycopg2")
+_stub_module("psycopg2.extras")
+_stub_module("google")
+_stub_module("google.cloud")
+_stub_module("google.cloud.firestore")
+
+
 class FakeDoc:
     """Mimics a Firestore DocumentSnapshot just enough for verify.py."""
 
