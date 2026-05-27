@@ -1,5 +1,4 @@
-import { createPostgresClient, PostgresNamespaceRepository } from '@mediforce/platform-infra';
-import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
+import postgres from 'postgres';
 import { TEST_ORG_HANDLE } from './constants';
 import { buildSeedData } from './seed-data';
 
@@ -8,34 +7,60 @@ import { buildSeedData } from './seed-data';
  * seeds written in `auth-setup.ts`. Invoked only when `STORAGE_BACKEND=postgres`
  * so the regular emulator-only `e2e-tests` job is unaffected (ADR-0001 PR2).
  *
- * Reuses `buildSeedData` so the Postgres-side fixture stays byte-for-byte
- * identical to the Firestore-side fixture — no drift between backends.
+ * Uses raw `postgres-js` rather than the `@mediforce/platform-infra` package
+ * because Playwright workers don't resolve the `@mediforce/source` package
+ * exports condition the way `tsx` does at type-check time — importing the
+ * compiled `dist` fails because we don't build it in CI. The fixture is tiny
+ * (one row + one row) so the SQL fits inline.
  *
- * Idempotent: `auth-setup` may run multiple times against the same DB
- * locally. Each entity is pre-checked via the repo before insert.
+ * Reuses `buildSeedData` so the fixture stays byte-identical to the
+ * Firestore-side seed — no drift between backends.
+ *
+ * Idempotent: ON CONFLICT DO NOTHING for the workspace, ON CONFLICT DO UPDATE
+ * for the member (matches the Postgres NamespaceRepository.addMember
+ * semantic).
  */
 export async function seedPostgresNamespace(testUserId: string): Promise<void> {
-  const { client, db } = createPostgresClient();
-  try {
-    const repo = new PostgresNamespaceRepository(db);
-    const data = buildSeedData(testUserId);
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to seed Postgres for E2E.');
+  }
 
-    const namespaceFixture = data.namespaces[TEST_ORG_HANDLE];
-    if (!namespaceFixture) {
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    const data = buildSeedData(testUserId);
+    const namespace = data.namespaces[TEST_ORG_HANDLE];
+    if (!namespace) {
       throw new Error(`buildSeedData has no fixture for handle "${TEST_ORG_HANDLE}"`);
     }
-    const namespace = namespaceFixture as unknown as Namespace;
-    const existing = await repo.getNamespace(namespace.handle);
-    if (!existing) {
-      await repo.createNamespace(namespace);
-    }
 
-    for (const memberFixture of Object.values(data.namespaceMembers)) {
-      const member = memberFixture as unknown as NamespaceMember;
-      // addMember is upsert in the Postgres repo — safe to call unconditionally.
-      await repo.addMember(namespace.handle, member);
+    await sql`
+      INSERT INTO workspaces (handle, type, display_name, linked_user_id, created_at)
+      VALUES (
+        ${namespace.handle as string},
+        ${namespace.type as string},
+        ${namespace.displayName as string},
+        ${(namespace.linkedUserId as string | undefined) ?? null},
+        ${namespace.createdAt as string}
+      )
+      ON CONFLICT (handle) DO NOTHING
+    `;
+
+    for (const member of Object.values(data.namespaceMembers)) {
+      await sql`
+        INSERT INTO workspace_members (workspace, uid, role, joined_at)
+        VALUES (
+          ${TEST_ORG_HANDLE},
+          ${member.uid as string},
+          ${member.role as string},
+          ${member.joinedAt as string}
+        )
+        ON CONFLICT (workspace, uid) DO UPDATE SET
+          role = EXCLUDED.role,
+          joined_at = EXCLUDED.joined_at
+      `;
     }
   } finally {
-    await client.end({ timeout: 5 });
+    await sql.end({ timeout: 5 });
   }
 }
