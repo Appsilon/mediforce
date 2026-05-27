@@ -106,6 +106,7 @@ describe('createRouteAdapter', () => {
     expect(await res.json()).toEqual({ id: 'agent-1' });
   });
 
+
   it('short-circuits with the 401 response returned by resolveCaller', async () => {
     const handler = vi.fn();
     const unauthorized = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -180,7 +180,7 @@ describe('POST /api/admin/oauth-providers', () => {
     const res = await POST(makePostRequest('appsilon', providerInput));
     const json = await res.json();
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(json.provider.id).toBe('github');
     expect(mockProviderCreate).toHaveBeenCalledWith('appsilon', providerInput);
   });

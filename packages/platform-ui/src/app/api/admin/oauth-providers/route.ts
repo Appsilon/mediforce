@@ -34,4 +34,5 @@ export const POST = createRouteAdapter<
     };
   },
   createOAuthProvider,
+  { successStatus: 201 },
 );

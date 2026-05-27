@@ -322,7 +322,7 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
   it('[JOURNEY] admin registers GitHub provider, user connects, disconnects, reconnects, and revokes', async () => {
     // 1. Admin creates the OAuth provider config.
     const createRes = await adminCreateProvider('appsilon', providerCreateInput);
-    expect(createRes.status).toBe(200);
+    expect(createRes.status).toBe(201);
     const created = (await createRes.json()) as { provider: OAuthProviderConfig };
     expect(created.provider.id).toBe('github');
 
