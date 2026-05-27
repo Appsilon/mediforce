@@ -447,9 +447,8 @@ export async function POST(
                 const waitMeta = output.__wait;
                 if (waitMeta.stepId === instance.currentStepId) {
                   await instanceRepo.updateStepExecution(instanceId, executionId, {
-                    status: 'completed',
-                    output,
-                    completedAt: new Date().toISOString(),
+                    status: 'paused',
+                    output: null,
                   });
                   await instanceRepo.update(instanceId, {
                     status: 'paused',

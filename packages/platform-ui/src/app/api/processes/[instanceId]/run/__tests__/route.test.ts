@@ -542,6 +542,76 @@ describe('POST /api/processes/[instanceId]/run', () => {
     });
   });
 
+  describe('action executor: wait', () => {
+    const waitWorkflow = {
+      name: 'team-pulse',
+      version: 1,
+      namespace: 'test-ns',
+      steps: [
+        {
+          id: 'pause',
+          name: 'Pause',
+          type: 'creation',
+          executor: 'action',
+          action: { kind: 'wait', config: { duration: { hours: 1 } } },
+        },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'pause', to: 'done' }],
+    };
+
+    it('[DATA] wait sentinel pauses the instance without completing the step or advancing', async () => {
+      mockInstanceGetById.mockResolvedValue({
+        id: 'inst-1', namespace: 'test-ns', definitionName: 'team-pulse', definitionVersion: '1',
+        status: 'running', currentStepId: 'pause', configName: undefined,
+        variables: {},
+        triggerPayload: {},
+      });
+      mockGetWorkflowDefinition.mockResolvedValue(waitWorkflow);
+
+      const waitSentinel = {
+        __wait: {
+          stepId: 'pause',
+          resumeAt: '2026-06-01T13:00:00.000Z',
+          pausedAt: '2026-06-01T12:00:00.000Z',
+          mode: 'duration',
+        },
+      };
+      mockActionDispatch.mockResolvedValue(waitSentinel);
+
+      const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
+
+      // Step execution recorded as paused with no output — the resolved output
+      // only materialises on resume (write-once), never the raw sentinel.
+      expect(mockInstanceUpdateStepExecution).toHaveBeenCalledWith(
+        'inst-1',
+        expect.any(String),
+        expect.objectContaining({ status: 'paused', output: null }),
+      );
+      expect(mockInstanceUpdateStepExecution).not.toHaveBeenCalledWith(
+        'inst-1',
+        expect.any(String),
+        expect.objectContaining({ status: 'completed' }),
+      );
+
+      // Instance paused on the timer reason, carrying the __wait metadata.
+      expect(mockInstanceUpdate).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({
+          status: 'paused',
+          pauseReason: 'waiting_for_timer',
+          variables: expect.objectContaining({ __wait: waitSentinel.__wait }),
+        }),
+      );
+
+      // Paused, not advanced — the wait step stays current until resume.
+      expect(mockAdvanceStep).not.toHaveBeenCalled();
+    });
+  });
+
   describe('basic guards', () => {
     it('[ERROR] returns 404 when instance not found', async () => {
       mockInstanceGetById.mockResolvedValue(null);
