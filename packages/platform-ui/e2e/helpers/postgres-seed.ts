@@ -197,10 +197,11 @@ export async function seedPostgresNamespace(testUserId: string): Promise<void> {
       const workspace = (parent?.namespace as string | undefined) ?? TEST_ORG_HANDLE;
       await sql`
         INSERT INTO human_tasks (
-          workspace, process_instance_id, step_id, assigned_role,
+          id, workspace, process_instance_id, step_id, assigned_role,
           assigned_user_id, status, deadline, completion_data, completed_at,
           ui, creation_reason, created_at, updated_at
         ) VALUES (
+          ${task.id as string},
           ${workspace},
           ${task.processInstanceId as string},
           ${task.stepId as string},
@@ -215,6 +216,7 @@ export async function seedPostgresNamespace(testUserId: string): Promise<void> {
           ${task.createdAt as string},
           ${task.updatedAt as string}
         )
+        ON CONFLICT (id) DO NOTHING
       `;
     }
 
