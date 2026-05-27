@@ -68,6 +68,10 @@ import {
   GetWorkspaceSecretPreviewsOutputSchema,
   ListWorkflowSecretKeysBatchInputSchema,
   ListWorkflowSecretKeysBatchOutputSchema,
+  GetWorkflowSecretsFullInputSchema,
+  GetWorkflowSecretsFullOutputSchema,
+  SaveWorkflowSecretsInputSchema,
+  SaveWorkflowSecretsOutputSchema,
   GetProcessInputSchema,
   GetProcessOutputSchema,
   ListAuditEventsInputSchema,
@@ -178,6 +182,10 @@ import {
   type GetWorkspaceSecretPreviewsOutput,
   type ListWorkflowSecretKeysBatchInput,
   type ListWorkflowSecretKeysBatchOutput,
+  type GetWorkflowSecretsFullInput,
+  type GetWorkflowSecretsFullOutput,
+  type SaveWorkflowSecretsInput,
+  type SaveWorkflowSecretsOutput,
   ListModelsInputSchema,
   ListModelsOutputSchema,
   GetModelInputSchema,
@@ -394,6 +402,11 @@ export class Mediforce {
     workflowKeysBatch: (
       input: ListWorkflowSecretKeysBatchInput,
     ) => Promise<ListWorkflowSecretKeysBatchOutput>;
+  };
+
+  readonly workflowSecrets: {
+    values: (input: GetWorkflowSecretsFullInput) => Promise<GetWorkflowSecretsFullOutput>;
+    save: (input: SaveWorkflowSecretsInput) => Promise<SaveWorkflowSecretsOutput>;
   };
 
   readonly system: {
@@ -1004,6 +1017,33 @@ export class Mediforce {
         const res = await this.request(`/api/workflow-secrets/keys-batch${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.secrets.workflowKeysBatch');
         return ListWorkflowSecretKeysBatchOutputSchema.parse(body);
+      },
+    };
+
+    this.workflowSecrets = {
+      values: async (input) => {
+        const validated = GetWorkflowSecretsFullInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflow: validated.workflow,
+        });
+        const res = await this.request(`/api/workflow-secrets/values${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.workflowSecrets.values');
+        return GetWorkflowSecretsFullOutputSchema.parse(body);
+      },
+      save: async (input) => {
+        const validated = SaveWorkflowSecretsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflow: validated.workflow,
+        });
+        const res = await this.request(`/api/workflow-secrets/values${qs}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secrets: validated.secrets }),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.workflowSecrets.save');
+        return SaveWorkflowSecretsOutputSchema.parse(body);
       },
     };
 

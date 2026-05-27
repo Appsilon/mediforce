@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/auth-context';
 import { Save } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
@@ -24,7 +23,6 @@ type SaveState =
 export default function WorkflowDefinitionVersionPage() {
   const { name, version, handle } = useParams<{ name: string; version: string; handle: string }>();
   const router = useRouter();
-  const { firebaseUser } = useAuth();
   const decodedName = decodeURIComponent(name);
   const versionNumber = parseInt(version, 10);
 
@@ -225,7 +223,6 @@ export default function WorkflowDefinitionVersionPage() {
         initialTransitions={definition.transitions}
         workflowName={decodedName}
         namespace={handle}
-        userId={firebaseUser?.uid}
         yamlFields={{ ...definition, version: undefined, createdAt: undefined } as Record<string, unknown>}
         onChange={handleCanvasChange}
         stepErrors={stepErrors}

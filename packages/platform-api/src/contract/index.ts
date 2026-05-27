@@ -192,6 +192,10 @@ export {
   SecretPreviewSchema,
   ListWorkflowSecretKeysBatchInputSchema,
   ListWorkflowSecretKeysBatchOutputSchema,
+  GetWorkflowSecretsFullInputSchema,
+  GetWorkflowSecretsFullOutputSchema,
+  SaveWorkflowSecretsInputSchema,
+  SaveWorkflowSecretsOutputSchema,
   type SetSecretInput,
   type SetSecretOutput,
   type ListSecretKeysInput,
@@ -203,6 +207,10 @@ export {
   type SecretPreview,
   type ListWorkflowSecretKeysBatchInput,
   type ListWorkflowSecretKeysBatchOutput,
+  type GetWorkflowSecretsFullInput,
+  type GetWorkflowSecretsFullOutput,
+  type SaveWorkflowSecretsInput,
+  type SaveWorkflowSecretsOutput,
 } from './secrets.js';
 
 export {

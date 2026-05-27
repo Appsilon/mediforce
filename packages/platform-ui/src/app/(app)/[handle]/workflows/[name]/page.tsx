@@ -532,7 +532,6 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
               <WorkflowSecretsEditor
                 namespace={handle}
                 workflowName={decodedName}
-                userId={firebaseUser.uid}
                 suggestedKeys={setupKeys}
               />
             )}
