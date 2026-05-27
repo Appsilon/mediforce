@@ -1267,6 +1267,12 @@ def _render_compose_env(ctx: Context) -> str:
         f"DOMAIN={_caddy_site(ctx)}",
         "",
     ]
+    extras = ctx.collected.get("_remote_env_extras") or {}
+    if extras:
+        lines.append("# Preserved from existing remote .env (manually added, not managed by bootstrap)")
+        for key in sorted(extras):
+            lines.append(f"{key}={extras[key]}")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -1304,6 +1310,60 @@ def _preview_env(rendered: str) -> str:
     return "\n".join(out_lines)
 
 
+def _fetch_remote_compose_env(ctx: Context) -> Optional[dict[str, str]]:
+    """Read /opt/mediforce/.env from the server, return KEY=VALUE pairs.
+
+    Returns:
+      - dict (possibly empty) when the file exists and was parsed successfully
+      - None when the file does not exist (fresh server)
+
+    Raises RuntimeError on any other failure (network drop, permission
+    issue). Distinguishing "missing" from "probe failed" is load-bearing:
+    silently treating an SSH error as "no existing keys" would cause
+    _ensure_api_keys to regenerate PLATFORM_API_KEY + SECRETS_ENCRYPTION_KEY,
+    and the subsequent upload would clobber the live file — destroying
+    every stored workflow secret. Caller must check for None and decide
+    whether a fresh-server flow is appropriate before proceeding.
+
+    Strips surrounding whitespace and unwraps a single layer of matching
+    quotes — matches docker compose's own .env parser. `partition("=")`
+    handles `FOO=bar=baz` correctly (split on first `=` only).
+    """
+    remote_path = f"{REMOTE_DEPLOY_DIR}/.env"
+    # Probe must distinguish "file truly missing" from "ssh/cat failed":
+    #   - File missing: explicit sentinel on stdout, rc=0
+    #   - File present + readable: file contents, rc=0
+    #   - Anything else (permission denied, ssh fail): rc != 0 → raise
+    script = (
+        f"if [ ! -f {shlex.quote(remote_path)} ]; then "
+        "echo __BOOTSTRAP_ENV_MISSING__; exit 0; "
+        f"fi; cat {shlex.quote(remote_path)}"
+    )
+    probe = ssh(ctx, script)
+    if probe.rc != 0:
+        raise RuntimeError(
+            f"probe of {remote_path} failed (rc={probe.rc}): {probe.stderr.strip() or '<no stderr>'}. "
+            "Refusing to proceed — silently treating this as 'fresh server' would regenerate "
+            "SECRETS_ENCRYPTION_KEY and corrupt the live .env. Investigate the SSH connection "
+            "or remote file permissions, then retry."
+        )
+    if probe.stdout.strip().startswith("__BOOTSTRAP_ENV_MISSING__"):
+        return None
+    parsed: dict[str, str] = {}
+    for line in probe.stdout.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
+            val = val[1:-1]
+        if key:
+            parsed[key] = val
+    return parsed
+
+
 def _upload_env_file(ctx: Context, rendered: str, remote_path: str) -> None:
     with tempfile.NamedTemporaryFile("w", delete=False) as tf:
         tf.write(rendered)
@@ -1325,7 +1385,55 @@ def _ensure_api_keys(ctx: Context) -> None:
     API keys are intentionally not persisted to local state — this is the
     authoritative place where they are collected, and step_env_local calls
     through here on resumed runs (when --from-step skipped step_api_keys).
+
+    On a re-run against an already-bootstrapped server, hydrate from the
+    existing remote .env first so existing PLATFORM_API_KEY /
+    SECRETS_ENCRYPTION_KEY / OPENROUTER_API_KEY values are preserved
+    verbatim — regenerating SECRETS_ENCRYPTION_KEY would make every stored
+    workflow secret unrecoverable, so this hydration is load-bearing.
     """
+    remote_env = _fetch_remote_compose_env(ctx)
+    if remote_env is None:
+        info("No existing /opt/mediforce/.env on server — fresh-server flow.")
+    else:
+        hydrated_keys = []
+        for key in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "PLATFORM_API_KEY",
+                    "SECRETS_ENCRYPTION_KEY", "POSTGRES_PASSWORD"):
+            # _render_compose_env writes OPENROUTER as DOCKER_OPENROUTER_API_KEY;
+            # the in-memory key keeps its un-prefixed name, so map back here.
+            remote_key = "DOCKER_OPENROUTER_API_KEY" if key == "OPENROUTER_API_KEY" else key
+            existing = remote_env.get(remote_key, "")
+            if existing and key not in ctx.collected:
+                ctx.collected[key] = existing
+                hydrated_keys.append(key)
+        if hydrated_keys:
+            ok(f"hydrated from remote /opt/mediforce/.env: {', '.join(hydrated_keys)}")
+        # Stash any keys the bootstrap script does NOT manage (e.g. MAILGUN_*,
+        # operator-added overrides) so step_env_local can carry them through
+        # to the re-rendered file. Without this, the scp upload would silently
+        # drop manually-added entries.
+        managed_keys = {
+            "NEXT_PUBLIC_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+            "NEXT_PUBLIC_FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+            "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", "NEXT_PUBLIC_FIREBASE_APP_ID",
+            "NEXT_PUBLIC_APP_URL", "PLATFORM_API_KEY", "SECRETS_ENCRYPTION_KEY",
+            "DOCKER_OPENROUTER_API_KEY", "DOCKER_DEEPSEEK_API_KEY",
+            "POSTGRES_PASSWORD", "DOMAIN",
+        }
+        extras = {k: v for k, v in remote_env.items() if k not in managed_keys}
+        if extras:
+            ctx.collected["_remote_env_extras"] = extras
+            info(f"preserving {len(extras)} unmanaged key(s) from remote .env: {', '.join(sorted(extras))}")
+        # Loud guard against the silent-loss case: file existed but contained
+        # no managed keys (truncated? corrupted?). Better to abort than to
+        # treat an empty file as "fresh server".
+        if not hydrated_keys and not extras:
+            raise RuntimeError(
+                f"remote /opt/mediforce/.env exists but parsed to 0 known keys "
+                f"({len(remote_env)} total entries). Inspect the file before re-running — "
+                "regenerating from scratch would corrupt existing deployment secrets."
+            )
+
     if not ctx.collected.get("OPENROUTER_API_KEY"):
         ctx.collected["OPENROUTER_API_KEY"] = ask(
             "OpenRouter API key (starts with sk-or-…) — get one at https://openrouter.ai/keys",

@@ -268,46 +268,53 @@ pnpm dev:no-docker
 
 ## Staging / production ops (Postgres)
 
-`docker-compose.prod.yml` now ships a `postgres:16-alpine` service alongside
-Redis. Before the next staging deploy, the operator must add the following to
-`/opt/mediforce/.env` on the host:
+`docker-compose.prod.yml` ships a `postgres:16-alpine` service alongside
+Redis. The host needs two things before `platform-ui` will start:
+
+1. `POSTGRES_PASSWORD` set in `/opt/mediforce/.env` (no default — required).
+   `POSTGRES_USER` + `POSTGRES_DB` default to `mediforce`.
+2. `/var/lib/mediforce/postgres-data` exists on the host, owned by UID
+   999 (the postgres-alpine user). `docker-compose.staging.yml` bind-mounts
+   that path so `docker compose down -v` cannot wipe data — only an
+   explicit `rm -rf` removes it. Local dev keeps a named volume, so
+   `docker compose down -v` is still a normal reset workflow on a
+   developer machine.
+
+Both are handled by **`scripts/bootstrap-server.py`** — the same tool that
+provisions a fresh server. It generates `POSTGRES_PASSWORD` if missing,
+writes it into `/opt/mediforce/.env`, and creates the bind-mount dir with
+the right ownership. The script is idempotent: re-running against an
+already-bootstrapped server reads the existing remote `.env`, hydrates
+managed keys (`PLATFORM_API_KEY`, `SECRETS_ENCRYPTION_KEY`,
+`DOCKER_OPENROUTER_API_KEY`, `POSTGRES_PASSWORD`), preserves any
+unmanaged operator-added keys verbatim, and only generates **missing**
+values. Firebase config comes from local state (`~/.mediforce/`). The
+SSH probe fails loudly if the remote `.env` can't be read, rather than
+silently treating it as "fresh server" — that path would regenerate
+`SECRETS_ENCRYPTION_KEY` and make every stored workflow secret
+unrecoverable.
 
 ```bash
-POSTGRES_PASSWORD=<strong, random>            # required when STORAGE_BACKEND=postgres
-# Optional (sensible defaults provided):
-POSTGRES_USER=mediforce
-POSTGRES_DB=mediforce
-# Flip when ready to cut over (default firestore — keeps Postgres dormant):
-# STORAGE_BACKEND=postgres
+# Always dry-run first against an existing deployment.
+python3 scripts/bootstrap-server.py \
+  --host staging.mediforce.example --user deploy \
+  --from-step api_keys --dry-run
 ```
 
-Add the matching GitHub secrets so the deploy script can render the host
-`.env`:
+`platform-ui` runs Drizzle migrations on every container start via
+[`packages/platform-infra/scripts/migrate.mjs`](packages/platform-infra/scripts/migrate.mjs)
+(idempotent via the `drizzle.__drizzle_migrations` ledger). No separate
+migration step in the deploy pipeline.
 
-- `STAGING_POSTGRES_PASSWORD` (mandatory)
-- `STAGING_STORAGE_BACKEND` (optional override; otherwise the deploy keeps
-  the default `firestore`)
+`STORAGE_BACKEND` defaults to `firestore` until the ADR-0001 §8 data
+cutover. Until then, Postgres runs on staging but the app routes only
+`tool-catalog` reads/writes through it (when the flag is flipped).
 
-`docker-compose.staging.yml` overrides the Postgres volume to a host bind
-mount at `/var/lib/mediforce/postgres-data`. Effect: `docker compose down
--v` cannot wipe staging data (the `-v` flag removes only Docker-managed
-volumes, never bind mounts). Removing data requires a deliberate `rm
--rf` against the host path. Operator must create the directory once with
-the correct ownership before the first `up`:
-
-```bash
-sudo mkdir -p /var/lib/mediforce/postgres-data
-sudo chown -R 999:999 /var/lib/mediforce/postgres-data   # postgres-alpine UID
-```
-
-Local-dev `docker-compose.yml` keeps the named volume — `docker compose
-down -v` is a normal reset workflow on a developer machine.
-
-The platform-ui container `CMD` wraps the app with
-[`packages/platform-infra/scripts/migrate.mjs`](packages/platform-infra/scripts/migrate.mjs):
-pending Drizzle migrations are applied before `server.js` starts (idempotent
-via drizzle's `drizzle.__drizzle_migrations` ledger). No separate migration
-step in the deploy pipeline.
+> **Current cutover (one-off):** existing staging needs the prep run
+> once before PR #515 lands. See
+> [`docs/staging-postgres-prep.md`](docs/staging-postgres-prep.md). That
+> file gets deleted after the cutover succeeds — long-term ops content
+> stays here.
 
 ## Deep Dives
 
