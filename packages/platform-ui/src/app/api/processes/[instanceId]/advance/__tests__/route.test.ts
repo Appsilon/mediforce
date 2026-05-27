@@ -120,6 +120,7 @@ describe('advance route', () => {
       kind: 'user',
       uid: 'outsider',
       namespaces: new Set(['other-ns']),
+      namespaceRoles: new Map([['other-ns', 'member']]),
       isSystemActor: false,
     });
 

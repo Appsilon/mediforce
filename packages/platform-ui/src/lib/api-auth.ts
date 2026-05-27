@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth } from '@mediforce/platform-infra';
-import type { FirestoreNamespaceRepository } from '@mediforce/platform-infra';
+import type { NamespaceRepository } from '@mediforce/platform-core';
 import type { CallerIdentity } from '@mediforce/platform-api/auth';
 
 // Re-export the canonical type from platform-api so route handlers can import
@@ -21,11 +21,22 @@ export { callerCanAccess, assertNamespaceAccess, filterByCaller } from '@medifor
  */
 export async function resolveCallerIdentity(
   request: Request,
-  namespaceRepo: FirestoreNamespaceRepository,
+  namespaceRepo: NamespaceRepository,
 ): Promise<CallerIdentity | NextResponse> {
+  // Both PLATFORM_API_KEY and PLATFORM_ADMIN_API_KEY mint the same apiKey
+  // shape — the historic tier-split (used to gate oauth-providers + docker-
+  // images at the route layer) collapses into a single `isSystemActor` flag
+  // per Phase 2.6 of the headless-platform-API migration. Per-user PATs
+  // (#376) supersede the distinction entirely; until then both keys are
+  // operator-issued and trusted.
   const apiKey = request.headers.get('X-Api-Key');
   const expectedKey = process.env.PLATFORM_API_KEY;
-  if (apiKey && expectedKey && apiKey === expectedKey) {
+  const adminKey = process.env.PLATFORM_ADMIN_API_KEY;
+  const apiKeyMatchesPrimary =
+    apiKey !== null && apiKey !== '' && expectedKey !== undefined && expectedKey !== '' && apiKey === expectedKey;
+  const apiKeyMatchesAdmin =
+    apiKey !== null && apiKey !== '' && adminKey !== undefined && adminKey !== '' && apiKey === adminKey;
+  if (apiKeyMatchesPrimary || apiKeyMatchesAdmin) {
     return { kind: 'apiKey', isSystemActor: true };
   }
 
@@ -43,11 +54,12 @@ export async function resolveCallerIdentity(
     return NextResponse.json({ error: 'Unauthorized — invalid token' }, { status: 401 });
   }
 
-  const namespaces = await namespaceRepo.getNamespacesByUser(uid);
+  const memberships = await namespaceRepo.getMembershipsForUser(uid);
   return {
     kind: 'user',
     uid,
-    namespaces: new Set(namespaces.map((ns) => ns.handle)),
+    namespaces: new Set(memberships.map((m) => m.handle)),
+    namespaceRoles: new Map(memberships.map((m) => [m.handle, m.role] as const)),
     isSystemActor: false,
   };
 }

@@ -29,6 +29,7 @@ import type { CallerIdentity } from '../../auth.js';
 import type { CallerScope } from '../caller-scope.js';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope.js';
 import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker.js';
+import type { InviteNotificationService, InviteService } from '../../services/invite-notification.js';
 
 class InMemoryAgentRunRepository implements AgentRunRepository {
   private readonly byId = new Map<string, AgentRun>();
@@ -105,6 +106,9 @@ const stubNamespaceRepo: NamespaceRepository = {
     return [];
   },
   async getUserNamespaces() {
+    return [];
+  },
+  async getMembershipsForUser() {
     return [];
   },
 };
@@ -195,6 +199,8 @@ export interface TestScopeOverrides {
   readonly secretsRepo?: WorkflowSecretsRepository;
   readonly namespaceSecretsRepo?: NamespaceSecretsRepository;
   readonly runKicker?: RunKicker;
+  readonly inviteService?: InviteService | null;
+  readonly inviteNotificationService?: InviteNotificationService | null;
 }
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
@@ -240,11 +246,34 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     webhookRouter: null as unknown as CallerScopeServices['webhookRouter'],
     agentRunner: null as unknown as CallerScopeServices['agentRunner'],
     runKicker: overrides.runKicker ?? noopRunKicker(),
+    inviteService: overrides.inviteService ?? null,
+    inviteNotificationService: overrides.inviteNotificationService ?? null,
   };
   return createCallerScope(services, caller);
 }
 
-/** Construct a user caller with the given namespace memberships. */
-export function userCaller(uid: string, namespaces: readonly string[]): CallerIdentity {
-  return { kind: 'user', uid, namespaces: new Set(namespaces), isSystemActor: false };
+/**
+ * Construct a user caller with the given namespace memberships.
+ *
+ * Roles default to `'member'` per namespace — callers that need owner/admin
+ * pass an explicit `roles` map. This default keeps every pre-Phase-2.6 test
+ * site (which never knew about roles) working without modification while
+ * still producing a fully-shaped `CallerIdentity.namespaceRoles`.
+ */
+export function userCaller(
+  uid: string,
+  namespaces: readonly string[],
+  roles?: ReadonlyMap<string, 'owner' | 'admin' | 'member'>,
+): CallerIdentity {
+  const namespaceRoles = new Map<string, 'owner' | 'admin' | 'member'>();
+  for (const handle of namespaces) {
+    namespaceRoles.set(handle, roles?.get(handle) ?? 'member');
+  }
+  return {
+    kind: 'user',
+    uid,
+    namespaces: new Set(namespaces),
+    namespaceRoles,
+    isSystemActor: false,
+  };
 }

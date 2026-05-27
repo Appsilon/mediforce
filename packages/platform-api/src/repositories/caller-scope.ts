@@ -13,6 +13,7 @@ import type {
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
 import type { RunKicker } from '../runtime/run-kicker.js';
+import type { InviteNotificationService, InviteService } from '../services/invite-notification.js';
 import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
 import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
 import type { AuthorizedAgentRunRepository } from './authorized-agent-run-repository.js';
@@ -103,4 +104,16 @@ export interface SystemServices {
    */
   readonly audit: AuditRepository;
   readonly runKicker: RunKicker;
+  /**
+   * Invite-flow surface (Firebase Auth user creation + password reset). `null`
+   * when not wired; Wave 5/6 handlers (users/invite, users/resend-invite)
+   * throw `PreconditionFailedError` in that case.
+   */
+  readonly inviteService: InviteService | null;
+  /**
+   * Invite/workspace email surface. `null` when Mailgun env vars are unset —
+   * handlers detect that and skip email delivery while still returning the
+   * temporary password (matching today's behavior).
+   */
+  readonly inviteNotificationService: InviteNotificationService | null;
 }

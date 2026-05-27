@@ -15,6 +15,7 @@ import {
   FirestoreModelRegistryRepository,
   FirestoreWorkflowSecretsRepository,
   FirestoreNamespaceSecretsRepository,
+  FirebaseInviteService,
   getAdminFirestore,
   validateSecretsKey,
   createMailgunSender,
@@ -22,6 +23,15 @@ import {
   FirebaseUserDirectoryService,
   getAdminAuth,
 } from '@mediforce/platform-infra';
+import type { SendEmailFn } from '@mediforce/platform-core';
+import { sendInviteEmail, sendWorkspaceNotificationEmail } from './invite-emails.js';
+import type {
+  InviteNotificationService,
+  InviteService,
+  InvitedUser,
+  SendInviteEmailInput,
+  SendWorkspaceNotificationEmailInput,
+} from './invite-notification.js';
 import type { CronTriggerStateRepository } from '@mediforce/platform-core';
 import {
   WorkflowEngine,
@@ -79,6 +89,98 @@ export interface PlatformServices {
   modelRegistryRepo: FirestoreModelRegistryRepository;
   secretsRepo: FirestoreWorkflowSecretsRepository;
   namespaceSecretsRepo: FirestoreNamespaceSecretsRepository;
+  inviteService: InviteService;
+  /** `null` when Mailgun env vars are unset (email disabled). */
+  inviteNotificationService: InviteNotificationService | null;
+}
+
+/**
+ * Narrow ports used by the invite-service adapter. Defined here so this file
+ * doesn't import `firebase-admin/*` directly — that dependency stays inside
+ * `platform-infra`. `getAdminAuth()` returns an `Auth` that satisfies the
+ * `AuthPort` shape structurally.
+ */
+interface UserRecordPort {
+  readonly email?: string;
+  readonly metadata: { readonly lastSignInTime: string | null };
+}
+interface AuthPort {
+  getUser(uid: string): Promise<UserRecordPort>;
+}
+interface DocSnapshotPort {
+  readonly exists: boolean;
+  data(): { readonly mustChangePassword?: boolean } | undefined;
+}
+interface DocRefPort {
+  get(): Promise<DocSnapshotPort>;
+}
+interface CollectionPort {
+  doc(id: string): DocRefPort;
+}
+interface FirestorePort {
+  collection(name: string): CollectionPort;
+}
+
+/**
+ * Adapts `FirebaseInviteService` onto the framework-free `InviteService`
+ * interface Wave 5/6 handlers consume. Adds `getUserEmail` + `isInvitePending`
+ * directly here so the Firebase service stays focused on writes.
+ */
+class FirebaseInviteServiceAdapter implements InviteService {
+  constructor(
+    private readonly firebase: FirebaseInviteService,
+    private readonly adminAuth: AuthPort,
+    private readonly adminDb: FirestorePort,
+  ) {}
+
+  async createInvitedUser(email: string, displayName: string | undefined): Promise<InvitedUser> {
+    return this.firebase.createInvitedUser(email, displayName, undefined);
+  }
+
+  async resetInvitePassword(uid: string): Promise<string> {
+    return this.firebase.resetInvitePassword(uid);
+  }
+
+  async getUserEmail(uid: string): Promise<string | null> {
+    try {
+      const record = await this.adminAuth.getUser(uid);
+      const email = record.email;
+      return typeof email === 'string' && email !== '' ? email : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async isInvitePending(uid: string): Promise<boolean> {
+    let lastSignInTime: string | null = '';
+    try {
+      const record = await this.adminAuth.getUser(uid);
+      lastSignInTime = record.metadata.lastSignInTime;
+    } catch {
+      // Treat unknown users as not pending — handlers will surface a 404.
+      return false;
+    }
+    const userDoc = await this.adminDb.collection('users').doc(uid).get();
+    const mustChangePassword = userDoc.exists ? userDoc.data()?.mustChangePassword === true : false;
+    const hasNeverSignedIn = lastSignInTime === null || lastSignInTime === '';
+    return mustChangePassword || hasNeverSignedIn;
+  }
+}
+
+/**
+ * Adapts the Mailgun `SendEmailFn` into the `InviteNotificationService`
+ * interface — delegates to the existing pure email-body helpers.
+ */
+class MailgunInviteNotificationService implements InviteNotificationService {
+  constructor(private readonly sendEmail: SendEmailFn) {}
+
+  async sendInviteEmail(input: SendInviteEmailInput): Promise<void> {
+    await sendInviteEmail(input, this.sendEmail);
+  }
+
+  async sendWorkspaceNotificationEmail(input: SendWorkspaceNotificationEmailInput): Promise<void> {
+    await sendWorkspaceNotificationEmail(input, this.sendEmail);
+  }
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -200,6 +302,13 @@ export function getPlatformServices(): PlatformServices {
 
   const webhookRouter = new WebhookRouter(engine, processRepo);
 
+  const adminAuth = getAdminAuth();
+  const firebaseInvite = new FirebaseInviteService(adminAuth, db);
+  const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, db);
+  const inviteNotificationService = mailgunSender
+    ? new MailgunInviteNotificationService(mailgunSender)
+    : null;
+
   services = {
     engine,
     manualTrigger,
@@ -225,6 +334,8 @@ export function getPlatformServices(): PlatformServices {
     modelRegistryRepo,
     secretsRepo,
     namespaceSecretsRepo,
+    inviteService,
+    inviteNotificationService,
   };
 
   if (!seedingStarted) {

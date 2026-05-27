@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextResponse } from 'next/server';
 
 const mockVerifyIdToken = vi.fn();
-const mockGetNamespacesByUser = vi.fn();
+const mockGetMembershipsForUser = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
@@ -17,7 +17,7 @@ import {
 } from '../api-auth';
 
 const fakeNamespaceRepo = {
-  getNamespacesByUser: mockGetNamespacesByUser,
+  getMembershipsForUser: mockGetMembershipsForUser,
 } as never;
 
 function makeRequest(headers: Record<string, string>): Request {
@@ -28,11 +28,21 @@ describe('resolveCallerIdentity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.PLATFORM_API_KEY = 'test-api-key';
+    delete process.env.PLATFORM_ADMIN_API_KEY;
   });
 
-  it('returns apiKey identity for valid API key', async () => {
+  it('returns apiKey identity for valid PLATFORM_API_KEY', async () => {
     const result = await resolveCallerIdentity(
       makeRequest({ 'X-Api-Key': 'test-api-key' }),
+      fakeNamespaceRepo,
+    );
+    expect(result).toEqual({ kind: 'apiKey', isSystemActor: true });
+  });
+
+  it('accepts PLATFORM_ADMIN_API_KEY and mints the same apiKey shape (tier-split collapsed per Phase 2.6)', async () => {
+    process.env.PLATFORM_ADMIN_API_KEY = 'admin-key';
+    const result = await resolveCallerIdentity(
+      makeRequest({ 'X-Api-Key': 'admin-key' }),
       fakeNamespaceRepo,
     );
     expect(result).toEqual({ kind: 'apiKey', isSystemActor: true });
@@ -57,11 +67,12 @@ describe('resolveCallerIdentity', () => {
     expect((result as NextResponse).status).toBe(401);
   });
 
-  it('returns user identity with namespace set for valid token', async () => {
+  it('returns user identity with namespaces + roles populated from getMembershipsForUser', async () => {
     mockVerifyIdToken.mockResolvedValue({ uid: 'user-1' });
-    mockGetNamespacesByUser.mockResolvedValue([
-      { handle: 'org-a' },
-      { handle: 'org-b' },
+    mockGetMembershipsForUser.mockResolvedValue([
+      { handle: 'org-a', role: 'owner' },
+      { handle: 'org-b', role: 'admin' },
+      { handle: 'org-c', role: 'member' },
     ]);
 
     const result = await resolveCallerIdentity(
@@ -72,7 +83,12 @@ describe('resolveCallerIdentity', () => {
     expect(result).toEqual({
       kind: 'user',
       uid: 'user-1',
-      namespaces: new Set(['org-a', 'org-b']),
+      namespaces: new Set(['org-a', 'org-b', 'org-c']),
+      namespaceRoles: new Map([
+        ['org-a', 'owner'],
+        ['org-b', 'admin'],
+        ['org-c', 'member'],
+      ]),
       isSystemActor: false,
     });
   });
@@ -93,12 +109,12 @@ describe('callerCanAccess', () => {
   });
 
   it('user can access own namespace', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['my-ns']), isSystemActor: false };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['my-ns']), namespaceRoles: new Map([['my-ns', 'member']]), isSystemActor: false };
     expect(callerCanAccess(caller, 'my-ns')).toBe(true);
   });
 
   it('user cannot access other namespace', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['my-ns']), isSystemActor: false };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['my-ns']), namespaceRoles: new Map([['my-ns', 'member']]), isSystemActor: false };
     expect(callerCanAccess(caller, 'other-ns')).toBe(false);
   });
 });
@@ -109,19 +125,19 @@ describe('requireNamespaceAccess', () => {
   });
 
   it('returns null for member', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']), isSystemActor: false };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']), namespaceRoles: new Map([['ns', 'member']]), isSystemActor: false };
     expect(requireNamespaceAccess(caller, 'ns')).toBeNull();
   });
 
   it('returns 403 for non-member', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']), isSystemActor: false };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']), namespaceRoles: new Map([['ns', 'member']]), isSystemActor: false };
     const result = requireNamespaceAccess(caller, 'other-ns');
     expect(result).toBeInstanceOf(NextResponse);
     expect(result!.status).toBe(403);
   });
 
   it('returns 403 for undefined namespace', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']), isSystemActor: false };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['ns']), namespaceRoles: new Map([['ns', 'member']]), isSystemActor: false };
     const result = requireNamespaceAccess(caller, undefined);
     expect(result).toBeInstanceOf(NextResponse);
     expect(result!.status).toBe(403);
@@ -140,7 +156,7 @@ describe('filterByNamespace', () => {
   });
 
   it('user sees only own namespace', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['org-a']), isSystemActor: false };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['org-a']), namespaceRoles: new Map([['org-a', 'member']]), isSystemActor: false };
     expect(filterByNamespace(caller, items)).toEqual([
       { namespace: 'org-a', name: 'wf-1' },
       { namespace: 'org-a', name: 'wf-3' },
@@ -148,7 +164,7 @@ describe('filterByNamespace', () => {
   });
 
   it('user with no matching namespace sees nothing', () => {
-    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['org-c']), isSystemActor: false };
+    const caller: CallerIdentity = { kind: 'user', uid: 'u1', namespaces: new Set(['org-c']), namespaceRoles: new Map([['org-c', 'member']]), isSystemActor: false };
     expect(filterByNamespace(caller, items)).toEqual([]);
   });
 });

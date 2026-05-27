@@ -71,6 +71,7 @@ describe('createRouteAdapter', () => {
       kind: 'user',
       uid: 'u1',
       namespaces: new Set(['ns-a']),
+      namespaceRoles: new Map([['ns-a', 'member']]),
       isSystemActor: false,
     };
     const GET = createRouteAdapter(

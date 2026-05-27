@@ -9,7 +9,7 @@ const mockTokenGet = vi.fn();
 const mockTokenDelete = vi.fn();
 const mockProviderGet = vi.fn();
 const mockGetMember = vi.fn();
-const mockGetNamespacesByUser = vi.fn();
+const mockGetMembershipsForUser = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
@@ -27,7 +27,7 @@ vi.mock('@/lib/platform-services', () => ({
     auditRepo: { append: mockAuditAppend },
     namespaceRepo: {
       getMember: mockGetMember,
-      getNamespacesByUser: mockGetNamespacesByUser,
+      getMembershipsForUser: mockGetMembershipsForUser,
     },
   }),
 }));
@@ -108,7 +108,7 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
     vi.clearAllMocks();
     mockVerifyIdToken.mockResolvedValue({ uid: 'uid-1' });
     mockGetMember.mockResolvedValue(memberAppsilon);
-    mockGetNamespacesByUser.mockResolvedValue([{ handle: 'appsilon' }]);
+    mockGetMembershipsForUser.mockResolvedValue([{ handle: 'appsilon', role: 'member' as const }]);
     originalFetch = globalThis.fetch;
     fetchMock = vi.fn();
     globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
@@ -321,9 +321,9 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('[AUTHZ] membership read from getNamespacesByUser gates the requested namespace', async () => {
+  it('[AUTHZ] membership read from getMembershipsForUser gates the requested namespace', async () => {
     mockTokenDelete.mockResolvedValue(true);
-    mockGetNamespacesByUser.mockResolvedValue([{ handle: 'other-ns' }]);
+    mockGetMembershipsForUser.mockResolvedValue([{ handle: 'other-ns', role: 'member' as const }]);
 
     await DELETE(
       makeDeleteRequest({
@@ -334,7 +334,7 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
       }),
       { params: makeParams('agent-1', 'github') },
     );
-    expect(mockGetNamespacesByUser).toHaveBeenCalledWith('uid-1');
+    expect(mockGetMembershipsForUser).toHaveBeenCalledWith('uid-1');
     expect(mockTokenDelete).toHaveBeenCalledWith('other-ns', 'agent-1', 'gh');
   });
 });
