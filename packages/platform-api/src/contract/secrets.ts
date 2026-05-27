@@ -32,17 +32,40 @@ export const SetSecretOutputSchema = z.object({
   ok: z.literal(true),
 });
 
+export const GetWorkflowSecretsFullInputSchema = z.object({
+  namespace: z.string().min(1),
+  workflow: z.string().min(1),
+});
+
+export const GetWorkflowSecretsFullOutputSchema = z.object({
+  secrets: z.record(z.string(), z.string()),
+});
+
+export const SaveWorkflowSecretsInputSchema = z.object({
+  namespace: z.string().min(1),
+  workflow: z.string().min(1),
+  secrets: z.record(z.string().min(1).max(256), z.string().max(SECRET_VALUE_MAX_BYTES)),
+});
+
+export const SaveWorkflowSecretsOutputSchema = z.object({
+  ok: z.literal(true),
+  savedKeyCount: z.number().int().nonnegative(),
+});
+
 export type SetSecretInput = z.infer<typeof SetSecretInputSchema>;
 export type SetSecretOutput = z.infer<typeof SetSecretOutputSchema>;
 export type ListSecretKeysInput = z.infer<typeof ListSecretKeysInputSchema>;
 export type ListSecretKeysOutput = z.infer<typeof ListSecretKeysOutputSchema>;
 export type DeleteSecretInput = z.infer<typeof DeleteSecretInputSchema>;
 export type DeleteSecretOutput = z.infer<typeof DeleteSecretOutputSchema>;
+export type GetWorkflowSecretsFullInput = z.infer<typeof GetWorkflowSecretsFullInputSchema>;
+export type GetWorkflowSecretsFullOutput = z.infer<typeof GetWorkflowSecretsFullOutputSchema>;
+export type SaveWorkflowSecretsInput = z.infer<typeof SaveWorkflowSecretsInputSchema>;
+export type SaveWorkflowSecretsOutput = z.infer<typeof SaveWorkflowSecretsOutputSchema>;
 
 // ---- GET /api/workspace-secrets/previews?namespace=… ------------------------
 // Returns masked previews for the workspace secrets editor. Workspace-scope
-// only — workflow-secrets editor reveals plaintext via a separate path that's
-// out of Phase 2.5 scope.
+// only — workflow-secrets editor reveals plaintext via the values endpoint.
 export const GetWorkspaceSecretPreviewsInputSchema = z.object({
   namespace: z.string().min(1),
 });
