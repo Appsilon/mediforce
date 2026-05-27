@@ -13,10 +13,9 @@ interface RouteContext {
  * POST /api/workflow-definitions/:name/transfer
  * body: { sourceNamespace, targetNamespace }
  *
- * Replaces the pre-Phase-2.5 Server Action. Three bug-fixes vs legacy:
- *   1. Goes through the repository (was: raw Firestore).
- *   2. Asserts caller membership on BOTH source AND target.
- *   3. Emits `workflow.transferred` audit.
+ * Requires caller membership on BOTH source and target namespaces; the write
+ * goes through the repository (not raw Firestore) and emits a
+ * `workflow.transferred` audit event.
  */
 export const POST = createRouteAdapter<
   typeof TransferWorkflowInputSchema,

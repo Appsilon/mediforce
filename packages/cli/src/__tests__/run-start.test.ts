@@ -9,7 +9,6 @@ beforeEach(() => {
 const BASE_ENV = { MEDIFORCE_API_KEY: 'k' };
 
 // Minimal ProcessInstance shape — entity-echo response per ADR-0005 §5.
-// Replaces the pre-Phase-3 `{ instanceId, status }` mock shape.
 function mkRun(id: string, status = 'running'): { run: Record<string, unknown> } {
   return {
     run: {

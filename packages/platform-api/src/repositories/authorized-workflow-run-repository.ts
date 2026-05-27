@@ -77,10 +77,10 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
    */
   /**
    * Cascade delete companion for workflow-definition soft-delete. The raw
-   * methods don't scope by namespace today — preserved as bit-for-bit parity
-   * with the pre-Phase-2.5 Server Action. The handler gates the
-   * workflow-definition namespace before invoking this; same trust model as
-   * `scope.system.*`. See ADR-0004 §6 on system-actor cascades.
+   * methods don't scope by namespace; the handler gates the
+   * workflow-definition namespace before invoking this, so the same trust
+   * model as `scope.system.*` applies. See ADR-0004 §6 on system-actor
+   * cascades.
    */
   getIdsByDefinitionName = async (definitionName: string): Promise<string[]> => {
     return this.raw.getIdsByDefinitionName(definitionName);

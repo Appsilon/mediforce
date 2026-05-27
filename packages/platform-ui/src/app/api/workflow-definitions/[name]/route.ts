@@ -49,7 +49,6 @@ const PatchScopedSchema = SetVisibilityInputSchema.extend({
 
 /**
  * PATCH /api/workflow-definitions/:name?namespace=… — set visibility.
- * Audit emission added in Phase 2.5 (was: none).
  */
 export const PATCH = createRouteAdapter<
   typeof PatchScopedSchema,
@@ -68,11 +67,9 @@ export const PATCH = createRouteAdapter<
 );
 
 /**
- * DELETE /api/workflow-definitions/:name?namespace=… body: { expectedRunCount }
- *
  * Soft-deletes definition + cascades to runs + human-tasks. `expectedRunCount`
- * is a stale-confirmation guard. Audit actor sourced from caller (was:
- * hard-coded 'system').
+ * is a stale-confirmation guard. Audit actor is sourced from the caller, not
+ * hard-coded.
  */
 export const DELETE = createRouteAdapter<
   typeof DeleteWorkflowInputSchema,

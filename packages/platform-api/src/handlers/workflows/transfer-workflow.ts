@@ -6,15 +6,13 @@ import type { CallerScope } from '../../repositories/index.js';
 import { actorFromCaller } from '../_helpers.js';
 
 /**
- * Move all versions of a workflow definition between workspaces. Three
- * bug-fixes over the pre-Phase-2.5 Server Action:
- *   1. Reads through the repository instead of raw Firestore.
- *   2. Asserts caller membership on BOTH source AND target (was: target only;
- *      and even target was checked only at the routing layer, not enforced).
- *   3. Emits a `workflow.transferred` audit event (was: none).
+ * Move all versions of a workflow definition between workspaces. Transfer
+ * requires caller membership on BOTH source and target namespaces, reads and
+ * writes through the repository (not raw Firestore) so namespace scoping is
+ * enforced, and emits a `workflow.transferred` audit event.
  *
- * Gate stays member-only on both — this is parity-with-tightening, not a
- * role-gate uplift (role enforcement is Phase 2.6 territory).
+ * The gate is membership-only on both namespaces; adding a role gate is a
+ * separate decision.
  */
 export async function transferWorkflowNamespace(
   input: TransferWorkflowInput,

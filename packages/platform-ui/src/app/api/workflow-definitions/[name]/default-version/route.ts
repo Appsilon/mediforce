@@ -12,9 +12,6 @@ interface RouteContext {
 /**
  * POST /api/workflow-definitions/:name/default-version
  * body: { namespace, version }
- *
- * Phase 2.5 new endpoint — replaces the `setDefaultWorkflowVersion` Server
- * Action. Audit emission added (was: none).
  */
 export const POST = createRouteAdapter<
   typeof SetDefaultVersionInputSchema,
