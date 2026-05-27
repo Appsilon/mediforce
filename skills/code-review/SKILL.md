@@ -103,7 +103,7 @@ Single message, three `Agent` tool calls, `general-purpose` subagent. Each promp
 > - **Dead code** — functions/exports/files not referenced anywhere. Grep to verify.
 > - **DRY/KISS violations** — duplicated logic, unnecessary abstraction, layers that solve nothing.
 > - **Reuse misses** — places where the diff reinvents a helper/util/pattern that already exists in the repo. Search for it before flagging.
-> - **Comment quality** — flag flowery / restating-the-code comments. Keep only comments that explain *why* (non-obvious constraints, invariants, gotchas). Self-documenting code wins.
+> - **Comment quality** — flag flowery / restating-the-code comments, section-title banners (`// ---- POST /api/foo ----`), and ephemeral plan numbering / migration history (`// Phase 2.5`, `// pre-Phase-2.5 Server Action`). Keep only comments that explain *why* (non-obvious constraints, invariants, gotchas) and that still make sense to a reader who never saw the migration plan. Self-documenting code wins.
 > Distinguish hard violations from judgement calls. Skip anything tooling already checks. Under 600 words. Format each finding as `file:line — issue — suggestion`.
 
 **Spec sub-agent prompt**:
