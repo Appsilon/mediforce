@@ -49,14 +49,21 @@ def snake(s: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
 
 
-def to_pg_value(v: Any) -> Any:
-    """Coerce a Firestore-decoded Python value into a Postgres-ready value."""
+def to_pg_value(v: Any, *, as_text_array: bool = False) -> Any:
+    """Coerce a Firestore-decoded Python value into a Postgres-ready value.
+
+    `as_text_array=True` opts the value out of JSON-wrapping so psycopg2
+    adapts a Python list to a Postgres `text[]` literal.
+    """
     if v is None:
         return None
     # Firestore timestamps decode to datetime.datetime; psycopg2 handles them.
     if isinstance(v, datetime):
         if v.tzinfo is None:
             return v.replace(tzinfo=timezone.utc)
+        return v
+    if as_text_array and isinstance(v, list):
+        # Let psycopg2 adapt list -> ARRAY for text[] columns.
         return v
     if isinstance(v, (dict, list)):
         return psycopg2.extras.Json(v)
@@ -83,10 +90,17 @@ def insert_rows(
     *,
     conflict: str | None,
     dry_run: bool,
+    text_array_columns: set[str] | None = None,
 ) -> tuple[int, int]:
-    """Insert `rows` with ON CONFLICT DO NOTHING. Returns (inserted, skipped)."""
+    """Insert `rows` with ON CONFLICT DO NOTHING. Returns (inserted, skipped).
+
+    `text_array_columns` names columns whose Python-list values should be
+    passed through to psycopg2 unwrapped, so they land as Postgres `text[]`
+    instead of JSON.
+    """
     if not rows:
         return 0, 0
+    text_array_cols = text_array_columns or set()
     cols = list(rows[0].keys())
     placeholders = ",".join(["%s"] * len(cols))
     col_list = ",".join(f'"{c}"' for c in cols)
@@ -101,7 +115,10 @@ def insert_rows(
     skipped = 0
     with pg.cursor() as cur:
         for row in rows:
-            cur.execute(sql, [to_pg_value(row[c]) for c in cols])
+            cur.execute(
+                sql,
+                [to_pg_value(row[c], as_text_array=c in text_array_cols) for c in cols],
+            )
             # rowcount is 1 when inserted, 0 when ON CONFLICT skipped it.
             if cur.rowcount == 1:
                 inserted += 1
@@ -408,7 +425,12 @@ def migrate_process_instances(
                 }
             )
     ins_p, skip_p = insert_rows(
-        pg, "process_instances", _strip_none_defaults(pi_rows), conflict="id", dry_run=dry_run
+        pg,
+        "process_instances",
+        _strip_none_defaults(pi_rows),
+        conflict="id",
+        dry_run=dry_run,
+        text_array_columns={"assigned_roles"},
     )
     ins_s, skip_s = insert_rows(
         pg, "step_executions", _strip_none_defaults(step_rows), conflict="id", dry_run=dry_run
