@@ -11,6 +11,7 @@
 
 import { clearEmulators, createTestUser, seedCollection, seedSubcollection } from '../e2e/helpers/emulator.js';
 import { buildSeedData } from '../e2e/helpers/seed-data.js';
+import { seedPostgresNamespace } from '../e2e/helpers/postgres-seed.js';
 
 const TEST_EMAIL = 'test@mediforce.dev';
 const TEST_PASSWORD = 'test123456';
@@ -62,6 +63,15 @@ async function main() {
     for (const [parent, parentId, sub, docs] of subcollections) {
       await seedSubcollection(parent, parentId, sub, docs);
       console.log(`  ${parent}/${parentId}/${sub} (${Object.keys(docs).length} docs)`);
+    }
+
+    // 5. ADR-0001 PR2: mirror fixture to Postgres when STORAGE_BACKEND=postgres.
+    // The full seed (workspaces, members, WDs, instances, tasks, etc.) lands
+    // in PG via the same helper auth-setup uses for E2E.
+    if (process.env.STORAGE_BACKEND === 'postgres') {
+      console.log('\nMirroring fixture to Postgres (STORAGE_BACKEND=postgres):');
+      await seedPostgresNamespace(testUserId);
+      console.log('  Postgres seed complete');
     }
 
     console.log('\nDevelopment data seeded successfully!\n');
