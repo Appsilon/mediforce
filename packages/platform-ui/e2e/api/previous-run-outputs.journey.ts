@@ -40,6 +40,14 @@ async function pollUntil<T>(
 }
 
 test.describe('Previous run outputs — API E2E', () => {
+  // ADR-0001 PR2: full chain spans process_instances reads through the entire
+  // run pipeline; that surface still uses the Firestore repo until §5.2 #9.
+  // Unblock when process-instance lands on Postgres.
+  test.skip(
+    process.env.STORAGE_BACKEND === 'postgres',
+    'Spans process_instances repo, still on Firestore until §5.2 #9',
+  );
+
   test('user-typed message round-trips across runs via inputForNextRun', async ({
     request,
   }) => {

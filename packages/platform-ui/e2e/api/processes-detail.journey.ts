@@ -23,6 +23,14 @@ const INSTANCE_ID = 'proc-running-1';
 const MISSING_INSTANCE_ID = 'proc-does-not-exist-zzz';
 
 test.describe('GET /api/processes/* — API E2E', () => {
+  // ADR-0001 PR2: this suite depends on Firestore-seeded fixtures (INSTANCE_ID
+  // 'proc-running-1' lives only in the Firestore emulator). Postgres seed
+  // parity ships with the process-instance repo (PLAN-0001 §5.2 #9).
+  test.skip(
+    process.env.STORAGE_BACKEND === 'postgres',
+    'Requires Firestore-seeded process_instances + audit_events; Postgres seed parity ships with §5.2 #9',
+  );
+
   let callers: MultiNamespaceFixture;
 
   test.beforeAll(async () => {
