@@ -136,25 +136,21 @@ docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml \
 
 ## Data cutover (before PR #534 deploys)
 
+The detailed operator runbook for the actual migration lives in
+[`scripts/migrate-firestore-to-postgres/CUTOVER-CHECKLIST.md`](../scripts/migrate-firestore-to-postgres/CUTOVER-CHECKLIST.md).
+Follow it once host prep above is done. Staging-specific deltas:
+
 1. **Accept staging data loss in the cut window.** Staging is dev-only; no
    read-only flag needed. Anyone writing to staging Firestore between the
    final migration run and the #534 deploy will lose those writes.
 
-2. **Optional dress rehearsal** — run the migration script locally against
-   staging Firestore + a throwaway local Postgres to validate the schema
-   conversion before touching staging Postgres.
-
-3. **Run the migration** from your laptop, pointing at staging Postgres.
-   See [`scripts/migrate-firestore-to-postgres/README.md`](../scripts/migrate-firestore-to-postgres/README.md)
-   for connection details. Staging Postgres is only reachable from inside
-   the docker network, so either:
+2. **Reachability.** Staging Postgres is only reachable from inside the
+   docker network, so for `main.py` / `verify.py` either:
    - SSH-tunnel `5432` to your laptop and run the script locally, or
    - `scp` the script onto the server and run it there.
 
-4. **Verify** with `verify.py` — non-zero exit on any row-count or sampled
-   field diff.
-
-5. **Merge PR #534.** Its deploy flips the app to Postgres unconditionally.
+3. **Merge PR #534** once `verify.py` exits 0. Its deploy flips the app
+   to Postgres unconditionally.
 
 ## After cutover succeeds
 
