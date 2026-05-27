@@ -12,17 +12,19 @@ export interface WaitSentinel {
     stepId: string;
     resumeAt: string;
     pausedAt: string;
+    mode: 'duration' | 'deadline';
     condition?: string;
   };
 }
 
 export function isWaitSentinel(output: Record<string, unknown>): output is WaitSentinel {
   const w = output.__wait;
+  if (w === null || typeof w !== 'object') return false;
+  const r = w as Record<string, unknown>;
   return (
-    w !== null &&
-    typeof w === 'object' &&
-    typeof (w as Record<string, unknown>).stepId === 'string' &&
-    typeof (w as Record<string, unknown>).resumeAt === 'string'
+    typeof r.stepId === 'string' &&
+    typeof r.resumeAt === 'string' &&
+    typeof r.pausedAt === 'string'
   );
 }
 
@@ -39,6 +41,7 @@ export const waitActionHandler: WaitActionHandler = async (config, ctx) => {
         stepId: ctx.stepId,
         resumeAt: resumeAt.toISOString(),
         pausedAt: now.toISOString(),
+        mode: 'duration' as const,
         ...(config.condition ? { condition: config.condition } : {}),
       },
     };
@@ -62,6 +65,7 @@ export const waitActionHandler: WaitActionHandler = async (config, ctx) => {
       stepId: ctx.stepId,
       resumeAt: parsed.toISOString(),
       pausedAt: now.toISOString(),
+      mode: 'deadline' as const,
       ...(config.condition ? { condition: config.condition } : {}),
     },
   };

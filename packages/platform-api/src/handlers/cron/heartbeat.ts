@@ -7,7 +7,7 @@ import type {
   TriggeredEntry,
 } from '../../contract/cron.js';
 import type { CallerScope } from '../../repositories/index.js';
-import { ForbiddenError } from '../../errors.js';
+import { ForbiddenError, PreconditionFailedError } from '../../errors.js';
 import { resumeWait } from '../processes/resume-wait.js';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
@@ -121,8 +121,10 @@ export async function heartbeat(
   for (const inst of waitingInstances) {
     try {
       await resumeWait({ runId: inst.id }, scope);
-    } catch {
-      // resumeWait throws PreconditionFailedError if not ready yet — expected
+    } catch (err) {
+      if (!(err instanceof PreconditionFailedError)) {
+        console.error(`[cron-heartbeat] Unexpected error resuming '${inst.id}':`, err);
+      }
     }
   }
 

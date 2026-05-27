@@ -35,6 +35,7 @@ describe('waitActionHandler', () => {
       expect(sentinel.__wait.stepId).toBe('wait-step');
       expect(sentinel.__wait.resumeAt).toBe('2026-06-01T14:00:00.000Z');
       expect(sentinel.__wait.pausedAt).toBe('2026-06-01T12:00:00.000Z');
+      expect(sentinel.__wait.mode).toBe('duration');
       expect(sentinel.__wait.condition).toBeUndefined();
     });
 
@@ -71,6 +72,7 @@ describe('waitActionHandler', () => {
       expect(isWaitSentinel(output)).toBe(true);
       const sentinel = output as unknown as WaitSentinel;
       expect(sentinel.__wait.resumeAt).toBe('2026-06-02T00:00:00.000Z');
+      expect(sentinel.__wait.mode).toBe('deadline');
     });
 
     it('returns immediate result for past deadline', async () => {
@@ -132,5 +134,9 @@ describe('isWaitSentinel', () => {
 
   it('returns false for __wait missing stepId', () => {
     expect(isWaitSentinel({ __wait: { resumeAt: '2026-06-01' } })).toBe(false);
+  });
+
+  it('returns false for __wait missing pausedAt', () => {
+    expect(isWaitSentinel({ __wait: { stepId: 's1', resumeAt: '2026-06-01' } })).toBe(false);
   });
 });

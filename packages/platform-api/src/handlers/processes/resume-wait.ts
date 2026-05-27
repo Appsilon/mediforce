@@ -8,6 +8,7 @@ interface WaitMetadata {
   stepId: string;
   resumeAt: string;
   pausedAt: string;
+  mode: 'duration' | 'deadline';
   condition?: string;
 }
 
@@ -55,7 +56,9 @@ export async function resumeWait(
   const waitedSeconds = Math.round(
     (now.getTime() - new Date(waitMeta.pausedAt).getTime()) / 1000,
   );
-  const resumeReason = conditionMet ? 'condition_met' : 'duration_elapsed';
+  const resumeReason = conditionMet
+    ? 'condition_met'
+    : waitMeta.mode === 'deadline' ? 'deadline_reached' : 'duration_elapsed';
   const waitOutput = { resumeReason, waitedSeconds, resolvedAt: now.toISOString() };
 
   const { __wait: _, ...cleanVars } = run.variables as Record<string, unknown>;

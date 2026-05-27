@@ -47,7 +47,7 @@ describe('resumeWait handler', () => {
         status: 'paused',
         pauseReason: 'waiting_for_timer',
         variables: {
-          __wait: { stepId: 'wait-step', resumeAt, pausedAt },
+          __wait: { stepId: 'wait-step', resumeAt, pausedAt, mode: 'duration' },
         },
       }),
     );
@@ -92,7 +92,7 @@ describe('resumeWait handler', () => {
         status: 'paused',
         pauseReason: 'waiting_for_timer',
         variables: {
-          __wait: { stepId: 'wait-step', resumeAt, pausedAt: '2026-06-01T10:00:00.000Z' },
+          __wait: { stepId: 'wait-step', resumeAt, pausedAt: '2026-06-01T10:00:00.000Z', mode: 'duration' },
         },
       }),
     );
@@ -114,6 +114,90 @@ describe('resumeWait handler', () => {
 
     const updated = await instanceRepo.getById('inst-waiting');
     expect(updated!.status).toBe('paused');
+
+    vi.useRealTimers();
+  });
+
+  it('resumes with deadline_reached for deadline-mode waits', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-deadline',
+        namespace: 'team-alpha',
+        status: 'paused',
+        pauseReason: 'waiting_for_timer',
+        variables: {
+          __wait: {
+            stepId: 'wait-step',
+            resumeAt: '2026-06-01T12:00:00.000Z',
+            pausedAt: '2026-06-01T10:00:00.000Z',
+            mode: 'deadline',
+          },
+        },
+      }),
+    );
+
+    const kicker = noopRunKicker();
+    const baseScope = createTestScope({
+      instanceRepo,
+      auditRepo,
+      runKicker: kicker,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    const scope = scopeWithEngine(baseScope);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T13:00:00.000Z'));
+
+    const result = await resumeWait({ runId: 'inst-deadline' }, scope);
+
+    expect(result.resumed).toBe(true);
+    expect(result.resumeReason).toBe('deadline_reached');
+
+    vi.useRealTimers();
+  });
+
+  it('resumes early when condition is met before resumeAt', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-condition',
+        namespace: 'team-alpha',
+        status: 'paused',
+        pauseReason: 'waiting_for_timer',
+        variables: {
+          __wait: {
+            stepId: 'wait-step',
+            resumeAt: '2026-06-02T00:00:00.000Z',
+            pausedAt: '2026-06-01T10:00:00.000Z',
+            mode: 'deadline',
+            condition: 'variables.allDone == true',
+          },
+          allDone: true,
+        },
+      }),
+    );
+
+    const kicker = noopRunKicker();
+    const baseScope = createTestScope({
+      instanceRepo,
+      auditRepo,
+      runKicker: kicker,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    const scope = scopeWithEngine(baseScope);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+
+    const result = await resumeWait({ runId: 'inst-condition' }, scope);
+
+    expect(result.resumed).toBe(true);
+    expect(result.resumeReason).toBe('condition_met');
+
+    const updated = await instanceRepo.getById('inst-condition');
+    expect(updated!.status).toBe('running');
+    expect((updated!.variables as Record<string, unknown>)['wait-step']).toMatchObject({
+      resumeReason: 'condition_met',
+    });
 
     vi.useRealTimers();
   });
