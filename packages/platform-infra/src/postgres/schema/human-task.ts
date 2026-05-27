@@ -34,7 +34,11 @@ import { processInstances } from './process-instance.js';
 export const humanTasks = pgTable(
   'human_tasks',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    // text PK so cutover preserves Firestore document ids verbatim and
+    // E2E seed can refer to tasks by stable human-readable handles
+    // (task-pending-1, task-completed-1, etc.). Caller mints id via
+    // crypto.randomUUID() in workflow-engine create paths.
+    id: text('id').primaryKey(),
     workspace: text('workspace')
       .notNull()
       .references(() => workspaces.handle, { onDelete: 'cascade' }),

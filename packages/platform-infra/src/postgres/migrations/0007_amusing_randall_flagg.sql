@@ -1,5 +1,5 @@
 CREATE TABLE "human_tasks" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" text PRIMARY KEY NOT NULL,
 	"workspace" text NOT NULL,
 	"process_instance_id" text NOT NULL,
 	"step_id" text NOT NULL,
