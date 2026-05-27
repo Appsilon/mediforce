@@ -28,12 +28,16 @@ export class FirestoreAuditRepository implements AuditRepository {
     // `inputSnapshot` payloads (`args`, etc.) routinely arrive as
     // undefined when omitted; scrub them so the in-memory and Firestore
     // paths agree on representation. Null is preserved.
-    const docRef = await colRef.add(
-      stripUndefined({
-        ...event,
-        serverTimestamp: FieldValue.serverTimestamp(),
-      }) as Record<string, unknown>,
-    );
+    //
+    // Strip only the user-supplied event; FieldValue.serverTimestamp() is
+    // a class-instance sentinel that the SDK recognises by identity. A
+    // recursive strip that walks every object would rebuild the sentinel
+    // as a plain object — Firestore would then write a regular Map and the
+    // read-back `.toDate()` call would fail.
+    const docRef = await colRef.add({
+      ...(stripUndefined(event) as Record<string, unknown>),
+      serverTimestamp: FieldValue.serverTimestamp(),
+    });
 
     const snapshot = await docRef.get();
     const data = snapshot.data()!;
@@ -128,9 +132,12 @@ function stripUndefined(value: unknown): unknown {
       .map((v) => stripUndefined(v))
       .filter((v): v is unknown => v !== undefined);
   }
-  if (typeof value === 'object') {
+  // Only recurse into plain `{}` objects. Class instances (FieldValue,
+  // Timestamp, Date, GeoPoint, ...) are SDK sentinels Firestore identifies
+  // by identity; rebuilding them as plain objects breaks the write.
+  if (typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value)) {
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       const stripped = stripUndefined(v);
       if (stripped !== undefined) out[k] = stripped;
     }

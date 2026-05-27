@@ -137,4 +137,34 @@ describe('FirestoreAuditRepository.append — undefined scrubbing', () => {
     expect(writtenSnapshot.explicitlyNull).toBeNull();
     expect(writtenSnapshot.alsoSet).toBe('value');
   });
+
+  it('preserves the FieldValue.serverTimestamp() sentinel unchanged', async () => {
+    // Bug: a naive deep-strip-undefined that walks every object recursively
+    // mistakes the Admin SDK FieldValue sentinel (a class instance) for a
+    // plain object and rebuilds it as `{}` (or worse). Firestore then writes
+    // a regular Map instead of resolving the server timestamp, and
+    // `data.serverTimestamp.toDate()` blows up on the read-back. The fix
+    // must skip non-plain-object instances (Date, FieldValue, Timestamp).
+    await repo.append({
+      actorId: 'user-1',
+      actorType: 'user',
+      actorRole: 'admin',
+      action: 'noop.done',
+      description: 'noop',
+      timestamp: '2026-01-01T00:00:00.000Z',
+      inputSnapshot: { args: undefined, x: 1 },
+      outputSnapshot: { ok: true },
+      basis: 'test',
+      entityType: 'case',
+      entityId: 'case-1',
+    });
+
+    // The serverTimestamp sentinel ends up on the written doc unchanged —
+    // identity-preserved (not a deep-copy plain object).
+    const written = adds[0].data.serverTimestamp;
+    expect(written).toBeDefined();
+    // Plain objects from `{}` literal have Object.prototype; the sentinel
+    // is a class instance and does not. This is what Firestore relies on.
+    expect(Object.getPrototypeOf(written)).not.toBe(Object.prototype);
+  });
 });
