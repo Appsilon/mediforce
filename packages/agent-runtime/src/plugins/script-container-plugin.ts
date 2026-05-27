@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/agent-plugin.js';
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy.js';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, type ContainerPluginInit } from './container-plugin.js';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, type ContainerPluginInit } from './container-plugin.js';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin.js';
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
@@ -294,10 +294,6 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         });
       }
 
-      const exitInfo = spawnResult.signal
-        ? `killed by ${spawnResult.signal}`
-        : `exit code ${spawnResult.exitCode}`;
-
       await emit({
         type: 'status',
         payload: `container exited: code=${spawnResult.exitCode}, signal=${spawnResult.signal ?? 'none'}`,
@@ -305,29 +301,38 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       });
 
       if (spawnResult.exitCode !== 0) {
+        const exitInfo = formatExitInfo(spawnResult, Math.round(timeoutMs / 60_000));
         const stderr = spawnResult.stderr.trim();
         const stdout = spawnResult.stdout.trim();
 
         let detail: string;
-        if (stderr || stdout) {
-          detail = stderr || stdout;
+        if (stderr.length > 0 || stdout.length > 0) {
+          // Captured streams were already written to the activity log line by
+          // line during the run, so they already show in the Step Log panel.
+          detail = stderr.length > 0 ? stderr : stdout;
         } else {
-          const envKeys = Object.keys(this.resolvedEnv.vars).join(',');
+          // RUN_ID / STEP_ID are injected into every container (separately from
+          // resolvedEnv.vars), so list them too — they're part of what the
+          // script saw.
+          const envKeys = [...Object.keys(this.resolvedEnv.vars), 'RUN_ID', 'STEP_ID'].join(',');
           let inputSize = '?';
           try {
-            const s = await stat(join(outputDir, 'input.json'));
-            inputSize = `${s.size}b`;
+            const inputStat = await stat(join(outputDir, 'input.json'));
+            inputSize = `${inputStat.size}b`;
           } catch { /* missing — shouldn't happen */ }
           detail = `no stdout/stderr captured — image=${this.image}, cmd=${this.commandDisplay}, env=[${envKeys}], inputSize=${inputSize}`;
+          // The Step Log panel renders the activity log FILE, not the event
+          // stream, and a no-output failure streamed nothing into it. Write the
+          // diagnostic there so the panel shows the reason instead of sticking
+          // on "Initializing log…".
+          emitLine(detail);
         }
 
-        if (stderr) {
-          await emit({ type: 'status', payload: `[stderr] ${stderr.slice(0, 4000)}`, timestamp: new Date().toISOString() });
-        }
-        if (stdout) {
-          await emit({ type: 'status', payload: `[stdout] ${stdout.slice(0, 4000)}`, timestamp: new Date().toISOString() });
-        }
-        await emit({ type: 'status', payload: `script failed (${exitInfo}): ${detail.slice(0, 2000)}`, timestamp: new Date().toISOString() });
+        await emit({
+          type: 'status',
+          payload: `script failed (${exitInfo}): ${detail.slice(0, 2000)}`,
+          timestamp: new Date().toISOString(),
+        });
 
         throw new Error(`Script container failed (${exitInfo}): ${detail}`);
       }

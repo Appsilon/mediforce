@@ -188,6 +188,34 @@ describe('ScriptContainerPlugin', () => {
       await expect(plugin.run(emit)).rejects.toThrow(/Script container failed/);
     });
 
+    it('[ERROR] empty stdout/stderr failure surfaces image, command, env keys, input size — and writes the diagnostic to the activity log', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      const mockChild = createMockChild();
+      mockSpawnFailure(mockChild); // exit 1 with no stdout/stderr
+
+      const error = await plugin.run(emit).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(Error);
+      const message = (error as Error).message;
+      expect(message).toContain('no stdout/stderr captured');
+      expect(message).toContain('image=mediforce-r:latest');
+      expect(message).toContain('cmd=Rscript /scripts/analyze.R');
+      // RUN_ID / STEP_ID are injected into every container, so the diagnostic
+      // must list them even though they aren't user-declared env vars.
+      expect(message).toContain('env=[RUN_ID,STEP_ID]');
+      expect(message).toMatch(/inputSize=\d+b/);
+
+      // The Step Log panel reads the activity log file, which is fed by
+      // assistant events — the no-output diagnostic must land there, not only
+      // in the status channel that the panel ignores.
+      const assistantTexts = events
+        .filter((e) => e.type === 'assistant')
+        .map((e) => (JSON.parse(e.payload as string) as { text: string }).text);
+      expect(assistantTexts.some((t) => t.includes('no stdout/stderr captured'))).toBe(true);
+    });
+
     it('[DATA] inlineScript mode writes script file and invokes it via runtime cmd', async () => {
       const context: AgentContext = {
         ...buildMockContext(),

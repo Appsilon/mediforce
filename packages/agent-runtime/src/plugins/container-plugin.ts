@@ -185,6 +185,26 @@ export function toHttpsWithToken(sshUrl: string, token: string): string {
   return sshUrl.replace('https://', `https://x-access-token:${token}@`);
 }
 
+/**
+ * Human-readable exit descriptor for a finished container or child process.
+ * A SIGTERM kill is annotated as a likely timeout when the step's limit is
+ * known — the signal name alone doesn't tell the user we killed it for
+ * running too long.
+ */
+export function formatExitInfo(
+  result: { exitCode: number | null; signal: string | null },
+  timeoutMinutes?: number,
+): string {
+  if (result.signal === null) {
+    return `exit code ${result.exitCode}`;
+  }
+  const timeoutHint =
+    result.signal === 'SIGTERM' && typeof timeoutMinutes === 'number'
+      ? ` (likely timeout — ${timeoutMinutes} min limit)`
+      : '';
+  return `killed by ${result.signal}${timeoutHint}`;
+}
+
 export interface CommitRunWorkspaceOptions {
   status?: 'success' | 'failed';
   /** Force the terminal marker (✓). Auto-detected from transitions when omitted. */
