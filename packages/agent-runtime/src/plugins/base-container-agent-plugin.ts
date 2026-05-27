@@ -7,7 +7,7 @@ import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/a
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env.js';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy.js';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, type ContainerPluginInit } from './container-plugin.js';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, normalizeRepoUrls, formatExitInfo, type ContainerPluginInit } from './container-plugin.js';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token.js';
 import { createLineStreamReader } from '@mediforce/platform-core';
 
@@ -1564,9 +1564,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const timeoutMinutes = Math.round(timeoutMs / 60_000);
 
     if (spawnResult.exitCode !== 0) {
-      const exitInfo = spawnResult.signal
-        ? `killed by ${spawnResult.signal}${spawnResult.signal === 'SIGTERM' ? ` (likely timeout — ${timeoutMinutes} min limit)` : ''}`
-        : `exit code ${spawnResult.exitCode}`;
+      const exitInfo = formatExitInfo(spawnResult, timeoutMinutes);
       const detail = this.extractErrorFromResult(finalResult) || spawnResult.stderr.trim() || 'no stderr output';
       const authHint = /not logged in|please run \/login/i.test(detail)
         ? ' — Hint: set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY + ANTHROPIC_BASE_URL) in workflow env or secrets'
