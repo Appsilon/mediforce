@@ -383,6 +383,7 @@ describe.skipIf(skipPg)('PostgresHandoffRepository (parity)', () => {
     const db = drizzle(testClient, { schema });
     await testClient.unsafe(
       `TRUNCATE TABLE "${schemaName}"."handoff_entities", ` +
+        `"${schemaName}"."process_instances", ` +
         `"${schemaName}"."workspace_members", "${schemaName}"."workspaces" CASCADE`,
     );
     const nsByInstance = new Map<string, string>();
@@ -401,6 +402,15 @@ describe.skipIf(skipPg)('PostgresHandoffRepository (parity)', () => {
             createdAt: '2026-05-27T00:00:00.000Z',
           });
         }
+        // Parent process_instances row required by FK from handoff_entities.
+        await testClient.unsafe(
+          `INSERT INTO "${schemaName}"."process_instances" ` +
+            `(id, workspace, definition_name, definition_version, status, ` +
+            `variables, trigger_type, trigger_payload) ` +
+            `VALUES ($1, $2, 'stub-def', '1.0.0', 'completed', '{}'::jsonb, 'manual', '{}'::jsonb) ` +
+            `ON CONFLICT (id) DO NOTHING`,
+          [id, namespace],
+        );
       },
     };
   });

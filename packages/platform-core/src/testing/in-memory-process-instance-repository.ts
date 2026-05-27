@@ -1,9 +1,11 @@
-import type {
-  ProcessInstanceRepository,
-  ProcessInstance,
-  InstanceStatus,
-  StepExecution,
-  ListInstancesOptions,
+import {
+  ProcessInstanceSchema,
+  StepExecutionSchema,
+  type ProcessInstanceRepository,
+  type ProcessInstance,
+  type InstanceStatus,
+  type StepExecution,
+  type ListInstancesOptions,
 } from '../index.js';
 
 /**
@@ -18,8 +20,9 @@ export class InMemoryProcessInstanceRepository
   private stepExecutions = new Map<string, StepExecution[]>();
 
   async create(instance: ProcessInstance): Promise<ProcessInstance> {
-    this.instances.set(instance.id, { ...instance });
-    return { ...instance };
+    const parsed = ProcessInstanceSchema.parse(instance);
+    this.instances.set(parsed.id, { ...parsed });
+    return { ...parsed };
   }
 
   async getById(instanceId: string): Promise<ProcessInstance | null> {
@@ -121,10 +124,11 @@ export class InMemoryProcessInstanceRepository
     instanceId: string,
     execution: StepExecution,
   ): Promise<StepExecution> {
+    const parsed = StepExecutionSchema.parse(execution);
     const executions = this.stepExecutions.get(instanceId) ?? [];
-    executions.push({ ...execution });
+    executions.push({ ...parsed });
     this.stepExecutions.set(instanceId, executions);
-    return { ...execution };
+    return { ...parsed };
   }
 
   async getStepExecutions(instanceId: string): Promise<StepExecution[]> {

@@ -7,6 +7,7 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { workspaces } from './workspace.js';
+import { processInstances } from './process-instance.js';
 
 /**
  * Agent → human handoff entity (PLAN-0001 §1.2 handoff_entities).
@@ -41,7 +42,10 @@ export const handoffEntities = pgTable(
       .references(() => workspaces.handle, { onDelete: 'cascade' }),
 
     type: text('type').notNull(),
-    processInstanceId: text('process_instance_id').notNull(),
+    // FK to process_instances.id added in #10 migration.
+    processInstanceId: text('process_instance_id')
+      .notNull()
+      .references(() => processInstances.id, { onDelete: 'cascade' }),
     stepId: text('step_id').notNull(),
     agentRunId: text('agent_run_id').notNull(),
 

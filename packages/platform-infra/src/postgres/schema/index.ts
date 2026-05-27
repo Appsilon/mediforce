@@ -8,3 +8,4 @@ export * from './agent-run.js';
 export * from './human-task.js';
 export * from './handoff.js';
 export * from './cowork-session.js';
+export * from './process-instance.js';

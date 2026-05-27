@@ -361,6 +361,7 @@ describe.skipIf(skipPg)('PostgresCoworkSessionRepository (parity)', () => {
     await testClient.unsafe(
       `TRUNCATE TABLE "${schemaName}"."cowork_turns", ` +
         `"${schemaName}"."cowork_sessions", ` +
+        `"${schemaName}"."process_instances", ` +
         `"${schemaName}"."workspace_members", "${schemaName}"."workspaces" CASCADE`,
     );
     const nsByInstance = new Map<string, string>();
@@ -379,6 +380,15 @@ describe.skipIf(skipPg)('PostgresCoworkSessionRepository (parity)', () => {
             createdAt: '2026-05-27T00:00:00.000Z',
           });
         }
+        // Parent process_instances row required by FK from cowork_sessions.
+        await testClient.unsafe(
+          `INSERT INTO "${schemaName}"."process_instances" ` +
+            `(id, workspace, definition_name, definition_version, status, ` +
+            `variables, trigger_type, trigger_payload) ` +
+            `VALUES ($1, $2, 'stub-def', '1.0.0', 'completed', '{}'::jsonb, 'manual', '{}'::jsonb) ` +
+            `ON CONFLICT (id) DO NOTHING`,
+          [id, namespace],
+        );
       },
     };
   });
@@ -401,6 +411,15 @@ describe.skipIf(skipPg)('PostgresCoworkSessionRepository (parity)', () => {
     }
     const instanceId = randomUUID();
     nsByInstance.set(instanceId, ns);
+    // Parent process_instances row required by FK from cowork_sessions.
+    await testClient.unsafe(
+      `INSERT INTO "${schemaName}"."process_instances" ` +
+        `(id, workspace, definition_name, definition_version, status, ` +
+        `variables, trigger_type, trigger_payload) ` +
+        `VALUES ($1, $2, 'stub-def', '1.0.0', 'completed', '{}'::jsonb, 'manual', '{}'::jsonb) ` +
+        `ON CONFLICT (id) DO NOTHING`,
+      [instanceId, ns],
+    );
     const session = await repo.create(sessionFor(instanceId));
 
     // Directly insert two turns at the same idx to verify the constraint.

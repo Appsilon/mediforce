@@ -25,6 +25,7 @@ import {
   PostgresAgentRunRepository,
   PostgresHumanTaskRepository,
   PostgresCoworkSessionRepository,
+  PostgresProcessInstanceRepository,
   getSharedPostgresClient,
   getAdminFirestore,
   validateSecretsKey,
@@ -43,6 +44,7 @@ import type {
   HumanTaskRepository,
   NamespaceRepository,
   OAuthProviderRepository,
+  ProcessInstanceRepository,
   ToolCatalogRepository,
 } from '@mediforce/platform-core';
 import {
@@ -85,7 +87,7 @@ export interface PlatformServices {
   pluginRegistry: PluginRegistry;
   llmClient: OpenRouterLlmClient;
   processRepo: FirestoreProcessRepository;
-  instanceRepo: FirestoreProcessInstanceRepository;
+  instanceRepo: ProcessInstanceRepository;
   auditRepo: AuditRepository;
   agentRunRepo: AgentRunRepository;
   humanTaskRepo: HumanTaskRepository;
@@ -112,7 +114,10 @@ export function getPlatformServices(): PlatformServices {
   const db = getAdminFirestore();
 
   const processRepo = new FirestoreProcessRepository(db);
-  const instanceRepo = new FirestoreProcessInstanceRepository(db);
+  const instanceRepo: ProcessInstanceRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresProcessInstanceRepository(getSharedPostgresClient().db)
+      : new FirestoreProcessInstanceRepository(db);
   // Indirect-namespace repos depend on instanceRepo for parent-run namespace
   // resolution inside the namespace-scoped read variants (ADR-0004 §"Storage-
   // layer filter, today").

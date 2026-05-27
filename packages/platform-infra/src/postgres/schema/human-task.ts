@@ -8,6 +8,7 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { workspaces } from './workspace.js';
+import { processInstances } from './process-instance.js';
 
 /**
  * Human review / approval task (PLAN-0001 §1.2 human_tasks).
@@ -26,9 +27,9 @@ import { workspaces } from './workspace.js';
  * ProcessInstance — HumanTask itself carries no namespace field. Same
  * pattern as audit_events and agent_runs.
  *
- * `process_instance_id` is `uuid` with NO FK constraint right now — the
- * `process_instances` table arrives in a later PR2 migration. FK to
- * `process_instances.id` added in #9 migration.
+ * `process_instance_id` is `text` with FK to `process_instances.id` added
+ * in #10 migration (when `process_instances` lands). ON DELETE CASCADE
+ * mirrors the Firestore subcollection lifetime.
  */
 export const humanTasks = pgTable(
   'human_tasks',
@@ -38,10 +39,12 @@ export const humanTasks = pgTable(
       .notNull()
       .references(() => workspaces.handle, { onDelete: 'cascade' }),
 
-    // Context — FK to process_instances.id added in #9 migration.
+    // Context — FK to process_instances.id (added in #10 migration).
     // `text` not `uuid` — process_instances retains Firestore-style string
     // ids during dual-code; stays text post-cutover (no conversion needed).
-    processInstanceId: text('process_instance_id').notNull(),
+    processInstanceId: text('process_instance_id')
+      .notNull()
+      .references(() => processInstances.id, { onDelete: 'cascade' }),
     stepId: text('step_id').notNull(),
 
     // Assignment + lifecycle

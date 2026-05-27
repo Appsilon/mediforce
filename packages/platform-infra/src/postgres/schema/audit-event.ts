@@ -3,6 +3,7 @@ import { pgTable, text, uuid, jsonb, timestamp, index } from 'drizzle-orm/pg-cor
 // keeps Firestore-shaped string ids during the dual-code window. Post-
 // cutover, ids stay text (no need to convert).
 import { workspaces } from './workspace.js';
+import { processInstances } from './process-instance.js';
 
 /**
  * Append-only audit log (PLAN-0001 §1.2 audit_events).
@@ -16,9 +17,9 @@ import { workspaces } from './workspace.js';
  * comes from the caller (ISO string); `server_timestamp` defaults to
  * `now()` so the DB always records when the row landed.
  *
- * `process_instance_id` is `uuid` with no FK constraint right now — the
- * `process_instances` table arrives in a later PR2 migration. FK to
- * `process_instances.id` added in #9 migration.
+ * `process_instance_id` is `text` with FK to `process_instances.id` added
+ * in #10 migration (when `process_instances` lands). Nullable because some
+ * audit events (e.g. workspace-level admin actions) have no parent run.
  */
 export const auditEvents = pgTable(
   'audit_events',
@@ -38,8 +39,13 @@ export const auditEvents = pgTable(
     entityType: text('entity_type').notNull(),
     entityId: text('entity_id').notNull(),
 
-    // Context — FK to process_instances.id added in #9 migration.
-    processInstanceId: text('process_instance_id'),
+    // Context — FK to process_instances.id (nullable: workspace-level
+    // admin actions have no parent run). ON DELETE SET NULL preserves the
+    // audit row when a run is hard-deleted.
+    processInstanceId: text('process_instance_id').references(
+      () => processInstances.id,
+      { onDelete: 'set null' },
+    ),
     stepId: text('step_id'),
     processDefinitionVersion: text('process_definition_version'),
     executorType: text('executor_type'),
