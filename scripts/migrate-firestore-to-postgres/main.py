@@ -443,11 +443,17 @@ def migrate_process_instances(
 
 def migrate_audit_events(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> dict[str, int]:
     rows: list[dict[str, Any]] = []
+    errors = 0
     for doc_id, data in fs_iter_collection(fs, "auditEvents"):
         pi_id = data.get("processInstanceId")
+        workspace = data.get("workspace") or ws_cache.get(pi_id or "")
+        if not workspace:
+            print(f"WARN: skipping audit_events doc {doc_id} — no workspace resolvable")
+            errors += 1
+            continue
         rows.append(
             {
-                "workspace": data.get("workspace") or ws_cache.get(pi_id or "") or "unknown",
+                "workspace": workspace,
                 "actor_id": data.get("actorId") or "unknown",
                 "actor_type": data.get("actorType") or "system",
                 "actor_role": data.get("actorRole") or "system",
@@ -479,17 +485,23 @@ def migrate_audit_events(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> 
     ins, skip = insert_rows(
         pg, "audit_events", _strip_none_defaults(rows), conflict=None, dry_run=dry_run
     )
-    return _result(ins, skip)
+    return _result(ins, skip, errors)
 
 
 def migrate_agent_runs(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> dict[str, int]:
     rows: list[dict[str, Any]] = []
+    errors = 0
     for doc_id, data in fs_iter_collection(fs, "agentRuns"):
         pi_id = data.get("processInstanceId")
         env = data.get("envelope") or {}
+        workspace = data.get("workspace") or ws_cache.get(pi_id or "")
+        if not workspace:
+            print(f"WARN: skipping agent_runs doc {doc_id} — no workspace resolvable")
+            errors += 1
+            continue
         rows.append(
             {
-                "workspace": data.get("workspace") or ws_cache.get(pi_id or "") or "unknown",
+                "workspace": workspace,
                 "process_instance_id": pi_id,
                 "step_id": data.get("stepId"),
                 "plugin_id": data.get("pluginId") or "unknown",
@@ -512,16 +524,22 @@ def migrate_agent_runs(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> di
     ins, skip = insert_rows(
         pg, "agent_runs", _strip_none_defaults(rows), conflict=None, dry_run=dry_run
     )
-    return _result(ins, skip)
+    return _result(ins, skip, errors)
 
 
 def migrate_human_tasks(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> dict[str, int]:
     rows: list[dict[str, Any]] = []
+    errors = 0
     for doc_id, data in fs_iter_collection(fs, "humanTasks"):
         pi_id = data.get("processInstanceId")
+        workspace = data.get("workspace") or ws_cache.get(pi_id or "")
+        if not workspace:
+            print(f"WARN: skipping human_tasks doc {doc_id} — no workspace resolvable")
+            errors += 1
+            continue
         rows.append(
             {
-                "workspace": data.get("workspace") or ws_cache.get(pi_id or "") or "unknown",
+                "workspace": workspace,
                 "process_instance_id": pi_id,
                 "step_id": data.get("stepId"),
                 "assigned_role": data.get("assignedRole") or "reviewer",
@@ -544,16 +562,22 @@ def migrate_human_tasks(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> d
     ins, skip = insert_rows(
         pg, "human_tasks", _strip_none_defaults(rows), conflict=None, dry_run=dry_run
     )
-    return _result(ins, skip)
+    return _result(ins, skip, errors)
 
 
 def migrate_handoff_entities(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> dict[str, int]:
     rows: list[dict[str, Any]] = []
+    errors = 0
     for doc_id, data in fs_iter_collection(fs, "handoffEntities"):
         pi_id = data.get("processInstanceId")
+        workspace = data.get("workspace") or ws_cache.get(pi_id or "")
+        if not workspace:
+            print(f"WARN: skipping handoff_entities doc {doc_id} — no workspace resolvable")
+            errors += 1
+            continue
         rows.append(
             {
-                "workspace": data.get("workspace") or ws_cache.get(pi_id or "") or "unknown",
+                "workspace": workspace,
                 "type": data.get("type") or "review",
                 "process_instance_id": pi_id,
                 "step_id": data.get("stepId"),
@@ -574,18 +598,24 @@ def migrate_handoff_entities(fs, pg, *, dry_run: bool, ws_cache: dict[str, str])
     ins, skip = insert_rows(
         pg, "handoff_entities", _strip_none_defaults(rows), conflict=None, dry_run=dry_run
     )
-    return _result(ins, skip)
+    return _result(ins, skip, errors)
 
 
 def migrate_cowork_sessions(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> dict[str, int]:
     sess_rows: list[dict[str, Any]] = []
     turn_rows: list[dict[str, Any]] = []
+    errors = 0
     for doc_id, data in fs_iter_collection(fs, "coworkSessions"):
         pi_id = data.get("processInstanceId")
+        workspace = data.get("workspace") or ws_cache.get(pi_id or "")
+        if not workspace:
+            print(f"WARN: skipping cowork_sessions doc {doc_id} — no workspace resolvable")
+            errors += 1
+            continue
         sess_rows.append(
             {
                 "id": doc_id,
-                "workspace": data.get("workspace") or ws_cache.get(pi_id or "") or "unknown",
+                "workspace": workspace,
                 "process_instance_id": pi_id,
                 "step_id": data.get("stepId"),
                 "assigned_role": data.get("assignedRole") or "reviewer",
@@ -627,7 +657,7 @@ def migrate_cowork_sessions(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) 
     ins_t, skip_t = insert_rows(
         pg, "cowork_turns", _strip_none_defaults(turn_rows), conflict="id", dry_run=dry_run
     )
-    return _result(ins_s + ins_t, skip_s + skip_t)
+    return _result(ins_s + ins_t, skip_s + skip_t, errors)
 
 
 def migrate_namespace_secrets(fs, pg, *, dry_run: bool) -> dict[str, int]:
