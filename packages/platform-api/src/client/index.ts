@@ -117,6 +117,16 @@ import {
   UpdateOAuthProviderOutputSchema,
   DeleteOAuthProviderInputSchema,
   DeleteOAuthProviderOutputSchema,
+  ListToolCatalogEntriesInputSchema,
+  ListToolCatalogEntriesOutputSchema,
+  GetToolCatalogEntryInputSchema,
+  GetToolCatalogEntryOutputSchema,
+  CreateToolCatalogEntryInputApiSchema,
+  CreateToolCatalogEntryOutputSchema,
+  UpdateToolCatalogEntryInputApiSchema,
+  UpdateToolCatalogEntryOutputSchema,
+  DeleteToolCatalogEntryInputSchema,
+  DeleteToolCatalogEntryOutputSchema,
   type ListOAuthProvidersInput,
   type ListOAuthProvidersOutput,
   type GetOAuthProviderInput,
@@ -127,6 +137,16 @@ import {
   type UpdateOAuthProviderOutput,
   type DeleteOAuthProviderInput,
   type DeleteOAuthProviderOutput,
+  type ListToolCatalogEntriesInput,
+  type ListToolCatalogEntriesOutput,
+  type GetToolCatalogEntryInput,
+  type GetToolCatalogEntryOutput,
+  type CreateToolCatalogEntryInputApi,
+  type CreateToolCatalogEntryOutput,
+  type UpdateToolCatalogEntryInputApi,
+  type UpdateToolCatalogEntryOutput,
+  type DeleteToolCatalogEntryInput,
+  type DeleteToolCatalogEntryOutput,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
@@ -445,6 +465,14 @@ export class Mediforce {
     create: (input: CreateOAuthProviderInputApi) => Promise<CreateOAuthProviderOutput>;
     update: (input: UpdateOAuthProviderInputApi) => Promise<UpdateOAuthProviderOutput>;
     delete: (input: DeleteOAuthProviderInput) => Promise<DeleteOAuthProviderOutput>;
+  };
+
+  readonly toolCatalog: {
+    list: (input: ListToolCatalogEntriesInput) => Promise<ListToolCatalogEntriesOutput>;
+    get: (input: GetToolCatalogEntryInput) => Promise<GetToolCatalogEntryOutput>;
+    create: (input: CreateToolCatalogEntryInputApi) => Promise<CreateToolCatalogEntryOutput>;
+    update: (input: UpdateToolCatalogEntryInputApi) => Promise<UpdateToolCatalogEntryOutput>;
+    delete: (input: DeleteToolCatalogEntryInput) => Promise<DeleteToolCatalogEntryOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -1146,6 +1174,62 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.delete');
         return DeleteOAuthProviderOutputSchema.parse(body);
+      },
+    };
+
+    this.toolCatalog = {
+      list: async (input) => {
+        const validated = ListToolCatalogEntriesInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/admin/tool-catalog${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.list');
+        return ListToolCatalogEntriesOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetToolCatalogEntryInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/tool-catalog/${encodeURIComponent(validated.id)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.get');
+        return GetToolCatalogEntryOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateToolCatalogEntryInputApiSchema.parse(input);
+        const { namespace, ...createBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/admin/tool-catalog${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.create');
+        return CreateToolCatalogEntryOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const validated = UpdateToolCatalogEntryInputApiSchema.parse(input);
+        const { namespace, id, ...patch } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(
+          `/api/admin/tool-catalog/${encodeURIComponent(id)}${qs}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.update');
+        return UpdateToolCatalogEntryOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteToolCatalogEntryInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/tool-catalog/${encodeURIComponent(validated.id)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.delete');
+        return DeleteToolCatalogEntryOutputSchema.parse(body);
       },
     };
   }

@@ -331,3 +331,26 @@ export {
   type DeleteOAuthProviderInput,
   type DeleteOAuthProviderOutput,
 } from './oauth-providers.js';
+
+export {
+  ListToolCatalogEntriesInputSchema,
+  ListToolCatalogEntriesOutputSchema,
+  GetToolCatalogEntryInputSchema,
+  GetToolCatalogEntryOutputSchema,
+  CreateToolCatalogEntryInputApiSchema,
+  CreateToolCatalogEntryOutputSchema,
+  UpdateToolCatalogEntryInputApiSchema,
+  UpdateToolCatalogEntryOutputSchema,
+  DeleteToolCatalogEntryInputSchema,
+  DeleteToolCatalogEntryOutputSchema,
+  type ListToolCatalogEntriesInput,
+  type ListToolCatalogEntriesOutput,
+  type GetToolCatalogEntryInput,
+  type GetToolCatalogEntryOutput,
+  type CreateToolCatalogEntryInputApi,
+  type CreateToolCatalogEntryOutput,
+  type UpdateToolCatalogEntryInputApi,
+  type UpdateToolCatalogEntryOutput,
+  type DeleteToolCatalogEntryInput,
+  type DeleteToolCatalogEntryOutput,
+} from './tool-catalog.js';

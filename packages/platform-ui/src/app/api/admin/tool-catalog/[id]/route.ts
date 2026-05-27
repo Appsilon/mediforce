@@ -1,67 +1,68 @@
-import { NextResponse } from 'next/server';
-import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
-import { getPlatformServices } from '@/lib/platform-services';
-import { resolveNamespaceFromQuery } from '../helpers';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import {
+  DeleteToolCatalogEntryInputSchema,
+  GetToolCatalogEntryInputSchema,
+  UpdateToolCatalogEntryInputApiSchema,
+  type DeleteToolCatalogEntryInput,
+  type GetToolCatalogEntryInput,
+  type UpdateToolCatalogEntryInputApi,
+} from '@mediforce/platform-api/contract';
+import {
+  deleteToolCatalogEntry,
+  getToolCatalogEntry,
+  updateToolCatalogEntry,
+} from '@mediforce/platform-api/handlers';
 
-/** Partial-update payload: id cannot be renamed — bindings reference it. */
-const ToolCatalogEntryPatchSchema = ToolCatalogEntrySchema.omit({ id: true }).partial().strict();
-
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
-  const { id } = await params;
-  const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
-  if (namespace instanceof NextResponse) return namespace;
-
-  const entry = await services.toolCatalogRepo.getById(namespace, id);
-  if (entry === null) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-  return NextResponse.json({ entry });
+interface RouteContext {
+  params: Promise<{ id: string }>;
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
-  const { id } = await params;
-  const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
-  if (namespace instanceof NextResponse) return namespace;
+export const GET = createRouteAdapter<
+  typeof GetToolCatalogEntryInputSchema,
+  GetToolCatalogEntryInput,
+  unknown,
+  RouteContext
+>(
+  GetToolCatalogEntryInputSchema,
+  async (req, ctx) => ({
+    namespace: new URL(req.url).searchParams.get('namespace') ?? '',
+    id: (await ctx.params).id,
+  }),
+  getToolCatalogEntry,
+);
 
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== 'object') {
-    return NextResponse.json({ error: 'JSON body is required' }, { status: 400 });
-  }
+export const PATCH = createRouteAdapter<
+  typeof UpdateToolCatalogEntryInputApiSchema,
+  UpdateToolCatalogEntryInputApi,
+  unknown,
+  RouteContext
+>(
+  UpdateToolCatalogEntryInputApiSchema,
+  async (req, ctx) => {
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    // Path id wins over any `id` field in the body — bindings reference id,
+    // so the route never allows a rename. The patch schema strips `id` from
+    // the partial body; we reinstate it from the URL.
+    const { id: _bodyId, ...rest } = body;
+    return {
+      ...rest,
+      namespace: new URL(req.url).searchParams.get('namespace') ?? '',
+      id: (await ctx.params).id,
+    };
+  },
+  updateToolCatalogEntry,
+);
 
-  const parsed = ToolCatalogEntryPatchSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-
-  const existing = await services.toolCatalogRepo.getById(namespace, id);
-  if (existing === null) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const entry = await services.toolCatalogRepo.upsert(namespace, { ...existing, ...parsed.data, id });
-  return NextResponse.json({ entry });
-}
-
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
-  const { id } = await params;
-  const services = getPlatformServices();
-  const namespace = await resolveNamespaceFromQuery(request, services.namespaceRepo);
-  if (namespace instanceof NextResponse) return namespace;
-
-  await services.toolCatalogRepo.delete(namespace, id);
-  return NextResponse.json({ success: true });
-}
+export const DELETE = createRouteAdapter<
+  typeof DeleteToolCatalogEntryInputSchema,
+  DeleteToolCatalogEntryInput,
+  unknown,
+  RouteContext
+>(
+  DeleteToolCatalogEntryInputSchema,
+  async (req, ctx) => ({
+    namespace: new URL(req.url).searchParams.get('namespace') ?? '',
+    id: (await ctx.params).id,
+  }),
+  deleteToolCatalogEntry,
+);

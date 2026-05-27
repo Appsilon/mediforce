@@ -75,4 +75,10 @@ export { createOAuthProvider } from './oauth-providers/create-provider.js';
 export { updateOAuthProvider } from './oauth-providers/update-provider.js';
 export { deleteOAuthProvider } from './oauth-providers/delete-provider.js';
 
+export { listToolCatalogEntries } from './tool-catalog/list-entries.js';
+export { getToolCatalogEntry } from './tool-catalog/get-entry.js';
+export { createToolCatalogEntry } from './tool-catalog/create-entry.js';
+export { updateToolCatalogEntry } from './tool-catalog/update-entry.js';
+export { deleteToolCatalogEntry } from './tool-catalog/delete-entry.js';
+
 export { listAdapter, getByIdAdapter } from './_generic.js';
