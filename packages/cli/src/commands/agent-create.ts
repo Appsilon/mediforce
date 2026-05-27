@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { CreateAgentInputSchema } from '@mediforce/platform-api/contract';
 import { defineCommand } from '../define-command.js';
 import { printJson, printError } from '../output.js';
 
@@ -25,10 +26,15 @@ export const agentCreateCommand = defineCommand({
       printError(output, { error: `failed to read ${args.file}: ${String(err)}` }, jsonMode);
       return 1;
     }
-    const body = typeof raw === 'object' && raw !== null ? { ...(raw as Record<string, unknown>) } : {};
-    if (args.namespace !== undefined) body.namespace = args.namespace;
+    const rawObject = typeof raw === 'object' && raw !== null ? { ...(raw as Record<string, unknown>) } : {};
+    if (args.namespace !== undefined) rawObject.namespace = args.namespace;
+    const parsed = CreateAgentInputSchema.safeParse(rawObject);
+    if (!parsed.success) {
+      printError(output, { error: `invalid agent definition: ${parsed.error.message}` }, jsonMode);
+      return 1;
+    }
 
-    const result = await mediforce.agents.create(body as never);
+    const result = await mediforce.agents.create(parsed.data);
     if (jsonMode) {
       printJson(output, result);
       return 0;

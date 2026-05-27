@@ -61,6 +61,12 @@ export const GetWorkflowOutputSchema = z.object({
 });
 
 export type RegisterWorkflowInput = z.infer<typeof RegisterWorkflowInputSchema>;
+/**
+ * Pre-parse shape accepted by `mediforce.workflows.register()`. Differs from
+ * `RegisterWorkflowInput` in that schema-level defaults (e.g. `visibility`)
+ * are optional — the client runs `.parse()` and fills them in.
+ */
+export type RegisterWorkflowBody = z.input<typeof RegisterWorkflowInputSchema>;
 export type RegisterWorkflowOutput = z.infer<typeof RegisterWorkflowOutputSchema>;
 export type WorkflowDefinitionGroupSummary = z.infer<typeof WorkflowDefinitionGroupSchema>;
 export type ListWorkflowsInput = z.infer<typeof ListWorkflowsInputSchema>;

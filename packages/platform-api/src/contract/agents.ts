@@ -55,6 +55,12 @@ export type UpdateAgentOutput = z.infer<typeof UpdateAgentOutputSchema>;
 export const CreateAgentInputSchema = CreateAgentDefinitionInputSchema;
 export const CreateAgentOutputSchema = z.object({ agent: AgentDefinitionSchema });
 export type CreateAgentInput = z.infer<typeof CreateAgentInputSchema>;
+/**
+ * Pre-parse shape accepted by `mediforce.agents.create()`. Differs from
+ * `CreateAgentInput` in that schema-level defaults (e.g. `kind`, `visibility`)
+ * are optional — the client runs `.parse()` and fills them in.
+ */
+export type CreateAgentBody = z.input<typeof CreateAgentInputSchema>;
 export type CreateAgentOutput = z.infer<typeof CreateAgentOutputSchema>;
 
 // ---- PUT /api/agents/:id/mcp-servers/:name ----------------------------------

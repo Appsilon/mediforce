@@ -111,7 +111,7 @@ import {
   type ClaimTaskOutput,
   type CompleteTaskInput,
   type CompleteTaskOutput,
-  type RegisterWorkflowInput,
+  type RegisterWorkflowBody,
   type RegisterWorkflowOutput,
   type RegisterWorkflowOptions,
   type ListWorkflowsInput,
@@ -154,7 +154,7 @@ import {
   type UpdateAgentInput,
   type UpdateAgentBody,
   type UpdateAgentOutput,
-  type CreateAgentInput,
+  type CreateAgentBody,
   type CreateAgentOutput,
   type UpsertAgentMcpBindingInput,
   type UpsertAgentMcpBindingOutput,
@@ -325,7 +325,7 @@ export class Mediforce {
 
   readonly workflows: {
     register: (
-      input: RegisterWorkflowInput,
+      input: RegisterWorkflowBody,
       options: RegisterWorkflowOptions,
     ) => Promise<RegisterWorkflowOutput>;
     list: (input?: ListWorkflowsInput) => Promise<ListWorkflowsOutput>;
@@ -355,7 +355,7 @@ export class Mediforce {
   readonly agents: {
     list: (input?: ListAgentsInput) => Promise<ListAgentsOutput>;
     get: (input: GetAgentInput) => Promise<GetAgentOutput>;
-    create: (input: CreateAgentInput) => Promise<CreateAgentOutput>;
+    create: (input: CreateAgentBody) => Promise<CreateAgentOutput>;
     delete: (input: DeleteAgentInput) => Promise<DeleteAgentOutput>;
     update: (input: UpdateAgentInput, body: UpdateAgentBody) => Promise<UpdateAgentOutput>;
     listMcpBindings: (
