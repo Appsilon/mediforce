@@ -111,9 +111,9 @@ describe('middleware admin prefix', () => {
   });
 
   it('passes through /api/admin/tool-catalog with valid PLATFORM_API_KEY', async () => {
-    // Tier-split was collapsed in Phase 2.6 (closes #218): PLATFORM_API_KEY
-    // and PLATFORM_ADMIN_API_KEY both mint apiKey identities; per-endpoint
-    // admin role enforcement lives in `assertCallerIsNamespaceAdmin`.
+    // Both PLATFORM_API_KEY and PLATFORM_ADMIN_API_KEY mint the same apiKey
+    // identity at this layer; per-endpoint admin role enforcement is in
+    // `assertCallerIsNamespaceAdmin` (closes #218).
     const res = await proxy(
       makeRequest('/api/admin/tool-catalog', { headers: { 'X-Api-Key': 'test-secret-key' } }),
     );

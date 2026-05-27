@@ -5,9 +5,7 @@ import type { ResendInviteInput, ResendInviteOutput } from '../../contract/users
 import { actorFromCaller } from '../_helpers.js';
 
 /**
- * Re-issue an invite for a pending workspace member (Wave 6 of the headless
- * platform-API migration). Preserves the legacy `/api/users/resend-invite`
- * route minus inline Firebase / Mailgun coupling.
+ * Re-issue an invite for a pending workspace member.
  *
  *   1. Caller must be `owner`/`admin` of `namespaceHandle` (apiKey bypass).
  *   2. Look up the target user's email via

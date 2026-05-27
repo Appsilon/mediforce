@@ -136,8 +136,9 @@ interface FirestorePort {
 
 /**
  * Adapts `FirebaseInviteService` onto the framework-free `InviteService`
- * interface Wave 5/6 handlers consume. Adds `getUserEmail` + `isInvitePending`
- * directly here so the Firebase service stays focused on writes.
+ * interface that handlers consume. Adds read-side methods (`getUserEmail`,
+ * `isInvitePending`) directly here so the Firebase service stays focused on
+ * writes.
  */
 class FirebaseInviteServiceAdapter implements InviteService {
   constructor(

@@ -108,8 +108,8 @@ export interface SystemServices {
   readonly runKicker: RunKicker;
   /**
    * Invite-flow surface (Firebase Auth user creation + password reset). `null`
-   * when not wired; Wave 5/6 handlers (users/invite, users/resend-invite)
-   * throw `PreconditionFailedError` in that case.
+   * when not wired; handlers throw `PreconditionFailedError` in that case so
+   * tests can run without a Firebase Admin SDK.
    */
   readonly inviteService: InviteService | null;
   /**

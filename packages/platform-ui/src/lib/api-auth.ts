@@ -24,11 +24,11 @@ export async function resolveCallerIdentity(
   namespaceRepo: NamespaceRepository,
 ): Promise<CallerIdentity | NextResponse> {
   // Both PLATFORM_API_KEY and PLATFORM_ADMIN_API_KEY mint the same apiKey
-  // shape — the historic tier-split (used to gate oauth-providers + docker-
-  // images at the route layer) collapses into a single `isSystemActor` flag
-  // per Phase 2.6 of the headless-platform-API migration. Per-user PATs
-  // (#376) supersede the distinction entirely; until then both keys are
-  // operator-issued and trusted.
+  // identity (`isSystemActor: true`). The two env vars exist for operator
+  // ergonomics — historic deployments used distinct keys per tier — but at
+  // the auth boundary they're interchangeable. Per-user PATs (#376) replace
+  // this whole branch once issued; until then both keys are operator-issued
+  // and trusted.
   const apiKey = request.headers.get('X-Api-Key');
   const expectedKey = process.env.PLATFORM_API_KEY;
   const adminKey = process.env.PLATFORM_ADMIN_API_KEY;

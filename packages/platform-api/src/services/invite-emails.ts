@@ -1,13 +1,8 @@
 /**
  * HTML + text bodies for the two invite-flow emails. Pure functions over
- * `SendEmailFn` — Wave 0 plumbing for the Wave 5/6 handler migration.
- *
- * Moved from `platform-ui/src/lib/send-invite-email.ts` so the Mailgun-backed
- * `InviteNotificationService` adapter (framework-free, lives in
- * `platform-api`) can delegate without forming a `platform-api → platform-ui`
- * dependency edge. `platform-ui` re-exports these from this module so the
- * still-inline routes (`/api/users/invite`, `/api/users/resend-invite`)
- * keep their imports stable until Wave 5/6 migrates them.
+ * `SendEmailFn` — kept framework-free so the Mailgun-backed
+ * `InviteNotificationService` adapter can delegate without forming a
+ * `platform-api → platform-ui` dependency edge.
  */
 import type { SendEmailFn } from '@mediforce/platform-core';
 

@@ -111,10 +111,10 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
   }
 
   // Auth guard: applies to all non-OPTIONS /api/* requests unless public.
-  // Either X-Api-Key (server-to-server) or Authorization: Bearer <Firebase ID token>
-  // (signed-in user) is sufficient. Per-endpoint admin gating lives in the
-  // handler layer (`assertCallerIsNamespaceAdmin`); PLATFORM_API_KEY and
-  // PLATFORM_ADMIN_API_KEY were collapsed in Phase 2.6 (closes #218).
+  // Either X-Api-Key (server-to-server) or Authorization: Bearer <Firebase ID
+  // token> (signed-in user) is sufficient. Per-endpoint admin gating lives
+  // in the handler layer via `assertCallerIsNamespaceAdmin` — this layer only
+  // proves the caller is authenticated, not what they may touch.
   const pathname = req.nextUrl.pathname;
   if (!isPublicRoute(pathname)) {
     const apiKeyOk = hasValidApiKey(req);

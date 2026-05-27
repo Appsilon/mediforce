@@ -39,7 +39,7 @@ describe('resolveCallerIdentity', () => {
     expect(result).toEqual({ kind: 'apiKey', isSystemActor: true });
   });
 
-  it('accepts PLATFORM_ADMIN_API_KEY and mints the same apiKey shape (tier-split collapsed per Phase 2.6)', async () => {
+  it('accepts PLATFORM_ADMIN_API_KEY and mints the same apiKey shape as PLATFORM_API_KEY', async () => {
     process.env.PLATFORM_ADMIN_API_KEY = 'admin-key';
     const result = await resolveCallerIdentity(
       makeRequest({ 'X-Api-Key': 'admin-key' }),
