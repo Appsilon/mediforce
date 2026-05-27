@@ -48,7 +48,7 @@ describe('run start command', () => {
     const output = captureOutput();
     const code = await runStartCommand({ argv: [], env: BASE_ENV, output });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/--workflow is required/);
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required argument: --workflow/);
   });
 
   it('starts a run without payload', async () => {
@@ -143,7 +143,7 @@ describe('run start command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/Cannot use both/);
+    expect(output.stderrLines.join('\n')).toMatch(/mutually exclusive/);
   });
 
   it('reads payload from stdin via --input-file -', async () => {

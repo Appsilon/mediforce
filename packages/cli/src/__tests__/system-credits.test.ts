@@ -75,6 +75,6 @@ describe('system credits', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toContain('Usage:');
+    expect(output.stdoutLines.join('\n')).toContain('USAGE');
   });
 });

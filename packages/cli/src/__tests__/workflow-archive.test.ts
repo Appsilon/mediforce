@@ -18,7 +18,7 @@ describe('workflow archive command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/Usage: mediforce workflow archive/);
+    expect(output.stdoutLines.join('\n')).toMatch(/USAGE mediforce workflow archive/);
   });
 
   it('exits 2 when <name> is missing', async () => {
@@ -29,7 +29,7 @@ describe('workflow archive command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/<name> is required/);
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required positional argument: NAME/);
   });
 
   it('exits 2 when neither --version nor --all provided', async () => {

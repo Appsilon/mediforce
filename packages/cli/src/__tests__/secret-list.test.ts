@@ -18,7 +18,7 @@ describe('secret list command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/Usage: mediforce secret list/);
+    expect(output.stdoutLines.join('\n')).toMatch(/USAGE mediforce secret list/);
   });
 
   it('lists secret keys in human-readable format', async () => {

@@ -54,7 +54,7 @@ describe('system status', () => {
     const output = captureOutput();
     const code = await systemStatusCommand({ argv: ['--help'], env: { MEDIFORCE_API_KEY: 'k' }, output });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toContain('Usage:');
+    expect(output.stdoutLines.join('\n')).toContain('USAGE');
   });
 
   it('accepts --base-url', async () => {

@@ -14,14 +14,18 @@ describe('runCli — top-level dispatch', () => {
     const output = captureOutput();
     const code = await runCli({ argv: ['--help'], env: {}, output });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/workflow register/);
+    const stdout = output.stdoutLines.join('\n');
+    expect(stdout).toMatch(/Usage: mediforce/);
+    expect(stdout).toMatch(/workflow/);
   });
 
   it('prints help on -h', async () => {
     const output = captureOutput();
     const code = await runCli({ argv: ['-h'], env: {}, output });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/workflow register/);
+    const stdout = output.stdoutLines.join('\n');
+    expect(stdout).toMatch(/Usage: mediforce/);
+    expect(stdout).toMatch(/workflow/);
   });
 
   it('returns exit 2 on unknown command', async () => {
