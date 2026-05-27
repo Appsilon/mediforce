@@ -20,6 +20,13 @@ import {
 const SEEDED_PRIVATE_WD = 'Supply Chain Review';
 
 test.describe('GET /api/workflow-definitions/[name] — visibility 404', () => {
+  // ADR-0001 PR2: depends on Firestore-seeded private WD.
+  // Postgres seed parity ships with postgres-seed extension pass.
+  test.skip(
+    process.env.STORAGE_BACKEND === 'postgres',
+    'Requires Firestore-seeded WDs; Postgres seed parity ships later in PR2',
+  );
+
   let callers: MultiNamespaceFixture;
 
   test.beforeAll(async () => {

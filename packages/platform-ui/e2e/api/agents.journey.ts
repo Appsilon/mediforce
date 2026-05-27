@@ -21,6 +21,13 @@ import {
  */
 
 test.describe('GET /api/agents — API E2E', () => {
+  // ADR-0001 PR2: depends on Firestore-seeded agent fixtures.
+  // Postgres seed parity ships with postgres-seed extension pass.
+  test.skip(
+    process.env.STORAGE_BACKEND === 'postgres',
+    'Requires Firestore-seeded agents; Postgres seed parity ships later in PR2',
+  );
+
   let callers: MultiNamespaceFixture;
 
   test.beforeAll(async () => {

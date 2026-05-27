@@ -13,6 +13,13 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
 
 test.describe('POST /api/cron/heartbeat — API E2E', () => {
+  // ADR-0001 PR2: heartbeat scans WDs across workspaces; requires seeded WDs.
+  // Postgres seed parity ships with postgres-seed extension pass.
+  test.skip(
+    process.env.STORAGE_BACKEND === 'postgres',
+    'Heartbeat scans seeded WDs; Postgres seed parity ships later in PR2',
+  );
+
   test('requires X-Api-Key (middleware 401)', async ({ request }) => {
     const res = await request.post('/api/cron/heartbeat');
     expect(res.status()).toBe(401);
