@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { middleware } from '../../middleware';
+import { proxy } from '../../proxy';
 
 const EMULATOR_ISS = 'https://securetoken.google.com/demo-mediforce';
 const EMULATOR_AUD = 'demo-mediforce';
@@ -59,14 +59,14 @@ describe('middleware auth guard', () => {
   });
 
   it('returns 401 when /api/workflow-definitions is called without X-Api-Key', async () => {
-    const res = await middleware(makeRequest('/api/workflow-definitions'));
+    const res = await proxy(makeRequest('/api/workflow-definitions'));
     expect(res.status).toBe(401);
     const body = await readJsonBody(res);
     expect(body).toEqual({ error: 'Unauthorized' });
   });
 
   it('returns 401 when X-Api-Key is wrong', async () => {
-    const res = await middleware(
+    const res = await proxy(
       makeRequest('/api/workflow-definitions', { headers: { 'X-Api-Key': 'wrong-key' } }),
     );
     expect(res.status).toBe(401);
@@ -75,7 +75,7 @@ describe('middleware auth guard', () => {
   });
 
   it('passes through when X-Api-Key matches PLATFORM_API_KEY', async () => {
-    const res = await middleware(
+    const res = await proxy(
       makeRequest('/api/workflow-definitions', { headers: { 'X-Api-Key': 'test-secret-key' } }),
     );
     expect(res.status).not.toBe(401);
@@ -90,12 +90,12 @@ describe('middleware public routes', () => {
   });
 
   it('allows GET /api/health without any key', async () => {
-    const res = await middleware(makeRequest('/api/health'));
+    const res = await proxy(makeRequest('/api/health'));
     expect(res.status).not.toBe(401);
   });
 
   it('allows GET /api/oauth/:provider/callback without any key', async () => {
-    const res = await middleware(makeRequest('/api/oauth/github-mock/callback'));
+    const res = await proxy(makeRequest('/api/oauth/github-mock/callback'));
     expect(res.status).not.toBe(401);
   });
 });
@@ -106,13 +106,13 @@ describe('middleware admin prefix', () => {
   });
 
   it('returns 401 when /api/admin/tool-catalog is called without key', async () => {
-    const res = await middleware(makeRequest('/api/admin/tool-catalog'));
+    const res = await proxy(makeRequest('/api/admin/tool-catalog'));
     expect(res.status).toBe(401);
   });
 
   it('passes through /api/admin/tool-catalog with valid PLATFORM_API_KEY', async () => {
     // TODO(#218): tighten to PLATFORM_ADMIN_API_KEY when tier split lands
-    const res = await middleware(
+    const res = await proxy(
       makeRequest('/api/admin/tool-catalog', { headers: { 'X-Api-Key': 'test-secret-key' } }),
     );
     expect(res.status).not.toBe(401);
@@ -125,7 +125,7 @@ describe('middleware preflight', () => {
   });
 
   it('allows OPTIONS preflight without auth', async () => {
-    const res = await middleware(makeRequest('/api/workflow-definitions', { method: 'OPTIONS' }));
+    const res = await proxy(makeRequest('/api/workflow-definitions', { method: 'OPTIONS' }));
     expect(res.status).toBe(204);
   });
 });
@@ -139,14 +139,14 @@ describe('middleware Firebase ID token (emulator mode)', () => {
 
   it('passes when Authorization: Bearer carries a valid emulator ID token', async () => {
     const token = buildEmulatorToken(validEmulatorPayload());
-    const res = await middleware(
+    const res = await proxy(
       makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
     );
     expect(res.status).not.toBe(401);
   });
 
   it('returns 401 when Bearer token is malformed (not a JWT)', async () => {
-    const res = await middleware(
+    const res = await proxy(
       makeRequest('/api/agents', { headers: { Authorization: 'Bearer not-a-jwt' } }),
     );
     expect(res.status).toBe(401);
@@ -156,7 +156,7 @@ describe('middleware Firebase ID token (emulator mode)', () => {
     const token = buildEmulatorToken(
       validEmulatorPayload({ exp: Math.floor(Date.now() / 1000) - 10, iat: Math.floor(Date.now() / 1000) - 3610 }),
     );
-    const res = await middleware(
+    const res = await proxy(
       makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
     );
     expect(res.status).toBe(401);
@@ -164,7 +164,7 @@ describe('middleware Firebase ID token (emulator mode)', () => {
 
   it('returns 401 when Bearer token aud does not match project', async () => {
     const token = buildEmulatorToken(validEmulatorPayload({ aud: 'other-project' }));
-    const res = await middleware(
+    const res = await proxy(
       makeRequest('/api/agents', { headers: { Authorization: `Bearer ${token}` } }),
     );
     expect(res.status).toBe(401);
@@ -172,7 +172,7 @@ describe('middleware Firebase ID token (emulator mode)', () => {
 
   it('accepts X-Api-Key when present even if Authorization is missing', async () => {
     // Regression guard: adding Bearer support must not break server-to-server X-Api-Key auth
-    const res = await middleware(
+    const res = await proxy(
       makeRequest('/api/agents', { headers: { 'X-Api-Key': 'test-secret-key' } }),
     );
     expect(res.status).not.toBe(401);
@@ -181,7 +181,7 @@ describe('middleware Firebase ID token (emulator mode)', () => {
   it('accepts valid Bearer even when X-Api-Key is wrong', async () => {
     // Either credential is sufficient
     const token = buildEmulatorToken(validEmulatorPayload());
-    const res = await middleware(
+    const res = await proxy(
       makeRequest('/api/agents', {
         headers: { Authorization: `Bearer ${token}`, 'X-Api-Key': 'wrong' },
       }),
