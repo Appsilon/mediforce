@@ -1,3 +1,23 @@
 # Append-only logs: take both sides on merge instead of flagging a conflict.
 # Order may interleave, but nothing is lost.
 CHANGELOG.md merge=union
+
+# Drizzle migration snapshots are auto-generated cumulative dumps of the
+# schema state. They're committed (drizzle needs them for next generate)
+# but reviewers don't read them — the SQL migration alongside is the
+# source of truth.
+#
+# `linguist-generated=true` → GitHub collapses these in PR diffs.
+# `-diff` → `git diff` shows "Binary files differ" instead of the dump.
+packages/platform-infra/src/postgres/migrations/meta/** linguist-generated=true
+packages/platform-infra/src/postgres/migrations/meta/** -diff
+
+# Lockfiles — reviewers care about package.json, not the lock dump.
+# pnpm is what mediforce uses; other patterns are defense-in-depth in case
+# someone accidentally commits a foreign lockfile.
+pnpm-lock.yaml linguist-generated=true
+pnpm-lock.yaml -diff
+**/package-lock.json linguist-generated=true
+**/package-lock.json -diff
+**/yarn.lock linguist-generated=true
+**/yarn.lock -diff
