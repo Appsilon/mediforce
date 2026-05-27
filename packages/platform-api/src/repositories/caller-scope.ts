@@ -4,6 +4,7 @@ import type {
   CronTriggerStateRepository,
   ModelRegistryRepository,
   NamespaceRepository,
+  UserDirectoryService,
 } from '@mediforce/platform-core';
 import type {
   CronTrigger,
@@ -124,4 +125,11 @@ export interface SystemServices {
    * case.
    */
   readonly dockerImageDeleter: DockerImageDeleter | null;
+  /**
+   * Directory lookup for Firebase Auth user metadata (email, lastSignInTime).
+   * `null` when not configured — handlers that consume it (e.g.
+   * `listNamespaceMembers`) degrade gracefully by returning null fields per
+   * member rather than failing the whole response.
+   */
+  readonly userDirectory: UserDirectoryService | null;
 }

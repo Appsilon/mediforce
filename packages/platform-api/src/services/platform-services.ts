@@ -23,7 +23,7 @@ import {
   FirebaseUserDirectoryService,
   getAdminAuth,
 } from '@mediforce/platform-infra';
-import type { SendEmailFn } from '@mediforce/platform-core';
+import type { SendEmailFn, UserDirectoryService } from '@mediforce/platform-core';
 import {
   ContainerWorkerImageDeleter,
   LocalDockerImageDeleter,
@@ -99,6 +99,12 @@ export interface PlatformServices {
   /** `null` when Mailgun env vars are unset (email disabled). */
   inviteNotificationService: InviteNotificationService | null;
   dockerImageDeleter: DockerImageDeleter;
+  /**
+   * Firebase Auth metadata lookup (uid → email, lastSignInTime). Always wired
+   * in production (depends on Firebase Auth, not Mailgun). Handlers consume
+   * via `scope.system.userDirectory`.
+   */
+  userDirectory: UserDirectoryService;
 }
 
 /**
@@ -273,9 +279,12 @@ export function getPlatformServices(): PlatformServices {
   const notificationService = mailgunSender
     ? new MailgunNotificationService(mailgunSender)
     : undefined;
-  const userDirectoryService = notificationService
-    ? new FirebaseUserDirectoryService(getAdminAuth())
-    : undefined;
+  // Wired whenever Firebase Auth is available — independent of Mailgun.
+  // Email-disabled deployments still need uid → email/lastSignInTime lookups
+  // for the namespace-members endpoint.
+  const userDirectoryService: UserDirectoryService = new FirebaseUserDirectoryService(
+    getAdminAuth(),
+  );
 
   const engine = new WorkflowEngine(
     processRepo,
@@ -351,6 +360,7 @@ export function getPlatformServices(): PlatformServices {
     inviteService,
     inviteNotificationService,
     dockerImageDeleter,
+    userDirectory: userDirectoryService,
   };
 
   if (!seedingStarted) {

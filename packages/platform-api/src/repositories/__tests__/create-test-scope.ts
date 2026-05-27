@@ -23,6 +23,7 @@ import type {
   NamespaceRepository,
   NamespaceSecretsRepository,
   ProcessInstanceRepository,
+  UserDirectoryService,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../auth.js';
@@ -203,6 +204,8 @@ export interface TestScopeOverrides {
   readonly inviteService?: InviteService | null;
   readonly inviteNotificationService?: InviteNotificationService | null;
   readonly dockerImageDeleter?: DockerImageDeleter | null;
+  readonly namespaceRepo?: NamespaceRepository;
+  readonly userDirectory?: UserDirectoryService | null;
 }
 
 const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
@@ -235,7 +238,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     coworkSessionRepo: overrides.coworkSessionRepo ?? new InMemoryCoworkSessionRepository(instanceRepo),
     cronTriggerStateRepo: overrides.cronTriggerStateRepo ?? new InMemoryCronTriggerStateRepository(),
     toolCatalogRepo: overrides.toolCatalogRepo ?? new InMemoryToolCatalogRepository(),
-    namespaceRepo: stubNamespaceRepo,
+    namespaceRepo: overrides.namespaceRepo ?? stubNamespaceRepo,
     oauthProviderRepo: overrides.oauthProviderRepo ?? new InMemoryOAuthProviderRepository(),
     agentOAuthTokenRepo: overrides.agentOAuthTokenRepo ?? new InMemoryAgentOAuthTokenRepository(),
     modelRegistryRepo: overrides.modelRegistryRepo ?? stubModelRegistry,
@@ -251,6 +254,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     inviteService: overrides.inviteService ?? null,
     inviteNotificationService: overrides.inviteNotificationService ?? null,
     dockerImageDeleter: overrides.dockerImageDeleter ?? null,
+    userDirectory: overrides.userDirectory ?? null,
   };
   return createCallerScope(services, caller);
 }

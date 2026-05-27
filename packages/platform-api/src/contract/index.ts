@@ -361,3 +361,12 @@ export {
   type DeleteToolCatalogEntryInput,
   type DeleteToolCatalogEntryOutput,
 } from './tool-catalog.js';
+
+export {
+  ListNamespaceMembersInputSchema,
+  ListNamespaceMembersOutputSchema,
+  NamespaceMemberWithAuthSchema,
+  type ListNamespaceMembersInput,
+  type ListNamespaceMembersOutput,
+  type NamespaceMemberWithAuth,
+} from './users.js';

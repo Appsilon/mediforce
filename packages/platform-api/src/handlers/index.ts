@@ -77,6 +77,8 @@ export { createOAuthProvider } from './oauth-providers/create-provider.js';
 export { updateOAuthProvider } from './oauth-providers/update-provider.js';
 export { deleteOAuthProvider } from './oauth-providers/delete-provider.js';
 
+export { listNamespaceMembers } from './users/list-members.js';
+
 export { listToolCatalogEntries } from './tool-catalog/list-entries.js';
 export { getToolCatalogEntry } from './tool-catalog/get-entry.js';
 export { createToolCatalogEntry } from './tool-catalog/create-entry.js';

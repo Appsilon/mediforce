@@ -15,6 +15,7 @@ import type {
   ProcessInstanceRepository,
   ProcessRepository,
   ToolCatalogRepository,
+  UserDirectoryService,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type {
@@ -74,6 +75,7 @@ export interface CallerScopeServices {
   readonly inviteService: InviteService | null;
   readonly inviteNotificationService: InviteNotificationService | null;
   readonly dockerImageDeleter: DockerImageDeleter | null;
+  readonly userDirectory: UserDirectoryService | null;
 }
 
 /**
@@ -137,6 +139,7 @@ export function createCallerScope(
       inviteService: services.inviteService,
       inviteNotificationService: services.inviteNotificationService,
       dockerImageDeleter: services.dockerImageDeleter,
+      userDirectory: services.userDirectory,
     },
   };
 }

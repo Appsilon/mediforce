@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { apiFetch } from '@/lib/api-fetch';
+import { mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
 import { WORKSPACE_ICONS, WORKSPACE_ICON_KEYS, getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
@@ -192,12 +193,10 @@ export default function WorkspaceConfigPage() {
   const fetchLastSignIn = useCallback(async () => {
     if (handle === '' || firebaseUser === null) return;
     try {
-      const res = await apiFetch(`/api/users/members?handle=${encodeURIComponent(handle)}`);
-      if (!res.ok) return;
-      const data = (await res.json()) as { members: Array<{ uid: string; email: string | null; lastSignInTime: string | null }> };
+      const { members } = await mediforce.users.listMembers({ namespace: handle });
       const map = new Map<string, string | null>();
       const emailMapLocal = new Map<string, string | null>();
-      for (const member of data.members) {
+      for (const member of members) {
         map.set(member.uid, member.lastSignInTime);
         emailMapLocal.set(member.uid, member.email);
       }

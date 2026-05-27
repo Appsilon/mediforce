@@ -206,6 +206,7 @@ export type {
   NotificationEvent,
   UserDirectoryService,
   DirectoryUser,
+  UserAuthMetadata,
   AgentRunRepository,
   CoworkSessionRepository,
   CronTriggerStateRepository,

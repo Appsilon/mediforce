@@ -127,6 +127,10 @@ import {
   UpdateToolCatalogEntryOutputSchema,
   DeleteToolCatalogEntryInputSchema,
   DeleteToolCatalogEntryOutputSchema,
+  ListNamespaceMembersInputSchema,
+  ListNamespaceMembersOutputSchema,
+  type ListNamespaceMembersInput,
+  type ListNamespaceMembersOutput,
   DeleteDockerImageInputSchema,
   DeleteDockerImageOutputSchema,
   type DeleteDockerImageInput,
@@ -481,6 +485,10 @@ export class Mediforce {
     create: (input: CreateToolCatalogEntryInputApi) => Promise<CreateToolCatalogEntryOutput>;
     update: (input: UpdateToolCatalogEntryInputApi) => Promise<UpdateToolCatalogEntryOutput>;
     delete: (input: DeleteToolCatalogEntryInput) => Promise<DeleteToolCatalogEntryOutput>;
+  };
+
+  readonly users: {
+    listMembers: (input: ListNamespaceMembersInput) => Promise<ListNamespaceMembersOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -1251,6 +1259,16 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.delete');
         return DeleteToolCatalogEntryOutputSchema.parse(body);
+      },
+    };
+
+    this.users = {
+      listMembers: async (input) => {
+        const validated = ListNamespaceMembersInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/users/members${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.users.listMembers');
+        return ListNamespaceMembersOutputSchema.parse(body);
       },
     };
   }
