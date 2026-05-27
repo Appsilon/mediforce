@@ -2,15 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAgentGetById = vi.fn();
+const mockAgentGetByIdVisibleTo = vi.fn();
 const mockAgentUpdate = vi.fn();
+const mockAuditAppend = vi.fn();
+const mockGetNamespacesByUser = vi.fn().mockResolvedValue([]);
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     agentDefinitionRepo: {
       getById: mockAgentGetById,
+      getByIdVisibleTo: mockAgentGetByIdVisibleTo,
       update: mockAgentUpdate,
     },
-    namespaceRepo: {},
+    auditRepo: { append: mockAuditAppend },
+    namespaceRepo: { getNamespacesByUser: mockGetNamespacesByUser },
   }),
 }));
 
@@ -176,21 +181,21 @@ describe('PUT /api/agents/:id/mcp-servers/:name', () => {
     expect(res.status).toBe(404);
   });
 
-  it('[AUTH] returns 403 when user is not a member of the agent namespace', async () => {
+  it('[AUTH] returns 404 when user is not a member of the agent namespace', async () => {
     mockResolveCallerIdentity.mockReturnValue({
       kind: 'user',
       uid: 'outsider',
       namespaces: new Set(['other-ns']),
       isSystemActor: false,
     });
-    mockAgentGetById.mockResolvedValue({ ...coworkAgent, namespace: 'test-ns' });
+    mockAgentGetByIdVisibleTo.mockResolvedValue(null);
 
     const res = await PUT(
       makePutRequest('tealflow-cowork-chat', 'new', stdioBinding),
       { params: makeParams('tealflow-cowork-chat', 'new') },
     );
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     expect(mockAgentUpdate).not.toHaveBeenCalled();
   });
 

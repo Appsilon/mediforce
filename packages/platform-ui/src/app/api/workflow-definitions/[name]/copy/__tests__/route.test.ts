@@ -16,6 +16,7 @@ const sourceDefinition: WorkflowDefinition = {
 const mockGetWorkflowDefinition = vi.fn();
 const mockGetLatestWorkflowVersion = vi.fn();
 const mockSaveWorkflowDefinition = vi.fn();
+const mockAuditAppend = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -24,6 +25,7 @@ vi.mock('@/lib/platform-services', () => ({
       getLatestWorkflowVersion: mockGetLatestWorkflowVersion,
       saveWorkflowDefinition: mockSaveWorkflowDefinition,
     },
+    auditRepo: { append: mockAuditAppend },
     namespaceRepo: {},
   }),
 }));
@@ -125,7 +127,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
     });
     expect(res.status).toBe(409);
     const json = await res.json();
-    expect(json.error).toContain('already exists');
+    expect(json.error.message).toContain('already exists');
   });
 
   it('returns 404 for non-existent workflow', async () => {
@@ -160,7 +162,7 @@ describe('POST /api/workflow-definitions/[name]/copy', () => {
   it('returns 403 when caller is not member of target namespace', async () => {
     mockCallerIdentity = { kind: 'user', namespaces: new Set(['other-ns']), isSystemActor: false };
 
-    const res = await POST(makeRequest('my-workflow', 'target-ns'), {
+    const res = await POST(makeRequest('my-workflow', 'target-ns', undefined, 'source-ns'), {
       params: Promise.resolve({ name: 'my-workflow' }),
     });
     expect(res.status).toBe(403);
