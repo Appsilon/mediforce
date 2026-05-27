@@ -107,6 +107,26 @@ import {
   BulkRunOutputSchema,
   HeartbeatInputSchema,
   HeartbeatOutputSchema,
+  ListOAuthProvidersInputSchema,
+  ListOAuthProvidersOutputSchema,
+  GetOAuthProviderInputSchema,
+  GetOAuthProviderOutputSchema,
+  CreateOAuthProviderInputApiSchema,
+  CreateOAuthProviderOutputSchema,
+  UpdateOAuthProviderInputApiSchema,
+  UpdateOAuthProviderOutputSchema,
+  DeleteOAuthProviderInputSchema,
+  DeleteOAuthProviderOutputSchema,
+  type ListOAuthProvidersInput,
+  type ListOAuthProvidersOutput,
+  type GetOAuthProviderInput,
+  type GetOAuthProviderOutput,
+  type CreateOAuthProviderInputApi,
+  type CreateOAuthProviderOutput,
+  type UpdateOAuthProviderInputApi,
+  type UpdateOAuthProviderOutput,
+  type DeleteOAuthProviderInput,
+  type DeleteOAuthProviderOutput,
   type ListTasksInput,
   type ListTasksOutput,
   type GetTaskInput,
@@ -417,6 +437,14 @@ export class Mediforce {
 
   readonly cron: {
     heartbeat: (input?: HeartbeatInput) => Promise<HeartbeatOutput>;
+  };
+
+  readonly oauthProviders: {
+    list: (input: ListOAuthProvidersInput) => Promise<ListOAuthProvidersOutput>;
+    get: (input: GetOAuthProviderInput) => Promise<GetOAuthProviderOutput>;
+    create: (input: CreateOAuthProviderInputApi) => Promise<CreateOAuthProviderOutput>;
+    update: (input: UpdateOAuthProviderInputApi) => Promise<UpdateOAuthProviderOutput>;
+    delete: (input: DeleteOAuthProviderInput) => Promise<DeleteOAuthProviderOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -1062,6 +1090,62 @@ export class Mediforce {
         const res = await this.request('/api/cron/heartbeat', { method: 'POST' });
         const body = await parseJsonOrThrow(res, 'mediforce.cron.heartbeat');
         return HeartbeatOutputSchema.parse(body);
+      },
+    };
+
+    this.oauthProviders = {
+      list: async (input) => {
+        const validated = ListOAuthProvidersInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/admin/oauth-providers${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.list');
+        return ListOAuthProvidersOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetOAuthProviderInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/oauth-providers/${encodeURIComponent(validated.id)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.get');
+        return GetOAuthProviderOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateOAuthProviderInputApiSchema.parse(input);
+        const { namespace, ...createBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/admin/oauth-providers${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.create');
+        return CreateOAuthProviderOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const validated = UpdateOAuthProviderInputApiSchema.parse(input);
+        const { namespace, id, ...patch } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(
+          `/api/admin/oauth-providers/${encodeURIComponent(id)}${qs}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.update');
+        return UpdateOAuthProviderOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteOAuthProviderInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(
+          `/api/admin/oauth-providers/${encodeURIComponent(validated.id)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.oauthProviders.delete');
+        return DeleteOAuthProviderOutputSchema.parse(body);
       },
     };
   }

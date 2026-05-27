@@ -35,6 +35,16 @@ const fake = vi.hoisted(() => {
         }
         return result;
       },
+      getMembershipsForUser: async (uid: string) => {
+        const out: Array<{ handle: string; role: 'owner' | 'admin' | 'member' }> = [];
+        for (const [handle, byUid] of members.entries()) {
+          const member = byUid.get(uid) as
+            | { role: 'owner' | 'admin' | 'member' }
+            | undefined;
+          if (member) out.push({ handle, role: member.role });
+        }
+        return out;
+      },
     },
     agentDefinitionRepo: {
       getById: async (id: string) => agents.get(id) ?? null,
@@ -44,6 +54,13 @@ const fake = vi.hoisted(() => {
     },
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    auditRepo: {
+      append: async () => undefined,
+      getByEntity: async () => [],
+      getByProcess: async () => [],
+      getByProcessInNamespaces: async () => [],
+      getByActor: async () => [],
+    },
   };
 
   return {
@@ -305,7 +322,7 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
   it('[JOURNEY] admin registers GitHub provider, user connects, disconnects, reconnects, and revokes', async () => {
     // 1. Admin creates the OAuth provider config.
     const createRes = await adminCreateProvider('appsilon', providerCreateInput);
-    expect(createRes.status).toBe(201);
+    expect(createRes.status).toBe(200);
     const created = (await createRes.json()) as { provider: OAuthProviderConfig };
     expect(created.provider.id).toBe('github');
 

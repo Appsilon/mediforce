@@ -308,3 +308,26 @@ export {
   type TriggeredEntry,
   type SkippedEntry,
 } from './cron.js';
+
+export {
+  ListOAuthProvidersInputSchema,
+  ListOAuthProvidersOutputSchema,
+  GetOAuthProviderInputSchema,
+  GetOAuthProviderOutputSchema,
+  CreateOAuthProviderInputApiSchema,
+  CreateOAuthProviderOutputSchema,
+  UpdateOAuthProviderInputApiSchema,
+  UpdateOAuthProviderOutputSchema,
+  DeleteOAuthProviderInputSchema,
+  DeleteOAuthProviderOutputSchema,
+  type ListOAuthProvidersInput,
+  type ListOAuthProvidersOutput,
+  type GetOAuthProviderInput,
+  type GetOAuthProviderOutput,
+  type CreateOAuthProviderInputApi,
+  type CreateOAuthProviderOutput,
+  type UpdateOAuthProviderInputApi,
+  type UpdateOAuthProviderOutput,
+  type DeleteOAuthProviderInput,
+  type DeleteOAuthProviderOutput,
+} from './oauth-providers.js';
