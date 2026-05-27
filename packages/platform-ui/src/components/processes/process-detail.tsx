@@ -10,7 +10,6 @@ import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
-import { archiveProcessRun } from '@/app/actions/processes';
 import { mediforce } from '@/lib/mediforce';
 import { ApiError } from '@mediforce/platform-api/client';
 import { useActiveCoworkSession } from '@/hooks/use-tasks';
@@ -140,8 +139,11 @@ export function ProcessDetail({
 
   async function handleArchiveToggle() {
     setArchiving(true);
-    await archiveProcessRun(instance.id, instance.archived !== true);
-    setArchiving(false);
+    try {
+      await mediforce.runs.archive({ runId: instance.id, archived: instance.archived !== true });
+    } finally {
+      setArchiving(false);
+    }
   }
 
   async function handleConfirmCancel() {

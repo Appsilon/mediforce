@@ -166,3 +166,48 @@ export const RetryStepOutputSchema = z.object({
 
 export type RetryStepInput = z.infer<typeof RetryStepInputSchema>;
 export type RetryStepOutput = z.infer<typeof RetryStepOutputSchema>;
+
+// ---- POST /api/processes/:instanceId/archive --------------------------------
+//
+// Soft-archive flag on the run (`archived` field). Blocked while the run is
+// still active (running/created/waiting-on-human). Entity echo per ADR-0005 §5.
+
+export const ArchiveRunInputSchema = z.object({
+  runId: z.string().min(1),
+  archived: z.boolean(),
+});
+
+export const ArchiveRunOutputSchema = z.object({
+  run: ProcessInstanceSchema,
+});
+
+export type ArchiveRunInput = z.infer<typeof ArchiveRunInputSchema>;
+export type ArchiveRunOutput = z.infer<typeof ArchiveRunOutputSchema>;
+
+// ---- POST /api/processes/bulk/cancel ----------------------------------------
+// ---- POST /api/processes/bulk/archive ---------------------------------------
+//
+// Bulk response shape per ADR-0005 §5: `{ results: [{ id, status, error? }] }`.
+// Per-item failures don't abort the batch; each id reports independently. Both
+// endpoints share the same input/output shape; the only difference is whether
+// the per-item operation is cancel or archive.
+
+const BULK_LIMIT = 100;
+
+export const BulkRunInputSchema = z.object({
+  runIds: z.array(z.string().min(1)).min(1).max(BULK_LIMIT),
+});
+
+export const BulkRunResultItemSchema = z.object({
+  id: z.string(),
+  status: z.enum(['ok', 'error']),
+  error: z.string().optional(),
+});
+
+export const BulkRunOutputSchema = z.object({
+  results: z.array(BulkRunResultItemSchema),
+});
+
+export type BulkRunInput = z.infer<typeof BulkRunInputSchema>;
+export type BulkRunResultItem = z.infer<typeof BulkRunResultItemSchema>;
+export type BulkRunOutput = z.infer<typeof BulkRunOutputSchema>;

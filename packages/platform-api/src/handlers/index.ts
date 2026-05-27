@@ -12,6 +12,9 @@ export { cancelRun } from './processes/cancel-run.js';
 export { resumeRun } from './processes/resume-run.js';
 export { resumeWait } from './processes/resume-wait.js';
 export { retryStep } from './processes/retry-step.js';
+export { archiveRun } from './processes/archive-run.js';
+export { bulkCancelRuns } from './processes/bulk-cancel-runs.js';
+export { bulkArchiveRuns } from './processes/bulk-archive-runs.js';
 
 export { listWorkflows } from './workflows/list-workflows.js';
 export { getWorkflow } from './workflows/get-workflow.js';
