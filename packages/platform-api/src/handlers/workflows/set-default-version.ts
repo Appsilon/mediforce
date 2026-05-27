@@ -3,7 +3,6 @@ import type {
   SetDefaultVersionOutput,
 } from '../../contract/workflows.js';
 import type { CallerScope } from '../../repositories/index.js';
-import { NotFoundError } from '../../errors.js';
 import { actorFromCaller, loadOr404 } from '../_helpers.js';
 
 export async function setDefaultWorkflowVersion(
@@ -15,13 +14,10 @@ export async function setDefaultWorkflowVersion(
     input.name,
   );
 
-  // Verify the version exists before setting it as default.
   await loadOr404(
     scope.workflowDefinitions.get(input.namespace, input.name, input.version),
     `Version ${input.version} not found for workflow '${input.name}'`,
-  ).catch(() => {
-    throw new NotFoundError(`Version ${input.version} not found for workflow '${input.name}'`);
-  });
+  );
 
   await scope.workflowDefinitions.setDefaultVersion(input.namespace, input.name, input.version);
 
