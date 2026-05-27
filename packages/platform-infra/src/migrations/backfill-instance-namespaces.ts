@@ -1,6 +1,5 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import { FirestoreProcessRepository } from '../firestore/process-repository.js';
-import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
+import { WorkflowDefinitionSchema, type ProcessRepository } from '@mediforce/platform-core';
 
 /**
  * One-time startup migration: backfill `namespace` on processInstances
@@ -12,7 +11,7 @@ import { WorkflowDefinitionSchema } from '@mediforce/platform-core';
  */
 export async function backfillInstanceNamespaces(
   db: Firestore,
-  _processRepo: FirestoreProcessRepository,
+  _processRepo: ProcessRepository,
 ): Promise<void> {
   const snapshot = await db
     .collection('processInstances')

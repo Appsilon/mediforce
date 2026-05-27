@@ -26,6 +26,7 @@ import {
   PostgresHumanTaskRepository,
   PostgresCoworkSessionRepository,
   PostgresProcessInstanceRepository,
+  PostgresProcessRepository,
   getSharedPostgresClient,
   getAdminFirestore,
   validateSecretsKey,
@@ -45,6 +46,7 @@ import type {
   NamespaceRepository,
   OAuthProviderRepository,
   ProcessInstanceRepository,
+  ProcessRepository,
   ToolCatalogRepository,
 } from '@mediforce/platform-core';
 import {
@@ -86,7 +88,7 @@ export interface PlatformServices {
   agentRunner: AgentRunner;
   pluginRegistry: PluginRegistry;
   llmClient: OpenRouterLlmClient;
-  processRepo: FirestoreProcessRepository;
+  processRepo: ProcessRepository;
   instanceRepo: ProcessInstanceRepository;
   auditRepo: AuditRepository;
   agentRunRepo: AgentRunRepository;
@@ -113,7 +115,10 @@ export function getPlatformServices(): PlatformServices {
 
   const db = getAdminFirestore();
 
-  const processRepo = new FirestoreProcessRepository(db);
+  const processRepo: ProcessRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresProcessRepository(getSharedPostgresClient().db)
+      : new FirestoreProcessRepository(db);
   const instanceRepo: ProcessInstanceRepository =
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresProcessInstanceRepository(getSharedPostgresClient().db)

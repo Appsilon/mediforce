@@ -39,6 +39,7 @@ export { PostgresHumanTaskRepository } from './postgres/repositories/human-task-
 export { PostgresHandoffRepository } from './postgres/repositories/handoff-repository.js';
 export { PostgresCoworkSessionRepository } from './postgres/repositories/cowork-session-repository.js';
 export { PostgresProcessInstanceRepository } from './postgres/repositories/process-instance-repository.js';
+export { PostgresProcessRepository } from './postgres/repositories/process-repository.js';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client.js';
 export type { Database } from './postgres/client.js';
 export { FirestoreOAuthProviderRepository } from './firestore/oauth-provider-repository.js';
