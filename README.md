@@ -105,11 +105,8 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 
 **[Getting Started Guide](GETTING-STARTED.md)** — Quick start with emulators and demo data, no setup required.
 
-> **Datastore transition (ADR-0001).** Mediforce is moving from Firestore to
-> self-hosted Postgres. The Postgres path is opt-in via
-> `STORAGE_BACKEND=postgres`; default is still `firestore` until the cutover.
-> Local-dev instructions below cover **both** modes. See
-> [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
+> **Datastore (ADR-0001).** Server data layer runs on self-hosted Postgres.
+> See [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
 > [`docs/adr/0001-firestore-to-postgres.md`](docs/adr/0001-firestore-to-postgres.md).
 
 ### Fastest start (no setup)
@@ -129,15 +126,12 @@ Open `http://localhost:9007`. Use this to click through the UI without configuri
 | `pnpm dev:mock` | Mocked agents + seeded local emulator data, port 9007. No cloud keys, no Docker, no Firebase project. |
 | `pnpm dev:no-docker` | Like `dev`, but agents run via host `claude` CLI instead of Docker. |
 | `pnpm dev:queue` | Like `dev`, but agent execution goes through BullMQ queue (production architecture). Requires Redis + worker running — see below. |
-| `pnpm dev:postgres` | One-command Postgres mode. Boots `postgres` + `redis` via docker compose, runs `pnpm db:migrate`, then starts the dev server with `STORAGE_BACKEND=postgres`. Idempotent — safe to re-run after pulling new migrations. |
+| `pnpm dev:postgres` | One-command Postgres mode. Boots `postgres` + `redis` via docker compose, runs `pnpm db:migrate`, then starts the dev server. Idempotent — safe to re-run after pulling new migrations. |
 
 ### Postgres mode (ADR-0001)
 
-The new path. Bring up Postgres + Redis, point the app at them, set
-`STORAGE_BACKEND=postgres` to route migrated repositories through Postgres
-(today: `tool_catalog_entries`; more land per the [PLAN-0001 build order](docs/adr/PLAN-0001.md#52-build-order-postgres-implementations)).
-
-One command does all of the above:
+Bring up Postgres + Redis and point the app at them. One command does all
+of the above:
 
 ```bash
 pnpm dev:postgres                                  # docker compose up + migrate + dev
@@ -149,7 +143,6 @@ external Postgres):
 ```bash
 docker compose up postgres redis -d                # boot Postgres 16 + Redis
 # in packages/platform-ui/.env.local:
-#   STORAGE_BACKEND=postgres
 #   DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce
 pnpm db:migrate                                    # apply Drizzle migrations once
 pnpm dev                                           # start the app
@@ -273,20 +266,16 @@ Redis. Before the next staging deploy, the operator must add the following to
 `/opt/mediforce/.env` on the host:
 
 ```bash
-POSTGRES_PASSWORD=<strong, random>            # required when STORAGE_BACKEND=postgres
+POSTGRES_PASSWORD=<strong, random>
 # Optional (sensible defaults provided):
 POSTGRES_USER=mediforce
 POSTGRES_DB=mediforce
-# Flip when ready to cut over (default firestore — keeps Postgres dormant):
-# STORAGE_BACKEND=postgres
 ```
 
 Add the matching GitHub secrets so the deploy script can render the host
 `.env`:
 
 - `STAGING_POSTGRES_PASSWORD` (mandatory)
-- `STAGING_STORAGE_BACKEND` (optional override; otherwise the deploy keeps
-  the default `firestore`)
 
 `docker-compose.staging.yml` overrides the Postgres volume to a host bind
 mount at `/var/lib/mediforce/postgres-data`. Effect: `docker compose down

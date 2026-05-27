@@ -10,7 +10,7 @@
     "dev:mock": "pnpm --filter @mediforce/platform-ui dev:mock",
     "dev:no-docker": "ALLOW_LOCAL_AGENTS=true pnpm --filter @mediforce/platform-ui dev",
     "dev:queue": "REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
-    "dev:postgres": "docker compose up postgres redis -d && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce STORAGE_BACKEND=postgres pnpm db:migrate && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce STORAGE_BACKEND=postgres REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
+    "dev:postgres": "docker compose up postgres redis -d && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce pnpm db:migrate && DATABASE_URL=postgresql://mediforce:mediforce@localhost:5432/mediforce REDIS_URL=redis://localhost:6379 pnpm --filter @mediforce/platform-ui dev",
     "emulators": "pnpm --filter @mediforce/platform-ui emulators",
     "test": "pnpm test:unit && pnpm test:e2e",
     "test:unit": "vitest run",

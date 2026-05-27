@@ -71,10 +71,8 @@ services:
       - "3000"
     environment:
       - REDIS_URL=redis://redis:6379
-      # ADR-0001 — Postgres storage backend. Default still firestore until
-      # cutover; flip STORAGE_BACKEND=postgres in the host `.env` when ready.
+      # ADR-0001 — Postgres storage backend.
       # Auto-migrate runs via Dockerfile CMD (migrate.mjs && server.js).
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-firestore}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
       - PLATFORM_API_KEY=${PLATFORM_API_KEY}
       - SECRETS_ENCRYPTION_KEY=${SECRETS_ENCRYPTION_KEY}

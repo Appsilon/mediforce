@@ -155,7 +155,7 @@ See `PLAN-0001 §8.2` for the maintenance-window procedure. Pre-conditions:
 3. `gcloud firestore export gs://mediforce-firestore-backups/<timestamp>`
 4. Run main.py against prod Firebase + prod Postgres.
 5. Run verify.py. Fix any diff.
-6. Re-deploy with DATABASE_URL set, STORAGE_BACKEND flag removed.
+6. Re-deploy with DATABASE_URL set.
 7. Disable read-only flag. Watch error rates 30 min.
 ```
 
