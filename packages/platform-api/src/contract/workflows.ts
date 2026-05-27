@@ -151,7 +151,6 @@ export interface RegisterWorkflowOptions {
   namespace: string;
 }
 
-// ---- POST /api/workflow-definitions/:name/default-version -------------------
 export const SetDefaultVersionInputSchema = z.object({
   name: z.string().min(1),
   namespace: z.string().min(1),
@@ -168,7 +167,6 @@ export const SetDefaultVersionOutputSchema = z.object({
 export type SetDefaultVersionInput = z.infer<typeof SetDefaultVersionInputSchema>;
 export type SetDefaultVersionOutput = z.infer<typeof SetDefaultVersionOutputSchema>;
 
-// ---- DELETE /api/workflow-definitions/:name ---------------------------------
 // `expectedRunCount` is a stale-confirmation guard: the dialog displays a
 // pre-fetched count; this re-checks server-side and rejects if it changed.
 export const DeleteWorkflowInputSchema = z.object({
@@ -185,7 +183,6 @@ export const DeleteWorkflowOutputSchema = z.object({
 export type DeleteWorkflowInput = z.infer<typeof DeleteWorkflowInputSchema>;
 export type DeleteWorkflowOutput = z.infer<typeof DeleteWorkflowOutputSchema>;
 
-// ---- GET /api/workflow-definitions/:name/run-count --------------------------
 export const GetWorkflowRunCountInputSchema = z.object({
   name: z.string().min(1),
   namespace: z.string().min(1),
@@ -198,11 +195,10 @@ export const GetWorkflowRunCountOutputSchema = z.object({
 export type GetWorkflowRunCountInput = z.infer<typeof GetWorkflowRunCountInputSchema>;
 export type GetWorkflowRunCountOutput = z.infer<typeof GetWorkflowRunCountOutputSchema>;
 
-// ---- POST /api/workflow-definitions/:name/transfer --------------------------
-// Move all versions of a workflow from one workspace to another. Bug-fix
-// over the pre-Phase-2.5 Server Action: source-namespace + target-namespace
-// membership both required; raw Firestore write replaced with a repository
-// method; audit event emitted.
+// Move all versions of a workflow from one workspace to another. Transfer
+// requires membership on BOTH source and target namespaces; the write goes
+// through the repository (not raw Firestore) so namespace scoping and audit
+// are enforced.
 export const TransferWorkflowInputSchema = z.object({
   name: z.string().min(1),
   sourceNamespace: z.string().min(1),

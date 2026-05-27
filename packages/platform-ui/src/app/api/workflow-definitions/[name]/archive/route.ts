@@ -16,7 +16,6 @@ const ScopedSchema = ArchiveAllInputSchema.extend({
 
 /**
  * POST /api/workflow-definitions/:name/archive?namespace=… body: { archived }
- * Audit emission added in Phase 2.5.
  */
 export const POST = createRouteAdapter<
   typeof ScopedSchema,

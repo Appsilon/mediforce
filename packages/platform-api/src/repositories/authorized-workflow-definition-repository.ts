@@ -117,10 +117,8 @@ export class AuthorizedWorkflowDefinitionRepository extends AuthorizedScope {
 
   /**
    * Transfer all versions of a workflow definition from `sourceNamespace` to
-   * `targetNamespace`. Caller must be a member of BOTH workspaces — parity
-   * with the membership-only stance everywhere else in Phase 2.5 (not a
-   * tightening, just plugging the pre-Phase-2.5 gap where the Server Action
-   * skipped the source check entirely).
+   * `targetNamespace`. Caller must be a member of BOTH workspaces, matching the
+   * membership-only stance applied everywhere else.
    */
   transferNamespace = async (
     name: string,

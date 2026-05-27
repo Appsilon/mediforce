@@ -8,11 +8,10 @@ import { actorFromCaller } from '../_helpers.js';
 
 /**
  * Soft-deletes a workflow definition and cascades the soft-delete to all
- * associated runs and human tasks. Pre-Phase-2.5 audit attribution used a
- * hard-coded `actorId: 'system'` literal — now sourced from the caller via
- * `actorFromCaller` so the audit trail reflects who actually issued the
- * deletion. Cascade semantics preserved bit-for-bit (parent + all runs +
- * all human tasks; `expectedRunCount` race guard).
+ * associated runs and human tasks. Audit attribution is sourced from the
+ * caller via `actorFromCaller` (not hard-coded) so the audit trail reflects
+ * who actually issued the deletion. Cascade covers the parent + all runs +
+ * all human tasks, guarded by the `expectedRunCount` race check.
  */
 export async function deleteWorkflow(
   input: DeleteWorkflowInput,

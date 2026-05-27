@@ -63,7 +63,6 @@ export type GetWorkflowSecretsFullOutput = z.infer<typeof GetWorkflowSecretsFull
 export type SaveWorkflowSecretsInput = z.infer<typeof SaveWorkflowSecretsInputSchema>;
 export type SaveWorkflowSecretsOutput = z.infer<typeof SaveWorkflowSecretsOutputSchema>;
 
-// ---- GET /api/workspace-secrets/previews?namespace=… ------------------------
 // Returns masked previews for the workspace secrets editor. Workspace-scope
 // only — workflow-secrets editor reveals plaintext via the values endpoint.
 export const GetWorkspaceSecretPreviewsInputSchema = z.object({
@@ -83,7 +82,6 @@ export type GetWorkspaceSecretPreviewsInput = z.infer<typeof GetWorkspaceSecretP
 export type SecretPreview = z.infer<typeof SecretPreviewSchema>;
 export type GetWorkspaceSecretPreviewsOutput = z.infer<typeof GetWorkspaceSecretPreviewsOutputSchema>;
 
-// ---- GET /api/workflow-secrets/keys-batch?namespace=…&workflow=A&workflow=B -
 // Bulk key-listing across N workflows in one round-trip. Powers the workflow
 // row's "configured-keys" indicator on the run launcher.
 export const ListWorkflowSecretKeysBatchInputSchema = z.object({
