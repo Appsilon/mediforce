@@ -35,8 +35,17 @@ describe('backlog-triage', () => {
     if (!result.success) return;
     const params = result.data.triggerInput ?? [];
     const names = params.map((p) => p.name);
-    expect(names).toEqual(['repo', 'labelFilter', 'limit', 'sprintDays']);
+    expect(names).toEqual(['repo', 'labelFilter', 'limit', 'sprintDays', 'pulseContext']);
     expect(params.find((p) => p.name === 'sprintDays')?.default).toBe(5);
+  });
+
+  it('pulseContext triggerInput is optional', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const params = result.data.triggerInput ?? [];
+    const pulse = params.find((p) => p.name === 'pulseContext');
+    expect(pulse?.required).toBe(false);
   });
 
   it('assign step uses assignment-table with assignees and priorities in ui.config', () => {

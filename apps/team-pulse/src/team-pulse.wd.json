@@ -1,0 +1,174 @@
+{
+  "name": "team-pulse",
+  "namespace": "appsilon",
+  "title": "Team Pulse",
+  "description": "Product owner gathers time-boxed perspectives from team members, synthesizes with LLM, and optionally launches backlog triage with insights.",
+  "preamble": "## Domain Context\nSoftware team sprint planning. A product owner poses a question to the team, collects time-boxed perspectives from each member via child workflows, then synthesizes responses with an LLM. The synthesis surfaces themes, agreements, and tensions to inform prioritization. Optionally launches backlog triage seeded with the pulse insights.",
+  "roles": ["product-owner"],
+  "triggers": [
+    { "name": "manual", "type": "manual" }
+  ],
+  "env": {
+    "PLATFORM_API_KEY": "{{PLATFORM_API_KEY}}",
+    "APP_BASE_URL": "{{APP_BASE_URL}}"
+  },
+  "triggerInput": [
+    {
+      "name": "question",
+      "type": "string",
+      "required": true,
+      "description": "Question to ask the team"
+    },
+    {
+      "name": "teamMembers",
+      "type": "string",
+      "required": true,
+      "description": "JSON array of {userId, email} objects"
+    },
+    {
+      "name": "collectUntil",
+      "type": "string",
+      "required": true,
+      "description": "ISO-8601 deadline for collecting perspectives"
+    },
+    {
+      "name": "repo",
+      "type": "string",
+      "required": true,
+      "default": "appsilon/mediforce",
+      "description": "GitHub repo for backlog-triage if launched"
+    },
+    {
+      "name": "labelFilter",
+      "type": "string",
+      "required": false,
+      "description": "Optional label filter for backlog-triage"
+    }
+  ],
+  "steps": [
+    {
+      "id": "spawn_perspectives",
+      "name": "Spawn perspectives",
+      "type": "creation",
+      "executor": "action",
+      "description": "Spawn a gather-perspective child workflow for each team member.",
+      "action": {
+        "kind": "spawn",
+        "config": {
+          "forEach": "${triggerPayload.teamMembers}",
+          "targets": {
+            "definitionName": "gather-perspective",
+            "payload": {
+              "userId": "${item.userId}",
+              "email": "${item.email}",
+              "question": "${triggerPayload.question}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "wait_for_responses",
+      "name": "Wait for responses",
+      "type": "creation",
+      "executor": "action",
+      "description": "Wait until collection deadline passes.",
+      "action": {
+        "kind": "wait",
+        "config": {
+          "deadline": "${triggerPayload.collectUntil}"
+        }
+      }
+    },
+    {
+      "id": "collect_responses",
+      "name": "Collect responses",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Fetch each spawned child instance and extract the perspective step output.",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const spawned = input.steps?.spawn_perspectives?.spawned || [];\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const baseUrl = process.env.APP_BASE_URL;\n  if (!apiKey || !baseUrl) { console.error('PLATFORM_API_KEY or APP_BASE_URL missing'); process.exit(1); }\n  const responses = [];\n  for (const entry of spawned) {\n    const instanceId = entry.instanceId;\n    try {\n      const res = await fetch(`${baseUrl}/api/processes/${instanceId}`, {\n        headers: { 'X-Api-Key': apiKey, Accept: 'application/json' },\n      });\n      if (!res.ok) { console.error(`Failed to fetch instance ${instanceId}: ${res.status}`); continue; }\n      const instance = await res.json();\n      const stepOutput = instance.variables?.provide_perspective;\n      const perspective = stepOutput?.paramValues?.perspective ?? stepOutput;\n      responses.push({ instanceId, perspective: perspective || null });\n    } catch (err) {\n      console.error(`Error fetching instance ${instanceId}: ${err?.message || err}`);\n    }\n  }\n  const summary = `Collected ${responses.length} of ${spawned.length} responses`;\n  console.log(summary);\n  writeFileSync('/output/result.json', JSON.stringify({\n    responses,\n    responseCount: responses.length,\n    totalSpawned: spawned.length,\n    summary\n  }));\n} catch (err) {\n  console.error('collect_responses crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
+      "id": "synthesize",
+      "name": "Synthesize perspectives",
+      "type": "creation",
+      "executor": "agent",
+      "plugin": "claude-code-agent",
+      "autonomyLevel": "L4",
+      "description": "LLM synthesizes collected perspectives into themes, agreements, tensions, and actionable insights.",
+      "env": {
+        "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "model": "sonnet",
+        "timeoutMinutes": 15,
+        "prompt": "# Synthesize Team Perspectives\n\nYou are synthesizing team perspectives collected during a team pulse check. The product owner asked the team a question and each member provided their perspective.\n\n## Input\n\nRead `/output/input.json`. You will find:\n\n- `question` — the original question posed by the product owner (from triggerPayload).\n- `responses[]` — array of `{ instanceId, perspective }` from the collect_responses step.\n- `responseCount` — number of responses collected.\n- `totalSpawned` — total number of child workflows spawned.\n\n## Task\n\nAnalyze all perspectives and produce a structured synthesis:\n\n1. **Themes** — recurring topics or concerns across responses.\n2. **Agreements** — points where multiple team members align.\n3. **Tensions** — areas of disagreement or conflicting viewpoints.\n4. **Insights** — actionable takeaways for the product owner.\n5. **Summary** — a concise 2-3 sentence summary of the team pulse.\n\nBe specific. Quote or paraphrase individual perspectives where relevant. Do not invent perspectives that were not provided.\n\n## Output contract\n\nWrite `/output/result.json` with:\n\n```json\n{\n  \"synthesis\": {\n    \"themes\": [\"theme 1\", \"theme 2\"],\n    \"agreements\": [\"agreement 1\"],\n    \"tensions\": [\"tension 1\"],\n    \"insights\": [\"insight 1\", \"insight 2\"],\n    \"summary\": \"2-3 sentence summary\"\n  },\n  \"question\": \"<copy from input>\",\n  \"responseCount\": 5\n}\n```\n\nOutput strict JSON only — no markdown, no commentary outside the result file."
+      }
+    },
+    {
+      "id": "decide_triage",
+      "name": "Decide triage",
+      "type": "decision",
+      "executor": "human",
+      "allowedRoles": ["product-owner"],
+      "description": "Review the synthesis and decide whether to launch backlog triage with these insights.",
+      "verdicts": {
+        "launch_triage": {
+          "target": "spawn_triage",
+          "label": "Launch triage",
+          "intent": "success"
+        },
+        "skip": {
+          "target": "report",
+          "label": "Done — skip triage",
+          "intent": "neutral"
+        }
+      }
+    },
+    {
+      "id": "spawn_triage",
+      "name": "Spawn triage",
+      "type": "creation",
+      "executor": "action",
+      "description": "Launch backlog-triage workflow seeded with pulse synthesis context.",
+      "action": {
+        "kind": "spawn",
+        "config": {
+          "targets": {
+            "definitionName": "backlog-triage",
+            "payload": {
+              "repo": "${triggerPayload.repo}",
+              "labelFilter": "${triggerPayload.labelFilter}",
+              "pulseContext": "${steps.synthesize.synthesis.summary}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "report",
+      "name": "Done",
+      "type": "terminal",
+      "executor": "script",
+      "description": "Team pulse complete."
+    }
+  ],
+  "transitions": [
+    { "from": "spawn_perspectives", "to": "wait_for_responses" },
+    { "from": "wait_for_responses", "to": "collect_responses" },
+    { "from": "collect_responses", "to": "synthesize" },
+    { "from": "synthesize", "to": "decide_triage" },
+    { "from": "decide_triage", "to": "spawn_triage", "when": "verdict.intent == \"success\"" },
+    { "from": "decide_triage", "to": "report", "when": "verdict.intent == \"neutral\"" },
+    { "from": "spawn_triage", "to": "report" }
+  ]
+}

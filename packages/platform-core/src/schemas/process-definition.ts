@@ -14,7 +14,7 @@ export const StepUiSchema = z.object({
 
 export const StepParamSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(['string', 'number', 'boolean', 'date']).default('string'),
+  type: z.enum(['string', 'number', 'boolean', 'date', 'textarea', 'multiselect']).default('string'),
   required: z.boolean().default(false),
   description: z.string().optional(),
   default: z.unknown().optional(),
