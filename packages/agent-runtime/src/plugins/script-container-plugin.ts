@@ -19,6 +19,29 @@ const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (path: s
 };
 
 /**
+ * Best-effort extraction of a human-readable failure reason from a step's
+ * /output/result.json. Script steps write their error there (`{ error }` or
+ * `{ errors: [...] }`) and exit non-zero without printing to stderr, so it is
+ * frequently the only actionable signal on failure. Returns null when the file
+ * is absent, unparseable, or carries no error field.
+ */
+async function readResultError(outputDir: string): Promise<string | null> {
+  try {
+    const raw = await readFile(join(outputDir, 'result.json'), 'utf-8');
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof parsed.error === 'string' && parsed.error.length > 0) {
+      return `result.json error: ${parsed.error}`;
+    }
+    if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+      return `result.json errors: ${parsed.errors.join('; ')}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Script container plugin — runs a deterministic command inside a Docker container.
  *
  * Unlike BaseContainerAgentPlugin, this does NOT involve an LLM, prompt assembly,
@@ -314,24 +337,33 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           // line during the run, so they already show in the Step Log panel.
           detail = stderr.length > 0 ? stderr : stdout;
         } else {
-          // RUN_ID / STEP_ID (and MEDIFORCE_RUN_NAMESPACE for workflow runs)
-          // are injected into every container separately from resolvedEnv.vars,
-          // so list them too — they're part of what the script saw.
-          const injectedKeys = ['RUN_ID', 'STEP_ID'];
-          if (isWorkflowAgentContext(this.context) && this.context.runNamespace) {
-            injectedKeys.push('MEDIFORCE_RUN_NAMESPACE');
+          // No stdout/stderr — but script-container steps write their structured
+          // output (incl. an `error`/`errors` field on failure) to result.json
+          // by convention, then exit non-zero without printing. Surface that
+          // reported error before falling back to bare invocation metadata.
+          const reportedError = await readResultError(outputDir);
+          if (reportedError !== null) {
+            detail = reportedError;
+          } else {
+            // RUN_ID / STEP_ID (and MEDIFORCE_RUN_NAMESPACE for workflow runs)
+            // are injected into every container separately from resolvedEnv.vars,
+            // so list them too — they're part of what the script saw.
+            const injectedKeys = ['RUN_ID', 'STEP_ID'];
+            if (isWorkflowAgentContext(this.context) && this.context.runNamespace) {
+              injectedKeys.push('MEDIFORCE_RUN_NAMESPACE');
+            }
+            const envKeys = [...Object.keys(this.resolvedEnv.vars), ...injectedKeys].join(',');
+            let inputSize = '?';
+            try {
+              const inputStat = await stat(join(outputDir, 'input.json'));
+              inputSize = `${inputStat.size}b`;
+            } catch { /* missing — shouldn't happen */ }
+            detail = `no stdout/stderr/result captured — image=${this.image}, cmd=${this.commandDisplay}, env=[${envKeys}], inputSize=${inputSize}`;
           }
-          const envKeys = [...Object.keys(this.resolvedEnv.vars), ...injectedKeys].join(',');
-          let inputSize = '?';
-          try {
-            const inputStat = await stat(join(outputDir, 'input.json'));
-            inputSize = `${inputStat.size}b`;
-          } catch { /* missing — shouldn't happen */ }
-          detail = `no stdout/stderr captured — image=${this.image}, cmd=${this.commandDisplay}, env=[${envKeys}], inputSize=${inputSize}`;
           // The Step Log panel renders the activity log FILE, not the event
-          // stream, and a no-output failure streamed nothing into it. Write the
-          // diagnostic there so the panel shows the reason instead of sticking
-          // on "Initializing log…".
+          // stream, and this failure streamed nothing into it. Write the reason
+          // there so the panel shows it instead of sticking on "Initializing
+          // log…".
           emitLine(detail);
         }
 

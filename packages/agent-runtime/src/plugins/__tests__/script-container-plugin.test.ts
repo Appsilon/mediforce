@@ -200,7 +200,7 @@ describe('ScriptContainerPlugin', () => {
       const error = await plugin.run(emit).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(Error);
       const message = (error as Error).message;
-      expect(message).toContain('no stdout/stderr captured');
+      expect(message).toContain('no stdout/stderr/result captured');
       expect(message).toContain('image=mediforce-r:latest');
       expect(message).toContain('cmd=Rscript /scripts/analyze.R');
       // RUN_ID / STEP_ID are injected into every container, so the diagnostic
@@ -214,7 +214,45 @@ describe('ScriptContainerPlugin', () => {
       const assistantTexts = events
         .filter((e) => e.type === 'assistant')
         .map((e) => (JSON.parse(e.payload as string) as { text: string }).text);
-      expect(assistantTexts.some((t) => t.includes('no stdout/stderr captured'))).toBe(true);
+      expect(assistantTexts.some((t) => t.includes('no stdout/stderr/result captured'))).toBe(true);
+    });
+
+    it('[ERROR] no-output failure surfaces the error the script wrote to result.json', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      const mockChild = createMockChild();
+
+      // Reproduce the workflow-designer register/validate failure: the script
+      // writes its reason to result.json and exits 1 with no stdout/stderr.
+      spawnMock.mockImplementation((_cmd, args) => {
+        const argsArr = args as string[];
+        const vIdx = argsArr.indexOf('-v');
+        const capturedDir = vIdx >= 0 ? argsArr[vIdx + 1].split(':')[0] : null;
+        setTimeout(async () => {
+          if (capturedDir) {
+            await writeFile(
+              join(capturedDir, 'result.json'),
+              JSON.stringify({ registered: false, error: 'Missing MEDIFORCE_RUN_NAMESPACE env var' }),
+              'utf-8',
+            );
+          }
+          (mockChild.stdout as Readable).push(null);
+          (mockChild.stderr as Readable).push(null);
+          mockChild.emit('close', 1, null);
+        }, 10);
+        return mockChild;
+      });
+
+      const error = await plugin.run(emit).catch((e: unknown) => e);
+      expect((error as Error).message).toContain('result.json error: Missing MEDIFORCE_RUN_NAMESPACE env var');
+
+      // …and the reason reaches the activity log the Step Log panel renders.
+      const assistantTexts = events
+        .filter((e) => e.type === 'assistant')
+        .map((e) => (JSON.parse(e.payload as string) as { text: string }).text);
+      expect(assistantTexts.some((t) => t.includes('result.json error: Missing MEDIFORCE_RUN_NAMESPACE env var'))).toBe(true);
     });
 
     it('[DATA] inlineScript mode writes script file and invokes it via runtime cmd', async () => {
