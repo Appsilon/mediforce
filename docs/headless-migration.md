@@ -1029,15 +1029,41 @@ Init (1):
 - `POST /api/namespaces` — create workspace (replaces direct writes in `workspaces/new/page.tsx`).
 - Audit + agent-runs per-instance endpoints already exist from Phase 1; verify shape covers UI needs before adding new ones.
 
-**SSE endpoints for live (~4 today, per `onSnapshot` consumers):**
+**Live-update strategy — default to polling.**
 
-- `GET /api/tasks/stream?role=…` — live task list per role.
-- `GET /api/processes/:id/stream` — live single-instance updates (status, current step, variables).
-- `GET /api/agent-runs/stream?processInstanceId=…` — live agent runs for a process.
-- `GET /api/cowork/:sessionId/stream` — live cowork turns (replaces `chat-cowork-view` snapshot).
+ADR-0001 §5 calls for "lists move to SWR polling 2-10s, live → SSE." Phase 4
+narrows that further: **polling for everything as the default**; SSE only
+when a concrete UX gap surfaces in a follow-up. Justification:
 
-`apiClient` wraps `fetch` + `ReadableStream` + incremental SSE parse (not
-`EventSource` — no custom-header support without a proxy hop).
+- Polling is one library + one interval config per hook. SSE per resource
+  requires: streaming `createRouteAdapter` variant, server-side change
+  detection (Postgres `LISTEN/NOTIFY` or in-process pub-sub from mutation
+  handlers — Postgres has no `onSnapshot` equivalent), connection lifecycle
+  (Firebase ID token refresh, reconnect), client-side `fetch +
+  ReadableStream` wrapper (`EventSource` lacks custom-header support).
+- Mediforce scale today (single-tenant, few concurrent users per workspace,
+  one VPS) makes a 1-2s polling lag invisible for everything except
+  streaming text deltas. Streaming text deltas are not in Phase 4 scope.
+- Polling is also the simpler rollback story during the PG cutover window:
+  one knob (`refreshInterval`) per consumer; SSE has more moving parts to
+  unwind if Postgres `LISTEN/NOTIFY` design proves wrong.
+
+**SSE endpoints if a concrete need surfaces (none mandatory in Phase 4):**
+
+- `GET /api/tasks/stream?role=…` — only if 1-2s task-list refresh feels
+  laggy to operators.
+- `GET /api/processes/:id/stream` — only if running-process detail page
+  visibly stutters under polling.
+- `GET /api/cowork/:sessionId/stream` — already deferred to
+  [#516](https://github.com/Appsilon/mediforce/issues/516)
+  alongside the streaming SSE chat overhaul.
+
+If/when added, `apiClient` wraps `fetch` + `ReadableStream` + incremental
+SSE parse (not `EventSource` — no custom-header support without a proxy
+hop). Server-side change detection in the Postgres era: Postgres
+`LISTEN/NOTIFY` from mutation triggers, OR in-process `EventEmitter`
+published from headless mutation handlers (simpler, single-worker only —
+falls apart under horizontal scaling). Pick when first SSE endpoint lands.
 
 **Client-side cache library — open question, not pre-decided.**
 
@@ -1064,10 +1090,38 @@ Firebase is never imported by `platform-api/client`. Browser wrapper
 Firebase Auth and reads `auth.currentUser.getIdToken()`. Same helper backs
 `apiFetch` — every browser call produces byte-identical auth headers.
 
-**Decision tree per file:**
-- Live updates needed? → SSE endpoint + `apiClient.X.subscribeY()` wrapper.
-- Static-ish list? → Polling via cache library, 2-10s per ADR-0001 §5.
-- One-shot read? → Direct `mediforce.X.Y()` call.
+**Migration principle — preserve, don't upgrade.**
+
+Phase 4 is a **swap**, not a redesign. Two cases per consumer:
+
+1. **Endpoint already exists, reads from API today** — UI just calls
+   `mediforce.X.Y()` instead of touching Firestore directly. No design pass,
+   no UX change. Mechanical.
+
+2. **Consumer reads Firestore directly today (no API endpoint exists)** —
+   needs design pass: add headless endpoint, decide live-update strategy
+   (polling vs SSE), wire UI hook. Each entry on the "Missing headless
+   endpoints" list above falls here.
+
+**Anti-upgrade rule.** Mutations migrated in Phase 2 / 2.5 / 2.6 / 3 / 3.1
+stay as they shipped — request/response shape unchanged. If today's flow
+relies on Firestore `onSnapshot` from a parent page to observe progress
+(e.g. cowork chat tool-loop turns), Phase 4 keeps that flow:
+**blocking handler stays blocking; UI polls session/turns at a sensible
+interval instead of subscribing.** UX may lose some smoothness (1-2s lag on
+tool-call animation vs instant snapshot push). That's acceptable. SSE
+streaming overhauls, message queue UIs, transactional finalize and similar
+UX improvements live in dedicated follow-up tickets ([#516](https://github.com/Appsilon/mediforce/issues/516)
+for cowork) — explicitly **not Phase 4**.
+
+**Decision tree per consumer:**
+
+| Today's source | Migration |
+|---|---|
+| One-shot Firestore `getDoc` / `getDocs` | Direct `mediforce.X.Y()` call (likely already exists from earlier phases; if not, add a GET endpoint). |
+| Live `onSnapshot` on a list / doc, no high-frequency changes (settings, namespace metadata, role) | Polling via cache library, 5-10s. |
+| Live `onSnapshot` driving progressive UX (active tasks, running process status, cowork turns during chat) | Polling 1-2s during active state, 5-10s when idle. Stretch goal: SSE in a follow-up if 1s lag proves bad in practice. |
+| Direct Firestore write (`addDoc` / `updateDoc` / `arrayUnion`) | Add headless mutation endpoint, call `mediforce.X.Y()`. |
 
 **Pause-safe**: yes — per-file migration, each backed by a journey test.
 Unmigrated consumers keep working on the Firestore bypass.
