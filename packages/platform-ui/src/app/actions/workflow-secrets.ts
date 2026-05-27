@@ -17,45 +17,19 @@ async function requireNamespaceMember(namespace: string, userId: string): Promis
   const db = getAdminFirestore();
   const namespaceRepo = new FirestoreNamespaceRepository(db);
 
-  // Check member doc first
   const member = await namespaceRepo.getMember(namespace, userId);
   if (member) return;
 
-  // Fallback: personal namespaces created before members subcollection may lack a member doc
   const ns = await namespaceRepo.getNamespace(namespace);
   if (ns?.type === 'personal' && ns.linkedUserId === userId) return;
 
   throw new Error('Not a member of this namespace');
 }
 
-/** Get secret keys only (safe for client — no values exposed) */
-export async function getWorkflowSecretKeys(
-  namespace: string,
-  workflowName: string,
-  userId: string,
-): Promise<string[]> {
-  await requireNamespaceMember(namespace, userId);
-  return getRepo().getSecretKeys(namespace, workflowName);
-}
-
-/** Get secret keys for multiple workflows in one round-trip */
-export async function getWorkflowSecretKeysBatch(
-  namespace: string,
-  workflowNames: string[],
-  userId: string,
-): Promise<Record<string, string[]>> {
-  await requireNamespaceMember(namespace, userId);
-  const repo = getRepo();
-  const results = await Promise.all(
-    workflowNames.map(async (name) => {
-      const keys = await repo.getSecretKeys(namespace, name);
-      return [name, keys] as const;
-    }),
-  );
-  return Object.fromEntries(results);
-}
-
-/** Get full secrets (values included) — for the secrets management page */
+/** Get full secrets (values included) — for the secrets management page.
+ *  Workflow-secret value reveal + bulk save stay as Server Actions until a
+ *  dedicated migration ticket; the read-companion endpoints in Phase 2.5
+ *  only cover key listing. */
 export async function getWorkflowSecrets(
   namespace: string,
   workflowName: string,
@@ -65,7 +39,8 @@ export async function getWorkflowSecrets(
   return getRepo().getSecrets(namespace, workflowName);
 }
 
-/** Save all secrets atomically */
+/** Save all secrets atomically. See `getWorkflowSecrets` for the migration
+ *  carve-out — bulk replace surface is out of Phase 2.5 scope. */
 export async function saveWorkflowSecrets(
   namespace: string,
   workflowName: string,

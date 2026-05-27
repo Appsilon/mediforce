@@ -140,12 +140,22 @@ export {
   ListSecretKeysOutputSchema,
   DeleteSecretInputSchema,
   DeleteSecretOutputSchema,
+  GetWorkspaceSecretPreviewsInputSchema,
+  GetWorkspaceSecretPreviewsOutputSchema,
+  SecretPreviewSchema,
+  ListWorkflowSecretKeysBatchInputSchema,
+  ListWorkflowSecretKeysBatchOutputSchema,
   type SetSecretInput,
   type SetSecretOutput,
   type ListSecretKeysInput,
   type ListSecretKeysOutput,
   type DeleteSecretInput,
   type DeleteSecretOutput,
+  type GetWorkspaceSecretPreviewsInput,
+  type GetWorkspaceSecretPreviewsOutput,
+  type SecretPreview,
+  type ListWorkflowSecretKeysBatchInput,
+  type ListWorkflowSecretKeysBatchOutput,
 } from './secrets.js';
 
 export {

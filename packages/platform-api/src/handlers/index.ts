@@ -36,6 +36,8 @@ export { startRun } from './runs/start-run.js';
 export { listSecretKeys } from './secrets/list-secret-keys.js';
 export { setSecret } from './secrets/set-secret.js';
 export { deleteSecret } from './secrets/delete-secret.js';
+export { getWorkspaceSecretPreviews } from './secrets/get-workspace-secret-previews.js';
+export { listWorkflowSecretKeysBatch } from './secrets/list-workflow-secret-keys-batch.js';
 
 export { getDockerInfo } from './system/get-docker-info.js';
 export { getOpenRouterCredits } from './system/get-openrouter-credits.js';

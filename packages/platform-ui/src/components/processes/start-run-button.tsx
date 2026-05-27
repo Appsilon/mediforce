@@ -8,8 +8,6 @@ import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
-import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
-import { getNamespaceSecretKeys } from '@/app/actions/namespace-secrets';
 import { useWorkflowSecretKeysContext } from '@/hooks/use-workflow-secret-keys';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
@@ -92,13 +90,13 @@ export function StartRunButton({
     let cancelled = false;
     setLocalSecretsLoading(true);
     Promise.all([
-      getWorkflowSecretKeys(handle, workflowName, uid),
-      getNamespaceSecretKeys(handle, uid),
+      mediforce.secrets.list({ namespace: handle, workflow: workflowName }),
+      mediforce.secrets.list({ namespace: handle }),
     ])
-      .then(([wfKeys, nsKeys]) => {
+      .then(([wf, ns]) => {
         if (cancelled) return;
-        setLocalSecretKeys(wfKeys);
-        setLocalNsSecretKeys(nsKeys);
+        setLocalSecretKeys(wf.keys);
+        setLocalNsSecretKeys(ns.keys);
         setLocalSecretsLoading(false);
       })
       .catch(() => {

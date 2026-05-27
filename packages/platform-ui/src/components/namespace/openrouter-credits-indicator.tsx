@@ -3,8 +3,11 @@
 import * as React from 'react';
 import { Eye, EyeOff, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { getOpenRouterCredits, type NamespaceOpenRouterCredits } from '@/app/actions/namespace-secrets';
+import { mediforce } from '@/lib/mediforce';
+import type { OpenRouterCreditsOutput } from '@mediforce/platform-api/contract';
 import { cn } from '@/lib/utils';
+
+type NamespaceOpenRouterCredits = OpenRouterCreditsOutput;
 
 const STORAGE_KEY = 'mediforce:show-credits';
 const LOW_CREDITS_THRESHOLD = 5;
@@ -27,7 +30,8 @@ export function OpenRouterCreditsIndicator({ handle }: OpenRouterCreditsIndicato
     if (!handle || !firebaseUser?.uid) return;
     let cancelled = false;
     setLoading(true);
-    getOpenRouterCredits(handle, firebaseUser.uid)
+    mediforce.system
+      .credits({ namespace: handle })
       .then((result) => {
         if (!cancelled) {
           setCredits(result);
