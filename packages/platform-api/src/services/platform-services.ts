@@ -1,23 +1,7 @@
 import {
-  FirestoreProcessRepository,
-  FirestoreProcessInstanceRepository,
-  FirestoreAuditRepository,
-  FirestoreAgentRunRepository,
-  FirestoreHumanTaskRepository,
-  FirestoreHandoffRepository,
   PostgresHandoffRepository,
-  FirestoreAgentDefinitionRepository,
   PostgresAgentDefinitionRepository,
-  FirestoreCoworkSessionRepository,
-  FirestoreCronTriggerStateRepository,
-  FirestoreToolCatalogRepository,
-  FirestoreNamespaceRepository,
-  FirestoreOAuthProviderRepository,
-  FirestoreAgentOAuthTokenRepository,
-  FirestoreModelRegistryRepository,
   PostgresModelRegistryRepository,
-  FirestoreWorkflowSecretsRepository,
-  FirestoreNamespaceSecretsRepository,
   PostgresNamespaceSecretsRepository,
   PostgresWorkflowSecretsRepository,
   PostgresToolCatalogRepository,
@@ -31,8 +15,8 @@ import {
   PostgresCoworkSessionRepository,
   PostgresProcessInstanceRepository,
   PostgresProcessRepository,
+  PostgresAgentEventLog,
   getSharedPostgresClient,
-  getAdminFirestore,
   validateSecretsKey,
   createMailgunSender,
   MailgunNotificationService,
@@ -66,7 +50,6 @@ import {
   AgentRunner,
   PluginRegistry,
   OpenRouterLlmClient,
-  FirestoreAgentEventLog,
   ClaudeCodeAgentPlugin,
   MockClaudeCodeAgentPlugin,
   OpenCodeAgentPlugin,
@@ -82,7 +65,6 @@ import {
 import { WebhookRouter } from '@mediforce/workflow-engine';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
 import { seedBuiltinToolCatalog } from './seed-tool-catalog.js';
-import { backfillInstanceNamespaces } from '@mediforce/platform-infra';
 
 let services: PlatformServices | null = null;
 let seedingStarted = false;
@@ -121,76 +103,33 @@ export function getPlatformServices(): PlatformServices {
   // than to boot successfully and fail opaquely mid-workflow.
   validateSecretsKey();
 
-  const db = getAdminFirestore();
+  const pg = getSharedPostgresClient().db;
 
-  const processRepo: ProcessRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresProcessRepository(getSharedPostgresClient().db)
-      : new FirestoreProcessRepository(db);
-  const instanceRepo: ProcessInstanceRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresProcessInstanceRepository(getSharedPostgresClient().db)
-      : new FirestoreProcessInstanceRepository(db);
+  const processRepo: ProcessRepository = new PostgresProcessRepository(pg);
+  const instanceRepo: PostgresProcessInstanceRepository =
+    new PostgresProcessInstanceRepository(pg);
   // Indirect-namespace repos depend on instanceRepo for parent-run namespace
   // resolution inside the namespace-scoped read variants (ADR-0004 §"Storage-
   // layer filter, today").
-  const auditRepo: AuditRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresAuditRepository(getSharedPostgresClient().db, instanceRepo)
-      : new FirestoreAuditRepository(db, instanceRepo);
-  const agentRunRepo: AgentRunRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresAgentRunRepository(getSharedPostgresClient().db, instanceRepo)
-      : new FirestoreAgentRunRepository(db, instanceRepo);
-  const humanTaskRepo: HumanTaskRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresHumanTaskRepository(getSharedPostgresClient().db, instanceRepo)
-      : new FirestoreHumanTaskRepository(db, instanceRepo);
-  const handoffRepo: HandoffRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresHandoffRepository(getSharedPostgresClient().db, instanceRepo)
-      : new FirestoreHandoffRepository(db, instanceRepo);
-  const agentDefinitionRepo: AgentDefinitionRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresAgentDefinitionRepository(getSharedPostgresClient().db)
-      : new FirestoreAgentDefinitionRepository(db);
+  const auditRepo: AuditRepository = new PostgresAuditRepository(pg, instanceRepo);
+  const agentRunRepo: AgentRunRepository = new PostgresAgentRunRepository(pg, instanceRepo);
+  const humanTaskRepo: HumanTaskRepository = new PostgresHumanTaskRepository(pg, instanceRepo);
+  const handoffRepo: HandoffRepository = new PostgresHandoffRepository(pg, instanceRepo);
+  const agentDefinitionRepo: AgentDefinitionRepository = new PostgresAgentDefinitionRepository(pg);
   const coworkSessionRepo: CoworkSessionRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresCoworkSessionRepository(getSharedPostgresClient().db, instanceRepo)
-      : new FirestoreCoworkSessionRepository(db, instanceRepo);
+    new PostgresCoworkSessionRepository(pg, instanceRepo);
   const cronTriggerStateRepo: CronTriggerStateRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresCronTriggerStateRepository(getSharedPostgresClient().db)
-      : new FirestoreCronTriggerStateRepository(db);
-  const toolCatalogRepo: ToolCatalogRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresToolCatalogRepository(getSharedPostgresClient().db)
-      : new FirestoreToolCatalogRepository(db);
-  const namespaceRepo: NamespaceRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresNamespaceRepository(getSharedPostgresClient().db)
-      : new FirestoreNamespaceRepository(db);
-  const oauthProviderRepo: OAuthProviderRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresOAuthProviderRepository(getSharedPostgresClient().db)
-      : new FirestoreOAuthProviderRepository(db);
+    new PostgresCronTriggerStateRepository(pg);
+  const toolCatalogRepo: ToolCatalogRepository = new PostgresToolCatalogRepository(pg);
+  const namespaceRepo: NamespaceRepository = new PostgresNamespaceRepository(pg);
+  const oauthProviderRepo: OAuthProviderRepository = new PostgresOAuthProviderRepository(pg);
   const agentOAuthTokenRepo: AgentOAuthTokenRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresAgentOAuthTokenRepository(getSharedPostgresClient().db)
-      : new FirestoreAgentOAuthTokenRepository(db);
-  const modelRegistryRepo: ModelRegistryRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresModelRegistryRepository(getSharedPostgresClient().db)
-      : new FirestoreModelRegistryRepository(db);
-  const secretsRepo: WorkflowSecretsRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresWorkflowSecretsRepository(getSharedPostgresClient().db)
-      : new FirestoreWorkflowSecretsRepository(db);
+    new PostgresAgentOAuthTokenRepository(pg);
+  const modelRegistryRepo: ModelRegistryRepository = new PostgresModelRegistryRepository(pg);
+  const secretsRepo: WorkflowSecretsRepository = new PostgresWorkflowSecretsRepository(pg);
   const namespaceSecretsRepo: NamespaceSecretsRepository =
-    process.env.STORAGE_BACKEND === 'postgres'
-      ? new PostgresNamespaceSecretsRepository(getSharedPostgresClient().db)
-      : new FirestoreNamespaceSecretsRepository(db);
-  const eventLog = new FirestoreAgentEventLog(db);
+    new PostgresNamespaceSecretsRepository(pg);
+  const eventLog = new PostgresAgentEventLog(instanceRepo);
 
   const pluginRegistry = new PluginRegistry();
 
@@ -314,9 +253,6 @@ export function getPlatformServices(): PlatformServices {
     });
     seedBuiltinToolCatalog(toolCatalogRepo).catch((err) => {
       console.error('[platform-services] Failed to seed built-in tool catalog:', err);
-    });
-    backfillInstanceNamespaces(db, processRepo).catch((err) => {
-      console.error('[platform-services] Failed to backfill instance namespaces:', err);
     });
   }
 

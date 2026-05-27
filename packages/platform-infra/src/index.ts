@@ -43,6 +43,7 @@ export { PostgresProcessRepository } from './postgres/repositories/process-repos
 export { PostgresAgentDefinitionRepository } from './postgres/repositories/agent-definition-repository.js';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client.js';
 export type { Database } from './postgres/client.js';
+export { PostgresAgentEventLog } from './postgres/agent-event-log.js';
 export { FirestoreOAuthProviderRepository } from './firestore/oauth-provider-repository.js';
 export { FirestoreAgentOAuthTokenRepository } from './firestore/agent-oauth-token-repository.js';
 export { validateSecretsKey } from './crypto/secrets-cipher.js';
