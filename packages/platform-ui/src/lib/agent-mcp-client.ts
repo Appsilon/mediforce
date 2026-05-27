@@ -1,25 +1,14 @@
-import { apiFetch } from './api-fetch';
+import { mediforce } from './mediforce';
 import type { AgentMcpBinding, AgentMcpBindingMap } from '@mediforce/platform-core';
 
 /**
- * Thin typed wrappers over `/api/agents/:id/mcp-servers` REST surface.
- * All calls attach the Firebase ID token via `apiFetch`.
- *
- * When #232's generated API client lands, this module becomes a mechanical
- * re-export of those clients — keep the call sites going through these helpers.
+ * Thin typed wrappers over `mediforce.agents.*` MCP binding methods. Kept as
+ * a façade so existing call sites don't need to change their import — the
+ * underlying call is now the headless typed client.
  */
 
-async function parseOrThrow<T>(res: Response, label: string): Promise<T> {
-  if (!res.ok) {
-    const payload = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(payload.error ?? `${label} failed with status ${res.status}`);
-  }
-  return (await res.json()) as T;
-}
-
 export async function listAgentBindings(agentId: string): Promise<AgentMcpBindingMap> {
-  const res = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/mcp-servers`);
-  const { mcpServers } = await parseOrThrow<{ mcpServers: AgentMcpBindingMap }>(res, 'List agent bindings');
+  const { mcpServers } = await mediforce.agents.listMcpBindings({ id: agentId });
   return mcpServers;
 }
 
@@ -28,15 +17,11 @@ export async function putAgentBinding(
   serverName: string,
   binding: AgentMcpBinding,
 ): Promise<AgentMcpBindingMap> {
-  const res = await apiFetch(
-    `/api/agents/${encodeURIComponent(agentId)}/mcp-servers/${encodeURIComponent(serverName)}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(binding),
-    },
-  );
-  const { mcpServers } = await parseOrThrow<{ mcpServers: AgentMcpBindingMap }>(res, 'Save agent binding');
+  const { mcpServers } = await mediforce.agents.upsertMcpBinding({
+    id: agentId,
+    name: serverName,
+    binding,
+  });
   return mcpServers;
 }
 
@@ -44,10 +29,9 @@ export async function deleteAgentBinding(
   agentId: string,
   serverName: string,
 ): Promise<AgentMcpBindingMap> {
-  const res = await apiFetch(
-    `/api/agents/${encodeURIComponent(agentId)}/mcp-servers/${encodeURIComponent(serverName)}`,
-    { method: 'DELETE' },
-  );
-  const { mcpServers } = await parseOrThrow<{ mcpServers: AgentMcpBindingMap }>(res, 'Delete agent binding');
+  const { mcpServers } = await mediforce.agents.deleteMcpBinding({
+    id: agentId,
+    name: serverName,
+  });
   return mcpServers;
 }
