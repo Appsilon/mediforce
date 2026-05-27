@@ -34,6 +34,10 @@ LOG = logging.getLogger("verify")
 #
 # Sub-collection rows use a leading 'cg:' prefix on the collection name to
 # signal `collection_group` counting in count_firestore.
+#
+# An 'ia:' prefix marks an INLINE ARRAY field on parent docs: the Postgres
+# table holds one row per element, so count_firestore sums array lengths
+# across the parent collection. Format: 'ia:<parent_collection>:<field_name>'.
 TABLES: list[tuple[str, str, str]] = [
     ("namespaces", "workspaces", "handle"),
     ("agentDefinitions", "agents", "id"),
@@ -48,7 +52,7 @@ TABLES: list[tuple[str, str, str]] = [
     ("humanTasks", "human_tasks", "no_verify"),
     ("handoffEntities", "handoff_entities", "no_verify"),
     ("coworkSessions", "cowork_sessions", "id"),
-    ("cg:turns", "cowork_turns", "count_only"),
+    ("ia:coworkSessions:turns", "cowork_turns", "count_only"),
     ("cg:members", "workspace_members", "count_only"),
     ("cg:namespaceSecrets", "namespace_secrets", "count_only"),
     ("cg:workflowSecrets", "workflow_secrets", "count_only"),
@@ -62,6 +66,12 @@ TABLES: list[tuple[str, str, str]] = [
 def count_firestore(fs: Any, collection: str) -> int:
     if collection.startswith("cg:"):
         return sum(1 for _ in fs.collection_group(collection[3:]).stream())
+    if collection.startswith("ia:"):
+        _, parent, field = collection.split(":", 2)
+        return sum(
+            len((doc.to_dict() or {}).get(field) or [])
+            for doc in fs.collection(parent).stream()
+        )
     return sum(1 for _ in fs.collection(collection).stream())
 
 
