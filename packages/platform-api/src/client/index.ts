@@ -32,7 +32,6 @@ import {
   TransferWorkflowInputSchema,
   TransferWorkflowOutputSchema,
   DockerInfoResponseSchema,
-  RemoveImageOutputSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
   ListAgentsInputSchema,
@@ -202,7 +201,6 @@ import {
   type ListRunsInput,
   type ListRunsOutput,
   type DockerInfoResponse,
-  type RemoveImageOutput,
   type OpenRouterCreditsInput,
   type OpenRouterCreditsOutput,
   type ListAgentsInput,
@@ -467,7 +465,6 @@ export class Mediforce {
 
   readonly system: {
     dockerInfo: () => Promise<DockerInfoResponse>;
-    removeImage: (imageId: string) => Promise<RemoveImageOutput>;
     credits: (input: OpenRouterCreditsInput) => Promise<OpenRouterCreditsOutput>;
   };
 
@@ -1119,15 +1116,6 @@ export class Mediforce {
         const res = await this.request('/api/system/docker-info');
         const body = await parseJsonOrThrow(res, 'mediforce.system.dockerInfo');
         return DockerInfoResponseSchema.parse(body);
-      },
-      removeImage: async (imageId: string) => {
-        const res = await this.request('/api/admin/docker-images', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageId }),
-        });
-        const body = await parseJsonOrThrow(res, 'mediforce.system.removeImage');
-        return RemoveImageOutputSchema.parse(body);
       },
       credits: async (input: OpenRouterCreditsInput) => {
         const validated = OpenRouterCreditsInputSchema.parse(input);

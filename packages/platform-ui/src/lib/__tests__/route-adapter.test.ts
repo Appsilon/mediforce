@@ -41,7 +41,7 @@ describe('createRouteAdapter', () => {
     vi.restoreAllMocks();
   });
 
-  // Auth pipeline: middleware (`src/middleware.ts`) first gates `/api/*` for
+  // Auth pipeline: proxy (`src/proxy.ts`) first gates `/api/*` for
   // presence of credentials. The adapter then resolves those credentials into
   // a typed `CallerIdentity`, builds a per-request `CallerScope` from the
   // platform services, and threads it into the handler. Tests stub both

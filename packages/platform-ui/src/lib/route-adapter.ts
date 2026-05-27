@@ -30,7 +30,7 @@ import { getAppBaseUrl } from './app-base-url.js';
  *      `PreconditionFailedError`, etc.) map to the ADR-0005 §1 envelope using
  *      `err.code`. Anything else is a 500 (full error logged).
  *
- * Auth note: middleware in `src/middleware.ts` already gates `/api/*` for
+ * Auth note: the proxy in `src/proxy.ts` already gates `/api/*` for
  * presence of credentials — that's the first line of defense and exists so
  * unauthenticated traffic never reaches handler code. The adapter's own
  * resolution step is what turns those credentials into a typed
