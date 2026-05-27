@@ -3,7 +3,8 @@ import type {
   SetVisibilityOutput,
 } from '../../contract/workflows.js';
 import type { CallerScope } from '../../repositories/index.js';
-import { actorFromCaller, loadOr404 } from '../_helpers.js';
+import { NotFoundError } from '../../errors.js';
+import { actorFromCaller } from '../_helpers.js';
 
 interface ScopedInput extends SetVisibilityInput {
   namespace: string;
@@ -18,7 +19,7 @@ export async function setWorkflowVisibility(
     input.name,
   );
   if (latestVersion === 0) {
-    await loadOr404(Promise.resolve(null), `Workflow '${input.name}' not found`);
+    throw new NotFoundError(`Workflow '${input.name}' not found`);
   }
 
   await scope.workflowDefinitions.setVisibility(input.namespace, input.name, input.visibility);
