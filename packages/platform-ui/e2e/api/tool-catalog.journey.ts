@@ -2,23 +2,15 @@ import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 
 /**
- * L3 API journey for the tool-catalog admin endpoints. Designed to run
- * under both backends:
- *
- *   - STORAGE_BACKEND unset / firestore (default `e2e-tests` job) → exercises
- *     the Firestore path.
- *   - STORAGE_BACKEND=postgres (the `e2e-tests-postgres` CI job) → exercises
- *     the Postgres path: route handler → AuthorizedToolCatalogRepository →
- *     PostgresToolCatalogRepository → Drizzle → live Postgres container.
- *
- * Two runs of the same suite is the parity guarantee at the HTTP-and-up
- * layer that the L2 contract test can't give.
+ * L3 API journey for the tool-catalog admin endpoints. Runs against
+ * Postgres: route handler → AuthorizedToolCatalogRepository →
+ * PostgresToolCatalogRepository → Drizzle → live Postgres container.
  */
 test.describe('tool-catalog admin API journey', () => {
   const apiKey = process.env.PLATFORM_API_KEY ?? 'test-api-key';
   const authHeaders = { 'X-Api-Key': apiKey };
 
-  test('CRUD round-trip survives a fresh GET (works on both backends)', async ({ request }) => {
+  test('CRUD round-trip survives a fresh GET', async ({ request }) => {
     const entryId = `e2e-tool-${Date.now()}`;
     const payload = {
       id: entryId,

@@ -3,17 +3,16 @@ import { TEST_ORG_HANDLE } from './constants';
 import { buildSeedData } from './seed-data';
 
 /**
- * Postgres mirror of the full Firestore fixture seeded in `auth-setup.ts`
- * (ADR-0001 PR2 §5.2 #9). Invoked only when `STORAGE_BACKEND=postgres` so
- * the regular emulator-only `e2e-tests` job is unaffected.
+ * Postgres seed for the full E2E fixture (ADR-0001 PR2 §5.2 #9), invoked
+ * from `auth-setup.ts` before Playwright workers start.
  *
  * Uses raw `postgres-js` rather than the `@mediforce/platform-infra` package
  * because Playwright workers don't resolve the `@mediforce/source` package
  * exports condition the way `tsx` does at type-check time — importing the
  * compiled `dist` fails because we don't build it in CI.
  *
- * Reuses `buildSeedData` so the fixture stays byte-identical to the
- * Firestore-side seed — no drift between backends.
+ * Reuses `buildSeedData` so the E2E fixture and the in-memory fixture stay
+ * byte-identical.
  *
  * Insert order respects FK constraints: workspaces → workflow_definitions →
  * process_instances → (step_executions + audit_events + agent_runs +

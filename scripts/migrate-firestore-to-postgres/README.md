@@ -41,7 +41,7 @@ Firestore read access on the source project.
 
    Exits non-zero on any count mismatch or sampled-row diff.
 
-6. Flip STORAGE_BACKEND=postgres in env. Restart app + workers.
+6. Deploy the Postgres-only app build (DATABASE_URL set, Firestore creds dropped).
 7. Smoke test (see PLAN §8.2 step 7).
 8. Clear read-only flag.
 ```

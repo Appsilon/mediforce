@@ -71,8 +71,7 @@ COPY --from=builder /app/data ./data
 # packages/platform-infra (the package that owns the schema). Migrations
 # are applied by CMD below before server.js starts. Idempotent (drizzle's
 # `drizzle.__drizzle_migrations` ledger) so re-deploys without schema
-# changes are a no-op. STORAGE_BACKEND != 'postgres' makes the runner
-# exit 0 immediately.
+# changes are a no-op.
 COPY --from=builder /app/packages/platform-infra/src/postgres/migrations ./packages/platform-infra/src/postgres/migrations
 COPY --from=builder /app/packages/platform-infra/scripts/migrate.mjs ./packages/platform-infra/scripts/migrate.mjs
 
