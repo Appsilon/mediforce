@@ -20,32 +20,75 @@ MOCK_DEV_BASE_URL = "http://localhost:9007"
 
 def sync_models(base_url: str, api_key: str) -> dict:
     """POST to /api/model-registry/sync to refresh all models from OpenRouter API."""
-    url = f"{base_url}/api/model-registry/sync"
-    req = urllib.request.Request(
-        url,
-        data=b"",
+    body = _fetch(
+        f"{base_url}/api/model-registry/sync",
         headers={"X-Api-Key": api_key},
-        method="POST",
+        data=b"",
+        timeout=120,
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    return json.loads(body.decode("utf-8"))
+
+
+RANKINGS_PATTERN = re.compile(
+    r'"id":"([^"]+)","slug":"[^"]*","name":"([^"]*)","author":"[^"]*","request_count":(\d+)'
+)
+BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+HEX_ID_RE = re.compile(r'"([0-9a-f]{30,})"')
+
+
+def _fetch(url: str, headers: dict | None = None, data: bytes | None = None,
+           timeout: int = 30) -> bytes:
+    hdrs = {"User-Agent": BROWSER_UA}
+    if headers:
+        hdrs.update(headers)
+    method = "POST" if data is not None else "GET"
+    req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+def _discover_action_id() -> str:
+    """Fetch OpenRouter /rankings, find the JS chunk containing the
+    getPerformanceDataCached server action, return its action ID."""
+    html = _fetch("https://openrouter.ai/rankings").decode("utf-8")
+    chunk_paths = re.findall(r'(/_next/static/chunks/[^"\']+\.js[^"\']*)', html)
+    for path in chunk_paths:
+        try:
+            js = _fetch(f"https://openrouter.ai{path}", timeout=10).decode("utf-8")
+        except Exception:
+            continue
+        if "getPerformanceDataCached" not in js:
+            continue
+        idx = js.index("getPerformanceDataCached")
+        before = js[max(0, idx - 200):idx]
+        hex_ids = HEX_ID_RE.findall(before)
+        if hex_ids:
+            return hex_ids[-1]
+    raise RuntimeError("Could not discover rankings action ID from OpenRouter JS bundles")
 
 
 def scrape_rankings() -> list[dict]:
-    """Fetch OpenRouter /rankings HTML and extract request_count per model."""
-    url = "https://openrouter.ai/rankings"
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        html = resp.read().decode("utf-8")
+    """Call OpenRouter's getPerformanceDataCached server action via RSC
+    protocol and extract request_count per model."""
+    action_id = _discover_action_id()
+    print(f"  Discovered action ID: {action_id}")
 
-    # Rankings data is embedded as inline JSON in RSC payload.
-    # Pattern: "id":"provider/model","slug":"...","name":"...","author":"...","request_count":N
-    pattern = r'"id":"([^"]+)","slug":"[^"]+","name":"([^"]+)","author":"[^"]+","request_count":(\d+)'
-    unescaped = html.replace('\\"', '"').replace("\\n", "\n")
-    matches = re.findall(pattern, unescaped)
+    rsc_body = _fetch(
+        "https://openrouter.ai/rankings",
+        headers={
+            "Accept": "text/x-component",
+            "Content-Type": "text/plain;charset=UTF-8",
+            "next-action": action_id,
+            "Origin": "https://openrouter.ai",
+            "Referer": "https://openrouter.ai/rankings",
+        },
+        data=b"[]",
+    ).decode("utf-8")
 
+    matches = RANKINGS_PATTERN.findall(rsc_body)
     if not matches:
-        print("ERROR: No ranking data found in HTML. Page structure may have changed.", file=sys.stderr)
+        print("ERROR: No ranking data in RSC response. Server action format may have changed.",
+              file=sys.stderr)
         sys.exit(1)
 
     rankings = []
@@ -58,19 +101,14 @@ def scrape_rankings() -> list[dict]:
 
 def post_rankings(rankings: list[dict], base_url: str, api_key: str) -> dict:
     """POST rankings to Mediforce API."""
-    url = f"{base_url}/api/model-registry/rankings"
     payload = json.dumps({"rankings": rankings}).encode("utf-8")
-    req = urllib.request.Request(
-        url,
+    body = _fetch(
+        f"{base_url}/api/model-registry/rankings",
+        headers={"Content-Type": "application/json", "X-Api-Key": api_key},
         data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "X-Api-Key": api_key,
-        },
-        method="POST",
+        timeout=60,
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    return json.loads(body.decode("utf-8"))
 
 
 def main():
