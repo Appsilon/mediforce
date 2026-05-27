@@ -8,6 +8,7 @@ import type {
 } from '../../contract/cron.js';
 import type { CallerScope } from '../../repositories/index.js';
 import { ForbiddenError } from '../../errors.js';
+import { resumeWait } from '../processes/resume-wait.js';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
 
@@ -108,6 +109,20 @@ export async function heartbeat(
 
       await scope.system.runKicker.kick(result.instanceId, { triggeredBy: 'cron-heartbeat' });
       triggered.push({ ...entryHead, instanceId: result.instanceId });
+    }
+  }
+
+  // Sweep: resume timer-paused instances whose deadline has passed
+  const pausedInstances = await scope.runs.getByStatus('paused');
+  const waitingInstances = pausedInstances.filter(
+    (inst) => inst.pauseReason === 'waiting_for_timer',
+  );
+
+  for (const inst of waitingInstances) {
+    try {
+      await resumeWait({ runId: inst.id }, scope);
+    } catch {
+      // resumeWait throws PreconditionFailedError if not ready yet — expected
     }
   }
 

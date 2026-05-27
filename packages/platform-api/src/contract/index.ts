@@ -162,6 +162,8 @@ export {
   CancelRunOutputSchema,
   ResumeRunInputSchema,
   ResumeRunOutputSchema,
+  ResumeWaitInputSchema,
+  ResumeWaitOutputSchema,
   RetryStepInputSchema,
   RetryStepOutputSchema,
   type GetProcessInput,
@@ -177,6 +179,8 @@ export {
   type CancelRunOutput,
   type ResumeRunInput,
   type ResumeRunOutput,
+  type ResumeWaitInput,
+  type ResumeWaitOutput,
   type RetryStepInput,
   type RetryStepOutput,
 } from './processes.js';

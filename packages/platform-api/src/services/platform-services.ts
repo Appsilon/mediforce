@@ -44,6 +44,7 @@ import {
   reshapeActionHandler,
   createSpawnActionHandler,
   createEmailActionHandler,
+  waitActionHandler,
 } from '@mediforce/core-actions';
 import { WebhookRouter } from '@mediforce/workflow-engine';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
@@ -192,6 +193,7 @@ export function getPlatformServices(): PlatformServices {
   actionRegistry.register('http', httpActionHandler);
   actionRegistry.register('reshape', reshapeActionHandler);
   actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo));
+  actionRegistry.register('wait', waitActionHandler);
   if (mailgunSender) {
     actionRegistry.register('email', createEmailActionHandler(mailgunSender));
   }

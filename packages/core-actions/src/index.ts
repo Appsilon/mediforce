@@ -4,6 +4,7 @@ export { httpActionHandler, type HttpActionOutput } from './handlers/http.js';
 export { reshapeActionHandler } from './handlers/reshape.js';
 export { createEmailActionHandler, type EmailActionOutput, type EmailRateLimitConfig } from './handlers/email.js';
 export { createSpawnActionHandler, type SpawnActionOutput } from './handlers/spawn.js';
+export { waitActionHandler, isWaitSentinel, type WaitActionOutput, type WaitSentinel } from './handlers/wait.js';
 export { validateActionSecrets, type MissingActionSecret } from './validate-action-secrets.js';
 export type {
   ActionConfig,
@@ -15,5 +16,6 @@ export type {
   ReshapeActionHandler,
   EmailActionHandler,
   SpawnActionHandler,
+  WaitActionHandler,
   InterpolationSources,
 } from './types.js';
