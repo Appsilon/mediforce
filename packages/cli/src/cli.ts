@@ -35,6 +35,7 @@ import { agentListCommand } from './commands/agent-list.js';
 import { agentGetCommand } from './commands/agent-get.js';
 import { agentDeleteCommand } from './commands/agent-delete.js';
 import { agentSetVisibilityCommand } from './commands/agent-set-visibility.js';
+import { agentCreateCommand } from './commands/agent-create.js';
 import { modelListCommand } from './commands/model-list.js';
 import { modelGetCommand } from './commands/model-get.js';
 import { modelSyncCommand } from './commands/model-sync.js';
@@ -85,10 +86,11 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   agent: {
-    description: 'Agent definitions (list, get, delete, visibility)',
+    description: 'Agent definitions (list, get, create, delete, visibility)',
     leaves: {
       list: { description: 'List agent definitions', fn: agentListCommand },
       get: { description: 'Fetch an agent definition', fn: agentGetCommand },
+      create: { description: 'Create an agent from a JSON file', fn: agentCreateCommand },
       delete: { description: 'Delete an agent definition', fn: agentDeleteCommand },
       'set-visibility': { description: 'Set agent visibility (public|private)', fn: agentSetVisibilityCommand },
     },

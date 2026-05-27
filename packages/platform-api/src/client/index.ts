@@ -36,6 +36,20 @@ import {
   UpdateAgentInputSchema,
   UpdateAgentBodySchema,
   UpdateAgentOutputSchema,
+  CreateAgentInputSchema,
+  CreateAgentOutputSchema,
+  UpsertAgentMcpBindingInputSchema,
+  UpsertAgentMcpBindingOutputSchema,
+  DeleteAgentMcpBindingInputSchema,
+  DeleteAgentMcpBindingOutputSchema,
+  ListAgentMcpBindingsInputSchema,
+  ListAgentMcpBindingsOutputSchema,
+  ListAgentOAuthTokensInputSchema,
+  ListAgentOAuthTokensOutputSchema,
+  GetAgentOAuthTokenInputSchema,
+  GetAgentOAuthTokenOutputSchema,
+  DeleteAgentOAuthTokenInputSchema,
+  DeleteAgentOAuthTokenOutputSchema,
   SetSecretInputSchema,
   SetSecretOutputSchema,
   ListSecretKeysInputSchema,
@@ -124,6 +138,20 @@ import {
   type UpdateAgentInput,
   type UpdateAgentBody,
   type UpdateAgentOutput,
+  type CreateAgentInput,
+  type CreateAgentOutput,
+  type UpsertAgentMcpBindingInput,
+  type UpsertAgentMcpBindingOutput,
+  type DeleteAgentMcpBindingInput,
+  type DeleteAgentMcpBindingOutput,
+  type ListAgentMcpBindingsInput,
+  type ListAgentMcpBindingsOutput,
+  type ListAgentOAuthTokensInput,
+  type ListAgentOAuthTokensOutput,
+  type GetAgentOAuthTokenInput,
+  type GetAgentOAuthTokenOutput,
+  type DeleteAgentOAuthTokenInput,
+  type DeleteAgentOAuthTokenOutput,
   type SetSecretInput,
   type SetSecretOutput,
   type ListSecretKeysInput,
@@ -307,8 +335,27 @@ export class Mediforce {
   readonly agents: {
     list: (input?: ListAgentsInput) => Promise<ListAgentsOutput>;
     get: (input: GetAgentInput) => Promise<GetAgentOutput>;
+    create: (input: CreateAgentInput) => Promise<CreateAgentOutput>;
     delete: (input: DeleteAgentInput) => Promise<DeleteAgentOutput>;
     update: (input: UpdateAgentInput, body: UpdateAgentBody) => Promise<UpdateAgentOutput>;
+    listMcpBindings: (
+      input: ListAgentMcpBindingsInput,
+    ) => Promise<ListAgentMcpBindingsOutput>;
+    upsertMcpBinding: (
+      input: UpsertAgentMcpBindingInput,
+    ) => Promise<UpsertAgentMcpBindingOutput>;
+    deleteMcpBinding: (
+      input: DeleteAgentMcpBindingInput,
+    ) => Promise<DeleteAgentMcpBindingOutput>;
+    listOAuthTokens: (
+      input: ListAgentOAuthTokensInput,
+    ) => Promise<ListAgentOAuthTokensOutput>;
+    getOAuthToken: (
+      input: GetAgentOAuthTokenInput,
+    ) => Promise<GetAgentOAuthTokenOutput>;
+    deleteOAuthToken: (
+      input: DeleteAgentOAuthTokenInput,
+    ) => Promise<DeleteAgentOAuthTokenOutput>;
   };
 
   readonly models: {
@@ -646,6 +693,76 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agents.update');
         return UpdateAgentOutputSchema.parse(body);
+      },
+      create: (input) => {
+        const v = CreateAgentInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          '/api/agents',
+          { ...v } as Record<string, unknown>,
+          CreateAgentOutputSchema,
+          'mediforce.agents.create',
+        );
+      },
+      listMcpBindings: async (input) => {
+        const v = ListAgentMcpBindingsInputSchema.parse(input);
+        const res = await this.request(`/api/agents/${encodeURIComponent(v.id)}/mcp-servers`);
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.listMcpBindings');
+        return ListAgentMcpBindingsOutputSchema.parse(body);
+      },
+      upsertMcpBinding: (input) => {
+        const v = UpsertAgentMcpBindingInputSchema.parse(input);
+        return this.sendJson(
+          'PUT',
+          `/api/agents/${encodeURIComponent(v.id)}/mcp-servers/${encodeURIComponent(v.name)}`,
+          v.binding as Record<string, unknown>,
+          UpsertAgentMcpBindingOutputSchema,
+          'mediforce.agents.upsertMcpBinding',
+        );
+      },
+      deleteMcpBinding: (input) => {
+        const v = DeleteAgentMcpBindingInputSchema.parse(input);
+        return this.sendJson(
+          'DELETE',
+          `/api/agents/${encodeURIComponent(v.id)}/mcp-servers/${encodeURIComponent(v.name)}`,
+          undefined,
+          DeleteAgentMcpBindingOutputSchema,
+          'mediforce.agents.deleteMcpBinding',
+        );
+      },
+      listOAuthTokens: async (input) => {
+        const v = ListAgentOAuthTokensInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        const res = await this.request(
+          `/api/agents/${encodeURIComponent(v.id)}/oauth${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.listOAuthTokens');
+        return ListAgentOAuthTokensOutputSchema.parse(body);
+      },
+      getOAuthToken: async (input) => {
+        const v = GetAgentOAuthTokenInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace, serverName: v.serverName });
+        const res = await this.request(
+          `/api/agents/${encodeURIComponent(v.id)}/oauth/${encodeURIComponent(v.provider)}${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.getOAuthToken');
+        return GetAgentOAuthTokenOutputSchema.parse(body);
+      },
+      deleteOAuthToken: async (input) => {
+        const v = DeleteAgentOAuthTokenInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: v.namespace,
+          serverName: v.serverName,
+          ...(v.revokeAtProvider !== undefined
+            ? { revokeAtProvider: v.revokeAtProvider ? 'true' : 'false' }
+            : {}),
+        });
+        const res = await this.request(
+          `/api/agents/${encodeURIComponent(v.id)}/oauth/${encodeURIComponent(v.provider)}${qs}`,
+          { method: 'DELETE' },
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.deleteOAuthToken');
+        return DeleteAgentOAuthTokenOutputSchema.parse(body);
       },
     };
 
