@@ -182,17 +182,35 @@ class FirebaseInviteServiceAdapter implements InviteService {
 
 /**
  * Adapts the Mailgun `SendEmailFn` into the `InviteNotificationService`
- * interface — delegates to the existing pure email-body helpers.
+ * interface — delegates to the existing pure email-body helpers and supplies
+ * deployment config (app URL, sender name) so handlers never see env vars.
  */
 class MailgunInviteNotificationService implements InviteNotificationService {
-  constructor(private readonly sendEmail: SendEmailFn) {}
+  constructor(
+    private readonly sendEmail: SendEmailFn,
+    private readonly appUrl: string,
+    private readonly senderName: string,
+  ) {}
 
   async sendInviteEmail(input: SendInviteEmailInput): Promise<void> {
-    await sendInviteEmail(input, this.sendEmail);
+    await sendInviteEmail(
+      { ...input, appUrl: this.appUrl, senderName: this.senderName },
+      this.sendEmail,
+    );
   }
 
   async sendWorkspaceNotificationEmail(input: SendWorkspaceNotificationEmailInput): Promise<void> {
-    await sendWorkspaceNotificationEmail(input, this.sendEmail);
+    await sendWorkspaceNotificationEmail(
+      {
+        toEmail: input.toEmail,
+        inviterName: input.inviterName,
+        workspaceName: input.workspaceName,
+        workspaceUrl: `${this.appUrl}/${input.workspaceHandle}`,
+        appUrl: this.appUrl,
+        senderName: this.senderName,
+      },
+      this.sendEmail,
+    );
   }
 }
 
@@ -321,8 +339,12 @@ export function getPlatformServices(): PlatformServices {
   const adminAuth = getAdminAuth();
   const firebaseInvite = new FirebaseInviteService(adminAuth, db);
   const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, db);
+  // `appUrl` matches the legacy invite route's fallback so dev-without-
+  // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
+  const inviteAppUrl =
+    process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
   const inviteNotificationService = mailgunSender
-    ? new MailgunInviteNotificationService(mailgunSender)
+    ? new MailgunInviteNotificationService(mailgunSender, inviteAppUrl, mailgunSenderName)
     : null;
 
   const dockerImageDeleter: DockerImageDeleter = isLocalAgentMode()

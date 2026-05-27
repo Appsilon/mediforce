@@ -78,6 +78,7 @@ export { updateOAuthProvider } from './oauth-providers/update-provider.js';
 export { deleteOAuthProvider } from './oauth-providers/delete-provider.js';
 
 export { listNamespaceMembers } from './users/list-members.js';
+export { inviteUser } from './users/invite-user.js';
 
 export { listToolCatalogEntries } from './tool-catalog/list-entries.js';
 export { getToolCatalogEntry } from './tool-catalog/get-entry.js';

@@ -129,8 +129,12 @@ import {
   DeleteToolCatalogEntryOutputSchema,
   ListNamespaceMembersInputSchema,
   ListNamespaceMembersOutputSchema,
+  InviteUserInputSchema,
+  InviteUserOutputSchema,
   type ListNamespaceMembersInput,
   type ListNamespaceMembersOutput,
+  type InviteUserInput,
+  type InviteUserOutput,
   DeleteDockerImageInputSchema,
   DeleteDockerImageOutputSchema,
   type DeleteDockerImageInput,
@@ -489,6 +493,7 @@ export class Mediforce {
 
   readonly users: {
     listMembers: (input: ListNamespaceMembersInput) => Promise<ListNamespaceMembersOutput>;
+    invite: (input: InviteUserInput) => Promise<InviteUserOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -1269,6 +1274,16 @@ export class Mediforce {
         const res = await this.request(`/api/users/members${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.users.listMembers');
         return ListNamespaceMembersOutputSchema.parse(body);
+      },
+      invite: async (input) => {
+        const validated = InviteUserInputSchema.parse(input);
+        const res = await this.request('/api/users/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.users.invite');
+        return InviteUserOutputSchema.parse(body);
       },
     };
   }

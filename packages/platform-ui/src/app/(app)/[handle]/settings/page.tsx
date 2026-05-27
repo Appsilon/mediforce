@@ -313,26 +313,20 @@ export default function WorkspaceConfigPage() {
 
     setInviting(true);
     try {
-      const res = await apiFetch('/api/users/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          displayName: inviteName.trim() !== '' ? inviteName.trim() : undefined,
-          namespaceHandle: handle,
-          role: inviteRole,
-          inviterName: firebaseUser?.displayName ?? firebaseUser?.email ?? undefined,
-        }),
+      const data = await mediforce.users.invite({
+        email: trimmedEmail,
+        displayName: inviteName.trim() !== '' ? inviteName.trim() : undefined,
+        namespaceHandle: handle,
+        role: inviteRole,
+        inviterName: firebaseUser?.displayName ?? firebaseUser?.email ?? undefined,
       });
 
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setError(data.error ?? 'Failed to send invite.');
-        return;
-      }
-
-      const data = (await res.json()) as { uid: string; email: string; temporaryPassword: string; emailSent: boolean; isExisting: boolean };
-      setInviteResult({ email: data.email, temporaryPassword: data.temporaryPassword, emailSent: data.emailSent, isExisting: data.isExisting });
+      setInviteResult({
+        email: data.email,
+        temporaryPassword: data.temporaryPassword,
+        emailSent: data.emailSent,
+        isExisting: data.isExisting,
+      });
       setShowInviteForm(false);
       setInviteEmail('');
       setInviteName('');

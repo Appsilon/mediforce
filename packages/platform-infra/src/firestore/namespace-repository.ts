@@ -6,7 +6,7 @@ import {
   type NamespaceMembership,
   type NamespaceRepository,
 } from '@mediforce/platform-core';
-import type { Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 
 export class FirestoreNamespaceRepository implements NamespaceRepository {
   private readonly namespacesCollection = 'namespaces';
@@ -61,12 +61,23 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
   }
 
   async addMember(handle: string, member: NamespaceMember): Promise<void> {
-    await this.db
-      .collection(this.namespacesCollection)
-      .doc(handle)
-      .collection(this.membersSubcollection)
-      .doc(member.uid)
-      .set(member);
+    // Two writes: the member doc (subcollection) plus a denormalized
+    // `users/{uid}.organizations` arrayUnion entry. The user-doc field is the
+    // primary read path for `getUserNamespaces` (single-doc read, no
+    // collectionGroup index needed); keep it consistent with the member
+    // subcollection here so a new member is reachable via both paths.
+    await Promise.all([
+      this.db
+        .collection(this.namespacesCollection)
+        .doc(handle)
+        .collection(this.membersSubcollection)
+        .doc(member.uid)
+        .set(member),
+      this.db
+        .collection('users')
+        .doc(member.uid)
+        .set({ organizations: FieldValue.arrayUnion(handle) }, { merge: true }),
+    ]);
   }
 
   async removeMember(handle: string, uid: string): Promise<void> {
