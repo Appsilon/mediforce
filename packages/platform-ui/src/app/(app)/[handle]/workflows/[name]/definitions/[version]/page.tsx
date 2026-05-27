@@ -97,7 +97,7 @@ export default function WorkflowDefinitionVersionPage() {
           metadata: definition.metadata,
           repo: definition.repo,
           url: definition.url,
-        } as never,
+        },
         { namespace: definition.namespace },
       );
       if (setAsDefault) {

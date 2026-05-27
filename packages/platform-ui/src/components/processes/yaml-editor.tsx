@@ -4,6 +4,7 @@ import * as React from 'react';
 import { CheckCircle, XCircle, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
+import { RegisterWorkflowInputSchema } from '@mediforce/platform-api/contract';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 
@@ -62,8 +63,13 @@ export function YamlEditor({ initialValue = '', namespace, onNamespaceChange, on
       return;
     }
     const { version: _v, createdAt: _c, namespace: _ns, ...body } = raw as Record<string, unknown>;
+    const parsed = RegisterWorkflowInputSchema.safeParse(body);
+    if (!parsed.success) {
+      setState({ status: 'error', message: `Invalid workflow: ${parsed.error.message}` });
+      return;
+    }
     try {
-      const result = await mediforce.workflows.register(body as never, { namespace });
+      const result = await mediforce.workflows.register(parsed.data, { namespace });
       setState({ status: 'saved', name: result.name, version: String(result.version) });
       onSaved?.(result.name, String(result.version));
     } catch (err) {
