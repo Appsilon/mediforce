@@ -10,3 +10,4 @@ export * from './handoff.js';
 export * from './cowork-session.js';
 export * from './process-instance.js';
 export * from './workflow-definition.js';
+export * from './agent-definition.js';

@@ -40,6 +40,7 @@ export { PostgresHandoffRepository } from './postgres/repositories/handoff-repos
 export { PostgresCoworkSessionRepository } from './postgres/repositories/cowork-session-repository.js';
 export { PostgresProcessInstanceRepository } from './postgres/repositories/process-instance-repository.js';
 export { PostgresProcessRepository } from './postgres/repositories/process-repository.js';
+export { PostgresAgentDefinitionRepository } from './postgres/repositories/agent-definition-repository.js';
 export { createPostgresClient, getSharedPostgresClient } from './postgres/client.js';
 export type { Database } from './postgres/client.js';
 export { FirestoreOAuthProviderRepository } from './firestore/oauth-provider-repository.js';

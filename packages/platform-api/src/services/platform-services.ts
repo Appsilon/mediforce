@@ -7,6 +7,7 @@ import {
   FirestoreHandoffRepository,
   PostgresHandoffRepository,
   FirestoreAgentDefinitionRepository,
+  PostgresAgentDefinitionRepository,
   FirestoreCoworkSessionRepository,
   FirestoreCronTriggerStateRepository,
   FirestoreToolCatalogRepository,
@@ -36,6 +37,7 @@ import {
   getAdminAuth,
 } from '@mediforce/platform-infra';
 import type {
+  AgentDefinitionRepository,
   AgentOAuthTokenRepository,
   AgentRunRepository,
   AuditRepository,
@@ -94,7 +96,7 @@ export interface PlatformServices {
   agentRunRepo: AgentRunRepository;
   humanTaskRepo: HumanTaskRepository;
   handoffRepo: HandoffRepository;
-  agentDefinitionRepo: FirestoreAgentDefinitionRepository;
+  agentDefinitionRepo: AgentDefinitionRepository;
   coworkSessionRepo: CoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
   toolCatalogRepo: ToolCatalogRepository;
@@ -142,7 +144,10 @@ export function getPlatformServices(): PlatformServices {
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresHandoffRepository(getSharedPostgresClient().db, instanceRepo)
       : new FirestoreHandoffRepository(db, instanceRepo);
-  const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
+  const agentDefinitionRepo: AgentDefinitionRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresAgentDefinitionRepository(getSharedPostgresClient().db)
+      : new FirestoreAgentDefinitionRepository(db);
   const coworkSessionRepo: CoworkSessionRepository =
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresCoworkSessionRepository(getSharedPostgresClient().db, instanceRepo)
