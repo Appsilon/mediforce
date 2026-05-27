@@ -48,6 +48,7 @@
       "type": "creation",
       "executor": "human",
       "allowedRoles": ["member"],
+      "assignedTo": "${triggerPayload.userId}",
       "description": "Team member provides their perspective on the PO's question.",
       "params": [
         {
