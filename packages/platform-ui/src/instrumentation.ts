@@ -47,13 +47,12 @@ function validateEnv(existsSync: (path: string) => boolean): void {
     }
   }
 
-  // --- STORAGE_BACKEND (ADR-0001) ---
-  if (process.env.STORAGE_BACKEND === 'postgres') {
+  // --- DATABASE_URL (ADR-0001 — Postgres is the only data layer) ---
+  {
     const dbUrl = process.env.DATABASE_URL;
     if (typeof dbUrl !== 'string' || dbUrl.length === 0) {
       errors.push(
-        'STORAGE_BACKEND=postgres requires DATABASE_URL. '
-        + 'Set DATABASE_URL or unset STORAGE_BACKEND to fall back to Firestore.',
+        'DATABASE_URL is not set. Required for the Postgres data layer.',
       );
     }
   }
