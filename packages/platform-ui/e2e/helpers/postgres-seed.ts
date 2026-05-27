@@ -211,7 +211,7 @@ export async function seedPostgresNamespace(testUserId: string): Promise<void> {
           ${task.completionData ? sql.json(task.completionData as unknown) : null},
           ${(task.completedAt as string | null) ?? null},
           ${task.ui ? sql.json(task.ui as unknown) : null},
-          'workflow-engine',
+          ${(task.creationReason as string | null) ?? null},
           ${task.createdAt as string},
           ${task.updatedAt as string}
         )
