@@ -86,7 +86,7 @@ test.describe('Previous run outputs — API E2E', () => {
         data: wd,
       },
     );
-    expect(createWdRes.status(), await createWdRes.text()).toBe(200);
+    expect(createWdRes.status(), await createWdRes.text()).toBe(201);
 
     async function driveRun(messageForNext: string): Promise<string> {
       const triggerRes = await request.post('/api/processes', {

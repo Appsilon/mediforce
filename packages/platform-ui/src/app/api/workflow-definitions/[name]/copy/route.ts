@@ -41,4 +41,5 @@ export const POST = createRouteAdapter<
     };
   },
   copyWorkflow,
+  { successStatus: 201 },
 );

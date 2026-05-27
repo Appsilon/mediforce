@@ -61,7 +61,7 @@ test.describe('POST /api/tasks/[taskId]/complete — verdict variant', () => {
         data: wd,
       },
     );
-    expect(createWdRes.status(), await createWdRes.text()).toBe(200);
+    expect(createWdRes.status(), await createWdRes.text()).toBe(201);
 
     const triggerRes = await request.post('/api/processes', {
       headers: { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' },

@@ -61,7 +61,7 @@ describe('POST /api/workflow-definitions', () => {
     const res = await POST(makeRequest('ns-1', validBody), {});
     const json = await res.json();
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(json).toEqual({ success: true, name: 'wf-new', version: 1 });
     expect(mockSaveWorkflowDefinition).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'wf-new', namespace: 'ns-1', version: 1 }),
@@ -77,7 +77,7 @@ describe('POST /api/workflow-definitions', () => {
     const res = await POST(makeRequest('ns-1', validBody), {});
     const json = await res.json();
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(json.version).toBe(3);
     expect(mockAuditAppend).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'workflow.version_added' }),

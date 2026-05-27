@@ -66,7 +66,7 @@ describe('POST /api/agents', () => {
     const res = await POST(makeRequest(validBody), {});
     const json = await res.json();
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(json.agent.id).toBe('agent-1');
     expect(json.agent.name).toBe('My Agent');
     expect(mockAgentCreate).toHaveBeenCalledWith(expect.objectContaining({ name: 'My Agent' }));

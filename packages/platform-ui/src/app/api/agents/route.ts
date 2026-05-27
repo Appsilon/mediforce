@@ -22,4 +22,5 @@ export const POST = createRouteAdapter<typeof CreateAgentInputSchema, CreateAgen
   CreateAgentInputSchema,
   async (req) => (await req.json().catch(() => ({}))),
   createAgent,
+  { successStatus: 201 },
 );
