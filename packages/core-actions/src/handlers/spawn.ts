@@ -38,9 +38,14 @@ export interface SpawnActionOutput {
   [key: string]: unknown;
 }
 
+interface RunKicker {
+  kick(instanceId: string, opts?: { readonly triggeredBy?: string }): Promise<void>;
+}
+
 export function createSpawnActionHandler(
   manualTrigger: WorkflowTrigger,
   processRepo: Pick<ProcessRepository, 'getLatestWorkflowVersion'>,
+  runKicker?: RunKicker,
 ): SpawnActionHandler {
   return async (config, ctx) => {
     const spawned: SpawnActionOutput['spawned'] = [];
@@ -94,6 +99,12 @@ export function createSpawnActionHandler(
           status: 'created',
           ...(itemIndex !== undefined ? { itemIndex } : {}),
         });
+
+        if (runKicker) {
+          await runKicker.kick(result.instanceId, {
+            triggeredBy: `spawn:${ctx.processInstanceId}`,
+          });
+        }
       } catch (err) {
         if (config.continueOnSpawnError === false) {
           throw err;

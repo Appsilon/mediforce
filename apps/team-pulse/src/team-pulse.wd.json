@@ -47,6 +47,20 @@
   ],
   "steps": [
     {
+      "id": "prepare",
+      "name": "Prepare",
+      "type": "creation",
+      "executor": "script",
+      "plugin": "script-container",
+      "autonomyLevel": "L4",
+      "description": "Parse teamMembers JSON string into an array (triggerInput only supports primitives).",
+      "agent": {
+        "image": "mediforce-golden-image:latest",
+        "runtime": "javascript",
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const raw = input.teamMembers;\n  const teamMembers = typeof raw === 'string' ? JSON.parse(raw) : raw;\n  if (!Array.isArray(teamMembers)) { console.error('teamMembers must be a JSON array'); process.exit(1); }\n  writeFileSync('/output/result.json', JSON.stringify({ teamMembers, question: input.question }));\n  console.log(`Parsed ${teamMembers.length} team member(s)`);\n} catch (err) {\n  console.error('prepare crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+      }
+    },
+    {
       "id": "spawn_perspectives",
       "name": "Spawn perspectives",
       "type": "creation",
@@ -55,7 +69,7 @@
       "action": {
         "kind": "spawn",
         "config": {
-          "forEach": "${triggerPayload.teamMembers}",
+          "forEach": "${steps.prepare.teamMembers}",
           "targets": {
             "definitionName": "gather-perspective",
             "payload": {
@@ -163,6 +177,7 @@
     }
   ],
   "transitions": [
+    { "from": "prepare", "to": "spawn_perspectives" },
     { "from": "spawn_perspectives", "to": "wait_for_responses" },
     { "from": "wait_for_responses", "to": "collect_responses" },
     { "from": "collect_responses", "to": "synthesize" },

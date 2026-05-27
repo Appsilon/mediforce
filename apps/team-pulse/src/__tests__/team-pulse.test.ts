@@ -21,12 +21,21 @@ describe('team-pulse', () => {
     expect(result.success).toBe(true);
   });
 
-  it('has 7 steps with exactly 1 terminal', () => {
+  it('has 8 steps with exactly 1 terminal', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.steps).toHaveLength(7);
+    expect(result.data.steps).toHaveLength(8);
     expect(result.data.steps.filter((s) => s.type === 'terminal')).toHaveLength(1);
+  });
+
+  it('prepare step parses teamMembers JSON string', () => {
+    const result = loadDefinition();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const step = result.data.steps.find((s) => s.id === 'prepare');
+    expect(step?.executor).toBe('script');
+    expect(step?.agent?.inlineScript).toMatch(/JSON\.parse/);
   });
 
   it('spawn_perspectives is action step with spawn kind and forEach', () => {
