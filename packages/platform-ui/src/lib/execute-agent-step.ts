@@ -177,6 +177,7 @@ export async function executeAgentStep(
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
     processInstanceId: instanceId,
+    runNamespace: instance.namespace ?? '',
     definitionVersion: instance.definitionVersion,
     stepInput: mergedInput,
     autonomyLevel,

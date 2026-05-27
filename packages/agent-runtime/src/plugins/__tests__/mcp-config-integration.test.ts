@@ -67,6 +67,7 @@ function buildMockWorkflowAgentContext(
   return {
     stepId: 'extract',
     processInstanceId: 'pi-001',
+    runNamespace: 'test',
     definitionVersion: 'v1',
     stepInput: {},
     autonomyLevel: 'L2',
