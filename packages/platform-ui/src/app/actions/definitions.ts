@@ -3,9 +3,9 @@
 import { getPlatformServices } from '@/lib/platform-services';
 import {
   parseWorkflowDefinitionForCreation,
+  WorkflowDefinitionVersionAlreadyExistsError,
 } from '@mediforce/platform-core';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
-import { WorkflowDefinitionVersionAlreadyExistsError, getAdminFirestore } from '@mediforce/platform-infra';
 
 export type SaveDefinitionResult =
   | { success: true; name: string; version: string }
@@ -228,25 +228,11 @@ export async function transferWorkflowNamespace(
   }
 
   try {
-    // Ensure platform services are initialized (this also initializes Firebase)
-    getPlatformServices();
-    const db = getAdminFirestore();
-
-    // Query all versions of this workflow
-    const snapshot = await db
-      .collection('workflowDefinitions')
-      .where('name', '==', workflowName)
-      .get();
-
-    if (snapshot.empty) {
+    const { processRepo } = getPlatformServices();
+    const transferred = await processRepo.transferWorkflowNamespace(workflowName, newNamespace);
+    if (transferred === 0) {
       return { success: false, error: `No workflow found with name "${workflowName}".` };
     }
-
-    // Update each version with the new namespace
-    for (const docSnap of snapshot.docs) {
-      await db.collection('workflowDefinitions').doc(docSnap.id).update({ namespace: newNamespace });
-    }
-
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };

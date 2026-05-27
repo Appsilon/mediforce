@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
-import { WorkflowDefinitionVersionNotFoundError } from '@mediforce/platform-infra';
+import { WorkflowDefinitionVersionNotFoundError } from '@mediforce/platform-core';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 
 export async function POST(

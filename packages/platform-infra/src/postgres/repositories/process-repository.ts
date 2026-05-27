@@ -1,6 +1,8 @@
 import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import {
   WorkflowDefinitionSchema,
+  WorkflowDefinitionVersionAlreadyExistsError,
+  WorkflowDefinitionVersionNotFoundError,
   type ProcessRepository,
   type WorkflowDefinition,
   type WorkflowDefinitionGroup,
@@ -12,10 +14,6 @@ import {
   workflowMeta,
 } from '../schema/workflow-definition.js';
 import { processInstances } from '../schema/process-instance.js';
-import {
-  WorkflowDefinitionVersionAlreadyExistsError,
-  WorkflowDefinitionVersionNotFoundError,
-} from '../../firestore/process-repository.js';
 
 /**
  * Postgres-backed ProcessRepository (ADR-0001 PR2, PLAN §1.2
@@ -345,6 +343,27 @@ export class PostgresProcessRepository implements ProcessRepository {
         and(
           eq(processInstances.workspace, namespace),
           eq(processInstances.definitionName, name),
+        ),
+      );
+    return rows.length;
+  }
+
+  async transferWorkflowNamespace(
+    name: string,
+    newNamespace: string,
+  ): Promise<number> {
+    const rows = await this.db
+      .select({ id: workflowDefinitions.id })
+      .from(workflowDefinitions)
+      .where(eq(workflowDefinitions.name, name));
+    if (rows.length === 0) return 0;
+    await this.db
+      .update(workflowDefinitions)
+      .set({ workspace: newNamespace })
+      .where(
+        inArray(
+          workflowDefinitions.id,
+          rows.map((r) => r.id),
         ),
       );
     return rows.length;

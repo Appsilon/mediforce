@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAdminAuth, getAdminFirestore, FirebaseInviteService, createMailgunSender } from '@mediforce/platform-infra';
+import { getPlatformServices } from '@/lib/platform-services';
 import { sendInviteEmail } from '@/lib/send-invite-email';
 
 const ResendInviteBodySchema = z.object({
@@ -46,16 +47,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const adminDb = getAdminFirestore();
+    const { namespaceRepo } = getPlatformServices();
 
     if (callerUid !== null) {
-      const memberSnap = await adminDb
-        .collection('namespaces')
-        .doc(namespaceHandle)
-        .collection('members')
-        .doc(callerUid)
-        .get();
-      const memberRole = memberSnap.exists ? (memberSnap.data()?.role as string | undefined) : undefined;
-      if (memberRole !== 'owner' && memberRole !== 'admin') {
+      const callerMember = await namespaceRepo.getMember(namespaceHandle, callerUid);
+      if (callerMember === null || (callerMember.role !== 'owner' && callerMember.role !== 'admin')) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
     }

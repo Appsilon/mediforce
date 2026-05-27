@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { parseWorkflowDefinitionForCreation } from '@mediforce/platform-core';
-import { WorkflowDefinitionVersionAlreadyExistsError } from '@mediforce/platform-infra';
+import {
+  parseWorkflowDefinitionForCreation,
+  WorkflowDefinitionVersionAlreadyExistsError,
+} from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 import { createRouteAdapter } from '@/lib/route-adapter';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';

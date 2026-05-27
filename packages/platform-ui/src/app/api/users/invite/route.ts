@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore, FirebaseInviteService, createMailgunSender } from '@mediforce/platform-infra';
+import { getPlatformServices } from '@/lib/platform-services';
 import { sendInviteEmail, sendWorkspaceNotificationEmail } from '@/lib/send-invite-email';
 
 const InviteBodySchema = z.object({
@@ -50,16 +51,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const adminDb = getAdminFirestore();
+    const { namespaceRepo } = getPlatformServices();
 
     if (callerUid !== null) {
-      const memberSnap = await adminDb
-        .collection('namespaces')
-        .doc(namespaceHandle)
-        .collection('members')
-        .doc(callerUid)
-        .get();
-      const memberRole = memberSnap.exists ? (memberSnap.data()?.role as string | undefined) : undefined;
-      if (memberRole !== 'owner' && memberRole !== 'admin') {
+      const callerMember = await namespaceRepo.getMember(namespaceHandle, callerUid);
+      if (callerMember === null || (callerMember.role !== 'owner' && callerMember.role !== 'admin')) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
     }
@@ -71,23 +67,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
 
     if (typeof namespaceHandle === 'string' && namespaceHandle.trim() !== '') {
-      await adminDb
-        .collection('namespaces')
-        .doc(namespaceHandle)
-        .collection('members')
-        .doc(uid)
-        .set(
-          {
-            uid,
-            role,
-            ...(typeof displayName === 'string' && displayName.trim() !== ''
-              ? { displayName: displayName.trim() }
-              : {}),
-            joinedAt: new Date().toISOString(),
-          },
-          { merge: true },
-        );
+      await namespaceRepo.addMember(namespaceHandle, {
+        uid,
+        role,
+        ...(typeof displayName === 'string' && displayName.trim() !== ''
+          ? { displayName: displayName.trim() }
+          : {}),
+        joinedAt: new Date().toISOString(),
+      });
 
+      // User-doc `organizations` array is still the UI-realtime source for
+      // workspace switching (auth-context.tsx). Phase 2.5 will migrate that
+      // collection to Postgres too.
       await adminDb.collection('users').doc(uid).set(
         { organizations: FieldValue.arrayUnion(namespaceHandle) },
         { merge: true },
@@ -116,10 +107,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       try {
         if (isExisting && typeof namespaceHandle === 'string' && namespaceHandle.trim() !== '') {
-          const namespaceDoc = await adminDb.collection('namespaces').doc(namespaceHandle).get();
-          const workspaceName = namespaceDoc.exists
-            ? (namespaceDoc.data()?.displayName as string | undefined ?? namespaceHandle)
-            : namespaceHandle;
+          const ns = await namespaceRepo.getNamespace(namespaceHandle);
+          const workspaceName = ns !== null ? ns.displayName : namespaceHandle;
 
           await sendWorkspaceNotificationEmail({
             toEmail: email.trim().toLowerCase(),

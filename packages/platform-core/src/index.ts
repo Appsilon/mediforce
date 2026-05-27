@@ -1,3 +1,9 @@
+// Cross-backend domain errors
+export {
+  WorkflowDefinitionVersionAlreadyExistsError,
+  WorkflowDefinitionVersionNotFoundError,
+} from './errors.js';
+
 // Schemas (Zod schema objects + inferred types)
 export {
   VerdictSchema,
