@@ -9,8 +9,8 @@ import { ProcessStatusBadge } from './process-status-badge';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
-import { archiveProcessRun, bulkCancelProcessRuns, bulkArchiveProcessRuns } from '@/app/actions/processes';
-import type { BulkOperationResult } from '@/app/actions/processes';
+import { mediforce, ApiError } from '@/lib/mediforce';
+import type { BulkRunOutput } from '@mediforce/platform-api/contract';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 import { formatCostUsd } from '@/lib/format';
 import { useToast } from '@/components/command-palette/toast-provider';
@@ -99,22 +99,30 @@ export function RunsTable({
   async function handleArchive(run: ProcessInstance) {
     const newArchived = run.archived !== true;
     setArchivingIds((prev) => new Set(prev).add(run.id));
-    await archiveProcessRun(run.id, newArchived);
-    setArchivingIds((prev) => {
-      const next = new Set(prev);
-      next.delete(run.id);
-      return next;
-    });
+    try {
+      await mediforce.runs.archive({ runId: run.id, archived: newArchived });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message : 'Archive failed';
+      toast({ title: 'Archive failed', description: message, variant: 'error' });
+    } finally {
+      setArchivingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(run.id);
+        return next;
+      });
+    }
   }
 
   const cancellableSelected = runs.filter((r) => selectedIds.has(r.id) && isCancellable(r));
   const archivableSelected = runs.filter((r) => selectedIds.has(r.id) && isArchivable(r));
 
-  function reportBulkResult(result: BulkOperationResult, action: string) {
-    if (result.failed.length > 0) {
+  function reportBulkResult(result: BulkRunOutput, action: string) {
+    const failed = result.results.filter((r) => r.status === 'error');
+    if (failed.length > 0) {
       toast({
-        title: `${result.failed.length} run(s) failed to ${action}`,
-        description: result.failed.map((f) => f.error).join('; '),
+        title: `${failed.length} run(s) failed to ${action}`,
+        description: failed.map((f) => f.error ?? 'Unknown error').join('; '),
         variant: 'error',
       });
     }
@@ -122,16 +130,30 @@ export function RunsTable({
 
   async function handleBulkCancel() {
     setBulkCancelling(true);
-    const result = await bulkCancelProcessRuns(cancellableSelected.map((r) => r.id));
-    reportBulkResult(result, 'cancel');
-    setBulkCancelling(false);
+    try {
+      const result = await mediforce.runs.bulkCancel({ runIds: cancellableSelected.map((r) => r.id) });
+      reportBulkResult(result, 'cancel');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message : 'Bulk cancel failed';
+      toast({ title: 'Bulk cancel failed', description: message, variant: 'error' });
+    } finally {
+      setBulkCancelling(false);
+    }
   }
 
   async function handleBulkArchive() {
     setBulkArchiving(true);
-    const result = await bulkArchiveProcessRuns(archivableSelected.map((r) => r.id));
-    reportBulkResult(result, 'archive');
-    setBulkArchiving(false);
+    try {
+      const result = await mediforce.runs.bulkArchive({ runIds: archivableSelected.map((r) => r.id) });
+      reportBulkResult(result, 'archive');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message : 'Bulk archive failed';
+      toast({ title: 'Bulk archive failed', description: message, variant: 'error' });
+    } finally {
+      setBulkArchiving(false);
+    }
   }
 
   const effectiveRunHref = runHref ?? ((run: ProcessInstance) =>

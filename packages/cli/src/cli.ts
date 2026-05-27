@@ -19,6 +19,8 @@ import { runGetCommand } from './commands/run-get.js';
 import { runListCommand } from './commands/run-list.js';
 import { runStartCommand } from './commands/run-start.js';
 import { runCancelCommand } from './commands/run-cancel.js';
+import { runArchiveCommand } from './commands/run-archive.js';
+import { runBulkCancelCommand, runBulkArchiveCommand } from './commands/run-bulk.js';
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility.js';
 import { workflowCopyCommand } from './commands/workflow-copy.js';
@@ -71,12 +73,15 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   run: {
-    description: 'Workflow runs (list, start, get, cancel)',
+    description: 'Workflow runs (list, start, get, cancel, archive, bulk)',
     leaves: {
       list: { description: 'List recent runs', fn: runListCommand },
       start: { description: 'Start a new run (manual trigger)', fn: runStartCommand },
       get: { description: "Fetch a single run's status", fn: runGetCommand },
       cancel: { description: 'Cancel a running or paused run', fn: runCancelCommand },
+      archive: { description: 'Soft-archive (or restore) a run', fn: runArchiveCommand },
+      'bulk-cancel': { description: 'Cancel multiple runs in one call', fn: runBulkCancelCommand },
+      'bulk-archive': { description: 'Archive multiple runs in one call', fn: runBulkArchiveCommand },
     },
   },
   agent: {

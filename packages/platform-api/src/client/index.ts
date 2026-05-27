@@ -71,6 +71,10 @@ import {
   ResumeRunOutputSchema,
   RetryStepInputSchema,
   RetryStepOutputSchema,
+  ArchiveRunInputSchema,
+  ArchiveRunOutputSchema,
+  BulkRunInputSchema,
+  BulkRunOutputSchema,
   HeartbeatInputSchema,
   HeartbeatOutputSchema,
   type ListTasksInput,
@@ -144,6 +148,10 @@ import {
   type ResumeRunOutput,
   type RetryStepInput,
   type RetryStepOutput,
+  type ArchiveRunInput,
+  type ArchiveRunOutput,
+  type BulkRunInput,
+  type BulkRunOutput,
   type HeartbeatInput,
   type HeartbeatOutput,
   type GetCoworkSessionInput,
@@ -283,6 +291,9 @@ export class Mediforce {
     cancel: (input: CancelRunInput) => Promise<CancelRunOutput>;
     resume: (input: ResumeRunInput) => Promise<ResumeRunOutput>;
     retryStep: (input: RetryStepInput) => Promise<RetryStepOutput>;
+    archive: (input: ArchiveRunInput) => Promise<ArchiveRunOutput>;
+    bulkCancel: (input: BulkRunInput) => Promise<BulkRunOutput>;
+    bulkArchive: (input: BulkRunInput) => Promise<BulkRunOutput>;
   };
 
   readonly agents: {
@@ -715,6 +726,36 @@ export class Mediforce {
         );
         const parsed = await parseJsonOrThrow(res, 'mediforce.runs.retryStep');
         return RetryStepOutputSchema.parse(parsed);
+      },
+      archive: (input) => {
+        const v = ArchiveRunInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/processes/${encodeURIComponent(v.runId)}/archive`,
+          { archived: v.archived },
+          ArchiveRunOutputSchema,
+          'mediforce.runs.archive',
+        );
+      },
+      bulkCancel: (input) => {
+        const v = BulkRunInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          '/api/processes/bulk/cancel',
+          { runIds: v.runIds },
+          BulkRunOutputSchema,
+          'mediforce.runs.bulkCancel',
+        );
+      },
+      bulkArchive: (input) => {
+        const v = BulkRunInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          '/api/processes/bulk/archive',
+          { runIds: v.runIds },
+          BulkRunOutputSchema,
+          'mediforce.runs.bulkArchive',
+        );
       },
     };
 

@@ -166,6 +166,11 @@ export {
   ResumeWaitOutputSchema,
   RetryStepInputSchema,
   RetryStepOutputSchema,
+  ArchiveRunInputSchema,
+  ArchiveRunOutputSchema,
+  BulkRunInputSchema,
+  BulkRunOutputSchema,
+  BulkRunResultItemSchema,
   type GetProcessInput,
   type GetProcessOutput,
   type ListAuditEventsInput,
@@ -183,6 +188,11 @@ export {
   type ResumeWaitOutput,
   type RetryStepInput,
   type RetryStepOutput,
+  type ArchiveRunInput,
+  type ArchiveRunOutput,
+  type BulkRunInput,
+  type BulkRunOutput,
+  type BulkRunResultItem,
 } from './processes.js';
 
 export {
