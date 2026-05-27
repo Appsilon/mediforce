@@ -94,7 +94,7 @@ The underlying lesson is that the pilot contract was designed to match what `Hum
 
 Concrete Phase 1 tickets (tracked in #231):
 
-- **Drop the actionable-only filter from `HumanTaskRepository.getByRole`** — ~~planned~~ **done in #232**. Both the Firestore and in-memory implementations now return every task for a role regardless of status; callers narrow via the `status` field in the contract. The only pre-pilot production caller of `getByRole` was our new handler, so the change had zero user-visible effect on main and unblocked migration of `useCompletedTasks` in future Phase 6 work.
+- **Drop the actionable-only filter from `HumanTaskRepository.getByRole`** — ~~planned~~ **done in #232**. Both the Firestore and in-memory implementations now return every task for a role regardless of status; callers narrow via the `status` field in the contract. The only pre-pilot production caller of `getByRole` was our new handler, so the change had zero user-visible effect on main and unblocked migration of `useCompletedTasks` in future Phase 4 work.
 - **Unfiltered list** (`useAllTasks`) — add a `GET /api/tasks` variant with mandatory pagination (`limit` + opaque `cursor`) and probably admin scope. Don't add "filter is optional" — the unbounded read is the footgun.
 - **Aggregate stats** (`useMonitoringData`) — different shape (counts, not list). Add `GET /api/tasks/stats` as a separate endpoint rather than contorting the list contract.
 - **Multi-field filter** (`instanceId + stepId` in `NextStepCard`) — extend `ListTasksInputSchema` with optional `stepId`. Trivial.
@@ -962,73 +962,152 @@ Audit emission per handler via `scope.system.audit.append` (ADR-0005 §7 handler
 
 Multi-tab live sync intentionally excluded — no demand. ChatGPT and Claude.ai don't live-mirror multi-tab same-user; refresh-on-focus is the dominant pattern.
 
-### Phase 4 — Typed `apiClient` + first hook migration
+### Phase 4 — UI off Firestore (gating for ADR-0001 cutover)
 
-Close the loop: UI consumes the same contract it serves.
+**Folded from previous Phase 4 + Phase 6 (2026-05-27).** Original split —
+"typed apiClient + first hook" vs "remaining UI data fetching" — was
+artificial. The typed `Mediforce` client already exists (started in #232,
+expanded alongside every Phase 1-3 endpoint), used punctually by
+`StepHistoryTabs` and `TaskDetail.siblingTasks`. Practical effort = one
+stream: rewrite every UI consumer that imports `firebase/firestore` to go
+through `mediforce.X.Y()` + SSE. Treating it as one phase reflects reality.
 
-- Build `packages/platform-ui/src/lib/api-client.ts`:
-  - Methods like `apiClient.tasks.list(input)` → `Promise<ListTasksOutput>`.
-  - Shares the browser Bearer path with `apiFetch` (Filip's helper) via the
-    `getFirebaseIdToken()` helper in `lib/firebase-id-token.ts` — one source
-    of truth for `auth.currentUser.getIdToken()`. The typed client itself is
-    Firebase-free; the browser wrapper `lib/mediforce.ts` injects the helper
-    as its `bearerToken` callback.
-  - Parses the response through `<Endpoint>OutputSchema` — runtime guarantee.
-  - Input type + schema come from `@mediforce/platform-api/contract`.
-- Migrate one non-realtime hook (settings list, archived items, detail view) from `useCollection` / direct Firestore SDK to `apiClient`.
-- Journey test for that page stays green — establishes the pattern.
+**Gating for ADR-0001.** Postgres has no `onSnapshot` equivalent. PG PR2
+([#534](https://github.com/Appsilon/mediforce/pull/534)) — server-side
+Firestore deletion + cutover script — is explicitly blocked on this phase.
+Sequencing per ADR-0001 §8 + PR2 description:
 
-**Accepted trade-off:** the first migrated hook loses real-time updates. That's fine for a non-critical read. Live reads come back later via SSE (Phase 6).
+1. Merge PG PR1 ([#515](https://github.com/Appsilon/mediforce/pull/515)) —
+   tracer-bullet `STORAGE_BACKEND=postgres` flag + `PostgresToolCatalogRepository`.
+2. **This phase** — UI off Firestore. Behavioural no-op alone (Firestore
+   stays the server data layer); UI just routes reads through
+   `mediforce.X.Y()` + SSE instead of `onSnapshot`.
+3. Staging cutover via `scripts/migrate-firestore-to-postgres/`.
+4. Merge PG PR2 ([#534](https://github.com/Appsilon/mediforce/pull/534)) —
+   server flips to Postgres, `STORAGE_BACKEND` flag removed,
+   `platform-infra/src/firestore/` deleted.
+5. Production cutover.
 
-**Status**: started in #232 — `Mediforce` class in `@mediforce/platform-api/client` + `mediforce.tasks.list` + `useInstanceTasks` hook consuming it in `StepHistoryTabs` and `TaskDetail.siblingTasks`. Expand the class alongside each Phase 1 / 2 endpoint migration rather than in one sweep.
+**Scope — 22 files importing `firebase/firestore`, 11 with live `onSnapshot`:**
 
-**Client shape** — runtime-agnostic, Stripe-style. Exactly one of three config fields must be provided at construction:
+Hooks (12):
+- Data reads: `use-tasks.ts`, `use-process-instances.ts`, `use-agent-runs.ts`,
+  `use-audit-events.ts`, `use-process-definitions.ts`,
+  `use-workflow-definitions.ts`, `use-monitoring.ts`, `use-collection.ts`.
+- Workspace metadata: `use-namespace.ts`, `use-namespace-role.ts`,
+  `use-all-user-namespaces.ts`, `use-user-namespace.ts`.
+
+Pages (5):
+- `app/(app)/[handle]/page.tsx` (workspace home)
+- `app/(app)/[handle]/settings/page.tsx`
+- `app/(app)/[handle]/tasks/[taskId]/page.tsx` (live task detail)
+- `app/(app)/[handle]/cowork/[sessionId]/page.tsx` (live cowork chat)
+- `app/(app)/workspaces/new/page.tsx` (create namespace — direct writes)
+
+Components (3):
+- `components/tasks/task-detail.tsx`, `components/tasks/next-step-card.tsx`
+- `components/cowork/chat-cowork-view.tsx` (live chat turns)
+
+Context (1):
+- `contexts/auth-context.tsx` — reads `users/{uid}` doc on sign-in.
+  Confusingly mixes Firebase Auth (stays) with Firestore reads (out).
+  Migrates via headless `GET /api/users/me` (or similar).
+
+Init (1):
+- `lib/firebase.ts` — `getFirestore()` + `connectFirestoreEmulator()`.
+  Removed entirely once last consumer goes; `firebase/firestore` peer-dep
+  uninstall from `platform-ui`.
+
+**Missing headless endpoints (~8-9 per PG PR2 description; confirm by walking each file):**
+
+- `GET /api/users/me` — current-user doc (replaces `auth-context.tsx` direct read).
+- `GET /api/users/me/namespaces` — workspaces caller belongs to (replaces `use-all-user-namespaces`).
+- `GET /api/namespaces/:handle` — workspace details (replaces `use-namespace`).
+- `GET /api/namespaces/:handle/role` — caller role (replaces `use-namespace-role`).
+- `GET /api/audit-events` — paginated audit listing with namespace filter (replaces direct collection-group query in `use-audit-events`).
+- `GET /api/agent-runs` — paginated agent-run listing (replaces `use-agent-runs` direct query).
+- `POST /api/namespaces` — create workspace (replaces direct writes in `workspaces/new/page.tsx`).
+- Audit + agent-runs per-instance endpoints already exist from Phase 1; verify shape covers UI needs before adding new ones.
+
+**SSE endpoints for live (~4 today, per `onSnapshot` consumers):**
+
+- `GET /api/tasks/stream?role=…` — live task list per role.
+- `GET /api/processes/:id/stream` — live single-instance updates (status, current step, variables).
+- `GET /api/agent-runs/stream?processInstanceId=…` — live agent runs for a process.
+- `GET /api/cowork/:sessionId/stream` — live cowork turns (replaces `chat-cowork-view` snapshot).
+
+`apiClient` wraps `fetch` + `ReadableStream` + incremental SSE parse (not
+`EventSource` — no custom-header support without a proxy hop).
+
+**Client-side cache library — open question, not pre-decided.**
+
+Neither `platform-ui` nor PG PR2 ([#534](https://github.com/Appsilon/mediforce/pull/534))
+adds a cache library today. Decide at the top of this phase; document
+choice + reasoning.
+
+| Option | Trade-off |
+|---|---|
+| **SWR** | Small. Stale-while-revalidate + focus-refetch + dedup out of box. Fits ADR-0001 §5's "lists move to polling 2-10s". No mutation-invalidation primitive. |
+| **@tanstack/react-query** | Heavier. Covers mutation invalidation, which post-Phase 4 the UI starts to need (`mediforce.X.create` → invalidate relevant lists). |
+| **Custom helper** | Extend today's `useInstanceTasks` (`useState` + `useEffect` + cancelled flag). Smallest dep footprint; loses dedup + cache. |
+
+**Client shape** — runtime-agnostic, Stripe-style. `Mediforce` class with
+exactly one of three config fields at construction:
 
 - `apiKey: string` → server-to-server (CLI, agent, MCP server). Uses `globalThis.fetch`, attaches `X-Api-Key`.
 - `bearerToken: () => Promise<string | null>` → user session (browser). Called per request for rotation; attaches `Authorization: Bearer`.
-- `fetch: typeof fetch` → escape hatch. Test loopback, retry/tracing wrappers with auth baked in via closure. No auth headers added by the client — caller's fetch handles it.
+- `fetch: typeof fetch` → escape hatch. Test loopback; auth baked in via closure.
 
-Firebase is never imported by `platform-api/client` — the browser wrapper in `platform-ui/src/lib/mediforce.ts` supplies `bearerToken` by reference to `getFirebaseIdToken()` (in `lib/firebase-id-token.ts`), which lazily imports the Firebase SDK and reads `auth.currentUser.getIdToken()`. That same helper backs `apiFetch`, so every browser-initiated call — typed or raw — produces byte-identical auth headers. For Node consumers, just `new Mediforce({ baseUrl, apiKey })`.
+Firebase is never imported by `platform-api/client`. Browser wrapper
+`platform-ui/src/lib/mediforce.ts` supplies `bearerToken` via
+`getFirebaseIdToken()` (in `lib/firebase-id-token.ts`), which lazily imports
+Firebase Auth and reads `auth.currentUser.getIdToken()`. Same helper backs
+`apiFetch` — every browser call produces byte-identical auth headers.
 
-**Open questions to settle**:
-- Do we keep our own tiny async-hook helper (`useInstanceTasks` pattern — `useState` + `useEffect` + cancelled flag), or adopt an existing library (`@tanstack/react-query` / `swr`) that gives caching, dedup, stale-while-revalidate for free?
-- Error surface — today `ApiError` (with `code`/`details`) is thrown from the client; hooks map it to `{ error }` state. Do we standardise an error boundary + toast pattern for failed API calls?
-- UI per-code narrowing — once the first real `if (err.code === 'X')` switch appears in UI, revisit ADR-0005 §2 "future-idea" note: reconstruct the matching server-side `HandlerError` subclass on the client from envelope `code` via a small map and surface it as a field on `ApiError`, so UI can do `if (clientErr.handlerError instanceof PreconditionFailedError)` with full TS narrowing. Out of scope until a concrete use-case lands.
+**Decision tree per file:**
+- Live updates needed? → SSE endpoint + `apiClient.X.subscribeY()` wrapper.
+- Static-ish list? → Polling via cache library, 2-10s per ADR-0001 §5.
+- One-shot read? → Direct `mediforce.X.Y()` call.
 
-### Phase 5 — Delete `@/lib/platform-services` shim
+**Pause-safe**: yes — per-file migration, each backed by a journey test.
+Unmigrated consumers keep working on the Firestore bypass.
 
-Mechanical cleanup. After Phase 4 the adapter surface is mostly migrated and we can codemod the remaining imports:
+**Open questions to settle at the top of the phase:**
+- Cache library — SWR vs react-query vs custom (above).
+- Auth on long-lived SSE streams — Firebase ID tokens expire ~1 h. Reconnect on expiry / server-side refresh / shorter stream lifetime + client reopen?
+- SSE granularity — one endpoint per resource (`/api/tasks/stream`, `/api/processes/:id/stream`), or one generic `subscribe` with contract-defined query? Former simpler; latter mirrors Firestore.
+- Error surface — today `ApiError` (with `code`/`details`) thrown from client. Standard error boundary + toast pattern for failed API calls?
+- UI per-code error narrowing — once first real `if (err.code === 'X')` lands, revisit ADR-0005 §2 "future-idea" to reconstruct server `HandlerError` subclass on the client from envelope `code`. Out of scope until concrete use-case.
 
-- Every `import { getPlatformServices } from '@/lib/platform-services'` → `from '@mediforce/platform-api/services'`
-- Every `import { getAppBaseUrl } from '@/lib/platform-services'` → `from '@/lib/app-base-url'`
+### Phase 5 — Delete `@/lib/platform-services` shim (off critical path)
+
+Mechanical cleanup. Codemod the remaining imports:
+
+- `import { getPlatformServices } from '@/lib/platform-services'` → `from '@mediforce/platform-api/services'`
+- `import { getAppBaseUrl } from '@/lib/platform-services'` → `from '@/lib/app-base-url'`
 - Delete `packages/platform-ui/src/lib/platform-services.ts`
 
 **Scope:** ~100+ imports, trivial per file. Single PR.
 
-**Pause-safe**: yes, but the shim is intentionally minimal and trivial — pausing mid-codemod looks ugly. Best to do it in one go.
+**Critical-path status**: no longer gating. Does NOT block ADR-0001 cutover.
+Schedule whenever — before, during, or after PG cutover. Pure cosmetics.
 
-**Open questions**: none expected — this is mechanical.
+**Pause-safe**: yes, but the shim is minimal and trivial — pausing
+mid-codemod looks ugly. Do it in one go.
 
-### Phase 6 — Migrate remaining UI data fetching
+**Open questions**: none expected — mechanical.
 
-The biggest remaining bypass: client hooks that read Firestore directly via SDK, skipping the API entirely (`useCollection`, `useProcessInstance`, `useAuditEvents`, etc.).
+### ~~Phase 6~~ — Folded into Phase 4 (2026-05-27)
 
-- Each hook gets rewritten to consume `apiClient`.
-- Live-critical hooks (active tasks, running processes) need a live-update story — most likely **SSE endpoints** exposed from `platform-api` handlers, one per subscribable resource. `apiClient` wraps `EventSource`.
-- Firestore SDK can be removed from browser once all live hooks have moved; at that point the browser no longer needs Firestore project config.
+Original split (Phase 4 = "typed client + first hook"; Phase 6 = "remaining
+hooks") was artificial. Typed `Mediforce` client already exists; the
+practical effort is one stream of work — rewritten under Phase 4 above.
+This header retained for back-references; the work itself lives in Phase 4.
 
-Ship this progressively — one hook at a time, backed by journey tests.
+### Phase 7 — Optional: split API into separate deployable (off critical path)
 
-**Pause-safe**: yes — per-hook migration, each backed by a journey test that must stay green. Any pause leaves untouched hooks on the Firestore bypass, working as today.
-
-**Open questions to settle**:
-- How does the browser subscribe to an SSE endpoint through `apiFetch`? `fetch` with `Accept: text/event-stream` works; `EventSource` doesn't support custom headers without a proxy hop. The simplest path is `fetch` + `res.body.getReader()` + incremental parse — do we hide that inside `apiClient.tasks.subscribeByRole(role, onEvent)`?
-- Auth for long-lived streams — Firebase ID tokens expire (~1 h). Do we reconnect on expiry, refresh on the server, or scope streams to a shorter lifetime and let the client reopen?
-- Granularity — one endpoint per subscribable collection (`/api/tasks/stream`, `/api/processes/:id/stream`) or one generic `subscribe` endpoint that takes a contract-defined query? The former is simpler; the latter mirrors Firestore's model more closely.
-
-### Phase 7 — Optional: split API into separate deployable
-
-Only if there's a real reason (scaling, non-Next clients, independent deploy cadence).
+Only if there's a real reason (scaling, non-Next clients, independent
+deploy cadence). Does NOT block ADR-0001 cutover.
 
 - Add `apps/api-server/` with a small HTTP runtime (Hono or Fastify) that mounts the platform-api handlers.
 - Deploy split: UI somewhere static (Vercel/CDN), API server somewhere with runtime (Cloud Run / Fly).
@@ -1130,13 +1209,13 @@ Honest self-review. `✅` = good template, `⚠️` = deliberately deferred, `�
 | Adapter | `createRouteAdapter` — 3 tests; `tasks/route.ts` — 5 tests (Filip-era mocks, stale but harmless) | ✅ Harmless mock debt called out in plan Phase 5 |
 | API client | `apiClient.tasks.list` — 6 tests, `apiFetch` mocked | ✅ |
 | Integration | apiClient ↔ adapter ↔ handler ↔ repo — 2 tests | ✅ First of kind; grow 1 per major feature, not per endpoint |
-| Hook | `useInstanceTasks` — 5 tests, incl. cancel-on-deps-change | ✅ Template for Phase 4 / 6 migrations |
+| Hook | `useInstanceTasks` — 5 tests, incl. cancel-on-deps-change | ✅ Template for Phase 4 migrations |
 | Component | `StepHistoryTabs` — 0 unit tests | ⚠️ Deliberately skipped; E2E covers, component logic trivial |
 | Structural | `api-boundaries.test.ts` (ours) + `api-auth-coverage.test.ts` (Filip's) | ✅ |
 | Engine | Existing, unchanged | ✅ |
 | Plugin unit | Existing, unchanged | ✅ |
 | Auto-runner integration | Existing, unchanged | ✅ |
-| E2E journey | Existing — no new journey for step-history migration (covered by existing process-detail journey) | ⚠️ Re-assess when Phase 6 migrates live hooks |
+| E2E journey | Existing — no new journey for step-history migration (covered by existing process-detail journey) | ⚠️ Re-assess when Phase 4 migrates live hooks |
 | E2E smoke | Existing, unchanged | ✅ |
 
 **Gaps to close in Phase 1** (noted, not blocking the pilot):
