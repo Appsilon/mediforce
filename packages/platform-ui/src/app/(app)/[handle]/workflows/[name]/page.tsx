@@ -11,7 +11,7 @@ import { useMyTasks } from '@/hooks/use-tasks';
 import { RunsTable } from '@/components/processes/runs-table';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { setProcessArchived, transferWorkflowNamespace } from '@/app/actions/definitions';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { apiFetch } from '@/lib/api-fetch';
 import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { VersionLabel } from '@/components/ui/version-label';
@@ -340,8 +340,14 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     const willArchive = !latest?.archived;
                     setMenuOpen(false);
                     setArchiving(true);
-                    await setProcessArchived(decodedName, handle, willArchive);
-                    setArchiving(false);
+                    try {
+                      await mediforce.workflows.archiveAll(
+                        { name: decodedName, archived: willArchive },
+                        { namespace: handle },
+                      );
+                    } finally {
+                      setArchiving(false);
+                    }
                     if (willArchive) {
                       router.push(`/${handle}`);
                     }
@@ -627,11 +633,20 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 onClick={async () => {
                   if (!transferTarget) return;
                   setTransferring(true);
-                  const result = await transferWorkflowNamespace(decodedName, transferTarget);
-                  setTransferring(false);
-                  if (result.success) {
+                  try {
+                    await mediforce.workflows.transferNamespace({
+                      name: decodedName,
+                      sourceNamespace: handle,
+                      targetNamespace: transferTarget,
+                    });
                     setTransferOpen(false);
                     router.push(`/${transferTarget}/workflows/${encodeURIComponent(decodedName)}`);
+                  } catch (err) {
+                    const message = err instanceof ApiError ? err.message
+                      : err instanceof Error ? err.message : 'Unknown error';
+                    alert(`Failed to transfer workflow: ${message}`);
+                  } finally {
+                    setTransferring(false);
                   }
                 }}
                 disabled={!transferTarget || transferring}

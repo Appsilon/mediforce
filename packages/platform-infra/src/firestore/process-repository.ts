@@ -266,4 +266,24 @@ export class FirestoreProcessRepository implements ProcessRepository {
       .get();
     return snapshot.size;
   }
+
+  async transferWorkflowNamespace(
+    sourceNamespace: string,
+    name: string,
+    targetNamespace: string,
+  ): Promise<void> {
+    const snapshot = await this.db
+      .collection(this.workflowDefinitionsCollection)
+      .where('name', '==', name)
+      .where('namespace', '==', sourceNamespace)
+      .get();
+    if (snapshot.empty) {
+      throw new Error(`Workflow '${name}' not found in namespace '${sourceNamespace}'`);
+    }
+    const batch = this.db.batch();
+    for (const d of snapshot.docs) {
+      batch.update(d.ref, { namespace: targetNamespace });
+    }
+    await batch.commit();
+  }
 }

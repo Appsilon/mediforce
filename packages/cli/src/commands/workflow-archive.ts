@@ -10,6 +10,7 @@ export const workflowArchiveCommand = defineCommand({
       required: true,
       description: 'Workflow definition name',
     },
+    namespace: { type: 'string', required: true, description: 'Workspace handle' },
     version: { type: 'string', description: 'Archive a specific version' },
     all: { type: 'boolean', description: 'Archive all versions' },
     unarchive: { type: 'boolean', description: 'Unarchive instead of archive' },
@@ -36,17 +37,21 @@ export const workflowArchiveCommand = defineCommand({
       return 2;
     }
 
+    const namespace = args.namespace!;
+
     const action = archived ? 'Archived' : 'Unarchived';
     if (version !== undefined) {
-      const result = await mediforce.workflows.archiveVersion({
-        name: args.name,
-        version,
-        archived,
-      });
+      const result = await mediforce.workflows.archiveVersion(
+        { name: args.name, version, archived },
+        { namespace },
+      );
       if (jsonMode) printJson(output, result);
       else output.stdout(`${action} ${args.name} v${String(version)}`);
     } else {
-      const result = await mediforce.workflows.archiveAll({ name: args.name, archived });
+      const result = await mediforce.workflows.archiveAll(
+        { name: args.name, archived },
+        { namespace },
+      );
       if (jsonMode) printJson(output, result);
       else output.stdout(`${action} all versions of ${args.name}`);
     }

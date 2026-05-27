@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, Pencil, Loader2, Archive, ArchiveRestore, Eye, EyeOff } from 'lucide-react';
 import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { VersionLabel } from '@/components/ui/version-label';
-import { setDefaultWorkflowVersion, setVersionArchived } from '@/app/actions/definitions';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 
@@ -132,7 +132,11 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                     onClick={async (e) => {
                       e.preventDefault();
                       if (canSetDefault) {
-                        await setDefaultWorkflowVersion(def.namespace, workflowName, def.version);
+                        await mediforce.workflows.setDefaultVersion({
+                          name: workflowName,
+                          namespace: def.namespace,
+                          version: def.version,
+                        });
                         refreshDefault();
                       }
                     }}
@@ -152,10 +156,17 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                   onClick={async (e) => {
                     e.preventDefault();
                     setArchivingVersion(def.version);
-                    const result = await setVersionArchived(def.namespace, workflowName, def.version, !isArchived);
-                    setArchivingVersion(null);
-                    if (!result.success) {
-                      alert(`Failed to ${isArchived ? 'unarchive' : 'archive'} v${def.version}: ${result.error}`);
+                    try {
+                      await mediforce.workflows.archiveVersion(
+                        { name: workflowName, version: def.version, archived: !isArchived },
+                        { namespace: def.namespace },
+                      );
+                    } catch (err) {
+                      const message = err instanceof ApiError ? err.message
+                        : err instanceof Error ? err.message : 'Unknown error';
+                      alert(`Failed to ${isArchived ? 'unarchive' : 'archive'} v${def.version}: ${message}`);
+                    } finally {
+                      setArchivingVersion(null);
                     }
                   }}
                   disabled={isArchiving || isDefault}

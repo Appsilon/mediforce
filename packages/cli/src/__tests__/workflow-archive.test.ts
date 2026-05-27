@@ -7,7 +7,7 @@ beforeEach(() => {
 });
 
 const BASE_ENV = { MEDIFORCE_API_KEY: 'k' };
-const BASE_ARGS = ['--base-url', 'http://localhost:1234'];
+const BASE_ARGS = ['--base-url', 'http://localhost:1234', '--namespace', 'ns1'];
 
 describe('workflow archive command', () => {
   it('prints help and exits 0 with --help', async () => {
@@ -101,7 +101,7 @@ describe('workflow archive command', () => {
     expect(output.stdoutLines.join('\n')).toContain('Archived my-wf v3');
     const url = fetchSpy.mock.calls[0]?.[0] as string;
     expect(url).toBe(
-      'http://localhost:1234/api/workflow-definitions/my-wf/versions/3/archive',
+      'http://localhost:1234/api/workflow-definitions/my-wf/versions/3/archive?namespace=ns1',
     );
     const init = fetchSpy.mock.calls[0]?.[1] as RequestInit;
     expect(JSON.parse(init.body as string)).toEqual({ archived: true });
@@ -135,7 +135,7 @@ describe('workflow archive command', () => {
     expect(output.stdoutLines.join('\n')).toContain('Archived all versions of my-wf');
     const url = fetchSpy.mock.calls[0]?.[0] as string;
     expect(url).toBe(
-      'http://localhost:1234/api/workflow-definitions/my-wf/archive',
+      'http://localhost:1234/api/workflow-definitions/my-wf/archive?namespace=ns1',
     );
   });
 

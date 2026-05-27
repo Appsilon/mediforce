@@ -1,5 +1,6 @@
 import type { WorkflowStep } from '@mediforce/platform-core';
-import type { ValidationIssue } from '@/app/actions/definitions';
+
+export type ValidationIssue = { path: (string | number)[]; message: string };
 
 type Transitions = { from: string; to: string; when?: string }[];
 

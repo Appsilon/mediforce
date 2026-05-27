@@ -24,6 +24,7 @@ import { runBulkCancelCommand, runBulkArchiveCommand } from './commands/run-bulk
 import { workflowArchiveCommand } from './commands/workflow-archive.js';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility.js';
 import { workflowCopyCommand } from './commands/workflow-copy.js';
+import { workflowDeleteCommand } from './commands/workflow-delete.js';
 import {
   systemStatusCommand,
   systemImagesCommand,
@@ -63,7 +64,7 @@ interface BranchEntry {
 
 export const TREE: Record<string, BranchEntry> = {
   workflow: {
-    description: 'Workflow definitions (register, list, get, copy, archive, visibility)',
+    description: 'Workflow definitions (register, list, get, copy, archive, delete, visibility)',
     leaves: {
       register: { description: 'Register a workflow definition from a JSON file', fn: workflowRegisterCommand },
       list: { description: 'List registered workflow definitions', fn: workflowListCommand },
@@ -71,6 +72,7 @@ export const TREE: Record<string, BranchEntry> = {
       'set-visibility': { description: 'Set workflow visibility (public|private)', fn: workflowSetVisibilityCommand },
       copy: { description: 'Copy workflow to another namespace', fn: workflowCopyCommand },
       archive: { description: 'Archive/unarchive workflow versions', fn: workflowArchiveCommand },
+      delete: { description: 'Soft-delete a workflow + cascade', fn: workflowDeleteCommand },
     },
   },
   run: {

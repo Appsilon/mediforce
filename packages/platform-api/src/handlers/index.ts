@@ -32,6 +32,17 @@ export {
 
 export { listWorkflows } from './workflows/list-workflows.js';
 export { getWorkflow } from './workflows/get-workflow.js';
+export { registerWorkflow } from './workflows/register-workflow.js';
+export { setWorkflowVisibility } from './workflows/set-visibility.js';
+export {
+  archiveWorkflow,
+  archiveWorkflowVersion,
+} from './workflows/archive-workflow.js';
+export { copyWorkflow } from './workflows/copy-workflow.js';
+export { setDefaultWorkflowVersion } from './workflows/set-default-version.js';
+export { deleteWorkflow } from './workflows/delete-workflow.js';
+export { transferWorkflowNamespace } from './workflows/transfer-workflow.js';
+export { getWorkflowRunCount } from './workflows/get-run-count.js';
 
 export { getCoworkSessionByInstance } from './cowork/get-cowork-session-by-instance.js';
 export { chatCoworkSession } from './cowork/chat.js';
