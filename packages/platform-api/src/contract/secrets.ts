@@ -38,3 +38,43 @@ export type ListSecretKeysInput = z.infer<typeof ListSecretKeysInputSchema>;
 export type ListSecretKeysOutput = z.infer<typeof ListSecretKeysOutputSchema>;
 export type DeleteSecretInput = z.infer<typeof DeleteSecretInputSchema>;
 export type DeleteSecretOutput = z.infer<typeof DeleteSecretOutputSchema>;
+
+// ---- GET /api/workspace-secrets/previews?namespace=… ------------------------
+// Returns masked previews for the workspace secrets editor. Workspace-scope
+// only — workflow-secrets editor reveals plaintext via a separate path that's
+// out of Phase 2.5 scope.
+export const GetWorkspaceSecretPreviewsInputSchema = z.object({
+  namespace: z.string().min(1),
+});
+
+export const SecretPreviewSchema = z.object({
+  key: z.string(),
+  preview: z.string(),
+});
+
+export const GetWorkspaceSecretPreviewsOutputSchema = z.object({
+  previews: z.array(SecretPreviewSchema),
+});
+
+export type GetWorkspaceSecretPreviewsInput = z.infer<typeof GetWorkspaceSecretPreviewsInputSchema>;
+export type SecretPreview = z.infer<typeof SecretPreviewSchema>;
+export type GetWorkspaceSecretPreviewsOutput = z.infer<typeof GetWorkspaceSecretPreviewsOutputSchema>;
+
+// ---- GET /api/workflow-secrets/keys-batch?namespace=…&workflow=A&workflow=B -
+// Bulk key-listing across N workflows in one round-trip. Powers the workflow
+// row's "configured-keys" indicator on the run launcher.
+export const ListWorkflowSecretKeysBatchInputSchema = z.object({
+  namespace: z.string().min(1),
+  workflows: z.array(z.string().min(1)).min(1).max(50),
+});
+
+export const ListWorkflowSecretKeysBatchOutputSchema = z.object({
+  keysByWorkflow: z.record(z.string(), z.array(z.string())),
+});
+
+export type ListWorkflowSecretKeysBatchInput = z.infer<
+  typeof ListWorkflowSecretKeysBatchInputSchema
+>;
+export type ListWorkflowSecretKeysBatchOutput = z.infer<
+  typeof ListWorkflowSecretKeysBatchOutputSchema
+>;
