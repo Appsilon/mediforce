@@ -6,7 +6,15 @@
  *   pnpm seed:dev
  *
  * Requires:
- *   - Firebase emulators running (Auth on 9099, Firestore on 8080)
+ *   - Firebase Auth emulator running (port 9099)
+ *   - Postgres running with the latest migrations applied (`pnpm db:migrate`)
+ *
+ * The server-side data layer is Postgres. A handful of Firestore collections
+ * still seed the Firestore emulator because platform-ui hooks/pages read
+ * them directly via the firebase/firestore client SDK (auth, user-doc,
+ * namespace, member, workflow-def reads). Phase 2.5 will collapse those
+ * remaining realtime reads to SWR-over-API and remove the last
+ * seedCollection callers.
  */
 
 import { clearEmulators, createTestUser, seedCollection, seedSubcollection } from '../e2e/helpers/emulator.js';
@@ -32,19 +40,12 @@ async function main() {
     // 3. Build seed data
     const data = buildSeedData(testUserId);
 
-    // 4. Seed all collections
-    console.log('Seeding collections:');
+    // 4. Seed the UI-realtime Firestore collections
+    console.log('Seeding UI-realtime Firestore collections:');
     const collections = [
       ['users', data.users],
-      ['humanTasks', data.humanTasks],
-      ['processInstances', data.processInstances],
-      ['agentRuns', data.agentRuns],
-      ['auditEvents', data.auditEvents],
-      ['processDefinitions', data.processDefinitions],
-      ['processConfigs', data.processConfigs],
       ['workflowDefinitions', data.workflowDefinitions],
       ['namespaces', data.namespaces],
-      ['coworkSessions', data.coworkSessions],
     ] as const;
 
     for (const [name, docs] of collections) {
@@ -52,27 +53,13 @@ async function main() {
       console.log(`  ${name} (${Object.keys(docs).length} docs)`);
     }
 
-    const subcollections = [
-      ['processInstances', 'proc-running-1', 'stepExecutions', data.stepExecutions],
-      ['processInstances', 'proc-human-waiting', 'stepExecutions', data.humanWaitingStepExecutions],
-      ['processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions],
-      ['processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions],
-      ['namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers],
-    ] as const;
+    await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
+    console.log(`  namespaces/${TEST_ORG_HANDLE}/members (${Object.keys(data.namespaceMembers).length} docs)`);
 
-    for (const [parent, parentId, sub, docs] of subcollections) {
-      await seedSubcollection(parent, parentId, sub, docs);
-      console.log(`  ${parent}/${parentId}/${sub} (${Object.keys(docs).length} docs)`);
-    }
-
-    // 5. ADR-0001 PR2: mirror fixture to Postgres when STORAGE_BACKEND=postgres.
-    // The full seed (workspaces, members, WDs, instances, tasks, etc.) lands
-    // in PG via the same helper auth-setup uses for E2E.
-    if (process.env.STORAGE_BACKEND === 'postgres') {
-      console.log('\nMirroring fixture to Postgres (STORAGE_BACKEND=postgres):');
-      await seedPostgresNamespace(testUserId);
-      console.log('  Postgres seed complete');
-    }
+    // 5. Mirror fixture into Postgres (server-side data layer).
+    console.log('\nMirroring fixture to Postgres:');
+    await seedPostgresNamespace(testUserId);
+    console.log('  Postgres seed complete');
 
     console.log('\nDevelopment data seeded successfully!\n');
     console.log('Demo credentials:');

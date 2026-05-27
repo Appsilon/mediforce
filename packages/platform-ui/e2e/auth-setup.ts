@@ -22,8 +22,8 @@ const TEST_DISPLAY_NAME = 'Test User';
 
 setup('authenticate and seed data', async ({ page }) => {
   // First-run Next.js route compilation (test-login + redirect) easily eats
-  // 20-30s in a cold dev server, and we still need time for Firestore seeding
-  // + Firebase auth emulator round trips. The default 30s test timeout races
+  // 20-30s in a cold dev server, and we still need time for Firebase auth
+  // emulator + Postgres seed round trips. The default 30s test timeout races
   // with that. Raise to 120s so the setup is not flaky.
   setup.setTimeout(120_000);
 
@@ -33,37 +33,23 @@ setup('authenticate and seed data', async ({ page }) => {
   // 2. Create test user and get UID
   const testUserId = await createTestUser(TEST_EMAIL, TEST_PASSWORD, TEST_DISPLAY_NAME);
 
-  // 3. Seed Firestore with test data
+  // 3. Seed Firestore — only the UI-realtime collections that the platform-ui
+  // hooks/pages still read directly via the firebase/firestore client SDK
+  // (auth, user-doc, namespace, member, workflow def reads). The server-side
+  // data layer (processes, instances, tasks, audits, agent runs, handoffs,
+  // cowork, model registry, tool catalog, oauth, agent defs) lives in Postgres
+  // — those seeds go via seedPostgresNamespace below. Phase 2.5 will collapse
+  // the remaining UI-realtime Firestore reads to SWR-over-API and remove the
+  // last seedCollection callers.
   const mockOAuthBaseUrl = readMockOAuthBaseUrl();
   const data = buildSeedData(testUserId, { mockOAuthBaseUrl });
   await seedCollection('users', data.users);
-  await seedCollection('humanTasks', data.humanTasks);
-  await seedCollection('processInstances', data.processInstances);
-  await seedCollection('agentRuns', data.agentRuns);
-  await seedCollection('auditEvents', data.auditEvents);
-  await seedSubcollection('processInstances', 'proc-running-1', 'stepExecutions', data.stepExecutions);
-  await seedSubcollection('processInstances', 'proc-human-waiting', 'stepExecutions', data.humanWaitingStepExecutions);
-  await seedSubcollection('processInstances', 'proc-review-target', 'stepExecutions', data.reviewTargetStepExecutions);
   await seedCollection('workflowDefinitions', data.workflowDefinitions);
   await seedCollection('namespaces', data.namespaces);
   await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'members', data.namespaceMembers);
-  // ADR-0001 PR2: under STORAGE_BACKEND=postgres, the namespaceRepo at runtime
-  // reads from Postgres — mirror the namespace + members fixture there too so
-  // handlers like /api/admin/tool-catalog can resolve `?namespace=test`.
-  if (process.env.STORAGE_BACKEND === 'postgres') {
-    await seedPostgresNamespace(testUserId);
-  }
-  await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'toolCatalog', data.toolCatalog);
-  await seedSubcollection('namespaces', TEST_ORG_HANDLE, 'oauthProviders', data.oauthProviders);
-  await seedCollection('agentDefinitions', data.agentDefinitions);
-  await seedSubcollection('processInstances', 'proc-completed-1', 'stepExecutions', data.completedProcessStepExecutions);
-  await seedSubcollection('processInstances', 'proc-completed-2', 'stepExecutions', data.completedSupplyChainStepExecutions);
-  await seedSubcollection('processInstances', 'proc-step-failure', 'stepExecutions', data.stepFailureStepExecutions);
-  await seedSubcollection('processInstances', 'proc-retry-test', 'stepExecutions', data.retryTestStepExecutions);
-  await seedSubcollection('processInstances', 'proc-agent-escalated-cancel', 'stepExecutions', data.agentEscalatedCancelStepExecutions);
-  await seedSubcollection('processInstances', 'proc-workflow-run-1', 'stepExecutions', data.workflowRunStepExecutions);
-  await seedCollection('coworkSessions', data.coworkSessions);
-  await seedCollection('modelRegistry', data.modelRegistry);
+  // Mirror the namespace + members fixture into Postgres so server-side
+  // handlers (e.g. /api/admin/tool-catalog) can resolve `?namespace=test`.
+  await seedPostgresNamespace(testUserId);
 
   // 4. Sign in via test-login page to capture auth state
   // First load warms up Next.js compilation — allow extra time
