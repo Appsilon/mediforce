@@ -8,6 +8,7 @@ export interface WaitActionOutput {
 }
 
 export interface WaitSentinel {
+  [key: string]: unknown;
   __wait: {
     stepId: string;
     resumeAt: string;
