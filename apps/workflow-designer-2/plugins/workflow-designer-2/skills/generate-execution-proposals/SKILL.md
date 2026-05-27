@@ -182,7 +182,7 @@ You MUST:
    {"output_file": "{output_directory}/result.json", "summary": "1-2 sentence summary"}
 ```
 
-9. Include `agent.model` (use `"sonnet"`)
+9. Include `agent.model` (use `"sonnet"`). **CRITICAL: also set `agent.image` — default `"mediforce-golden-image"` (same for `opencode-agent`).** The platform runs agent steps in Docker; a step without an image crashes on staging/production (imageless/local execution only works in dev with `ALLOW_LOCAL_AGENTS=true`). Only omit `image` if the user EXPLICITLY asks for local / no-Docker execution.
 10. Each proposal needs a distinct `label` and `description`
 11. **Preserve all structural fields** (`params`, `verdicts`, `selection`, etc.)
 12. **transitions and triggers** are copied verbatim into every proposal

@@ -142,7 +142,7 @@ All executor-related fields are optional except `executor` which is required on 
 | `skillsDir` | claude-code-agent | Directory containing skill files |
 | `runtime` | script-container | Script runtime: `javascript`, `python`, `r`, `bash` |
 | `inlineScript` | script-container | Inline script source code |
-| `image` | script-container | Docker image for container execution |
+| `image` | claude-code-agent, opencode-agent, script-container | Docker image the step runs in. **Required for agent steps** — default `"mediforce-golden-image"`. |
 | `timeoutMs` | any | Execution timeout in milliseconds |
 | `timeoutMinutes` | any | Execution timeout in minutes |
 | `confidenceThreshold` | agent | Minimum confidence (0.0-1.0) before auto-advancing |
@@ -204,7 +204,7 @@ You MUST:
 The {output_directory} placeholder will be replaced with the actual path at runtime.
 If you do NOT follow this contract, the platform will receive an empty result.
 ```
-9. For `claude-code-agent` steps, include `agent.model` (use `"sonnet"`)
+9. For `claude-code-agent` steps, include `agent.model` (use `"sonnet"`). **CRITICAL: also set `agent.image` — default `"mediforce-golden-image"` (same for `opencode-agent`).** The platform runs agent steps in Docker; a step without an image crashes on staging/production (imageless/local execution only works in dev with `ALLOW_LOCAL_AGENTS=true`). Only omit `image` if the user EXPLICITLY asks for local / no-Docker execution in their preferences.
 10. Each proposal needs a distinct `label` and `description` explaining the trade-offs
 11. **Preserve all structural fields** from the original YAML — `params`, `verdicts`, `selection`, `description`, `metadata`, `triggerInput`, etc. must be copied as-is into every proposal
 12. **transitions, triggers, and triggerInput** are copied verbatim from the structure into every proposal
@@ -278,6 +278,7 @@ The result JSON must follow this structure for the selection review UI:
             "plugin": "claude-code-agent",
             "agent": {
               "model": "sonnet",
+              "image": "mediforce-golden-image",
               "prompt": "You are a report generator. Read the requirements from input and produce a structured report..."
             }
           },
