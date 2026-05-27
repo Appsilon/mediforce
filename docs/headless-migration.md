@@ -496,56 +496,272 @@ Cut as dead code (no API surface added):
 - `UnclaimButton` removed from `claim-button.tsx`; `ClaimButton` retained.
 - Phase 2 closed. Wrapper-layer mutation pattern proven on two state transitions of opposite shape (`claim`: pending→claimed, `cancel`: running/paused→failed).
 
-### Phase 2.5 — Definitions, agents, admin, users
+### Phase 2.5 — Definitions, agents (mechanical), secrets, processes archive/bulk (scope frozen 2026-05-27)
 
-Wider mutation surface that doesn't fit Phase 2's uniform shape. Each group has a quirk that justifies its own design pass once Phase 2 has validated the wrapper-layer mutation pattern.
+**Single-PR target — purely mechanical migration.** After grilling
+2026-05-27, the admin/users group + role-gate plumbing were split off
+into Phase 2.6 (see below); URL canonicalization moved to its own
+concern ([#544](https://github.com/Appsilon/mediforce/issues/544),
+independent of every headless-migration phase). Phase 2.5 inherits
+patterns from Phase 2/3/3.1 and ships zero new design surface.
+Membership-only gating across every endpoint, all via existing
+`Authorized<Entity>Repository` wrappers.
 
-**Definitions & versioning:**
-- `POST /api/workflow-definitions` — creates new version of a workflow. Mints next `version` integer; concurrency on version assignment needs thought (DB sequence vs check-then-insert).
-- `PUT /api/workflow-definitions/:name` — update default-version pointer / visibility.
-- `POST /api/workflow-definitions/:name/archive` — archives the whole workflow (cascades to all versions — soft-delete pattern).
-- `POST /api/workflow-definitions/:name/copy` — copies into another workspace (cross-namespace write, needs both source-read and target-write gates).
-- `POST /api/workflow-definitions/:name/versions/:version/archive` — archives one version only.
+**Already shipped infrastructure that Phase 2.5 inherits:**
 
-**Process create (split from Phase 2):**
-- `POST /api/processes` — instantiate run from definition. Trigger payload validation against definition's input schema. Idempotency design (client-supplied key vs server-derived dedupe window).
+- Wrappers exist for every Phase 2.5 entity:
+  `AuthorizedAgentDefinitionRepository`, `AuthorizedWorkflowDefinitionRepository`,
+  `AuthorizedAgentOAuthTokenRepository`, `AuthorizedWorkspaceSecretRepository`,
+  `AuthorizedWorkflowSecretRepository`. All gate on namespace membership
+  via `AuthorizedScope.assertNamespaceWrite`. Write methods are "armed
+  surface, not inert" (see `authorized-repository.ts:21-27`) — Phase 2.5
+  wires handlers + runs the per-mutation re-audit the TODO flags.
+- Handler shape + error envelope + entity-echo locked in ADR-0005.
+- `scope.system.audit.append` raw write surface for handler-resident audit
+  bridge (ADR-0005 §7) wired since Phase 2 PR1.
+- `Mediforce.sendJson(method, path, body, outputSchema, ctx)` helper on the
+  typed client (Phase 3.1 #525).
+- `scope.workspaceSecrets.getRuntimeSecrets(namespace, workflow)` consolidates
+  namespace-secret + workflow-secret resolution.
 
-**Agents:**
-- `POST /api/agents` — create new agent (workspace-scoped write).
-- `PUT /api/agents/:id` — update agent.
-- `PUT/DELETE /api/agents/:id/mcp-servers/:name` — MCP binding lifecycle.
-- `POST /api/agents/:id/oauth/:provider/start` — initiate OAuth flow.
-- `POST /api/agents/:id/oauth/:provider` + `oauth-discover` — callback-side persistence.
+**Endpoint inventory (all membership-only, wrapper-enforced):**
 
-**Workflow secrets:** ✅ done in [#482](https://github.com/Appsilon/mediforce/pull/482). `set-secret` handler is an upsert (PUT semantics) covering create + update — no separate `POST` needed.
+| Endpoint | Source today | Notes |
+|---|---|---|
+| `POST /api/workflow-definitions` | inline route | Mint next-version race preserved (status quo); ADR-0001 Postgres closes via unique constraint |
+| `PATCH /api/workflow-definitions/:name` | inline route | Visibility + default-version pointer |
+| `POST /api/workflow-definitions/:name/archive` | inline route | Whole-workflow archive |
+| `POST /api/workflow-definitions/:name/versions/:version/archive` | inline route | Per-version archive |
+| `POST /api/workflow-definitions/:name/copy` | inline (via `actions/definitions.ts:saveDefinition`?) | Cross-namespace write — two scope calls (source `getByName` + target `create`) per ADR-0004 §5 |
+| `POST /api/workflow-definitions/:name/transfer` | `actions/definitions.ts:transferWorkflowNamespace` | **Bug fix in scope:** today writes raw Firestore bypassing repo + no target-ns membership check + no audit. Phase 2.5 adds repo method + wrapper passthrough + handler asserts membership of BOTH source AND target + emits `workflow.transferred` audit. Gate stays member-only on both (parity, not tightening). |
+| `DELETE /api/workflow-definitions/:name` | `actions/definitions.ts:deleteWorkflow` | Preserve cascade semantics bit-for-bit (soft-delete parent + all runs + all human tasks) + `expectedRunCount` race guard. **Audit actor bug fix:** flip hard-coded `'system'` → `scope.caller.userId`. |
+| `GET /api/workflow-definitions/:name/run-count` | `actions/definitions.ts:getWorkflowRunCount` | Read companion |
+| `POST /api/agents` | inline route | Workspace-scoped agent create |
+| `PUT/DELETE /api/agents/:id` | inline route | Update/delete agent |
+| `PUT/DELETE /api/agents/:id/mcp-servers/:name` | inline route | MCP binding lifecycle |
+| `GET/DELETE /api/agents/:id/oauth/:provider` | inline route | Token read + revoke (mechanical CRUD) |
+| `GET /api/agents/:id/oauth` | inline route | List agent OAuth tokens |
+| `PUT /api/workspace-secrets/:key` | `actions/namespace-secrets.ts:upsertNamespaceSecret` | Migrate under existing URL shape; any URL rename tracked separately by [#544](https://github.com/Appsilon/mediforce/issues/544) |
+| `DELETE /api/workspace-secrets/:key` | `actions/namespace-secrets.ts:deleteNamespaceSecret` | |
+| `GET /api/workspace-secrets` | `actions/namespace-secrets.ts:getNamespaceSecretKeys` + previews | Read companions |
+| `GET /api/workflow-secrets/keys` (batch) | `actions/workflow-secrets.ts:getWorkflowSecretKeys[Batch]` | Read companions to PUT/DELETE landed in #482 |
+| `POST /api/processes/:instanceId/archive` | `actions/processes.ts:archiveProcessRun` | Soft-delete on Run |
+| `POST /api/processes/bulk/cancel` | `actions/processes.ts:bulkCancelProcessRuns` | Bulk response shape per ADR-0005 §5 |
+| `POST /api/processes/bulk/archive` | `actions/processes.ts:bulkArchiveProcessRuns` | Same |
 
-**Admin (deployment-admin-only):**
-- `POST/PUT/DELETE /api/admin/oauth-providers[/:id]`
-- `POST/PUT/DELETE /api/admin/tool-catalog[/:id]`
-- `POST /api/admin/docker-images` — image management.
+Audit action names introduced by Phase 2.5: `workflow.archived` /
+`workflow.unarchived` (parameterised by `archived` bool),
+`workflow.version_archived` / `workflow.version_unarchived`,
+`workflow.default_version_changed`, `workflow.transferred`. Existing
+`workflow.delete` stays (only audit actor fixed). Snapshot shape mirrors
+engine's `instance.*` pattern (input = what triggered, output = what
+changed, basis = short why).
 
-These bypass workspace scope (deployment-admin gate). The wrapper layer's `caller.isDeploymentAdmin` predicate needs to exist (or inline the check until a second admin endpoint exists).
+**Decisions locked during 2026-05-27 grilling:**
 
-**Users:**
-- `POST /api/users/invite` — sends invite email.
-- `POST /api/users/resend-invite` — re-sends.
+- ✅ Handler signature / error envelope / entity echo / audit-bridge /
+  typed client / Server Action policy — inherited from ADR-0005 + Phase
+  2/3/3.1, no new design.
+- ✅ Next-version concurrency on `POST /api/workflow-definitions` — preserve
+  status quo race window. Postgres ADR-0001 closes later.
+- ✅ Cross-namespace `copy` gating — handler does two scope-mediated
+  calls (source `getByName` + target `create`). Two gates, no wrapper
+  magic, no ADR amendment.
+- ✅ `transferWorkflowNamespace` bug-fix — wrap under repo + add
+  target-ns membership check + add audit. Gate stays member-only.
+- ✅ `deleteWorkflow` audit actor fix — `scope.caller.userId` replaces
+  hard-coded `'system'`.
+- ✅ Add audit emission on `archive` / `versionArchive` /
+  `setDefaultVersion` (today emit zero).
+- ✅ Bulk response shape per ADR-0005 §5 (`{ results: [{id, status, error?}] }`).
+- ✅ Agent OAuth `start` + `oauth-discover` deferred to dedicated
+  ticket (multi-step OAuth protocol + external HTTP + DCR orphan
+  cleanup deserves own design pass).
 
-Touches NextAuth migration boundary (ADR-0002 unwritten). May want to wait for that ADR to land before designing the contract.
+**Out of Phase 2.5 — moved to Phase 2.6:**
+
+- `/api/admin/oauth-providers/*` — per-namespace, NamespaceAdmin gate.
+- `/api/admin/tool-catalog/*` — per-namespace, NamespaceAdmin gate.
+  **Bug today:** no membership/role check at all (`resolveNamespaceFromQuery`
+  only verifies namespace exists; any authenticated caller can write any
+  namespace's tool catalog).
+- `/api/admin/docker-images` — platform-wide (SystemActor concept). Use
+  case: delete Docker image from container-worker / local registry,
+  affects all workspaces using that image.
+- `/api/users/invite` — per-namespace, NamespaceAdmin gate.
+- `/api/users/resend-invite` — per-namespace, NamespaceAdmin gate.
+- `/api/users/members` — per-namespace read. **Bug today:** no membership
+  check (any authenticated caller can list any namespace's members).
+- `POST /api/agents/:id/oauth/:provider/start` — OAuth flow initiation.
+- `POST /api/agents/:id/mcp-servers/:name/oauth-discover` — MCP Discovery + DCR.
 
 **Out of Phase 2.5 (intentionally inline forever, not API surface):**
 
-- `POST /api/oauth/:provider/callback` — external OAuth callback, redirect-based protocol, not part of our typed contract.
-- `POST /api/triggers/webhook/[...path]` — external webhook ingestion, body shape is whoever-is-calling-us, validated per-trigger.
-- `POST /api/tickets` — external GitHub Issues bridge with its own rate limit; no Mediforce-domain meaning.
+- `POST /api/oauth/:provider/callback` — external OAuth callback, redirect-based protocol.
+- `POST /api/triggers/webhook/[...path]` — external webhook ingestion.
+- `POST /api/tickets` — external GitHub Issues bridge.
 
-**Open questions for Phase 2.5 design pass** (defer until Phase 2 ships):
+**Out of scope for Phase 2.5 (explicit non-goals):**
 
-- Cross-namespace write (`copy`): does the wrapper support "two scopes at once" or do we drop to raw repo with explicit double-gate?
-- Cascade archive: soft-delete vs hard-delete + reference invalidation; per-version vs parent.
-- Deployment-admin predicate: lives on `CallerIdentity` directly, or as a separate `AdminScope` analog of `CallerScope`?
-- NextAuth boundary: do user-invite endpoints wait for ADR-0002?
+- Role-gate plumbing (`namespaceRoles` on `CallerIdentity` +
+  `assertCallerIsNamespaceAdmin` helper) — moved to Phase 2.6 because
+  no Phase 2.5 endpoint requires role enforcement.
+- URL refactor — independent concern, tracked by [#544](https://github.com/Appsilon/mediforce/issues/544).
+- ADR-0002 NextAuth migration.
+- Per-user API keys (#376).
+- Idempotency keys on creates.
+- Audit-actor / missing-audit bugs outside the definitions group
+  (e.g. `setSecret`, `saveWorkflowDefinition` create) — audit-wiring
+  phase rewrites repo-resident anyway.
 
-**Pause-safe**: yes — Phase 2 leaves Phase 2.5 routes inline; they keep working.
+**PR sizing**: ~14 mutations + ~4 read companions, zero new design.
+Comparable to #450 (10 GETs) and #520 (Phase 3, 6 mutations + kick
+abstraction). Reviewable in one pass; commits split per-endpoint for
+sequential reading.
+
+**Pause-safe within PR**: no. Pause-safe across phases — leaving
+Phase 2.5 unstarted keeps every endpoint on today's inline path.
+
+**Independence from Phase 2.6**: technically independent (Phase 2.5
+endpoints + Phase 2.6 endpoints don't overlap). Phase 2.6 can land
+before, after, or in parallel — does not block on Phase 2.5 patterns.
+
+### Phase 2.6 — Admin / users group + role-gate plumbing + bug fix (split 2026-05-27)
+
+Six remaining inline endpoints that share a role-gate dependency, plus
+two existing security bugs that intersect the migration. **Migrates
+under today's URLs** — URL canonicalization is independent and tracked
+separately by [#544](https://github.com/Appsilon/mediforce/issues/544) /
+its own ADR. Phase 2.6 ships ADR-0005 patterns + role-gate plumbing
+only; the URL rename phase rides on top later.
+
+**Prerequisites — none.** Inherits ADR-0005 patterns directly. If
+Phase 2.6 needs to change something ADR-0005 said, the ADR-0005
+amendment lands inside the same PR (ADR-0005 is `Accepted` not
+`Finalized`, mutable while implementation in progress per the status
+policy).
+
+**Endpoint inventory (URLs unchanged):**
+
+| Endpoint | Concept | Notes |
+|---|---|---|
+| `POST/PUT/DELETE /api/admin/oauth-providers[/:id]` | **NamespaceAdmin** | Per-ns OAuth provider configs |
+| `POST/PUT/DELETE /api/admin/tool-catalog[/:id]` | **NamespaceAdmin** | **Add NamespaceAdmin gate (today: no gate, bug)** |
+| `DELETE /api/admin/docker-images` | **SystemActor** | Platform-wide; preserve today's any-namespace-admin proxy |
+| `POST /api/users/invite` | **NamespaceAdmin** | |
+| `POST /api/users/resend-invite` | **NamespaceAdmin** | |
+| `GET /api/users/members` | **NamespaceMember** | **Add membership gate (today: no gate, bug)** |
+
+**Role-gate plumbing (lands in Phase 2.6):**
+
+`CallerIdentity` (`packages/platform-api/src/auth.ts`) reshapes:
+
+```ts
+export type CallerIdentity =
+  | { kind: 'apiKey'; isSystemActor: true }  // unchanged from today
+  | {
+      kind: 'user';
+      uid: string;
+      namespaces: ReadonlySet<string>;
+      namespaceRoles: ReadonlyMap<string, 'owner' | 'admin' | 'member'>;
+      isSystemActor: false;
+    };
+```
+
+- `user` variant gains `namespaceRoles`. `api-auth.ts` already reads
+  `members/{uid}` to build `namespaces` — `role` comes from the same
+  doc, no extra Firestore hit.
+- `apiKey` variant **unchanged**. Both `PLATFORM_API_KEY` and
+  `PLATFORM_ADMIN_API_KEY` mint `{ kind: 'apiKey', isSystemActor: true }`
+  identically. This **collapses today's tier-split** (where
+  `requireAdminForNamespace` rejects regular `PLATFORM_API_KEY` callers
+  on `oauth-providers` + `docker-images`). Justified by: both keys are
+  conceptually platform admin in deployment operator's mental model,
+  `apiKey` callers are trusted infra (CLI / engine / worker / agents),
+  per-user tokens (#376) supersede tier-split entirely. **De facto
+  retirement of `PLATFORM_ADMIN_API_KEY` as a distinct concept** —
+  documented in PR description; pre-merge scan deployment configs for
+  external scripts depending on the distinction (decision locked
+  2026-05-27 grilling).
+
+Wrappers (`AuthorizedScope`) **do NOT consult** `namespaceRoles`
+(ADR-0004 §4 + §"Considered alternatives" rejecting "Combined wrapper
+with role/state checks"). The handler-resident helper is the only
+consumer:
+
+```ts
+// packages/platform-api/src/auth.ts
+export function assertCallerIsNamespaceAdmin(
+  caller: CallerIdentity,
+  namespace: string,
+): void {
+  if (caller.isSystemActor) return;  // apiKey bypass — trusted infra
+  const role = caller.namespaceRoles.get(namespace);
+  if (role !== 'owner' && role !== 'admin') {
+    throw new ForbiddenError();
+  }
+}
+```
+
+For `/api/admin/docker-images` — preserve today's "owner|admin in any
+namespace" proxy for user callers via:
+
+```ts
+export function assertCallerCanAdminDockerImages(
+  caller: CallerIdentity,
+): void {
+  if (caller.isSystemActor) return;
+  for (const role of caller.namespaceRoles.values()) {
+    if (role === 'owner' || role === 'admin') return;
+  }
+  throw new ForbiddenError();
+}
+```
+
+Replaced by first-class platform-admin field after #376 lands.
+
+**Bug fixes folded in:**
+
+1. `/api/admin/tool-catalog/*` today accepts any authenticated caller —
+   adds NamespaceAdmin gate as part of migration.
+2. `/api/users/members` today accepts any authenticated caller — adds
+   NamespaceMember gate.
+
+**Naming clarifications captured in this PR:**
+
+- `isSystemActor` stays as the platform-wide "all-bypass" flag on
+  `apiKey` callers. Semantically correct ("system actor" =
+  not-a-user-actor); after #376 PAT callers move to `kind: 'user'`,
+  so `isSystemActor` precisely means "engine / worker / CLI service
+  account". No rename.
+- `assertCallerIsNamespaceAdmin` = the **org-admin (per-namespace
+  `owner|admin`)** check, distinct from any platform-level admin
+  concept.
+- `assertCallerCanAdminDockerImages` = the loose cross-namespace proxy
+  that today's `requireSystemAdmin` (for `docker-images`) uses.
+  Replaced by a first-class platform-admin field after #376.
+
+**Out of scope for Phase 2.6 (explicit non-goals):**
+
+- URL canonicalization — tracked separately by [#544](https://github.com/Appsilon/mediforce/issues/544).
+  Phase 2.6 migrates under today's URLs (`/api/admin/*`, `/api/users/*`).
+- Per-user API keys (#376) — separate concern, ships later.
+- ADR-0002 NextAuth swap.
+- Tightening transfer/copy to namespaceAdmin (member-only stays).
+- Restoring a tier-split between `PLATFORM_API_KEY` /
+  `PLATFORM_ADMIN_API_KEY` (#218 may revisit later; Phase 2.6 collapses
+  by design per the rationale above).
+
+**PR sizing**: 6 endpoints + role-gate plumbing (only `namespaceRoles`
+on user variant + two helpers) + 2 bug-fix tests + audit emission on
+each endpoint. Comparable to Phase 2.5 in raw count.
+
+**Pause-safe within PR**: no.
+
+**Sequencing**: independent of Phase 2.5 (no file overlap). Can land
+before, after, or in parallel. No external prerequisite — inherits
+ADR-0005 directly; if a clause needs amendment, the amendment lands in
+the same PR.
 
 ### Phase 3 — Kick-driven mutations (split from prior Phase 3 — 2026-05-26)
 
@@ -1063,3 +1279,100 @@ either narrow §5 explicitly or supersede the relevant clause.
 
 **Action.** Dedicated audit-wiring phase post-migration, with its own ADR
 covering HTTP handlers + engine + worker uniformly. Don't pre-design here.
+
+### URL canonicalization across the API surface (raised during Phase 2.5 grilling, 2026-05-27)
+
+**Current state.** API URL shape is inconsistent across the surface
+created by the migration so far:
+
+- Per-namespace operations live under `/api/admin/*` (e.g.
+  `/api/admin/oauth-providers/*`, `/api/admin/tool-catalog/*`) when they
+  are conceptually NamespaceAdmin endpoints, not platform-admin.
+- Per-namespace operations live under `/api/users/*` (e.g.
+  `/api/users/invite`, `/api/users/members`) when they are
+  per-namespace invitation / member operations gated on a namespace
+  membership, not "user management".
+- Per-namespace reads/writes use a `?namespace=` query parameter
+  (`/api/runs?namespace=X`, `/api/workflow-secrets?namespace=X`,
+  `/api/workflow-definitions?namespace=X`) instead of a RESTful
+  `:handle` path segment.
+- `/api/admin/docker-images` is in fact platform-wide
+  (cross-workspace cleanup of a shared Docker registry) — its `/admin/`
+  prefix is correct conceptually but its peers under `/admin/` are
+  not.
+
+The URL inconsistency materialised gradually as Phase 1/1.5/2/3/3.1
+landed; the path segment choices were inherited from pre-migration
+shape rather than designed.
+
+**Why it warrants an ADR.**
+
+1. **`namespaces` vs `workspaces` path segment.** Tied to ADR-001
+   (Firestore→Postgres) which proposes renaming the storage canon
+   from `Namespace` to `Workspace`. The URL canon should match the
+   user-facing canon — locking `/namespaces/` pre-ADR-001 forces a
+   later rename; locking `/workspaces/` pre-ADR-001 lands the
+   user-facing term before ADR-001 finalises.
+2. **Reverberates through every typed client method, every CLI
+   command, every UI caller.** Renaming after the surface lands is
+   3× the work: client + CLI + UI + every doc / journey test / smoke
+   test referencing the URL.
+3. **First-time choice locks the pattern for partner integrations,
+   MCP server clients, future external consumers.** Once external
+   callers depend on a URL, breaking changes are a major-version
+   bump.
+4. **Concept tag in URL ≠ gate at runtime.** `/api/admin/*` today
+   carries a hint about gating that's enforced (or not, see bugs)
+   per-route. A canonical structure makes the concept tag stable
+   (`/api/system/*` = platform; `/api/namespaces/:handle/*` =
+   per-ns) so the gate at the route layer can be inferred from the
+   path.
+
+**Sketch of the canonical shape (not pre-decided here):**
+
+| Concept | URL shape |
+|---|---|
+| Per-namespace operations | `/api/namespaces/:handle/<resource>[/...]` (or `/api/workspaces/:handle/...` per ADR-001) |
+| Platform-wide system operations | `/api/system/<resource>` |
+| External protocol endpoints (OAuth callback, webhook ingest) | Keep current paths (`/api/oauth/:provider/callback`, `/api/triggers/webhook/...`) — not in scope; they're not Mediforce-domain API surface |
+| Per-resource by global id (where workspace is derivable from the resource) | `/api/<resource>/:id` (e.g. `/api/processes/:id` — fine as-is, but reads/writes that take `?namespace=` for filtering should split to `/api/namespaces/:handle/processes`) |
+
+Concrete examples of moves the ADR would settle:
+
+| Today | Proposed |
+|---|---|
+| `?namespace=X` everywhere | `/api/namespaces/:handle/...` |
+| `/api/admin/oauth-providers?namespace=X` | `/api/namespaces/:handle/oauth-providers` |
+| `/api/admin/tool-catalog?namespace=X` | `/api/namespaces/:handle/tool-catalog` |
+| `/api/admin/docker-images` | `/api/system/docker-images` |
+| `/api/users/invite` | `POST /api/namespaces/:handle/invitations` |
+| `/api/users/resend-invite` | `POST /api/namespaces/:handle/invitations/:uid/resend` |
+| `/api/users/members?handle=X` | `GET /api/namespaces/:handle/members` |
+| `/api/runs?namespace=X` | `GET /api/namespaces/:handle/runs` |
+| `/api/workflow-definitions?namespace=X` | `GET /api/namespaces/:handle/workflows` |
+| `/api/workflow-secrets?namespace=X` | `/api/namespaces/:handle/workflow-secrets/...` |
+| `/api/workspace-secrets[/:key]` (today `namespace-secrets` via Server Actions) | `/api/namespaces/:handle/secrets[/:key]` |
+
+**Open questions the ADR needs to settle:**
+
+- `/namespaces/` vs `/workspaces/` path segment (coordinate with ADR-001).
+- Whether to ship the rename as one mega-PR (touches every typed client
+  method + every UI caller + every test) or per-domain incremental
+  (`/runs/` first, then `/workflows/`, etc.) with both shapes coexisting
+  during transition.
+- Deprecation policy — soft 410 with `Location` redirect to new URL?
+  Hard break? Compatibility window?
+- CLI command rename strategy — `mediforce ns:create` vs
+  `mediforce workspace:create` etc. (CLI vocabulary follows the URL).
+- Whether `/api/processes/:id` collapses to `/api/runs/:id` at the
+  same time (the `processes/` → `runs/` legacy schema rename per
+  CONTEXT.md — still uses `processes` in URL today). Bundling = clean
+  cut; separate = smaller PRs.
+
+**Status.** Not started. Tracked by [#544](https://github.com/Appsilon/mediforce/issues/544). **Independent of every headless-migration phase** — Phase 2.5, 2.6, 3, 3.1, 4, 5, 6 all ship under today's URLs.
+
+**Action.** Draft an ADR (`docs/adr/0006-api-url-canonicalization.md` or
+next available number) once ADR-001 status is settled enough to commit
+to the `namespaces` vs `workspaces` segment. Headless-migration
+finishes on today's URL shape; the canonicalization phase lands as a
+coordinated rename PR after.
