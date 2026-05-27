@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout *)",
+      "Bash(git worktree *)",
+      "Bash(git stash *)",
+      "Bash(git pull *)",
+      "Bash(git push *)",
+      "Bash(gh pr create *)",
+      "Bash(gh issue create *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm exec *)",
+      "Bash(pnpm --filter *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm -F *)",
+      "WebSearch"
+    ]
+  }
+}
