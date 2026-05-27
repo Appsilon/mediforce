@@ -1110,24 +1110,70 @@ Firebase is never imported by `platform-api/client`. Browser wrapper
 Firebase Auth and reads `auth.currentUser.getIdToken()`. Same helper backs
 `apiFetch` — every browser call produces byte-identical auth headers.
 
-**Live-by-default fallacy — most hooks don't actually need live updates.**
+**Live-by-default fallacy — audit each consumer by its UI flow.**
 
 Today's hooks use `onSnapshot` not because UX requires live — because
-Firestore gave it for free. Audit each consumer before defaulting to
-polling: a lot of them are fine as one-shot fetch on mount, with manual
-refresh / focus-refetch / mutation-invalidate as the freshness mechanism.
+Firestore gave it for free. Walk each consumer at its **call site** (which
+page, what flow), not at its hook name; the same hook can be live on a run
+detail page and one-shot on a definition viewer.
 
-| Truly live (operator notices delay) | Live-by-accident (Firestore default; one-shot fetch is fine) |
+**CRITICAL LIVE (polling 1-2s; off when run is terminal)** — operator
+watching execution:
+
+| Call site | What the user watches |
 |---|---|
-| Active task list — new tasks appear from agents | Settings page |
-| Running process status — current step indicator | Namespace metadata / role |
-| Agent run page — log lines mid-execution | Workflow / agent definitions list |
-| Cowork chat turns — tool-call bubbles during blocking POST | Audit history |
-| Monitoring dashboard counts | User membership lists |
-| | Archived items |
+| `runs/[runId]/page.tsx` + `report/page.tsx` | run status, current step, **audit feed appearing as engine emits** |
+| `runs/[runId]/steps/[stepId]/page.tsx` | step detail, agent attempts, output growing |
+| `agents/[runId]/page.tsx` | agent run detail, log lines |
+| `process-detail.tsx` / `next-step-card.tsx` | "current task on this run" — task pops in when step completes |
+| Cowork chat (turns subscription) | tool-call bubbles during blocking POST |
 
-Default policy: **one-shot on mount, no polling**. Add polling only to the
-left-column hooks. Saves Postgres load + simplifies error surface.
+Pollers consumed here: `useProcessInstance`, `useSubcollection`,
+`useAuditEvents`, `useAgentRun`, `useAgentRunsForStep`,
+`useActiveTaskForInstance`, `useActiveCoworkSession`. Gate the polling
+key on `status !== 'completed' && status !== 'failed' && status !==
+'archived'` to stop hitting Postgres for runs nobody is advancing.
+
+**STANDARD LIVE (polling 3-5s)** — operator worklist:
+
+| Call site | Why live |
+|---|---|
+| `[handle]/tasks/page.tsx`, `[handle]/page.tsx` (home), `runs/page.tsx`, `workflows/[name]/page.tsx`, `agents/page.tsx` | new tasks / runs appear from agents; operator wants to see them without refresh |
+
+Pollers: `useMyTasks`, `useProcessInstances`, `useAgentRuns`.
+
+**NICE LIVE (polling 30s or focus-refetch only)** — dashboards:
+
+| Call site | Hook |
+|---|---|
+| `[handle]/monitoring/page.tsx` | `useMonitoringData` |
+
+**ONE-SHOT — no polling, focus-refetch policy varies:**
+
+| Call site | Hook | Refresh trigger | Reason |
+|---|---|---|---|
+| `settings/page.tsx`, workspace header, workspace home | `useNamespace` | invalidate after settings save; `revalidateOnFocus: true` as safety net | workspace metadata changes via deliberate edit |
+| App shell, admin pages, page gates | `useNamespaceRole` | **none — strictly one-shot**, `revalidateOnFocus: false` | role-change-mid-session → silent UI mutation = bad. Better: backend 403 on next mutation → user sees explicit "permission denied" and signs out+in |
+| App shell switcher, workflows/new, transfer dialogs | `useAllUserNamespaces` | `revalidateOnFocus: false` | same reasoning — membership change should not silently mutate UI |
+| Definition viewers (`definitions/[version]/page.tsx`), run-detail definition slice (`useWorkflowDefinitions`) | `useWorkflowDefinitions` | invalidate after edit/create mutation | engine snapshots definition at run start; mid-run edits don't apply |
+| `definitions-list.tsx`, `start-run-button.tsx`, `task-grouped-view.tsx` | `useProcessDefinitions`, `useProcessNameMap` | invalidate after edit/create | static lookups |
+
+**On `revalidateOnFocus` as a safety net:** for one-shot hooks where the
+data CAN change (workspace metadata, definitions list), turning on
+focus-refetch costs one refetch per tab-return — much cheaper than a
+polling loop, and catches "user came back from lunch, cache is stale."
+For one-shot hooks where the data SHOULD NOT silently change mid-session
+(role, membership), keep focus-refetch OFF and let the backend's 403 be
+the canary.
+
+**TO INVESTIGATE / DELETE:**
+
+- `use-collection.ts` — generic Firestore wrapper. Consumed by
+  `next-step-card.tsx`, `task-detail.tsx`. Replace consumers with specific
+  `mediforce.X.Y()` calls per the table above (live vs one-shot per
+  consumer); delete the helper.
+- `use-user-namespace.ts` — zero source-tree imports per grep. Likely dead,
+  drop with confirmation.
 
 **Migration principle — preserve, don't upgrade.**
 
@@ -1164,6 +1210,38 @@ for cowork) — explicitly **not Phase 4**.
 
 **Pause-safe**: yes — per-file migration, each backed by a journey test.
 Unmigrated consumers keep working on the Firestore bypass.
+
+**Captured for after Phase 4 — per-resource event stream consolidation.**
+
+The "CRITICAL LIVE" call sites above all poll *separately* for facets of
+the same logical resource: a run-detail page fires 4-5 polling hooks
+(`useProcessInstance`, `useSubcollection` for steps + agent-runs +
+turns, `useAuditEvents`, `useActiveTaskForInstance`) against the same
+run. Natural design is **one stream per resource the user is watching**:
+
+```
+GET /api/runs/:id/stream  (SSE)
+   event: step_changed     {stepId, status}
+   event: task_created     {task}
+   event: task_completed   {taskId}
+   event: audit_event      {action, ...}
+   event: agent_run_progress {runId, ...}
+   event: instance_finished {status}
+```
+
+Multiplexed at server (mutation handlers emit events; SSE handler
+listens via Postgres `LISTEN/NOTIFY`); client subscribes once per page,
+context-provider rebroadcasts to facet components. Pattern in
+production at Linear, Vercel deploy logs, GitHub Actions UI.
+
+Phase 4 explicitly does NOT do this. The migration is a swap, not a
+redesign — polling N hooks first, then consolidate per-resource streams
+as a focused follow-up after the polling baseline ships and PG cutover
+stabilises. Tracked as: future ADR / ticket.
+
+Trade-off captured here so the polling proliferation doesn't calcify:
+the moment two hooks on the same page are gated on the same "run not
+terminal" predicate, that's the signal to merge them into the stream.
 
 **Open questions to settle at the top of the phase:**
 - Cache library — SWR vs react-query vs custom (above).
