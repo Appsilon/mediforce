@@ -33,8 +33,8 @@ export interface ActionContext {
   stepId: string;
   /** Process instance id — handlers may stash extra audit data via this. */
   processInstanceId: string;
-  /** Namespace of the parent workflow instance. */
-  namespace: string;
+  /** Namespace of the parent workflow instance. Used by spawn action. */
+  namespace?: string;
   /** Sources for interpolation. The handler is free to walk these manually
    *  for advanced cases (path access into nested objects). */
   sources: InterpolationSources;

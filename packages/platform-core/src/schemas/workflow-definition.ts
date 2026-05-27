@@ -58,7 +58,7 @@ export const EmailActionConfigSchema = z.object({
 export const SpawnTargetSchema = z.object({
   definitionName: z.string().min(1),
   definitionVersion: z.number().int().positive().optional(),
-  triggerName: z.string().min(1).default('manual'),
+  triggerName: z.string().min(1).optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
 });
 

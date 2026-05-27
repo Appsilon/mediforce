@@ -1,7 +1,22 @@
 import type { SpawnActionConfig, SpawnTargetConfig, ProcessRepository } from '@mediforce/platform-core';
-import type { ManualTrigger } from '@mediforce/workflow-engine';
 import { interpolate } from '../interpolation.js';
 import type { SpawnActionHandler, InterpolationSources } from '../types.js';
+
+interface TriggerResult {
+  instanceId: string;
+  status: string;
+}
+
+interface WorkflowTrigger {
+  fireWorkflow(context: {
+    namespace: string;
+    definitionName: string;
+    definitionVersion: number;
+    triggerName: string;
+    triggeredBy: string;
+    payload?: Record<string, unknown>;
+  }): Promise<TriggerResult>;
+}
 
 const MAX_SPAWNS_PER_STEP = 50;
 
@@ -20,15 +35,21 @@ export interface SpawnActionOutput {
   }>;
   spawnedCount: number;
   errorCount: number;
+  [key: string]: unknown;
 }
 
 export function createSpawnActionHandler(
-  manualTrigger: ManualTrigger,
-  processRepo: ProcessRepository,
+  manualTrigger: WorkflowTrigger,
+  processRepo: Pick<ProcessRepository, 'getLatestWorkflowVersion'>,
 ): SpawnActionHandler {
   return async (config, ctx) => {
     const spawned: SpawnActionOutput['spawned'] = [];
     const errors: SpawnActionOutput['errors'] = [];
+
+    if (!ctx.namespace) {
+      throw new Error('spawn action requires namespace in ActionContext');
+    }
+    const namespace = ctx.namespace;
 
     const expandedTargets = resolveTargets(config, ctx.sources);
 
@@ -49,16 +70,16 @@ export function createSpawnActionHandler(
 
       try {
         const version = target.definitionVersion
-          ?? await processRepo.getLatestWorkflowVersion(ctx.namespace, target.definitionName);
+          ?? await processRepo.getLatestWorkflowVersion(namespace, target.definitionName);
 
         if (version === 0) {
           throw new Error(
-            `workflow definition '${target.definitionName}' not found in namespace '${ctx.namespace}'`,
+            `workflow definition '${target.definitionName}' not found in namespace '${namespace}'`,
           );
         }
 
         const result = await manualTrigger.fireWorkflow({
-          namespace: ctx.namespace,
+          namespace: namespace,
           definitionName: target.definitionName,
           definitionVersion: version,
           triggerName: target.triggerName ?? 'manual',
