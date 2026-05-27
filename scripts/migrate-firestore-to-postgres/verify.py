@@ -106,6 +106,28 @@ def _count_workflow_secrets(fs: Any) -> int:
     return total
 
 
+def compute_table_passed(
+    fs_count: int, pg_count: int, skipped: int, mismatched: int
+) -> bool:
+    """A table passes when Postgres + orphan-skipped equals Firestore, with no
+    field-level mismatches. `skipped` reflects main.py's per-table `errors`
+    count (rows main.py couldn't migrate because the parent process_instance
+    was missing — an expected outcome for some pre-cutover backfill cases)."""
+    return (fs_count == pg_count + skipped) and (mismatched == 0)
+
+
+def load_skipped_counts(path: str) -> dict[str, int]:
+    """Read main.py's migration_log.json and return per-table orphan-skipped
+    counts (the `errors` field). Returns `{}` if the log is missing so the
+    verifier can fall back to a strict fs == pg check with a warning."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            log = json.load(fh)
+    except FileNotFoundError:
+        return {}
+    return {table: int((entry or {}).get("errors") or 0) for table, entry in log.items()}
+
+
 def count_pg(pg: Any, table: str) -> int:
     with pg.cursor() as cur:
         cur.execute(f'SELECT count(*) FROM "{table}"')
@@ -260,6 +282,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--database-url", required=True)
     p.add_argument("--sample", type=int, default=50)
     p.add_argument("--only", help="Comma-separated postgres table names to verify.")
+    p.add_argument(
+        "--migration-log",
+        default="migration_log.json",
+        help=(
+            "Path to migration_log.json (written by main.py). Per-table "
+            "`errors` are treated as orphan-skipped rows when reconciling "
+            "counts. Missing file -> strict fs==pg check (with warning)."
+        ),
+    )
     return p.parse_args(argv)
 
 
@@ -273,6 +304,12 @@ def main(argv: list[str]) -> int:
     pg = psycopg2.connect(args.database_url)
 
     only = set(args.only.split(",")) if args.only else None
+    skipped_by_table = load_skipped_counts(args.migration_log)
+    if not skipped_by_table:
+        LOG.warning(
+            "no migration log at %s — orphan reconciliation disabled (strict fs==pg)",
+            args.migration_log,
+        )
     report: dict[str, dict[str, Any]] = {}
     any_fail = False
 
@@ -282,21 +319,32 @@ def main(argv: list[str]) -> int:
         LOG.info("=== verifying %s -> %s ===", collection, table)
         fs_count = count_firestore(fs, collection)
         pg_count = count_pg(pg, table)
+        skipped = skipped_by_table.get(table, 0)
         sampled, mismatched, messages = sample_diff(
             fs, pg, collection, table, lookup, args.sample
         )
-        passed = (fs_count == pg_count) and (mismatched == 0)
+        passed = compute_table_passed(fs_count, pg_count, skipped, mismatched)
         if not passed:
             any_fail = True
         report[table] = {
             "fs_count": fs_count,
             "pg_count": pg_count,
+            "orphans_skipped": skipped,
             "sampled": sampled,
             "mismatched": mismatched,
             "messages": messages[:10],  # truncate noise
             "passed": passed,
         }
-        LOG.info("%s: %s", table, report[table])
+        LOG.info(
+            "%s: fs=%d pg=%d orphans-skipped=%d sampled=%d mismatched=%d passed=%s",
+            table,
+            fs_count,
+            pg_count,
+            skipped,
+            sampled,
+            mismatched,
+            passed,
+        )
 
     pg.close()
     print(json.dumps(report, indent=2, default=str))
