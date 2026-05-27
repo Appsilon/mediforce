@@ -18,6 +18,8 @@ import {
   PostgresModelRegistryRepository,
   FirestoreWorkflowSecretsRepository,
   FirestoreNamespaceSecretsRepository,
+  PostgresNamespaceSecretsRepository,
+  PostgresWorkflowSecretsRepository,
   PostgresToolCatalogRepository,
   PostgresNamespaceRepository,
   PostgresAuditRepository,
@@ -48,10 +50,12 @@ import type {
   HumanTaskRepository,
   ModelRegistryRepository,
   NamespaceRepository,
+  NamespaceSecretsRepository,
   OAuthProviderRepository,
   ProcessInstanceRepository,
   ProcessRepository,
   ToolCatalogRepository,
+  WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import {
   WorkflowEngine,
@@ -106,8 +110,8 @@ export interface PlatformServices {
   oauthProviderRepo: OAuthProviderRepository;
   agentOAuthTokenRepo: AgentOAuthTokenRepository;
   modelRegistryRepo: ModelRegistryRepository;
-  secretsRepo: FirestoreWorkflowSecretsRepository;
-  namespaceSecretsRepo: FirestoreNamespaceSecretsRepository;
+  secretsRepo: WorkflowSecretsRepository;
+  namespaceSecretsRepo: NamespaceSecretsRepository;
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -178,8 +182,14 @@ export function getPlatformServices(): PlatformServices {
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresModelRegistryRepository(getSharedPostgresClient().db)
       : new FirestoreModelRegistryRepository(db);
-  const secretsRepo = new FirestoreWorkflowSecretsRepository(db);
-  const namespaceSecretsRepo = new FirestoreNamespaceSecretsRepository(db);
+  const secretsRepo: WorkflowSecretsRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresWorkflowSecretsRepository(getSharedPostgresClient().db)
+      : new FirestoreWorkflowSecretsRepository(db);
+  const namespaceSecretsRepo: NamespaceSecretsRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresNamespaceSecretsRepository(getSharedPostgresClient().db)
+      : new FirestoreNamespaceSecretsRepository(db);
   const eventLog = new FirestoreAgentEventLog(db);
 
   const pluginRegistry = new PluginRegistry();

@@ -12,3 +12,5 @@ export * from './process-instance.js';
 export * from './workflow-definition.js';
 export * from './agent-definition.js';
 export * from './model-registry.js';
+export * from './namespace-secret.js';
+export * from './workflow-secret.js';

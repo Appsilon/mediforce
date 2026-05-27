@@ -14,6 +14,8 @@ export { InMemoryAgentDefinitionRepository } from './in-memory-agent-definition-
 export { InMemoryNamespaceRepository } from './in-memory-namespace-repository.js';
 export { InMemoryAgentRunRepository } from './in-memory-agent-run-repository.js';
 export { InMemoryModelRegistryRepository } from './in-memory-model-registry-repository.js';
+export { InMemoryNamespaceSecretsRepository } from './in-memory-namespace-secrets-repository.js';
+export { InMemoryWorkflowSecretsRepository } from './in-memory-workflow-secrets-repository.js';
 
 // Test factories
 export {

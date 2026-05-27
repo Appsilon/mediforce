@@ -1,14 +1,10 @@
 'use server';
 
-import {
-  getAdminFirestore,
-  FirestoreNamespaceSecretsRepository,
-} from '@mediforce/platform-infra';
+import type { NamespaceSecretsRepository } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
 
-function getRepo() {
-  getPlatformServices();
-  return new FirestoreNamespaceSecretsRepository(getAdminFirestore());
+function getRepo(): NamespaceSecretsRepository {
+  return getPlatformServices().namespaceSecretsRepo;
 }
 
 async function requireNamespaceMember(namespace: string, userId: string): Promise<void> {
