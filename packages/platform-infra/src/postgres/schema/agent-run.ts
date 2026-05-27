@@ -43,7 +43,9 @@ export const agentRuns = pgTable(
       .references(() => workspaces.handle, { onDelete: 'cascade' }),
 
     // Context — FK to process_instances.id added in #9 migration.
-    processInstanceId: uuid('process_instance_id').notNull(),
+    // `text` not `uuid` — process_instances retains Firestore-style string
+    // ids during dual-code; stays text post-cutover (no conversion needed).
+    processInstanceId: text('process_instance_id').notNull(),
     stepId: text('step_id').notNull(),
     pluginId: text('plugin_id').notNull(),
     autonomyLevel: text('autonomy_level').notNull(),

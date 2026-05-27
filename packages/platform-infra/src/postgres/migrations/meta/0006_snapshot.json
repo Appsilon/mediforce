@@ -287,7 +287,7 @@
         },
         "process_instance_id": {
           "name": "process_instance_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -737,7 +737,7 @@
         },
         "process_instance_id": {
           "name": "process_instance_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },

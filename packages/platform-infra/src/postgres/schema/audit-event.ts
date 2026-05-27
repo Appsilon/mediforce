@@ -1,4 +1,7 @@
 import { pgTable, text, uuid, jsonb, timestamp, index } from 'drizzle-orm/pg-core';
+// `process_instance_id` is `text` not `uuid` because process_instances
+// keeps Firestore-shaped string ids during the dual-code window. Post-
+// cutover, ids stay text (no need to convert).
 import { workspaces } from './workspace.js';
 
 /**
@@ -36,7 +39,7 @@ export const auditEvents = pgTable(
     entityId: text('entity_id').notNull(),
 
     // Context — FK to process_instances.id added in #9 migration.
-    processInstanceId: uuid('process_instance_id'),
+    processInstanceId: text('process_instance_id'),
     stepId: text('step_id'),
     processDefinitionVersion: text('process_definition_version'),
     executorType: text('executor_type'),
