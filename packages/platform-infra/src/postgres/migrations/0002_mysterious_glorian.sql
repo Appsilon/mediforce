@@ -7,7 +7,7 @@ CREATE TABLE "audit_events" (
 	"action" text NOT NULL,
 	"entity_type" text NOT NULL,
 	"entity_id" text NOT NULL,
-	"process_instance_id" uuid,
+	"process_instance_id" text,
 	"step_id" text,
 	"process_definition_version" text,
 	"executor_type" text,
