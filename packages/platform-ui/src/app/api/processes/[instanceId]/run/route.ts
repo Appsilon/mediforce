@@ -434,6 +434,7 @@ export async function POST(
               const output = await actionRegistry.dispatch(currentStep.action, {
                 stepId: instance.currentStepId,
                 processInstanceId: instanceId,
+                namespace: instance.namespace ?? '',
                 sources: {
                   triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
                   steps: instance.variables,

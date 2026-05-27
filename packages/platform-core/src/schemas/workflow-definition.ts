@@ -55,12 +55,25 @@ export const EmailActionConfigSchema = z.object({
   html: z.string().optional(),
 });
 
-/** Discriminated union of action configs. Future kinds (wait, subworkflow,
- *  set) plug in here. */
+export const SpawnTargetSchema = z.object({
+  definitionName: z.string().min(1),
+  definitionVersion: z.number().int().positive().optional(),
+  triggerName: z.string().min(1).default('manual'),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const SpawnActionConfigSchema = z.object({
+  targets: z.union([SpawnTargetSchema, z.array(SpawnTargetSchema)]),
+  forEach: z.string().min(1).optional(),
+  continueOnSpawnError: z.boolean().default(true),
+});
+
+/** Discriminated union of action configs. New kinds plug in here. */
 export const ActionConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('http'), config: HttpActionConfigSchema }),
   z.object({ kind: z.literal('reshape'), config: ReshapeActionConfigSchema }),
   z.object({ kind: z.literal('email'), config: EmailActionConfigSchema }),
+  z.object({ kind: z.literal('spawn'), config: SpawnActionConfigSchema }),
 ]);
 
 export type HttpMethod = z.infer<typeof HttpMethodSchema>;
@@ -68,6 +81,8 @@ export type WebhookTriggerConfig = z.infer<typeof WebhookTriggerConfigSchema>;
 export type HttpActionConfig = z.infer<typeof HttpActionConfigSchema>;
 export type ReshapeActionConfig = z.infer<typeof ReshapeActionConfigSchema>;
 export type EmailActionConfig = z.infer<typeof EmailActionConfigSchema>;
+export type SpawnTargetConfig = z.infer<typeof SpawnTargetSchema>;
+export type SpawnActionConfig = z.infer<typeof SpawnActionConfigSchema>;
 export type ActionConfig = z.infer<typeof ActionConfigSchema>;
 
 export const WorkflowAgentConfigSchema = z.object({
@@ -235,6 +250,16 @@ function validateExecutorAndTriggers(
         path: ['steps', i, 'action'],
         message: `step '${step.id}' has action config but executor is '${step.executor}' (must be 'action')`,
       });
+    }
+    if (step.executor === 'action' && step.action !== undefined) {
+      const action = step.action as { kind: string; config: Record<string, unknown> };
+      if (action.kind === 'spawn' && action.config.forEach && Array.isArray(action.config.targets)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['steps', i, 'action', 'config', 'forEach'],
+          message: `step '${step.id}': forEach requires a single target template, not an array`,
+        });
+      }
     }
   });
 
