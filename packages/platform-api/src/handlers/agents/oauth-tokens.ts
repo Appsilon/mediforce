@@ -14,8 +14,9 @@ import { actorFromCaller } from '../_helpers.js';
 function sanitize(
   entry: AgentOAuthToken & { serverName: string },
 ) {
-  const publicSlice = PublicAgentOAuthTokenSchema.parse(entry);
-  return { ...publicSlice, serverName: entry.serverName };
+  const { serverName, accessToken: _omitAccess, refreshToken: _omitRefresh, ...rest } = entry;
+  const publicSlice = PublicAgentOAuthTokenSchema.parse(rest);
+  return { ...publicSlice, serverName };
 }
 
 export async function listAgentOAuthTokens(
