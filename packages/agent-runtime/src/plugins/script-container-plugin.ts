@@ -251,6 +251,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         const envFlags: string[] = [];
         envFlags.push('-e', `RUN_ID=${this.context.processInstanceId}`);
         envFlags.push('-e', `STEP_ID=${this.context.stepId}`);
+        if (isWorkflowAgentContext(this.context) && this.context.runNamespace) {
+          envFlags.push('-e', `MEDIFORCE_RUN_NAMESPACE=${this.context.runNamespace}`);
+        }
         for (const [key, value] of Object.entries(this.resolvedEnv.vars)) {
           envFlags.push('-e', `${key}=${value}`);
         }
@@ -455,6 +458,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         ...this.resolvedEnv.vars,
         RUN_ID: this.context.processInstanceId,
         STEP_ID: this.context.stepId,
+        ...(isWorkflowAgentContext(this.context) && this.context.runNamespace
+          ? { MEDIFORCE_RUN_NAMESPACE: this.context.runNamespace }
+          : {}),
       };
       const child = spawn(cmd, args, {
         cwd,

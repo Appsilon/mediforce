@@ -47,6 +47,7 @@ function buildWorkflowContext(overrides: Partial<WorkflowAgentContext> = {}): Wo
   return {
     stepId: 'extract',
     processInstanceId: `pi-${Date.now().toString()}-${Math.random().toString(36).slice(2, 6)}`,
+    runNamespace: 'test',
     definitionVersion: 'v1',
     stepInput: {},
     autonomyLevel: 'L4',

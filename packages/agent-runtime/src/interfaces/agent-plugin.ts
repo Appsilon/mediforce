@@ -66,6 +66,11 @@ export interface ResolvedOAuthBinding {
 export interface WorkflowAgentContext {
   stepId: string;
   processInstanceId: string;
+  /** Namespace the run operates in — the org that owns this process instance.
+   *  Steps acting on the platform on the run's behalf (e.g. a script that
+   *  registers a generated artifact) must target this namespace, not the WD's
+   *  home namespace. Injected into script steps as `MEDIFORCE_RUN_NAMESPACE`. */
+  runNamespace: string;
   definitionVersion: string;
   stepInput: Record<string, unknown>;
   autonomyLevel: AutonomyLevel;

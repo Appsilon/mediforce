@@ -73,6 +73,7 @@ function buildScriptContext(overrides: {
   return {
     stepId: step.id,
     processInstanceId: `pi-${Date.now().toString()}-${Math.random().toString(36).slice(2, 6)}`,
+    runNamespace: 'test',
     definitionVersion: 'v1',
     stepInput: {},
     autonomyLevel: 'L4',
