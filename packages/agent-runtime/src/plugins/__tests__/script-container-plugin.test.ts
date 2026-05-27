@@ -490,6 +490,42 @@ describe('ScriptContainerPlugin', () => {
       expect(dockerArgs).toContain('MEDIFORCE_RUN_NAMESPACE=acme');
     });
 
+    it('[ERROR] no-output diagnostic lists MEDIFORCE_RUN_NAMESPACE for workflow runs', async () => {
+      const context: WorkflowAgentContext = {
+        stepId: 'register',
+        processInstanceId: 'pi-acme',
+        runNamespace: 'acme',
+        definitionVersion: '1',
+        stepInput: {},
+        autonomyLevel: 'L4',
+        workflowDefinition: buildWorkflowDefinition({
+          name: 'workflow-designer',
+          version: 1,
+          namespace: 'appsilon',
+          steps: [],
+          transitions: [],
+        }),
+        step: {
+          id: 'register',
+          name: 'Register',
+          type: 'creation',
+          executor: 'script',
+          agent: { runtime: 'bash', inlineScript: '#!/bin/sh\necho ok\n' },
+        },
+        llm: { complete: vi.fn() },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+      };
+      await plugin.initialize(context);
+
+      const { emit } = buildEmitSpy();
+      mockSpawnFailure(createMockChild()); // exit 1 with no stdout/stderr
+
+      const error = await plugin.run(emit).catch((e: unknown) => e);
+      // The diagnostic must reflect every injected var the script saw — RUN_ID
+      // and STEP_ID plus the run namespace #539 injects for workflow runs.
+      expect((error as Error).message).toContain('env=[RUN_ID,STEP_ID,MEDIFORCE_RUN_NAMESPACE]');
+    });
+
     it('[DATA] writes input.json to the output directory', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
