@@ -236,6 +236,24 @@ describe('createSpawnActionHandler', () => {
     );
   });
 
+  it('forwards custom triggerName to fireWorkflow', async () => {
+    const trigger = makeTrigger();
+    const repo = makeProcessRepo();
+    const handler = createSpawnActionHandler(trigger as never, repo as never);
+
+    await handler(
+      {
+        targets: { definitionName: 'child', triggerName: 'api' },
+        continueOnSpawnError: true,
+      },
+      baseCtx,
+    );
+
+    expect(trigger.fireWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ triggerName: 'api' }),
+    );
+  });
+
   it('rejects when fan-out exceeds 50 spawns', async () => {
     const trigger = makeTrigger();
     const repo = makeProcessRepo();

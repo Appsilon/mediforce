@@ -166,7 +166,6 @@ Factory function (like `createEmailActionHandler`) because it needs `ManualTrigg
 export function createSpawnActionHandler(
   manualTrigger: ManualTrigger,
   processRepo: ProcessRepository,
-  getAppBaseUrl: () => string,
 ): SpawnActionHandler
 ```
 
@@ -178,7 +177,6 @@ export function createSpawnActionHandler(
    - Interpolate `payload` against standard sources. In `forEach` mode, add `item` to sources so `${item.field}` resolves.
    - Resolve `definitionVersion`: if omitted, call `processRepo.getLatestWorkflowVersion(namespace, definitionName)`.
    - Call `manualTrigger.fireWorkflow(...)` directly (in-process, no HTTP).
-   - Fire-and-forget the auto-runner kick via internal HTTP.
    - On success, push to `spawned[]`. On error, push to `errors[]`.
 4. **Return output.**
 
@@ -234,7 +232,7 @@ Hard cap of 50 spawns per step execution. Error: `"spawn fan-out exceeds maximum
 | `core-actions/handlers/spawn.ts` | New file. Factory `createSpawnActionHandler(...)` |
 | `core-actions/handlers/__tests__/spawn.test.ts` | New file. Handler tests (single, fan-out, errors, empty forEach) |
 | `core-actions/index.ts` | Export `createSpawnActionHandler` |
-| `platform-api/services/platform-services.ts` | Register spawn handler: `actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo, getAppBaseUrl))` |
+| `platform-api/services/platform-services.ts` | Register spawn handler: `actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo))` |
 | `platform-ui/.../run/route.ts` | Pass `namespace: initialInstance.namespace` in `ActionContext` |
 | `core-actions/validate-action-secrets.ts` | Scan spawn `payload` values for `${secrets.*}` refs |
 
