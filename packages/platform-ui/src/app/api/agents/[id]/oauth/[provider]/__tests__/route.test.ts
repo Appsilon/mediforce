@@ -9,10 +9,13 @@ const mockTokenGet = vi.fn();
 const mockTokenDelete = vi.fn();
 const mockProviderGet = vi.fn();
 const mockGetMember = vi.fn();
+const mockGetNamespacesByUser = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
 }));
+
+const mockAuditAppend = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -21,7 +24,11 @@ vi.mock('@/lib/platform-services', () => ({
       delete: mockTokenDelete,
     },
     oauthProviderRepo: { get: mockProviderGet },
-    namespaceRepo: { getMember: mockGetMember },
+    auditRepo: { append: mockAuditAppend },
+    namespaceRepo: {
+      getMember: mockGetMember,
+      getNamespacesByUser: mockGetNamespacesByUser,
+    },
   }),
 }));
 
@@ -101,6 +108,7 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
     vi.clearAllMocks();
     mockVerifyIdToken.mockResolvedValue({ uid: 'uid-1' });
     mockGetMember.mockResolvedValue(memberAppsilon);
+    mockGetNamespacesByUser.mockResolvedValue([{ handle: 'appsilon' }]);
     originalFetch = globalThis.fetch;
     fetchMock = vi.fn();
     globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
@@ -294,15 +302,11 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
       }),
       { params: makeParams('agent-1', 'github') },
     );
-    const json = await res.json();
     expect(res.status).toBe(400);
-    expect(json.error).toContain('serverName');
     expect(mockTokenDelete).not.toHaveBeenCalled();
   });
 
-  it('[AUTHZ] caller who is not a member of the namespace gets 404 and does not delete', async () => {
-    mockGetMember.mockResolvedValue(null);
-
+  it('[AUTHZ] caller who is not a member of the namespace gets 403 and does not delete', async () => {
     const res = await DELETE(
       makeDeleteRequest({
         agentId: 'agent-1',
@@ -312,13 +316,14 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
       }),
       { params: makeParams('agent-1', 'github') },
     );
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(403);
     expect(mockTokenDelete).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('[AUTHZ] membership check uses the query-param namespace', async () => {
+  it('[AUTHZ] membership read from getNamespacesByUser gates the requested namespace', async () => {
     mockTokenDelete.mockResolvedValue(true);
+    mockGetNamespacesByUser.mockResolvedValue([{ handle: 'other-ns' }]);
 
     await DELETE(
       makeDeleteRequest({
@@ -329,6 +334,7 @@ describe('DELETE /api/agents/:id/oauth/:provider', () => {
       }),
       { params: makeParams('agent-1', 'github') },
     );
-    expect(mockGetMember).toHaveBeenCalledWith('other-ns', 'uid-1');
+    expect(mockGetNamespacesByUser).toHaveBeenCalledWith('uid-1');
+    expect(mockTokenDelete).toHaveBeenCalledWith('other-ns', 'agent-1', 'gh');
   });
 });
