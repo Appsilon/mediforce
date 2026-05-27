@@ -54,8 +54,8 @@ TABLES: list[tuple[str, str, str]] = [
     ("coworkSessions", "cowork_sessions", "id"),
     ("ia:coworkSessions:turns", "cowork_turns", "count_only"),
     ("cg:members", "workspace_members", "count_only"),
-    ("cg:namespaceSecrets", "namespace_secrets", "count_only"),
-    ("cg:workflowSecrets", "workflow_secrets", "count_only"),
+    ("custom:namespaceSecrets", "namespace_secrets", "count_only"),
+    ("custom:workflowSecrets", "workflow_secrets", "count_only"),
     ("cg:toolCatalog", "tool_catalog_entries", "count_only"),
     ("cg:oauthProviders", "oauth_providers", "count_only"),
     ("cg:agentOAuthTokens", "agent_oauth_tokens", "count_only"),
@@ -72,7 +72,38 @@ def count_firestore(fs: Any, collection: str) -> int:
             len((doc.to_dict() or {}).get(field) or [])
             for doc in fs.collection(parent).stream()
         )
+    if collection == "custom:namespaceSecrets":
+        return _count_namespace_secrets(fs)
+    if collection == "custom:workflowSecrets":
+        return _count_workflow_secrets(fs)
     return sum(1 for _ in fs.collection(collection).stream())
+
+
+def _count_namespace_secrets(fs: Any) -> int:
+    """Sum keys in `secrets` map on namespaces/{h}/namespaceSecrets/_config docs.
+
+    Mirrors `migrate_namespace_secrets` in main.py: one Postgres row per key.
+    """
+    total = 0
+    for ns in fs.collection("namespaces").stream():
+        cfg = ns.reference.collection("namespaceSecrets").document("_config").get()
+        if not cfg.exists:
+            continue
+        total += len((cfg.to_dict() or {}).get("secrets") or {})
+    return total
+
+
+def _count_workflow_secrets(fs: Any) -> int:
+    """Sum keys across namespaces/{h}/workflowSecrets/{workflow} docs.
+
+    Mirrors `migrate_workflow_secrets` in main.py: one Postgres row per key
+    per workflow.
+    """
+    total = 0
+    for ns in fs.collection("namespaces").stream():
+        for wf_doc in ns.reference.collection("workflowSecrets").stream():
+            total += len((wf_doc.to_dict() or {}).get("secrets") or {})
+    return total
 
 
 def count_pg(pg: Any, table: str) -> int:
