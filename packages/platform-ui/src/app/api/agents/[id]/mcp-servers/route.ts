@@ -1,24 +1,21 @@
-import { NextResponse } from 'next/server';
-import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { listAgentMcpBindings } from '@mediforce/platform-api/handlers';
+import {
+  ListAgentMcpBindingsInputSchema,
+  type ListAgentMcpBindingsInput,
+} from '@mediforce/platform-api/contract';
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
-  const { id } = await params;
-  const { agentDefinitionRepo, namespaceRepo } = getPlatformServices();
-
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const agent = await agentDefinitionRepo.getById(id);
-  if (agent === null) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const denied = agent.namespace ? requireNamespaceAccess(caller, agent.namespace) : null;
-  if (denied) return denied;
-
-  return NextResponse.json({ mcpServers: agent.mcpServers ?? {} });
+interface RouteContext {
+  params: Promise<{ id: string }>;
 }
+
+export const GET = createRouteAdapter<
+  typeof ListAgentMcpBindingsInputSchema,
+  ListAgentMcpBindingsInput,
+  unknown,
+  RouteContext
+>(
+  ListAgentMcpBindingsInputSchema,
+  async (_req, ctx) => ({ id: (await ctx.params).id }),
+  listAgentMcpBindings,
+);

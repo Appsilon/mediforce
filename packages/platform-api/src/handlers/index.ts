@@ -16,6 +16,20 @@ export { archiveRun } from './processes/archive-run.js';
 export { bulkCancelRuns } from './processes/bulk-cancel-runs.js';
 export { bulkArchiveRuns } from './processes/bulk-archive-runs.js';
 
+export { createAgent } from './agents/create-agent.js';
+export { updateAgent } from './agents/update-agent.js';
+export { deleteAgent } from './agents/delete-agent.js';
+export {
+  listAgentMcpBindings,
+  upsertAgentMcpBinding,
+  deleteAgentMcpBinding,
+} from './agents/mcp-bindings.js';
+export {
+  listAgentOAuthTokens,
+  getAgentOAuthToken,
+  deleteAgentOAuthToken,
+} from './agents/oauth-tokens.js';
+
 export { listWorkflows } from './workflows/list-workflows.js';
 export { getWorkflow } from './workflows/get-workflow.js';
 

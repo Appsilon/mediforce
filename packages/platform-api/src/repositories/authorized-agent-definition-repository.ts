@@ -33,6 +33,17 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
       ? this.raw.listAll()
       : this.raw.listVisibleTo([...this.caller.namespaces]);
 
+  create = async (input: CreateAgentDefinitionInput): Promise<AgentDefinition> => {
+    // Preserve the legacy inline-route contract: the namespace field is
+    // optional and only gates when supplied. Namespace-less agents are
+    // platform-global and historically have no caller-side check at create
+    // time; tightening that is a separate decision (Phase 2.6 territory).
+    if (typeof input.namespace === 'string') {
+      this.assertNamespaceWrite(input.namespace);
+    }
+    return this.raw.create(input);
+  };
+
   upsert = async (id: string, input: CreateAgentDefinitionInput): Promise<AgentDefinition> => {
     this.assertNamespaceWrite(input.namespace);
     return this.raw.upsert(id, input);

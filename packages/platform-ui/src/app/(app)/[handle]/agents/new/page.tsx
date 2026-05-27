@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { ref, uploadBytes } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
-import { apiFetch } from '@/lib/api-fetch';
+import { mediforce } from '@/lib/mediforce';
 import { FOUNDATION_MODELS } from '@/lib/agent-models';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
@@ -84,7 +84,8 @@ export default function NewAgentPage() {
         );
       }
 
-      const payload = {
+      await mediforce.agents.create({
+        kind: 'plugin',
         name: name.trim(),
         iconName: selectedIcon,
         description,
@@ -93,11 +94,7 @@ export default function NewAgentPage() {
         foundationModel: selectedModelId,
         systemPrompt: prompt,
         skillFileNames,
-      };
-      await apiFetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        visibility: 'private',
       });
       router.push(`/${handle}/agents`);
     } finally {
