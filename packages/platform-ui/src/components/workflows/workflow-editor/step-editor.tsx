@@ -5,7 +5,7 @@ import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, Ale
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
 import { useAuth } from '@/contexts/auth-context';
-import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
+import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import type { WorkflowStep, HttpMethod, ActionConfig } from '@mediforce/platform-core';
 import { ModelPicker } from './model-picker';
@@ -214,8 +214,9 @@ export function StepEditor({
   const uid = firebaseUser?.uid;
   useEffect(() => {
     if (handle && workflowName && uid) {
-      getWorkflowSecretKeys(handle, workflowName, uid)
-        .then(setSecretKeys)
+      mediforce.secrets
+        .list({ namespace: handle, workflow: workflowName })
+        .then(({ keys }) => setSecretKeys(keys))
         .catch((err) => console.error('Failed to load secret keys:', err));
     }
   }, [handle, workflowName, uid]);
