@@ -268,7 +268,11 @@ def migrate_model_registry(fs, pg, *, dry_run: bool) -> dict[str, int]:
                 "supports_vision": bool(data.get("supportsVision")),
                 "source": data.get("source") or "openrouter",
                 "request_count": data.get("requestCount"),
-                "last_synced_at": data.get("lastSyncedAt"),
+                # `last_synced_at` is notNull-without-default on Postgres. Fall back
+                # to epoch zero so operators can spot un-migrated rows in a later
+                # audit instead of failing the whole table insert.
+                "last_synced_at": data.get("lastSyncedAt")
+                or datetime(1970, 1, 1, tzinfo=timezone.utc),
                 "created_at": data.get("createdAt"),
                 "updated_at": data.get("updatedAt"),
             }
@@ -838,7 +842,10 @@ def migrate_cron_trigger_state(fs, pg, *, dry_run: bool) -> dict[str, int]:
             {
                 "definition_name": def_name,
                 "trigger_name": trigger_name,
-                "last_triggered_at": data.get("lastTriggeredAt"),
+                # notNull-without-default on Postgres — sentinel epoch zero so
+                # un-migrated rows are auditable later.
+                "last_triggered_at": data.get("lastTriggeredAt")
+                or datetime(1970, 1, 1, tzinfo=timezone.utc),
             }
         )
     ins, skip = insert_rows(
