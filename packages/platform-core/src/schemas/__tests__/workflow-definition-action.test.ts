@@ -90,7 +90,7 @@ describe('workflow-definition action executor', () => {
           name: 'echo',
           type: 'terminal',
           executor: 'action',
-          action: { kind: 'wait', config: { ms: 100 } },
+          action: { kind: 'noop', config: {} },
         },
       ],
     });
@@ -212,5 +212,137 @@ describe('workflow-definition action executor', () => {
       ],
     });
     expect(result.success).toBe(false);
+  });
+
+  it('parses wait action with duration', () => {
+    const result = parseWorkflowDefinitionForCreation({
+      ...baseTemplate,
+      namespace: 'examples',
+      steps: [
+        {
+          id: 'pause',
+          name: 'Wait 2 hours',
+          type: 'creation',
+          executor: 'action',
+          action: {
+            kind: 'wait',
+            config: { duration: { hours: 2 } },
+          },
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('parses wait action with deadline', () => {
+    const result = parseWorkflowDefinitionForCreation({
+      ...baseTemplate,
+      namespace: 'examples',
+      steps: [
+        {
+          id: 'pause',
+          name: 'Wait until deadline',
+          type: 'creation',
+          executor: 'action',
+          action: {
+            kind: 'wait',
+            config: { deadline: '${triggerPayload.collectUntil}' },
+          },
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('parses wait action with deadline and condition', () => {
+    const result = parseWorkflowDefinitionForCreation({
+      ...baseTemplate,
+      namespace: 'examples',
+      steps: [
+        {
+          id: 'pause',
+          name: 'Wait for children',
+          type: 'creation',
+          executor: 'action',
+          action: {
+            kind: 'wait',
+            config: {
+              deadline: '${triggerPayload.collectUntil}',
+              condition: 'variables.spawn_step.allCompleted == true',
+            },
+          },
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects wait with both duration and deadline', () => {
+    const result = parseWorkflowDefinitionForCreation({
+      ...baseTemplate,
+      namespace: 'examples',
+      steps: [
+        {
+          id: 'pause',
+          name: 'Bad wait',
+          type: 'creation',
+          executor: 'action',
+          action: {
+            kind: 'wait',
+            config: { duration: { hours: 1 }, deadline: '2026-06-01T00:00:00Z' },
+          },
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(JSON.stringify(result.error.issues)).toContain('exactly one of duration or deadline');
+    }
+  });
+
+  it('rejects wait with neither duration nor deadline', () => {
+    const result = parseWorkflowDefinitionForCreation({
+      ...baseTemplate,
+      namespace: 'examples',
+      steps: [
+        {
+          id: 'pause',
+          name: 'Bad wait',
+          type: 'creation',
+          executor: 'action',
+          action: {
+            kind: 'wait',
+            config: {},
+          },
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(JSON.stringify(result.error.issues)).toContain('exactly one of duration or deadline');
+    }
+  });
+
+  it('rejects wait with zero duration', () => {
+    const result = parseWorkflowDefinitionForCreation({
+      ...baseTemplate,
+      namespace: 'examples',
+      steps: [
+        {
+          id: 'pause',
+          name: 'Bad wait',
+          type: 'creation',
+          executor: 'action',
+          action: {
+            kind: 'wait',
+            config: { duration: { seconds: 0 } },
+          },
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(JSON.stringify(result.error.issues)).toContain('duration must be greater than zero');
+    }
   });
 });

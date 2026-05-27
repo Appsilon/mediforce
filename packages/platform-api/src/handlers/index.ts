@@ -10,6 +10,7 @@ export { listAuditEvents } from './processes/list-audit-events.js';
 export { getProcessSteps } from './processes/get-process-steps.js';
 export { cancelRun } from './processes/cancel-run.js';
 export { resumeRun } from './processes/resume-run.js';
+export { resumeWait } from './processes/resume-wait.js';
 export { retryStep } from './processes/retry-step.js';
 
 export { listWorkflows } from './workflows/list-workflows.js';

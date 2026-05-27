@@ -142,6 +142,19 @@ export const ResumeRunOutputSchema = z.object({
 export type ResumeRunInput = z.infer<typeof ResumeRunInputSchema>;
 export type ResumeRunOutput = z.infer<typeof ResumeRunOutputSchema>;
 
+export const ResumeWaitInputSchema = z.object({
+  runId: z.string().min(1),
+});
+
+export const ResumeWaitOutputSchema = z.object({
+  resumed: z.boolean(),
+  resumeReason: z.string().optional(),
+  resumeAt: z.string().optional(),
+});
+
+export type ResumeWaitInput = z.infer<typeof ResumeWaitInputSchema>;
+export type ResumeWaitOutput = z.infer<typeof ResumeWaitOutputSchema>;
+
 export const RetryStepInputSchema = z.object({
   runId: z.string().min(1),
   stepId: z.string().min(1),

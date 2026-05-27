@@ -68,12 +68,23 @@ export const SpawnActionConfigSchema = z.object({
   continueOnSpawnError: z.boolean().default(true),
 });
 
+export const WaitActionConfigSchema = z.object({
+  duration: z.object({
+    seconds: z.number().int().nonnegative().optional(),
+    minutes: z.number().int().nonnegative().optional(),
+    hours: z.number().int().nonnegative().optional(),
+  }).optional(),
+  deadline: z.string().min(1).optional(),
+  condition: z.string().optional(),
+});
+
 /** Discriminated union of action configs. New kinds plug in here. */
 export const ActionConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('http'), config: HttpActionConfigSchema }),
   z.object({ kind: z.literal('reshape'), config: ReshapeActionConfigSchema }),
   z.object({ kind: z.literal('email'), config: EmailActionConfigSchema }),
   z.object({ kind: z.literal('spawn'), config: SpawnActionConfigSchema }),
+  z.object({ kind: z.literal('wait'), config: WaitActionConfigSchema }),
 ]);
 
 export type HttpMethod = z.infer<typeof HttpMethodSchema>;
@@ -83,6 +94,7 @@ export type ReshapeActionConfig = z.infer<typeof ReshapeActionConfigSchema>;
 export type EmailActionConfig = z.infer<typeof EmailActionConfigSchema>;
 export type SpawnTargetConfig = z.infer<typeof SpawnTargetSchema>;
 export type SpawnActionConfig = z.infer<typeof SpawnActionConfigSchema>;
+export type WaitActionConfig = z.infer<typeof WaitActionConfigSchema>;
 export type ActionConfig = z.infer<typeof ActionConfigSchema>;
 
 export const WorkflowAgentConfigSchema = z.object({
@@ -259,6 +271,26 @@ function validateExecutorAndTriggers(
           path: ['steps', i, 'action', 'config', 'forEach'],
           message: `step '${step.id}': forEach requires a single target template, not an array`,
         });
+      }
+      if (action.kind === 'wait') {
+        const c = action.config as { duration?: { seconds?: number; minutes?: number; hours?: number }; deadline?: string };
+        if ((c.duration !== undefined) === (c.deadline !== undefined)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['steps', i, 'action', 'config'],
+            message: `step '${step.id}': exactly one of duration or deadline must be set`,
+          });
+        }
+        if (c.duration) {
+          const total = (c.duration.seconds ?? 0) + (c.duration.minutes ?? 0) + (c.duration.hours ?? 0);
+          if (total === 0) {
+            ctx.addIssue({
+              code: 'custom',
+              path: ['steps', i, 'action', 'config', 'duration'],
+              message: `step '${step.id}': duration must be greater than zero`,
+            });
+          }
+        }
       }
     }
   });
