@@ -22,10 +22,18 @@ export class FirestoreAuditRepository implements AuditRepository {
   ): Promise<AuditEvent> {
     const colRef = this.db.collection(this.collectionName);
 
-    const docRef = await colRef.add({
-      ...event,
-      serverTimestamp: FieldValue.serverTimestamp(),
-    });
+    // Real Firestore rejects undefined values with
+    // "Cannot use undefined as a Firestore value". Optional fields on
+    // AuditEvent (`processInstanceId`, `stepId`, ...) and on handlers'
+    // `inputSnapshot` payloads (`args`, etc.) routinely arrive as
+    // undefined when omitted; scrub them so the in-memory and Firestore
+    // paths agree on representation. Null is preserved.
+    const docRef = await colRef.add(
+      stripUndefined({
+        ...event,
+        serverTimestamp: FieldValue.serverTimestamp(),
+      }) as Record<string, unknown>,
+    );
 
     const snapshot = await docRef.get();
     const data = snapshot.data()!;
@@ -110,4 +118,23 @@ export class FirestoreAuditRepository implements AuditRepository {
         data.processDefinitionVersion as string | undefined,
     };
   }
+}
+
+function stripUndefined(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => stripUndefined(v))
+      .filter((v): v is unknown => v !== undefined);
+  }
+  if (typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      const stripped = stripUndefined(v);
+      if (stripped !== undefined) out[k] = stripped;
+    }
+    return out;
+  }
+  return value;
 }
