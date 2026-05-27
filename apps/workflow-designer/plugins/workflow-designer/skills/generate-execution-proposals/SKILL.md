@@ -77,6 +77,12 @@ For each proposal, take the parsed structure and add execution config to every s
   "name": "string",
   "version": 1,
   "description": "string",
+  "env": {
+    "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_BASE_URL": "{{ANTHROPIC_BASE_URL}}",
+    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_API_KEY": ""
+  },
   "roles": ["string"],
   "triggerInput": [ /* copied from structure if present */ ],
   "steps": [ /* WorkflowStep[] */ ],
@@ -84,6 +90,10 @@ For each proposal, take the parsed structure and add execution config to every s
   "triggers": [ /* copied from structure */ ]
 }
 ```
+
+The top-level `env` block is inherited by all steps. Include it in every
+proposal that has at least one `claude-code-agent` step. Without it, agent
+containers cannot authenticate and fail with "Not logged in".
 
 ### WorkflowStep Schema (with executor fields)
 
@@ -186,7 +196,22 @@ You may also generate additional proposals based on the user's preferences (e.g.
 5. **Review steps** should generally be `executor: "human"` in hybrid proposals
 6. **Only use plugins** that appeared in the GET /api/plugins response
 7. **CRITICAL: `claude-code-agent` steps MUST have `agent.prompt`** — this is a newly generated workflow with no SKILL.md files, so `skill` cannot be used. Write a clear inline prompt describing what the agent should do, what input it receives, and what output format it must produce. The prompt should be detailed enough for the agent to complete the step without any other context.
-8. **CRITICAL: Every `agent.prompt` MUST include the output contract instructions.** The Mediforce agent runtime parses output from a file, NOT from the conversation. Every prompt must instruct the agent to: (a) write its result as JSON to `{output_directory}/result.json` using bash, and (b) output ONLY a small JSON contract as its final message: `{"output_file": "/absolute/path/to/result.json", "summary": "..."}`. Without this contract, the platform cannot read the agent's output and the step will fail with an empty result. Here is the exact block to include in every agent prompt:
+8. **CRITICAL: Top-level `env` block for agent auth.** Any proposal that
+   contains at least one `claude-code-agent` step MUST include a top-level
+   `env` block with the OpenRouter credentials the container needs:
+   ```json
+   "env": {
+     "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+     "ANTHROPIC_BASE_URL": "{{ANTHROPIC_BASE_URL}}",
+     "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+     "ANTHROPIC_API_KEY": ""
+   }
+   ```
+   Without this, the agent container cannot authenticate and fails with
+   "Not logged in". The `{{…}}` references resolve from namespace/workflow
+   secrets at runtime. `ANTHROPIC_API_KEY` must be explicitly empty to
+   prevent the CLI from looking for a direct Anthropic key.
+9. **CRITICAL: Every `agent.prompt` MUST include the output contract instructions.** The Mediforce agent runtime parses output from a file, NOT from the conversation. Every prompt must instruct the agent to: (a) write its result as JSON to `{output_directory}/result.json` using bash, and (b) output ONLY a small JSON contract as its final message: `{"output_file": "/absolute/path/to/result.json", "summary": "..."}`. Without this contract, the platform cannot read the agent's output and the step will fail with an empty result. Here is the exact block to include in every agent prompt:
 
 ```
 ## OUTPUT CONTRACT (MANDATORY)
@@ -204,11 +229,11 @@ You MUST:
 The {output_directory} placeholder will be replaced with the actual path at runtime.
 If you do NOT follow this contract, the platform will receive an empty result.
 ```
-9. For `claude-code-agent` steps, include `agent.model` (use `"sonnet"`). **CRITICAL: also set `agent.image` — default `"mediforce-golden-image"` (same for `opencode-agent`).** The platform runs agent steps in Docker; a step without an image crashes on staging/production (imageless/local execution only works in dev with `ALLOW_LOCAL_AGENTS=true`). Only omit `image` if the user EXPLICITLY asks for local / no-Docker execution in their preferences.
-10. Each proposal needs a distinct `label` and `description` explaining the trade-offs
-11. **Preserve all structural fields** from the original YAML — `params`, `verdicts`, `selection`, `description`, `metadata`, `triggerInput`, etc. must be copied as-is into every proposal
-12. **transitions, triggers, and triggerInput** are copied verbatim from the structure into every proposal
-13. Tailor proposals to the user's stated preferences when available
+10. For `claude-code-agent` steps, include `agent.model` (use `"sonnet"`). **CRITICAL: also set `agent.image` — default `"mediforce-golden-image"` (same for `opencode-agent`).** The platform runs agent steps in Docker; a step without an image crashes on staging/production (imageless/local execution only works in dev with `ALLOW_LOCAL_AGENTS=true`). Only omit `image` if the user EXPLICITLY asks for local / no-Docker execution in their preferences.
+11. Each proposal needs a distinct `label` and `description` explaining the trade-offs
+12. **Preserve all structural fields** from the original YAML — `params`, `verdicts`, `selection`, `description`, `metadata`, `triggerInput`, etc. must be copied as-is into every proposal
+13. **transitions, triggers, and triggerInput** are copied verbatim from the structure into every proposal
+14. Tailor proposals to the user's stated preferences when available
 
 ### Output Shape
 
