@@ -294,11 +294,41 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         });
       }
 
+      const exitInfo = spawnResult.signal
+        ? `killed by ${spawnResult.signal}`
+        : `exit code ${spawnResult.exitCode}`;
+
+      await emit({
+        type: 'status',
+        payload: `container exited: code=${spawnResult.exitCode}, signal=${spawnResult.signal ?? 'none'}`,
+        timestamp: new Date().toISOString(),
+      });
+
       if (spawnResult.exitCode !== 0) {
-        const exitInfo = spawnResult.signal
-          ? `killed by ${spawnResult.signal}`
-          : `exit code ${spawnResult.exitCode}`;
-        const detail = spawnResult.stderr.trim() || spawnResult.stdout.trim() || 'no output';
+        const stderr = spawnResult.stderr.trim();
+        const stdout = spawnResult.stdout.trim();
+
+        let detail: string;
+        if (stderr || stdout) {
+          detail = stderr || stdout;
+        } else {
+          const envKeys = Object.keys(this.resolvedEnv.vars).join(',');
+          let inputSize = '?';
+          try {
+            const s = await stat(join(outputDir, 'input.json'));
+            inputSize = `${s.size}b`;
+          } catch { /* missing — shouldn't happen */ }
+          detail = `no stdout/stderr captured — image=${this.image}, cmd=${this.commandDisplay}, env=[${envKeys}], inputSize=${inputSize}`;
+        }
+
+        if (stderr) {
+          await emit({ type: 'status', payload: `[stderr] ${stderr.slice(0, 4000)}`, timestamp: new Date().toISOString() });
+        }
+        if (stdout) {
+          await emit({ type: 'status', payload: `[stdout] ${stdout.slice(0, 4000)}`, timestamp: new Date().toISOString() });
+        }
+        await emit({ type: 'status', payload: `script failed (${exitInfo}): ${detail.slice(0, 2000)}`, timestamp: new Date().toISOString() });
+
         throw new Error(`Script container failed (${exitInfo}): ${detail}`);
       }
 
