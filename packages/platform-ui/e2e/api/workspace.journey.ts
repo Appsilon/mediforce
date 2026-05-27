@@ -9,13 +9,6 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
  * we want to verify platform behaviour that does not need a UI.
  */
 test.describe('WD.workspace API journey', () => {
-  // ADR-0001 PR2: depends on Firestore-seeded WDs / workspaces.
-  // Postgres seed parity ships with postgres-seed extension pass.
-  test.skip(
-    process.env.STORAGE_BACKEND === 'postgres',
-    'Requires Firestore-seeded WDs + workspaces; Postgres seed parity ships later in PR2',
-  );
-
   // Locally bootstrap_e2e.py writes `test-api-key`; CI overrides via env.
   const apiKey = process.env.PLATFORM_API_KEY ?? 'test-api-key';
   const authHeaders = { 'X-Api-Key': apiKey };

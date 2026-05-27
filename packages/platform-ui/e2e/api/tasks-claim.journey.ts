@@ -7,14 +7,6 @@ import {
 } from '../helpers/multi-namespace';
 
 test.describe('POST /api/tasks/[taskId]/claim — API E2E', () => {
-  // ADR-0001 PR2: this suite depends on Firestore-seeded fixtures
-  // ('task-pending-1', 'task-completed-1'). Postgres seed parity ships with
-  // the process-instance + human-task fixture mirroring (PLAN-0001 §5.2 #9).
-  test.skip(
-    process.env.STORAGE_BACKEND === 'postgres',
-    'Requires Firestore-seeded human_tasks; Postgres seed parity ships with §5.2 #9',
-  );
-
   let callers: MultiNamespaceFixture;
 
   test.beforeAll(async () => {

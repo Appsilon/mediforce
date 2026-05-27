@@ -24,13 +24,6 @@ const SESSION_ID = 'cowork-active-1';
 const MISSING_SESSION_ID = 'cowork-does-not-exist-zzz';
 
 test.describe('POST /api/cowork/* — mutation E2E', () => {
-  // ADR-0001 PR2: depends on Firestore-seeded session 'cowork-active-1'.
-  // Postgres seed parity ships with §5.2 #9 fixture mirror extension.
-  test.skip(
-    process.env.STORAGE_BACKEND === 'postgres',
-    'Requires Firestore-seeded cowork_sessions; Postgres seed parity ships with §5.2 #9',
-  );
-
   let callers: MultiNamespaceFixture;
 
   test.beforeAll(async () => {

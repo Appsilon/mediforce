@@ -20,13 +20,6 @@ import {
  */
 
 test.describe('GET /api/tasks/[taskId] — API E2E', () => {
-  // ADR-0001 PR2: depends on Firestore-seeded task-completed-1.
-  // Postgres seed parity ships with §5.2 #9 (process-instance repo).
-  test.skip(
-    process.env.STORAGE_BACKEND === 'postgres',
-    'Requires Firestore-seeded human_tasks; Postgres seed parity ships with §5.2 #9',
-  );
-
   let callers: MultiNamespaceFixture;
 
   test.beforeAll(async () => {
