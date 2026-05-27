@@ -205,6 +205,12 @@ export const WorkflowStepSchema = z.object({
    *  When unset, no MCP resolution runs for this step. */
   agentId: z.string().optional(),
   allowedRoles: z.array(z.string()).optional(),
+  /** Pre-assigns the created human task to a specific user. Supports `${...}`
+   *  interpolation against the run's trigger payload / step outputs
+   *  (e.g. "${triggerPayload.userId}"). Only valid when executor='human' — the
+   *  auto-runner resolves it, sets the result as the task's assignedUserId, and
+   *  marks the task 'claimed'. Validation rejects it on non-human steps. */
+  assignedTo: z.string().optional(),
   agent: WorkflowAgentConfigSchema.optional(),
   review: WorkflowReviewConfigSchema.optional(),
   cowork: WorkflowCoworkConfigSchema.optional(),
@@ -243,12 +249,19 @@ export const InputForNextRunEntrySchema = z.object({
  */
 function validateExecutorAndTriggers(
   wd: {
-    steps: Array<{ id: string; executor: string; action?: unknown }>;
+    steps: Array<{ id: string; executor: string; action?: unknown; assignedTo?: string }>;
     triggers: Array<{ type: string; config?: unknown }>;
   },
   ctx: z.RefinementCtx,
 ): void {
   wd.steps.forEach((step, i) => {
+    if (step.assignedTo !== undefined && step.executor !== 'human') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'assignedTo'],
+        message: `step '${step.id}' has assignedTo but executor is '${step.executor}' (assignedTo is only valid on executor='human')`,
+      });
+    }
     if (step.executor === 'action' && step.action === undefined) {
       ctx.addIssue({
         code: 'custom',

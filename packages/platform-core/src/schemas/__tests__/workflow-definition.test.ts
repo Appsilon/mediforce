@@ -218,3 +218,52 @@ describe('WorkflowDefinitionSchema — verdicts', () => {
     expect(() => WorkflowDefinitionSchema.parse(wd)).not.toThrow();
   });
 });
+
+describe('WorkflowDefinitionSchema — assignedTo', () => {
+  it('accepts assignedTo (with interpolation) on a human step', () => {
+    const wd = {
+      ...baseWd,
+      steps: [
+        { id: 'scan', name: 'Scan', type: 'creation' as const, executor: 'script' as const },
+        {
+          id: 'review',
+          name: 'Review',
+          type: 'creation' as const,
+          executor: 'human' as const,
+          assignedTo: '${triggerPayload.userId}',
+        },
+        { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+      ],
+      transitions: [
+        { from: 'scan', to: 'review' },
+        { from: 'review', to: 'done' },
+      ],
+    };
+    expect(() => WorkflowDefinitionSchema.parse(wd)).not.toThrow();
+  });
+
+  it('rejects assignedTo on a non-human step', () => {
+    const wd = {
+      ...baseWd,
+      steps: [
+        {
+          id: 'scan',
+          name: 'Scan',
+          type: 'creation' as const,
+          executor: 'script' as const,
+          assignedTo: '${triggerPayload.userId}',
+        },
+        { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+      ],
+    };
+    const result = WorkflowDefinitionSchema.safeParse(wd);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(
+        result.error.issues.some((issue) =>
+          /assignedTo.*executor is 'script'/.test(issue.message),
+        ),
+      ).toBe(true);
+    }
+  });
+});
