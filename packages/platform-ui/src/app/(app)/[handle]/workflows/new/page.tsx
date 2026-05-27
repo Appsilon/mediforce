@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
-import { saveWorkflowDefinition } from '@/app/actions/definitions';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { parseStepErrors, validateSteps, mergeVerdictTransitions } from '@/lib/workflow-save-utils';
 import { cn } from '@/lib/utils';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -118,29 +118,35 @@ export default function NewWorkflowPage() {
 
     const mergedTransitions = mergeVerdictTransitions(steps, transitions);
 
-    const result = await saveWorkflowDefinition({
-      name: workflowId,
-      namespace: effectiveNamespace || undefined,
-      title: versionTitle || undefined,
-      description: description.trim() || undefined,
-      steps,
-      transitions: mergedTransitions,
-      triggers: [{ type: 'manual', name: 'start' }],
-    });
-
-    if (result.success) {
+    try {
+      const result = await mediforce.workflows.register(
+        {
+          name: workflowId,
+          title: versionTitle || undefined,
+          description: description.trim() || undefined,
+          steps,
+          transitions: mergedTransitions,
+          triggers: [{ type: 'manual', name: 'start' }],
+        } as never,
+        { namespace: effectiveNamespace },
+      );
       setSaveState({ status: 'saved', name: result.name });
       redirectTimerRef.current = setTimeout(() => {
         router.push(`/${handle}/workflows/${encodeURIComponent(result.name)}/definitions/${result.version}`);
       }, 500);
-    } else {
-      const parsed = parseStepErrors(result.issues ?? [], steps);
+    } catch (err) {
+      const issues = err instanceof ApiError && Array.isArray(err.details)
+        ? (err.details as Array<{ path: (string | number)[]; message: string }>)
+        : [];
+      const parsed = parseStepErrors(issues, steps);
       setStepErrors(parsed);
+      const message = err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message : 'Unknown error';
       setSaveState({
         status: 'error',
         message: Object.keys(parsed).length > 0
           ? 'Some steps have errors — check the highlighted steps in the diagram.'
-          : result.error,
+          : message,
       });
     }
   }, [workflowName, effectiveNamespace, description, handle, router]);

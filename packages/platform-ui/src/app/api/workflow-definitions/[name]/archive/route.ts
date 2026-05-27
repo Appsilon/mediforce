@@ -1,48 +1,35 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { getPlatformServices } from '@/lib/platform-services';
-import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import { archiveWorkflow } from '@mediforce/platform-api/handlers';
+import {
+  ArchiveAllInputSchema,
+  type ArchiveAllInput,
+} from '@mediforce/platform-api/contract';
+import { z } from 'zod';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ name: string }> },
-): Promise<NextResponse> {
-  const { name } = await params;
-
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const archived = (body as { archived?: unknown })?.archived;
-  if (typeof archived !== 'boolean') {
-    return NextResponse.json(
-      { error: '`archived` (boolean) is required in request body' },
-      { status: 400 },
-    );
-  }
-
-  const { processRepo, namespaceRepo } = getPlatformServices();
-  const caller = await resolveCallerIdentity(request, namespaceRepo);
-  if (caller instanceof NextResponse) return caller;
-
-  const archiveNamespace = request.nextUrl.searchParams.get('namespace') ?? '';
-  const latestVersion = await processRepo.getLatestWorkflowVersion(archiveNamespace, name);
-  if (latestVersion === 0) {
-    return NextResponse.json({ error: `Workflow '${name}' not found` }, { status: 404 });
-  }
-  const definition = await processRepo.getWorkflowDefinition(archiveNamespace, name, latestVersion);
-  const denied = requireNamespaceAccess(caller, definition?.namespace);
-  if (denied) return denied;
-
-  try {
-    await processRepo.setProcessArchived(name, archiveNamespace, archived);
-    return NextResponse.json({ success: true, name, archived });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Unknown error' },
-      { status: 500 },
-    );
-  }
+interface RouteContext {
+  params: Promise<{ name: string }>;
 }
+
+const ScopedSchema = ArchiveAllInputSchema.extend({
+  namespace: z.string().min(1),
+});
+
+/**
+ * POST /api/workflow-definitions/:name/archive?namespace=… body: { archived }
+ * Audit emission added in Phase 2.5.
+ */
+export const POST = createRouteAdapter<
+  typeof ScopedSchema,
+  ArchiveAllInput & { namespace: string },
+  unknown,
+  RouteContext
+>(
+  ScopedSchema,
+  async (req, ctx) => {
+    const { name } = await ctx.params;
+    const namespace = req.nextUrl.searchParams.get('namespace');
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    return { ...body, name, namespace: namespace ?? undefined };
+  },
+  archiveWorkflow,
+);

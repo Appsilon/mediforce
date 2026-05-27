@@ -50,6 +50,16 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
     return this.raw.cancel(taskId);
   };
 
+  /**
+   * Cascade companion for workflow-definition soft-delete. Trust model is
+   * the same as `AuthorizedWorkflowRunRepository.softDeleteByDefinitionName`:
+   * the handler gates the workflow-definition's namespace before invoking;
+   * the raw method takes pre-validated instance IDs.
+   */
+  softDeleteByInstanceIds = async (instanceIds: string[]): Promise<void> => {
+    await this.raw.setDeletedByInstanceIds(instanceIds, true);
+  };
+
   private async assertCanMutate(taskId: string): Promise<void> {
     const task = await this.getById(taskId);
     if (task === null) throw new ForbiddenError();
