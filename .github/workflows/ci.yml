@@ -152,11 +152,18 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Start Firebase Auth Emulator
+      # Firestore emulator is still required: auth-setup seeds the UI-realtime
+      # collections (users, namespaces, members, workflowDefinitions) that
+      # platform-ui hooks/pages read via firebase/firestore client SDK.
+      # Phase 2.5 (PR3) migrates those reads to SWR-over-headless-API; once
+      # that lands, drop firestore from `--only` and the seed-collection calls
+      # in auth-setup.ts.
+      - name: Start Firebase Emulators
         working-directory: packages/platform-ui
         run: |
-          firebase emulators:start --project demo-mediforce --only auth --config firebase.ci.json &
+          firebase emulators:start --project demo-mediforce --only auth,firestore --config firebase.ci.json &
           curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
+          curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:8080/
 
       # NEXT_PUBLIC_* values are baked into the bundle, so cache key includes
       # them as a literal suffix. Bump the suffix if you change any value below.
