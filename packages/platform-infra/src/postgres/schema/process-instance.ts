@@ -161,13 +161,10 @@ export const stepExecutions = pgTable(
 /**
  * Agent event — append-only log of agent emits during a step execution.
  *
- * Firestore today writes these via FirestoreAgentEventLog (agent-runtime
- * package) into a sub-collection. The table lands here so the FK to
- * `process_instances` can be declared in one migration; a future PR will
- * add the AgentEventLog interface method on the repo and migrate the
- * agent-runtime impl.
+ * Written by PostgresAgentEventLog (platform-infra) via
+ * PostgresProcessInstanceRepository.addAgentEvent.
  *
- * `id` is caller-supplied text — FirestoreAgentEventLog mints
+ * `id` is caller-supplied text — PostgresAgentEventLog mints
  * `crypto.randomUUID()`. `sequence` is `bigint` per PLAN §1.2 since
  * timestamps alone aren't reliable ordering across distributed emitters.
  *

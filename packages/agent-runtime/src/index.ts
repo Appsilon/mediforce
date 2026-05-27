@@ -27,7 +27,6 @@ export type { DockerSpawnStrategy, DockerSpawnRequest, DockerSpawnResult } from 
 
 // Runner
 export type { AgentEventLog } from './runner/agent-event-log.js';
-export { FirestoreAgentEventLog } from './runner/agent-event-log.js';
 export { PluginRegistry, PluginNotFoundError } from './runner/plugin-registry.js';
 export { OpenRouterLlmClient } from './runner/llm-client.js';
 export { AgentRunner } from './runner/agent-runner.js';

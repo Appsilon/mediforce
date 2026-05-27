@@ -44,12 +44,11 @@ import {
  *
  * `addAgentEvent` / `getAgentEvents` are present here to keep the agent-
  * events table colocated with the parent (one FK declaration, one
- * migration). They are not yet on the ProcessInstanceRepository interface;
- * a follow-up will migrate the AgentEventLog (agent-runtime) to delegate
- * to this repo. Callers today should keep using FirestoreAgentEventLog.
+ * migration). They are not on the ProcessInstanceRepository interface;
+ * PostgresAgentEventLog (platform-infra) delegates to these methods.
  *
- * Validation matches the Firestore + in-memory backends: parse on every
- * read AND every write (ADR-0001 Implementation pattern 2).
+ * Validation parses on every read AND every write (ADR-0001 Implementation
+ * pattern 2).
  */
 export class PostgresProcessInstanceRepository
   implements ProcessInstanceRepository
@@ -374,8 +373,8 @@ export class PostgresProcessInstanceRepository
 
   /**
    * Append a single agent event under (instanceId, stepId). Caller mints
-   * `id` + `sequence` (FirestoreAgentEventLog uses `crypto.randomUUID()` +
-   * the next free position). Not yet on the ProcessInstanceRepository
+   * `id` + `sequence` (PostgresAgentEventLog uses `crypto.randomUUID()` +
+   * the next free position). Not on the ProcessInstanceRepository
    * interface — see class-level docs.
    */
   async addAgentEvent(instanceId: string, event: AgentEvent): Promise<AgentEvent> {
@@ -397,7 +396,7 @@ export class PostgresProcessInstanceRepository
 
   /**
    * Read agent events for an instance, optionally narrowed to a step.
-   * Ordered by `sequence` to match the FirestoreAgentEventLog cache.
+   * Ordered by `sequence` to match the in-memory cache.
    */
   async getAgentEvents(
     instanceId: string,

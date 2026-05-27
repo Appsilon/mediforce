@@ -18,8 +18,7 @@ interface AgentEventLog {
  * fallback handlers) stay free.
  *
  * Per-step writes are serialized through a promise chain so concurrent emits
- * cannot race on `existing.length` and produce duplicate `sequence` values
- * (matches the original FirestoreAgentEventLog semantics).
+ * cannot race on `existing.length` and produce duplicate `sequence` values.
  */
 export class PostgresAgentEventLog implements AgentEventLog {
   private cache = new Map<string, AgentEvent[]>();
