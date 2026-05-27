@@ -23,7 +23,7 @@ export async function upsertAgentMcpBinding(
 ): Promise<UpsertAgentMcpBindingOutput> {
   const agent = await loadOr404(scope.agentDefinitions.getById(input.id), 'Agent not found');
   const nextMcpServers = { ...(agent.mcpServers ?? {}), [input.name]: input.binding };
-  const updated = await scope.agentDefinitions.update(input.id, { mcpServers: nextMcpServers });
+  const updated = await scope.agentDefinitions.updateMcpServers(input.id, nextMcpServers);
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,
@@ -46,7 +46,7 @@ export async function deleteAgentMcpBinding(
   const agent = await loadOr404(scope.agentDefinitions.getById(input.id), 'Agent not found');
   const next = { ...(agent.mcpServers ?? {}) };
   delete next[input.name];
-  const updated = await scope.agentDefinitions.update(input.id, { mcpServers: next });
+  const updated = await scope.agentDefinitions.updateMcpServers(input.id, next);
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,
