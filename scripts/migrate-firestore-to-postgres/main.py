@@ -1,0 +1,931 @@
+"""Firestore -> Postgres one-shot data migration (ADR-0001 §8.2 step 4).
+
+Streams every documented Firestore collection into the matching Postgres
+table using INSERT ... ON CONFLICT DO NOTHING for idempotency. Writes per-
+table counts to `migration_log.json` for audit.
+
+Mapping ground truth: `packages/platform-infra/src/postgres/schema/*.ts`.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import re
+import sys
+from collections.abc import Iterable, Iterator
+from datetime import datetime, timezone
+from typing import Any, Callable
+
+import firebase_admin
+import psycopg2
+import psycopg2.extras
+from firebase_admin import credentials, firestore
+
+LOG = logging.getLogger("migrate")
+
+
+# ---------- mapping table -----------------------------------------------------
+
+# Top-level Firestore collection -> Postgres table. Sub-collections are
+# walked from their parents inside per-table functions (see process_instances
+# and namespaces below).
+COLLECTION_TABLE_MAP: dict[str, str] = {
+    "namespaces": "workspaces",
+    "agentDefinitions": "agents",
+    "modelRegistry": "model_registry_entries",
+    "workflowDefinitions": "workflow_definitions",
+    "workflowMeta": "workflow_meta",
+    "processInstances": "process_instances",
+    "cronTriggerState": "cron_trigger_state",
+}
+
+
+# ---------- utilities ---------------------------------------------------------
+
+
+def snake(s: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
+
+
+def to_pg_value(v: Any) -> Any:
+    """Coerce a Firestore-decoded Python value into a Postgres-ready value."""
+    if v is None:
+        return None
+    # Firestore timestamps decode to datetime.datetime; psycopg2 handles them.
+    if isinstance(v, datetime):
+        if v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
+    if isinstance(v, (dict, list)):
+        return psycopg2.extras.Json(v)
+    return v
+
+
+def fs_iter_collection(fs: Any, path: str) -> Iterator[tuple[str, dict[str, Any]]]:
+    """Yield (doc_id, data) tuples by streaming a Firestore collection."""
+    for doc in fs.collection(path).stream():
+        yield doc.id, doc.to_dict() or {}
+
+
+def fs_iter_subcollection(
+    fs: Any, parent_path: str, parent_id: str, sub_name: str
+) -> Iterator[tuple[str, dict[str, Any]]]:
+    for doc in fs.collection(parent_path).document(parent_id).collection(sub_name).stream():
+        yield doc.id, doc.to_dict() or {}
+
+
+def insert_rows(
+    pg: psycopg2.extensions.connection,
+    table: str,
+    rows: list[dict[str, Any]],
+    *,
+    conflict: str | None,
+    dry_run: bool,
+) -> tuple[int, int]:
+    """Insert `rows` with ON CONFLICT DO NOTHING. Returns (inserted, skipped)."""
+    if not rows:
+        return 0, 0
+    cols = list(rows[0].keys())
+    placeholders = ",".join(["%s"] * len(cols))
+    col_list = ",".join(f'"{c}"' for c in cols)
+    conflict_clause = ""
+    if conflict:
+        conflict_clause = f" ON CONFLICT ({conflict}) DO NOTHING"
+    sql = f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders}){conflict_clause}'
+    if dry_run:
+        LOG.info("[dry-run] %s rows -> %s; first row: %s", len(rows), table, rows[0])
+        return 0, 0
+    inserted = 0
+    skipped = 0
+    with pg.cursor() as cur:
+        for row in rows:
+            cur.execute(sql, [to_pg_value(row[c]) for c in cols])
+            # rowcount is 1 when inserted, 0 when ON CONFLICT skipped it.
+            if cur.rowcount == 1:
+                inserted += 1
+            else:
+                skipped += 1
+        pg.commit()
+    return inserted, skipped
+
+
+def batched(it: Iterable[Any], n: int) -> Iterator[list[Any]]:
+    batch: list[Any] = []
+    for item in it:
+        batch.append(item)
+        if len(batch) >= n:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
+# ---------- per-table migrations ---------------------------------------------
+#
+# Each function:
+#   - reads from the relevant Firestore collection(s),
+#   - maps each doc to one or more Postgres rows,
+#   - calls insert_rows with the table's conflict key,
+#   - returns dict {'inserted': N, 'skipped': N, 'errors': N}.
+#
+# Workspace derivation: rows whose parent doc lives at
+# `processInstances/{id}` read `instance.namespace` once via a cache built
+# at the start of the run (build_workspace_cache).
+
+
+def _result(inserted: int, skipped: int, errors: int = 0) -> dict[str, int]:
+    return {"inserted": inserted, "skipped": skipped, "errors": errors}
+
+
+def build_workspace_cache(fs: Any) -> dict[str, str]:
+    """Cache process_instance_id -> namespace so children can derive workspace."""
+    cache: dict[str, str] = {}
+    for doc_id, data in fs_iter_collection(fs, "processInstances"):
+        ns = data.get("namespace")
+        if ns:
+            cache[doc_id] = ns
+    LOG.info("workspace cache built: %s process instances", len(cache))
+    return cache
+
+
+def migrate_namespaces(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    """namespaces -> workspaces (+ workspace_members from sub-collection)."""
+    ws_rows: list[dict[str, Any]] = []
+    member_rows: list[dict[str, Any]] = []
+    for handle, data in fs_iter_collection(fs, "namespaces"):
+        ws_rows.append(
+            {
+                "handle": handle,
+                "type": data.get("type") or "personal",
+                "display_name": data.get("displayName") or handle,
+                "avatar_url": data.get("avatarUrl"),
+                "icon": data.get("icon"),
+                "linked_user_id": data.get("linkedUserId"),
+                "bio": data.get("bio"),
+                "created_at": data.get("createdAt"),
+                "updated_at": data.get("updatedAt"),
+            }
+        )
+        for uid, mdata in fs_iter_subcollection(fs, "namespaces", handle, "members"):
+            member_rows.append(
+                {
+                    "workspace": handle,
+                    "uid": uid,
+                    "role": mdata.get("role") or "member",
+                    "display_name": mdata.get("displayName"),
+                    "avatar_url": mdata.get("avatarUrl"),
+                    "joined_at": mdata.get("joinedAt"),
+                }
+            )
+    ins_ws, skip_ws = insert_rows(
+        pg, "workspaces", _strip_none_defaults(ws_rows), conflict="handle", dry_run=dry_run
+    )
+    ins_m, skip_m = insert_rows(
+        pg,
+        "workspace_members",
+        _strip_none_defaults(member_rows),
+        conflict="workspace, uid",
+        dry_run=dry_run,
+    )
+    return _result(ins_ws + ins_m, skip_ws + skip_m)
+
+
+def migrate_agents(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    """agentDefinitions -> agents (id preserved)."""
+    rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "agentDefinitions"):
+        rows.append(
+            {
+                "id": doc_id,
+                "workspace": data.get("workspace") or data.get("namespace"),
+                "kind": data.get("kind") or "plugin",
+                "runtime_id": data.get("runtimeId"),
+                "name": data.get("name"),
+                "icon_name": data.get("iconName") or "robot",
+                "description": data.get("description") or "",
+                "foundation_model": data.get("foundationModel") or "",
+                "system_prompt": data.get("systemPrompt") or "",
+                "input_description": data.get("inputDescription") or "",
+                "output_description": data.get("outputDescription") or "",
+                "skill_file_names": data.get("skillFileNames") or [],
+                "mcp_servers": data.get("mcpServers"),
+                "namespace": data.get("namespace"),
+                "visibility": data.get("visibility") or "private",
+                "created_at": data.get("createdAt"),
+                "updated_at": data.get("updatedAt"),
+            }
+        )
+    ins, skip = insert_rows(
+        pg, "agents", _strip_none_defaults(rows), conflict="id", dry_run=dry_run
+    )
+    return _result(ins, skip)
+
+
+def migrate_model_registry(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    rows: list[dict[str, Any]] = []
+    meta_rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "modelRegistry"):
+        if doc_id == "_meta":
+            meta_rows.append(
+                {
+                    "id": "singleton",
+                    "rankings_updated_at": data.get("rankingsUpdatedAt"),
+                }
+            )
+            continue
+        rows.append(
+            {
+                "id": doc_id,
+                "canonical_slug": data.get("canonicalSlug"),
+                "name": data.get("name") or doc_id,
+                "provider": data.get("provider") or "unknown",
+                "context_length": data.get("contextLength") or 0,
+                "max_completion_tokens": data.get("maxCompletionTokens"),
+                "pricing": data.get("pricing") or {"input": 0, "output": 0},
+                "modality": data.get("modality") or "text",
+                "input_modalities": data.get("inputModalities") or ["text"],
+                "output_modalities": data.get("outputModalities") or ["text"],
+                "supports_tools": bool(data.get("supportsTools")),
+                "supports_vision": bool(data.get("supportsVision")),
+                "source": data.get("source") or "openrouter",
+                "request_count": data.get("requestCount"),
+                "last_synced_at": data.get("lastSyncedAt"),
+                "created_at": data.get("createdAt"),
+                "updated_at": data.get("updatedAt"),
+            }
+        )
+    ins_e, skip_e = insert_rows(
+        pg, "model_registry_entries", _strip_none_defaults(rows), conflict="id", dry_run=dry_run
+    )
+    ins_m, skip_m = insert_rows(
+        pg, "model_registry_meta", _strip_none_defaults(meta_rows), conflict="id", dry_run=dry_run
+    )
+    return _result(ins_e + ins_m, skip_e + skip_m)
+
+
+def migrate_workflow_definitions(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "workflowDefinitions"):
+        # Firestore id pattern: `${namespace}:${name}:${version}` (composite).
+        # Postgres mints its own uuid via default; we DO NOT preserve doc_id.
+        workspace = data.get("namespace") or data.get("workspace")
+        rows.append(
+            {
+                "workspace": workspace,
+                "name": data.get("name"),
+                "version": int(data.get("version") or 1),
+                "title": data.get("title"),
+                "description": data.get("description"),
+                "preamble": data.get("preamble"),
+                "visibility": data.get("visibility") or "private",
+                "steps": data.get("steps") or [],
+                "transitions": data.get("transitions") or [],
+                "triggers": data.get("triggers") or [],
+                "trigger_input": data.get("triggerInput"),
+                "roles": data.get("roles"),
+                "env": data.get("env"),
+                "notifications": data.get("notifications"),
+                "git_workspace": data.get("workspace") if isinstance(data.get("workspace"), dict) else None,
+                "metadata": data.get("metadata"),
+                "repo": data.get("repo"),
+                "url": data.get("url"),
+                "copied_from": data.get("copiedFrom"),
+                "input_for_next_run": data.get("inputForNextRun"),
+                "archived_at": _bool_to_tombstone(data.get("archived"), data.get("archivedAt")),
+                "deleted_at": _bool_to_tombstone(data.get("deleted"), data.get("deletedAt")),
+                "created_at": data.get("createdAt"),
+                "updated_at": data.get("updatedAt"),
+            }
+        )
+    # The unique constraint is (workspace, name, version) — use it as conflict
+    # target so re-runs are idempotent on that natural key.
+    ins, skip = insert_rows(
+        pg,
+        "workflow_definitions",
+        _strip_none_defaults(rows),
+        conflict="workspace, name, version",
+        dry_run=dry_run,
+    )
+    return _result(ins, skip)
+
+
+def migrate_workflow_meta(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "workflowMeta"):
+        # Firestore doc id pattern: `${namespace}:${name}`.
+        workspace = data.get("namespace") or data.get("workspace")
+        name = data.get("name")
+        if not workspace or not name:
+            # Fall back to splitting the composite doc id.
+            parts = doc_id.split(":", 1)
+            if len(parts) == 2:
+                workspace = workspace or parts[0]
+                name = name or parts[1]
+        rows.append(
+            {
+                "workspace": workspace,
+                "name": name,
+                "default_version": data.get("defaultVersion"),
+                "hidden": bool(data.get("hidden")),
+                "updated_at": data.get("updatedAt"),
+            }
+        )
+    ins, skip = insert_rows(
+        pg, "workflow_meta", _strip_none_defaults(rows), conflict="workspace, name", dry_run=dry_run
+    )
+    return _result(ins, skip)
+
+
+def migrate_process_instances(
+    fs, pg, *, dry_run: bool, ws_cache: dict[str, str]
+) -> dict[str, int]:
+    """processInstances (+ stepExecutions + agentEvents from sub-collections)."""
+    pi_rows: list[dict[str, Any]] = []
+    step_rows: list[dict[str, Any]] = []
+    event_rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "processInstances"):
+        pi_rows.append(
+            {
+                "id": doc_id,
+                "workspace": data.get("namespace"),
+                "definition_name": data.get("definitionName"),
+                "definition_version": str(data.get("definitionVersion") or "1"),
+                "status": data.get("status") or "created",
+                "current_step_id": data.get("currentStepId"),
+                "variables": data.get("variables") or {},
+                "trigger_type": data.get("triggerType") or "manual",
+                "trigger_payload": data.get("triggerPayload"),
+                "pause_reason": data.get("pauseReason"),
+                "error": data.get("error") if isinstance(data.get("error"), str) else (
+                    json.dumps(data.get("error")) if data.get("error") else None
+                ),
+                "assigned_roles": data.get("assignedRoles"),
+                "previous_run": data.get("previousRun"),
+                "previous_run_source_id": data.get("previousRunSourceId"),
+                "total_cost_usd": data.get("totalCostUsd"),
+                "created_by": data.get("createdBy"),
+                "archived_at": _bool_to_tombstone(data.get("archived"), data.get("archivedAt")),
+                "deleted_at": _bool_to_tombstone(data.get("deleted"), data.get("deletedAt")),
+                "created_at": data.get("createdAt"),
+                "updated_at": data.get("updatedAt"),
+            }
+        )
+        for sid, sdata in fs_iter_subcollection(fs, "processInstances", doc_id, "stepExecutions"):
+            step_rows.append(
+                {
+                    "id": sid,
+                    "process_instance_id": doc_id,
+                    "step_id": sdata.get("stepId"),
+                    "status": sdata.get("status") or "pending",
+                    "iteration_number": int(sdata.get("iterationNumber") or 1),
+                    "input": sdata.get("input"),
+                    "output": sdata.get("output"),
+                    "verdict": sdata.get("verdict"),
+                    "gate_result": sdata.get("gateResult"),
+                    "error": sdata.get("error") if isinstance(sdata.get("error"), str) else (
+                        json.dumps(sdata.get("error")) if sdata.get("error") else None
+                    ),
+                    "review_verdicts": sdata.get("reviewVerdicts"),
+                    "agent_output": sdata.get("agentOutput"),
+                    "executed_by": sdata.get("executedBy"),
+                    "started_at": sdata.get("startedAt"),
+                    "completed_at": sdata.get("completedAt"),
+                    "created_at": sdata.get("createdAt"),
+                }
+            )
+        for eid, edata in fs_iter_subcollection(fs, "processInstances", doc_id, "agentEvents"):
+            event_rows.append(
+                {
+                    "id": eid,
+                    "process_instance_id": doc_id,
+                    "step_id": edata.get("stepId"),
+                    "type": edata.get("type"),
+                    "payload": edata.get("payload"),
+                    "sequence": int(edata.get("sequence") or 0),
+                    "timestamp": edata.get("timestamp"),
+                }
+            )
+    ins_p, skip_p = insert_rows(
+        pg, "process_instances", _strip_none_defaults(pi_rows), conflict="id", dry_run=dry_run
+    )
+    ins_s, skip_s = insert_rows(
+        pg, "step_executions", _strip_none_defaults(step_rows), conflict="id", dry_run=dry_run
+    )
+    ins_e, skip_e = insert_rows(
+        pg, "agent_events", _strip_none_defaults(event_rows), conflict="id", dry_run=dry_run
+    )
+    return _result(ins_p + ins_s + ins_e, skip_p + skip_s + skip_e)
+
+
+def migrate_audit_events(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> dict[str, int]:
+    rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "auditEvents"):
+        pi_id = data.get("processInstanceId")
+        rows.append(
+            {
+                "workspace": data.get("workspace") or ws_cache.get(pi_id or "") or "unknown",
+                "actor_id": data.get("actorId") or "unknown",
+                "actor_type": data.get("actorType") or "system",
+                "actor_role": data.get("actorRole") or "system",
+                "action": data.get("action") or "unknown",
+                "entity_type": data.get("entityType") or "unknown",
+                "entity_id": data.get("entityId") or "unknown",
+                "process_instance_id": pi_id,
+                "step_id": data.get("stepId"),
+                "process_definition_version": (
+                    str(data.get("processDefinitionVersion"))
+                    if data.get("processDefinitionVersion") is not None
+                    else None
+                ),
+                "executor_type": data.get("executorType"),
+                "reviewer_type": data.get("reviewerType"),
+                "timestamp": data.get("timestamp"),
+                "server_timestamp": data.get("serverTimestamp"),
+                "payload": {
+                    "description": data.get("description") or "",
+                    "basis": data.get("basis") or "",
+                    "inputSnapshot": data.get("inputSnapshot") or {},
+                    "outputSnapshot": data.get("outputSnapshot") or {},
+                },
+            }
+        )
+    # audit_events has no natural unique key besides id (uuid). We can't
+    # rerun safely without dedup -- this script is intended for the one-shot
+    # cutover so re-running implies a TRUNCATE first (or use --dry-run).
+    ins, skip = insert_rows(
+        pg, "audit_events", _strip_none_defaults(rows), conflict=None, dry_run=dry_run
+    )
+    return _result(ins, skip)
+
+
+def migrate_agent_runs(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> dict[str, int]:
+    rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "agentRuns"):
+        pi_id = data.get("processInstanceId")
+        env = data.get("envelope") or {}
+        rows.append(
+            {
+                "workspace": data.get("workspace") or ws_cache.get(pi_id or "") or "unknown",
+                "process_instance_id": pi_id,
+                "step_id": data.get("stepId"),
+                "plugin_id": data.get("pluginId") or "unknown",
+                "autonomy_level": data.get("autonomyLevel") or "L1",
+                "status": data.get("status") or "completed",
+                "fallback_reason": data.get("fallbackReason"),
+                "confidence": env.get("confidence"),
+                "model": env.get("model"),
+                "duration_ms": env.get("durationMs"),
+                "prompt_tokens": (env.get("usage") or {}).get("promptTokens"),
+                "completion_tokens": (env.get("usage") or {}).get("completionTokens"),
+                "cost_usd": env.get("costUsd"),
+                "envelope_payload": env,
+                "executor_type": data.get("executorType"),
+                "reviewer_type": data.get("reviewerType"),
+                "started_at": data.get("startedAt"),
+                "completed_at": data.get("completedAt"),
+            }
+        )
+    ins, skip = insert_rows(
+        pg, "agent_runs", _strip_none_defaults(rows), conflict=None, dry_run=dry_run
+    )
+    return _result(ins, skip)
+
+
+def migrate_human_tasks(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> dict[str, int]:
+    rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "humanTasks"):
+        pi_id = data.get("processInstanceId")
+        rows.append(
+            {
+                "workspace": data.get("workspace") or ws_cache.get(pi_id or "") or "unknown",
+                "process_instance_id": pi_id,
+                "step_id": data.get("stepId"),
+                "assigned_role": data.get("assignedRole") or "reviewer",
+                "assigned_user_id": data.get("assignedUserId"),
+                "status": data.get("status") or "pending",
+                "deadline": data.get("deadline"),
+                "completion_data": data.get("completionData"),
+                "completed_at": data.get("completedAt"),
+                "ui": data.get("ui"),
+                "params": data.get("params"),
+                "selection": data.get("selection"),
+                "options": data.get("options"),
+                "verdicts": data.get("verdicts"),
+                "creation_reason": data.get("creationReason") or "human_executor",
+                "deleted_at": _bool_to_tombstone(data.get("deleted"), data.get("deletedAt")),
+                "created_at": data.get("createdAt"),
+                "updated_at": data.get("updatedAt"),
+            }
+        )
+    ins, skip = insert_rows(
+        pg, "human_tasks", _strip_none_defaults(rows), conflict=None, dry_run=dry_run
+    )
+    return _result(ins, skip)
+
+
+def migrate_handoff_entities(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> dict[str, int]:
+    rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "handoffEntities"):
+        pi_id = data.get("processInstanceId")
+        rows.append(
+            {
+                "workspace": data.get("workspace") or ws_cache.get(pi_id or "") or "unknown",
+                "type": data.get("type") or "review",
+                "process_instance_id": pi_id,
+                "step_id": data.get("stepId"),
+                "agent_run_id": data.get("agentRunId") or "unknown",
+                "assigned_role": data.get("assignedRole") or "reviewer",
+                "assigned_user_id": data.get("assignedUserId"),
+                "status": data.get("status") or "created",
+                "agent_work": data.get("agentWork"),
+                "agent_reasoning": data.get("agentReasoning"),
+                "agent_question": data.get("agentQuestion"),
+                "payload": data.get("payload"),
+                "resolution": data.get("resolution"),
+                "resolved_at": data.get("resolvedAt"),
+                "created_at": data.get("createdAt"),
+                "updated_at": data.get("updatedAt"),
+            }
+        )
+    ins, skip = insert_rows(
+        pg, "handoff_entities", _strip_none_defaults(rows), conflict=None, dry_run=dry_run
+    )
+    return _result(ins, skip)
+
+
+def migrate_cowork_sessions(fs, pg, *, dry_run: bool, ws_cache: dict[str, str]) -> dict[str, int]:
+    sess_rows: list[dict[str, Any]] = []
+    turn_rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "coworkSessions"):
+        pi_id = data.get("processInstanceId")
+        sess_rows.append(
+            {
+                "id": doc_id,
+                "workspace": data.get("workspace") or ws_cache.get(pi_id or "") or "unknown",
+                "process_instance_id": pi_id,
+                "step_id": data.get("stepId"),
+                "assigned_role": data.get("assignedRole") or "reviewer",
+                "assigned_user_id": data.get("assignedUserId"),
+                "status": data.get("status") or "active",
+                "agent": data.get("agent") or "chat",
+                "model": data.get("model"),
+                "system_prompt": data.get("systemPrompt"),
+                "output_schema": data.get("outputSchema"),
+                "voice_config": data.get("voiceConfig"),
+                "mcp_servers": data.get("mcpServers"),
+                "artifact": data.get("artifact"),
+                "finalized_at": data.get("finalizedAt"),
+                "created_at": data.get("createdAt"),
+                "updated_at": data.get("updatedAt"),
+            }
+        )
+        # Firestore stores `turns` as an array on the session doc.
+        for idx, turn in enumerate(data.get("turns") or []):
+            turn_rows.append(
+                {
+                    "id": turn.get("id") or f"{doc_id}-{idx}",
+                    "session_id": doc_id,
+                    "idx": idx,
+                    "role": turn.get("role") or "human",
+                    "content": turn.get("content") or "",
+                    "artifact_delta": turn.get("artifactDelta"),
+                    "timestamp": turn.get("timestamp"),
+                    "tool_name": turn.get("toolName"),
+                    "tool_args": turn.get("toolArgs"),
+                    "tool_result": turn.get("toolResult"),
+                    "tool_status": turn.get("toolStatus"),
+                    "server_name": turn.get("serverName"),
+                }
+            )
+    ins_s, skip_s = insert_rows(
+        pg, "cowork_sessions", _strip_none_defaults(sess_rows), conflict="id", dry_run=dry_run
+    )
+    ins_t, skip_t = insert_rows(
+        pg, "cowork_turns", _strip_none_defaults(turn_rows), conflict="id", dry_run=dry_run
+    )
+    return _result(ins_s + ins_t, skip_s + skip_t)
+
+
+def migrate_namespace_secrets(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    """namespaces/{handle}/namespaceSecrets/_config -> rows per key (flattened)."""
+    rows: list[dict[str, Any]] = []
+    for handle, _ in fs_iter_collection(fs, "namespaces"):
+        for doc_id, data in fs_iter_subcollection(fs, "namespaces", handle, "namespaceSecrets"):
+            if doc_id != "_config":
+                continue
+            secrets_map = data.get("secrets") or {}
+            for key, encrypted_value in secrets_map.items():
+                rows.append(
+                    {
+                        "workspace": handle,
+                        "key": key,
+                        "encrypted_value": encrypted_value,
+                        "created_at": data.get("createdAt"),
+                        "updated_at": data.get("updatedAt"),
+                    }
+                )
+    ins, skip = insert_rows(
+        pg,
+        "namespace_secrets",
+        _strip_none_defaults(rows),
+        conflict="workspace, key",
+        dry_run=dry_run,
+    )
+    return _result(ins, skip)
+
+
+def migrate_workflow_secrets(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    """namespaces/{handle}/workflowSecrets/{workflowName} -> row per key."""
+    rows: list[dict[str, Any]] = []
+    for handle, _ in fs_iter_collection(fs, "namespaces"):
+        for workflow_name, data in fs_iter_subcollection(
+            fs, "namespaces", handle, "workflowSecrets"
+        ):
+            secrets_map = data.get("secrets") or {}
+            for key, encrypted_value in secrets_map.items():
+                rows.append(
+                    {
+                        "workspace": handle,
+                        "workflow_name": workflow_name,
+                        "key": key,
+                        "encrypted_value": encrypted_value,
+                        "created_at": data.get("createdAt"),
+                        "updated_at": data.get("updatedAt"),
+                    }
+                )
+    ins, skip = insert_rows(
+        pg,
+        "workflow_secrets",
+        _strip_none_defaults(rows),
+        conflict="workspace, workflow_name, key",
+        dry_run=dry_run,
+    )
+    return _result(ins, skip)
+
+
+def migrate_tool_catalog(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    """namespaces/{handle}/toolCatalog/{entryId} -> tool_catalog_entries."""
+    rows: list[dict[str, Any]] = []
+    for handle, _ in fs_iter_collection(fs, "namespaces"):
+        for entry_id, data in fs_iter_subcollection(fs, "namespaces", handle, "toolCatalog"):
+            rows.append(
+                {
+                    "workspace": handle,
+                    "id": entry_id,
+                    "command": data.get("command") or "",
+                    "args": data.get("args"),
+                    "env": data.get("env"),
+                    "description": data.get("description"),
+                    "created_at": data.get("createdAt"),
+                    "updated_at": data.get("updatedAt"),
+                }
+            )
+    ins, skip = insert_rows(
+        pg,
+        "tool_catalog_entries",
+        _strip_none_defaults(rows),
+        conflict="workspace, id",
+        dry_run=dry_run,
+    )
+    return _result(ins, skip)
+
+
+def migrate_oauth_providers(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    rows: list[dict[str, Any]] = []
+    for handle, _ in fs_iter_collection(fs, "namespaces"):
+        for provider_id, data in fs_iter_subcollection(fs, "namespaces", handle, "oauthProviders"):
+            rows.append(
+                {
+                    "workspace": handle,
+                    "id": provider_id,
+                    "name": data.get("name") or provider_id,
+                    "client_id": data.get("clientId") or "",
+                    "client_secret": data.get("clientSecret"),
+                    "authorize_url": data.get("authorizeUrl") or "",
+                    "token_url": data.get("tokenUrl") or "",
+                    "revoke_url": data.get("revokeUrl"),
+                    "user_info_url": data.get("userInfoUrl"),
+                    "scopes": data.get("scopes") or [],
+                    "token_endpoint_auth_method": data.get("tokenEndpointAuthMethod"),
+                    "issuer": data.get("issuer"),
+                    "registration_endpoint": data.get("registrationEndpoint"),
+                    "resource_url": data.get("resourceUrl"),
+                    "icon_url": data.get("iconUrl"),
+                    "created_at": data.get("createdAt"),
+                    "updated_at": data.get("updatedAt"),
+                }
+            )
+    ins, skip = insert_rows(
+        pg,
+        "oauth_providers",
+        _strip_none_defaults(rows),
+        conflict="workspace, id",
+        dry_run=dry_run,
+    )
+    return _result(ins, skip)
+
+
+def migrate_agent_oauth_tokens(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    rows: list[dict[str, Any]] = []
+    for handle, _ in fs_iter_collection(fs, "namespaces"):
+        for doc_id, data in fs_iter_subcollection(
+            fs, "namespaces", handle, "agentOAuthTokens"
+        ):
+            # doc id is `${agentId}__${serverName}`; the row carries both
+            # explicitly so we don't depend on the composite id format.
+            agent_id = data.get("agentId")
+            server_name = data.get("serverName")
+            if not agent_id or not server_name:
+                # Fall back to splitting the composite id.
+                parts = doc_id.split("__", 1)
+                if len(parts) == 2:
+                    agent_id = agent_id or parts[0]
+                    server_name = server_name or parts[1]
+            rows.append(
+                {
+                    "workspace": handle,
+                    "agent_id": agent_id,
+                    "server_name": server_name,
+                    "provider_id": data.get("providerId") or "unknown",
+                    "access_token": data.get("accessToken") or "",
+                    "refresh_token": data.get("refreshToken"),
+                    "expires_at": data.get("expiresAt"),
+                    "scope": data.get("scope") or "",
+                    "provider_user_id": data.get("providerUserId") or "",
+                    "account_login": data.get("accountLogin") or "",
+                    "connected_at": data.get("connectedAt") or 0,
+                    "connected_by": data.get("connectedBy") or "system",
+                    "created_at": data.get("createdAt"),
+                    "updated_at": data.get("updatedAt"),
+                }
+            )
+    ins, skip = insert_rows(
+        pg,
+        "agent_oauth_tokens",
+        _strip_none_defaults(rows),
+        conflict="workspace, agent_id, server_name",
+        dry_run=dry_run,
+    )
+    return _result(ins, skip)
+
+
+def migrate_cron_trigger_state(fs, pg, *, dry_run: bool) -> dict[str, int]:
+    rows: list[dict[str, Any]] = []
+    for doc_id, data in fs_iter_collection(fs, "cronTriggerState"):
+        # Doc id pattern: `${definitionName}:${triggerName}`.
+        def_name = data.get("definitionName")
+        trigger_name = data.get("triggerName")
+        if not def_name or not trigger_name:
+            parts = doc_id.split(":", 1)
+            if len(parts) == 2:
+                def_name = def_name or parts[0]
+                trigger_name = trigger_name or parts[1]
+        rows.append(
+            {
+                "definition_name": def_name,
+                "trigger_name": trigger_name,
+                "last_triggered_at": data.get("lastTriggeredAt"),
+            }
+        )
+    ins, skip = insert_rows(
+        pg,
+        "cron_trigger_state",
+        _strip_none_defaults(rows),
+        conflict="definition_name, trigger_name",
+        dry_run=dry_run,
+    )
+    return _result(ins, skip)
+
+
+# ---------- helpers ----------------------------------------------------------
+
+
+def _bool_to_tombstone(flag: Any, explicit: Any) -> Any:
+    """Resolve Firestore's `archived`/`deleted` boolean to a tombstone timestamp.
+
+    The Postgres schema stores `_at` timestamps (NULL = not tombstoned).
+    Firestore stored booleans + sometimes an explicit `*At` timestamp.
+    Prefer the explicit timestamp when present.
+    """
+    if explicit:
+        return explicit
+    if flag:
+        return datetime.now(timezone.utc)
+    return None
+
+
+def _strip_none_defaults(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop None values so DB defaults (e.g. defaultNow) fire correctly.
+
+    Without this, an explicit NULL would override the column default for
+    created_at/updated_at when the Firestore doc had no value.
+    """
+    cleaned: list[dict[str, Any]] = []
+    for row in rows:
+        cleaned.append({k: v for k, v in row.items() if v is not None})
+    return cleaned
+
+
+# ---------- driver -----------------------------------------------------------
+
+
+TABLE_FUNCTIONS: dict[str, Callable] = {
+    # Order matters: parents before children (FK constraints).
+    "workspaces": migrate_namespaces,
+    "agents": migrate_agents,
+    "model_registry_entries": migrate_model_registry,
+    "workflow_definitions": migrate_workflow_definitions,
+    "workflow_meta": migrate_workflow_meta,
+    "process_instances": migrate_process_instances,
+    "audit_events": migrate_audit_events,
+    "agent_runs": migrate_agent_runs,
+    "human_tasks": migrate_human_tasks,
+    "handoff_entities": migrate_handoff_entities,
+    "cowork_sessions": migrate_cowork_sessions,
+    "namespace_secrets": migrate_namespace_secrets,
+    "workflow_secrets": migrate_workflow_secrets,
+    "tool_catalog_entries": migrate_tool_catalog,
+    "oauth_providers": migrate_oauth_providers,
+    "agent_oauth_tokens": migrate_agent_oauth_tokens,
+    "cron_trigger_state": migrate_cron_trigger_state,
+}
+
+CHILD_TABLES_REQUIRING_WS_CACHE = {
+    "process_instances",
+    "audit_events",
+    "agent_runs",
+    "human_tasks",
+    "handoff_entities",
+    "cowork_sessions",
+}
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--firebase-project", required=True)
+    p.add_argument("--database-url", required=True)
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument(
+        "--only",
+        help="Comma-separated list of Postgres table names to limit migration to.",
+    )
+    p.add_argument("--log-file", default="migration_log.json")
+    return p.parse_args(argv)
+
+
+def main(argv: list[str]) -> int:
+    args = parse_args(argv)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    cred = credentials.ApplicationDefault()
+    firebase_admin.initialize_app(cred, {"projectId": args.firebase_project})
+    fs = firestore.client()
+
+    pg = psycopg2.connect(args.database_url)
+    pg.autocommit = False
+
+    only = set(args.only.split(",")) if args.only else None
+
+    # Workspace cache only needed for child tables.
+    ws_cache: dict[str, str] = {}
+    needs_cache = (only is None) or bool(only & CHILD_TABLES_REQUIRING_WS_CACHE)
+    if needs_cache:
+        LOG.info("building workspace cache from processInstances ...")
+        ws_cache = build_workspace_cache(fs)
+
+    log: dict[str, dict[str, int]] = {}
+    for table, func in TABLE_FUNCTIONS.items():
+        if only is not None and table not in only:
+            continue
+        LOG.info("=== migrating -> %s ===", table)
+        try:
+            if table in CHILD_TABLES_REQUIRING_WS_CACHE and table != "process_instances":
+                result = func(fs, pg, dry_run=args.dry_run, ws_cache=ws_cache)
+            elif table == "process_instances":
+                result = func(fs, pg, dry_run=args.dry_run, ws_cache=ws_cache)
+            else:
+                result = func(fs, pg, dry_run=args.dry_run)
+        except Exception as exc:  # noqa: BLE001
+            LOG.exception("migration of %s failed", table)
+            pg.rollback()
+            result = {"inserted": 0, "skipped": 0, "errors": 1, "exception": str(exc)}
+        log[table] = result
+        LOG.info("%s -> %s", table, result)
+
+    pg.close()
+    with open(args.log_file, "w", encoding="utf-8") as fh:
+        json.dump(log, fh, indent=2, default=str)
+    LOG.info("wrote audit log to %s", args.log_file)
+    LOG.info("FINAL SUMMARY: %s", json.dumps(log, indent=2, default=str))
+
+    # Non-zero exit if any table errored.
+    return 1 if any(v.get("errors") for v in log.values()) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
