@@ -110,29 +110,13 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
   }
 
   async getMembershipsForUser(uid: string): Promise<readonly NamespaceMembership[]> {
-    // Two parallel sources, dedup by handle (personal wins on conflict — the
-    // owner of a personal namespace always outranks any other recorded role,
-    // and the same handle showing up in both queries shouldn't happen in
-    // practice).
-    const [memberSnapshot, personalSnapshot] = await Promise.all([
-      (async () => {
-        try {
-          return await this.db
-            .collectionGroup(this.membersSubcollection)
-            .where('uid', '==', uid)
-            .get();
-        } catch (err: unknown) {
-          const grpcErr = err as { code?: number };
-          if (grpcErr.code === 9) {
-            console.warn(
-              '[namespace-repository] collectionGroup("members") index missing — getMembershipsForUser returning personal-only for uid:',
-              uid,
-            );
-            return null;
-          }
-          throw err;
-        }
-      })(),
+    // Primary path mirrors `getUserNamespaces`: single doc read on
+    // `users/{uid}.organizations`, then per-handle fetch of the member doc to
+    // get the role. Avoids requiring the `members` collectionGroup index in
+    // dev/emulator environments. Falls back to collectionGroup when the
+    // organizations array is empty/missing.
+    const [userDoc, personalSnapshot] = await Promise.all([
+      this.db.collection('users').doc(uid).get(),
       this.db
         .collection(this.namespacesCollection)
         .where('linkedUserId', '==', uid)
@@ -141,18 +125,50 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
 
     const byHandle = new Map<string, NamespaceMembership>();
 
-    if (memberSnapshot !== null) {
-      for (const memberDoc of memberSnapshot.docs) {
-        const namespaceRef = memberDoc.ref.parent.parent;
-        if (namespaceRef === null) continue;
-        const member = NamespaceMemberSchema.parse(memberDoc.data());
-        byHandle.set(namespaceRef.id, { handle: namespaceRef.id, role: member.role });
+    const organizations = userDoc.exists ? (userDoc.data()?.organizations as unknown) : undefined;
+    if (Array.isArray(organizations) && organizations.length > 0) {
+      const memberships = await Promise.all(
+        organizations.map(async (handle: string) => {
+          const memberSnap = await this.db
+            .collection(this.namespacesCollection).doc(handle)
+            .collection(this.membersSubcollection).doc(uid)
+            .get();
+          if (!memberSnap.exists) return null;
+          const member = NamespaceMemberSchema.parse(memberSnap.data());
+          return { handle, role: member.role } satisfies NamespaceMembership;
+        }),
+      );
+      for (const m of memberships) {
+        if (m !== null) byHandle.set(m.handle, m);
+      }
+    } else {
+      // Fallback: collectionGroup query (requires deployed
+      // `members.uid ASCENDING` index). Surfaces a console warning when the
+      // index is missing rather than silently returning personal-only.
+      try {
+        const memberSnapshot = await this.db
+          .collectionGroup(this.membersSubcollection)
+          .where('uid', '==', uid)
+          .get();
+        for (const memberDoc of memberSnapshot.docs) {
+          const namespaceRef = memberDoc.ref.parent.parent;
+          if (namespaceRef === null) continue;
+          const member = NamespaceMemberSchema.parse(memberDoc.data());
+          byHandle.set(namespaceRef.id, { handle: namespaceRef.id, role: member.role });
+        }
+      } catch (err: unknown) {
+        const grpcErr = err as { code?: number };
+        if (grpcErr.code !== 9) throw err;
+        console.warn(
+          '[namespace-repository] collectionGroup("members") index missing and users/%s.organizations empty — returning personal-only',
+          uid,
+        );
       }
     }
 
+    // Personal namespaces (linkedUserId match) — owner wins over any prior entry.
     for (const doc of personalSnapshot.docs) {
       const ns = NamespaceSchema.parse(doc.data());
-      // Personal namespace: owner regardless of any prior entry.
       byHandle.set(ns.handle, { handle: ns.handle, role: 'owner' });
     }
 
