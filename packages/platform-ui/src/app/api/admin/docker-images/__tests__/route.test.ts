@@ -11,7 +11,7 @@ const mockAuditAppend = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
-    dockerImageDeleter: { delete: mockDeleterDelete },
+    dockerImages: { delete: mockDeleterDelete },
     auditRepo: { append: mockAuditAppend },
     instanceRepo: { getById: vi.fn() },
     namespaceRepo: {},

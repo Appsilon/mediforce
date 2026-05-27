@@ -30,7 +30,7 @@ import type { CallerIdentity } from '../../auth.js';
 import type { CallerScope } from '../caller-scope.js';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope.js';
 import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker.js';
-import type { DockerImageDeleter } from '../../services/docker-image-deleter.js';
+import type { DockerImagesService } from '../../services/docker-images-service.js';
 import type { InviteNotificationService, InviteService } from '../../services/invite-notification.js';
 
 class InMemoryAgentRunRepository implements AgentRunRepository {
@@ -203,7 +203,7 @@ export interface TestScopeOverrides {
   readonly runKicker?: RunKicker;
   readonly inviteService?: InviteService | null;
   readonly inviteNotificationService?: InviteNotificationService | null;
-  readonly dockerImageDeleter?: DockerImageDeleter | null;
+  readonly dockerImages?: DockerImagesService | null;
   readonly namespaceRepo?: NamespaceRepository;
   readonly userDirectory?: UserDirectoryService | null;
 }
@@ -253,7 +253,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     runKicker: overrides.runKicker ?? noopRunKicker(),
     inviteService: overrides.inviteService ?? null,
     inviteNotificationService: overrides.inviteNotificationService ?? null,
-    dockerImageDeleter: overrides.dockerImageDeleter ?? null,
+    dockerImages: overrides.dockerImages ?? null,
     userDirectory: overrides.userDirectory ?? null,
   };
   return createCallerScope(services, caller);

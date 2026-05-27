@@ -25,11 +25,11 @@ import {
 } from '@mediforce/platform-infra';
 import type { SendEmailFn, UserDirectoryService } from '@mediforce/platform-core';
 import {
-  ContainerWorkerImageDeleter,
-  LocalDockerImageDeleter,
+  ContainerWorkerDockerImagesService,
+  LocalDockerImagesService,
   isLocalAgentMode,
-  type DockerImageDeleter,
-} from './docker-image-deleter.js';
+  type DockerImagesService,
+} from './docker-images-service.js';
 import { sendInviteEmail, sendWorkspaceNotificationEmail } from './invite-emails.js';
 import type {
   InviteNotificationService,
@@ -98,7 +98,7 @@ export interface PlatformServices {
   inviteService: InviteService;
   /** `null` when Mailgun env vars are unset (email disabled). */
   inviteNotificationService: InviteNotificationService | null;
-  dockerImageDeleter: DockerImageDeleter;
+  dockerImages: DockerImagesService;
   /**
    * Firebase Auth metadata lookup (uid → email, lastSignInTime). Always wired
    * in production (depends on Firebase Auth, not Mailgun). Handlers consume
@@ -348,9 +348,9 @@ export function getPlatformServices(): PlatformServices {
     ? new MailgunInviteNotificationService(mailgunSender, inviteAppUrl, mailgunSenderName)
     : null;
 
-  const dockerImageDeleter: DockerImageDeleter = isLocalAgentMode()
-    ? new LocalDockerImageDeleter()
-    : new ContainerWorkerImageDeleter(
+  const dockerImages: DockerImagesService = isLocalAgentMode()
+    ? new LocalDockerImagesService()
+    : new ContainerWorkerDockerImagesService(
         process.env.CONTAINER_WORKER_URL ?? 'http://container-worker:3001',
         process.env.CONTAINER_WORKER_SECRET,
       );
@@ -382,7 +382,7 @@ export function getPlatformServices(): PlatformServices {
     namespaceSecretsRepo,
     inviteService,
     inviteNotificationService,
-    dockerImageDeleter,
+    dockerImages,
     userDirectory: userDirectoryService,
   };
 

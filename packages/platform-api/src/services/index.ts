@@ -1,11 +1,11 @@
 export { getPlatformServices, type PlatformServices } from './platform-services.js';
 export { seedBuiltinAgentDefinitions } from './seed-agent-definitions.js';
 export {
-  ContainerWorkerImageDeleter,
-  LocalDockerImageDeleter,
+  ContainerWorkerDockerImagesService,
+  LocalDockerImagesService,
   isLocalAgentMode,
-  type DockerImageDeleter,
-} from './docker-image-deleter.js';
+  type DockerImagesService,
+} from './docker-images-service.js';
 export type {
   InviteService,
   InvitedUser,

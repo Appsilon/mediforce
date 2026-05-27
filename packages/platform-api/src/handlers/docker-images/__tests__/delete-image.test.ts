@@ -6,10 +6,10 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope.js';
-import type { DockerImageDeleter } from '../../../services/docker-image-deleter.js';
+import type { DockerImagesService } from '../../../services/docker-images-service.js';
 import type { CallerIdentity } from '../../../auth.js';
 
-class FakeDeleter implements DockerImageDeleter {
+class FakeDeleter implements DockerImagesService {
   public calls: string[] = [];
   constructor(private readonly result: { deleted: string; output?: string }) {}
   async delete(imageId: string) {
@@ -32,7 +32,7 @@ describe('deleteDockerImage handler', () => {
   it('[AUTHZ] apiKey caller passes through, audit emitted', async () => {
     const scope = createTestScope({
       auditRepo,
-      dockerImageDeleter: deleter,
+      dockerImages: deleter,
       caller: apiKeyCaller,
     });
 
@@ -51,7 +51,7 @@ describe('deleteDockerImage handler', () => {
   it('[AUTHZ] user with owner role in some namespace passes', async () => {
     const scope = createTestScope({
       auditRepo,
-      dockerImageDeleter: deleter,
+      dockerImages: deleter,
       caller: userCaller(
         'u-owner',
         ['alpha'],
@@ -67,7 +67,7 @@ describe('deleteDockerImage handler', () => {
   it('[AUTHZ] user with admin role in some namespace passes', async () => {
     const scope = createTestScope({
       auditRepo,
-      dockerImageDeleter: deleter,
+      dockerImages: deleter,
       caller: userCaller(
         'u-admin',
         ['alpha'],
@@ -83,7 +83,7 @@ describe('deleteDockerImage handler', () => {
   it('[AUTHZ] user with only member role is forbidden', async () => {
     const scope = createTestScope({
       auditRepo,
-      dockerImageDeleter: deleter,
+      dockerImages: deleter,
       caller: userCaller(
         'u-member',
         ['alpha'],
@@ -100,7 +100,7 @@ describe('deleteDockerImage handler', () => {
   it('[AUTHZ] user with no namespace memberships is forbidden', async () => {
     const scope = createTestScope({
       auditRepo,
-      dockerImageDeleter: deleter,
+      dockerImages: deleter,
       caller: userCaller('u-none', []),
     });
 
@@ -112,7 +112,7 @@ describe('deleteDockerImage handler', () => {
   it('[ERROR] PreconditionFailedError when deleter is not configured', async () => {
     const scope = createTestScope({
       auditRepo,
-      dockerImageDeleter: null,
+      dockerImages: null,
       caller: apiKeyCaller,
     });
 
@@ -128,7 +128,7 @@ describe('deleteDockerImage handler', () => {
     const silentDeleter = new FakeDeleter({ deleted: 'img-1' });
     const scope = createTestScope({
       auditRepo,
-      dockerImageDeleter: silentDeleter,
+      dockerImages: silentDeleter,
       caller: apiKeyCaller,
     });
 

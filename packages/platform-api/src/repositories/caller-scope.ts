@@ -14,7 +14,7 @@ import type {
 } from '@mediforce/workflow-engine';
 import type { CallerIdentity } from '../auth.js';
 import type { RunKicker } from '../runtime/run-kicker.js';
-import type { DockerImageDeleter } from '../services/docker-image-deleter.js';
+import type { DockerImagesService } from '../services/docker-images-service.js';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification.js';
 import type { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository.js';
 import type { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository.js';
@@ -124,7 +124,7 @@ export interface SystemServices {
    * delete-image flow; the handler throws `PreconditionFailedError` in that
    * case.
    */
-  readonly dockerImageDeleter: DockerImageDeleter | null;
+  readonly dockerImages: DockerImagesService | null;
   /**
    * Directory lookup for Firebase Auth user metadata (email, lastSignInTime).
    * `null` when not configured — handlers that consume it (e.g.

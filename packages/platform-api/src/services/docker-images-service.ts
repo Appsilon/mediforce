@@ -5,23 +5,15 @@ import { HandlerError } from '../errors.js';
 const execFileAsync = promisify(execFile);
 
 /**
- * Framework-free port for "remove a docker image from the platform's image
- * store." Two production implementations exist: a local `docker rmi` shell-out
- * (used when the deployment runs agents inline) and a remote call to the
- * container-worker (the standard production topology). The handler picks
- * neither — `platform-services` wires the correct one based on
- * `isLocalAgentMode()`.
+ * Framework-free port for managing the platform's docker image store.
+ * `platform-services` picks the right implementation based on
+ * `isLocalAgentMode()`: local `docker rmi` shell-out vs container-worker HTTP.
  */
-export interface DockerImageDeleter {
+export interface DockerImagesService {
   delete(imageId: string): Promise<{ deleted: string; output?: string }>;
 }
 
-/**
- * Shells out to the local docker daemon. Used in the `ALLOW_LOCAL_AGENTS &&
- * !REDIS_URL` deployment topology — single-node, no worker, agents run inline
- * on the platform host.
- */
-export class LocalDockerImageDeleter implements DockerImageDeleter {
+export class LocalDockerImagesService implements DockerImagesService {
   async delete(imageId: string): Promise<{ deleted: string; output?: string }> {
     try {
       const result = await execFileAsync('docker', ['rmi', imageId]);
@@ -37,13 +29,11 @@ export class LocalDockerImageDeleter implements DockerImageDeleter {
 }
 
 /**
- * Forwards the delete to the container-worker over HTTP. The worker handles
- * actually invoking docker against the shared host daemon, so this client just
- * proxies the request. Non-2xx responses surface as `HandlerError('internal')`
- * — the legacy route mirrored the worker's status code, but the typed envelope
- * doesn't support arbitrary upstream codes, so 500 is the honest fallback.
+ * Non-2xx responses surface as `HandlerError('internal')` — the legacy route
+ * mirrored the worker's status code, but the typed envelope doesn't support
+ * arbitrary upstream codes, so 500 is the honest fallback.
  */
-export class ContainerWorkerImageDeleter implements DockerImageDeleter {
+export class ContainerWorkerDockerImagesService implements DockerImagesService {
   constructor(
     private readonly baseUrl: string,
     private readonly workerSecret?: string,
@@ -69,11 +59,6 @@ export class ContainerWorkerImageDeleter implements DockerImageDeleter {
   }
 }
 
-/**
- * Mirrors the legacy route's `isLocalAgentMode()` check — exported here so
- * `platform-services` can pick the right deleter at wiring time without
- * duplicating the env logic across the codebase.
- */
 export function isLocalAgentMode(): boolean {
   const redisUrl = process.env.REDIS_URL;
   return (

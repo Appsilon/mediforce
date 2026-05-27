@@ -13,7 +13,7 @@ export async function deleteDockerImage(
 ): Promise<DeleteDockerImageOutput> {
   assertCallerCanAdminDockerImages(scope.caller);
 
-  const deleter = scope.system.dockerImageDeleter;
+  const deleter = scope.system.dockerImages;
   if (deleter === null) {
     throw new PreconditionFailedError(
       'Docker image deletion is not configured in this deployment',
