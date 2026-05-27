@@ -24,6 +24,7 @@ import {
   PostgresCronTriggerStateRepository,
   PostgresAgentRunRepository,
   PostgresHumanTaskRepository,
+  PostgresCoworkSessionRepository,
   getSharedPostgresClient,
   getAdminFirestore,
   validateSecretsKey,
@@ -36,6 +37,7 @@ import type {
   AgentOAuthTokenRepository,
   AgentRunRepository,
   AuditRepository,
+  CoworkSessionRepository,
   CronTriggerStateRepository,
   HandoffRepository,
   HumanTaskRepository,
@@ -89,7 +91,7 @@ export interface PlatformServices {
   humanTaskRepo: HumanTaskRepository;
   handoffRepo: HandoffRepository;
   agentDefinitionRepo: FirestoreAgentDefinitionRepository;
-  coworkSessionRepo: FirestoreCoworkSessionRepository;
+  coworkSessionRepo: CoworkSessionRepository;
   cronTriggerStateRepo: CronTriggerStateRepository;
   toolCatalogRepo: ToolCatalogRepository;
   namespaceRepo: NamespaceRepository;
@@ -131,7 +133,10 @@ export function getPlatformServices(): PlatformServices {
       ? new PostgresHandoffRepository(getSharedPostgresClient().db, instanceRepo)
       : new FirestoreHandoffRepository(db, instanceRepo);
   const agentDefinitionRepo = new FirestoreAgentDefinitionRepository(db);
-  const coworkSessionRepo = new FirestoreCoworkSessionRepository(db, instanceRepo);
+  const coworkSessionRepo: CoworkSessionRepository =
+    process.env.STORAGE_BACKEND === 'postgres'
+      ? new PostgresCoworkSessionRepository(getSharedPostgresClient().db, instanceRepo)
+      : new FirestoreCoworkSessionRepository(db, instanceRepo);
   const cronTriggerStateRepo: CronTriggerStateRepository =
     process.env.STORAGE_BACKEND === 'postgres'
       ? new PostgresCronTriggerStateRepository(getSharedPostgresClient().db)
