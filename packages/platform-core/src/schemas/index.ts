@@ -163,6 +163,7 @@ export {
   EmailActionConfigSchema,
   SpawnTargetSchema,
   SpawnActionConfigSchema,
+  WaitActionConfigSchema,
   ActionConfigSchema,
   validateInputForNextRun,
   validateExecutorAndTriggers,
@@ -186,6 +187,7 @@ export {
   type EmailActionConfig,
   type SpawnTargetConfig,
   type SpawnActionConfig,
+  type WaitActionConfig,
   type ActionConfig,
 } from './workflow-definition.js';
 

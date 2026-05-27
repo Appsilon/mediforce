@@ -3,7 +3,7 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv } from '@mediforce/agent-runtime';
-import { validateActionSecrets } from '@mediforce/core-actions';
+import { validateActionSecrets, isWaitSentinel } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
 import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '@/lib/loop-guard';
@@ -381,6 +381,18 @@ export async function POST(
             }
 
             const { actionRegistry, engine } = getPlatformServices();
+
+            // Wait actions: if resumeWait already wrote the step output, skip dispatch
+            if (currentStep.action.kind === 'wait') {
+              const preResolved = instance.variables[instance.currentStepId] as Record<string, unknown> | undefined;
+              if (preResolved?.resumeReason) {
+                console.log(`[auto-runner] Wait step '${instance.currentStepId}' already resolved (${preResolved.resumeReason}) — advancing`);
+                await engine.advanceStep(instanceId, preResolved, { id: 'auto-runner', role: 'system' });
+                stepsExecuted++;
+                continue;
+              }
+            }
+
             console.log(`[auto-runner] Executing action step '${instance.currentStepId}' (kind: ${currentStep.action.kind}) on instance '${instanceId}'`);
 
             const previousStepId = workflowDefinition.transitions.find(
@@ -442,6 +454,24 @@ export async function POST(
                   secrets: workflowSecrets,
                 },
               });
+
+              if (isWaitSentinel(output)) {
+                const waitMeta = output.__wait;
+                if (waitMeta.stepId === instance.currentStepId) {
+                  await instanceRepo.updateStepExecution(instanceId, executionId, {
+                    status: 'paused',
+                    output: null,
+                  });
+                  await instanceRepo.update(instanceId, {
+                    status: 'paused',
+                    pauseReason: 'waiting_for_timer',
+                    variables: { ...instance.variables, __wait: waitMeta },
+                    updatedAt: new Date().toISOString(),
+                  });
+                  console.log(`[auto-runner] Wait action paused instance '${instanceId}' until ${waitMeta.resumeAt}`);
+                  break;
+                }
+              }
 
               await instanceRepo.updateStepExecution(instanceId, executionId, {
                 status: 'completed',

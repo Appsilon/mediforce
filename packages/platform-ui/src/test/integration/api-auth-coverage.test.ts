@@ -9,7 +9,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const PLATFORM_UI_ROOT = resolve(__dirname, '..', '..', '..');
-const MIDDLEWARE_PATH = join(PLATFORM_UI_ROOT, 'src', 'middleware.ts');
+const PROXY_PATH = join(PLATFORM_UI_ROOT, 'src', 'proxy.ts');
 const API_ROOT = join(PLATFORM_UI_ROOT, 'src', 'app', 'api');
 
 function walkRouteFiles(dir: string): string[] {
@@ -28,15 +28,15 @@ function walkRouteFiles(dir: string): string[] {
 }
 
 describe('API route auth coverage', () => {
-  it('has a middleware file at src/middleware.ts that exports a matcher covering /api/:path*', () => {
-    expect(existsSync(MIDDLEWARE_PATH)).toBe(true);
-    const source = readFileSync(MIDDLEWARE_PATH, 'utf8');
+  it('has a proxy file at src/proxy.ts that exports a matcher covering /api/:path*', () => {
+    expect(existsSync(PROXY_PATH)).toBe(true);
+    const source = readFileSync(PROXY_PATH, 'utf8');
     expect(source).toMatch(/matcher:\s*['"]\/api\/:path\*['"]/);
   });
 
   it('declares a PUBLIC_ROUTES constant with exactly the approved public endpoints', () => {
-    expect(existsSync(MIDDLEWARE_PATH)).toBe(true);
-    const source = readFileSync(MIDDLEWARE_PATH, 'utf8');
+    expect(existsSync(PROXY_PATH)).toBe(true);
+    const source = readFileSync(PROXY_PATH, 'utf8');
     expect(source).toMatch(/PUBLIC_ROUTES/);
     expect(source).toMatch(/\/api\/health/);
     // Per-provider OAuth callback is public (state HMAC is the sole integrity

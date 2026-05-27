@@ -53,6 +53,8 @@ export function getWorkflowStatus(instance: {
         return { displayStatus: 'waiting_for_human', reason: 'Waiting for agent approval review', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'cowork_in_progress':
         return { displayStatus: 'waiting_for_human', reason: 'Cowork session in progress', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
+      case 'waiting_for_timer':
+        return { displayStatus: 'in_progress', reason: 'Waiting for timer or condition', rawReason: pauseReason, isRetryable: false, hasDedicatedBanner: false };
       case 'agent_escalated':
         return { displayStatus: 'waiting_for_human', reason: error !== null ? `Agent failed: ${error}` : 'Agent escalated to human review', rawReason: pauseReason, isRetryable: true, hasDedicatedBanner: false };
       case 'agent_paused':

@@ -108,6 +108,27 @@ Parse the YAML to extract `name`, `steps`, `transitions`, `triggers`.
 ## Step 3: Generate Execution Proposals
 
 For each proposal, take the parsed structure and add execution config to every step.
+Each proposal is a **complete WorkflowDefinition** at the top level:
+
+```json
+{
+  "name": "string",
+  "version": 1,
+  "description": "string",
+  "env": {
+    "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_BASE_URL": "{{ANTHROPIC_BASE_URL}}",
+    "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+    "ANTHROPIC_API_KEY": ""
+  },
+  "triggers": [ /* copied from structure */ ],
+  "steps": [ /* see WorkflowStep Schema below */ ],
+  "transitions": [ /* copied from structure */ ]
+}
+```
+
+The top-level `env` block is inherited by all steps. Include it in every
+proposal that has at least one `claude-code-agent` step.
 
 ### WorkflowStep Schema (with executor fields)
 
@@ -166,7 +187,22 @@ For each proposal, take the parsed structure and add execution config to every s
 5. **Review steps** → generally `executor: "human"` in hybrid proposals
 6. **Only use plugins** from GET /api/plugins
 7. **CRITICAL: `claude-code-agent` steps MUST have `agent.prompt`** — no SKILL.md files exist for the generated workflow. Write a detailed inline prompt.
-8. **Every `agent.prompt` MUST include the output contract:**
+8. **CRITICAL: Top-level `env` block for agent auth.** Any proposal that
+   contains at least one `claude-code-agent` step MUST include a top-level
+   `env` block with the OpenRouter credentials the container needs:
+   ```json
+   "env": {
+     "OPENROUTER_API_KEY": "{{OPENROUTER_API_KEY}}",
+     "ANTHROPIC_BASE_URL": "{{ANTHROPIC_BASE_URL}}",
+     "ANTHROPIC_AUTH_TOKEN": "{{OPENROUTER_API_KEY}}",
+     "ANTHROPIC_API_KEY": ""
+   }
+   ```
+   Without this, the agent container cannot authenticate and fails with
+   "Not logged in". The `{{…}}` references resolve from namespace/workflow
+   secrets at runtime. `ANTHROPIC_API_KEY` must be explicitly empty to
+   prevent the CLI from looking for a direct Anthropic key.
+9. **Every `agent.prompt` MUST include the output contract:**
 
 ```
 ## OUTPUT CONTRACT (MANDATORY)
@@ -182,11 +218,11 @@ You MUST:
    {"output_file": "{output_directory}/result.json", "summary": "1-2 sentence summary"}
 ```
 
-9. Include `agent.model` (use `"sonnet"`). **CRITICAL: also set `agent.image` — default `"mediforce-golden-image"` (same for `opencode-agent`).** The platform runs agent steps in Docker; a step without an image crashes on staging/production (imageless/local execution only works in dev with `ALLOW_LOCAL_AGENTS=true`). Only omit `image` if the user EXPLICITLY asks for local / no-Docker execution.
-10. Each proposal needs a distinct `label` and `description`
-11. **Preserve all structural fields** (`params`, `verdicts`, `selection`, etc.)
-12. **transitions and triggers** are copied verbatim into every proposal
-13. Tailor proposals to user preferences when available
+10. Include `agent.model` (use `"sonnet"`). **CRITICAL: also set `agent.image` — default `"mediforce-golden-image"` (same for `opencode-agent`).** The platform runs agent steps in Docker; a step without an image crashes on staging/production (imageless/local execution only works in dev with `ALLOW_LOCAL_AGENTS=true`). Only omit `image` if the user EXPLICITLY asks for local / no-Docker execution.
+11. Each proposal needs a distinct `label` and `description`
+12. **Preserve all structural fields** (`params`, `verdicts`, `selection`, etc.)
+13. **transitions and triggers** are copied verbatim into every proposal
+14. Tailor proposals to user preferences when available
 
 ## Presentation HTML Template
 
