@@ -71,6 +71,8 @@
 - [ ] No docstrings added to code the diff didn't change.
 - [ ] Self-documenting code wins: prefer a better name over a comment.
 - [ ] No "Added for X flow" / "Used by Y" / issue-number comments — that belongs in the PR description.
+- [ ] No section-title / banner comments (`// ---- POST /api/foo ----`, `// === Helpers ===`) — symbol names and file structure already delineate sections.
+- [ ] No ephemeral plan numbering or migration history (`// Phase 2.5`, `// added in Phase 2.6`, `// pre-Phase-2.5 Server Action`, `// replaces the old action`). Plan phases are temporary scaffolding; describe the durable behavior/reason instead. Test: would this still make sense to a reader in two years who never saw the plan? If not, cut it — the history belongs in the PR description / changelog.
 
 ## 6. Testing
 
