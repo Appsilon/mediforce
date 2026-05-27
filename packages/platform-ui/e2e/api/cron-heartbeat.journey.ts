@@ -52,7 +52,7 @@ test.describe('POST /api/cron/heartbeat — API E2E', () => {
         data: cronWd,
       },
     );
-    expect(createWdRes.status()).toBe(201);
+    expect(createWdRes.status()).toBe(200);
 
     // Prime trigger state — first heartbeat may fire or skip depending on
     // isDue() semantics vs def.createdAt. We don't assert on the first

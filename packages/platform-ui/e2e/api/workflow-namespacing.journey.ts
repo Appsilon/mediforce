@@ -25,21 +25,21 @@ test.describe('Workflow definition namespace isolation — API E2E', () => {
       `/api/workflow-definitions?namespace=${tenantB}`,
       { headers: authHeaders, data: workflowDefinition(name) },
     );
-    expect(tenantBFirst.status(), await tenantBFirst.text()).toBe(201);
+    expect(tenantBFirst.status(), await tenantBFirst.text()).toBe(200);
     expect((await tenantBFirst.json()).version).toBe(1);
 
     const tenantBSecond = await request.post(
       `/api/workflow-definitions?namespace=${tenantB}`,
       { headers: authHeaders, data: workflowDefinition(name) },
     );
-    expect(tenantBSecond.status(), await tenantBSecond.text()).toBe(201);
+    expect(tenantBSecond.status(), await tenantBSecond.text()).toBe(200);
     expect((await tenantBSecond.json()).version).toBe(2);
 
     const tenantAFirst = await request.post(
       `/api/workflow-definitions?namespace=${tenantA}`,
       { headers: authHeaders, data: workflowDefinition(name) },
     );
-    expect(tenantAFirst.status(), await tenantAFirst.text()).toBe(201);
+    expect(tenantAFirst.status(), await tenantAFirst.text()).toBe(200);
     expect((await tenantAFirst.json()).version).toBe(1);
 
     const tenantAGet = await request.get(
