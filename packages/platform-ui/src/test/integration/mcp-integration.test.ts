@@ -63,6 +63,12 @@ const fake = vi.hoisted(() => {
         return updated;
       },
     },
+    // Headless handler now writes an audit event on every binding mutation;
+    // the route adapter wires `auditRepo` straight into `scope.system.audit`,
+    // so a no-op `append` is enough for the fake to satisfy the call site.
+    auditRepo: {
+      append: async () => {},
+    },
   };
 
   return { state, services };
