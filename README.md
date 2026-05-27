@@ -288,11 +288,18 @@ already-bootstrapped server reads the existing remote `.env`, hydrates
 managed keys (`PLATFORM_API_KEY`, `SECRETS_ENCRYPTION_KEY`,
 `DOCKER_OPENROUTER_API_KEY`, `POSTGRES_PASSWORD`), preserves any
 unmanaged operator-added keys verbatim, and only generates **missing**
-values. Firebase config comes from local state (`~/.mediforce/`). The
-SSH probe fails loudly if the remote `.env` can't be read, rather than
-silently treating it as "fresh server" — that path would regenerate
-`SECRETS_ENCRYPTION_KEY` and make every stored workflow secret
-unrecoverable.
+values. Firebase config comes from local state (`~/.mediforce/`). Every
+re-render also leaves a timestamped `.bak-YYYYMMDDTHHMMSSZ` copy of the
+previous `.env` next to it on the host — recoverable via a manual `cp`
+if anything goes sideways. The SSH probe fails loudly if the remote
+`.env` can't be read, rather than silently treating it as "fresh server"
+— that path would regenerate `SECRETS_ENCRYPTION_KEY` and make every
+stored workflow secret unrecoverable.
+
+This same pattern (`--from-step 10 --dry-run`, then the real run) is the
+canonical way to push **any** new env var to an already-bootstrapped
+deployment — extend `_render_compose_env` in `bootstrap-server.py`, then
+re-run against each target host. See the module docstring.
 
 ```bash
 # Always dry-run first against an existing deployment.

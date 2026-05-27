@@ -15,12 +15,28 @@ so sync flows keep working).
 State is persisted at ~/.mediforce/bootstrap-<host>.json so the run is
 resumable after Ctrl+C or a network hiccup.
 
+The script is **idempotent on existing servers**: re-running it reads
+the existing /opt/mediforce/.env, hydrates managed secrets back into
+memory, and only generates values that are actually missing. Existing
+PLATFORM_API_KEY / SECRETS_ENCRYPTION_KEY / OPENROUTER_API_KEY /
+POSTGRES_PASSWORD survive the round-trip unchanged. Unmanaged keys (any
+operator-added entries) are preserved verbatim under a comment-labeled
+section in the re-rendered file. Every upload also leaves a timestamped
+.bak-YYYYMMDDTHHMMSSZ copy of the previous file next to it. This is how
+you add a new env var to an already-bootstrapped deployment: extend
+_render_compose_env, then `--from-step 10 --dry-run` against each
+target host to preview, then drop --dry-run.
+
 Usage:
-    python3 scripts/bootstrap-server.py                                # interactive
+    python3 scripts/bootstrap-server.py                                # interactive, fresh server
     python3 scripts/bootstrap-server.py --host 1.2.3.4
     python3 scripts/bootstrap-server.py --repo Appsilon/mediforce-pharmaverse
     python3 scripts/bootstrap-server.py --branch main --from-step 6
     python3 scripts/bootstrap-server.py --resume                       # force resume prompt
+
+    # Re-run pattern (add a new env var, top up missing secrets, fix postgres-data dir):
+    python3 scripts/bootstrap-server.py --host <existing> --user deploy --from-step 10 --dry-run
+    python3 scripts/bootstrap-server.py --host <existing> --user deploy --from-step 10
 """
 
 from __future__ import annotations
@@ -1364,7 +1380,39 @@ def _fetch_remote_compose_env(ctx: Context) -> Optional[dict[str, str]]:
     return parsed
 
 
+def _backup_remote_file_if_exists(ctx: Context, remote_path: str) -> Optional[str]:
+    """If `remote_path` exists, copy it to `<remote_path>.bak-<UTC timestamp>`.
+
+    Returns the backup path on success, None if the file didn't exist.
+    Cheap insurance: any re-render upload becomes recoverable via a manual
+    `cp` from the backup. Backups accumulate — operator can prune
+    periodically. We never delete old backups automatically because the
+    one time we'd want to is also the one time the operator wants the
+    history.
+    """
+    quoted = shlex.quote(remote_path)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    backup_path = f"{remote_path}.bak-{stamp}"
+    # Single ssh: probe + cp atomically so we can't race a concurrent write.
+    # `cp -p` preserves mode/ownership; `cp -n` would no-clobber (irrelevant
+    # since the timestamped path is fresh).
+    script = (
+        f"if [ -f {quoted} ]; then "
+        f"cp -p {quoted} {shlex.quote(backup_path)} && echo __BACKED_UP__; "
+        "else echo __NOT_PRESENT__; fi"
+    )
+    result = ssh(ctx, script, check=True)
+    if "__BACKED_UP__" in result.stdout:
+        ok(f"backed up existing {remote_path} → {backup_path}")
+        return backup_path
+    return None
+
+
 def _upload_env_file(ctx: Context, rendered: str, remote_path: str) -> None:
+    if ctx.dry_run:
+        info(f"[dry-run] would back up existing {remote_path} (if present) then upload {len(rendered)} bytes")
+        return
+    _backup_remote_file_if_exists(ctx, remote_path)
     with tempfile.NamedTemporaryFile("w", delete=False) as tf:
         tf.write(rendered)
         tmp_path = Path(tf.name)
