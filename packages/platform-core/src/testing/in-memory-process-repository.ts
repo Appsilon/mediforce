@@ -152,6 +152,29 @@ export class InMemoryProcessRepository implements ProcessRepository {
     return 0;
   }
 
+  async transferWorkflowNamespace(
+    sourceNamespace: string,
+    name: string,
+    targetNamespace: string,
+  ): Promise<void> {
+    const moved: Array<[string, ReturnType<typeof this.workflowDefinitions.get>]> = [];
+    for (const [key, def] of this.workflowDefinitions) {
+      if (def?.name === name && def.namespace === sourceNamespace) {
+        moved.push([key, def]);
+      }
+    }
+    if (moved.length === 0) {
+      throw new Error(`Workflow '${name}' not found in namespace '${sourceNamespace}'`);
+    }
+    for (const [key, def] of moved) {
+      if (def === undefined) continue;
+      this.workflowDefinitions.delete(key);
+      const newDef = { ...def, namespace: targetNamespace };
+      const newKey = `${targetNamespace}:${def.name}:${def.version}`;
+      this.workflowDefinitions.set(newKey, newDef);
+    }
+  }
+
   /** Test helper: clear all stored data */
   clear(): void {
     this.workflowDefinitions.clear();

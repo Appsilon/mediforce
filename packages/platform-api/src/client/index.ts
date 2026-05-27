@@ -23,6 +23,14 @@ import {
   SetVisibilityOutputSchema,
   CopyWorkflowInputSchema,
   CopyWorkflowOutputSchema,
+  SetDefaultVersionInputSchema,
+  SetDefaultVersionOutputSchema,
+  DeleteWorkflowInputSchema,
+  DeleteWorkflowOutputSchema,
+  GetWorkflowRunCountInputSchema,
+  GetWorkflowRunCountOutputSchema,
+  TransferWorkflowInputSchema,
+  TransferWorkflowOutputSchema,
   DockerInfoResponseSchema,
   RemoveImageOutputSchema,
   OpenRouterCreditsInputSchema,
@@ -119,6 +127,14 @@ import {
   type CopyWorkflowInput,
   type CopyWorkflowOutput,
   type CopyWorkflowOptions,
+  type SetDefaultVersionInput,
+  type SetDefaultVersionOutput,
+  type DeleteWorkflowInput,
+  type DeleteWorkflowOutput,
+  type GetWorkflowRunCountInput,
+  type GetWorkflowRunCountOutput,
+  type TransferWorkflowInput,
+  type TransferWorkflowOutput,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -314,10 +330,14 @@ export class Mediforce {
     ) => Promise<RegisterWorkflowOutput>;
     list: (input?: ListWorkflowsInput) => Promise<ListWorkflowsOutput>;
     get: (input: GetWorkflowInput) => Promise<GetWorkflowOutput>;
-    archiveVersion: (input: ArchiveVersionInput) => Promise<ArchiveVersionOutput>;
-    archiveAll: (input: ArchiveAllInput) => Promise<ArchiveAllOutput>;
-    setVisibility: (input: SetVisibilityInput) => Promise<SetVisibilityOutput>;
-    copy: (input: CopyWorkflowInput, options: CopyWorkflowOptions) => Promise<CopyWorkflowOutput>;
+    archiveVersion: (input: ArchiveVersionInput, options: { namespace: string }) => Promise<ArchiveVersionOutput>;
+    archiveAll: (input: ArchiveAllInput, options: { namespace: string }) => Promise<ArchiveAllOutput>;
+    setVisibility: (input: SetVisibilityInput, options: { namespace: string }) => Promise<SetVisibilityOutput>;
+    copy: (input: CopyWorkflowInput, options: CopyWorkflowOptions & { sourceNamespace?: string }) => Promise<CopyWorkflowOutput>;
+    setDefaultVersion: (input: SetDefaultVersionInput) => Promise<SetDefaultVersionOutput>;
+    delete: (input: DeleteWorkflowInput) => Promise<DeleteWorkflowOutput>;
+    getRunCount: (input: GetWorkflowRunCountInput) => Promise<GetWorkflowRunCountOutput>;
+    transferNamespace: (input: TransferWorkflowInput) => Promise<TransferWorkflowOutput>;
   };
 
   readonly runs: {
@@ -599,10 +619,11 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.get');
         return GetWorkflowOutputSchema.parse(body);
       },
-      archiveVersion: async (input) => {
+      archiveVersion: async (input, options) => {
         const validated = ArchiveVersionInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: options.namespace });
         const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/versions/${validated.version}/archive`,
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/versions/${validated.version}/archive${qs}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -612,10 +633,11 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.archiveVersion');
         return ArchiveVersionOutputSchema.parse(body);
       },
-      archiveAll: async (input) => {
+      archiveAll: async (input, options) => {
         const validated = ArchiveAllInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: options.namespace });
         const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/archive`,
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}/archive${qs}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -625,10 +647,11 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.archiveAll');
         return ArchiveAllOutputSchema.parse(body);
       },
-      setVisibility: async (input) => {
+      setVisibility: async (input, options) => {
         const validated = SetVisibilityInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: options.namespace });
         const res = await this.request(
-          `/api/workflow-definitions/${encodeURIComponent(validated.name)}`,
+          `/api/workflow-definitions/${encodeURIComponent(validated.name)}${qs}`,
           {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -638,9 +661,52 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.workflows.setVisibility');
         return SetVisibilityOutputSchema.parse(body);
       },
+      setDefaultVersion: (input) => {
+        const v = SetDefaultVersionInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(v.name)}/default-version`,
+          { namespace: v.namespace, version: v.version },
+          SetDefaultVersionOutputSchema,
+          'mediforce.workflows.setDefaultVersion',
+        );
+      },
+      delete: (input) => {
+        const v = DeleteWorkflowInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        return this.sendJson(
+          'DELETE',
+          `/api/workflow-definitions/${encodeURIComponent(v.name)}${qs}`,
+          { expectedRunCount: v.expectedRunCount, namespace: v.namespace },
+          DeleteWorkflowOutputSchema,
+          'mediforce.workflows.delete',
+        );
+      },
+      getRunCount: async (input) => {
+        const v = GetWorkflowRunCountInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: v.namespace });
+        const res = await this.request(
+          `/api/workflow-definitions/${encodeURIComponent(v.name)}/run-count${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.workflows.getRunCount');
+        return GetWorkflowRunCountOutputSchema.parse(body);
+      },
+      transferNamespace: (input) => {
+        const v = TransferWorkflowInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/${encodeURIComponent(v.name)}/transfer`,
+          { sourceNamespace: v.sourceNamespace, targetNamespace: v.targetNamespace },
+          TransferWorkflowOutputSchema,
+          'mediforce.workflows.transferNamespace',
+        );
+      },
       copy: async (input, options) => {
         const validated = CopyWorkflowInputSchema.parse(input);
-        const qs = toSearchParams({ targetNamespace: options.targetNamespace });
+        const qs = toSearchParams({
+          targetNamespace: options.targetNamespace,
+          ...(options.sourceNamespace !== undefined ? { namespace: options.sourceNamespace } : {}),
+        });
         const reqBody: Record<string, unknown> = {};
         if (validated.version !== undefined) reqBody.version = validated.version;
         if (validated.targetName !== undefined) reqBody.targetName = validated.targetName;

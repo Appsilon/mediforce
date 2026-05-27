@@ -144,3 +144,71 @@ export interface CopyWorkflowOptions {
 export interface RegisterWorkflowOptions {
   namespace: string;
 }
+
+// ---- POST /api/workflow-definitions/:name/default-version -------------------
+export const SetDefaultVersionInputSchema = z.object({
+  name: z.string().min(1),
+  namespace: z.string().min(1),
+  version: z.number().int().positive(),
+});
+
+export const SetDefaultVersionOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  namespace: z.string(),
+  version: z.number().int().positive(),
+});
+
+export type SetDefaultVersionInput = z.infer<typeof SetDefaultVersionInputSchema>;
+export type SetDefaultVersionOutput = z.infer<typeof SetDefaultVersionOutputSchema>;
+
+// ---- DELETE /api/workflow-definitions/:name ---------------------------------
+// `expectedRunCount` is a stale-confirmation guard: the dialog displays a
+// pre-fetched count; this re-checks server-side and rejects if it changed.
+export const DeleteWorkflowInputSchema = z.object({
+  name: z.string().min(1),
+  namespace: z.string().min(1),
+  expectedRunCount: z.number().int().nonnegative(),
+});
+
+export const DeleteWorkflowOutputSchema = z.object({
+  success: z.literal(true),
+  deletedRuns: z.number().int().nonnegative(),
+});
+
+export type DeleteWorkflowInput = z.infer<typeof DeleteWorkflowInputSchema>;
+export type DeleteWorkflowOutput = z.infer<typeof DeleteWorkflowOutputSchema>;
+
+// ---- GET /api/workflow-definitions/:name/run-count --------------------------
+export const GetWorkflowRunCountInputSchema = z.object({
+  name: z.string().min(1),
+  namespace: z.string().min(1),
+});
+
+export const GetWorkflowRunCountOutputSchema = z.object({
+  count: z.number().int().nonnegative(),
+});
+
+export type GetWorkflowRunCountInput = z.infer<typeof GetWorkflowRunCountInputSchema>;
+export type GetWorkflowRunCountOutput = z.infer<typeof GetWorkflowRunCountOutputSchema>;
+
+// ---- POST /api/workflow-definitions/:name/transfer --------------------------
+// Move all versions of a workflow from one workspace to another. Bug-fix
+// over the pre-Phase-2.5 Server Action: source-namespace + target-namespace
+// membership both required; raw Firestore write replaced with a repository
+// method; audit event emitted.
+export const TransferWorkflowInputSchema = z.object({
+  name: z.string().min(1),
+  sourceNamespace: z.string().min(1),
+  targetNamespace: z.string().min(1),
+});
+
+export const TransferWorkflowOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  sourceNamespace: z.string(),
+  targetNamespace: z.string(),
+});
+
+export type TransferWorkflowInput = z.infer<typeof TransferWorkflowInputSchema>;
+export type TransferWorkflowOutput = z.infer<typeof TransferWorkflowOutputSchema>;

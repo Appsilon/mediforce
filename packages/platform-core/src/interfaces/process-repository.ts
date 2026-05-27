@@ -43,4 +43,19 @@ export interface ProcessRepository {
   setWorkflowDeleted(namespace: string, name: string, deleted: boolean): Promise<void>;
   isWorkflowNameDeleted(namespace: string, name: string): Promise<boolean>;
   countInstancesByDefinitionName(namespace: string, name: string): Promise<number>;
+
+  /**
+   * Move all versions of a workflow definition from `sourceNamespace` to
+   * `targetNamespace`. Pre-Phase 2.5 the operation lived in a Server Action
+   * that wrote raw Firestore, bypassed the repository, and didn't scope by
+   * source namespace. Phase 2.5 routes it through the repo so both Firestore
+   * + in-memory backends share one implementation and so the
+   * `AuthorizedWorkflowDefinitionRepository` wrapper can gate on both
+   * namespaces (caller must own source AND target).
+   */
+  transferWorkflowNamespace(
+    sourceNamespace: string,
+    name: string,
+    targetNamespace: string,
+  ): Promise<void>;
 }
