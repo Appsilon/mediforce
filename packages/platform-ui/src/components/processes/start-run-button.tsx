@@ -165,6 +165,11 @@ export function StartRunButton({
     } catch (err) {
       console.error('[StartRunButton] Failed to start run:', err);
       setError(err instanceof Error ? err.message : 'Failed to start run');
+    } finally {
+      // Reset on every code path — under the legacy Server Action the implicit
+      // revalidate-on-success remounted the component; the headless migration
+      // (PR #520) lost that side-effect, so success without unmount left the
+      // button stuck on "Starting...".
       setStarting(false);
     }
   }

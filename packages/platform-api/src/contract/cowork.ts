@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CoworkSessionSchema } from '@mediforce/platform-core';
+import { ConversationTurnSchema, CoworkSessionSchema } from '@mediforce/platform-core';
 
 /**
  * Contracts for the `cowork` domain.
@@ -40,9 +40,11 @@ export type GetCoworkSessionByInstanceOutput = z.infer<
 // ---- POST /api/cowork/:sessionId/chat ---------------------------------------
 //
 // Non-streaming turn — runs the MCP tool loop server-side and returns the
-// final agent text plus optional artifact. Intermediate tool turns are
-// persisted to the session as they execute so the UI can observe them via
-// the existing Firestore subscription. Parity migration: no streaming surface.
+// final agent text plus optional artifact, the post-mutation session, and
+// the full turns array (server's final shape). Intermediate tool turns are
+// persisted to the session as they execute so polling consumers observe
+// progress; the additive `session` + `turns` fields let the UI replace
+// optimistic state with server truth in one round trip.
 
 export const ChatCoworkSessionInputSchema = z.object({
   sessionId: z.string().min(1),
@@ -60,6 +62,8 @@ export const ChatCoworkSessionOutputSchema = z.object({
   agentText: z.string(),
   artifact: z.record(z.string(), z.unknown()).optional(),
   toolCalls: z.array(ChatCoworkToolCallSchema),
+  session: CoworkSessionSchema,
+  turns: z.array(ConversationTurnSchema),
 });
 
 export type ChatCoworkSessionInput = z.infer<typeof ChatCoworkSessionInputSchema>;

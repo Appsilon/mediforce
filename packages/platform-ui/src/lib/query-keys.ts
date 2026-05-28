@@ -8,8 +8,8 @@ import type { HumanTaskStatus } from '@mediforce/platform-core';
  * every variant under the prefix. Plain values for top-level filters; object
  * literal at the tail when the filter set has multiple fields.
  *
- * Currently covers the `tasks` domain. Future work extends with `runs`,
- * `workflows`, `agent-runs`, `cowork`, `audit`, `namespace`, `users`,
+ * Currently covers the `tasks` and `cowork` domains. Future work extends
+ * with `runs`, `workflows`, `agent-runs`, `audit`, `namespace`, `users`,
  * `monitoring`.
  */
 export const queryKeys = {
@@ -29,4 +29,12 @@ export const queryKeys = {
    * cache — detail and list are different cache surfaces.
    */
   task: (taskId: string) => ['task', taskId] as const,
+  cowork: {
+    /** Session metadata key (status, artifact, model, voice config). */
+    session: (sessionId: string) => ['cowork', sessionId] as const,
+    /** Conversation turns key — separate cache surface from session
+     * metadata so chat-mutation optimistic prepends operate on a focused
+     * scope without invalidating session metadata. */
+    turns: (sessionId: string) => ['cowork', sessionId, 'turns'] as const,
+  },
 } as const;

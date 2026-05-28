@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import type { CoworkSession, ConversationTurn, ProcessInstance } from '@mediforce/platform-core';
+import { useCoworkTurns, useSendCoworkMessage } from '@/hooks/use-cowork';
 import { ArtifactPanel } from './artifact-panel';
 import { ContextPanel } from './context-panel';
 import { ToolCallBubble } from './tool-call-bubble';
@@ -111,19 +112,34 @@ export function ChatCoworkView({
   handle,
   stepDescription,
 }: ChatCoworkViewProps) {
-  // Turns + artifact stream in via Firestore onSnapshot on the parent page;
-  // the platform-api chat handler writes intermediate tool turns and the
-  // final agent turn straight to the repo so the UI sees them live.
-  const turns = session.turns;
+  // Chat send + turns polling. `isPending` from the mutation flips the
+  // turns-query polling cadence to 1 s (CRITICAL LIVE) while a message is
+  // in-flight, so tool-call bubbles surface within the polling tick.
+  const sendMessage = useSendCoworkMessage(session.id);
+  const sending = sendMessage.isPending;
+  const { turns: liveTurns } = useCoworkTurns(session.id, sending);
+  // Cache is hydrated from the parent's session query — `liveTurns` becomes
+  // authoritative once the turns query reports, so prefer it; fall back to
+  // the session-embedded turns until then to avoid a flash of empty chat.
+  const turns: ConversationTurn[] = liveTurns.length > 0 ? liveTurns : session.turns;
   const artifact = session.artifact;
 
   const [input, setInput] = React.useState('');
-  const [sending, setSending] = React.useState(false);
   const [finalizing, setFinalizing] = React.useState(false);
   const finalized = session.status === 'finalized';
   const [error, setError] = React.useState<string | null>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
+
+  React.useEffect(() => {
+    if (sendMessage.error !== null) {
+      setError(
+        sendMessage.error instanceof ApiError || sendMessage.error instanceof Error
+          ? sendMessage.error.message
+          : 'Failed to send message',
+      );
+    }
+  }, [sendMessage.error]);
 
   // Auto-focus on mount
   React.useEffect(() => {
@@ -154,20 +170,17 @@ export function ChatCoworkView({
 
     setInput('');
     setError(null);
-    setSending(true);
+    sendMessage.reset();
 
     try {
-      await mediforce.cowork.chat({ sessionId: session.id, message });
-    } catch (err) {
-      const fallback = err instanceof ApiError || err instanceof Error
-        ? err.message
-        : 'Failed to send message';
-      setError(fallback);
+      await sendMessage.send(message);
+    } catch {
+      // Error surfaces via `sendMessage.error` effect above; restoration of
+      // the optimistic prepend happens inside the mutation's `onError`.
     } finally {
-      setSending(false);
       inputRef.current?.focus();
     }
-  }, [input, sending, finalized, session.id]);
+  }, [input, sending, finalized, sendMessage]);
 
   const handleFinalize = React.useCallback(async () => {
     if (!artifact || finalizing) return;
