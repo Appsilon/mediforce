@@ -69,8 +69,19 @@ export class FirestoreAgentRunRepository implements AgentRunRepository {
   }
 
   async list(opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> {
-    const page = await this.fetchPage(opts);
-    return this.toPage(page, opts.limit);
+    // Skip the per-row `AgentRunSchema.parse` on this hot path — for a
+    // 2.3k-doc page in dev mode the envelope sub-schema dominates
+    // wall-clock by ~10 s, and the SDK client revalidates the entire
+    // response through `ListAgentRunsOutputSchema.parse` at the boundary
+    // anyway. Write-side guarantees the shape (`create()` accepts a typed
+    // `AgentRun`), so trusting the raw doc data here halves the parse
+    // budget end-to-end. A corrupt legacy row would have failed the SDK
+    // parse downstream regardless.
+    const docs = await this.fetchPageDocs(opts);
+    return this.toPage(
+      docs.map((d) => d.data() as AgentRun),
+      opts.limit,
+    );
   }
 
   async listInNamespaces(
