@@ -43,6 +43,7 @@
 - [ ] No needless indirection — pass-through functions, re-exports of re-exports, config objects with one field.
 - [ ] Each hunk is a *sensible* change — not a copy-paste of the adjacent file with one symbol renamed.
 - [ ] No half-implemented branches, dangling TODOs, or scaffolding left from intermediate steps.
+- [ ] **No tech debt deferred to follow-up.** If the diff contains handmade code where a standard pattern would fit (custom string format where JSON / Zod / a library does it, per-domain helper where a generic in `platform-core` belongs, inline auth check where the wrapper exists, raw `fetch` where the CLI / client covers it), the refactor lands in **this PR** when it is small + mechanical (≤ ~100 LOC, ≤ ~3 call sites, no behaviour change). "We'll generalise when the second consumer lands" / "will file an issue" / "follow-up PR" for an adjacent ≤100-LOC mechanical refactor = debt accumulation — block. Only acceptable defer reasons: architectural change (new ADR, cross-package surface), genuinely large diff, or behaviour change that needs its own review.
 
 ## 5b. Dead code & removal candidates
 
