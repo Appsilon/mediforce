@@ -17,10 +17,16 @@ describe('encodeAgentRunCursor / decodeAgentRunCursor', () => {
     });
   });
 
-  it('returns null on tokens without a `|` separator', () => {
-    // 'Zm9v' is base64url('foo') — decodes to 'foo', no `|`, → null.
+  it('returns null on malformed tokens', () => {
+    // 'Zm9v' is base64url('foo') — round-trips through base64 but
+    // JSON.parse throws, so the codec surfaces null rather than crashing.
     expect(decodeAgentRunCursor('Zm9v')).toBeNull();
     expect(decodeAgentRunCursor('')).toBeNull();
+    // Payload that parses as JSON but fails the keyset schema (missing
+    // `id`) — schema validation guards against shape drift across
+    // backends or future codec changes.
+    const wrongShape = Buffer.from(JSON.stringify({ startedAt: 'x' }), 'utf8').toString('base64url');
+    expect(decodeAgentRunCursor(wrongShape)).toBeNull();
   });
 });
 
