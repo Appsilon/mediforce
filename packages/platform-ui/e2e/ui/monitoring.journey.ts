@@ -32,8 +32,8 @@ test.describe('Monitoring Journey', () => {
     // archive instances under the shared `test` namespace.
     expect(summaryBody).toHaveProperty('summary.runs.running');
     expect(summaryBody).toHaveProperty('summary.runs.paused');
-    expect(summaryBody).toHaveProperty('summary.runs.failed_24h');
-    expect(summaryBody).toHaveProperty('summary.runs.completed_24h');
+    expect(summaryBody).toHaveProperty('summary.runs.failed');
+    expect(summaryBody).toHaveProperty('summary.runs.completed');
     expect(summaryBody).toHaveProperty('summary.tasks.pending');
     expect(summaryBody).toHaveProperty('summary.tasks.claimed');
 

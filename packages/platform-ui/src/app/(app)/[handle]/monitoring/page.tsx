@@ -50,8 +50,8 @@ export default function MonitoringPage() {
         <MonitoringSummaryCards
           running={runs?.running ?? 0}
           paused={runs?.paused ?? 0}
-          failed={runs?.failed_24h ?? 0}
-          completed={runs?.completed_24h ?? 0}
+          failed={runs?.failed ?? 0}
+          completed={runs?.completed ?? 0}
           loading={loading}
         />
       </section>

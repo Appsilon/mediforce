@@ -51,7 +51,7 @@ describe('getMonitoringSummary handler', () => {
     });
   });
 
-  it('counts archived runs separately and skips their tasks', async () => {
+  it('counts archived runs in their status bucket (parity with pre-PR2 useMonitoringData)', async () => {
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-1', namespace: 'h', status: 'completed', archived: true }),
     );
@@ -61,37 +61,24 @@ describe('getMonitoringSummary handler', () => {
 
     const scope = createTestScope({ humanTaskRepo, instanceRepo });
     const result = await getMonitoringSummary({ handle: 'h' }, scope);
-    expect(result.summary.runs.archived_total).toBe(1);
+    expect(result.summary.runs.completed).toBe(1);
     expect(result.summary.runs.running).toBe(0);
-    expect(result.summary.tasks.pending).toBe(0);
+    expect(result.summary.tasks.pending).toBe(1);
   });
 
-  it('marks claimed tasks older than 24h as stuck', async () => {
-    const longAgo = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
-    const recent = new Date(Date.now() - 60 * 1000).toISOString();
-    await instanceRepo.create(buildProcessInstance({ id: 'inst-1', namespace: 'h', status: 'running' }));
-    await humanTaskRepo.create(
-      buildHumanTask({
-        id: 't-old',
-        processInstanceId: 'inst-1',
-        assignedRole: 'r',
-        status: 'claimed',
-        updatedAt: longAgo,
-      }),
+  it('counts completed and failed all-time (no 24h window)', async () => {
+    const longAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'inst-old-c', namespace: 'h', status: 'completed', updatedAt: longAgo }),
     );
-    await humanTaskRepo.create(
-      buildHumanTask({
-        id: 't-new',
-        processInstanceId: 'inst-1',
-        assignedRole: 'r',
-        status: 'claimed',
-        updatedAt: recent,
-      }),
+    await instanceRepo.create(
+      buildProcessInstance({ id: 'inst-old-f', namespace: 'h', status: 'failed', updatedAt: longAgo }),
     );
 
     const scope = createTestScope({ humanTaskRepo, instanceRepo });
     const result = await getMonitoringSummary({ handle: 'h' }, scope);
-    expect(result.summary.tasks.stuck_count).toBe(1);
+    expect(result.summary.runs.completed).toBe(1);
+    expect(result.summary.runs.failed).toBe(1);
   });
 
   it('throws ForbiddenError when user caller is not a member of handle', async () => {

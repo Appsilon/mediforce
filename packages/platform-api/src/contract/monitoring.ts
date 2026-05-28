@@ -16,14 +16,12 @@ export const MonitoringSummarySchema = z.object({
   runs: z.object({
     running: z.number().int().nonnegative(),
     paused: z.number().int().nonnegative(),
-    completed_24h: z.number().int().nonnegative(),
-    failed_24h: z.number().int().nonnegative(),
-    archived_total: z.number().int().nonnegative(),
+    completed: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
   }),
   tasks: z.object({
     pending: z.number().int().nonnegative(),
     claimed: z.number().int().nonnegative(),
-    stuck_count: z.number().int().nonnegative(),
   }),
   roleTaskCounts: z.record(
     z.string(),
