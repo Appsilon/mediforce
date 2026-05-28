@@ -36,6 +36,22 @@ services:
       timeout: 3s
       retries: 5
 
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    mem_limit: ${POSTGRES_MEM_LIMIT:-1g}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mediforce}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-mediforce}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mediforce} -d ${POSTGRES_DB:-mediforce}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   platform-ui:
     build:
       context: .
@@ -55,6 +71,11 @@ services:
       - "3000"
     environment:
       - REDIS_URL=redis://redis:6379
+      # ADR-0001 — Postgres storage backend. Default still firestore until
+      # cutover; flip STORAGE_BACKEND=postgres in the host `.env` when ready.
+      # Auto-migrate runs via Dockerfile CMD (migrate.mjs && server.js).
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-firestore}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}
       - PLATFORM_API_KEY=${PLATFORM_API_KEY}
       - SECRETS_ENCRYPTION_KEY=${SECRETS_ENCRYPTION_KEY}
       - DOCKER_DEEPSEEK_API_KEY=${DOCKER_DEEPSEEK_API_KEY}
@@ -88,6 +109,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   container-worker:
     build:
@@ -112,3 +135,4 @@ volumes:
   redis-data:
   caddy-data:
   caddy-config:
+  postgres-data:

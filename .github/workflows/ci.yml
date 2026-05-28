@@ -60,6 +60,38 @@ jobs:
         run: docker build -t mediforce-node:latest -f packages/agent-runtime/container/Dockerfile.node .
       - run: pnpm test:unit
 
+  postgres-tests:
+    # ADR-0001 parity: every Postgres-backed repository test runs against a
+    # real Postgres instance. Set TEST_DATABASE_URL so the parity suites
+    # exercise the Postgres branch instead of skipping it.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mediforce
+          POSTGRES_PASSWORD: mediforce
+          POSTGRES_DB: mediforce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mediforce -d mediforce"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://mediforce:mediforce@localhost:5432/mediforce
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mediforce/platform-infra exec vitest run src/postgres
+
   e2e-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -163,6 +195,116 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
+          path: packages/platform-ui/playwright-report/
+          retention-days: 14
+
+  e2e-tests-postgres:
+    # ADR-0001 L3 API E2E against the Postgres path. Runs the api Playwright
+    # project (browserless HTTP journeys) with STORAGE_BACKEND=postgres
+    # against a real Postgres container. Auth still goes through Firebase
+    # emulators — ADR-0002 (NextAuth) is a later phase.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mediforce
+          POSTGRES_PASSWORD: mediforce
+          POSTGRES_DB: mediforce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mediforce -d mediforce"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://mediforce:mediforce@localhost:5432/mediforce
+      STORAGE_BACKEND: postgres
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply Postgres migrations
+        run: pnpm db:migrate
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('packages/platform-ui/pnpm-lock.yaml', 'pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @mediforce/platform-ui exec playwright install --with-deps chromium
+
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter @mediforce/platform-ui exec playwright install-deps chromium
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Start Firebase Emulators
+        working-directory: packages/platform-ui
+        run: |
+          firebase emulators:start --project demo-mediforce --only auth,firestore --config firebase.ci.json &
+          curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:9099/
+          curl --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:8080/
+
+      # Same baked NEXT_PUBLIC_* vars as the e2e-tests job → same cache hits.
+      # STORAGE_BACKEND is read at runtime so it does not affect the bake.
+      - name: Cache .next build for E2E
+        id: next-cache
+        uses: actions/cache@v5
+        with:
+          path: packages/platform-ui/.next
+          key: next-e2e-v1-${{ runner.os }}-${{ hashFiles('packages/*/src/**/*.ts', 'packages/*/src/**/*.tsx', 'packages/*/src/**/*.js', 'packages/*/src/**/*.jsx', 'packages/*/src/**/*.css', 'packages/platform-ui/public/**', 'packages/platform-ui/next.config.mjs', 'packages/*/tsconfig.json', 'tsconfig.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml') }}-env-fake-api-key-localhost-demo-mediforce-demo-mediforce.appspot.com-000000000000-1:000000000000:web:fake-true-http://localhost:9007
+
+      - name: Build platform-ui for E2E
+        if: steps.next-cache.outputs.cache-hit != 'true'
+        run: cd packages/platform-ui && pnpm build:e2e
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-mediforce.appspot.com
+          FIREBASE_PROJECT_ID: demo-mediforce
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
+          PLATFORM_API_KEY: ci-e2e-test-key
+          SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+
+      - name: Run API E2E against Postgres
+        run: pnpm test:e2e:api
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: fake-api-key
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-mediforce
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-mediforce.appspot.com
+          FIREBASE_PROJECT_ID: demo-mediforce
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:fake'
+          PLATFORM_API_KEY: ci-e2e-test-key
+          SECRETS_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+          MEDIFORCE_DISABLE_EMAIL: 'true'
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-postgres
           path: packages/platform-ui/playwright-report/
           retention-days: 14
 
