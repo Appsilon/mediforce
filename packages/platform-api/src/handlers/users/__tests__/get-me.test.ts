@@ -280,7 +280,11 @@ describe('getMe handler', () => {
 
     expect(result.user.email).toBeNull();
     expect(result.user.displayName).toBeNull();
-    expect(result.namespaces[0]?.handle).toBe('user');
+    // No userDirectory → email is null, so generateHandle falls back to the
+    // uid as seed. `'uid-marek'` is already a valid handle, so no further
+    // transformation; the PERSONAL_HANDLE_FALLBACK ('user') only kicks in
+    // when the seed sanitises down to an empty string.
+    expect(result.namespaces[0]?.handle).toBe('uid-marek');
   });
 
   it('appends a numeric suffix when the base handle is already taken', async () => {

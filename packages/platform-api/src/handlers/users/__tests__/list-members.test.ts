@@ -71,7 +71,9 @@ function directoryWith(
       return [];
     },
     async getUserMetadata(uid: string) {
-      return map.has(uid) ? map.get(uid) ?? null : null;
+      const entry = map.has(uid) ? map.get(uid) ?? null : null;
+      if (entry === null) return null;
+      return { ...entry, displayName: null };
     },
   };
 }
@@ -157,7 +159,7 @@ describe('listNamespaceMembers handler', () => {
       },
       async getUserMetadata(uid: string) {
         if (uid === 'uid-member') throw new Error('boom');
-        return { email: 'owner@alpha.test', lastSignInTime: null };
+        return { email: 'owner@alpha.test', displayName: null, lastSignInTime: null };
       },
     };
     const scope = createTestScope({ namespaceRepo, userDirectory: flaky });
