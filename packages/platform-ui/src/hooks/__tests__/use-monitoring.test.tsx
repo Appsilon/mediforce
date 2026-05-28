@@ -17,8 +17,8 @@ vi.mock('@/lib/mediforce', () => ({
 const { useMonitoringSummary } = await import('../use-monitoring');
 
 const EMPTY_SUMMARY: MonitoringSummary = {
-  runs: { running: 0, paused: 0, completed_24h: 0, failed_24h: 0, archived_total: 0 },
-  tasks: { pending: 0, claimed: 0, stuck_count: 0 },
+  runs: { running: 0, paused: 0, completed: 0, failed: 0 },
+  tasks: { pending: 0, claimed: 0 },
   roleTaskCounts: {},
 };
 

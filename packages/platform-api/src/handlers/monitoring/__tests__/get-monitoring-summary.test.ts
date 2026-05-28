@@ -66,7 +66,7 @@ describe('getMonitoringSummary handler', () => {
     expect(result.summary.tasks.pending).toBe(1);
   });
 
-  it('counts completed and failed all-time (no 24h window)', async () => {
+  it('counts completed and failed runs regardless of age', async () => {
     const longAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     await instanceRepo.create(
       buildProcessInstance({ id: 'inst-old-c', namespace: 'h', status: 'completed', updatedAt: longAgo }),
