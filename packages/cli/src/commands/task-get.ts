@@ -1,5 +1,5 @@
 import { defineCommand } from '../define-command.js';
-import { printJson } from '../output.js';
+import { printJson, printKv } from '../output.js';
 
 export const taskGetCommand = defineCommand({
   name: 'mediforce task get',
@@ -14,15 +14,15 @@ export const taskGetCommand = defineCommand({
       return 0;
     }
     output.stdout(`Task ${task.id}`);
-    output.stdout(`  status:        ${task.status}`);
-    output.stdout(`  role:          ${task.assignedRole}`);
-    output.stdout(`  assignedUser:  ${task.assignedUserId ?? '(unassigned)'}`);
-    output.stdout(`  instance:      ${task.processInstanceId}`);
-    output.stdout(`  step:          ${task.stepId}`);
-    output.stdout(`  created:       ${task.createdAt}`);
-    if (task.completedAt !== null) {
-      output.stdout(`  completed:     ${task.completedAt}`);
-    }
+    printKv(output, [
+      ['status', task.status],
+      ['role', task.assignedRole],
+      ['assignedUser', task.assignedUserId ?? '(unassigned)'],
+      ['instance', task.processInstanceId],
+      ['step', task.stepId],
+      ['created', task.createdAt],
+      ['completed', task.completedAt ?? undefined],
+    ]);
     return 0;
   },
 });

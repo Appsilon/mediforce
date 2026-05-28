@@ -1,5 +1,5 @@
 import { defineCommand } from '../define-command.js';
-import { printJson } from '../output.js';
+import { printJson, printKv } from '../output.js';
 
 export const taskClaimCommand = defineCommand({
   name: 'mediforce task claim',
@@ -14,8 +14,10 @@ export const taskClaimCommand = defineCommand({
       return 0;
     }
     output.stdout(`Task ${result.task.id} claimed`);
-    output.stdout(`  status:        ${result.task.status}`);
-    output.stdout(`  assignedUser:  ${result.task.assignedUserId ?? '(unassigned)'}`);
+    printKv(output, [
+      ['status', result.task.status],
+      ['assignedUser', result.task.assignedUserId ?? '(unassigned)'],
+    ]);
     return 0;
   },
 });
