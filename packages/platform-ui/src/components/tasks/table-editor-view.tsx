@@ -455,7 +455,7 @@ function StaticCell({ field, href, link }: { field: unknown; href: string | unde
   return <span className="font-medium">{text}</span>;
 }
 
-function deriveInitials(name: string): string {
+export function deriveInitials(name: string): string {
   const words = name.trim().split(/\s+/);
   const first = words[0]?.[0] ?? '';
   const last = words.length > 1 ? words[words.length - 1]![0] ?? '' : '';
