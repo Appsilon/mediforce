@@ -32,12 +32,15 @@ afterEach(() => {
 });
 
 describe('useAgentRuns', () => {
-  it('GETs /api/agent-runs with namespace filter and returns runs', async () => {
+  it('GETs /api/agent-runs with namespace filter + unbounded UI limit', async () => {
     listMock.mockResolvedValue({ runs: [buildAgentRun({ id: 'r-1' })] });
     const { wrapper } = createQueryWrapper();
     const { result } = renderHook(() => useAgentRuns('team-alpha'), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(listMock).toHaveBeenCalledWith({ namespace: 'team-alpha' });
+    // The UI hook fetches the whole workspace in one bounded request so
+    // the JS-side filters on Run History keep working. CLI / server-actor
+    // callers continue to walk the cursor pagination.
+    expect(listMock).toHaveBeenCalledWith({ namespace: 'team-alpha', limit: 10_000 });
     expect(result.current.data.map((r) => r.id)).toEqual(['r-1']);
   });
 
@@ -55,49 +58,6 @@ describe('useAgentRuns', () => {
     const { wrapper } = createQueryWrapper();
     renderHook(() => useAgentRuns(''), { wrapper });
     expect(listMock).not.toHaveBeenCalled();
-  });
-
-  it('exposes hasNextPage when the server returns a cursor', async () => {
-    listMock.mockResolvedValue({
-      runs: [buildAgentRun({ id: 'r-1' })],
-      nextCursor: 'cur-1',
-    });
-    const { wrapper } = createQueryWrapper();
-    const { result } = renderHook(() => useAgentRuns('team-alpha'), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.hasNextPage).toBe(true);
-    expect(result.current.isFetchingNextPage).toBe(false);
-  });
-
-  it('reports hasNextPage=false on the last page', async () => {
-    listMock.mockResolvedValue({ runs: [buildAgentRun({ id: 'r-1' })] });
-    const { wrapper } = createQueryWrapper();
-    const { result } = renderHook(() => useAgentRuns('team-alpha'), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.hasNextPage).toBe(false);
-  });
-
-  it('fetchNextPage forwards the cursor and concatenates pages', async () => {
-    listMock.mockResolvedValueOnce({
-      runs: [buildAgentRun({ id: 'r-1' })],
-      nextCursor: 'cur-1',
-    });
-    listMock.mockResolvedValueOnce({
-      runs: [buildAgentRun({ id: 'r-2' })],
-    });
-    const { wrapper } = createQueryWrapper();
-    const { result } = renderHook(() => useAgentRuns('team-alpha'), { wrapper });
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.data.map((r) => r.id)).toEqual(['r-1']);
-    expect(result.current.hasNextPage).toBe(true);
-
-    result.current.fetchNextPage();
-
-    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
-    expect(listMock).toHaveBeenNthCalledWith(2, { namespace: 'team-alpha', cursor: 'cur-1' });
-    await waitFor(() => expect(result.current.data.map((r) => r.id)).toEqual(['r-1', 'r-2']));
-    expect(result.current.hasNextPage).toBe(false);
   });
 });
 

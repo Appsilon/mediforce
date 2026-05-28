@@ -18,7 +18,7 @@ describe('ListAgentRunsInputSchema', () => {
     expect(ok.success).toBe(true);
     if (ok.success) expect(ok.data.limit).toBe(10);
 
-    const overCap = ListAgentRunsInputSchema.safeParse({ limit: 500 });
+    const overCap = ListAgentRunsInputSchema.safeParse({ limit: 10_001 });
     expect(overCap.success).toBe(false);
   });
 
