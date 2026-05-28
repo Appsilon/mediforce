@@ -280,33 +280,17 @@ Redis. The host needs two things before `platform-ui` will start:
    `docker compose down -v` is still a normal reset workflow on a
    developer machine.
 
-Both are handled by **`scripts/bootstrap-server.py`** — the same tool that
-provisions a fresh server. It generates `POSTGRES_PASSWORD` if missing,
-writes it into `/opt/mediforce/.env`, and creates the bind-mount dir with
-the right ownership. The script is idempotent: re-running against an
-already-bootstrapped server reads the existing remote `.env`, hydrates
-managed keys (`PLATFORM_API_KEY`, `SECRETS_ENCRYPTION_KEY`,
-`DOCKER_OPENROUTER_API_KEY`, `POSTGRES_PASSWORD`), preserves any
-unmanaged operator-added keys verbatim, and only generates **missing**
-values. Firebase config comes from local state (`~/.mediforce/`). Every
-re-render also leaves a timestamped `.bak-YYYYMMDDTHHMMSSZ` copy of the
-previous `.env` next to it on the host — recoverable via a manual `cp`
-if anything goes sideways. The SSH probe fails loudly if the remote
-`.env` can't be read, rather than silently treating it as "fresh server"
-— that path would regenerate `SECRETS_ENCRYPTION_KEY` and make every
-stored workflow secret unrecoverable.
+**Fresh server provisioning** is handled by
+[`scripts/bootstrap-server.py`](scripts/bootstrap-server.py): it
+auto-generates `POSTGRES_PASSWORD` (per ADR-0001, PR #559) and creates
+the bind-mount data dir with the right ownership as part of its
+`step_env_local` + `step_postgres_dir` flow on a new host.
 
-This same pattern (`--from-step 10 --dry-run`, then the real run) is the
-canonical way to push **any** new env var to an already-bootstrapped
-deployment — extend `_render_compose_env` in `bootstrap-server.py`, then
-re-run against each target host. See the module docstring.
-
-```bash
-# Always dry-run first against an existing deployment.
-python3 scripts/bootstrap-server.py \
-  --host staging.mediforce.example --user deploy \
-  --from-step api_keys --dry-run
-```
+**Already-bootstrapped deployments** (the current staging) — bootstrap
+is not re-run against them. Add `POSTGRES_PASSWORD` + create the dir
+manually via ssh. See
+[`docs/staging-postgres-prep.md`](docs/staging-postgres-prep.md) for
+the one-off checklist.
 
 `platform-ui` runs Drizzle migrations on every container start via
 [`packages/platform-infra/scripts/migrate.mjs`](packages/platform-infra/scripts/migrate.mjs)

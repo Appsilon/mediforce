@@ -15,38 +15,12 @@ so sync flows keep working).
 State is persisted at ~/.mediforce/bootstrap-<host>.json so the run is
 resumable after Ctrl+C or a network hiccup.
 
-The script **attempts to be safe to re-run against existing servers**
-— not byte-idempotent (the rendered .env carries a fresh
-`# Generated: …` timestamp, every scp upload creates a new
-`.bak-<UTC>` copy, and step_first_deploy rebuilds docker images), and
-the re-run path is **not yet battle-tested in production**, so the
-operator stays in the loop via preview + dry-run. The intent:
-re-running reads the existing /opt/mediforce/.env, hydrates managed
-secrets back into memory, and only generates values that are actually
-missing. Existing PLATFORM_API_KEY / SECRETS_ENCRYPTION_KEY /
-OPENROUTER_API_KEY / POSTGRES_PASSWORD should survive the round-trip
-unchanged. Unmanaged keys (operator-added entries) are preserved
-verbatim under a comment-labeled section in the re-rendered file.
-Every upload also leaves a timestamped .bak-YYYYMMDDTHHMMSSZ copy of
-the previous file next to it — defense in depth for the hydration
-code, not the other way around. To add a new env var to an
-already-bootstrapped deployment: extend _render_compose_env, then
-`--from-step N --to-step M --dry-run` to scope a contiguous block of
-steps against each target host, review the preview, then drop
---dry-run.
-
 Usage:
-    python3 scripts/bootstrap-server.py                                # interactive, fresh server
+    python3 scripts/bootstrap-server.py                                # interactive
     python3 scripts/bootstrap-server.py --host 1.2.3.4
     python3 scripts/bootstrap-server.py --repo Appsilon/mediforce-pharmaverse
     python3 scripts/bootstrap-server.py --branch main --from-step 6
     python3 scripts/bootstrap-server.py --resume                       # force resume prompt
-
-    # Re-run pattern (add a new env var, top up missing secrets, fix postgres-data dir):
-    # --to-step 13 stops cleanly before step 14 (firewall) and 15 (first_deploy);
-    # the next CI deploy applies the new .env without us touching the server.
-    python3 scripts/bootstrap-server.py --host <existing> --user deploy --from-step 10 --to-step 13 --dry-run
-    python3 scripts/bootstrap-server.py --host <existing> --user deploy --from-step 10 --to-step 13
 """
 
 from __future__ import annotations
@@ -1293,12 +1267,6 @@ def _render_compose_env(ctx: Context) -> str:
         f"DOMAIN={_caddy_site(ctx)}",
         "",
     ]
-    extras = ctx.collected.get("_remote_env_extras") or {}
-    if extras:
-        lines.append("# Preserved from existing remote .env (manually added, not managed by bootstrap)")
-        for key in sorted(extras):
-            lines.append(f"{key}={extras[key]}")
-        lines.append("")
     return "\n".join(lines)
 
 
@@ -1336,125 +1304,7 @@ def _preview_env(rendered: str) -> str:
     return "\n".join(out_lines)
 
 
-def _fetch_remote_compose_env(ctx: Context) -> Optional[dict[str, str]]:
-    """Read /opt/mediforce/.env from the server, return KEY=VALUE pairs.
-
-    Returns:
-      - dict (possibly empty) when the file exists and was parsed successfully
-      - None when the file does not exist (fresh server)
-
-    Raises RuntimeError on any other failure (network drop, permission
-    issue). Distinguishing "missing" from "probe failed" is load-bearing:
-    silently treating an SSH error as "no existing keys" would cause
-    _ensure_api_keys to regenerate PLATFORM_API_KEY + SECRETS_ENCRYPTION_KEY,
-    and the subsequent upload would clobber the live file — destroying
-    every stored workflow secret. Caller must check for None and decide
-    whether a fresh-server flow is appropriate before proceeding.
-
-    Strips surrounding whitespace and unwraps a single layer of matching
-    quotes — matches docker compose's own .env parser. `partition("=")`
-    handles `FOO=bar=baz` correctly (split on first `=` only).
-    """
-    remote_path = f"{REMOTE_DEPLOY_DIR}/.env"
-    # Probe must distinguish "file truly missing" from "ssh/cat failed":
-    #   - File missing: explicit sentinel on stdout, rc=0
-    #   - File present + readable: file contents, rc=0
-    #   - Anything else (permission denied, ssh fail): rc != 0 → raise
-    script = (
-        f"if [ ! -f {shlex.quote(remote_path)} ]; then "
-        "echo __BOOTSTRAP_ENV_MISSING__; exit 0; "
-        f"fi; cat {shlex.quote(remote_path)}"
-    )
-    probe = ssh(ctx, script)
-    if probe.rc != 0:
-        raise RuntimeError(
-            f"probe of {remote_path} failed (rc={probe.rc}): {probe.stderr.strip() or '<no stderr>'}. "
-            "Refusing to proceed — silently treating this as 'fresh server' would regenerate "
-            "SECRETS_ENCRYPTION_KEY and corrupt the live .env. Investigate the SSH connection "
-            "or remote file permissions, then retry."
-        )
-    if probe.stdout.strip().startswith("__BOOTSTRAP_ENV_MISSING__"):
-        return None
-    parsed: dict[str, str] = {}
-    for line in probe.stdout.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, val = line.partition("=")
-        key = key.strip()
-        val = val.strip()
-        if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
-            val = val[1:-1]
-        if key:
-            parsed[key] = val
-    return parsed
-
-
-def _fetch_remote_env_local(ctx: Context) -> dict[str, str]:
-    """Read /opt/mediforce/packages/platform-ui/.env.local from the server.
-
-    Returns {} when the file doesn't exist or can't be read. Unlike
-    _fetch_remote_compose_env, the absence of this file is benign — the
-    standalone Next.js container doesn't depend on it, so we don't need
-    to raise on probe failure. We only care about OPENAI_API_KEY since
-    it's the one key that lives here and not in /opt/mediforce/.env.
-    """
-    remote_path = f"{REMOTE_DEPLOY_DIR}/packages/platform-ui/.env.local"
-    script = (
-        f"if [ ! -f {shlex.quote(remote_path)} ]; then echo __MISSING__; exit 0; "
-        f"fi; cat {shlex.quote(remote_path)}"
-    )
-    probe = ssh(ctx, script)
-    if probe.rc != 0 or probe.stdout.strip().startswith("__MISSING__"):
-        return {}
-    parsed: dict[str, str] = {}
-    for line in probe.stdout.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, val = line.partition("=")
-        key = key.strip()
-        val = val.strip()
-        if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
-            val = val[1:-1]
-        if key:
-            parsed[key] = val
-    return parsed
-
-
-def _backup_remote_file_if_exists(ctx: Context, remote_path: str) -> Optional[str]:
-    """If `remote_path` exists, copy it to `<remote_path>.bak-<UTC timestamp>`.
-
-    Returns the backup path on success, None if the file didn't exist.
-    Cheap insurance: any re-render upload becomes recoverable via a manual
-    `cp` from the backup. Backups accumulate — operator can prune
-    periodically. We never delete old backups automatically because the
-    one time we'd want to is also the one time the operator wants the
-    history.
-    """
-    quoted = shlex.quote(remote_path)
-    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    backup_path = f"{remote_path}.bak-{stamp}"
-    # Single ssh: probe + cp atomically so we can't race a concurrent write.
-    # `cp -p` preserves mode/ownership; `cp -n` would no-clobber (irrelevant
-    # since the timestamped path is fresh).
-    script = (
-        f"if [ -f {quoted} ]; then "
-        f"cp -p {quoted} {shlex.quote(backup_path)} && echo __BACKED_UP__; "
-        "else echo __NOT_PRESENT__; fi"
-    )
-    result = ssh(ctx, script, check=True)
-    if "__BACKED_UP__" in result.stdout:
-        ok(f"backed up existing {remote_path} → {backup_path}")
-        return backup_path
-    return None
-
-
 def _upload_env_file(ctx: Context, rendered: str, remote_path: str) -> None:
-    if ctx.dry_run:
-        info(f"[dry-run] would back up existing {remote_path} (if present) then upload {len(rendered)} bytes")
-        return
-    _backup_remote_file_if_exists(ctx, remote_path)
     with tempfile.NamedTemporaryFile("w", delete=False) as tf:
         tf.write(rendered)
         tmp_path = Path(tf.name)
@@ -1475,98 +1325,7 @@ def _ensure_api_keys(ctx: Context) -> None:
     API keys are intentionally not persisted to local state — this is the
     authoritative place where they are collected, and step_env_local calls
     through here on resumed runs (when --from-step skipped step_api_keys).
-
-    On a re-run against an already-bootstrapped server, hydrate from the
-    existing remote .env first so existing PLATFORM_API_KEY /
-    SECRETS_ENCRYPTION_KEY / OPENROUTER_API_KEY values are preserved
-    verbatim — regenerating SECRETS_ENCRYPTION_KEY would make every stored
-    workflow secret unrecoverable, so this hydration is load-bearing.
     """
-    remote_env = _fetch_remote_compose_env(ctx)
-    if remote_env is None:
-        info("No existing /opt/mediforce/.env on server — fresh-server flow.")
-    else:
-        # Also pick up OPENAI_API_KEY from the matching .env.local —
-        # it lives there, not in the compose env. Failure to hydrate it
-        # would silently empty the field in the re-rendered .env.local.
-        remote_env_local = _fetch_remote_env_local(ctx)
-        if remote_env_local:
-            openai_from_local = remote_env_local.get("OPENAI_API_KEY", "")
-            if openai_from_local and "OPENAI_API_KEY" not in ctx.collected:
-                ctx.collected["OPENAI_API_KEY"] = openai_from_local
-                ok("hydrated OPENAI_API_KEY from remote .env.local")
-
-        hydrated_keys = []
-        for key in ("OPENROUTER_API_KEY", "PLATFORM_API_KEY",
-                    "SECRETS_ENCRYPTION_KEY", "POSTGRES_PASSWORD"):
-            # _render_compose_env writes OPENROUTER as DOCKER_OPENROUTER_API_KEY;
-            # the in-memory key keeps its un-prefixed name, so map back here.
-            remote_key = "DOCKER_OPENROUTER_API_KEY" if key == "OPENROUTER_API_KEY" else key
-            existing = remote_env.get(remote_key, "")
-            if existing and key not in ctx.collected:
-                ctx.collected[key] = existing
-                hydrated_keys.append(key)
-        if hydrated_keys:
-            ok(f"hydrated from remote /opt/mediforce/.env: {', '.join(hydrated_keys)}")
-        # DOMAIN is non-secret but persisted in remote .env; hydrate into
-        # ctx.state so step_domain skips its prompt on re-runs that used
-        # a different --host alias (state file is per-host-string).
-        remote_domain = remote_env.get("DOMAIN", "")
-        if remote_domain and not ctx.state.domain:
-            ctx.state.domain = remote_domain
-            ctx.state.save()
-            ok(f"hydrated DOMAIN from remote .env: {remote_domain} (saved to state)")
-        # Firebase web SDK config is also persisted in remote .env (as
-        # NEXT_PUBLIC_FIREBASE_* lines). Hydrate so step_env_local's
-        # "Loaded Firebase web SDK config from state" path fires instead
-        # of falling through to a re-fetch via the Firebase CLI (which
-        # fails if the operator isn't logged in to firebase on this laptop).
-        fb_field_map = {
-            "apiKey": "NEXT_PUBLIC_FIREBASE_API_KEY",
-            "authDomain": "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
-            "projectId": "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
-            "storageBucket": "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
-            "messagingSenderId": "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
-            "appId": "NEXT_PUBLIC_FIREBASE_APP_ID",
-        }
-        if not ctx.state.firebase_web_config:
-            hydrated_fb = {
-                local_key: remote_env[remote_key]
-                for local_key, remote_key in fb_field_map.items()
-                if remote_env.get(remote_key)
-            }
-            if hydrated_fb.get("projectId"):
-                ctx.state.firebase_web_config = hydrated_fb
-                if not ctx.state.firebase_project_id:
-                    ctx.state.firebase_project_id = hydrated_fb["projectId"]
-                ctx.state.save()
-                ok(f"hydrated Firebase web SDK config from remote .env ({hydrated_fb['projectId']})")
-        # Stash any keys the bootstrap script does NOT manage (e.g. MAILGUN_*,
-        # operator-added overrides) so step_env_local can carry them through
-        # to the re-rendered file. Without this, the scp upload would silently
-        # drop manually-added entries.
-        managed_keys = {
-            "NEXT_PUBLIC_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
-            "NEXT_PUBLIC_FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
-            "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", "NEXT_PUBLIC_FIREBASE_APP_ID",
-            "NEXT_PUBLIC_APP_URL", "PLATFORM_API_KEY", "SECRETS_ENCRYPTION_KEY",
-            "DOCKER_OPENROUTER_API_KEY", "DOCKER_DEEPSEEK_API_KEY",
-            "POSTGRES_PASSWORD", "DOMAIN",
-        }
-        extras = {k: v for k, v in remote_env.items() if k not in managed_keys}
-        if extras:
-            ctx.collected["_remote_env_extras"] = extras
-            info(f"preserving {len(extras)} unmanaged key(s) from remote .env: {', '.join(sorted(extras))}")
-        # Loud guard against the silent-loss case: file existed but contained
-        # no managed keys (truncated? corrupted?). Better to abort than to
-        # treat an empty file as "fresh server".
-        if not hydrated_keys and not extras:
-            raise RuntimeError(
-                f"remote /opt/mediforce/.env exists but parsed to 0 known keys "
-                f"({len(remote_env)} total entries). Inspect the file before re-running — "
-                "regenerating from scratch would corrupt existing deployment secrets."
-            )
-
     if not ctx.collected.get("OPENROUTER_API_KEY"):
         ctx.collected["OPENROUTER_API_KEY"] = ask(
             "OpenRouter API key (starts with sk-or-…) — get one at https://openrouter.ai/keys",
@@ -1900,7 +1659,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--repo", help=f"GitHub repo to deploy, e.g. Org/Name (default: {DEFAULT_REPO}).")
     p.add_argument("--branch", help=f"Branch to deploy (default: {DEFAULT_BRANCH}).")
     p.add_argument("--from-step", type=int, help="Skip to step number N (1-based).")
-    p.add_argument("--to-step", type=int, help="Stop after step number N (1-based, inclusive). Useful with --from-step to run a range without manually aborting at later prompts.")
     p.add_argument("--only-step", help="Run a single step by name (e.g. docker_gc) and exit.")
     p.add_argument("--resume", action="store_true", help="Force resume prompt even if state looks fresh.")
     p.add_argument("--dry-run", action="store_true", help="Describe actions without making changes.")
@@ -2008,22 +1766,8 @@ def main() -> int:
         return 0
 
     start = resolve_start_index(args, state)
-    # --to-step bounds the upper end (inclusive, 1-based). Defaults to last
-    # step. Range check mirrors --from-step.
-    if args.to_step is not None:
-        if args.to_step < 1 or args.to_step > len(STEPS):
-            raise SystemExit(
-                f"--to-step {args.to_step} out of range (1..{len(STEPS)})"
-            )
-        if args.to_step < start + 1:
-            raise SystemExit(
-                f"--to-step {args.to_step} is before --from-step {start + 1}; nothing to run"
-            )
-        stop = args.to_step
-    else:
-        stop = len(STEPS)
     try:
-        for idx, (name, title, fn) in enumerate(STEPS[start:stop], start=start + 1):
+        for idx, (name, title, fn) in enumerate(STEPS[start:], start=start + 1):
             section(f"{idx}. {title}")
             fn(ctx)
             state.mark(name)
