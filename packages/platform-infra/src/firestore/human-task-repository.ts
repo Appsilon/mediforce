@@ -93,8 +93,17 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
           .get(),
       ),
     );
+    // Skip per-row `HumanTaskSchema.parse` for the same reason
+    // `FirestoreProcessInstanceRepository.listAll` skips its parse: a
+    // single legacy doc with an out-of-enum `status` or a `Timestamp`-
+    // typed `updatedAt` would otherwise 400 the whole monitoring summary
+    // (which fans out across every workspace task). The monitoring
+    // aggregator tolerates the raw shape — unknown statuses skip the
+    // bucket, and non-finite `updatedAt` falls out of the
+    // `Number.isFinite` stuck-task guard. Callers that need the strict
+    // shape (e.g. the per-instance `getByInstanceId`) still parse.
     return snapshots.flatMap((snap) =>
-      snap.docs.map((d) => HumanTaskSchema.parse(d.data())),
+      snap.docs.map((d) => d.data() as HumanTask),
     );
   }
 

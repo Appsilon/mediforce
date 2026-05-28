@@ -15,7 +15,9 @@ interface InCall {
   readonly values: readonly string[];
 }
 
-function makeDb(): { db: Firestore; calls: InCall[] } {
+function makeDb(
+  docsByChunk: ReadonlyArray<ReadonlyArray<Record<string, unknown>>> = [],
+): { db: Firestore; calls: InCall[] } {
   const calls: InCall[] = [];
   const query: Record<string, unknown> = {};
   query.where = vi.fn((field: string, op: string, value: unknown) => {
@@ -24,7 +26,12 @@ function makeDb(): { db: Firestore; calls: InCall[] } {
     }
     return query;
   });
-  query.get = vi.fn(async () => ({ docs: [] }));
+  query.get = vi.fn(async () => {
+    const idx = (query.get as { _callIdx?: number })._callIdx ?? 0;
+    (query.get as { _callIdx?: number })._callIdx = idx + 1;
+    const docs = docsByChunk[idx] ?? [];
+    return { docs: docs.map((d) => ({ id: String(d.id ?? 'x'), data: () => d })) };
+  });
   const db = {
     collection: vi.fn((name: string) => {
       if (name !== 'humanTasks') throw new Error(`unexpected: ${name}`);
@@ -98,5 +105,29 @@ describe('FirestoreHumanTaskRepository.getByInstanceIdsAll', () => {
     await repo.getByInstanceIdsAll(ids(113));
 
     expect(calls.map((c) => c.values.length)).toEqual([30, 30, 30, 23]);
+  });
+
+  it('returns raw doc data without schema parse so legacy corrupt tasks do not 400 the page', async () => {
+    const corrupt = {
+      id: 'task-legacy',
+      processInstanceId: 'inst-0000',
+      assignedRole: 'reviewer',
+      assignedUserId: null,
+      status: 'cancelled',
+      createdAt: '2026-01-15T10:00:00.000Z',
+      updatedAt: { _seconds: 1, _nanoseconds: 0 },
+      completedAt: null,
+      completionData: {},
+      deleted: false,
+    };
+    const { db } = makeDb([[corrupt]]);
+    const parents = new InMemoryProcessInstanceRepository();
+    const repo = new FirestoreHumanTaskRepository(db, parents);
+
+    const result = await repo.getByInstanceIdsAll(['inst-0000']);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('task-legacy');
+    expect(result[0].status).toBe('cancelled');
   });
 });
