@@ -1480,5 +1480,15 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
+  // Match prod write shape — WorkflowEngine.createInstance writes `deleted: false`
+  // on every instance, and the runs.list query filters server-side via
+  // `.where('deleted','==',false)`. Firestore equality where-clauses do not
+  // match docs missing the field, so seeded rows without `deleted` are hidden.
+  for (const key of Object.keys(processInstances)) {
+    if (processInstances[key].deleted === undefined) {
+      processInstances[key].deleted = false;
+    }
+  }
+
   return { users, humanTasks, processInstances, agentRuns, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
 }
