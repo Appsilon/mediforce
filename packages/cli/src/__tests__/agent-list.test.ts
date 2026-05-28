@@ -46,7 +46,7 @@ describe('agent list command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/Usage: mediforce agent list/);
+    expect(output.stdoutLines.join('\n')).toMatch(/USAGE mediforce agent list/);
   });
 
   it('lists agents in human-readable format', async () => {

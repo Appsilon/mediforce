@@ -14,105 +14,15 @@ import {
   type AuthError,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+// TODO(phase-4 follow-up): The `mustChangePassword` flag is the last
+// firestore read in this file. Moving it to a dedicated endpoint
+// (`GET /api/users/me` extension + `POST /api/users/me/clear-must-change-password`)
+// requires a new `UserProfileRepository`; tracked separately to keep PR4
+// focused on the namespace + identity bundle. The personal-namespace
+// bootstrap that used to live here moved to the handler-side lazy create.
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-
-function generateHandle(email: string): string {
-  const localPart = email.split('@')[0] ?? '';
-  return localPart
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'user';
-}
-
-const namespaceCreationInProgress = new Set<string>();
-
-async function ensurePersonalNamespace(user: { uid: string; email: string | null; displayName: string | null }) {
-  if (namespaceCreationInProgress.has(user.uid)) return;
-  namespaceCreationInProgress.add(user.uid);
-
-  try {
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    const userData = userSnap.exists() ? userSnap.data() : {};
-
-    // Self-heal helper: the hardened rules from PR #250 silently rejected
-    // this uid's owner-member write on any prior login (circular-dep bug
-    // fixed in the Step-5 rules patch). A namespace doc may therefore exist
-    // without a member doc for the owner. Re-seed when missing.
-    async function ensureOwnerMember(handle: string): Promise<void> {
-      const memberRef = doc(db, 'namespaces', handle, 'members', user.uid);
-      const memberSnap = await getDoc(memberRef);
-      if (memberSnap.exists()) return;
-      await setDoc(memberRef, {
-        uid: user.uid,
-        role: 'owner',
-        ...(user.displayName !== null ? { displayName: user.displayName } : {}),
-        joinedAt: new Date().toISOString(),
-      });
-    }
-
-    if (typeof userData.handle === 'string' && userData.handle !== '') {
-      // Already has handle — check namespace exists
-      const nsRef = doc(db, 'namespaces', userData.handle);
-      const nsSnap = await getDoc(nsRef);
-      if (!nsSnap.exists()) {
-        await setDoc(nsRef, {
-          handle: userData.handle,
-          type: 'personal',
-          displayName: user.displayName ?? user.email ?? userData.handle,
-          linkedUserId: user.uid,
-          createdAt: new Date().toISOString(),
-        });
-      }
-      await ensureOwnerMember(userData.handle);
-      return;
-    }
-
-    // No handle in user doc — check if a personal namespace already exists for this uid
-    const existingQuery = query(
-      collection(db, 'namespaces'),
-      where('linkedUserId', '==', user.uid),
-      where('type', '==', 'personal'),
-      limit(1),
-    );
-    const existingSnap = await getDocs(existingQuery);
-    if (!existingSnap.empty) {
-      const existingHandle = existingSnap.docs[0]!.id;
-      await setDoc(userRef, { handle: existingHandle }, { merge: true });
-      await ensureOwnerMember(existingHandle);
-      return;
-    }
-
-    // No handle yet — generate one and create namespace
-    const baseHandle = generateHandle(user.email ?? user.uid);
-    let handle = baseHandle;
-    let attempt = 1;
-    while (true) {
-      const nsSnap = await getDoc(doc(db, 'namespaces', handle));
-      if (!nsSnap.exists()) break;
-      attempt += 1;
-      handle = `${baseHandle}-${attempt}`;
-    }
-
-    await setDoc(doc(db, 'namespaces', handle), {
-      handle,
-      type: 'personal',
-      displayName: user.displayName ?? user.email ?? handle,
-      linkedUserId: user.uid,
-      createdAt: new Date().toISOString(),
-    });
-    await setDoc(doc(db, 'namespaces', handle, 'members', user.uid), {
-      uid: user.uid,
-      role: 'owner',
-      ...(user.displayName !== null ? { displayName: user.displayName } : {}),
-      joinedAt: new Date().toISOString(),
-    });
-    await setDoc(userRef, { handle }, { merge: true });
-  } finally {
-    namespaceCreationInProgress.delete(user.uid);
-  }
-}
+import { useUserMe } from '@/hooks/use-user-me';
 
 interface AuthContextValue {
   firebaseUser: FirebaseUser | null;
@@ -180,6 +90,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [googleAuthEnabled, setGoogleAuthEnabled] = React.useState<boolean | null>(null);
   const [pendingGoogleCredential, setPendingGoogleCredential] = React.useState<OAuthCredential | null>(null);
 
+  // Trigger /api/users/me as soon as the user is signed in. The handler
+  // bootstraps the personal namespace on first call (formerly inline here as
+  // `ensurePersonalNamespace`), then react-query keeps the cache warm for
+  // every selector hook (`useNamespaceRole`, `useAllUserNamespaces`,
+  // `usePersonalNamespace`). The query result is consumed via the cache, not
+  // through this provider, so we just need it to *run*.
+  useUserMe({ enabled: firebaseUser !== null });
+
   React.useEffect(() => {
     // In emulator mode both providers are always enabled — skip probes to avoid
     // spurious 400 console errors that break E2E tests.
@@ -197,12 +115,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFirebaseUser(user);
 
       if (user !== null) {
-        const profile: Record<string, string> = {};
-        if (user.displayName !== null) profile.displayName = user.displayName;
-        if (user.photoURL !== null) profile.photoURL = user.photoURL;
-        if (user.email !== null) profile.email = user.email;
-        profile.uid = user.uid;
-
         // Resolve mustChangePassword BEFORE clearing loading — layout reads
         // both flags to decide whether to redirect to /change-password.
         // Clearing loading first lets layout render with the default
@@ -212,14 +124,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setMustChangePassword(snap.data().mustChangePassword === true);
           }
           setLoading(false);
-          if (Object.keys(profile).length > 0) {
-            setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch((err) => {
-              console.error('[auth] Failed to update user profile doc:', err);
-            });
-          }
-          ensurePersonalNamespace(user).catch((err) => {
-            console.error('[auth] ensurePersonalNamespace failed:', err);
-          });
         }).catch((err) => {
           // Fail-closed: if we cannot read mustChangePassword, assume it is true so
           // the forced-reset gate is never silently bypassed by a rules rejection or
@@ -227,14 +131,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('[auth] Failed to read user doc for mustChangePassword — failing closed:', err);
           setMustChangePassword(true);
           setLoading(false);
-          if (Object.keys(profile).length > 0) {
-            setDoc(doc(db, 'users', user.uid), profile, { merge: true }).catch((writeErr) => {
-              console.error('[auth] Failed to update user profile doc:', writeErr);
-            });
-          }
-          ensurePersonalNamespace(user).catch((nsErr) => {
-            console.error('[auth] ensurePersonalNamespace failed:', nsErr);
-          });
         });
       } else {
         setMustChangePassword(false);

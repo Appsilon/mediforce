@@ -75,6 +75,7 @@ COPY --from=builder /app/data ./data
 COPY --from=builder /app/packages/platform-infra/src/postgres/migrations ./packages/platform-infra/src/postgres/migrations
 COPY --from=builder /app/packages/platform-infra/scripts/migrate.mjs ./packages/platform-infra/scripts/migrate.mjs
 
+
 EXPOSE 3000
 
 CMD ["sh", "-c", "node packages/platform-infra/scripts/migrate.mjs && node packages/platform-ui/server.js"]

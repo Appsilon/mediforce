@@ -1,35 +1,59 @@
 'use client';
 
-import type { AuditEvent } from '@mediforce/platform-core';
-import { mediforce } from '@/lib/mediforce';
-import { useRetro } from './use-swr-mediforce';
+import { useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { AuditEvent, InstanceStatus, ProcessInstance } from '@mediforce/platform-core';
+import { ApiError, mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
 
-type AuditEventWithId = AuditEvent & { id: string };
+const CRITICAL_LIVE_INTERVAL_MS = 1500;
+const TERMINAL_RUN_STATUSES: ReadonlySet<InstanceStatus> = new Set(['completed', 'failed']);
 
 /**
- * Polls audit events for a single run via `mediforce.processes.listAuditEvents`.
- * 5s tier per PLAN-0001 §3 — audit events are retro / append-only.
+ * Audit-trail feed for a single run. CRITICAL LIVE per ADR-0006 §4 while the
+ * parent run is non-terminal (operator watching execution), then idle once the
+ * run reaches `completed` / `failed`. The terminal-state gate is read from the
+ * `['run', id]` query cache populated by `useProcessInstance`; if that cache
+ * is cold (audit page loaded directly), we keep polling because we cannot
+ * prove the run is terminal.
  */
-export function useAuditEvents(processInstanceId: string | null) {
-  const key = processInstanceId === null
-    ? null
-    : (['audit-events', processInstanceId] as const);
-
-  const { data, isLoading, error } = useRetro(
-    key,
-    async ([, instanceId]) => {
-      const result = await mediforce.processes.listAuditEvents({ instanceId });
-      return result.events as AuditEventWithId[];
+export function useAuditEvents(processInstanceId: string | null): {
+  data: AuditEvent[];
+  loading: boolean;
+  error: Error | null;
+} {
+  const qc = useQueryClient();
+  const enabled = processInstanceId !== null && processInstanceId.length > 0;
+  const query = useQuery({
+    queryKey: enabled ? queryKeys.audit(processInstanceId) : ['audit', '__noop__'] as const,
+    queryFn: async () => {
+      const result = await mediforce.processes.listAuditEvents({ instanceId: processInstanceId as string });
+      return result.events;
     },
-  );
+    enabled,
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+      return failureCount < 2;
+    },
+    refetchInterval: (q) => {
+      if (q.state.error !== null) return false;
+      if (!enabled) return false;
+      const run = qc.getQueryData<ProcessInstance>(queryKeys.run(processInstanceId as string));
+      if (run !== undefined && TERMINAL_RUN_STATUSES.has(run.status)) return false;
+      return CRITICAL_LIVE_INTERVAL_MS;
+    },
+  });
 
-  const sorted = data === undefined
-    ? []
-    : [...data].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const data = useMemo(() => {
+    const events = query.data ?? [];
+    return [...events].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  }, [query.data]);
 
+  // `isPending` keeps the skeleton on while the first fetch is in flight;
+  // gated by `enabled` so a deliberate `null` id surfaces `loading: false`.
   return {
-    data: sorted,
-    loading: isLoading,
-    error: error ?? null,
+    data,
+    loading: enabled && query.isPending,
+    error: (query.error as Error | null) ?? null,
   };
 }

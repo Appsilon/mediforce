@@ -1,0 +1,10 @@
+# Files copied into every new Claude Code worktree.
+# Same syntax as .gitignore. Only files that are ALSO gitignored get copied —
+# tracked files are never duplicated.
+#
+# Use for local secrets / env files that every worktree needs but that don't
+# belong in git (Firebase keys, OAuth client secrets, dev DB URLs, etc.).
+
+# Per-package env files (gitignored via .env.local / .env*.local rules)
+**/.env.local
+**/.env*.local

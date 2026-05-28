@@ -3,6 +3,7 @@ import {
   NamespaceMemberSchema,
   type Namespace,
   type NamespaceMember,
+  type NamespaceMembership,
 } from '../schemas/namespace.js';
 import type { NamespaceRepository } from '../interfaces/namespace-repository.js';
 
@@ -26,6 +27,18 @@ export class InMemoryNamespaceRepository implements NamespaceRepository {
   async createNamespace(namespace: Namespace): Promise<void> {
     const parsed = NamespaceSchema.parse(namespace);
     this.namespaces.set(parsed.handle, { ...parsed });
+  }
+
+  async createNamespaceWithOwner(input: {
+    namespace: Namespace;
+    ownerMember: NamespaceMember;
+  }): Promise<void> {
+    const parsedNs = NamespaceSchema.parse(input.namespace);
+    const parsedMember = NamespaceMemberSchema.parse(input.ownerMember);
+    this.namespaces.set(parsedNs.handle, { ...parsedNs });
+    const bucket = this.members.get(parsedNs.handle) ?? new Map<string, NamespaceMember>();
+    bucket.set(parsedMember.uid, { ...parsedMember });
+    this.members.set(parsedNs.handle, bucket);
   }
 
   async updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void> {
@@ -79,6 +92,22 @@ export class InMemoryNamespaceRepository implements NamespaceRepository {
       .map((h) => this.namespaces.get(h))
       .filter((n): n is Namespace => n !== undefined)
       .map((n) => ({ ...n }));
+  }
+
+  async getMembershipsForUser(uid: string): Promise<readonly NamespaceMembership[]> {
+    const out: NamespaceMembership[] = [];
+    // Personal namespace: implicit owner via linkedUserId.
+    for (const ns of this.namespaces.values()) {
+      if (ns.linkedUserId === uid) out.push({ handle: ns.handle, role: 'owner' });
+    }
+    // Org namespaces: explicit member role.
+    for (const [handle, bucket] of this.members) {
+      const member = bucket.get(uid);
+      if (member && !out.some((m) => m.handle === handle)) {
+        out.push({ handle, role: member.role });
+      }
+    }
+    return out;
   }
 
   /** Test helper: wipe all namespaces + members. */

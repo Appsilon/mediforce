@@ -21,6 +21,18 @@
 - [ ] Nullable fields handled defensively
 - [ ] No unbounded reads (missing `.limit()`)
 
+## 3a. Regression check — non-negotiable
+
+A behaviour the user could rely on yesterday MUST keep working today. Migrations, refactors, and rewrites are the most common offenders.
+
+- [ ] **Diff the user-observable surface, not just the code.** For every replaced read / write / endpoint / hook: compare OLD vs NEW in terms the user would notice (visible rows, polled freshness, error messages, retry behaviour, ordering, pagination, defaults).
+- [ ] **No silent caps.** If the old code fetched everything and the new code adds `.limit(N)`, that is a regression — even if N is "probably enough". Either keep parity, or ship the pagination that makes the cap correct in the same PR.
+- [ ] **No silent default changes.** If a default flipped (`retry: 2` → `retry: 0`, `polling: 1s` → `polling: 5s`, `showArchived: true` → `false`), call it out explicitly — it's a behaviour change, not a refactor.
+- [ ] **Migration parity sweep.** When replacing hook / endpoint / repo X with Y: enumerate X's call sites and side effects; verify Y covers each. If Y can't, the gap is the regression — flag it, don't ship around it.
+- [ ] Language matters: call a regression a **regression**, never "regression risk". A risk is "might break"; a regression is "does break under inputs Y could already give it". If you'd write "risk", reproduce the failing input first and confirm.
+
+**Regressions are blockers.** SHIP only after every regression is either fixed in the PR or deliberately accepted by the user with a tracked follow-up. Never accept a regression on the implementer's word.
+
 ## 4. API Design
 
 - [ ] RESTful conventions followed
@@ -43,6 +55,7 @@
 - [ ] No needless indirection — pass-through functions, re-exports of re-exports, config objects with one field.
 - [ ] Each hunk is a *sensible* change — not a copy-paste of the adjacent file with one symbol renamed.
 - [ ] No half-implemented branches, dangling TODOs, or scaffolding left from intermediate steps.
+- [ ] **No tech debt deferred to follow-up.** If the diff contains handmade code where a standard pattern would fit (custom string format where JSON / Zod / a library does it, per-domain helper where a generic in `platform-core` belongs, inline auth check where the wrapper exists, raw `fetch` where the CLI / client covers it), the refactor lands in **this PR** when it is small + mechanical (≤ ~100 LOC, ≤ ~3 call sites, no behaviour change). "We'll generalise when the second consumer lands" / "will file an issue" / "follow-up PR" for an adjacent ≤100-LOC mechanical refactor = debt accumulation — block. Only acceptable defer reasons: architectural change (new ADR, cross-package surface), genuinely large diff, or behaviour change that needs its own review.
 
 ## 5b. Dead code & removal candidates
 
@@ -71,6 +84,8 @@
 - [ ] No docstrings added to code the diff didn't change.
 - [ ] Self-documenting code wins: prefer a better name over a comment.
 - [ ] No "Added for X flow" / "Used by Y" / issue-number comments — that belongs in the PR description.
+- [ ] No section-title / banner comments (`// ---- POST /api/foo ----`, `// === Helpers ===`) — symbol names and file structure already delineate sections.
+- [ ] No ephemeral plan numbering or migration history (`// Phase 2.5`, `// added in Phase 2.6`, `// pre-Phase-2.5 Server Action`, `// replaces the old action`). Plan phases are temporary scaffolding; describe the durable behavior/reason instead. Test: would this still make sense to a reader in two years who never saw the plan? If not, cut it — the history belongs in the PR description / changelog.
 
 ## 6. Testing
 

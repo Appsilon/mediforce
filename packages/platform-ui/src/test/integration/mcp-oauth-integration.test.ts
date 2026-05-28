@@ -28,12 +28,39 @@ const fake = vi.hoisted(() => {
       getNamespace: async (handle: string) => namespaces.get(handle) ?? null,
       getMember: async (handle: string, uid: string) =>
         members.get(handle)?.get(uid) ?? null,
+      getNamespacesByUser: async (uid: string) => {
+        const result: Array<{ handle: string }> = [];
+        for (const [handle, byUid] of members.entries()) {
+          if (byUid.has(uid)) result.push({ handle });
+        }
+        return result;
+      },
+      getMembershipsForUser: async (uid: string) => {
+        const out: Array<{ handle: string; role: 'owner' | 'admin' | 'member' }> = [];
+        for (const [handle, byUid] of members.entries()) {
+          const member = byUid.get(uid) as
+            | { role: 'owner' | 'admin' | 'member' }
+            | undefined;
+          if (member) out.push({ handle, role: member.role });
+        }
+        return out;
+      },
     },
     agentDefinitionRepo: {
       getById: async (id: string) => agents.get(id) ?? null,
     },
+    auditRepo: {
+      append: async (_event: unknown) => undefined,
+    },
     oauthProviderRepo,
     agentOAuthTokenRepo,
+    auditRepo: {
+      append: async () => undefined,
+      getByEntity: async () => [],
+      getByProcess: async () => [],
+      getByProcessInNamespaces: async () => [],
+      getByActor: async () => [],
+    },
   };
 
   return {
@@ -505,7 +532,7 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     expect(await tokenRepo.get('other-ns', 'agent-1', 'gh')).toBeNull();
   });
 
-  it('[AUTHZ] delete rejects cross-namespace caller with 404 and leaves token intact', async () => {
+  it('[AUTHZ] delete rejects cross-namespace caller with 403 and leaves token intact', async () => {
     const OTHER = { ...APPSILON, handle: 'other-ns', displayName: 'Other' };
     fake.state.namespaces.set(OTHER.handle, OTHER);
 
@@ -524,7 +551,7 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     await tokenRepo.put('other-ns', 'agent-1', 'gh', token);
 
     const deleteRes = await userDeleteToken('agent-1', 'github', 'other-ns', 'gh', false);
-    expect(deleteRes.status).toBe(404);
+    expect(deleteRes.status).toBe(403);
     // The other-ns token must still be there — cross-tenant delete denied.
     const surviving = await tokenRepo.get('other-ns', 'agent-1', 'gh');
     expect(surviving?.accessToken).toBe('survives-attack');
@@ -549,6 +576,8 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     await tokenRepo.put('other-ns', 'agent-1', 'gh', secretToken);
 
     const listRes = await userListOAuthTokens('agent-1', 'other-ns');
-    expect(listRes.status).toBe(404);
+    expect(listRes.status).toBe(200);
+    const json = (await listRes.json()) as { tokens: unknown[] };
+    expect(json.tokens).toEqual([]);
   });
 });

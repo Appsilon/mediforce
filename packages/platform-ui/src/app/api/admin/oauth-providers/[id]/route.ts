@@ -1,62 +1,64 @@
-import { NextResponse } from 'next/server';
-import { UpdateOAuthProviderInputSchema } from '@mediforce/platform-core';
-import { getPlatformServices } from '@/lib/platform-services';
-import { requireAdminForNamespace, toPublicProvider } from '../helpers';
+import { createRouteAdapter } from '@/lib/route-adapter';
+import {
+  DeleteOAuthProviderInputSchema,
+  GetOAuthProviderInputSchema,
+  UpdateOAuthProviderInputApiSchema,
+  type DeleteOAuthProviderInput,
+  type GetOAuthProviderInput,
+  type UpdateOAuthProviderInputApi,
+} from '@mediforce/platform-api/contract';
+import {
+  deleteOAuthProvider,
+  getOAuthProvider,
+  updateOAuthProvider,
+} from '@mediforce/platform-api/handlers';
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
-  const { id } = await params;
-  const services = getPlatformServices();
-  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
-  if (namespace instanceof NextResponse) return namespace;
-
-  const provider = await services.oauthProviderRepo.get(namespace, id);
-  if (provider === null) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-  return NextResponse.json({ provider: toPublicProvider(provider) });
+interface RouteContext {
+  params: Promise<{ id: string }>;
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
-  const { id } = await params;
-  const services = getPlatformServices();
-  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
-  if (namespace instanceof NextResponse) return namespace;
+export const GET = createRouteAdapter<
+  typeof GetOAuthProviderInputSchema,
+  GetOAuthProviderInput,
+  unknown,
+  RouteContext
+>(
+  GetOAuthProviderInputSchema,
+  async (req, ctx) => ({
+    namespace: new URL(req.url).searchParams.get('namespace') ?? '',
+    id: (await ctx.params).id,
+  }),
+  getOAuthProvider,
+);
 
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== 'object') {
-    return NextResponse.json({ error: 'JSON body is required' }, { status: 400 });
-  }
+export const PATCH = createRouteAdapter<
+  typeof UpdateOAuthProviderInputApiSchema,
+  UpdateOAuthProviderInputApi,
+  unknown,
+  RouteContext
+>(
+  UpdateOAuthProviderInputApiSchema,
+  async (req, ctx) => {
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    return {
+      ...body,
+      namespace: new URL(req.url).searchParams.get('namespace') ?? '',
+      id: (await ctx.params).id,
+    };
+  },
+  updateOAuthProvider,
+);
 
-  const parsed = UpdateOAuthProviderInputSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-
-  const updated = await services.oauthProviderRepo.update(namespace, id, parsed.data);
-  if (updated === null) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-  return NextResponse.json({ provider: toPublicProvider(updated) });
-}
-
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
-  const { id } = await params;
-  const services = getPlatformServices();
-  const namespace = await requireAdminForNamespace(request, services.namespaceRepo);
-  if (namespace instanceof NextResponse) return namespace;
-
-  await services.oauthProviderRepo.delete(namespace, id);
-  return NextResponse.json({ success: true });
-}
+export const DELETE = createRouteAdapter<
+  typeof DeleteOAuthProviderInputSchema,
+  DeleteOAuthProviderInput,
+  unknown,
+  RouteContext
+>(
+  DeleteOAuthProviderInputSchema,
+  async (req, ctx) => ({
+    namespace: new URL(req.url).searchParams.get('namespace') ?? '',
+    id: (await ctx.params).id,
+  }),
+  deleteOAuthProvider,
+);

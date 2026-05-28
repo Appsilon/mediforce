@@ -34,6 +34,14 @@ const fake = vi.hoisted(() => {
       getNamespace: async (handle: string) =>
         state.namespaces.get(handle) ?? null,
     },
+    // No-op audit sink — handlers append `tool_catalog_entry.created` and
+    // friends; this integration test exercises the wire-level happy path,
+    // not audit assertions. L2 handler tests cover audit content.
+    auditRepo: {
+      append: async () => {
+        /* no-op */
+      },
+    },
     toolCatalogRepo: {
       list: async (ns: string) => Array.from(nsCatalog(ns).values()),
       getById: async (ns: string, id: string) =>
@@ -62,6 +70,12 @@ const fake = vi.hoisted(() => {
         state.agents.set(id, updated);
         return updated;
       },
+    },
+    // Headless handler now writes an audit event on every binding mutation;
+    // the route adapter wires `auditRepo` straight into `scope.system.audit`,
+    // so a no-op `append` is enough for the fake to satisfy the call site.
+    auditRepo: {
+      append: async () => {},
     },
   };
 
@@ -240,19 +254,22 @@ describe('MCP lifecycle — admin REST API composed with runtime resolver', () =
     });
   });
 
-  it('[JOURNEY] renaming a bound catalog entry is rejected — bindings reference id, so rename would strand them', async () => {
+  it('[JOURNEY] renaming a bound catalog entry is impossible — bindings reference id, so rename would strand them', async () => {
     await seedTealflowCatalog();
     await bindTealflowToCowork();
 
-    // Rename attempt — PATCH schema omits `id` and is .strict(), so the
-    // unknown key fails validation.
+    // Rename attempt — the route adapter strips `id` from the body before
+    // validation and reinstates it from the path segment, so any rename
+    // attempt is silently ignored. The repo never sees the renamed id.
     const renameRes = await catalogByIdRoute.PATCH(
       jsonRequest('PATCH', '/api/admin/tool-catalog/tealflow-mcp?namespace=appsilon', {
         id: 'renamed-mcp',
       }),
       { params: Promise.resolve({ id: 'tealflow-mcp' }) },
     );
-    expect(renameRes.status).toBe(400);
+    expect(renameRes.status).toBe(200);
+    expect(fake.state.catalog.get('appsilon')?.has('renamed-mcp')).toBe(false);
+    expect(fake.state.catalog.get('appsilon')?.has('tealflow-mcp')).toBe(true);
 
     // Legitimate metadata edit still works and flows to the resolver.
     const descRes = await catalogByIdRoute.PATCH(

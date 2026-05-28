@@ -4,6 +4,7 @@ import {
   NamespaceMemberSchema,
   type Namespace,
   type NamespaceMember,
+  type NamespaceMembership,
   type NamespaceRepository,
 } from '@mediforce/platform-core';
 import type { Database } from '../client.js';
@@ -45,6 +46,36 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       linkedUserId: parsed.linkedUserId ?? null,
       bio: parsed.bio ?? null,
       createdAt: new Date(parsed.createdAt),
+    });
+  }
+
+  async createNamespaceWithOwner(input: {
+    namespace: Namespace;
+    ownerMember: NamespaceMember;
+  }): Promise<void> {
+    const parsedNs = NamespaceSchema.parse(input.namespace);
+    const parsedMember = NamespaceMemberSchema.parse(input.ownerMember);
+    // Drizzle's transaction helper rolls back if the callback throws, giving
+    // us the same all-or-nothing semantic as the Firestore WriteBatch path.
+    await this.db.transaction(async (tx) => {
+      await tx.insert(workspaces).values({
+        handle: parsedNs.handle,
+        type: parsedNs.type,
+        displayName: parsedNs.displayName,
+        avatarUrl: parsedNs.avatarUrl ?? null,
+        icon: parsedNs.icon ?? null,
+        linkedUserId: parsedNs.linkedUserId ?? null,
+        bio: parsedNs.bio ?? null,
+        createdAt: new Date(parsedNs.createdAt),
+      });
+      await tx.insert(workspaceMembers).values({
+        workspace: parsedNs.handle,
+        uid: parsedMember.uid,
+        role: parsedMember.role,
+        displayName: parsedMember.displayName ?? null,
+        avatarUrl: parsedMember.avatarUrl ?? null,
+        joinedAt: new Date(parsedMember.joinedAt),
+      });
     });
   }
 
@@ -151,6 +182,32 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       .from(workspaces)
       .where(inArray(workspaces.handle, handles));
     return rows.map((r) => NamespaceSchema.parse(toNamespace(r)));
+  }
+
+  async getMembershipsForUser(uid: string): Promise<readonly NamespaceMembership[]> {
+    // Explicit org memberships from workspace_members.
+    const orgRows = await this.db
+      .select({ handle: workspaceMembers.workspace, role: workspaceMembers.role })
+      .from(workspaceMembers)
+      .where(eq(workspaceMembers.uid, uid));
+    // Implicit personal-workspace owner via workspaces.linkedUserId.
+    const personalRows = await this.db
+      .select({ handle: workspaces.handle })
+      .from(workspaces)
+      .where(eq(workspaces.linkedUserId, uid));
+
+    const out: NamespaceMembership[] = personalRows.map((r) => ({
+      handle: r.handle,
+      role: 'owner' as const,
+    }));
+    const seen = new Set(out.map((m) => m.handle));
+    for (const row of orgRows) {
+      if (!seen.has(row.handle)) {
+        seen.add(row.handle);
+        out.push({ handle: row.handle, role: row.role as 'owner' | 'admin' | 'member' });
+      }
+    }
+    return out;
   }
 }
 

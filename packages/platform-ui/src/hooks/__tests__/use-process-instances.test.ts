@@ -1,108 +1,142 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import type { ProcessInstance } from '@mediforce/platform-core';
 import { buildProcessInstance } from '@mediforce/platform-core/testing';
+import { createQueryWrapper } from '@/test/react-query';
+import { queryKeys } from '@/lib/query-keys';
 
-const useCollectionMock = vi.fn<(...args: unknown[]) => { data: ProcessInstance[]; loading: boolean; error: Error | null }>();
+const listMock = vi.fn<(...args: unknown[]) => Promise<{ runs: ProcessInstance[] }>>();
+const getMock = vi.fn<(...args: unknown[]) => Promise<ProcessInstance>>();
 
-vi.mock('../use-collection', () => ({
-  useCollection: (...args: unknown[]) => useCollectionMock(...args),
+vi.mock('@/lib/mediforce', () => ({
+  mediforce: {
+    runs: { list: listMock },
+    processes: { get: getMock },
+  },
+  ApiError: class ApiError extends Error {
+    constructor(public status: number, message: string) {
+      super(message);
+    }
+  },
 }));
 
 vi.mock('@/lib/firebase', () => ({ db: {} }));
-
 vi.mock('firebase/firestore', () => ({
-  where: (field: string, op: string, value: unknown) => ({ field, op, value }),
-  orderBy: (field: string, dir: string) => ({ orderBy: field, dir }),
   doc: vi.fn(),
   onSnapshot: vi.fn(),
   collection: vi.fn(),
 }));
 
-const { useProcessInstances } = await import('../use-process-instances');
+const { useProcessInstances, useProcessInstance } = await import('../use-process-instances');
 
-describe('useProcessInstances — namespace filter (regression for PR #424)', () => {
+describe('useProcessInstances — react-query backed', () => {
   beforeEach(() => {
-    useCollectionMock.mockReset();
+    listMock.mockReset();
   });
 
-  it('only returns instances matching the requested namespace', () => {
-    useCollectionMock.mockReturnValue({
-      data: [
-        buildProcessInstance({ id: 'a-1', namespace: 'appsilon', definitionName: 'daily-weather' }),
-        buildProcessInstance({ id: 'f-1', namespace: 'filip',    definitionName: 'daily-weather' }),
-        buildProcessInstance({ id: 'a-2', namespace: 'appsilon', definitionName: 'community-digest' }),
-        buildProcessInstance({ id: 'm-1', namespace: 'mediforce', definitionName: 'workflow-designer' }),
+  it('passes the namespace filter through to `mediforce.runs.list`', async () => {
+    listMock.mockResolvedValue({
+      runs: [
+        buildProcessInstance({ id: 'a-1', namespace: 'appsilon' }),
+        buildProcessInstance({ id: 'a-2', namespace: 'appsilon' }),
       ],
-      loading: false,
-      error: null,
     });
+    const { wrapper } = createQueryWrapper();
 
-    const { result } = renderHook(() => useProcessInstances('all', undefined, false, 'appsilon'));
+    const { result } = renderHook(
+      () => useProcessInstances('all', undefined, false, 'appsilon'),
+      { wrapper },
+    );
 
-    expect(result.current.data.map((i) => i.id)).toEqual(['a-1', 'a-2']);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ namespace: 'appsilon' }));
+    expect(result.current.data.map((r) => r.id)).toEqual(['a-1', 'a-2']);
   });
 
-  it('returns empty list when no instance matches the namespace', () => {
-    useCollectionMock.mockReturnValue({
-      data: [
-        buildProcessInstance({ id: 'f-1', namespace: 'filip' }),
-        buildProcessInstance({ id: 'm-1', namespace: 'mediforce' }),
+  it('hides archived runs by default, keeps them when showArchived=true', async () => {
+    listMock.mockResolvedValue({
+      runs: [
+        buildProcessInstance({ id: 'live', namespace: 'alpha', archived: false }),
+        buildProcessInstance({ id: 'arch', namespace: 'alpha', archived: true }),
       ],
-      loading: false,
-      error: null,
     });
+    const { wrapper } = createQueryWrapper();
 
-    const { result } = renderHook(() => useProcessInstances('all', undefined, false, 'appsilon'));
+    const hidden = renderHook(
+      () => useProcessInstances('all', undefined, false, 'alpha'),
+      { wrapper },
+    );
+    await waitFor(() => expect(hidden.result.current.loading).toBe(false));
+    expect(hidden.result.current.data.map((r) => r.id)).toEqual(['live']);
 
+    const shown = renderHook(
+      () => useProcessInstances('all', undefined, true, 'alpha'),
+      { wrapper },
+    );
+    await waitFor(() => expect(shown.result.current.loading).toBe(false));
+    expect(shown.result.current.data.map((r) => r.id).sort()).toEqual(['arch', 'live']);
+  });
+
+  it('is disabled when namespace is the empty string (avoids cross-workspace cache pollution)', () => {
+    const { wrapper } = createQueryWrapper();
+    const { result } = renderHook(
+      () => useProcessInstances('all', undefined, false, ''),
+      { wrapper },
+    );
+    expect(listMock).not.toHaveBeenCalled();
+    // Reports loading=true so callers keep the skeleton on while the route
+    // param is still resolving — prevents the "no runs" flash before the
+    // first fetch even starts.
+    expect(result.current.loading).toBe(true);
     expect(result.current.data).toEqual([]);
   });
 
-  it('treats a missing namespace field on an instance as not matching (no implicit bypass)', () => {
-    useCollectionMock.mockReturnValue({
-      data: [
-        buildProcessInstance({ id: 'no-ns', namespace: undefined as unknown as string }),
-        buildProcessInstance({ id: 'appsilon-1', namespace: 'appsilon' }),
-      ],
-      loading: false,
-      error: null,
-    });
+  it('forwards the status filter to the API (apiStatus !== "all")', async () => {
+    listMock.mockResolvedValue({ runs: [] });
+    const { wrapper } = createQueryWrapper();
 
-    const { result } = renderHook(() => useProcessInstances('all', undefined, false, 'appsilon'));
+    renderHook(
+      () => useProcessInstances('running', undefined, false, 'alpha'),
+      { wrapper },
+    );
 
-    expect(result.current.data.map((i) => i.id)).toEqual(['appsilon-1']);
+    await waitFor(() => expect(listMock).toHaveBeenCalled());
+    expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'running' }));
+  });
+});
+
+describe('useProcessInstance — single-run CRITICAL LIVE polling', () => {
+  beforeEach(() => {
+    getMock.mockReset();
   });
 
-  it('combines namespace filter with deleted + archived filters', () => {
-    useCollectionMock.mockReturnValue({
-      data: [
-        buildProcessInstance({ id: 'a-active',   namespace: 'appsilon' }),
-        buildProcessInstance({ id: 'a-deleted',  namespace: 'appsilon', deleted: true }),
-        buildProcessInstance({ id: 'a-archived', namespace: 'appsilon', archived: true }),
-        buildProcessInstance({ id: 'f-active',   namespace: 'filip' }),
-      ],
-      loading: false,
-      error: null,
-    });
+  it('populates the cache under queryKeys.run(id)', async () => {
+    const instance = buildProcessInstance({ id: 'r-1', status: 'running' });
+    getMock.mockResolvedValue(instance);
+    const { wrapper, queryClient } = createQueryWrapper();
 
-    const { result } = renderHook(() => useProcessInstances('all', undefined, false, 'appsilon'));
+    const { result } = renderHook(() => useProcessInstance('r-1'), { wrapper });
+    await waitFor(() => expect(result.current.data).not.toBeNull());
 
-    expect(result.current.data.map((i) => i.id)).toEqual(['a-active']);
+    expect(queryClient.getQueryData<ProcessInstance>(queryKeys.run('r-1'))).toEqual(instance);
   });
 
-  it('keeps archived instances when showArchived=true but still scopes by namespace', () => {
-    useCollectionMock.mockReturnValue({
-      data: [
-        buildProcessInstance({ id: 'a-active',   namespace: 'appsilon' }),
-        buildProcessInstance({ id: 'a-archived', namespace: 'appsilon', archived: true }),
-        buildProcessInstance({ id: 'f-archived', namespace: 'filip',    archived: true }),
-      ],
-      loading: false,
-      error: null,
-    });
+  it('returns notFound=true on 404 and clears the error field', async () => {
+    const { ApiError } = await import('@/lib/mediforce');
+    getMock.mockRejectedValue(new (ApiError as new (status: number, msg: string) => Error)(404, 'not found'));
+    const { wrapper } = createQueryWrapper();
 
-    const { result } = renderHook(() => useProcessInstances('all', undefined, true, 'appsilon'));
+    const { result } = renderHook(() => useProcessInstance('r-missing'), { wrapper });
+    await waitFor(() => expect(result.current.notFound).toBe(true));
+    expect(result.current.data).toBeNull();
+    expect(result.current.error).toBeNull();
+  });
 
-    expect(result.current.data.map((i) => i.id).sort()).toEqual(['a-active', 'a-archived']);
+  it('does not fire when instanceId is null', () => {
+    const { wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useProcessInstance(null), { wrapper });
+    expect(getMock).not.toHaveBeenCalled();
+    expect(result.current.loading).toBe(false);
+    expect(result.current.data).toBeNull();
   });
 });

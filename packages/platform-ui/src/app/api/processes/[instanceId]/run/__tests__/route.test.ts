@@ -612,6 +612,67 @@ describe('POST /api/processes/[instanceId]/run', () => {
     });
   });
 
+  describe('human pre-assignment (assignedTo)', () => {
+    const assignedHumanWorkflow = {
+      ...workflowDefinition,
+      steps: [
+        { id: 'fill-form', name: 'Fill Form', type: 'creation', executor: 'human', allowedRoles: ['member'], assignedTo: '${triggerPayload.userId}' },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'fill-form', to: 'done' }],
+    };
+
+    it('[DATA] pre-assigns the task to the interpolated user (claimed + assignedUserId)', async () => {
+      mockInstanceGetById.mockImplementation(() =>
+        Promise.resolve({
+          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
+          status: 'running', currentStepId: 'fill-form', configName: undefined,
+          variables: {}, triggerPayload: { userId: 'filip' },
+        }),
+      );
+      mockGetWorkflowDefinition.mockResolvedValue(assignedHumanWorkflow);
+
+      const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
+
+      expect(mockHumanTaskCreate).toHaveBeenCalledWith(expect.objectContaining({
+        stepId: 'fill-form',
+        assignedRole: 'member',
+        assignedUserId: 'filip',
+        status: 'claimed',
+        creationReason: 'human_executor',
+      }));
+      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
+        status: 'paused',
+        pauseReason: 'waiting_for_human',
+      }));
+    });
+
+    it('[ERROR] fails the instance when assignedTo resolves to nothing', async () => {
+      mockInstanceGetById.mockImplementation(() =>
+        Promise.resolve({
+          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
+          status: 'running', currentStepId: 'fill-form', configName: undefined,
+          variables: {}, triggerPayload: {},
+        }),
+      );
+      mockGetWorkflowDefinition.mockResolvedValue(assignedHumanWorkflow);
+
+      const res = await POST(makeRequest(), { params: makeParams('inst-1') });
+      expect(res.status).toBe(202);
+      expect(afterCallback).not.toBeNull();
+      await afterCallback!();
+
+      expect(mockHumanTaskCreate).not.toHaveBeenCalled();
+      expect(mockInstanceUpdate).toHaveBeenCalledWith('inst-1', expect.objectContaining({
+        status: 'failed',
+        error: expect.stringContaining('assignedTo'),
+      }));
+    });
+  });
+
   describe('basic guards', () => {
     it('[ERROR] returns 404 when instance not found', async () => {
       mockInstanceGetById.mockResolvedValue(null);
@@ -636,6 +697,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
         kind: 'user',
         uid: 'outsider',
         namespaces: new Set(['other-ns']),
+        namespaceRoles: new Map([['other-ns', 'member']]),
         isSystemActor: false,
       });
       mockInstanceGetById.mockResolvedValue({

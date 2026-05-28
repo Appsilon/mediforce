@@ -41,7 +41,7 @@ type DetailLevel = 'brief' | 'full';
 interface RunReportProps {
   instance: ProcessInstance;
   stepExecutions: StepExecution[];
-  auditEvents: Array<AuditEvent & { id: string }>;
+  auditEvents: AuditEvent[];
   definitionSteps: Step[];
   runDetailHref: string;
 }
@@ -283,7 +283,7 @@ function StepCard({
   index: number;
   detailLevel: DetailLevel;
   definitionSteps: Step[];
-  auditEvents: Array<AuditEvent & { id: string }>;
+  auditEvents: AuditEvent[];
 }) {
   const duration = getStepDuration(step);
   const stepName = getStepName(step.stepId, definitionSteps);
@@ -380,8 +380,8 @@ function StepCard({
                   Audit Trail
                 </h4>
                 <ul className="space-y-0.5 text-xs">
-                  {stepAuditEvents.map((event) => (
-                    <li key={event.id} className="flex gap-2 text-muted-foreground">
+                  {stepAuditEvents.map((event, i) => (
+                    <li key={`${event.timestamp}-${event.actorId}-${i}`} className="flex gap-2 text-muted-foreground">
                       <span className="shrink-0">{format(new Date(event.timestamp), 'HH:mm:ss')}</span>
                       <span className="font-medium text-foreground">{event.action}</span>
                       <span className="truncate">{event.description}</span>

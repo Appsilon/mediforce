@@ -1,8 +1,12 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import {
   AgentRunSchema,
+  decodeAgentRunCursor,
+  encodeAgentRunCursor,
   type AgentRun,
   type AgentRunRepository,
+  type ListAgentRunsOptions,
+  type ListAgentRunsPage,
   type ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 import type { Database } from '../client.js';
@@ -133,6 +137,70 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
       .orderBy(desc(agentRuns.startedAt))
       .limit(limitN);
     return rows.map((r) => AgentRunSchema.parse(toAgentRun(r)));
+  }
+
+  async list(opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> {
+    return this.listImpl(opts, undefined);
+  }
+
+  async listInNamespaces(
+    allowed: readonly string[],
+    opts: ListAgentRunsOptions,
+  ): Promise<ListAgentRunsPage> {
+    if (allowed.length === 0) return { items: [] };
+    return this.listImpl(opts, [...allowed]);
+  }
+
+  private async listImpl(
+    opts: ListAgentRunsOptions,
+    allowed: readonly string[] | undefined,
+  ): Promise<ListAgentRunsPage> {
+    const conditions = [];
+    if (allowed !== undefined) {
+      conditions.push(inArray(agentRuns.workspace, [...allowed]));
+    }
+    if (opts.namespace !== undefined) {
+      conditions.push(eq(agentRuns.workspace, opts.namespace));
+    }
+    if (opts.runId !== undefined) {
+      conditions.push(eq(agentRuns.processInstanceId, opts.runId));
+    }
+    if (opts.stepId !== undefined) {
+      conditions.push(eq(agentRuns.stepId, opts.stepId));
+    }
+    if (opts.cursor !== undefined) {
+      const after = decodeAgentRunCursor(opts.cursor);
+      if (after !== null) {
+        // Keyset (startedAt, id) DESC: emit rows strictly past the cursor.
+        conditions.push(
+          or(
+            lt(agentRuns.startedAt, new Date(after.startedAt)),
+            and(
+              eq(agentRuns.startedAt, new Date(after.startedAt)),
+              sql`${agentRuns.id} < ${after.id}`,
+            ),
+          ),
+        );
+      }
+    }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const rows = await this.db
+      .select()
+      .from(agentRuns)
+      .where(whereClause)
+      .orderBy(desc(agentRuns.startedAt), desc(agentRuns.id))
+      .limit(opts.limit + 1);
+    const hasMore = rows.length > opts.limit;
+    const pageRows = hasMore ? rows.slice(0, opts.limit) : rows;
+    const items = pageRows.map((r) => AgentRunSchema.parse(toAgentRun(r)));
+    const last = pageRows[pageRows.length - 1];
+    if (hasMore && last !== undefined) {
+      return {
+        items,
+        nextCursor: encodeAgentRunCursor(last.startedAt.toISOString(), last.id),
+      };
+    }
+    return { items };
   }
 }
 

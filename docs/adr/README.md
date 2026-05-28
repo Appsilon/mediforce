@@ -65,3 +65,4 @@ appendix can capture what actually shipped vs the original decision body.
 - [0002 — Move authentication from Firebase Auth to NextAuth (Auth.js v5)](./0002-firebase-auth-to-nextauth.md) (+ [PLAN](./PLAN-0002.md))
 - [0004 — Authorization enforcement moves to a scoped data-access layer](./0004-scoped-data-access-authorization.md)
 - [0005 — Headless platform: API/UI separation](./0005-headless-platform-api-ui-separation.md)
+- [0006 — Client-side server-state management](./0006-client-side-server-state.md)

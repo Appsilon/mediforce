@@ -17,6 +17,8 @@ import {
   PostgresProcessRepository,
   PostgresAgentEventLog,
   getSharedPostgresClient,
+  FirebaseInviteService,
+  getAdminFirestore,
   validateSecretsKey,
   createMailgunSender,
   MailgunNotificationService,
@@ -38,9 +40,25 @@ import type {
   OAuthProviderRepository,
   ProcessInstanceRepository,
   ProcessRepository,
+  SendEmailFn,
   ToolCatalogRepository,
+  UserDirectoryService,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
+import {
+  ContainerWorkerDockerImagesService,
+  LocalDockerImagesService,
+  isLocalAgentMode,
+  type DockerImagesService,
+} from './docker-images-service.js';
+import { sendInviteEmail, sendWorkspaceNotificationEmail } from './invite-emails.js';
+import type {
+  InviteNotificationService,
+  InviteService,
+  InvitedUser,
+  SendInviteEmailInput,
+  SendWorkspaceNotificationEmailInput,
+} from './invite-notification.js';
 import {
   WorkflowEngine,
   ManualTrigger,
@@ -95,6 +113,124 @@ export interface PlatformServices {
   modelRegistryRepo: ModelRegistryRepository;
   secretsRepo: WorkflowSecretsRepository;
   namespaceSecretsRepo: NamespaceSecretsRepository;
+  inviteService: InviteService;
+  /** `null` when Mailgun env vars are unset (email disabled). */
+  inviteNotificationService: InviteNotificationService | null;
+  dockerImages: DockerImagesService;
+  /**
+   * Firebase Auth metadata lookup (uid → email, lastSignInTime). Always wired
+   * in production (depends on Firebase Auth, not Mailgun). Handlers consume
+   * via `scope.system.userDirectory`.
+   */
+  userDirectory: UserDirectoryService;
+}
+
+/**
+ * Narrow ports used by the invite-service adapter. Defined here so this file
+ * doesn't import `firebase-admin/*` directly — that dependency stays inside
+ * `platform-infra`. `getAdminAuth()` returns an `Auth` that satisfies the
+ * `AuthPort` shape structurally.
+ */
+interface UserRecordPort {
+  readonly email?: string;
+  readonly metadata: { readonly lastSignInTime: string | null };
+}
+interface AuthPort {
+  getUser(uid: string): Promise<UserRecordPort>;
+}
+interface DocSnapshotPort {
+  readonly exists: boolean;
+  data(): { readonly mustChangePassword?: boolean } | undefined;
+}
+interface DocRefPort {
+  get(): Promise<DocSnapshotPort>;
+}
+interface CollectionPort {
+  doc(id: string): DocRefPort;
+}
+interface FirestorePort {
+  collection(name: string): CollectionPort;
+}
+
+/**
+ * Adapts `FirebaseInviteService` onto the framework-free `InviteService`
+ * interface that handlers consume. Adds read-side methods (`getUserEmail`,
+ * `isInvitePending`) directly here so the Firebase service stays focused on
+ * writes.
+ */
+class FirebaseInviteServiceAdapter implements InviteService {
+  constructor(
+    private readonly firebase: FirebaseInviteService,
+    private readonly adminAuth: AuthPort,
+    private readonly adminDb: FirestorePort,
+  ) {}
+
+  async createInvitedUser(email: string, displayName: string | undefined): Promise<InvitedUser> {
+    return this.firebase.createInvitedUser(email, displayName, undefined);
+  }
+
+  async resetInvitePassword(uid: string): Promise<string> {
+    return this.firebase.resetInvitePassword(uid);
+  }
+
+  async getUserEmail(uid: string): Promise<string | null> {
+    try {
+      const record = await this.adminAuth.getUser(uid);
+      const email = record.email;
+      return typeof email === 'string' && email !== '' ? email : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async isInvitePending(uid: string): Promise<boolean> {
+    let lastSignInTime: string | null = '';
+    try {
+      const record = await this.adminAuth.getUser(uid);
+      lastSignInTime = record.metadata.lastSignInTime;
+    } catch {
+      // Treat unknown users as not pending — handlers will surface a 404.
+      return false;
+    }
+    const userDoc = await this.adminDb.collection('users').doc(uid).get();
+    const mustChangePassword = userDoc.exists ? userDoc.data()?.mustChangePassword === true : false;
+    const hasNeverSignedIn = lastSignInTime === null || lastSignInTime === '';
+    return mustChangePassword || hasNeverSignedIn;
+  }
+}
+
+/**
+ * Adapts the Mailgun `SendEmailFn` into the `InviteNotificationService`
+ * interface — delegates to the existing pure email-body helpers and supplies
+ * deployment config (app URL, sender name) so handlers never see env vars.
+ */
+class MailgunInviteNotificationService implements InviteNotificationService {
+  constructor(
+    private readonly sendEmail: SendEmailFn,
+    private readonly appUrl: string,
+    private readonly senderName: string,
+  ) {}
+
+  async sendInviteEmail(input: SendInviteEmailInput): Promise<void> {
+    await sendInviteEmail(
+      { ...input, appUrl: this.appUrl, senderName: this.senderName },
+      this.sendEmail,
+    );
+  }
+
+  async sendWorkspaceNotificationEmail(input: SendWorkspaceNotificationEmailInput): Promise<void> {
+    await sendWorkspaceNotificationEmail(
+      {
+        toEmail: input.toEmail,
+        inviterName: input.inviterName,
+        workspaceName: input.workspaceName,
+        workspaceUrl: `${this.appUrl}/${input.workspaceHandle}`,
+        appUrl: this.appUrl,
+        senderName: this.senderName,
+      },
+      this.sendEmail,
+    );
+  }
 }
 
 export function getPlatformServices(): PlatformServices {
@@ -185,9 +321,12 @@ export function getPlatformServices(): PlatformServices {
   const notificationService = mailgunSender
     ? new MailgunNotificationService(mailgunSender)
     : undefined;
-  const userDirectoryService = notificationService
-    ? new FirebaseUserDirectoryService(getAdminAuth())
-    : undefined;
+  // Wired whenever Firebase Auth is available — independent of Mailgun.
+  // Email-disabled deployments still need uid → email/lastSignInTime lookups
+  // for the namespace-members endpoint.
+  const userDirectoryService: UserDirectoryService = new FirebaseUserDirectoryService(
+    getAdminAuth(),
+  );
 
   const engine = new WorkflowEngine(
     processRepo,
@@ -221,6 +360,29 @@ export function getPlatformServices(): PlatformServices {
 
   const webhookRouter = new WebhookRouter(engine, processRepo);
 
+  // FirebaseInviteService writes to the Firebase Auth user store and the
+  // `users` Firestore collection. Auth state and the user docs remain on
+  // Firebase post-PR2 (only workflow data moved to Postgres), so the
+  // Firestore handle is still required for invite operations.
+  const adminAuth = getAdminAuth();
+  const adminDb = getAdminFirestore();
+  const firebaseInvite = new FirebaseInviteService(adminAuth, adminDb);
+  const inviteService = new FirebaseInviteServiceAdapter(firebaseInvite, adminAuth, adminDb);
+  // `appUrl` matches the legacy invite route's fallback so dev-without-
+  // NEXT_PUBLIC_PLATFORM_URL still renders sensible links.
+  const inviteAppUrl =
+    process.env.NEXT_PUBLIC_PLATFORM_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
+  const inviteNotificationService = mailgunSender
+    ? new MailgunInviteNotificationService(mailgunSender, inviteAppUrl, mailgunSenderName)
+    : null;
+
+  const dockerImages: DockerImagesService = isLocalAgentMode()
+    ? new LocalDockerImagesService()
+    : new ContainerWorkerDockerImagesService(
+        process.env.CONTAINER_WORKER_URL ?? 'http://container-worker:3001',
+        process.env.CONTAINER_WORKER_SECRET,
+      );
+
   services = {
     engine,
     manualTrigger,
@@ -246,6 +408,10 @@ export function getPlatformServices(): PlatformServices {
     modelRegistryRepo,
     secretsRepo,
     namespaceSecretsRepo,
+    inviteService,
+    inviteNotificationService,
+    dockerImages,
+    userDirectory: userDirectoryService,
   };
 
   if (!seedingStarted) {

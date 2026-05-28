@@ -162,6 +162,46 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
     return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
   }
 
+  async getByInstanceIdsAll(instanceIds: readonly string[]): Promise<HumanTask[]> {
+    if (instanceIds.length === 0) return [];
+    const rows = await this.db
+      .select()
+      .from(humanTasks)
+      .where(inArray(humanTasks.processInstanceId, [...instanceIds]));
+    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+  }
+
+  async getByInstanceIdsInNamespaces(
+    instanceIds: readonly string[],
+    allowed: readonly string[],
+  ): Promise<HumanTask[]> {
+    if (instanceIds.length === 0 || allowed.length === 0) return [];
+    const rows = await this.db
+      .select()
+      .from(humanTasks)
+      .where(
+        and(
+          inArray(humanTasks.processInstanceId, [...instanceIds]),
+          inArray(humanTasks.workspace, [...allowed]),
+        ),
+      );
+    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+  }
+
+  async listAll(): Promise<HumanTask[]> {
+    const rows = await this.db.select().from(humanTasks);
+    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+  }
+
+  async listInNamespaces(allowed: readonly string[]): Promise<HumanTask[]> {
+    if (allowed.length === 0) return [];
+    const rows = await this.db
+      .select()
+      .from(humanTasks)
+      .where(inArray(humanTasks.workspace, [...allowed]));
+    return rows.map((r) => HumanTaskSchema.parse(toHumanTask(r)));
+  }
+
   async claim(taskId: string, userId: string): Promise<HumanTask> {
     // `updated_at` is maintained by the `set_updated_at` trigger.
     const [row] = await this.db

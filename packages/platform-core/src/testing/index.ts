@@ -16,6 +16,10 @@ export { InMemoryAgentRunRepository } from './in-memory-agent-run-repository.js'
 export { InMemoryModelRegistryRepository } from './in-memory-model-registry-repository.js';
 export { InMemoryNamespaceSecretsRepository } from './in-memory-namespace-secrets-repository.js';
 export { InMemoryWorkflowSecretsRepository } from './in-memory-workflow-secrets-repository.js';
+export {
+  encodeAgentRunCursor,
+  decodeAgentRunCursor,
+} from '../cursors/agent-run-cursor.js';
 
 // Test factories
 export {

@@ -53,9 +53,19 @@ Move the primary datastore to **self-hosted Postgres 16**, accessed via
    `archived: boolean` flags with `deleted_at timestamptz` and
    `archived_at timestamptz` columns. NULL = active. Soft-delete is **forever**
    for now; a later ADR may introduce a retention purge.
-5. **Realtime swap.** All `onSnapshot` listeners are removed. Lists move to
-   **SWR polling** (2–10 s interval). Live agent run logs and cowork text chat
-   move to **Server-Sent Events**. No WebSockets are introduced.
+5. **Realtime swap.** All `onSnapshot` listeners are removed. Everything moves
+   to **react-query polling** (1–10 s interval, terminal-state gating per
+   resource — see [`ADR-0006`](./0006-client-side-server-state.md)). No SSE
+   and no WebSockets at cutover. SSE remains a forward option for surfaces
+   where polling lag proves visible in practice (live token-stream during
+   agent runs, multi-second cowork tool loops); tracked by
+   [#516](https://github.com/Appsilon/mediforce/issues/516) and a future ADR.
+   `createRouteAdapter` stays forward-compatible — the handler shape
+   `(input, scope) => Promise<output>` does not preclude a sibling
+   `createStreamingRouteAdapter` later. _Amended 2026-05-28 to drop the
+   original SSE-at-cutover commitment per Phase 4 plan grilling; see
+   [`docs/headless-migration-phase-4-plan.md`](../headless-migration-phase-4-plan.md)
+   § 2 "ADR amendments bundled" for full reasoning._
 6. **Cross-workspace public discovery.** `WorkflowDefinition.visibility =
    'public'` remains a live, cross-Workspace feature — teams may publish,
    platform examples ship as public. Access goes through an explicit repo
@@ -226,8 +236,10 @@ removable in one sweep after the cutover (§8.4).
   removing a class of race-condition workarounds (notably the personal-
   namespace bootstrap dance in `auth-context.tsx`).
 - One-time migration effort, estimated 2 focused engineering weeks.
-- ~14 UI hook sites + 3 page-component sites are rewired from `onSnapshot` to
-  SWR / SSE. Mostly mechanical.
+- ~20 UI consumer sites are rewired from `onSnapshot` to react-query polling
+  (1–10 s, terminal-state gating). Mostly mechanical; see
+  [`docs/headless-migration-phase-4-plan.md`](../headless-migration-phase-4-plan.md)
+  per-consumer migration table.
 - New operational responsibility for self-hosted customers: Postgres backup.
   Standard tooling; documented as part of this migration.
 - Cross-workspace public-workflow discovery is the **single permitted scope

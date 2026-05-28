@@ -205,4 +205,85 @@ describe('listTasks handler', () => {
       expect(result.tasks).toEqual([]);
     });
   });
+
+  /**
+   * GitHub-like default: bare endpoint with no axis returns the caller's
+   * workspace-visible queue. System actors see everything; user callers see
+   * tasks whose parent run is in their namespaces (across all roles +
+   * instances).
+   */
+  describe('caller-scope axis (no instanceId, no role)', () => {
+    beforeEach(async () => {
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-alpha', namespace: 'team-alpha' }));
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-beta', namespace: 'team-beta' }));
+      await instanceRepo.create(buildProcessInstance({ id: 'inst-orphan', namespace: undefined }));
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 't-a1', processInstanceId: 'inst-alpha', assignedRole: 'reviewer', status: 'pending' }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 't-a2', processInstanceId: 'inst-alpha', assignedRole: 'approver', status: 'claimed' }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 't-a3', processInstanceId: 'inst-alpha', assignedRole: 'reviewer', status: 'completed' }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 't-b1', processInstanceId: 'inst-beta', assignedRole: 'reviewer', status: 'pending' }),
+      );
+      await humanTaskRepo.create(
+        buildHumanTask({ id: 't-orphan', processInstanceId: 'inst-orphan', assignedRole: 'reviewer', status: 'pending' }),
+      );
+    });
+
+    it('returns every task across all namespaces for api-key callers', async () => {
+      const scope = createTestScope({ humanTaskRepo, instanceRepo });
+      const result = await listTasks({}, scope);
+      expect(result.tasks.map((t) => t.id).sort()).toEqual([
+        't-a1',
+        't-a2',
+        't-a3',
+        't-b1',
+        't-orphan',
+      ]);
+    });
+
+    it('returns only tasks in the user caller’s namespaces, across roles', async () => {
+      const scope = createTestScope({
+        humanTaskRepo,
+        instanceRepo,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+      const result = await listTasks({}, scope);
+      expect(result.tasks.map((t) => t.id).sort()).toEqual(['t-a1', 't-a2', 't-a3']);
+    });
+
+    it('combines with status[] filter — caller scope + actionable only', async () => {
+      const scope = createTestScope({
+        humanTaskRepo,
+        instanceRepo,
+        caller: userCaller('u-2', ['team-alpha', 'team-beta']),
+      });
+      const result = await listTasks({ status: [...ACTIONABLE_STATUSES] }, scope);
+      expect(result.tasks.map((t) => t.id).sort()).toEqual(['t-a1', 't-a2', 't-b1']);
+    });
+
+    it('drops tasks whose parent instance has no namespace, for user callers', async () => {
+      const scope = createTestScope({
+        humanTaskRepo,
+        instanceRepo,
+        caller: userCaller('u-3', ['team-alpha', 'team-beta']),
+      });
+      const result = await listTasks({}, scope);
+      expect(result.tasks.map((t) => t.id).sort()).toEqual(['t-a1', 't-a2', 't-a3', 't-b1']);
+    });
+
+    it('returns empty when user has no namespace overlap', async () => {
+      const scope = createTestScope({
+        humanTaskRepo,
+        instanceRepo,
+        caller: userCaller('u-4', ['team-gamma']),
+      });
+      const result = await listTasks({}, scope);
+      expect(result.tasks).toEqual([]);
+    });
+  });
 });

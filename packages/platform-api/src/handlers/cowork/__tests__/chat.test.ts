@@ -102,6 +102,12 @@ describe('chatCoworkSession handler', () => {
       { role: 'agent', content: 'Hello back' },
     ]);
     expect(fetchSpy).toHaveBeenCalledOnce();
+
+    // Additive return shape — `session` + `turns` echo server truth so the
+    // UI can replace optimistic state without a follow-up GET.
+    expect(result.session.id).toBe('sess-1');
+    expect(result.session.status).toBe('active');
+    expect(result.turns.map((t) => ({ role: t.role, content: t.content }))).toEqual(turnSummary);
   });
 
   it('persists artifact and exits the tool loop when update_artifact is called', async () => {
@@ -157,6 +163,8 @@ describe('chatCoworkSession handler', () => {
     const session = await coworkSessionRepo.getById('sess-1');
     expect(session?.artifact).toEqual({ title: 'v1' });
     expect(fetchSpy).toHaveBeenCalledOnce();
+    // Additive shape: returned session carries the same artifact.
+    expect(result.session.artifact).toEqual({ title: 'v1' });
   });
 
   it('throws HandlerError when OPENROUTER_API_KEY missing', async () => {

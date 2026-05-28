@@ -16,7 +16,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const packageRoot = path.resolve(__dirname, '..');
-const entry = path.join(packageRoot, 'src', 'cli.ts');
+const entry = path.join(packageRoot, 'src', 'run.ts');
 
 let tsxBin;
 try {

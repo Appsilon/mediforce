@@ -1,8 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { getWorkflowSecretKeysBatch } from '@/app/actions/workflow-secrets';
-import { getNamespaceSecretKeys } from '@/app/actions/namespace-secrets';
+import { mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 
 interface WorkflowSecretKeysContextValue {
@@ -39,17 +38,17 @@ export function WorkflowSecretKeysProvider({
     setLoading(true);
 
     Promise.all([
-      getWorkflowSecretKeysBatch(handle, workflowNames, uid),
-      getNamespaceSecretKeys(handle, uid),
+      mediforce.secrets.workflowKeysBatch({ namespace: handle, workflows: workflowNames }),
+      mediforce.secrets.list({ namespace: handle }),
     ])
       .then(([workflowResult, namespaceResult]) => {
         if (cancelled) return;
         const map = new Map<string, string[]>();
-        for (const [name, keys] of Object.entries(workflowResult)) {
+        for (const [name, keys] of Object.entries(workflowResult.keysByWorkflow)) {
           map.set(name, keys);
         }
         setSecretsByWorkflow(map);
-        setNsKeys(namespaceResult);
+        setNsKeys(namespaceResult.keys);
         setLoading(false);
       })
       .catch((err) => {

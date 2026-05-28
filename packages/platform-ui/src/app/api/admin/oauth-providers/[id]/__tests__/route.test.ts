@@ -1,101 +1,43 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-// ---- Mocks ----
+// Route smoke for the [id] adapter. Handler behaviour is covered by L2
+// handler tests in packages/platform-api/src/handlers/oauth-providers/__tests__/.
+// This file only proves the dynamic-segment params + query namespace get
+// stitched into the input shape correctly.
 
-const mockVerifyIdToken = vi.fn();
-const mockNamespaceGet = vi.fn();
-const mockGetMember = vi.fn();
 const mockProviderGet = vi.fn();
 const mockProviderUpdate = vi.fn();
 const mockProviderDelete = vi.fn();
-
-vi.mock('@mediforce/platform-infra', () => ({
-  getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
-}));
+const mockAuditAppend = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
-    namespaceRepo: {
-      getNamespace: mockNamespaceGet,
-      getMember: mockGetMember,
-    },
     oauthProviderRepo: {
+      list: vi.fn(),
       get: mockProviderGet,
+      create: vi.fn(),
       update: mockProviderUpdate,
       delete: mockProviderDelete,
     },
+    auditRepo: { append: mockAuditAppend },
+    instanceRepo: { getById: vi.fn() },
+    namespaceRepo: {},
   }),
+  getAppBaseUrl: () => 'http://localhost:3000',
 }));
 
-import { GET, PATCH, DELETE } from '../route';
+const mockResolveCallerIdentity = vi.fn();
 
-// ---- Helpers ----
-
-const makeParams = (id: string) => Promise.resolve({ id });
-
-function authedHeaders(authHeader: string | null = 'Bearer valid-token'): Record<string, string> {
-  const headers: Record<string, string> = {};
-  if (authHeader !== null) headers.Authorization = authHeader;
-  return headers;
-}
-
-function makeGetRequest(
-  id: string,
-  namespace?: string,
-  authHeader: string | null = 'Bearer valid-token',
-): NextRequest {
-  const url = new URL(`http://localhost/api/admin/oauth-providers/${id}`);
-  if (namespace !== undefined) url.searchParams.set('namespace', namespace);
-  return new NextRequest(url.toString(), { headers: authedHeaders(authHeader) });
-}
-
-function makePatchRequest(
-  id: string,
-  namespace: string | null,
-  body: unknown,
-  authHeader: string | null = 'Bearer valid-token',
-): NextRequest {
-  const url = new URL(`http://localhost/api/admin/oauth-providers/${id}`);
-  if (namespace !== null) url.searchParams.set('namespace', namespace);
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...authedHeaders(authHeader),
+vi.mock('@/lib/api-auth', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-auth')>('@/lib/api-auth');
+  return {
+    ...actual,
+    resolveCallerIdentity: (...args: unknown[]) => mockResolveCallerIdentity(...args),
   };
-  return new NextRequest(url.toString(), {
-    method: 'PATCH',
-    headers,
-    body: JSON.stringify(body),
-  });
-}
+});
 
-function makeDeleteRequest(
-  id: string,
-  namespace?: string,
-  authHeader: string | null = 'Bearer valid-token',
-): NextRequest {
-  const url = new URL(`http://localhost/api/admin/oauth-providers/${id}`);
-  if (namespace !== undefined) url.searchParams.set('namespace', namespace);
-  return new NextRequest(url.toString(), {
-    method: 'DELETE',
-    headers: authedHeaders(authHeader),
-  });
-}
-
-const existingNamespace = {
-  handle: 'appsilon',
-  type: 'organization',
-  displayName: 'Appsilon',
-  createdAt: '2026-01-01T00:00:00.000Z',
-};
-
-const adminMember = {
-  uid: 'uid-admin',
-  role: 'admin' as const,
-  joinedAt: '2026-01-01T00:00:00.000Z',
-};
-
-const plainMember = { ...adminMember, role: 'member' as const };
+import { GET, PATCH, DELETE } from '../route';
 
 const providerConfig = {
   id: 'github',
@@ -110,19 +52,57 @@ const providerConfig = {
   updatedAt: '2026-04-23T00:00:00.000Z',
 };
 
-function setupAdminAuth(): void {
-  vi.clearAllMocks();
-  mockVerifyIdToken.mockResolvedValue({ uid: 'uid-admin' });
-  mockNamespaceGet.mockResolvedValue(existingNamespace);
-  mockGetMember.mockResolvedValue(adminMember);
+function adminCaller(handle = 'appsilon') {
+  return {
+    kind: 'user' as const,
+    uid: 'uid-admin',
+    namespaces: new Set([handle]),
+    namespaceRoles: new Map([[handle, 'admin' as const]]),
+    isSystemActor: false as const,
+  };
 }
 
-// ---- GET ----
+function memberCaller(handle = 'appsilon') {
+  return {
+    kind: 'user' as const,
+    uid: 'uid-member',
+    namespaces: new Set([handle]),
+    namespaceRoles: new Map([[handle, 'member' as const]]),
+    isSystemActor: false as const,
+  };
+}
+
+const makeParams = (id: string) => Promise.resolve({ id });
+
+function makeGetRequest(id: string, namespace?: string): NextRequest {
+  const url = new URL(`http://localhost/api/admin/oauth-providers/${id}`);
+  if (namespace !== undefined) url.searchParams.set('namespace', namespace);
+  return new NextRequest(url.toString());
+}
+
+function makePatchRequest(id: string, namespace: string | null, body: unknown): NextRequest {
+  const url = new URL(`http://localhost/api/admin/oauth-providers/${id}`);
+  if (namespace !== null) url.searchParams.set('namespace', namespace);
+  return new NextRequest(url.toString(), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+function makeDeleteRequest(id: string, namespace?: string): NextRequest {
+  const url = new URL(`http://localhost/api/admin/oauth-providers/${id}`);
+  if (namespace !== undefined) url.searchParams.set('namespace', namespace);
+  return new NextRequest(url.toString(), { method: 'DELETE' });
+}
 
 describe('GET /api/admin/oauth-providers/:id', () => {
-  beforeEach(setupAdminAuth);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveCallerIdentity.mockResolvedValue(adminCaller());
+  });
 
-  it('[DATA] returns provider by id', async () => {
+  it('[DATA] returns provider by id (wiring smoke)', async () => {
     mockProviderGet.mockResolvedValue(providerConfig);
 
     const res = await GET(
@@ -136,7 +116,7 @@ describe('GET /api/admin/oauth-providers/:id', () => {
     expect(mockProviderGet).toHaveBeenCalledWith('appsilon', 'github');
   });
 
-  it('[SECURITY] single-get response strips clientSecret', async () => {
+  it('[SECURITY] strips clientSecret', async () => {
     mockProviderGet.mockResolvedValue(providerConfig);
 
     const res = await GET(
@@ -145,29 +125,8 @@ describe('GET /api/admin/oauth-providers/:id', () => {
     );
     const json = await res.json();
 
-    expect(res.status).toBe(200);
     expect(json.provider).not.toHaveProperty('clientSecret');
     expect(JSON.stringify(json)).not.toContain('client-secret-xyz');
-  });
-
-  it('[ERROR] 400 when namespace missing', async () => {
-    const res = await GET(
-      makeGetRequest('github'),
-      { params: makeParams('github') },
-    );
-    expect(res.status).toBe(400);
-    expect(mockProviderGet).not.toHaveBeenCalled();
-  });
-
-  it('[ERROR] 404 when namespace does not exist', async () => {
-    mockNamespaceGet.mockResolvedValue(null);
-
-    const res = await GET(
-      makeGetRequest('github', 'nope'),
-      { params: makeParams('github') },
-    );
-    expect(res.status).toBe(404);
-    expect(mockProviderGet).not.toHaveBeenCalled();
   });
 
   it('[ERROR] 404 when provider not found', async () => {
@@ -177,34 +136,29 @@ describe('GET /api/admin/oauth-providers/:id', () => {
       makeGetRequest('missing', 'appsilon'),
       { params: makeParams('missing') },
     );
+
     expect(res.status).toBe(404);
   });
 
   it('[AUTHZ] plain member gets 403', async () => {
-    mockGetMember.mockResolvedValue(plainMember);
+    mockResolveCallerIdentity.mockResolvedValue(memberCaller());
 
     const res = await GET(
       makeGetRequest('github', 'appsilon'),
       { params: makeParams('github') },
     );
-    expect(res.status).toBe(403);
-    expect(mockProviderGet).not.toHaveBeenCalled();
-  });
 
-  it('[AUTHZ] missing auth header gets 401', async () => {
-    const res = await GET(
-      makeGetRequest('github', 'appsilon', null),
-      { params: makeParams('github') },
-    );
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
     expect(mockProviderGet).not.toHaveBeenCalled();
   });
 });
 
-// ---- PATCH ----
-
 describe('PATCH /api/admin/oauth-providers/:id', () => {
-  beforeEach(setupAdminAuth);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveCallerIdentity.mockResolvedValue(adminCaller());
+    mockAuditAppend.mockResolvedValue(undefined);
+  });
 
   it('[DATA] updates fields returned from repo', async () => {
     const patched = { ...providerConfig, name: 'GitHub Enterprise' };
@@ -223,67 +177,6 @@ describe('PATCH /api/admin/oauth-providers/:id', () => {
     });
   });
 
-  it('[SECURITY] PATCH response strips clientSecret', async () => {
-    mockProviderUpdate.mockResolvedValue(providerConfig);
-
-    const res = await PATCH(
-      makePatchRequest('github', 'appsilon', { name: 'GitHub Enterprise' }),
-      { params: makeParams('github') },
-    );
-    const json = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(json.provider).not.toHaveProperty('clientSecret');
-    expect(JSON.stringify(json)).not.toContain('client-secret-xyz');
-  });
-
-  it('[DATA] accepts partial scopes update', async () => {
-    const patched = { ...providerConfig, scopes: ['repo'] };
-    mockProviderUpdate.mockResolvedValue(patched);
-
-    const res = await PATCH(
-      makePatchRequest('github', 'appsilon', { scopes: ['repo'] }),
-      { params: makeParams('github') },
-    );
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.provider.scopes).toEqual(['repo']);
-  });
-
-  it('[ERROR] 400 on invalid URL in patch', async () => {
-    const res = await PATCH(
-      makePatchRequest('github', 'appsilon', { tokenUrl: 'not-a-url' }),
-      { params: makeParams('github') },
-    );
-    expect(res.status).toBe(400);
-    expect(mockProviderUpdate).not.toHaveBeenCalled();
-  });
-
-  it('[ERROR] 400 when body is not an object', async () => {
-    const url = new URL('http://localhost/api/admin/oauth-providers/github?namespace=appsilon');
-    const req = new NextRequest(url.toString(), {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer valid-token',
-      },
-      body: 'not-json',
-    });
-
-    const res = await PATCH(req, { params: makeParams('github') });
-    expect(res.status).toBe(400);
-    expect(mockProviderUpdate).not.toHaveBeenCalled();
-  });
-
-  it('[ERROR] 400 when patch tries to rename id (strict schema)', async () => {
-    const res = await PATCH(
-      makePatchRequest('github', 'appsilon', { id: 'renamed' }),
-      { params: makeParams('github') },
-    );
-    expect(res.status).toBe(400);
-    expect(mockProviderUpdate).not.toHaveBeenCalled();
-  });
-
   it('[ERROR] 404 when provider does not exist', async () => {
     mockProviderUpdate.mockResolvedValue(null);
 
@@ -291,35 +184,45 @@ describe('PATCH /api/admin/oauth-providers/:id', () => {
       makePatchRequest('missing', 'appsilon', { name: 'X' }),
       { params: makeParams('missing') },
     );
+
     expect(res.status).toBe(404);
   });
 
-  it('[ERROR] 404 when namespace missing', async () => {
-    mockNamespaceGet.mockResolvedValue(null);
+  it('[CANONICAL] path id wins over body id (rename attempt is silently ignored)', async () => {
+    // The route adapter merges the body, then overrides `id` with the path
+    // segment — so `{ id: 'renamed' }` in the body never reaches the repo as
+    // a rename. UpdateOAuthProviderInputSchema already strips `id` from the
+    // partial-patch, but the API input schema reinstates it from the path.
+    mockProviderUpdate.mockResolvedValue({ ...providerConfig, name: providerConfig.name });
 
     const res = await PATCH(
-      makePatchRequest('github', 'nope', { name: 'X' }),
+      makePatchRequest('github', 'appsilon', { id: 'renamed', name: 'X' }),
       { params: makeParams('github') },
     );
-    expect(res.status).toBe(404);
+
+    expect(res.status).toBe(200);
+    expect(mockProviderUpdate).toHaveBeenCalledWith('appsilon', 'github', { name: 'X' });
   });
 
   it('[AUTHZ] plain member gets 403', async () => {
-    mockGetMember.mockResolvedValue(plainMember);
+    mockResolveCallerIdentity.mockResolvedValue(memberCaller());
 
     const res = await PATCH(
       makePatchRequest('github', 'appsilon', { name: 'X' }),
       { params: makeParams('github') },
     );
+
     expect(res.status).toBe(403);
     expect(mockProviderUpdate).not.toHaveBeenCalled();
   });
 });
 
-// ---- DELETE ----
-
 describe('DELETE /api/admin/oauth-providers/:id', () => {
-  beforeEach(setupAdminAuth);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveCallerIdentity.mockResolvedValue(adminCaller());
+    mockAuditAppend.mockResolvedValue(undefined);
+  });
 
   it('[DATA] deletes an existing provider', async () => {
     mockProviderDelete.mockResolvedValue(true);
@@ -342,48 +245,18 @@ describe('DELETE /api/admin/oauth-providers/:id', () => {
       makeDeleteRequest('missing', 'appsilon'),
       { params: makeParams('missing') },
     );
+
     expect(res.status).toBe(200);
-    expect(mockProviderDelete).toHaveBeenCalledWith('appsilon', 'missing');
-  });
-
-  it('[ERROR] 400 when namespace missing', async () => {
-    const res = await DELETE(
-      makeDeleteRequest('github'),
-      { params: makeParams('github') },
-    );
-    expect(res.status).toBe(400);
-    expect(mockProviderDelete).not.toHaveBeenCalled();
-  });
-
-  it('[ERROR] 404 when namespace does not exist', async () => {
-    mockNamespaceGet.mockResolvedValue(null);
-
-    const res = await DELETE(
-      makeDeleteRequest('github', 'nope'),
-      { params: makeParams('github') },
-    );
-    expect(res.status).toBe(404);
-    expect(mockProviderDelete).not.toHaveBeenCalled();
   });
 
   it('[AUTHZ] plain member gets 403', async () => {
-    mockGetMember.mockResolvedValue(plainMember);
+    mockResolveCallerIdentity.mockResolvedValue(memberCaller());
 
     const res = await DELETE(
       makeDeleteRequest('github', 'appsilon'),
       { params: makeParams('github') },
     );
-    expect(res.status).toBe(403);
-    expect(mockProviderDelete).not.toHaveBeenCalled();
-  });
 
-  it('[AUTHZ] non-member gets 403', async () => {
-    mockGetMember.mockResolvedValue(null);
-
-    const res = await DELETE(
-      makeDeleteRequest('github', 'appsilon'),
-      { params: makeParams('github') },
-    );
     expect(res.status).toBe(403);
     expect(mockProviderDelete).not.toHaveBeenCalled();
   });

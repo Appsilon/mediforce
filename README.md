@@ -109,6 +109,7 @@ We're building the standard for human-agent collaboration in pharma — and we'r
 > See [`docs/postgres-local-dev.md`](docs/postgres-local-dev.md) and
 > [`docs/adr/0001-firestore-to-postgres.md`](docs/adr/0001-firestore-to-postgres.md).
 
+
 ### Fastest start (no setup)
 
 ```bash
@@ -261,42 +262,35 @@ pnpm dev:no-docker
 
 ## Staging / production ops (Postgres)
 
-`docker-compose.prod.yml` now ships a `postgres:16-alpine` service alongside
-Redis. Before the next staging deploy, the operator must add the following to
-`/opt/mediforce/.env` on the host:
+`docker-compose.prod.yml` ships a `postgres:16-alpine` service alongside
+Redis. The host needs two things before `platform-ui` will start:
 
-```bash
-POSTGRES_PASSWORD=<strong, random>
-# Optional (sensible defaults provided):
-POSTGRES_USER=mediforce
-POSTGRES_DB=mediforce
-```
+1. `POSTGRES_PASSWORD` set in `/opt/mediforce/.env` (no default — required).
+   `POSTGRES_USER` + `POSTGRES_DB` default to `mediforce`.
+2. `/var/lib/mediforce/postgres-data` exists on the host, owned by UID
+   999 (the postgres-alpine user). `docker-compose.staging.yml` bind-mounts
+   that path so `docker compose down -v` cannot wipe data — only an
+   explicit `rm -rf` removes it. Local dev keeps a named volume, so
+   `docker compose down -v` is still a normal reset workflow on a
+   developer machine.
 
-Add the matching GitHub secrets so the deploy script can render the host
-`.env`:
+**Fresh server provisioning** is handled by
+[`scripts/bootstrap-server.py`](scripts/bootstrap-server.py): it
+auto-generates `POSTGRES_PASSWORD` (per ADR-0001, PR #559) and creates
+the bind-mount data dir with the right ownership as part of its
+`step_env_local` + `step_postgres_dir` flow on a new host.
 
-- `STAGING_POSTGRES_PASSWORD` (mandatory)
+**Already-bootstrapped deployments** (the current staging) — bootstrap
+is not re-run against them. Add `POSTGRES_PASSWORD` + create the dir
+manually via ssh. See
+[`docs/staging-postgres-prep.md`](docs/staging-postgres-prep.md) for
+the one-off checklist.
 
-`docker-compose.staging.yml` overrides the Postgres volume to a host bind
-mount at `/var/lib/mediforce/postgres-data`. Effect: `docker compose down
--v` cannot wipe staging data (the `-v` flag removes only Docker-managed
-volumes, never bind mounts). Removing data requires a deliberate `rm
--rf` against the host path. Operator must create the directory once with
-the correct ownership before the first `up`:
+`platform-ui` runs Drizzle migrations on every container start via
+[`packages/platform-infra/scripts/migrate.mjs`](packages/platform-infra/scripts/migrate.mjs)
+(idempotent via the `drizzle.__drizzle_migrations` ledger). No separate
+migration step in the deploy pipeline.
 
-```bash
-sudo mkdir -p /var/lib/mediforce/postgres-data
-sudo chown -R 999:999 /var/lib/mediforce/postgres-data   # postgres-alpine UID
-```
-
-Local-dev `docker-compose.yml` keeps the named volume — `docker compose
-down -v` is a normal reset workflow on a developer machine.
-
-The platform-ui container `CMD` wraps the app with
-[`packages/platform-infra/scripts/migrate.mjs`](packages/platform-infra/scripts/migrate.mjs):
-pending Drizzle migrations are applied before `server.js` starts (idempotent
-via drizzle's `drizzle.__drizzle_migrations` ledger). No separate migration
-step in the deploy pipeline.
 
 ## Deep Dives
 

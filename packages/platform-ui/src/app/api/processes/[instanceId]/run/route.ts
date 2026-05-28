@@ -3,7 +3,7 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv } from '@mediforce/agent-runtime';
-import { validateActionSecrets, isWaitSentinel } from '@mediforce/core-actions';
+import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
 import { isStuckLoop, createLoopTracker, MAX_SAME_STEP_ITERATIONS } from '@/lib/loop-guard';
@@ -328,13 +328,44 @@ export async function POST(
               ? (previousOutput as Record<string, unknown>).options as Array<Record<string, unknown>>
               : undefined;
 
+            // Pre-assignment: when the step declares `assignedTo`, interpolate it
+            // against the run's sources and pin the task to that user (status
+            // 'claimed'). A template that resolves to nothing is a hard failure —
+            // a step that asked to be pre-assigned must not silently fall back to
+            // an open, role-wide task.
+            let assignedUserId: string | null = null;
+            let taskStatus: 'pending' | 'claimed' = 'pending';
+            if (currentStep.assignedTo !== undefined) {
+              const resolved = interpolate(currentStep.assignedTo, {
+                triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
+                steps: instance.variables,
+                variables: instance.variables,
+                // Secrets are deliberately withheld: the resolved value is persisted
+                // as the task's assignedUserId and shown in the UI/audit, and secrets
+                // must never be persisted. A `${secrets.*}` template resolves to
+                // nothing here and hard-fails below — a secret is never an assignee.
+                secrets: {},
+              });
+              if (typeof resolved === 'string' && resolved.length > 0) {
+                assignedUserId = resolved;
+                taskStatus = 'claimed';
+              } else {
+                await instanceRepo.update(instanceId, {
+                  status: 'failed',
+                  error: `Step '${currentStep.id}': assignedTo '${currentStep.assignedTo}' resolved to empty — cannot pre-assign human task`,
+                  updatedAt: new Date().toISOString(),
+                });
+                break;
+              }
+            }
+
             await humanTaskRepo.create({
               id: taskId,
               processInstanceId: instanceId,
               stepId: instance.currentStepId,
               assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned',
-              assignedUserId: null,
-              status: 'pending',
+              assignedUserId,
+              status: taskStatus,
               deadline: null,
               createdAt: now,
               updatedAt: now,
@@ -353,7 +384,7 @@ export async function POST(
               action: 'task.created',
               description: `Human task created for step '${instance.currentStepId}' (reason: human_executor)`,
               timestamp: now,
-              inputSnapshot: { taskId, stepId: instance.currentStepId, reason: 'human_executor', assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned' },
+              inputSnapshot: { taskId, stepId: instance.currentStepId, reason: 'human_executor', assignedRole: currentStep.allowedRoles?.[0] ?? 'unassigned', assignedUserId },
               outputSnapshot: {},
               basis: 'Human executor step reached in auto-runner loop',
               entityType: 'humanTask',

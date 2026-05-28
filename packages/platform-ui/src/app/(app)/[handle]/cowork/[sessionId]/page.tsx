@@ -2,63 +2,42 @@
 
 import * as React from 'react';
 import { useParams } from 'next/navigation';
-import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import type { CoworkSession, ProcessInstance, WorkflowDefinition } from '@mediforce/platform-core';
-import { db } from '@/lib/firebase';
+import { mediforce } from '@/lib/mediforce';
 import { ChatCoworkView } from '@/components/cowork/chat-cowork-view';
 import { VoiceCoworkView } from '@/components/cowork/voice-cowork-view';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useCoworkSession } from '@/hooks/use-cowork';
 import { routes } from '@/lib/routes';
 
 export default function CoworkSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const handle = useHandleFromPath();
-  const [session, setSession] = React.useState<CoworkSession | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [stepDescription, setStepDescription] = React.useState<string | undefined>(undefined);
 
-  // Load session via real-time listener
-  React.useEffect(() => {
-    if (!sessionId) return;
-    const unsub = onSnapshot(doc(db, 'coworkSessions', sessionId), (snap) => {
-      if (snap.exists()) {
-        setSession({ id: snap.id, ...snap.data() } as CoworkSession);
-      } else {
-        setSession(null);
-      }
-      setLoading(false);
-    });
-    return unsub;
-  }, [sessionId]);
+  // Session metadata + polling (cadence is constant 5 s here — the chat
+  // mutation's `isPending` lives inside ChatCoworkView, which owns the
+  // turns query that flips to 1 s while a message is in-flight).
+  const { session, loading } = useCoworkSession(sessionId, false);
 
-  // Load process instance
   const { data: instance } = useProcessInstance(session?.processInstanceId ?? null);
 
-  // Load step description from workflow definition
-  React.useEffect(() => {
-    if (!instance || !session) return;
-
-    async function loadStepDescription() {
-      const colRef = collection(db, 'workflowDefinitions');
-      const q = query(
-        colRef,
-        where('name', '==', instance!.definitionName),
-      );
-      const snap = await getDocs(q);
-      if (snap.empty) return;
-
-      const def = snap.docs[0].data() as WorkflowDefinition;
-      const step = def.steps?.find((s) => s.id === session!.stepId);
-      if (step?.description) {
-        setStepDescription(step.description);
-      }
-    }
-
-    loadStepDescription();
-  }, [instance?.definitionName, session?.stepId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const definitionName = instance?.definitionName;
+  const stepId = session?.stepId;
+  const { data: stepDescription } = useQuery({
+    queryKey: ['workflow-step-description', handle, definitionName, stepId],
+    enabled: definitionName !== undefined && stepId !== undefined,
+    queryFn: async () => {
+      const { definition } = await mediforce.workflows.get({
+        name: definitionName as string,
+        namespace: handle,
+      });
+      const step = definition.steps.find((s) => s.id === stepId);
+      return step?.description ?? null;
+    },
+  });
 
   if (loading) {
     return (
@@ -109,14 +88,14 @@ export default function CoworkSessionPage() {
           session={session}
           instance={instance}
           handle={handle}
-          stepDescription={stepDescription}
+          stepDescription={stepDescription ?? undefined}
         />
       ) : (
         <ChatCoworkView
           session={session}
           instance={instance}
           handle={handle}
-          stepDescription={stepDescription}
+          stepDescription={stepDescription ?? undefined}
         />
       )}
     </div>

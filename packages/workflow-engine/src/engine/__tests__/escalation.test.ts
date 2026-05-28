@@ -28,6 +28,10 @@ class InMemoryUserDirectoryService implements UserDirectoryService {
       .filter((u) => u.role === role)
       .map((u) => ({ uid: u.uid, email: u.email }));
   }
+
+  async getUserMetadata(): Promise<null> {
+    return null;
+  }
 }
 
 // A 2-step workflow: agent-step -> done

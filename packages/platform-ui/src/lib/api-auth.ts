@@ -23,9 +23,20 @@ export async function resolveCallerIdentity(
   request: Request,
   namespaceRepo: NamespaceRepository,
 ): Promise<CallerIdentity | NextResponse> {
+  // Both PLATFORM_API_KEY and PLATFORM_ADMIN_API_KEY mint the same apiKey
+  // identity (`isSystemActor: true`). The two env vars exist for operator
+  // ergonomics — historic deployments used distinct keys per tier — but at
+  // the auth boundary they're interchangeable. Per-user PATs (#376) replace
+  // this whole branch once issued; until then both keys are operator-issued
+  // and trusted.
   const apiKey = request.headers.get('X-Api-Key');
   const expectedKey = process.env.PLATFORM_API_KEY;
-  if (apiKey && expectedKey && apiKey === expectedKey) {
+  const adminKey = process.env.PLATFORM_ADMIN_API_KEY;
+  const apiKeyMatchesPrimary =
+    apiKey !== null && apiKey !== '' && expectedKey !== undefined && expectedKey !== '' && apiKey === expectedKey;
+  const apiKeyMatchesAdmin =
+    apiKey !== null && apiKey !== '' && adminKey !== undefined && adminKey !== '' && apiKey === adminKey;
+  if (apiKeyMatchesPrimary || apiKeyMatchesAdmin) {
     return { kind: 'apiKey', isSystemActor: true };
   }
 
@@ -43,11 +54,12 @@ export async function resolveCallerIdentity(
     return NextResponse.json({ error: 'Unauthorized — invalid token' }, { status: 401 });
   }
 
-  const namespaces = await namespaceRepo.getNamespacesByUser(uid);
+  const memberships = await namespaceRepo.getMembershipsForUser(uid);
   return {
     kind: 'user',
     uid,
-    namespaces: new Set(namespaces.map((ns) => ns.handle)),
+    namespaces: new Set(memberships.map((m) => m.handle)),
+    namespaceRoles: new Map(memberships.map((m) => [m.handle, m.role] as const)),
     isSystemActor: false,
   };
 }

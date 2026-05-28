@@ -11,7 +11,7 @@ import {
  * own contract; we don't re-test it here.
  */
 
-describe('ListTasksInputSchema — filter exclusivity refine (instanceId XOR role)', () => {
+describe('ListTasksInputSchema — filter exclusivity (instanceId vs role)', () => {
   it('accepts instanceId alone', () => {
     expect(ListTasksInputSchema.safeParse({ instanceId: 'inst-1' }).success).toBe(true);
   });
@@ -20,18 +20,53 @@ describe('ListTasksInputSchema — filter exclusivity refine (instanceId XOR rol
     expect(ListTasksInputSchema.safeParse({ role: 'reviewer' }).success).toBe(true);
   });
 
-  it('rejects when neither is provided', () => {
-    const result = ListTasksInputSchema.safeParse({});
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0].message).toMatch(/exactly one of/i);
-    }
+  it('accepts empty input — caller-scope axis (GitHub-like default)', () => {
+    expect(ListTasksInputSchema.safeParse({}).success).toBe(true);
   });
 
   it('rejects when both instanceId and role are provided', () => {
+    const result = ListTasksInputSchema.safeParse({ instanceId: 'inst-1', role: 'reviewer' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toMatch(/mutually exclusive/i);
+    }
+  });
+});
+
+describe('ListTasksInputSchema — stepId / status narrowing', () => {
+  // No "stepId requires instanceId" refine: `role + stepId` is a valid
+  // cross-instance bottleneck view, and `stepId` alone now combines with
+  // the caller-scope axis (every step `step-a` task across the caller's
+  // workspaces).
+
+  it('accepts instanceId + stepId (next-step-card pattern)', () => {
     expect(
-      ListTasksInputSchema.safeParse({ instanceId: 'inst-1', role: 'reviewer' }).success,
-    ).toBe(false);
+      ListTasksInputSchema.safeParse({ instanceId: 'inst-1', stepId: 'step-a' }).success,
+    ).toBe(true);
+  });
+
+  it('accepts role + stepId (cross-instance step inspection)', () => {
+    expect(
+      ListTasksInputSchema.safeParse({ role: 'reviewer', stepId: 'step-a' }).success,
+    ).toBe(true);
+  });
+
+  it('accepts instanceId + stepId + status (full narrowing)', () => {
+    expect(
+      ListTasksInputSchema.safeParse({
+        instanceId: 'inst-1',
+        stepId: 'step-a',
+        status: ['pending'],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts stepId alone (caller-scope axis + stepId filter)', () => {
+    expect(ListTasksInputSchema.safeParse({ stepId: 'step-a' }).success).toBe(true);
+  });
+
+  it('accepts status alone (caller-scope axis + status filter — "my actionable queue")', () => {
+    expect(ListTasksInputSchema.safeParse({ status: ['pending'] }).success).toBe(true);
   });
 });
 

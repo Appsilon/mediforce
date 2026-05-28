@@ -9,7 +9,6 @@ beforeEach(() => {
 const BASE_ENV = { MEDIFORCE_API_KEY: 'k' };
 
 // Minimal ProcessInstance shape — entity-echo response per ADR-0005 §5.
-// Replaces the pre-Phase-3 `{ instanceId, status }` mock shape.
 function mkRun(id: string, status = 'running'): { run: Record<string, unknown> } {
   return {
     run: {
@@ -48,7 +47,7 @@ describe('run start command', () => {
     const output = captureOutput();
     const code = await runStartCommand({ argv: [], env: BASE_ENV, output });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/--workflow is required/);
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required argument: --workflow/);
   });
 
   it('starts a run without payload', async () => {
@@ -143,7 +142,7 @@ describe('run start command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/Cannot use both/);
+    expect(output.stderrLines.join('\n')).toMatch(/mutually exclusive/);
   });
 
   it('reads payload from stdin via --input-file -', async () => {

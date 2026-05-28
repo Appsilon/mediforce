@@ -18,7 +18,7 @@ describe('secret delete command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/Usage: mediforce secret delete/);
+    expect(output.stdoutLines.join('\n')).toMatch(/USAGE mediforce secret delete/);
   });
 
   it('deletes secret and prints confirmation', async () => {
@@ -60,7 +60,7 @@ describe('secret delete command', () => {
       output,
     });
     expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/--key are required/);
+    expect(output.stderrLines.join('\n')).toMatch(/Missing required argument: --key/);
   });
 
   it('exits 1 on API error', async () => {

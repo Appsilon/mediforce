@@ -8,8 +8,7 @@ import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
-import { getWorkflowSecretKeys } from '@/app/actions/workflow-secrets';
-import { getNamespaceSecretKeys } from '@/app/actions/namespace-secrets';
+import { useStartRun } from '@/hooks/use-run-mutations';
 import { useWorkflowSecretKeysContext } from '@/hooks/use-workflow-secret-keys';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
@@ -42,6 +41,7 @@ export function StartRunButton({
   const openRouterCredits = useOpenRouterCredits();
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const startMutation = useStartRun();
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [pendingVersion, setPendingVersion] = React.useState<number | undefined>(undefined);
@@ -92,13 +92,13 @@ export function StartRunButton({
     let cancelled = false;
     setLocalSecretsLoading(true);
     Promise.all([
-      getWorkflowSecretKeys(handle, workflowName, uid),
-      getNamespaceSecretKeys(handle, uid),
+      mediforce.secrets.list({ namespace: handle, workflow: workflowName }),
+      mediforce.secrets.list({ namespace: handle }),
     ])
-      .then(([wfKeys, nsKeys]) => {
+      .then(([wf, ns]) => {
         if (cancelled) return;
-        setLocalSecretKeys(wfKeys);
-        setLocalNsSecretKeys(nsKeys);
+        setLocalSecretKeys(wf.keys);
+        setLocalNsSecretKeys(ns.keys);
         setLocalSecretsLoading(false);
       })
       .catch(() => {
@@ -155,7 +155,7 @@ export function StartRunButton({
     const payload = hasTriggerInput ? buildPayload() : undefined;
 
     try {
-      const result = await mediforce.runs.start({
+      const result = await startMutation.mutateAsync({
         namespace: handle,
         definitionName: workflowName,
         definitionVersion: targetVersion,
@@ -167,6 +167,11 @@ export function StartRunButton({
     } catch (err) {
       console.error('[StartRunButton] Failed to start run:', err);
       setError(err instanceof Error ? err.message : 'Failed to start run');
+    } finally {
+      // Reset on every code path — under the legacy Server Action the implicit
+      // revalidate-on-success remounted the component; the headless migration
+      // (PR #520) lost that side-effect, so success without unmount left the
+      // button stuck on "Starting...".
       setStarting(false);
     }
   }

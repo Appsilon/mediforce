@@ -31,7 +31,7 @@ describe('agent get command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/Usage: mediforce agent get/);
+    expect(output.stdoutLines.join('\n')).toMatch(/USAGE mediforce agent get/);
   });
 
   it('exits 2 when no id positional is given', async () => {
@@ -43,7 +43,7 @@ describe('agent get command', () => {
     });
     expect(code).toBe(2);
     expect(output.stderrLines.join('\n') + output.stdoutLines.join('\n')).toMatch(
-      /<id> is required/,
+      /Missing required positional argument: ID/,
     );
   });
 

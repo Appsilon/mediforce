@@ -3,8 +3,8 @@
 import * as React from 'react';
 import { CheckCircle, XCircle, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { saveDefinition } from '@/app/actions/definitions';
-import type { SaveDefinitionResult } from '@/app/actions/definitions';
+import { mediforce, ApiError } from '@/lib/mediforce';
+import { RegisterWorkflowInputSchema } from '@mediforce/platform-api/contract';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 
@@ -42,12 +42,40 @@ export function YamlEditor({ initialValue = '', namespace, onNamespaceChange, on
 
   const handleSave = async () => {
     setState({ status: 'saving' });
-    const result: SaveDefinitionResult = await saveDefinition(yaml, namespace);
-    if (result.success) {
-      setState({ status: 'saved', name: result.name, version: result.version });
-      onSaved?.(result.name, result.version);
-    } else {
-      setState({ status: 'error', message: result.error });
+    if (!yaml.trim()) {
+      setState({ status: 'error', message: 'YAML content is required.' });
+      return;
+    }
+    if (typeof namespace !== 'string' || namespace.length === 0) {
+      setState({ status: 'error', message: 'Namespace is required.' });
+      return;
+    }
+    let raw: unknown;
+    try {
+      const { parse: parseYaml } = await import('yaml');
+      raw = parseYaml(yaml);
+    } catch (err) {
+      setState({ status: 'error', message: `YAML syntax error: ${(err as Error).message}` });
+      return;
+    }
+    if (raw === null || raw === undefined) {
+      setState({ status: 'error', message: 'YAML document is empty or contains only comments.' });
+      return;
+    }
+    const { version: _v, createdAt: _c, namespace: _ns, ...body } = raw as Record<string, unknown>;
+    const parsed = RegisterWorkflowInputSchema.safeParse(body);
+    if (!parsed.success) {
+      setState({ status: 'error', message: `Invalid workflow: ${parsed.error.message}` });
+      return;
+    }
+    try {
+      const result = await mediforce.workflows.register(parsed.data, { namespace });
+      setState({ status: 'saved', name: result.name, version: String(result.version) });
+      onSaved?.(result.name, String(result.version));
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message
+        : err instanceof Error ? err.message : 'Unknown error';
+      setState({ status: 'error', message });
     }
   };
 

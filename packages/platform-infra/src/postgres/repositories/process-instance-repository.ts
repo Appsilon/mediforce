@@ -102,6 +102,15 @@ export class PostgresProcessInstanceRepository
     return row ? ProcessInstanceSchema.parse(toInstance(row)) : null;
   }
 
+  async getNamespaceById(instanceId: string): Promise<string | null> {
+    const rows = await this.db
+      .select({ workspace: processInstances.workspace })
+      .from(processInstances)
+      .where(eq(processInstances.id, instanceId))
+      .limit(1);
+    return rows[0]?.workspace ?? null;
+  }
+
   async getByIdInNamespaces(
     instanceId: string,
     allowed: readonly string[],

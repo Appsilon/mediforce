@@ -1,58 +1,42 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { NamespaceSchema } from '@mediforce/platform-core';
-import type { Namespace } from '@mediforce/platform-core';
+import { useQuery } from '@tanstack/react-query';
+import type { Namespace, NamespaceMember } from '@mediforce/platform-core';
+import { ApiError, mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
 
-export type UseNamespaceResult = {
+export interface UseNamespaceResult {
   namespace: Namespace | null;
+  members: NamespaceMember[];
   loading: boolean;
   error: Error | null;
-};
+}
 
-export function useNamespace(handle: string): UseNamespaceResult {
-  const [namespace, setNamespace] = useState<Namespace | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+/**
+ * Workspace detail fetch keyed under `['namespace', handle]`. ONE-SHOT per
+ * ADR-0006 §4 sub-case (a): workspace metadata changes via deliberate user
+ * action (settings save), so `refetchOnWindowFocus: true` is the safety net.
+ */
+export function useNamespace(handle: string | undefined | null): UseNamespaceResult {
+  const enabled = typeof handle === 'string' && handle !== '';
+  const query = useQuery({
+    queryKey: queryKeys.namespace(enabled ? handle : ''),
+    queryFn: () => mediforce.namespaces.get({ handle: handle as string }),
+    enabled,
+    refetchOnWindowFocus: true,
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+      return failureCount < 2;
+    },
+  });
 
-  useEffect(() => {
-    if (!handle) {
-      setNamespace(null);
-      setLoading(false);
-      return;
-    }
+  const err = enabled ? (query.error as Error | null) ?? null : null;
+  const notFound = err instanceof ApiError && err.status === 404;
 
-    setLoading(true);
-    setError(null);
-
-    const namespaceRef = doc(db, 'namespaces', handle);
-
-    const unsubscribe = onSnapshot(
-      namespaceRef,
-      (snapshot) => {
-        if (!snapshot.exists()) {
-          setNamespace(null);
-        } else {
-          const parsed = NamespaceSchema.safeParse(snapshot.data());
-          if (parsed.success) {
-            setNamespace(parsed.data);
-          } else {
-            setError(new Error('Invalid namespace data'));
-            setNamespace(null);
-          }
-        }
-        setLoading(false);
-      },
-      (err) => {
-        setError(err instanceof Error ? err : new Error(String(err)));
-        setLoading(false);
-      },
-    );
-
-    return unsubscribe;
-  }, [handle]);
-
-  return { namespace, loading, error };
+  return {
+    namespace: enabled ? query.data?.namespace ?? null : null,
+    members: enabled ? query.data?.members ?? [] : [],
+    loading: query.isLoading && enabled,
+    error: notFound ? null : err,
+  };
 }

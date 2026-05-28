@@ -15,6 +15,12 @@
  */
 export async function getFirebaseIdToken(): Promise<string | null> {
   const { auth } = await import('./firebase');
+  // `authStateReady()` resolves once Firebase has finished restoring auth
+  // state from persistent storage (IndexedDB on the browser). Without this,
+  // a caller that fires immediately on mount can read `currentUser === null`
+  // mid-restore and ship a request with no Authorization header, producing
+  // a spurious 401 from the proxy.
+  await auth.authStateReady();
   const user = auth.currentUser;
   return user === null ? null : user.getIdToken();
 }

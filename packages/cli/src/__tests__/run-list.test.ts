@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { buildProcessInstance } from '@mediforce/platform-core/testing';
 import { runListCommand } from '../commands/run-list.js';
 import { captureOutput, jsonResponse } from './test-helpers.js';
 
@@ -6,10 +7,13 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
+// Wire shape per Phase 4 PRD §9 (read-path convergence): the list endpoint
+// returns the full ProcessInstance shape, the same one served by GET
+// /api/processes/:instanceId.
 const SAMPLE_RUNS = {
   runs: [
-    {
-      runId: 'run-1',
+    buildProcessInstance({
+      id: 'run-1',
       status: 'completed',
       definitionName: 'my-workflow',
       definitionVersion: '3',
@@ -18,9 +22,9 @@ const SAMPLE_RUNS = {
       createdAt: '2026-04-30T10:00:00.000Z',
       updatedAt: '2026-04-30T10:05:00.000Z',
       createdBy: 'mediforce-cli',
-    },
-    {
-      runId: 'run-2',
+    }),
+    buildProcessInstance({
+      id: 'run-2',
       status: 'failed',
       definitionName: 'my-workflow',
       definitionVersion: '2',
@@ -29,7 +33,7 @@ const SAMPLE_RUNS = {
       createdAt: '2026-04-29T10:00:00.000Z',
       updatedAt: '2026-04-29T10:01:00.000Z',
       createdBy: 'user-1',
-    },
+    }),
   ],
 };
 
@@ -65,7 +69,7 @@ describe('run list command', () => {
     });
     expect(code).toBe(0);
     const parsed: unknown = JSON.parse(output.stdoutLines.join('\n'));
-    expect(parsed).toMatchObject({ runs: expect.arrayContaining([expect.objectContaining({ runId: 'run-1' })]) });
+    expect(parsed).toMatchObject({ runs: expect.arrayContaining([expect.objectContaining({ id: 'run-1' })]) });
   });
 
   it('passes --workflow filter as query param', async () => {
@@ -105,7 +109,7 @@ describe('run list command', () => {
     });
     expect(code).toBe(2);
     const allOutput = output.stderrLines.join('\n') + output.stdoutLines.join('\n');
-    expect(allOutput).toMatch(/Invalid status/i);
+    expect(allOutput).toMatch(/Invalid value for argument: --status/i);
   });
 
   it('prints "No runs found" for empty result', async () => {
@@ -145,6 +149,6 @@ describe('run list command', () => {
       output,
     });
     expect(code).toBe(0);
-    expect(output.stdoutLines.join('\n')).toMatch(/Usage: mediforce run list/);
+    expect(output.stdoutLines.join('\n')).toMatch(/USAGE mediforce run list/);
   });
 });

@@ -38,8 +38,6 @@ export const StepExecutorTypeSchema = z.enum([
 ]);
 export type StepExecutorType = z.infer<typeof StepExecutorTypeSchema>;
 
-// ---- GET /api/processes/:instanceId -----------------------------------------
-
 export const GetProcessInputSchema = z.object({
   instanceId: z.string().min(1),
 });
@@ -49,8 +47,6 @@ export const GetProcessOutputSchema = ProcessInstanceSchema;
 export type GetProcessInput = z.infer<typeof GetProcessInputSchema>;
 export type GetProcessOutput = z.infer<typeof GetProcessOutputSchema>;
 
-// ---- GET /api/processes/:instanceId/audit -----------------------------------
-//
 // Response shape: `{ events: [...] }`. This is a breaking change vs `main`,
 // which returned the bare array — wrapping the array keeps a future
 // `nextCursor` field additive once pagination lands (#231).
@@ -66,8 +62,6 @@ export const ListAuditEventsOutputSchema = z.object({
 export type ListAuditEventsInput = z.infer<typeof ListAuditEventsInputSchema>;
 export type ListAuditEventsOutput = z.infer<typeof ListAuditEventsOutputSchema>;
 
-// ---- GET /api/processes/:instanceId/steps -----------------------------------
-//
 // Derived view: walks the workflow definition in order and joins each step's
 // latest execution + the slice of `instance.variables` keyed by stepId.
 // Human steps don't produce executions, so their input/output is
@@ -104,8 +98,6 @@ export type StepEntry = z.infer<typeof StepEntrySchema>;
 export type GetProcessStepsInput = z.infer<typeof GetProcessStepsInputSchema>;
 export type GetProcessStepsOutput = z.infer<typeof GetProcessStepsOutputSchema>;
 
-// ---- POST /api/processes/:instanceId/cancel ---------------------------------
-//
 // State transition: running | paused → failed. Entity echo per ADR-0005 §5.
 // `reason` defaults to "Cancelled by user" in the handler; that literal is
 // load-bearing — workflow-status.ts:82 gates on it to distinguish operator
@@ -166,3 +158,43 @@ export const RetryStepOutputSchema = z.object({
 
 export type RetryStepInput = z.infer<typeof RetryStepInputSchema>;
 export type RetryStepOutput = z.infer<typeof RetryStepOutputSchema>;
+
+// Soft-archive flag on the run (`archived` field). Blocked while the run is
+// still active (running/created/waiting-on-human). Entity echo per ADR-0005 §5.
+
+export const ArchiveRunInputSchema = z.object({
+  runId: z.string().min(1),
+  archived: z.boolean(),
+});
+
+export const ArchiveRunOutputSchema = z.object({
+  run: ProcessInstanceSchema,
+});
+
+export type ArchiveRunInput = z.infer<typeof ArchiveRunInputSchema>;
+export type ArchiveRunOutput = z.infer<typeof ArchiveRunOutputSchema>;
+
+// Bulk response shape per ADR-0005 §5: `{ results: [{ id, status, error? }] }`.
+// Per-item failures don't abort the batch; each id reports independently. Both
+// endpoints share the same input/output shape; the only difference is whether
+// the per-item operation is cancel or archive.
+
+const BULK_LIMIT = 100;
+
+export const BulkRunInputSchema = z.object({
+  runIds: z.array(z.string().min(1)).min(1).max(BULK_LIMIT),
+});
+
+export const BulkRunResultItemSchema = z.object({
+  id: z.string(),
+  status: z.enum(['ok', 'error']),
+  error: z.string().optional(),
+});
+
+export const BulkRunOutputSchema = z.object({
+  results: z.array(BulkRunResultItemSchema),
+});
+
+export type BulkRunInput = z.infer<typeof BulkRunInputSchema>;
+export type BulkRunResultItem = z.infer<typeof BulkRunResultItemSchema>;
+export type BulkRunOutput = z.infer<typeof BulkRunOutputSchema>;

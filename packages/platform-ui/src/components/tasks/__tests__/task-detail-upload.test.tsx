@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HumanTask } from '@mediforce/platform-core';
 import { buildHumanTask } from '@mediforce/platform-core/testing';
+import { createQueryWrapper } from '@/test/react-query';
+
+function render(ui: React.ReactElement) {
+  const { wrapper } = createQueryWrapper();
+  return rtlRender(ui, { wrapper });
+}
 
 // Mock Firebase — must come before any component imports
 vi.mock('@/lib/firebase', () => ({
@@ -59,6 +65,15 @@ vi.mock('@/lib/mediforce', () => ({
       list: vi.fn(async () => ({ tasks: [] })),
       get: vi.fn(async (input: { taskId: string }) => ({ id: input.taskId })),
     },
+    processes: {
+      get: vi.fn(async (input: { instanceId: string }) => ({ id: input.instanceId, status: 'running' })),
+      listAuditEvents: vi.fn(async () => ({ events: [] })),
+    },
+  },
+  ApiError: class ApiError extends Error {
+    constructor(public status: number, message: string) {
+      super(message);
+    }
   },
 }));
 

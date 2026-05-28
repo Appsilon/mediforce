@@ -3,6 +3,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import * as Switch from '@radix-ui/react-switch';
 import { useParams, useRouter } from 'next/navigation';
+// TODO(phase-4 follow-up): the remaining firestore writes on this page
+// (update namespace metadata, role flip, member remove, workspace delete,
+// leave) are out of PR4 scope — PR4 only adds GET /namespaces/:handle +
+// POST /namespaces. Migration of these mutations lands with the dedicated
+// member-management endpoints.
 import {
   arrayRemove,
   collection,
@@ -10,7 +15,6 @@ import {
   deleteField,
   doc,
   getDocs,
-  onSnapshot,
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
@@ -25,11 +29,10 @@ import {
   Users,
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { apiFetch } from '@/lib/api-fetch';
+import { mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
 import { WORKSPACE_ICONS, WORKSPACE_ICON_KEYS, getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
-import { NamespaceMemberSchema } from '@mediforce/platform-core';
 import type { NamespaceMember } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { NamespaceSecretsEditor } from '@/components/namespace/namespace-secrets-editor';
@@ -166,24 +169,26 @@ export default function WorkspaceConfigPage() {
   const { firebaseUser } = useAuth();
   const { namespace, loading: namespaceLoading } = useNamespace(handle);
 
-  // Realtime Firestore subscription for role changes
+  // Polled members list via the headless contract — replaces the previous
+  // `onSnapshot(namespaces/{handle}/members)` subscription. Realtime updates
+  // become a small staleness window (next listMembers tick after a mutation);
+  // §"Phase 4 is a swap, not a redesign" accepts this regression.
   const [realtimeMembers, setRealtimeMembers] = useState<NamespaceMemberWithId[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
-  useEffect(() => {
+  const refreshMembers = useCallback(async () => {
     if (handle === '') return;
-    const colRef = collection(db, `namespaces/${handle}/members`);
-    const unsubscribe = onSnapshot(colRef, (snapshot) => {
-      const docs = snapshot.docs
-        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as NamespaceMemberWithId)
-        .filter((raw) => NamespaceMemberSchema.safeParse(raw).success);
-      setRealtimeMembers(docs);
+    try {
+      const { members: fetched } = await mediforce.users.listMembers({ namespace: handle });
+      setRealtimeMembers(fetched.map((m) => ({ ...m, id: m.uid })));
+    } finally {
       setMembersLoading(false);
-    }, () => {
-      setMembersLoading(false);
-    });
-    return unsubscribe;
+    }
   }, [handle]);
+
+  useEffect(() => {
+    void refreshMembers();
+  }, [refreshMembers]);
 
   // API fetch for lastSignInTime + email
   const [lastSignInMap, setLastSignInMap] = useState<Map<string, string | null>>(new Map());
@@ -192,12 +197,10 @@ export default function WorkspaceConfigPage() {
   const fetchLastSignIn = useCallback(async () => {
     if (handle === '' || firebaseUser === null) return;
     try {
-      const res = await apiFetch(`/api/users/members?handle=${encodeURIComponent(handle)}`);
-      if (!res.ok) return;
-      const data = (await res.json()) as { members: Array<{ uid: string; email: string | null; lastSignInTime: string | null }> };
+      const { members } = await mediforce.users.listMembers({ namespace: handle });
       const map = new Map<string, string | null>();
       const emailMapLocal = new Map<string, string | null>();
-      for (const member of data.members) {
+      for (const member of members) {
         map.set(member.uid, member.lastSignInTime);
         emailMapLocal.set(member.uid, member.email);
       }
@@ -314,26 +317,20 @@ export default function WorkspaceConfigPage() {
 
     setInviting(true);
     try {
-      const res = await apiFetch('/api/users/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          displayName: inviteName.trim() !== '' ? inviteName.trim() : undefined,
-          namespaceHandle: handle,
-          role: inviteRole,
-          inviterName: firebaseUser?.displayName ?? firebaseUser?.email ?? undefined,
-        }),
+      const data = await mediforce.users.invite({
+        email: trimmedEmail,
+        displayName: inviteName.trim() !== '' ? inviteName.trim() : undefined,
+        namespaceHandle: handle,
+        role: inviteRole,
+        inviterName: firebaseUser?.displayName ?? firebaseUser?.email ?? undefined,
       });
 
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setError(data.error ?? 'Failed to send invite.');
-        return;
-      }
-
-      const data = (await res.json()) as { uid: string; email: string; temporaryPassword: string; emailSent: boolean; isExisting: boolean };
-      setInviteResult({ email: data.email, temporaryPassword: data.temporaryPassword, emailSent: data.emailSent, isExisting: data.isExisting });
+      setInviteResult({
+        email: data.email,
+        temporaryPassword: data.temporaryPassword,
+        emailSent: data.emailSent,
+        isExisting: data.isExisting,
+      });
       setShowInviteForm(false);
       setInviteEmail('');
       setInviteName('');
@@ -350,18 +347,15 @@ export default function WorkspaceConfigPage() {
     setResendResult(null);
     setResendingUid(memberUid);
     try {
-      const res = await apiFetch('/api/users/resend-invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: memberUid, namespaceHandle: handle }),
+      const data = await mediforce.users.resendInvite({
+        uid: memberUid,
+        namespaceHandle: handle,
       });
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setError(data.error ?? 'Failed to resend invite.');
-        return;
-      }
-      const data = (await res.json()) as { email: string; temporaryPassword: string; emailSent: boolean };
-      setResendResult({ email: data.email, temporaryPassword: data.temporaryPassword, emailSent: data.emailSent });
+      setResendResult({
+        email: data.email,
+        temporaryPassword: data.temporaryPassword,
+        emailSent: data.emailSent,
+      });
       void fetchLastSignIn();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to resend invite.');

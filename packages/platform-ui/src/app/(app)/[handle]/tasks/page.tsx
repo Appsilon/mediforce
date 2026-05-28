@@ -95,7 +95,7 @@ export default function TasksPage() {
     });
   }, [firebaseUser]);
 
-  const { data: activeTasks, loading: activeLoading } = useMyTasks(role);
+  const { data: activeTasks, loading: activeLoading } = useMyTasks(role, firebaseUser?.uid ?? null);
   const { data: completedTasks, loading: completedLoading } = useCompletedTasks(role);
   const { data: activeCoworkSessions, loading: coworkLoading } = useMyCoworkSessions(role);
   const { data: finalizedCoworkSessions, loading: finalizedLoading } = useFinalizedCoworkSessions(role);

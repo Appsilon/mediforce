@@ -43,7 +43,16 @@ export interface ProcessRepository {
   setWorkflowDeleted(namespace: string, name: string, deleted: boolean): Promise<void>;
   isWorkflowNameDeleted(namespace: string, name: string): Promise<boolean>;
   countInstancesByDefinitionName(namespace: string, name: string): Promise<number>;
-  /** Move every version of a workflow (matched by `name`) to a new namespace.
-   *  Returns the number of versions transferred (0 = workflow not found). */
-  transferWorkflowNamespace(name: string, newNamespace: string): Promise<number>;
+
+  /**
+   * Move all versions of a workflow definition from `sourceNamespace` to
+   * `targetNamespace`. Takes both namespaces so the
+   * `AuthorizedWorkflowDefinitionRepository` wrapper can gate on each (caller
+   * must own source AND target).
+   */
+  transferWorkflowNamespace(
+    sourceNamespace: string,
+    name: string,
+    targetNamespace: string,
+  ): Promise<void>;
 }

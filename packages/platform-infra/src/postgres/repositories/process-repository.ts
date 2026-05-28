@@ -349,24 +349,19 @@ export class PostgresProcessRepository implements ProcessRepository {
   }
 
   async transferWorkflowNamespace(
+    sourceNamespace: string,
     name: string,
-    newNamespace: string,
-  ): Promise<number> {
-    const rows = await this.db
-      .select({ id: workflowDefinitions.id })
-      .from(workflowDefinitions)
-      .where(eq(workflowDefinitions.name, name));
-    if (rows.length === 0) return 0;
+    targetNamespace: string,
+  ): Promise<void> {
     await this.db
       .update(workflowDefinitions)
-      .set({ workspace: newNamespace })
+      .set({ workspace: targetNamespace })
       .where(
-        inArray(
-          workflowDefinitions.id,
-          rows.map((r) => r.id),
+        and(
+          eq(workflowDefinitions.name, name),
+          eq(workflowDefinitions.workspace, sourceNamespace),
         ),
       );
-    return rows.length;
   }
 }
 

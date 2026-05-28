@@ -52,7 +52,7 @@ CI runs the same suite (job `postgres-tests`) plus an L3 API E2E job
 
 - **`relation "tool_catalog_entries" does not exist`** — run `pnpm db:migrate`.
 - **`DATABASE_URL is not set` at boot** — check `packages/platform-ui/.env.local`.
-  `instrumentation.ts` refuses to start without a DATABASE_URL.
+  `instrumentation.ts` refuses to start with `STORAGE_BACKEND=postgres` + missing URL.
 - **Migration applied but table missing** — duplicate `idx` in `_journal.json`
   from a rebase. See [PLAN-0001 §10.1](adr/PLAN-0001.md#101-migration-filename-rule).
 - **Too many connections** — bump `POOL_MAX` in
