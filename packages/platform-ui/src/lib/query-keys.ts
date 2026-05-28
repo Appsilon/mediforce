@@ -1,4 +1,4 @@
-import type { HumanTaskStatus } from '@mediforce/platform-core';
+import type { HumanTaskStatus, InstanceStatus } from '@mediforce/platform-core';
 
 /**
  * Cache key factories per ADR-0006 §2.
@@ -8,8 +8,13 @@ import type { HumanTaskStatus } from '@mediforce/platform-core';
  * every variant under the prefix. Plain values for top-level filters; object
  * literal at the tail when the filter set has multiple fields.
  *
- * Currently covers tasks, cowork, users (`me`), namespace (detail). Future
- * work extends with `runs`, `workflows`, `agent-runs`, `audit`, `monitoring`.
+ * Convention for the singular detail key: lives under a distinct domain
+ * (`'task'`, `'run'`) so list-prefix invalidation of `['tasks']` / `['runs']`
+ * does not clobber the detail cache. Detail and list are different surfaces.
+ *
+ * Currently covers tasks, runs / processes / audit, cowork, users (`me`),
+ * namespace (detail). Future work extends with `workflows`, `agent-runs`,
+ * `monitoring`.
  */
 export const queryKeys = {
   tasks: {
@@ -21,13 +26,27 @@ export const queryKeys = {
     /** All tasks for a role, optionally narrowed by status. */
     byRole: (role: string, filters?: { status?: HumanTaskStatus[] }) =>
       ['tasks', { role, ...filters }] as const,
+    /** Caller-scope axis: every task visible to the caller across roles + instances. */
+    forCaller: (filters?: { status?: HumanTaskStatus[] }) =>
+      ['tasks', { caller: 'me', ...filters }] as const,
   },
-  /**
-   * Single-task detail key. Lives under its own domain (`'task'` singular)
-   * so list-prefix invalidation of `['tasks']` does not clobber the detail
-   * cache — detail and list are different cache surfaces.
-   */
   task: (taskId: string) => ['task', taskId] as const,
+
+  runs: {
+    /** Prefix matcher — `['runs']` invalidates every list slice. */
+    all: () => ['runs'] as const,
+    /** Runs scoped to a workspace handle, optionally narrowed by workflow + status. */
+    byHandle: (
+      handle: string,
+      filters?: { workflow?: string; status?: InstanceStatus; limit?: number },
+    ) => ['runs', handle, { ...filters }] as const,
+  },
+  run: (runId: string) => ['run', runId] as const,
+
+  /** Audit-trail key, scoped per run. List domain so consumers can tag-prefix
+   *  invalidate `['audit']` across every detail page if needed. */
+  audit: (runId: string) => ['audit', runId] as const,
+
   cowork: {
     /** Session metadata key (status, artifact, model, voice config). */
     session: (sessionId: string) => ['cowork', sessionId] as const,

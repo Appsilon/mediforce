@@ -73,6 +73,22 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     return this.getByInstanceId(instanceId);
   }
 
+  async listAll(): Promise<HumanTask[]> {
+    // Caller-scope read path. Newest first matches the human-queue convention
+    // already established by `getByRoleAll`; the `createdAt` order is the
+    // single sort the UI relies on.
+    const snap = await this.db
+      .collection(this.collectionName)
+      .orderBy('createdAt', 'desc')
+      .get();
+    return snap.docs.map((d) => HumanTaskSchema.parse(d.data()));
+  }
+
+  async listInNamespaces(allowed: readonly string[]): Promise<HumanTask[]> {
+    const rows = await this.listAll();
+    return this.filterByParentNamespace(rows, allowed);
+  }
+
   async claim(taskId: string, userId: string): Promise<HumanTask> {
     await this.db.collection(this.collectionName).doc(taskId).update({
       assignedUserId: userId,

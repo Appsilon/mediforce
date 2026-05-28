@@ -56,15 +56,21 @@ describe('task list command', () => {
     expect(url).toMatch(/status=pending/);
   });
 
-  it('exits 2 when neither --role nor --instance-id is given', async () => {
+  it('hits /api/tasks with no axis flag — caller-scope queue (GitHub-like default)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ tasks: [SAMPLE_TASK] }),
+    );
     const output = captureOutput();
     const code = await taskListCommand({
       argv: [],
       env: { MEDIFORCE_API_KEY: 'k' },
       output,
     });
-    expect(code).toBe(2);
-    expect(output.stderrLines.join('\n')).toMatch(/Exactly one of --role or --instance-id/);
+    expect(code).toBe(0);
+    const url = fetchSpy.mock.calls[0]?.[0] as string;
+    expect(url).toMatch(/\/api\/tasks(\?|$)/);
+    expect(url).not.toMatch(/role=/);
+    expect(url).not.toMatch(/instanceId=/);
   });
 
   it('exits 2 when both --role and --instance-id are given', async () => {

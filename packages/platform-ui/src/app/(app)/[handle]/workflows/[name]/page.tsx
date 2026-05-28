@@ -7,7 +7,7 @@ import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, Mo
 import * as Tabs from '@radix-ui/react-tabs';
 import { useProcessDefinitionVersions } from '@/hooks/use-process-definitions';
 import { useProcessInstances } from '@/hooks/use-process-instances';
-import { useMyTasks } from '@/hooks/use-tasks';
+import { useMyActionableTasks } from '@/hooks/use-tasks';
 import { RunsTable } from '@/components/processes/runs-table';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
@@ -186,7 +186,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
   const { versions, loading: versionsLoading } = useProcessDefinitionVersions(decodedName, handle);
   const { data: runs, loading: runsLoading } = useProcessInstances('all', decodedName, showArchivedRuns, handle);
-  const { data: activeTasks } = useMyTasks(null);
+  const { data: activeTasks } = useMyActionableTasks();
 
   const activeTaskByInstance = React.useMemo(() => {
     const map = new Map<string, string>();

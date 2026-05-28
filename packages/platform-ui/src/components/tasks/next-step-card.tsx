@@ -2,11 +2,13 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Bot, User, CheckCircle2, Loader2 } from 'lucide-react';
-import type { StepExecution, WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import type { StepExecution, WorkflowStep, HumanTask } from '@mediforce/platform-core';
+import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
 import { useSubcollection, useProcessInstance } from '@/hooks/use-process-instances';
-import { useCollection } from '@/hooks/use-collection';
-import { where } from 'firebase/firestore';
+import { ApiError, mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
@@ -23,10 +25,10 @@ function formatStepName(stepId: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-type WorkflowDefinitionDoc = WorkflowDefinition & { id: string };
-
 export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const handle = useHandleFromPath();
+  // Step executions still live in Firestore (PR2 scope migrates the agent /
+  // step-execution domain). Keep Firestore-backed here.
   const { data: executions, loading: execLoading } = useSubcollection<StepExecution & { id: string }>(
     processInstanceId ? `processInstances/${processInstanceId}` : '',
     'stepExecutions',
@@ -34,7 +36,6 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
 
   const { data: instance, loading: instanceLoading } = useProcessInstance(processInstanceId);
 
-  // Find the step execution for this task's step that has completed
   const stepExecution = React.useMemo(() => {
     if (executions.length === 0) return null;
     const matching = executions
@@ -45,49 +46,46 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
 
   const nextStepId = stepExecution?.gateResult?.next ?? null;
 
-  // Fetch workflow definition to get step metadata
-  const definitionConstraints = React.useMemo(
-    () =>
-      instance
-        ? [
-            where('name', '==', instance.definitionName),
-          ]
-        : [],
-    [instance?.definitionName], // eslint-disable-line react-hooks/exhaustive-deps
-  );
-  const { data: definitions, loading: defLoading } = useCollection<WorkflowDefinitionDoc>(
-    instance ? 'workflowDefinitions' : '',
-    definitionConstraints,
-  );
+  const definitionVersion = instance ? Number.parseInt(instance.definitionVersion, 10) : NaN;
+  const definitionName = instance?.definitionName ?? '';
+  const defQuery = useQuery({
+    queryKey: [
+      'workflow',
+      handle,
+      definitionName,
+      Number.isFinite(definitionVersion) ? definitionVersion : 'latest',
+    ] as const,
+    queryFn: () =>
+      mediforce.workflows.get({
+        name: definitionName,
+        namespace: handle,
+        ...(Number.isFinite(definitionVersion) ? { version: definitionVersion } : {}),
+      }),
+    enabled: instance !== null && definitionName.length > 0,
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+      return failureCount < 2;
+    },
+  });
+  const definition = defQuery.data?.definition ?? null;
+  const defLoading = defQuery.isLoading && instance !== null;
 
-  // Find the matching version, or fall back to latest
-  const definition = React.useMemo(() => {
-    if (definitions.length === 0 || !instance) return null;
-    const versionNum = parseInt(instance.definitionVersion, 10);
-    if (!isNaN(versionNum)) {
-      const match = definitions.find((d) => d.version === versionNum);
-      if (match) return match;
-    }
-    // Fall back to latest version
-    return [...definitions].sort((a, b) => b.version - a.version)[0] ?? null;
-  }, [definitions, instance]);
-
-  // Find next human task (if one was created for the next step)
-  const nextTaskConstraints = React.useMemo(
-    () =>
-      nextStepId
-        ? [
-            where('processInstanceId', '==', processInstanceId),
-            where('stepId', '==', nextStepId),
-          ]
-        : [],
-    [processInstanceId, nextStepId],
-  );
-  const { data: nextTasks } = useCollection<{ id: string; status: string; assignedRole: string }>(
-    nextStepId ? 'humanTasks' : '',
-    nextTaskConstraints,
-  );
-  const nextHumanTask = nextTasks[0] ?? null;
+  const nextTasksQuery = useQuery({
+    queryKey: queryKeys.tasks.byInstance(processInstanceId, {
+      stepId: nextStepId ?? undefined,
+      status: [...ACTIONABLE_STATUSES, 'completed'],
+    }),
+    queryFn: async () => {
+      const result = await mediforce.tasks.list({
+        instanceId: processInstanceId,
+        stepId: nextStepId as string,
+        status: [...ACTIONABLE_STATUSES, 'completed'],
+      });
+      return result.tasks;
+    },
+    enabled: nextStepId !== null && processInstanceId.length > 0,
+  });
+  const nextHumanTask: HumanTask | null = nextTasksQuery.data?.[0] ?? null;
 
   const loading = execLoading || instanceLoading || defLoading;
 
@@ -100,7 +98,6 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
     );
   }
 
-  // No step execution found or no gate result -- nothing to show
   if (!stepExecution || !nextStepId) return null;
 
   const nextStep = definition?.steps.find((s) => s.id === nextStepId) as WorkflowStep | undefined;
@@ -108,7 +105,6 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const executorType = nextStep?.executor ?? null;
   const processCompleted = instance?.status === 'completed';
 
-  // Build the run link
   const runHref = instance
     ? routes.workflowRun(handle, instance.definitionName, processInstanceId)
     : null;
@@ -198,7 +194,7 @@ function StepDescription({
   reason,
 }: {
   executorType: string | null;
-  nextHumanTask: { assignedRole: string; status: string } | null;
+  nextHumanTask: HumanTask | null;
   reason: string | undefined;
 }) {
   const parts: string[] = [];
@@ -236,11 +232,10 @@ function StepLink({
   isTerminal: boolean;
   processCompleted: boolean;
   executorType: string | null;
-  nextHumanTask: { id: string } | null;
+  nextHumanTask: HumanTask | null;
   runHref: string | null;
   handle: string;
 }) {
-  // Human step with a task -> link to the task
   if (!isTerminal && !processCompleted && executorType === 'human' && nextHumanTask) {
     return (
       <Link
@@ -256,7 +251,6 @@ function StepLink({
     );
   }
 
-  // Agent step or terminal -> link to the run view
   if (runHref) {
     return (
       <Link

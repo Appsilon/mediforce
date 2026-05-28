@@ -212,17 +212,21 @@ describe('Mediforce', () => {
 
   describe('input validation', () => {
     it('rejects contract violations before firing any request', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValue(jsonResponse({ tasks: [] }));
 
       const mediforce = new Mediforce({ apiKey: 'k', baseUrl: TEST_BASE_URL });
-      // Both TS (discriminated union for ListTasksInput) and the Zod refine
-      // reject an empty input — the call is type-forbidden, and the refine is
-      // the runtime backstop for JS callers / bad casts.
+      // Empty input is the caller-scope axis (GitHub-like default) — fires.
+      await mediforce.tasks.list({});
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      // Mutual-exclusion is the remaining refine: instanceId + role together
+      // is rejected before the request is fired.
       await expect(
-        // @ts-expect-error — empty input is type-forbidden under the discriminated union; refine is the runtime backstop
-        mediforce.tasks.list({}),
-      ).rejects.toThrow(/exactly one of/i);
-      expect(fetchSpy).not.toHaveBeenCalled();
+        // @ts-expect-error — both axes set is type-forbidden under the discriminated union; refine is the runtime backstop
+        mediforce.tasks.list({ instanceId: 'inst-a', role: 'reviewer' }),
+      ).rejects.toThrow(/mutually exclusive/i);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
   });
 

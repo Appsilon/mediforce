@@ -5,6 +5,13 @@ import type { InstanceStatus } from '../schemas/process-instance.js';
 export interface ListInstancesOptions {
   definitionName?: string;
   status?: InstanceStatus;
+  /**
+   * Narrow to a single workspace. Composed with the caller's allowed-
+   * namespaces filter: a user caller asking for a namespace they don't
+   * belong to gets an empty list back (not an error — list reads are
+   * intersection semantics, not access checks).
+   */
+  namespace?: string;
   limit?: number;
 }
 

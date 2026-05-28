@@ -57,24 +57,27 @@ export const ListRunsInputSchema = z.object({
   status: z
     .enum(['created', 'running', 'paused', 'completed', 'failed'])
     .optional(),
+  /**
+   * Workspace handle. Narrows the result to a single workspace; defense in
+   * depth on top of the caller-namespace gate enforced by `scope.runs`.
+   * Asking for a workspace the caller isn't in returns an empty list — list
+   * reads are intersection semantics, not access checks.
+   */
+  namespace: z.string().min(1).optional(),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });
 
+/**
+ * Read-path schema convergence per Phase 4 PRD §9: the list endpoint returns
+ * the full `ProcessInstance` shape, the same one served by
+ * `GET /api/processes/:instanceId`. This lets the UI hydrate detail/list cache
+ * from a single wire shape — see [ADR-0006] §6 multi-cache-key template.
+ *
+ * Narrow projections (`{ runId, status, ... }`) belong to consumers
+ * (CLI presenters, agent tooling), not the wire.
+ */
 export const ListRunsOutputSchema = z.object({
-  runs: z.array(
-    z.object({
-      runId: z.string().min(1),
-      status: InstanceStatusSchema,
-      definitionName: z.string().min(1),
-      definitionVersion: z.string().min(1),
-      currentStepId: z.string().nullable(),
-      error: z.string().nullable(),
-      createdAt: z.string().datetime(),
-      updatedAt: z.string().datetime(),
-      createdBy: z.string().min(1),
-      totalCostUsd: z.number().optional(),
-    }),
-  ),
+  runs: z.array(ProcessInstanceSchema),
 });
 
 export type ListRunsInput = z.infer<typeof ListRunsInputSchema>;

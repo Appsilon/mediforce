@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { where, orderBy } from 'firebase/firestore';
 import type { HumanTask, CoworkSession } from '@mediforce/platform-core';
 import { ACTIONABLE_STATUSES } from '@mediforce/platform-api/contract';
-import { mediforce } from '@/lib/mediforce';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { useCollection } from './use-collection';
 
@@ -46,6 +46,43 @@ export function useMyActionableTasksByRole(
   return {
     data: filtered,
     loading: query.isLoading && assignedRole !== undefined && assignedRole.length > 0,
+    error: (query.error as Error | null) ?? null,
+  };
+}
+
+/**
+ * Caller-scope actionable queue: every actionable task across the caller's
+ * workspaces, irrespective of role. Powered by the GitHub-like default on
+ * `mediforce.tasks.list` (no `instanceId` / `role` ⇒ caller scope).
+ * STANDARD LIVE per ADR-0006 §4.
+ */
+export function useMyActionableTasks(
+  currentUserId?: string | null,
+): { data: HumanTask[]; loading: boolean; error: Error | null } {
+  const query = useQuery({
+    queryKey: queryKeys.tasks.forCaller({ status: [...ACTIONABLE_STATUSES] }),
+    queryFn: async () => {
+      const result = await mediforce.tasks.list({ status: [...ACTIONABLE_STATUSES] });
+      return result.tasks;
+    },
+    refetchInterval: STANDARD_LIVE_INTERVAL_MS,
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+      return failureCount < 2;
+    },
+  });
+
+  const filtered = useMemo(() => {
+    const tasks = (query.data ?? []).filter((t) => !t.deleted);
+    if (currentUserId === undefined || currentUserId === null) return tasks;
+    return tasks.filter(
+      (t) => t.assignedUserId === null || t.assignedUserId === currentUserId,
+    );
+  }, [query.data, currentUserId]);
+
+  return {
+    data: filtered,
+    loading: query.isLoading,
     error: (query.error as Error | null) ?? null,
   };
 }

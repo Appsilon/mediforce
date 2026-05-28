@@ -963,6 +963,7 @@ export class Mediforce {
         const qs = toSearchParams({
           workflow: validated.workflow,
           status: validated.status,
+          namespace: validated.namespace,
           limit: validated.limit !== undefined ? String(validated.limit) : undefined,
         });
         const res = await this.request(`/api/runs${qs}`);
