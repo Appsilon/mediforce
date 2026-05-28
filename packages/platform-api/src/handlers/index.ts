@@ -91,4 +91,7 @@ export { createToolCatalogEntry } from './tool-catalog/create-entry.js';
 export { updateToolCatalogEntry } from './tool-catalog/update-entry.js';
 export { deleteToolCatalogEntry } from './tool-catalog/delete-entry.js';
 
+export { listAgentRuns } from './agent-runs/list-agent-runs.js';
+export { getMonitoringSummary } from './monitoring/get-monitoring-summary.js';
+
 export { listAdapter, getByIdAdapter } from './_generic.js';

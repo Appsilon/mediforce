@@ -361,6 +361,26 @@ export {
 } from './tool-catalog.js';
 
 export {
+  ListAgentRunsInputSchema,
+  ListAgentRunsOutputSchema,
+  GetAgentRunInputSchema,
+  GetAgentRunOutputSchema,
+  type ListAgentRunsInput,
+  type ListAgentRunsOutput,
+  type GetAgentRunInput,
+  type GetAgentRunOutput,
+} from './agent-runs.js';
+
+export {
+  MonitoringSummaryInputSchema,
+  MonitoringSummarySchema,
+  GetMonitoringSummaryOutputSchema,
+  type MonitoringSummaryInput,
+  type MonitoringSummary,
+  type GetMonitoringSummaryOutput,
+} from './monitoring.js';
+
+export {
   ListNamespaceMembersInputSchema,
   ListNamespaceMembersOutputSchema,
   NamespaceMemberWithAuthSchema,

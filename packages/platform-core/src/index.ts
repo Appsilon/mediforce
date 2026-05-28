@@ -213,6 +213,8 @@ export type {
   DirectoryUser,
   UserAuthMetadata,
   AgentRunRepository,
+  ListAgentRunsOptions,
+  ListAgentRunsPage,
   CoworkSessionRepository,
   CronTriggerStateRepository,
   ToolCatalogRepository,

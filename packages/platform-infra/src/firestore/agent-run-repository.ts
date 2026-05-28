@@ -1,10 +1,30 @@
-import type { Firestore } from 'firebase-admin/firestore';
+import type { Firestore, Query } from 'firebase-admin/firestore';
 import {
   AgentRunSchema,
   type AgentRun,
   type AgentRunRepository,
+  type ListAgentRunsOptions,
+  type ListAgentRunsPage,
   type ProcessInstanceRepository,
 } from '@mediforce/platform-core';
+
+function encodeCursor(startedAt: string, id: string): string {
+  return Buffer.from(`${startedAt}|${id}`, 'utf8').toString('base64url');
+}
+
+function decodeCursor(cursor: string): { startedAt: string; id: string } | null {
+  try {
+    const raw = Buffer.from(cursor, 'base64url').toString('utf8');
+    const sep = raw.indexOf('|');
+    if (sep < 0) return null;
+    const startedAt = raw.slice(0, sep);
+    const id = raw.slice(sep + 1);
+    if (startedAt.length === 0 || id.length === 0) return null;
+    return { startedAt, id };
+  } catch {
+    return null;
+  }
+}
 
 export class FirestoreAgentRunRepository implements AgentRunRepository {
   private readonly collectionName = 'agentRuns';
@@ -62,5 +82,62 @@ export class FirestoreAgentRunRepository implements AgentRunRepository {
       .limit(limitN)
       .get();
     return snap.docs.map((d) => AgentRunSchema.parse(d.data()));
+  }
+
+  async list(opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> {
+    const page = await this.fetchPage(opts);
+    return this.toPage(page, opts.limit);
+  }
+
+  async listInNamespaces(
+    allowed: readonly string[],
+    opts: ListAgentRunsOptions,
+  ): Promise<ListAgentRunsPage> {
+    // Agent runs carry no namespace field; the parent ProcessInstance owns
+    // workspace membership. Over-fetch by 2x to absorb namespace-filter
+    // attrition without paging twice for the common "all my workspace" view.
+    const allowedSet = new Set(allowed);
+    const raw = await this.fetchPage({ ...opts, limit: opts.limit * 2 });
+    const kept: AgentRun[] = [];
+    for (const run of raw) {
+      const parent = await this.parents.getById(run.processInstanceId);
+      if (!parent || typeof parent.namespace !== 'string') continue;
+      if (!allowedSet.has(parent.namespace)) continue;
+      kept.push(run);
+      if (kept.length >= opts.limit + 1) break;
+    }
+    return this.toPage(kept, opts.limit);
+  }
+
+  private async fetchPage(opts: ListAgentRunsOptions): Promise<AgentRun[]> {
+    let q: Query = this.db
+      .collection(this.collectionName)
+      .orderBy('startedAt', 'desc')
+      .orderBy('id', 'desc');
+    if (opts.runId !== undefined) {
+      q = q.where('processInstanceId', '==', opts.runId);
+    }
+    if (opts.stepId !== undefined) {
+      q = q.where('stepId', '==', opts.stepId);
+    }
+    if (opts.cursor !== undefined) {
+      const cur = decodeCursor(opts.cursor);
+      if (cur !== null) q = q.startAfter(cur.startedAt, cur.id);
+    }
+    // +1 so we can detect "more pages" without a second query.
+    const snap = await q.limit(opts.limit + 1).get();
+    return snap.docs.map((d) => AgentRunSchema.parse(d.data()));
+  }
+
+  private toPage(runs: readonly AgentRun[], limit: number): ListAgentRunsPage {
+    const hasMore = runs.length > limit;
+    const items = hasMore ? runs.slice(0, limit) : [...runs];
+    const last = items[items.length - 1];
+    return {
+      items,
+      ...(hasMore && last !== undefined
+        ? { nextCursor: encodeCursor(last.startedAt, last.id) }
+        : {}),
+    };
   }
 }

@@ -1,79 +1,127 @@
 'use client';
 
-import * as React from 'react';
 import { useMemo } from 'react';
-import { orderBy, where, doc, onSnapshot } from 'firebase/firestore';
-import type { AgentRun, ProcessInstance } from '@mediforce/platform-core';
-import { db } from '@/lib/firebase';
-import { useCollection, type FirestoreState } from './use-collection';
+import { useQuery } from '@tanstack/react-query';
+import type { AgentRun, AgentRunStatus, ProcessInstance } from '@mediforce/platform-core';
+import { ApiError, mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
+import { useCollection } from './use-collection';
 
-export function useAgentRuns() {
-  // Always order by startedAt desc — most recent runs first
-  // The agentRuns collection was created in Plan 01 (FirestoreAgentRunRepository + AgentRunner write path)
-  const constraints = useMemo(
-    () => [orderBy('startedAt', 'desc')],
-    [],
-  );
-  return useCollection<AgentRun>('agentRuns', constraints);
-}
+const STANDARD_LIVE_INTERVAL_MS = 5_000;
+const CRITICAL_LIVE_INTERVAL_MS = 1_500;
+const TERMINAL: ReadonlySet<AgentRunStatus> = new Set([
+  'completed',
+  'timed_out',
+  'low_confidence',
+  'error',
+  'escalated',
+  'flagged',
+]);
 
 /**
- * Subscribe to all processInstances and return a Map of instanceId -> definitionName.
- * Single collection subscription avoids N+1 queries.
+ * List agent runs visible to the caller via `mediforce.agentRuns.list`.
+ * STANDARD LIVE per ADR-0006 §4 — polls every 5 s for fresh runs.
  */
-export function useProcessNameMap(): Map<string, string> {
-  const { data: instances } = useCollection<ProcessInstance>('processInstances');
+export function useAgentRuns(handle?: string): {
+  data: AgentRun[];
+  loading: boolean;
+  error: Error | null;
+} {
+  const query = useQuery({
+    queryKey: queryKeys.agentRuns.list(handle),
+    queryFn: async () => {
+      const result = await mediforce.agentRuns.list(
+        handle !== undefined ? { namespace: handle } : {},
+      );
+      return result.runs;
+    },
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+  });
 
-  return useMemo(() => {
-    const map = new Map<string, string>();
-    for (const inst of instances) {
-      map.set(inst.id, inst.definitionName);
-    }
-    return map;
-  }, [instances]);
+  return {
+    data: query.data ?? [],
+    loading: query.isLoading,
+    error: (query.error as Error | null) ?? null,
+  };
 }
 
 /**
- * Subscribe to `agentRuns` filtered server-side by processInstanceId + stepId.
- * Returns an empty result while either argument is missing.
- *
- * Two equality predicates on a single collection don't require a composite
- * index — Firestore serves them by intersecting single-field indexes.
+ * Agent runs for a specific (processInstanceId, stepId). STANDARD LIVE so the
+ * step-detail page reflects newly-spawned reviews / retries within a few
+ * seconds.
  */
 export function useAgentRunsForStep(
   processInstanceId: string | null,
   stepId: string | null,
-): FirestoreState<AgentRun> {
+): { data: AgentRun[]; loading: boolean; error: Error | null } {
   const enabled = processInstanceId !== null && stepId !== null;
-  const constraints = useMemo(
-    () =>
-      enabled
-        ? [where('processInstanceId', '==', processInstanceId), where('stepId', '==', stepId)]
-        : [],
-    [enabled, processInstanceId, stepId],
-  );
-  return useCollection<AgentRun>(enabled ? 'agentRuns' : '', constraints);
+  const query = useQuery({
+    queryKey: queryKeys.agentRuns.list(undefined, {
+      runId: processInstanceId ?? undefined,
+      stepId: stepId ?? undefined,
+    }),
+    queryFn: async () => {
+      const result = await mediforce.agentRuns.list({
+        runId: processInstanceId as string,
+        stepId: stepId as string,
+      });
+      return result.runs;
+    },
+    enabled,
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+  });
+
+  return {
+    data: enabled ? query.data ?? [] : [],
+    loading: enabled && query.isLoading,
+    error: (query.error as Error | null) ?? null,
+  };
 }
 
-export function useAgentRun(runId: string | null) {
-  const [run, setRun] = React.useState<AgentRun | null>(null);
-  const [loading, setLoading] = React.useState(true);
+/**
+ * Single agent-run detail. CRITICAL LIVE while non-terminal so an operator
+ * watching a still-running agent sees envelope updates within ~1.5 s; polling
+ * stops once the run reaches a terminal status or the query errors.
+ */
+export function useAgentRun(runId: string | null): {
+  data: AgentRun | null;
+  loading: boolean;
+} {
+  const query = useQuery({
+    queryKey: queryKeys.agentRun(runId ?? ''),
+    queryFn: async () => {
+      const result = await mediforce.agentRuns.get({ agentRunId: runId as string });
+      return result.run;
+    },
+    enabled: runId !== null,
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+      return failureCount < 2;
+    },
+    refetchInterval: (q) => {
+      if (q.state.error !== null) return false;
+      const status = q.state.data?.status;
+      if (status === undefined) return CRITICAL_LIVE_INTERVAL_MS;
+      return TERMINAL.has(status) ? false : CRITICAL_LIVE_INTERVAL_MS;
+    },
+  });
 
-  React.useEffect(() => {
-    if (!runId) {
-      setLoading(false);
-      return;
-    }
-    const unsub = onSnapshot(doc(db, 'agentRuns', runId), (snap) => {
-      if (snap.exists()) {
-        setRun({ id: snap.id, ...snap.data() } as AgentRun);
-      } else {
-        setRun(null);
-      }
-      setLoading(false);
-    });
-    return unsub;
-  }, [runId]);
+  return {
+    data: runId === null ? null : query.data ?? null,
+    loading: runId !== null && query.isLoading,
+  };
+}
 
-  return { data: run, loading };
+/**
+ * @deprecated Firestore-backed `processInstances` subscription kept here so
+ * the agents list page can render definition-name labels until the
+ * processes-domain react-query migration lands.
+ */
+export function useProcessNameMap(): Map<string, string> {
+  const { data: instances } = useCollection<ProcessInstance>('processInstances');
+  return useMemo(() => {
+    const map = new Map<string, string>();
+    for (const inst of instances) map.set(inst.id, inst.definitionName);
+    return map;
+  }, [instances]);
 }

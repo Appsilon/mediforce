@@ -11,6 +11,11 @@ export { InMemoryToolCatalogRepository } from './in-memory-tool-catalog-reposito
 export { InMemoryOAuthProviderRepository } from './in-memory-oauth-provider-repository.js';
 export { InMemoryAgentOAuthTokenRepository } from './in-memory-agent-oauth-token-repository.js';
 export { InMemoryAgentDefinitionRepository } from './in-memory-agent-definition-repository.js';
+export {
+  InMemoryAgentRunRepository,
+  encodeAgentRunCursor,
+  decodeAgentRunCursor,
+} from './in-memory-agent-run-repository.js';
 
 // Test factories
 export {
