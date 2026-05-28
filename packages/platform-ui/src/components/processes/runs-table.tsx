@@ -264,6 +264,7 @@ export function RunsTable({
             return (
               <tr
                 key={run.id}
+                data-run-id={run.id}
                 className={`border-b last:border-0 transition-colors ${
                   isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-muted/30'
                 }`}

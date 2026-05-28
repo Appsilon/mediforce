@@ -23,8 +23,9 @@ test.describe('Archive run from list — useArchiveRun optimistic', () => {
     await setupRecording(page, 'archive-from-runs-list', testInfo);
     await page.goto(`/${TEST_ORG_HANDLE}/runs`);
 
-    // Row visible by default — list query loaded.
-    const targetRow = page.getByRole('row', { name: /proc-archive-target/i });
+    // Row visible by default — list query loaded. `data-run-id` is the
+    // stable selector; the rendered id cell truncates to first 8 chars.
+    const targetRow = page.locator('tr[data-run-id="proc-archive-target"]');
     await expect(targetRow).toBeVisible({ timeout: 10_000 });
     await showStep(page);
 
