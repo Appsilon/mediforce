@@ -73,6 +73,45 @@ export class FirestoreHumanTaskRepository implements HumanTaskRepository {
     return this.getByInstanceId(instanceId);
   }
 
+  async getByInstanceIdsAll(
+    instanceIds: readonly string[],
+  ): Promise<HumanTask[]> {
+    if (instanceIds.length === 0) return [];
+    // Firestore `in` accepts at most 30 values per query; chunk and fan
+    // out in parallel so a 113-instance monitoring summary collapses to
+    // ~4 indexed reads instead of 113 single-doc lookups.
+    const chunkSize = 30;
+    const chunks: string[][] = [];
+    for (let i = 0; i < instanceIds.length; i += chunkSize) {
+      chunks.push([...instanceIds.slice(i, i + chunkSize)]);
+    }
+    const snapshots = await Promise.all(
+      chunks.map((chunk) =>
+        this.db
+          .collection(this.collectionName)
+          .where('processInstanceId', 'in', chunk)
+          .get(),
+      ),
+    );
+    return snapshots.flatMap((snap) =>
+      snap.docs.map((d) => HumanTaskSchema.parse(d.data())),
+    );
+  }
+
+  async getByInstanceIdsInNamespaces(
+    instanceIds: readonly string[],
+    allowed: readonly string[],
+  ): Promise<HumanTask[]> {
+    const allowedIds: string[] = [];
+    for (const id of instanceIds) {
+      const parent = await this.parents.getById(id);
+      if (parent && typeof parent.namespace === 'string' && allowed.includes(parent.namespace)) {
+        allowedIds.push(id);
+      }
+    }
+    return this.getByInstanceIdsAll(allowedIds);
+  }
+
   async claim(taskId: string, userId: string): Promise<HumanTask> {
     await this.db.collection(this.collectionName).doc(taskId).update({
       assignedUserId: userId,

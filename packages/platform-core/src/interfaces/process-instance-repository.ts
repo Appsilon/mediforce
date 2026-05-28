@@ -5,6 +5,16 @@ import type { InstanceStatus } from '../schemas/process-instance.js';
 export interface ListInstancesOptions {
   definitionName?: string;
   status?: InstanceStatus;
+  /**
+   * Workspace filter pushed into the storage layer. Set by handlers that
+   * already know which workspace they're aggregating for (e.g. the
+   * monitoring summary). Replaces a JS-side `r.namespace === handle`
+   * pass over an over-fetched cross-workspace page — the Firestore
+   * impl rewrites to a `where('namespace','==',ns)` so the wire payload
+   * shrinks to the keep-set. Independent from `listInNamespaces`'s
+   * `allowed` set; the two compose when both are set.
+   */
+  namespace?: string;
   limit?: number;
 }
 

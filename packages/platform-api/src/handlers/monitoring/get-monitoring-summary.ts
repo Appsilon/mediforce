@@ -12,10 +12,11 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
  * Compact dashboard aggregate for a single workspace. Computed server-side so
  * the wire payload is ~200 B regardless of the underlying data set size.
  *
- * Method: pull workspace runs + tally; for the tasks tally, walk those runs
- * and pull each run's tasks. N+1 today against Firestore; the Postgres era
- * replaces this with `SELECT COUNT(*) ... GROUP BY ...` queries against
- * workspace-scoped partial indexes (PRD §3 endpoint inventory note).
+ * Method: pull workspace runs in one indexed query, then pull every task
+ * whose parent is in the run set in a single chunked `in`-query bulk
+ * fetch, then tally in JS. The Postgres era replaces both calls with
+ * `SELECT COUNT(*) ... GROUP BY ...` against workspace-scoped partial
+ * indexes (PRD §3 endpoint inventory note).
  */
 export async function getMonitoringSummary(
   input: MonitoringSummaryInput,
@@ -24,16 +25,13 @@ export async function getMonitoringSummary(
   assertNamespaceAccess(scope.caller, input.handle);
   const handle = input.handle;
 
-  // `scope.runs.list({})` would default to 20 rows in the Firestore impl,
-  // which then dropped the workspace's older paused/running runs once the
-  // newest 20 ProcessInstances were from another namespace. Pre-PR2 the UI
-  // used a `useProcessInstances` subscription with no limit at all, so the
-  // dashboard never lost a paused run. Match that ceiling here until the
-  // PR3 follow-up pushes the namespace filter into the repo (see
-  // `docs/headless-migration-phase-4-plan.md`) and we can count off the
-  // indexed slice directly.
-  const allRuns = await scope.runs.list({ limit: 10_000 });
-  const runs = allRuns.filter((r) => r.namespace === handle && r.deleted !== true);
+  // Namespace filter is pushed into the repo so Firestore returns the
+  // workspace's slice directly off the
+  // `(namespace, deleted, createdAt DESC)` composite index instead of
+  // streaming up to 10k cross-workspace docs for a JS-side filter. The
+  // 10_000 ceiling stays as a defence in depth; in practice a workspace
+  // is in the low hundreds.
+  const runs = await scope.runs.list({ namespace: handle, limit: 10_000 });
 
   const now = Date.now();
   const since24h = now - TWENTY_FOUR_HOURS_MS;
@@ -60,21 +58,21 @@ export async function getMonitoringSummary(
 
   const tasksBucket = { pending: 0, claimed: 0, stuck_count: 0 };
   const roleTally = new Map<string, { pending: number; claimed: number }>();
-  for (const run of runs) {
-    if (run.archived === true) continue;
-    const tasks = await scope.tasks.getByInstanceId(run.id);
-    for (const task of tasks) {
-      if (task.deleted === true) continue;
-      if (task.status === 'pending') {
-        tasksBucket.pending++;
-        roleBucket(roleTally, task.assignedRole).pending++;
-      } else if (task.status === 'claimed') {
-        tasksBucket.claimed++;
-        roleBucket(roleTally, task.assignedRole).claimed++;
-        const updatedTs = new Date(task.updatedAt).getTime();
-        if (Number.isFinite(updatedTs) && now - updatedTs > TWENTY_FOUR_HOURS_MS) {
-          tasksBucket.stuck_count++;
-        }
+  const activeRunIds = runs
+    .filter((r) => r.archived !== true)
+    .map((r) => r.id);
+  const tasks = await scope.tasks.getByInstanceIds(activeRunIds);
+  for (const task of tasks) {
+    if (task.deleted === true) continue;
+    if (task.status === 'pending') {
+      tasksBucket.pending++;
+      roleBucket(roleTally, task.assignedRole).pending++;
+    } else if (task.status === 'claimed') {
+      tasksBucket.claimed++;
+      roleBucket(roleTally, task.assignedRole).claimed++;
+      const updatedTs = new Date(task.updatedAt).getTime();
+      if (Number.isFinite(updatedTs) && now - updatedTs > TWENTY_FOUR_HOURS_MS) {
+        tasksBucket.stuck_count++;
       }
     }
   }

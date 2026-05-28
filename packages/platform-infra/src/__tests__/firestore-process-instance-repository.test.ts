@@ -87,4 +87,13 @@ describe('FirestoreProcessInstanceRepository.listAll', () => {
     expect(where).toContainEqual({ field: 'status', op: '==', value: 'running' });
     expect(limits).toEqual([42]);
   });
+
+  it('pushes the namespace filter into Firestore so cross-workspace docs never reach the JS layer', async () => {
+    const { db, where } = makeDb([]);
+    const repo = new FirestoreProcessInstanceRepository(db);
+
+    await repo.listAll({ namespace: 'mediforce', limit: 100 });
+
+    expect(where).toContainEqual({ field: 'namespace', op: '==', value: 'mediforce' });
+  });
 });

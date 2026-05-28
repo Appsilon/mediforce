@@ -35,6 +35,11 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
       ? this.raw.getByInstanceId(instanceId)
       : this.raw.getByInstanceIdInNamespaces(instanceId, [...this.caller.namespaces]);
 
+  getByInstanceIds = async (instanceIds: readonly string[]): Promise<HumanTask[]> =>
+    this.caller.isSystemActor
+      ? this.raw.getByInstanceIdsAll(instanceIds)
+      : this.raw.getByInstanceIdsInNamespaces(instanceIds, [...this.caller.namespaces]);
+
   claim = async (taskId: string, userId: string): Promise<HumanTask> => {
     await this.assertCanMutate(taskId);
     return this.raw.claim(taskId, userId);
