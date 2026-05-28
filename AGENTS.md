@@ -130,6 +130,18 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    nested list. Skip only for trivial edits. Weekly cut is automated —
    never edit dated `## [YYYY-MM-DD]` sections by hand.
 
+10. **No regressions.** Every migration / refactor / rewrite must keep the
+    user-observable surface intact unless the user explicitly accepts the
+    change. Before opening the PR, diff OLD vs NEW behaviour on every
+    replaced read / write / endpoint / hook: visible rows, polled freshness,
+    error messages, retry behaviour, ordering, defaults, pagination. Silent
+    `.limit()` caps where the old code fetched everything, silent default
+    flips, missing parity branches in the new abstraction — all regressions.
+    Call them **regressions**, never "regression risk" — if you'd write
+    "risk", reproduce the failing input first and either fix it in the PR
+    or get explicit user acceptance with a tracked follow-up. `/code-review`
+    checklist §3a enforces this; treat it as a SHIP gate.
+
 ## Skills
 
 Claude auto-loads every skill under `.claude/skills/` at session start —
@@ -149,5 +161,9 @@ trigger phrases match the action you're about to take. List with
 7. Main thread = manager + lead architect. NEVER fg subagent or
    non-trivial bash. Decompose, narrate, verify actual output.
 8. Log non-trivial changes via `/add-changelog-entry`.
+9. No regressions. Diff OLD vs NEW user-observable behaviour on every
+   replaced read / write / endpoint / hook. Silent `.limit()` caps, silent
+   default flips, missing parity branches all count. Word them
+   "regression", never "risk".
 
 See `README.md` for one-time env setup (Node, pnpm, Firebase CLI, `.env.local`).
