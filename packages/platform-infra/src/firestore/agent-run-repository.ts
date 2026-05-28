@@ -1,30 +1,14 @@
 import type { Firestore, Query } from 'firebase-admin/firestore';
 import {
   AgentRunSchema,
+  encodeAgentRunCursor,
+  decodeAgentRunCursor,
   type AgentRun,
   type AgentRunRepository,
   type ListAgentRunsOptions,
   type ListAgentRunsPage,
   type ProcessInstanceRepository,
 } from '@mediforce/platform-core';
-
-function encodeCursor(startedAt: string, id: string): string {
-  return Buffer.from(`${startedAt}|${id}`, 'utf8').toString('base64url');
-}
-
-function decodeCursor(cursor: string): { startedAt: string; id: string } | null {
-  try {
-    const raw = Buffer.from(cursor, 'base64url').toString('utf8');
-    const sep = raw.indexOf('|');
-    if (sep < 0) return null;
-    const startedAt = raw.slice(0, sep);
-    const id = raw.slice(sep + 1);
-    if (startedAt.length === 0 || id.length === 0) return null;
-    return { startedAt, id };
-  } catch {
-    return null;
-  }
-}
 
 export class FirestoreAgentRunRepository implements AgentRunRepository {
   private readonly collectionName = 'agentRuns';
@@ -121,7 +105,7 @@ export class FirestoreAgentRunRepository implements AgentRunRepository {
       q = q.where('stepId', '==', opts.stepId);
     }
     if (opts.cursor !== undefined) {
-      const cur = decodeCursor(opts.cursor);
+      const cur = decodeAgentRunCursor(opts.cursor);
       if (cur !== null) q = q.startAfter(cur.startedAt, cur.id);
     }
     // +1 so we can detect "more pages" without a second query.
@@ -136,7 +120,7 @@ export class FirestoreAgentRunRepository implements AgentRunRepository {
     return {
       items,
       ...(hasMore && last !== undefined
-        ? { nextCursor: encodeCursor(last.startedAt, last.id) }
+        ? { nextCursor: encodeAgentRunCursor(last.startedAt, last.id) }
         : {}),
     };
   }

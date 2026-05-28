@@ -4,6 +4,8 @@ import type {
   ListAgentRunsOutput,
 } from '../../contract/agent-runs.js';
 
+const DEFAULT_LIMIT = 50;
+
 /**
  * List agent runs visible to the caller. Workspace gating is enforced inside
  * `scope.agentRuns.list` (system actors see everything, user callers see only
@@ -18,7 +20,7 @@ export async function listAgentRuns(
   scope: CallerScope,
 ): Promise<ListAgentRunsOutput> {
   const page = await scope.agentRuns.list({
-    limit: input.limit,
+    limit: input.limit ?? DEFAULT_LIMIT,
     cursor: input.cursor,
     runId: input.runId,
     stepId: input.stepId,

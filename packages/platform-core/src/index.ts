@@ -226,6 +226,11 @@ export type {
   SendEmailFn,
 } from './interfaces/index.js';
 
+export {
+  encodeAgentRunCursor,
+  decodeAgentRunCursor,
+} from './cursors/agent-run-cursor.js';
+
 // Agent definition schema + repository interface
 export {
   AgentDefinitionSchema,

@@ -24,7 +24,7 @@ export const ListAgentRunsInputSchema = z
     namespace: z.string().min(1).optional(),
     runId: z.string().min(1).optional(),
     stepId: z.string().min(1).optional(),
-    limit: z.coerce.number().int().min(1).max(200).default(50),
+    limit: z.coerce.number().int().min(1).max(200).optional(),
     cursor: z.string().min(1).optional(),
   })
   .refine((v) => v.stepId === undefined || v.runId !== undefined, {

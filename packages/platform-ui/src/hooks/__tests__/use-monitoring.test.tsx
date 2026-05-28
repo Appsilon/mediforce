@@ -4,9 +4,14 @@ import type { MonitoringSummary } from '@mediforce/platform-api/contract';
 import { createQueryWrapper } from '@/test/react-query';
 
 const summaryMock = vi.fn<(...args: unknown[]) => Promise<{ summary: MonitoringSummary }>>();
+class ApiErrorMock extends Error {
+  constructor(public status: number) {
+    super(`ApiError ${String(status)}`);
+  }
+}
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { monitoring: { summary: summaryMock } },
-  ApiError: class ApiError extends Error {},
+  ApiError: ApiErrorMock,
 }));
 
 const { useMonitoringSummary } = await import('../use-monitoring');
@@ -43,11 +48,13 @@ describe('useMonitoringSummary', () => {
     expect(result.current.data?.runs.running).toBe(3);
   });
 
-  it('surfaces errors without staying stuck loading', async () => {
-    summaryMock.mockRejectedValue(new Error('boom'));
+  it('surfaces a 403 ApiError without retrying or staying stuck loading', async () => {
+    const err = new ApiErrorMock(403);
+    summaryMock.mockRejectedValue(err);
     const { wrapper } = createQueryWrapper();
     const { result } = renderHook(() => useMonitoringSummary('team-alpha'), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.error).toBe(err);
+    expect(summaryMock).toHaveBeenCalledTimes(1);
   });
 });

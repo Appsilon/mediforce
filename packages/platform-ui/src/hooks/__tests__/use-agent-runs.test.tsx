@@ -41,13 +41,14 @@ describe('useAgentRuns', () => {
     expect(result.current.data.map((r) => r.id)).toEqual(['r-1']);
   });
 
-  it('surfaces an error without leaving loading stuck', async () => {
-    const err = new Error('boom');
+  it('surfaces a 4xx ApiError without retrying or staying stuck loading', async () => {
+    const err = new ApiErrorMock(403);
     listMock.mockRejectedValue(err);
     const { wrapper } = createQueryWrapper();
     const { result } = renderHook(() => useAgentRuns('team-alpha'), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe(err);
+    expect(listMock).toHaveBeenCalledTimes(1);
   });
 });
 

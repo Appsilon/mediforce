@@ -7,10 +7,10 @@ import {
 } from '../agent-runs.js';
 
 describe('ListAgentRunsInputSchema', () => {
-  it('defaults limit to 50 and accepts no input', () => {
+  it('accepts an empty input — limit is optional, handler picks the default', () => {
     const result = ListAgentRunsInputSchema.safeParse({});
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.limit).toBe(50);
+    if (result.success) expect(result.data.limit).toBeUndefined();
   });
 
   it('coerces string limit from query params and caps at 200', () => {

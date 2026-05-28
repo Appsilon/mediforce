@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import type { MonitoringSummary } from '@mediforce/platform-api/contract';
-import { mediforce } from '@/lib/mediforce';
+import { ApiError, mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 
 const NICE_LIVE_INTERVAL_MS = 30_000;
@@ -24,6 +24,11 @@ export function useMonitoringSummary(handle: string | undefined): {
       return result.summary;
     },
     enabled: handle !== undefined && handle.length > 0,
+    // ADR-0006 §8a — 403 (not a member) and 404 (workspace gone) are terminal.
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+      return failureCount < 2;
+    },
     refetchInterval: (q) => (q.state.error !== null ? false : NICE_LIVE_INTERVAL_MS),
     refetchOnWindowFocus: true,
   });

@@ -32,22 +32,20 @@ export class AuthorizedAgentRunRepository extends AuthorizedScope {
 
   list = async (opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> => {
     if (this.caller.isSystemActor) return this.raw.list(opts);
-    const allowed = opts.namespace !== undefined
-      ? this.narrow(opts.namespace)
-      : [...this.caller.namespaces];
+    // Narrow the caller's memberships down to a single workspace when the
+    // request asks for one explicitly. Reaching into a workspace the caller
+    // doesn't belong to surfaces as `ForbiddenError` (403), not an empty
+    // list — empty would be indistinguishable from "no runs here".
+    const memberships = this.caller.namespaces;
+    let allowed: string[];
+    if (opts.namespace !== undefined) {
+      if (!memberships.has(opts.namespace)) {
+        throw new ForbiddenError(`Not a member of workspace '${opts.namespace}'`);
+      }
+      allowed = [opts.namespace];
+    } else {
+      allowed = [...memberships];
+    }
     return this.raw.listInNamespaces(allowed, opts);
   };
-
-  /**
-   * Intersection of an explicit `?namespace=` filter with the caller's
-   * memberships. Reaching into a workspace the caller doesn't belong to is
-   * the standard anti-enum 404: surface as `ForbiddenError`, route adapter
-   * maps to 403.
-   */
-  private narrow(requested: string): string[] {
-    if (!this.caller.namespaces.has(requested)) {
-      throw new ForbiddenError(`Not a member of workspace '${requested}'`);
-    }
-    return [requested];
-  }
 }

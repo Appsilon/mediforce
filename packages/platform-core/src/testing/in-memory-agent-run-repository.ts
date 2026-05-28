@@ -5,31 +5,10 @@ import type {
   ListAgentRunsPage,
 } from '../interfaces/agent-run-repository.js';
 import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository.js';
-
-/**
- * Cursor encoding mirrored across in-memory + Firestore impls. Opaque to
- * clients; encodes the `(startedAt, id)` tie-breaker that drives keyset
- * pagination.
- */
-export function encodeAgentRunCursor(startedAt: string, id: string): string {
-  return Buffer.from(`${startedAt}|${id}`, 'utf8').toString('base64url');
-}
-
-export function decodeAgentRunCursor(
-  cursor: string,
-): { startedAt: string; id: string } | null {
-  try {
-    const raw = Buffer.from(cursor, 'base64url').toString('utf8');
-    const sep = raw.indexOf('|');
-    if (sep < 0) return null;
-    const startedAt = raw.slice(0, sep);
-    const id = raw.slice(sep + 1);
-    if (startedAt.length === 0 || id.length === 0) return null;
-    return { startedAt, id };
-  } catch {
-    return null;
-  }
-}
+import {
+  encodeAgentRunCursor,
+  decodeAgentRunCursor,
+} from '../cursors/agent-run-cursor.js';
 
 /**
  * Comparator: startedAt DESC then id DESC. Same ordering in-memory and

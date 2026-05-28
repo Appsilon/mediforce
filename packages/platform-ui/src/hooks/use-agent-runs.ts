@@ -18,6 +18,13 @@ const TERMINAL: ReadonlySet<AgentRunStatus> = new Set([
   'flagged',
 ]);
 
+// ADR-0006 §8a — 4xx is not transient; stop retrying so a 403/404 surfaces
+// immediately instead of burning the default two retries first.
+function stopRetryOn4xx(failureCount: number, err: unknown): boolean {
+  if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
+  return failureCount < 2;
+}
+
 /**
  * List agent runs visible to the caller via `mediforce.agentRuns.list`.
  * STANDARD LIVE per ADR-0006 §4 — polls every 5 s for fresh runs.
@@ -35,6 +42,7 @@ export function useAgentRuns(handle?: string): {
       );
       return result.runs;
     },
+    retry: stopRetryOn4xx,
     refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
   });
 
@@ -68,6 +76,7 @@ export function useAgentRunsForStep(
       return result.runs;
     },
     enabled,
+    retry: stopRetryOn4xx,
     refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
   });
 
@@ -94,10 +103,7 @@ export function useAgentRun(runId: string | null): {
       return result.run;
     },
     enabled: runId !== null,
-    retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: stopRetryOn4xx,
     refetchInterval: (q) => {
       if (q.state.error !== null) return false;
       const status = q.state.data?.status;

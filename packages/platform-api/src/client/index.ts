@@ -1306,7 +1306,7 @@ export class Mediforce {
           namespace: validated.namespace,
           runId: validated.runId,
           stepId: validated.stepId,
-          limit: String(validated.limit),
+          limit: validated.limit !== undefined ? String(validated.limit) : undefined,
           cursor: validated.cursor,
         });
         const res = await this.request(`/api/agent-runs${qs}`);
