@@ -46,6 +46,9 @@ export {
   WorkflowWorkspaceSchema,
   WorkflowStepSchema,
   WorkflowVisibilitySchema,
+  WorkflowSourceSchema,
+  WorkflowManifestEntrySchema,
+  WorkflowManifestSchema,
   WorkflowDefinitionSchema,
   WorkflowDefinitionBaseSchema,
   WorkflowTemplateSchema,
@@ -147,6 +150,9 @@ export type {
   WorkflowWorkspace,
   WorkflowStep,
   WorkflowVisibility,
+  WorkflowSource,
+  WorkflowManifestEntry,
+  WorkflowManifest,
   WorkflowDefinition,
   WorkflowTemplate,
   TriggerInputField,
@@ -337,3 +343,4 @@ export type { HandoffTypeRegistration } from './collaboration/index.js';
 export { createLineStreamReader } from './utils/line-stream.js';
 export type { LineStreamReader } from './utils/line-stream.js';
 export { calculateEstimatedCost } from './utils/cost.js';
+export { githubRawBase } from './utils/github.js';

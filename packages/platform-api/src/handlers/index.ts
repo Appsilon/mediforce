@@ -33,6 +33,7 @@ export {
 export { listWorkflows } from './workflows/list-workflows.js';
 export { getWorkflow } from './workflows/get-workflow.js';
 export { registerWorkflow } from './workflows/register-workflow.js';
+export { importWorkflow } from './workflows/import-workflow.js';
 export { setWorkflowVisibility } from './workflows/set-visibility.js';
 export {
   archiveWorkflow,

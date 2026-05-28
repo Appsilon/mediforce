@@ -31,6 +31,8 @@ import {
   GetWorkflowRunCountOutputSchema,
   TransferWorkflowInputSchema,
   TransferWorkflowOutputSchema,
+  ImportWorkflowInputSchema,
+  ImportWorkflowOutputSchema,
   DockerInfoResponseSchema,
   OpenRouterCreditsInputSchema,
   OpenRouterCreditsOutputSchema,
@@ -194,6 +196,8 @@ import {
   type GetWorkflowRunCountOutput,
   type TransferWorkflowInput,
   type TransferWorkflowOutput,
+  type ImportWorkflowInput,
+  type ImportWorkflowOutput,
   type GetRunInput,
   type GetRunOutput,
   type StartRunInput,
@@ -400,6 +404,7 @@ export class Mediforce {
     delete: (input: DeleteWorkflowInput) => Promise<DeleteWorkflowOutput>;
     getRunCount: (input: GetWorkflowRunCountInput) => Promise<GetWorkflowRunCountOutput>;
     transferNamespace: (input: TransferWorkflowInput) => Promise<TransferWorkflowOutput>;
+    importFromRepo: (input: ImportWorkflowInput, options: { namespace: string }) => Promise<ImportWorkflowOutput>;
   };
 
   readonly runs: {
@@ -782,6 +787,17 @@ export class Mediforce {
           { sourceNamespace: v.sourceNamespace, targetNamespace: v.targetNamespace },
           TransferWorkflowOutputSchema,
           'mediforce.workflows.transferNamespace',
+        );
+      },
+      importFromRepo: (input, options) => {
+        const validated = ImportWorkflowInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: options.namespace });
+        return this.sendJson(
+          'POST',
+          `/api/workflow-definitions/import${qs}`,
+          validated as Record<string, unknown>,
+          ImportWorkflowOutputSchema,
+          'mediforce.workflows.importFromRepo',
         );
       },
       copy: (input, options) => {

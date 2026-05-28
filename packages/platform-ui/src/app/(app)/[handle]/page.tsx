@@ -20,6 +20,7 @@ import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons, isActiveStatus }
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
 import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-credits-indicator';
 import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
+import { ImportWorkflowDialog } from '@/components/workflows/import-workflow-dialog';
 import { cn } from '@/lib/utils';
 import { NamespaceSchema } from '@mediforce/platform-core';
 import type { Namespace, ProcessInstance } from '@mediforce/platform-core';
@@ -491,6 +492,7 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
 function WorkflowCatalogMember({ handle }: { handle: string }) {
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [showArchived, setShowArchived] = React.useState(false);
+  const [importDialogOpen, setImportDialogOpen] = React.useState(false);
 
   const { definitions, stepsByDefinition, latestDocs, loading: defsLoading } = useProcessDefinitions();
   const { data: allInstances, loading: instancesLoading } = useProcessInstances('all', undefined, false, handle);
@@ -556,6 +558,16 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
             onToggleArchived={() => setShowArchived((prev) => !prev)}
             hasArchivedDefinitions={hasArchivedDefinitions}
           />
+          <button
+            onClick={() => setImportDialogOpen(true)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap shrink-0',
+              'border hover:bg-muted transition-colors',
+            )}
+          >
+            <GitBranch className="h-3.5 w-3.5" />
+            Import from git
+          </button>
           <Link
             href={`/${handle}/workflows/new`}
             className={cn(
@@ -582,13 +594,22 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
               Create your first workflow to start orchestrating agents and humans.
             </p>
           </div>
-          <Link
-            href={`/${handle}/workflows/new`}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New Workflow
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setImportDialogOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border hover:bg-muted transition-colors"
+            >
+              <GitBranch className="h-3.5 w-3.5" />
+              Import from git
+            </button>
+            <Link
+              href={`/${handle}/workflows/new`}
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Workflow
+            </Link>
+          </div>
         </div>
       ) : sortedDefinitions.length === 0 ? (
         <div className="text-center py-16 text-sm text-muted-foreground">
@@ -614,6 +635,12 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
         </div>
       )}
     </div>
+    <ImportWorkflowDialog
+      namespace={handle}
+      open={importDialogOpen}
+      onOpenChange={setImportDialogOpen}
+      onImported={() => {}}
+    />
     </WorkflowSecretKeysProvider>
   );
 }

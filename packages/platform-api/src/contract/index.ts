@@ -65,6 +65,8 @@ export {
   GetWorkflowRunCountOutputSchema,
   TransferWorkflowInputSchema,
   TransferWorkflowOutputSchema,
+  ImportWorkflowInputSchema,
+  ImportWorkflowOutputSchema,
   type CopyWorkflowInput,
   type CopyWorkflowOutput,
   type CopyWorkflowOptions,
@@ -76,6 +78,8 @@ export {
   type GetWorkflowRunCountOutput,
   type TransferWorkflowInput,
   type TransferWorkflowOutput,
+  type ImportWorkflowInput,
+  type ImportWorkflowOutput,
 } from './workflows.js';
 
 export {

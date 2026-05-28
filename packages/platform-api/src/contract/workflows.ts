@@ -214,3 +214,19 @@ export const TransferWorkflowOutputSchema = z.object({
 
 export type TransferWorkflowInput = z.infer<typeof TransferWorkflowInputSchema>;
 export type TransferWorkflowOutput = z.infer<typeof TransferWorkflowOutputSchema>;
+
+export const ImportWorkflowInputSchema = z.object({
+  repo: z.string().min(1),
+  path: z.string().min(1),
+  ref: z.string().min(1).default('main'),
+});
+
+export const ImportWorkflowOutputSchema = z.object({
+  success: z.literal(true),
+  name: z.string(),
+  version: z.number().int().positive(),
+  source: z.object({ repo: z.string(), path: z.string() }),
+});
+
+export type ImportWorkflowInput = z.infer<typeof ImportWorkflowInputSchema>;
+export type ImportWorkflowOutput = z.infer<typeof ImportWorkflowOutputSchema>;

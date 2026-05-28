@@ -12,6 +12,7 @@
  *   2 — usage error (unknown command, missing required flag)
  */
 
+import { workflowImportCommand } from './commands/workflow-import.js';
 import { workflowRegisterCommand } from './commands/workflow-register.js';
 import { workflowListCommand } from './commands/workflow-list.js';
 import { workflowGetCommand } from './commands/workflow-get.js';
@@ -67,6 +68,7 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'Workflow definitions (register, list, get, copy, archive, delete, visibility)',
     leaves: {
       register: { description: 'Register a workflow definition from a JSON file', fn: workflowRegisterCommand },
+      import: { description: 'Import a workflow from a public GitHub repository', fn: workflowImportCommand },
       list: { description: 'List registered workflow definitions', fn: workflowListCommand },
       get: { description: 'Fetch a workflow definition', fn: workflowGetCommand },
       'set-visibility': { description: 'Set workflow visibility (public|private)', fn: workflowSetVisibilityCommand },
