@@ -270,6 +270,37 @@ remains an opt-in per hook; nothing in this ADR commits the app to
 Suspense as the default loading-state mechanism. The two co-exist
 fine.
 
+#### 8a. Stop polling on persistent error (terminal errors)
+
+Some HTTP failures are *not* worth retrying — retrying just produces a
+tight loop that swamps the server and burns the user's tab.
+
+The hook-level rule: a `useQuery` whose `error` is a 4xx (other than
+explicit transient codes — none today) **must not be re-polled by
+`refetchInterval`**. `useTask` ([`packages/platform-ui/src/hooks/use-task.ts`](../../packages/platform-ui/src/hooks/use-task.ts))
+is the reference: `refetchInterval` returns `false` when `query.state.error`
+is set, distinguishing 404 (drop the row from the list) from any other
+4xx (surface inline, but stop hammering the endpoint). All Phase 4
+hooks that poll inherit this pattern. New hooks copy from `useTask`.
+
+Discovered the hard way: a `humanTasks/*` doc with a `params[i].type`
+outside the (then-strict) `StepParamSchema.type` enum returned a
+generic 400 from the route adapter, no server log, and React Query's
+default `refetchInterval` re-fired the failing GET every 2 s. The
+client-side fix (terminal-on-error) shipped in Phase 4 PR1; the
+schema fix shipped as [#562](https://github.com/Appsilon/mediforce/pull/562)
+(see plan §9).
+
+#### 8b. Route adapter logs handler ZodErrors
+
+[`packages/platform-ui/src/lib/route-adapter.ts`](../../packages/platform-ui/src/lib/route-adapter.ts)
+now `console.error`s any `ZodError` thrown from inside a handler
+(typically a repo-boundary `Schema.parse(snap.data())`). Before, the
+adapter mapped the error to a 400 envelope with no log line, so
+data/schema drift was invisible until a user opened the network tab.
+ADR-0005's error-envelope contract is unchanged; only the dev/prod
+log line is new.
+
 ## Considered alternatives
 
 - **SWR (vercel/swr).** Rejected. SWR covers polling + dedup + focus-refetch

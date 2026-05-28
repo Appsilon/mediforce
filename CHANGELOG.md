@@ -11,6 +11,9 @@ Every non-trivial PR adds a bullet under `## [Unreleased]`. Trivial edits (typos
 
 ## [Unreleased]
 
+### Fixed
+- `StepParamSchema.type` widened from a strict enum to `z.string().min(1).default('string')` so human-task GETs no longer 400 when the param uses a widget hint the UI already renders (e.g. `textarea`, `multiselect`). Non-string `type` still fails parsing — only the enum was the bug. Route adapter also `console.error`s handler ZodErrors so similar mismatches are debuggable from the server log.
+
 ### Changed
 - ADR-0005 Phase 2.5 — 18 endpoints (workflow-definition mutations, agents, secret read companions, processes archive/bulk) migrated to headless handlers; `actions/processes.ts` and `actions/definitions.ts` deleted. `transferWorkflow` now gates both source and target namespace, `deleteWorkflow` audit actor fixed, and archive / setDefault / register / copy / setVisibility now emit audit events.
 - ADR-0005 Phase 2.5 — workflow-secret value reveal + atomic bulk save migrated to headless handlers (`getWorkflowSecretsFull`, `saveWorkflowSecrets`) behind `GET`/`PUT /api/workflow-secrets/values`; `getWorkflowSecrets` / `saveWorkflowSecrets` Server Actions deleted; UI uses `mediforce.workflowSecrets.values()` / `.save()`; new audit actions `workflow_secret.values_revealed` and `workflow_secret.bulk_saved`.
