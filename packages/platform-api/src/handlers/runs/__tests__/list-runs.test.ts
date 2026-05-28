@@ -15,7 +15,7 @@ describe('listRuns handler', () => {
     instanceRepo = new InMemoryProcessInstanceRepository();
   });
 
-  it('returns every run for an api-key caller, mapped to the wire shape', async () => {
+  it('returns every run for an api-key caller, as full ProcessInstance shape', async () => {
     await instanceRepo.create(
       buildProcessInstance({ id: 'r1', namespace: 'alpha', definitionName: 'wf' }),
     );
@@ -26,12 +26,15 @@ describe('listRuns handler', () => {
     const scope = createTestScope({ instanceRepo });
     const result = await listRuns({ limit: 20 }, scope);
 
-    expect(result.runs.map((r) => r.runId).sort()).toEqual(['r1', 'r2']);
+    expect(result.runs.map((r) => r.id).sort()).toEqual(['r1', 'r2']);
+    // Phase 4 PRD §9: read-path convergence — list returns the same shape
+    // as detail. Spot-check fields only the full schema carries.
     expect(result.runs[0]).toMatchObject({
-      runId: expect.any(String),
+      id: expect.any(String),
       status: expect.any(String),
       definitionName: 'wf',
-      error: null,
+      namespace: expect.any(String),
+      variables: expect.any(Object),
     });
   });
 
@@ -42,7 +45,7 @@ describe('listRuns handler', () => {
     const scope = createTestScope({ instanceRepo });
     const result = await listRuns({ workflow: 'a', limit: 20 }, scope);
 
-    expect(result.runs.map((r) => r.runId)).toEqual(['r1']);
+    expect(result.runs.map((r) => r.id)).toEqual(['r1']);
   });
 
   it('returns only runs in the user caller’s namespaces', async () => {
@@ -56,7 +59,7 @@ describe('listRuns handler', () => {
     });
     const result = await listRuns({ limit: 20 }, scope);
 
-    expect(result.runs.map((r) => r.runId)).toEqual(['r-alpha']);
+    expect(result.runs.map((r) => r.id)).toEqual(['r-alpha']);
   });
 
   it('returns empty when the user has no namespace overlap', async () => {

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { RotateCw, XCircle, Check } from 'lucide-react';
 import { mediforce } from '@/lib/mediforce';
 import { ApiError } from '@mediforce/platform-api/client';
+import { useCancelRun } from '@/hooks/use-run-mutations';
 import { cn } from '@/lib/utils';
 
 interface AgentEscalatedBannerProps {
@@ -22,6 +23,7 @@ export function AgentEscalatedBanner({ instanceId, stepId }: AgentEscalatedBanne
   const [retryError, setRetryError] = React.useState<string | null>(null);
   const [cancelStatus, setCancelStatus] = React.useState<CancelStatus>('idle');
   const [cancelError, setCancelError] = React.useState<string | null>(null);
+  const cancelMutation = useCancelRun();
 
   async function handleRetry() {
     setRetryStatus('submitting');
@@ -43,7 +45,7 @@ export function AgentEscalatedBanner({ instanceId, stepId }: AgentEscalatedBanne
     setCancelStatus('submitting');
     setCancelError(null);
     try {
-      await mediforce.runs.cancel({ runId: instanceId });
+      await cancelMutation.mutateAsync({ runId: instanceId });
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Cancel failed';

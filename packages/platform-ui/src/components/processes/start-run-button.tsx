@@ -8,6 +8,7 @@ import { useWorkflowDefinitions } from '@/hooks/use-workflow-definitions';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
+import { useStartRun } from '@/hooks/use-run-mutations';
 import { useWorkflowSecretKeysContext } from '@/hooks/use-workflow-secret-keys';
 import { VersionLabel } from '@/components/ui/version-label';
 import { cn } from '@/lib/utils';
@@ -40,6 +41,7 @@ export function StartRunButton({
   const openRouterCredits = useOpenRouterCredits();
   const [starting, setStarting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const startMutation = useStartRun();
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [pendingVersion, setPendingVersion] = React.useState<number | undefined>(undefined);
@@ -153,7 +155,7 @@ export function StartRunButton({
     const payload = hasTriggerInput ? buildPayload() : undefined;
 
     try {
-      const result = await mediforce.runs.start({
+      const result = await startMutation.mutateAsync({
         namespace: handle,
         definitionName: workflowName,
         definitionVersion: targetVersion,

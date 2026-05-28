@@ -21,6 +21,18 @@
 - [ ] Nullable fields handled defensively
 - [ ] No unbounded reads (missing `.limit()`)
 
+## 3a. Regression check — non-negotiable
+
+A behaviour the user could rely on yesterday MUST keep working today. Migrations, refactors, and rewrites are the most common offenders.
+
+- [ ] **Diff the user-observable surface, not just the code.** For every replaced read / write / endpoint / hook: compare OLD vs NEW in terms the user would notice (visible rows, polled freshness, error messages, retry behaviour, ordering, pagination, defaults).
+- [ ] **No silent caps.** If the old code fetched everything and the new code adds `.limit(N)`, that is a regression — even if N is "probably enough". Either keep parity, or ship the pagination that makes the cap correct in the same PR.
+- [ ] **No silent default changes.** If a default flipped (`retry: 2` → `retry: 0`, `polling: 1s` → `polling: 5s`, `showArchived: true` → `false`), call it out explicitly — it's a behaviour change, not a refactor.
+- [ ] **Migration parity sweep.** When replacing hook / endpoint / repo X with Y: enumerate X's call sites and side effects; verify Y covers each. If Y can't, the gap is the regression — flag it, don't ship around it.
+- [ ] Language matters: call a regression a **regression**, never "regression risk". A risk is "might break"; a regression is "does break under inputs Y could already give it". If you'd write "risk", reproduce the failing input first and confirm.
+
+**Regressions are blockers.** SHIP only after every regression is either fixed in the PR or deliberately accepted by the user with a tracked follow-up. Never accept a regression on the implementer's word.
+
 ## 4. API Design
 
 - [ ] RESTful conventions followed

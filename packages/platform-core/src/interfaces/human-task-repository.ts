@@ -19,6 +19,11 @@ export interface HumanTaskRepository {
   getByInstanceId(instanceId: string): Promise<HumanTask[]>;
   getByInstanceIdInNamespaces(instanceId: string, allowed: readonly string[]): Promise<HumanTask[]>;
 
+  /** Every task in the store, irrespective of role or instance. */
+  listAll(): Promise<HumanTask[]>;
+  /** Every task whose parent run's namespace appears in `allowed`. */
+  listInNamespaces(allowed: readonly string[]): Promise<HumanTask[]>;
+
   claim(taskId: string, userId: string): Promise<HumanTask>; // sets assignedUserId + status: 'claimed'
   complete(taskId: string, completionData: Record<string, unknown>): Promise<HumanTask>;
   cancel(taskId: string): Promise<HumanTask>;

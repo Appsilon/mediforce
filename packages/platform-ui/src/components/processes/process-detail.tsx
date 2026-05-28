@@ -10,10 +10,10 @@ import { AuditLogTab } from './audit-log-tab';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
-import { mediforce } from '@/lib/mediforce';
 import { ApiError } from '@mediforce/platform-api/client';
 import { useActiveCoworkSession } from '@/hooks/use-tasks';
 import { useProcessInstance } from '@/hooks/use-process-instances';
+import { useArchiveRun, useCancelRun } from '@/hooks/use-run-mutations';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
@@ -24,8 +24,6 @@ import { AgentEscalatedBanner } from './agent-escalated-banner';
 import { PreviousRunBanner } from './previous-run-banner';
 import { formatDuration, formatCostUsd } from '@/lib/format';
 import { getWorkflowStatus } from '@/lib/workflow-status';
-
-type AuditEventWithId = AuditEvent & { id: string };
 
 function resolveStepLabel(stepId: string, steps: Step[]): string {
   const found = steps.find((s) => s.id === stepId);
@@ -54,7 +52,7 @@ export function ProcessDetail({
 }: {
   instance: ProcessInstance;
   stepExecutions: StepExecution[];
-  auditEvents: AuditEventWithId[];
+  auditEvents: AuditEvent[];
   auditEventsLoading: boolean;
   auditEventsError?: Error | null;
   definitionSteps?: Step[];
@@ -137,10 +135,13 @@ export function ProcessDetail({
   const canArchive = wfStatus.displayStatus === 'completed' || wfStatus.displayStatus === 'error' || wfStatus.displayStatus === 'cancelled';
   const [archiving, setArchiving] = React.useState(false);
 
+  const archiveMutation = useArchiveRun();
+  const cancelMutation = useCancelRun();
+
   async function handleArchiveToggle() {
     setArchiving(true);
     try {
-      await mediforce.runs.archive({ runId: instance.id, archived: instance.archived !== true });
+      await archiveMutation.mutateAsync({ runId: instance.id, archived: instance.archived !== true });
     } finally {
       setArchiving(false);
     }
@@ -150,7 +151,7 @@ export function ProcessDetail({
     setCancelStep(2);
     setCancelError(null);
     try {
-      await mediforce.runs.cancel({ runId: instance.id });
+      await cancelMutation.mutateAsync({ runId: instance.id });
       setCancelStep(0);
     } catch (err) {
       const message =

@@ -19,6 +19,7 @@ export const GET = createRouteAdapter<typeof ListRunsInputSchema, ListRunsInput>
     return {
       workflow: params.get('workflow') ?? undefined,
       status: params.get('status') ?? undefined,
+      namespace: params.get('namespace') ?? undefined,
       limit: params.get('limit') ?? undefined,
     };
   },
