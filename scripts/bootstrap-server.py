@@ -35,8 +35,10 @@ Usage:
     python3 scripts/bootstrap-server.py --resume                       # force resume prompt
 
     # Re-run pattern (add a new env var, top up missing secrets, fix postgres-data dir):
-    python3 scripts/bootstrap-server.py --host <existing> --user deploy --from-step 10 --dry-run
-    python3 scripts/bootstrap-server.py --host <existing> --user deploy --from-step 10
+    # --to-step 13 stops cleanly before step 14 (firewall) and 15 (first_deploy);
+    # the next CI deploy applies the new .env without us touching the server.
+    python3 scripts/bootstrap-server.py --host <existing> --user deploy --from-step 10 --to-step 13 --dry-run
+    python3 scripts/bootstrap-server.py --host <existing> --user deploy --from-step 10 --to-step 13
 """
 
 from __future__ import annotations
@@ -1815,6 +1817,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--repo", help=f"GitHub repo to deploy, e.g. Org/Name (default: {DEFAULT_REPO}).")
     p.add_argument("--branch", help=f"Branch to deploy (default: {DEFAULT_BRANCH}).")
     p.add_argument("--from-step", type=int, help="Skip to step number N (1-based).")
+    p.add_argument("--to-step", type=int, help="Stop after step number N (1-based, inclusive). Useful with --from-step to run a range without manually aborting at later prompts.")
     p.add_argument("--only-step", help="Run a single step by name (e.g. docker_gc) and exit.")
     p.add_argument("--resume", action="store_true", help="Force resume prompt even if state looks fresh.")
     p.add_argument("--dry-run", action="store_true", help="Describe actions without making changes.")
@@ -1922,8 +1925,22 @@ def main() -> int:
         return 0
 
     start = resolve_start_index(args, state)
+    # --to-step bounds the upper end (inclusive, 1-based). Defaults to last
+    # step. Range check mirrors --from-step.
+    if args.to_step is not None:
+        if args.to_step < 1 or args.to_step > len(STEPS):
+            raise SystemExit(
+                f"--to-step {args.to_step} out of range (1..{len(STEPS)})"
+            )
+        if args.to_step < start + 1:
+            raise SystemExit(
+                f"--to-step {args.to_step} is before --from-step {start + 1}; nothing to run"
+            )
+        stop = args.to_step
+    else:
+        stop = len(STEPS)
     try:
-        for idx, (name, title, fn) in enumerate(STEPS[start:], start=start + 1):
+        for idx, (name, title, fn) in enumerate(STEPS[start:stop], start=start + 1):
             section(f"{idx}. {title}")
             fn(ctx)
             state.mark(name)

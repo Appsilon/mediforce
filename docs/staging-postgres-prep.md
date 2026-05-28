@@ -37,13 +37,18 @@ generates `POSTGRES_PASSWORD` only if missing, the subsequent `env_local`
 step writes it into `/opt/mediforce/.env`, and the new `postgres_dir`
 step (13) creates the bind-mount dir with the right ownership.
 
-Dry-run first to see exactly what would change:
+Dry-run first to see exactly what would change. `--to-step 13` stops
+cleanly after the new postgres-data dir step so the script never
+reaches step 14 (firewall) or step 15 (first_deploy, which would
+trigger a full docker rebuild). Letting the next CI deploy pick up
+the new `.env` is the path we want.
 
 ```bash
 python3 scripts/bootstrap-server.py \
   --host staging.mediforce.example \
   --user deploy \
   --from-step 10 \
+  --to-step 13 \
   --dry-run
 ```
 
@@ -67,19 +72,21 @@ Once the dry-run looks right:
 python3 scripts/bootstrap-server.py \
   --host staging.mediforce.example \
   --user deploy \
-  --from-step 10
+  --from-step 10 \
+  --to-step 13
 ```
 
-Steps that fire:
+Steps that fire (10–13 only, stops cleanly):
 
 | # | Step | What happens |
 |---|------|---|
 | 10 | `api_keys` | Hydrates from remote `.env`, generates `POSTGRES_PASSWORD` only if missing, preserves everything else verbatim |
 | 11 | `domain` | "Domain from state: …; Keep using? [Y/n]" — press Enter |
-| 12 | `env_local` | Previews merged `.env` (secrets masked), confirms, uploads with 0600 / owned by `deploy` |
+| 12 | `env_local` | Previews merged `.env` (secrets masked), confirms, uploads with 0600 / owned by `deploy`. Existing `.env` backed up to `.env.bak-<UTC timestamp>` first |
 | 13 | `postgres_dir` | Idempotent `mkdir -p /var/lib/mediforce/postgres-data` + `chown -R 999:999`; no-op if already correct |
-| 14 | `firewall` | UFW status check; no-op if already configured |
-| 15 | `first_deploy` | **Triggers full `deploy.sh` on the server (5-15 min docker build).** Abort here if you'd rather let the next CI deploy do it. |
+
+Steps 14 (`firewall`) and 15 (`first_deploy`) are skipped — `--to-step 13`
+exits before reaching them. The next CI deploy applies the new `.env`.
 
 The interactive prompt previews the new `.env` with secrets masked
 (`abcd…wxyz (32 chars)`). Confirm the upload.
