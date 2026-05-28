@@ -1,4 +1,4 @@
-import type { AgentRun } from '../schemas/agent-run.js';
+import { AgentRunSchema, type AgentRun } from '../schemas/agent-run.js';
 import type {
   AgentRunRepository,
   ListAgentRunsOptions,
@@ -26,8 +26,9 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
   constructor(private readonly parents?: ProcessInstanceRepository) {}
 
   async create(run: AgentRun): Promise<AgentRun> {
-    this.byId.set(run.id, run);
-    return run;
+    const parsed = AgentRunSchema.parse(run);
+    this.byId.set(parsed.id, parsed);
+    return parsed;
   }
   async getById(runId: string): Promise<AgentRun | null> {
     return this.byId.get(runId) ?? null;
@@ -43,7 +44,9 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
     return allowed.includes(parent.namespace) ? run : null;
   }
   async getByInstanceId(instanceId: string): Promise<AgentRun[]> {
-    return [...this.byId.values()].filter((r) => r.processInstanceId === instanceId);
+    return [...this.byId.values()]
+      .filter((r) => r.processInstanceId === instanceId)
+      .sort(compareDesc);
   }
   async getByInstanceIdInNamespaces(
     instanceId: string,
@@ -55,8 +58,8 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
     return this.getByInstanceId(instanceId);
   }
   async getAll(limit?: number): Promise<AgentRun[]> {
-    const all = [...this.byId.values()];
-    return limit === undefined ? all : all.slice(0, limit);
+    const sorted = [...this.byId.values()].sort(compareDesc);
+    return limit === undefined ? sorted : sorted.slice(0, limit);
   }
 
   async list(opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> {
