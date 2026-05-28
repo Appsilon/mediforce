@@ -26,10 +26,10 @@
       "description": "JSON array of {userId, email} objects"
     },
     {
-      "name": "collectUntil",
-      "type": "string",
+      "name": "durationHours",
+      "type": "number",
       "required": true,
-      "description": "ISO-8601 deadline for collecting perspectives"
+      "description": "Hours to collect perspectives (e.g. 0.5 = 30min, 24 = 1 day)"
     },
     {
       "name": "repo",
@@ -57,7 +57,7 @@
       "agent": {
         "image": "mediforce-golden-image:latest",
         "runtime": "javascript",
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const raw = input.teamMembers;\n  const teamMembers = typeof raw === 'string' ? JSON.parse(raw) : raw;\n  if (!Array.isArray(teamMembers)) { console.error('teamMembers must be a JSON array'); process.exit(1); }\n  writeFileSync('/output/result.json', JSON.stringify({ teamMembers, question: input.question }));\n  console.log(`Parsed ${teamMembers.length} team member(s)`);\n} catch (err) {\n  console.error('prepare crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
+        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const raw = input.teamMembers;\n  const teamMembers = typeof raw === 'string' ? JSON.parse(raw) : raw;\n  if (!Array.isArray(teamMembers)) { console.error('teamMembers must be a JSON array'); process.exit(1); }\n  const hours = Number(input.durationHours);\n  if (!Number.isFinite(hours) || hours <= 0) { console.error('durationHours must be a positive number'); process.exit(1); }\n  const deadline = new Date(Date.now() + hours * 3600000).toISOString();\n  writeFileSync('/output/result.json', JSON.stringify({ teamMembers, question: input.question, deadline }));\n  console.log(`Parsed ${teamMembers.length} team member(s), deadline: ${deadline}`);\n} catch (err) {\n  console.error('prepare crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n"
       }
     },
     {
@@ -90,7 +90,7 @@
       "action": {
         "kind": "wait",
         "config": {
-          "deadline": "${triggerPayload.collectUntil}"
+          "deadline": "${steps.prepare.deadline}"
         }
       }
     },

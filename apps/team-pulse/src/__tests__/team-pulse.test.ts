@@ -29,13 +29,15 @@ describe('team-pulse', () => {
     expect(result.data.steps.filter((s) => s.type === 'terminal')).toHaveLength(1);
   });
 
-  it('prepare step parses teamMembers JSON string', () => {
+  it('prepare step parses teamMembers and computes deadline from durationHours', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'prepare');
     expect(step?.executor).toBe('script');
     expect(step?.agent?.inlineScript).toMatch(/JSON\.parse/);
+    expect(step?.agent?.inlineScript).toMatch(/durationHours/);
+    expect(step?.agent?.inlineScript).toMatch(/deadline/);
   });
 
   it('spawn_perspectives is action step with spawn kind and forEach', () => {
@@ -126,13 +128,14 @@ describe('team-pulse', () => {
     expect(fromDecide.find((t) => t.to === 'report')?.when).toBe('verdict == "skip"');
   });
 
-  it('declares triggerInput for question, teamMembers, collectUntil, repo, labelFilter', () => {
+  it('declares triggerInput for question, teamMembers, durationHours, repo, labelFilter', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
     const params = result.data.triggerInput ?? [];
     const names = params.map((p) => p.name);
-    expect(names).toEqual(['question', 'teamMembers', 'collectUntil', 'repo', 'labelFilter']);
+    expect(names).toEqual(['question', 'teamMembers', 'durationHours', 'repo', 'labelFilter']);
+    expect(params.find((p) => p.name === 'durationHours')?.type).toBe('number');
     expect(params.find((p) => p.name === 'repo')?.default).toBe('appsilon/mediforce');
     expect(params.find((p) => p.name === 'labelFilter')?.required).toBe(false);
   });
