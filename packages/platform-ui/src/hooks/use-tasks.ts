@@ -18,18 +18,19 @@ const STANDARD_LIVE_INTERVAL_MS = 5_000;
  * in mechanically once an "all my visible tasks" endpoint axis exists.
  */
 export function useMyActionableTasksByRole(
-  assignedRole: string,
+  assignedRole: string | undefined,
   currentUserId?: string | null,
 ): { data: HumanTask[]; loading: boolean; error: Error | null } {
   const query = useQuery({
-    queryKey: queryKeys.tasks.byRole(assignedRole, { status: [...ACTIONABLE_STATUSES] }),
+    queryKey: queryKeys.tasks.byRole(assignedRole ?? '', { status: [...ACTIONABLE_STATUSES] }),
     queryFn: async () => {
       const result = await mediforce.tasks.list({
-        role: assignedRole,
+        role: assignedRole as string,
         status: [...ACTIONABLE_STATUSES],
       });
       return result.tasks;
     },
+    enabled: assignedRole !== undefined && assignedRole.length > 0,
     refetchInterval: STANDARD_LIVE_INTERVAL_MS,
   });
 
@@ -44,7 +45,7 @@ export function useMyActionableTasksByRole(
 
   return {
     data: filtered,
-    loading: query.isLoading,
+    loading: query.isLoading && assignedRole !== undefined && assignedRole.length > 0,
     error: (query.error as Error | null) ?? null,
   };
 }

@@ -1,29 +1,12 @@
 'use client';
 
-import * as React from 'react';
 import { useParams } from 'next/navigation';
-import { doc, onSnapshot } from 'firebase/firestore';
-import type { HumanTask } from '@mediforce/platform-core';
-import { db } from '@/lib/firebase';
+import { useTask } from '@/hooks/use-task';
 import { TaskDetail } from '@/components/tasks/task-detail';
 
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
-  const [task, setTask] = React.useState<HumanTask | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    if (!taskId) return;
-    const unsub = onSnapshot(doc(db, 'humanTasks', taskId), (snap) => {
-      if (snap.exists()) {
-        setTask({ id: snap.id, ...snap.data() } as HumanTask);
-      } else {
-        setTask(null);
-      }
-      setLoading(false);
-    });
-    return unsub;
-  }, [taskId]);
+  const { task, loading } = useTask(taskId);
 
   if (loading) {
     return (

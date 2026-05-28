@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HumanTask } from '@mediforce/platform-core';
 import { buildHumanTask } from '@mediforce/platform-core/testing';
+import { createQueryWrapper } from '@/test/react-query';
+
+function render(ui: React.ReactElement) {
+  const { wrapper } = createQueryWrapper();
+  return rtlRender(ui, { wrapper });
+}
 
 // Mock Firebase — must come before any component imports
 vi.mock('@/lib/firebase', () => ({
