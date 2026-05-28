@@ -31,6 +31,13 @@ export const GetMeOutputSchema = z.object({
     uid: z.string(),
     email: z.string().email().nullable(),
     displayName: z.string().nullable(),
+    /**
+     * `true` when the user must change their password before continuing.
+     * Defaults to `false` when no `users/{uid}` profile doc exists yet — see
+     * `UserProfileRepository.getProfile`. Cleared via
+     * `POST /api/users/me/clear-must-change-password`.
+     */
+    mustChangePassword: z.boolean(),
   }),
   namespaces: z.array(MeNamespaceSchema),
 });
@@ -95,3 +102,27 @@ export const ResendInviteOutputSchema = z.object({
 
 export type ResendInviteInput = z.infer<typeof ResendInviteInputSchema>;
 export type ResendInviteOutput = z.infer<typeof ResendInviteOutputSchema>;
+
+export const ClearMustChangePasswordInputSchema = z
+  .object({
+    /**
+     * Server-to-server escape hatch: when an apiKey caller invokes this
+     * endpoint (e.g. CLI `mediforce users clear-must-change-password`), it
+     * must name the target uid since the system actor has no implicit
+     * identity. User callers always derive the uid from the verified token;
+     * if `uid` is set for a user caller it MUST match `caller.uid` or the
+     * handler 403s.
+     */
+    uid: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const ClearMustChangePasswordOutputSchema = z.object({
+  user: z.object({
+    uid: z.string(),
+    mustChangePassword: z.literal(false),
+  }),
+});
+
+export type ClearMustChangePasswordInput = z.infer<typeof ClearMustChangePasswordInputSchema>;
+export type ClearMustChangePasswordOutput = z.infer<typeof ClearMustChangePasswordOutputSchema>;

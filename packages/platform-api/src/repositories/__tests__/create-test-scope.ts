@@ -16,6 +16,7 @@ import {
   InMemoryProcessRepository,
   InMemoryToolCatalogRepository,
   InMemoryAgentOAuthTokenRepository,
+  InMemoryUserProfileRepository,
 } from '@mediforce/platform-core/testing';
 import type {
   AgentRunRepository,
@@ -24,6 +25,7 @@ import type {
   NamespaceSecretsRepository,
   ProcessInstanceRepository,
   UserDirectoryService,
+  UserProfileRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../auth.js';
@@ -53,6 +55,15 @@ const stubNamespaceRepo: NamespaceRepository = {
     /* no-op */
   },
   async removeMember() {
+    /* no-op */
+  },
+  async removeMemberWithOrganizations() {
+    /* no-op */
+  },
+  async setMemberRole() {
+    /* no-op */
+  },
+  async deleteNamespaceCascade() {
     /* no-op */
   },
   async getMember() {
@@ -159,6 +170,7 @@ export interface TestScopeOverrides {
   readonly inviteNotificationService?: InviteNotificationService | null;
   readonly dockerImages?: DockerImagesService | null;
   readonly namespaceRepo?: NamespaceRepository;
+  readonly userProfileRepo?: UserProfileRepository;
   readonly userDirectory?: UserDirectoryService | null;
 }
 
@@ -193,6 +205,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     cronTriggerStateRepo: overrides.cronTriggerStateRepo ?? new InMemoryCronTriggerStateRepository(),
     toolCatalogRepo: overrides.toolCatalogRepo ?? new InMemoryToolCatalogRepository(),
     namespaceRepo: overrides.namespaceRepo ?? stubNamespaceRepo,
+    userProfileRepo: overrides.userProfileRepo ?? new InMemoryUserProfileRepository(),
     oauthProviderRepo: overrides.oauthProviderRepo ?? new InMemoryOAuthProviderRepository(),
     agentOAuthTokenRepo: overrides.agentOAuthTokenRepo ?? new InMemoryAgentOAuthTokenRepository(),
     modelRegistryRepo: overrides.modelRegistryRepo ?? stubModelRegistry,

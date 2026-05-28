@@ -19,6 +19,27 @@ export interface NamespaceRepository {
   getNamespacesByUser(uid: string): Promise<Namespace[]>;
   addMember(handle: string, member: NamespaceMember): Promise<void>;
   removeMember(handle: string, uid: string): Promise<void>;
+  /**
+   * Atomic remove: deletes the member subcollection doc AND arrayRemoves the
+   * handle from `users/{uid}.organizations` in one transaction. Mirrors
+   * `createNamespaceWithOwner`'s atomic shape. Used by the DELETE member +
+   * POST leave handlers so a half-removed member cannot strand in
+   * `users/{uid}.organizations` after the member doc is gone.
+   */
+  removeMemberWithOrganizations(handle: string, uid: string): Promise<void>;
+  /**
+   * Update a member's role in-place. No-op if no member doc exists for `uid`.
+   * Used by PATCH /api/namespaces/:handle/members/:uid.
+   */
+  setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void>;
+  /**
+   * Cascade delete: deletes every member doc, arrayRemoves the handle from
+   * each member's `users/{uid}.organizations`, then deletes the namespace
+   * doc. Firestore impl uses a single `WriteBatch`; capacity ~500 ops, so
+   * scales to ~249 members (2 ops/member + 1 namespace delete). Used by
+   * DELETE /api/namespaces/:handle (owner-only).
+   */
+  deleteNamespaceCascade(handle: string): Promise<void>;
   getMember(handle: string, uid: string): Promise<NamespaceMember | null>;
   getMembers(handle: string): Promise<NamespaceMember[]>;
   getUserNamespaces(uid: string): Promise<Namespace[]>;

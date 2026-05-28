@@ -10,6 +10,7 @@ import {
   FirestoreCronTriggerStateRepository,
   FirestoreToolCatalogRepository,
   FirestoreNamespaceRepository,
+  FirestoreUserProfileRepository,
   FirestoreOAuthProviderRepository,
   FirestoreAgentOAuthTokenRepository,
   FirestoreModelRegistryRepository,
@@ -95,6 +96,7 @@ export interface PlatformServices {
   cronTriggerStateRepo: CronTriggerStateRepository;
   toolCatalogRepo: ToolCatalogRepository;
   namespaceRepo: FirestoreNamespaceRepository;
+  userProfileRepo: FirestoreUserProfileRepository;
   oauthProviderRepo: FirestoreOAuthProviderRepository;
   agentOAuthTokenRepo: FirestoreAgentOAuthTokenRepository;
   modelRegistryRepo: FirestoreModelRegistryRepository;
@@ -246,6 +248,7 @@ export function getPlatformServices(): PlatformServices {
       ? new PostgresToolCatalogRepository(getSharedPostgresClient().db)
       : new FirestoreToolCatalogRepository(db);
   const namespaceRepo = new FirestoreNamespaceRepository(db);
+  const userProfileRepo = new FirestoreUserProfileRepository(db);
   const oauthProviderRepo = new FirestoreOAuthProviderRepository(db);
   const agentOAuthTokenRepo = new FirestoreAgentOAuthTokenRepository(db);
   const modelRegistryRepo = new FirestoreModelRegistryRepository(db);
@@ -383,6 +386,7 @@ export function getPlatformServices(): PlatformServices {
     cronTriggerStateRepo,
     toolCatalogRepo,
     namespaceRepo,
+    userProfileRepo,
     oauthProviderRepo,
     agentOAuthTokenRepo,
     modelRegistryRepo,

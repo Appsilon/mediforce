@@ -51,6 +51,15 @@ class InMemoryNamespaceRepository implements NamespaceRepository {
   async removeMember(): Promise<void> {
     /* not exercised */
   }
+  async removeMemberWithOrganizations(): Promise<void> {
+    /* not exercised */
+  }
+  async setMemberRole(): Promise<void> {
+    /* not exercised */
+  }
+  async deleteNamespaceCascade(): Promise<void> {
+    /* not exercised */
+  }
   async getMember(handle: string, uid: string): Promise<NamespaceMember | null> {
     return this.members.get(handle)?.find((m) => m.uid === uid) ?? null;
   }

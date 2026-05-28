@@ -113,6 +113,56 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
       .delete();
   }
 
+  async removeMemberWithOrganizations(handle: string, uid: string): Promise<void> {
+    const batch = this.db.batch();
+    const memberRef = this.db
+      .collection(this.namespacesCollection)
+      .doc(handle)
+      .collection(this.membersSubcollection)
+      .doc(uid);
+    const userRef = this.db.collection('users').doc(uid);
+    batch.delete(memberRef);
+    batch.set(
+      userRef,
+      { organizations: FieldValue.arrayRemove(handle) },
+      { merge: true },
+    );
+    await batch.commit();
+  }
+
+  async setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void> {
+    await this.db
+      .collection(this.namespacesCollection)
+      .doc(handle)
+      .collection(this.membersSubcollection)
+      .doc(uid)
+      .update({ role });
+  }
+
+  async deleteNamespaceCascade(handle: string): Promise<void> {
+    // Firestore batch cap = 500 ops; 2 ops per member (member doc delete +
+    // user doc arrayRemove) + 1 namespace delete = 2N + 1, so this scales to
+    // ~249 members per workspace. At Mediforce scale (handful of members per
+    // workspace) the cap is not reachable; if/when it becomes one, split into
+    // chunked batches.
+    const membersSnapshot = await this.db
+      .collection(this.namespacesCollection)
+      .doc(handle)
+      .collection(this.membersSubcollection)
+      .get();
+    const batch = this.db.batch();
+    for (const memberDoc of membersSnapshot.docs) {
+      batch.delete(memberDoc.ref);
+      batch.set(
+        this.db.collection('users').doc(memberDoc.id),
+        { organizations: FieldValue.arrayRemove(handle) },
+        { merge: true },
+      );
+    }
+    batch.delete(this.db.collection(this.namespacesCollection).doc(handle));
+    await batch.commit();
+  }
+
   async getMember(handle: string, uid: string): Promise<NamespaceMember | null> {
     const snapshot = await this.db
       .collection(this.namespacesCollection)

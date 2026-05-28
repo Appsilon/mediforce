@@ -54,6 +54,15 @@ class InMemoryNamespaceRepository implements NamespaceRepository {
   async removeMember(): Promise<void> {
     /* not exercised */
   }
+  async removeMemberWithOrganizations(): Promise<void> {
+    /* not exercised */
+  }
+  async setMemberRole(): Promise<void> {
+    /* not exercised */
+  }
+  async deleteNamespaceCascade(): Promise<void> {
+    /* not exercised */
+  }
   async getMember(): Promise<NamespaceMember | null> {
     return null;
   }

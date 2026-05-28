@@ -50,10 +50,16 @@ import { coworkGetCommand } from './commands/cowork-get.js';
 import { coworkGetByInstanceCommand } from './commands/cowork-get-by-instance.js';
 import { coworkChatCommand } from './commands/cowork-chat.js';
 import { usersMeCommand } from './commands/users-me.js';
+import { usersClearMustChangePasswordCommand } from './commands/users-clear-must-change-password.js';
 import { namespaceGetCommand } from './commands/namespace-get.js';
 import { namespaceCreateCommand } from './commands/namespace-create.js';
 import { agentRunListCommand } from './commands/agent-run-list.js';
 import { agentRunGetCommand } from './commands/agent-run-get.js';
+import { namespaceUpdateCommand } from './commands/namespace-update.js';
+import { namespaceDeleteCommand } from './commands/namespace-delete.js';
+import { namespaceLeaveCommand } from './commands/namespace-leave.js';
+import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member.js';
+import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role.js';
 import { type CommandFn } from './define-command.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
@@ -154,13 +160,22 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'User identity + workspace memberships',
     leaves: {
       me: { description: 'Show the signed-in user + their workspaces', fn: usersMeCommand },
+      'clear-must-change-password': {
+        description: 'Acknowledge a forced password change',
+        fn: usersClearMustChangePasswordCommand,
+      },
     },
   },
   namespace: {
-    description: 'Workspaces (get, create)',
+    description: 'Workspaces (get, create, update, delete, leave, members)',
     leaves: {
       get: { description: 'Fetch a namespace + member list', fn: namespaceGetCommand },
       create: { description: 'Create an organization namespace', fn: namespaceCreateCommand },
+      update: { description: 'Edit display name / bio / icon', fn: namespaceUpdateCommand },
+      delete: { description: 'Delete a workspace (owner only, cascades members)', fn: namespaceDeleteCommand },
+      leave: { description: 'Leave a workspace (self-remove)', fn: namespaceLeaveCommand },
+      'remove-member': { description: 'Remove a member from a workspace', fn: namespaceRemoveMemberCommand },
+      'set-member-role': { description: 'Flip a member to admin|member', fn: namespaceSetMemberRoleCommand },
     },
   },
   system: {

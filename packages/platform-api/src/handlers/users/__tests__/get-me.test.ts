@@ -73,6 +73,24 @@ class InMemoryNamespaceRepository implements NamespaceRepository {
     const list = this.members.get(handle) ?? [];
     this.members.set(handle, list.filter((m) => m.uid !== uid));
   }
+  async removeMemberWithOrganizations(handle: string, uid: string): Promise<void> {
+    await this.removeMember(handle, uid);
+    const orgs = this.userOrganizations.get(uid) ?? [];
+    this.userOrganizations.set(uid, orgs.filter((h) => h !== handle));
+  }
+  async setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void> {
+    const list = this.members.get(handle) ?? [];
+    this.members.set(handle, list.map((m) => (m.uid === uid ? { ...m, role } : m)));
+  }
+  async deleteNamespaceCascade(handle: string): Promise<void> {
+    const list = this.members.get(handle) ?? [];
+    for (const member of list) {
+      const orgs = this.userOrganizations.get(member.uid) ?? [];
+      this.userOrganizations.set(member.uid, orgs.filter((h) => h !== handle));
+    }
+    this.members.delete(handle);
+    this.namespaces.delete(handle);
+  }
   async getMember(handle: string, uid: string): Promise<NamespaceMember | null> {
     return this.members.get(handle)?.find((m) => m.uid === uid) ?? null;
   }
@@ -158,7 +176,7 @@ describe('getMe handler', () => {
 
     const result = await getMe({}, scope);
 
-    expect(result.user).toEqual({ uid: 'uid-1', email: 'alice@example.test', displayName: 'Alice' });
+    expect(result.user).toEqual({ uid: 'uid-1', email: 'alice@example.test', displayName: 'Alice', mustChangePassword: false });
     expect(result.namespaces).toHaveLength(1);
     expect(result.namespaces[0]).toMatchObject({
       handle: 'alice',
@@ -307,5 +325,37 @@ describe('getMe handler', () => {
 
     expect(result.namespaces[0]?.handle).toBe('alice-2');
     expect(result.namespaces[0]?.role).toBe('owner');
+  });
+
+  it('projects mustChangePassword: false when no users/{uid} profile exists', async () => {
+    const directory = directoryWith('uid-marek', { email: 'marek@example.test', displayName: 'Marek' });
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      userDirectory: directory,
+      caller: userCaller('uid-marek', []),
+    });
+
+    const result = await getMe({}, scope);
+
+    expect(result.user.mustChangePassword).toBe(false);
+  });
+
+  it('projects mustChangePassword: true when the profile flag is set', async () => {
+    const { InMemoryUserProfileRepository } = await import('@mediforce/platform-core/testing');
+    const userProfileRepo = new InMemoryUserProfileRepository();
+    await userProfileRepo.setMustChangePassword('uid-marek', true);
+    const directory = directoryWith('uid-marek', { email: 'marek@example.test', displayName: 'Marek' });
+    const scope = createTestScope({
+      namespaceRepo,
+      auditRepo,
+      userProfileRepo,
+      userDirectory: directory,
+      caller: userCaller('uid-marek', []),
+    });
+
+    const result = await getMe({}, scope);
+
+    expect(result.user.mustChangePassword).toBe(true);
   });
 });

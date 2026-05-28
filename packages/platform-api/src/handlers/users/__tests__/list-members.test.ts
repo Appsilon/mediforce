@@ -48,6 +48,15 @@ function namespaceRepoWith(members: ReadonlyMap<string, NamespaceMember[]>): Nam
     async removeMember() {
       /* no-op */
     },
+    async removeMemberWithOrganizations() {
+      /* no-op */
+    },
+    async setMemberRole() {
+      /* no-op */
+    },
+    async deleteNamespaceCascade() {
+      /* no-op */
+    },
     async getMember() {
       return null;
     },

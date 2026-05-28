@@ -113,3 +113,21 @@ export function assertCallerCanAdminDockerImages(caller: CallerIdentity): void {
   }
   throw new ForbiddenError();
 }
+
+/**
+ * Throw `ForbiddenError` unless the caller is the owner of `namespace`.
+ *
+ * apiKey callers bypass (platform-admin trust). Used by handlers that perform
+ * owner-exclusive mutations: workspace deletion, role flips that promote /
+ * demote admins, and the owner-cannot-leave precondition check.
+ */
+export function assertCallerIsNamespaceOwner(
+  caller: CallerIdentity,
+  namespace: string,
+): void {
+  if (caller.isSystemActor) return;
+  const role = caller.namespaceRoles.get(namespace);
+  if (role !== 'owner') {
+    throw new ForbiddenError();
+  }
+}

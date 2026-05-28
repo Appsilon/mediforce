@@ -5,6 +5,7 @@ import type {
   ModelRegistryRepository,
   NamespaceRepository,
   UserDirectoryService,
+  UserProfileRepository,
 } from '@mediforce/platform-core';
 import type {
   CronTrigger,
@@ -71,6 +72,7 @@ export interface CallerScope {
   readonly models: ModelRegistryRepository;
   readonly plugins: PluginsRegistryView;
   readonly workspaces: NamespaceRepository;
+  readonly userProfiles: UserProfileRepository;
   readonly cron: CronTriggerStateRepository;
 
   // System services (engine, manual trigger, etc.) — handlers use these

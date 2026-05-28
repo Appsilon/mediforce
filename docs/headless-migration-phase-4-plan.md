@@ -519,11 +519,16 @@ conflicts):
 | PR3 — processes/runs | `use-process-instances`, `use-audit-events`, `next-step-card` migrations. `process-detail.tsx` + cancel/archive/bulk mutations via `useMutation` + optimistic. | Must sequence with PR4 (shared `[handle]/page.tsx`). |
 | PR4 — namespaces + auth + workspaces/new | `GET /api/users/me` (with lazy bootstrap), `GET /api/namespaces/:handle`, `POST /api/namespaces`. `use-namespace`, `use-namespace-role`, `use-all-user-namespaces`, `use-user-namespace` → selectors. `auth-context.tsx` drops Firestore. `workspaces/new/page.tsx` uses `useMutation`. Settings page drops remaining `onSnapshot`. Repo addition `NamespaceRepository.createNamespaceWithOwner`. Schema constants `HandleSchema`. | Must sequence with PR3 (shared `[handle]/page.tsx`). |
 | PR5 — cowork | `cowork/[sessionId]/page.tsx` rewire, chat send via `useMutation` + optimistic + isPending-gated polling. Chat handler return shape extended (additive). | Can run parallel with PR3/PR4 once PR1 lands. |
-| PR-final — flip | Delete `lib/firebase.ts` `getFirestore` + emulator. Uninstall `firebase/firestore` from `platform-ui` peer deps. Verify `api-boundaries.test.ts` still passes. Update `docs/headless-migration.md` Phase 4 → "done". | Must merge last. |
+| PR4.5 — firestore residual sweep | Migrates the writes/reads PR4 left behind so PR-final can be a true delete-only diff. Adds `UserProfileRepository` (interface + Firestore impl + in-memory) wired into `CallerScope.userProfiles`; extends `GetMeOutput.user` with `mustChangePassword` (default `false`); adds `POST /api/users/me/clear-must-change-password` and the matching CLI / client method. Adds five settings-page mutations: `PATCH /api/namespaces/:handle` (displayName / bio / icon — owner/admin), `DELETE /api/namespaces/:handle` (owner-only cascade via new `NamespaceRepository.deleteNamespaceCascade`), `POST /api/namespaces/:handle/leave` (owner blocked → `precondition_failed`), `DELETE /api/namespaces/:handle/members/:uid` (atomic via new `removeMemberWithOrganizations`), and `PATCH /api/namespaces/:handle/members/:uid` (owner-only, entity-echo). Rewires `auth-context.tsx`, `settings/page.tsx`, and the namespace/user sections of `app/(app)/[handle]/page.tsx` to consume `useUserMe` + `useNamespace` + the new `use-namespace-mutations` hooks. After PR4.5 merges, only `lib/firebase.ts`'s `db` export and the `firebase/firestore` peer dep remain. | Must sequence after PR4. Independent of PR2/PR3/PR5. Must merge before PR-final. |
+| PR-final — flip | Delete `lib/firebase.ts` `getFirestore` + emulator. Uninstall `firebase/firestore` from `platform-ui` peer deps. No remaining migration debt — PR4.5 cleared the last writes. Verify `api-boundaries.test.ts` still passes. Update `docs/headless-migration.md` Phase 4 → "done". | Must merge last (after PR4.5). |
 
 Pause-safe across PRs: each merged PR leaves a consistent app state.
 Multi-hook page conflicts (above) require sequencing, not full
 serialization — at most 2–3 PRs in parallel review.
+
+Merge sequence: PR1 first, PR2/PR3/PR4/PR5 in any order subject to the
+shared-page constraints, **PR4.5 after PR4** (depends on the new
+`useUserMe`/`useNamespace` cache + `CallerScope` wiring), PR-final last.
 
 Once PR-final merges, PG PR2 ([#534](https://github.com/Appsilon/mediforce/pull/534))
 is unblocked.

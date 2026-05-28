@@ -3,21 +3,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import * as Switch from '@radix-ui/react-switch';
 import { useParams, useRouter } from 'next/navigation';
-// TODO(phase-4 follow-up): the remaining firestore writes on this page
-// (update namespace metadata, role flip, member remove, workspace delete,
-// leave) are out of PR4 scope — PR4 only adds GET /namespaces/:handle +
-// POST /namespaces. Migration of these mutations lands with the dedicated
-// member-management endpoints.
-import {
-  arrayRemove,
-  collection,
-  deleteDoc,
-  deleteField,
-  doc,
-  getDocs,
-  updateDoc,
-  writeBatch,
-} from 'firebase/firestore';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -28,10 +13,16 @@ import {
   Trash2,
   Users,
 } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { mediforce } from '@/lib/mediforce';
+import { ApiError, mediforce } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
+import {
+  useDeleteNamespace,
+  useLeaveNamespace,
+  useRemoveMember,
+  useUpdateMemberRole,
+  useUpdateNamespace,
+} from '@/hooks/use-namespace-mutations';
 import { WORKSPACE_ICONS, WORKSPACE_ICON_KEYS, getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
 import type { NamespaceMember } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
@@ -254,8 +245,9 @@ export default function WorkspaceConfigPage() {
   const [profileDisplayName, setProfileDisplayName] = useState('');
   const [profileBio, setProfileBio] = useState('');
   const [profileIcon, setProfileIcon] = useState('Building2');
-  const [savingProfile, setSavingProfile] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const updateNamespace = useUpdateNamespace(handle);
+  const savingProfile = updateNamespace.isPending;
 
   // Initialise form fields from namespace once loaded
   useEffect(() => {
@@ -270,16 +262,17 @@ export default function WorkspaceConfigPage() {
     event.preventDefault();
     const trimmedName = profileDisplayName.trim();
     if (trimmedName === '') return;
-    setSavingProfile(true);
+    const trimmedBio = profileBio.trim();
     try {
-      await updateDoc(doc(db, 'namespaces', handle), {
+      await updateNamespace.mutateAsync({
+        handle,
         displayName: trimmedName,
-        bio: profileBio.trim() !== '' ? profileBio.trim() : deleteField(),
+        bio: trimmedBio !== '' ? trimmedBio : null,
       });
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 2500);
-    } finally {
-      setSavingProfile(false);
+    } catch {
+      // Optimistic snapshot already restored by the hook; nothing to do.
     }
   }
 
@@ -287,9 +280,8 @@ export default function WorkspaceConfigPage() {
   async function handleIconChange(iconKey: string) {
     setProfileIcon(iconKey);
     try {
-      await updateDoc(doc(db, 'namespaces', handle), { icon: iconKey });
+      await updateNamespace.mutateAsync({ handle, icon: iconKey });
     } catch {
-      // Revert to last saved value on error
       setProfileIcon(namespace?.icon ?? 'Building2');
     }
   }
@@ -364,73 +356,65 @@ export default function WorkspaceConfigPage() {
     }
   }
 
+  const removeMember = useRemoveMember(handle);
+  const updateMemberRole = useUpdateMemberRole(handle);
+  const leaveNamespace = useLeaveNamespace();
+  const deleteNamespace = useDeleteNamespace();
+
   async function handleRemoveMember(memberUid: string) {
     try {
-      await deleteDoc(doc(db, 'namespaces', handle, 'members', memberUid));
-      await updateDoc(doc(db, 'users', memberUid), {
-        organizations: arrayRemove(handle),
-      });
+      await removeMember.mutateAsync({ handle, uid: memberUid });
+      void refreshMembers();
     } catch {
-      // realtime subscription reflects actual state
+      // Hook restored the optimistic snapshot.
     }
   }
 
   async function handleToggleRole(memberUid: string, currentRole: string) {
-    const nextRole = currentRole === 'admin' ? 'member' : 'admin';
+    const nextRole: 'admin' | 'member' = currentRole === 'admin' ? 'member' : 'admin';
     try {
-      await updateDoc(doc(db, 'namespaces', handle, 'members', memberUid), { role: nextRole });
+      await updateMemberRole.mutateAsync({ handle, uid: memberUid, role: nextRole });
+      void refreshMembers();
     } catch {
-      // realtime subscription reflects actual state
+      // Hook restored the optimistic snapshot.
     }
   }
 
   // ── Danger zone ────────────────────────────────────────────────────────────
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [leaving, setLeaving] = useState(false);
+  const [dangerError, setDangerError] = useState<string | null>(null);
 
   async function handleDeleteWorkspace() {
     if (!confirmDelete) {
       setConfirmDelete(true);
       return;
     }
-    setDeleting(true);
+    setDangerError(null);
     try {
-      const membersSnapshot = await getDocs(collection(db, 'namespaces', handle, 'members'));
-      const batch = writeBatch(db);
-      for (const memberDoc of membersSnapshot.docs) {
-        batch.delete(memberDoc.ref);
-      }
-      batch.delete(doc(db, 'namespaces', handle));
-      await batch.commit();
-
-      await Promise.all(
-        membersSnapshot.docs.map((memberDoc) =>
-          updateDoc(doc(db, 'users', memberDoc.id), {
-            organizations: arrayRemove(handle),
-          }),
-        ),
-      );
-
+      await deleteNamespace.mutateAsync({ handle });
       router.push('/workspace-selection');
-    } catch {
-      setDeleting(false);
+    } catch (err: unknown) {
+      setDangerError(err instanceof Error ? err.message : 'Failed to delete workspace.');
     }
   }
 
   async function handleLeaveWorkspace() {
     if (firebaseUser === null) return;
-    setLeaving(true);
+    setDangerError(null);
     try {
-      await deleteDoc(doc(db, 'namespaces', handle, 'members', firebaseUser.uid));
-      await updateDoc(doc(db, 'users', firebaseUser.uid), {
-        organizations: arrayRemove(handle),
-      });
+      await leaveNamespace.mutateAsync({ handle });
       router.push('/workspace-selection');
-    } catch {
-      setLeaving(false);
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.code === 'precondition_failed') {
+        setDangerError(err.message);
+        return;
+      }
+      setDangerError(err instanceof Error ? err.message : 'Failed to leave workspace.');
     }
   }
+
+  const deleting = deleteNamespace.isPending;
+  const leaving = leaveNamespace.isPending;
 
   const loading = namespaceLoading || membersLoading;
 
@@ -914,6 +898,12 @@ export default function WorkspaceConfigPage() {
         )}
 
         {/* ── Danger zone ───────────────────────────────────────────────────── */}
+        {dangerError !== null && (
+          <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {dangerError}
+          </div>
+        )}
+
         {!isOwner && currentUserMember !== undefined && (
           <div className="rounded-lg border border-destructive/30 bg-card px-4 py-5">
             <h2 className="text-sm font-semibold mb-1">Leave workspace</h2>

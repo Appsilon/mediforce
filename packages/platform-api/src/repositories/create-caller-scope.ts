@@ -16,6 +16,7 @@ import type {
   ProcessRepository,
   ToolCatalogRepository,
   UserDirectoryService,
+  UserProfileRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
 import type {
@@ -60,6 +61,7 @@ export interface CallerScopeServices {
   readonly cronTriggerStateRepo: CronTriggerStateRepository;
   readonly toolCatalogRepo: ToolCatalogRepository;
   readonly namespaceRepo: NamespaceRepository;
+  readonly userProfileRepo: UserProfileRepository;
   readonly oauthProviderRepo: OAuthProviderRepository;
   readonly agentOAuthTokenRepo: AgentOAuthTokenRepository;
   readonly modelRegistryRepo: ModelRegistryRepository;
@@ -126,6 +128,7 @@ export function createCallerScope(
     models: services.modelRegistryRepo,
     plugins: services.pluginRegistry,
     workspaces: services.namespaceRepo,
+    userProfiles: services.userProfileRepo,
     cron: services.cronTriggerStateRepo,
 
     system: {

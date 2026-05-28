@@ -74,6 +74,9 @@ export {
   NamespaceSchema,
   NamespaceMemberSchema,
   NamespaceMembershipSchema,
+  HandleSchema,
+  HANDLE_REGEX,
+  HANDLE_MAX_LENGTH,
   WorkflowSecretsSchema,
   NamespaceSecretsSchema,
   CronTriggerStateSchema,
@@ -96,9 +99,6 @@ export {
   AssignmentItemSchema,
   TableEditorRowSchema,
   CompleteHumanTaskPayloadSchema,
-  HandleSchema,
-  HANDLE_REGEX,
-  HANDLE_MAX_LENGTH,
 } from './schemas/index.js';
 
 export type { Handle } from './schemas/handle.js';
@@ -220,6 +220,8 @@ export type {
   ToolCatalogRepository,
   NamespaceRepository,
   NamespaceSecretsRepository,
+  UserProfile,
+  UserProfileRepository,
   WorkflowSecretsRepository,
   SendEmailParams,
   SendEmailResult,
