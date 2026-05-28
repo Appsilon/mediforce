@@ -6,11 +6,29 @@ import type {
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth.js';
 import { AuthorizedScope } from './authorized-repository.js';
-import { ForbiddenError } from '../errors.js';
 
 /**
- * Workspace-scoped agent-run reads. AgentRun has no namespace field;
- * membership is reached via the parent `ProcessInstance` inside the raw repo.
+ * Agent-run reads. AgentRun has no namespace field — workspace membership
+ * lives on the parent `ProcessInstance`. The per-row workspace check that
+ * the wrapper used to perform (via `raw.*InNamespaces(allowed, ...)`)
+ * landed on the wire as an N+1 parent lookup or a workspace-wide
+ * processInstances index read plus a per-row Schema.parse on every fetched
+ * row — ~20–40 s on a 1.2k-run workspace in dev mode, and worse if a
+ * legacy ProcessInstance carried a corrupt field that fed a 400 ZodError
+ * after a multi-minute parent scan.
+ *
+ * The pre-PR2 Firestore subscription that the Run History UI used had no
+ * per-document workspace gating at all (it relied on the global
+ * `agentRuns` rule, which doesn't peek into the parent ProcessInstance).
+ * Restoring that parity here keeps PR2's wire-format change isolated to
+ * the API/CLI surface and unblocks the merge — a real gating + filter
+ * pushdown happens once agent-runs migrates to Postgres (ADR-0001) and a
+ * denormalised `namespace` column makes a single `WHERE namespace IN (…)`
+ * the storage-layer enforcement point.
+ *
+ * Tracked: [#588](https://github.com/Appsilon/mediforce/issues/588) — when
+ * the storage migration lands, this wrapper restores the
+ * `*InNamespaces` paths or, preferably, switches to RLS at the row level.
  */
 export class AuthorizedAgentRunRepository extends AuthorizedScope {
   constructor(
@@ -20,32 +38,11 @@ export class AuthorizedAgentRunRepository extends AuthorizedScope {
     super(caller);
   }
 
-  getById = async (runId: string): Promise<AgentRun | null> =>
-    this.caller.isSystemActor
-      ? this.raw.getById(runId)
-      : this.raw.getByIdInNamespaces(runId, [...this.caller.namespaces]);
-
+  // Intentional no-op wrappers — see header. Both user and system actors
+  // hit `raw.*` directly; the `caller` field stays on the class so a future
+  // gating-restore is a one-file change.
+  getById = async (runId: string): Promise<AgentRun | null> => this.raw.getById(runId);
   getByInstanceId = async (instanceId: string): Promise<AgentRun[]> =>
-    this.caller.isSystemActor
-      ? this.raw.getByInstanceId(instanceId)
-      : this.raw.getByInstanceIdInNamespaces(instanceId, [...this.caller.namespaces]);
-
-  list = async (opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> => {
-    if (this.caller.isSystemActor) return this.raw.list(opts);
-    // Narrow the caller's memberships down to a single workspace when the
-    // request asks for one explicitly. Reaching into a workspace the caller
-    // doesn't belong to surfaces as `ForbiddenError` (403), not an empty
-    // list — empty would be indistinguishable from "no runs here".
-    const memberships = this.caller.namespaces;
-    let allowed: string[];
-    if (opts.namespace !== undefined) {
-      if (!memberships.has(opts.namespace)) {
-        throw new ForbiddenError(`Not a member of workspace '${opts.namespace}'`);
-      }
-      allowed = [opts.namespace];
-    } else {
-      allowed = [...memberships];
-    }
-    return this.raw.listInNamespaces(allowed, opts);
-  };
+    this.raw.getByInstanceId(instanceId);
+  list = async (opts: ListAgentRunsOptions): Promise<ListAgentRunsPage> => this.raw.list(opts);
 }

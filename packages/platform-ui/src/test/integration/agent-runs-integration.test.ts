@@ -155,15 +155,17 @@ describe('Mediforce client ↔ route-adapter ↔ agentRuns handlers (user caller
     });
   });
 
-  it('returns a 403 envelope when the user is not a member of the requested workspace', async () => {
-    await expect(mediforce.agentRuns.list({ namespace: 'team-beta' })).rejects.toMatchObject({
-      status: 403,
-      code: 'forbidden',
-    });
+  // PR2 keeps parity with the pre-PR2 Firestore subscription, which had
+  // no per-row workspace gating on agent-runs. Real gating + filter
+  // pushdown returns once the storage migrates to Postgres with a
+  // denormalised `namespace` column (#588).
+  it('user caller still sees their own workspace runs without an explicit filter', async () => {
+    const { runs } = await mediforce.agentRuns.list({});
+    expect(runs.map((r) => r.id)).toEqual(['ar-1']);
   });
 
-  it('returns only the runs from the user’s own workspace when no namespace filter is set', async () => {
-    const { runs } = await mediforce.agentRuns.list({});
+  it('explicit cross-workspace ?namespace= currently no-ops to the full list (#588)', async () => {
+    const { runs } = await mediforce.agentRuns.list({ namespace: 'team-beta' });
     expect(runs.map((r) => r.id)).toEqual(['ar-1']);
   });
 });

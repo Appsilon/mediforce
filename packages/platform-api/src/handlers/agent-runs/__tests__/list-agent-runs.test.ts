@@ -34,25 +34,29 @@ describe('listAgentRuns handler', () => {
     expect(result.nextCursor).toBeUndefined();
   });
 
-  it('scopes a user caller to their workspaces', async () => {
+  // PR2 parity with the pre-PR2 Firestore subscription (`useCollection`)
+  // intentionally drops the per-row workspace gate — both system and user
+  // callers see the full list. Real gating returns once agent-runs lands
+  // on Postgres with a denormalised `namespace` column (#588), and these
+  // assertions flip back at that point.
+  it('returns every run for a user caller too (no workspace gating, see #588)', async () => {
     const scope = createTestScope({
       agentRunRepo,
       instanceRepo,
       caller: userCaller('u-1', ['team-alpha']),
     });
     const result = await listAgentRuns({ limit: 50 }, scope);
-    expect(result.runs.map((r) => r.id)).toEqual(['r-a']);
+    expect(result.runs.map((r) => r.id)).toEqual(['r-a', 'r-b']);
   });
 
-  it('returns a 403 when the user explicitly asks for a non-member workspace', async () => {
+  it('explicit ?namespace= is also a no-op until #588 (no 403, full list)', async () => {
     const scope = createTestScope({
       agentRunRepo,
       instanceRepo,
       caller: userCaller('u-1', ['team-alpha']),
     });
-    await expect(
-      listAgentRuns({ limit: 50, namespace: 'team-beta' }, scope),
-    ).rejects.toThrow(/Not a member/);
+    const result = await listAgentRuns({ limit: 50, namespace: 'team-beta' }, scope);
+    expect(result.runs.map((r) => r.id)).toEqual(['r-a', 'r-b']);
   });
 
   it('emits a stable nextCursor when limit < total visible runs', async () => {
