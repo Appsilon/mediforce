@@ -182,8 +182,8 @@
     { "from": "wait_for_responses", "to": "collect_responses" },
     { "from": "collect_responses", "to": "synthesize" },
     { "from": "synthesize", "to": "decide_triage" },
-    { "from": "decide_triage", "to": "spawn_triage", "when": "verdict.intent == \"success\"" },
-    { "from": "decide_triage", "to": "report", "when": "verdict.intent == \"neutral\"" },
+    { "from": "decide_triage", "to": "spawn_triage", "when": "verdict == \"launch_triage\"" },
+    { "from": "decide_triage", "to": "report", "when": "verdict == \"skip\"" },
     { "from": "spawn_triage", "to": "report" }
   ]
 }

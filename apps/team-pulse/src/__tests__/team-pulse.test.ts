@@ -116,14 +116,14 @@ describe('team-pulse', () => {
     expect(action.config.targets.payload?.pulseContext).toBeDefined();
   });
 
-  it('transitions branch on verdict.intent from decide_triage', () => {
+  it('transitions branch on verdict key from decide_triage', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
     const fromDecide = result.data.transitions.filter((t) => t.from === 'decide_triage');
     expect(fromDecide).toHaveLength(2);
-    expect(fromDecide.find((t) => t.to === 'spawn_triage')?.when).toBe('verdict.intent == "success"');
-    expect(fromDecide.find((t) => t.to === 'report')?.when).toBe('verdict.intent == "neutral"');
+    expect(fromDecide.find((t) => t.to === 'spawn_triage')?.when).toBe('verdict == "launch_triage"');
+    expect(fromDecide.find((t) => t.to === 'report')?.when).toBe('verdict == "skip"');
   });
 
   it('declares triggerInput for question, teamMembers, collectUntil, repo, labelFilter', () => {

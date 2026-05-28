@@ -24,4 +24,17 @@ export class FirebaseUserDirectoryService implements UserDirectoryService {
       })
       .map((u) => ({ uid: u.uid, email: u.email ?? '' }));
   }
+
+  async resolveUser(identifier: string): Promise<DirectoryUser | null> {
+    try {
+      if (identifier.includes('@')) {
+        const user = await this.adminAuth.getUserByEmail(identifier);
+        return { uid: user.uid, email: user.email ?? '', displayName: user.displayName };
+      }
+      const user = await this.adminAuth.getUser(identifier);
+      return { uid: user.uid, email: user.email ?? '', displayName: user.displayName };
+    } catch {
+      return null;
+    }
+  }
 }

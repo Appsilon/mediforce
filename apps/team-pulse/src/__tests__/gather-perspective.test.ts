@@ -45,7 +45,7 @@ describe('gather-perspective', () => {
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'provide_perspective');
     expect(step?.executor).toBe('human');
-    expect(step?.assignedTo).toBe('${triggerPayload.userId}');
+    expect(step?.assignedTo).toBe('${triggerPayload.email}');
     expect(step?.params).toHaveLength(1);
     expect(step?.params?.[0]?.name).toBe('perspective');
     expect(step?.params?.[0]?.type).toBe('textarea');
