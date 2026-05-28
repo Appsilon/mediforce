@@ -24,7 +24,15 @@ export async function getMonitoringSummary(
   assertNamespaceAccess(scope.caller, input.handle);
   const handle = input.handle;
 
-  const allRuns = await scope.runs.list({});
+  // `scope.runs.list({})` would default to 20 rows in the Firestore impl,
+  // which then dropped the workspace's older paused/running runs once the
+  // newest 20 ProcessInstances were from another namespace. Pre-PR2 the UI
+  // used a `useProcessInstances` subscription with no limit at all, so the
+  // dashboard never lost a paused run. Match that ceiling here until the
+  // PR3 follow-up pushes the namespace filter into the repo (see
+  // `docs/headless-migration-phase-4-plan.md`) and we can count off the
+  // indexed slice directly.
+  const allRuns = await scope.runs.list({ limit: 10_000 });
   const runs = allRuns.filter((r) => r.namespace === handle && r.deleted !== true);
 
   const now = Date.now();
