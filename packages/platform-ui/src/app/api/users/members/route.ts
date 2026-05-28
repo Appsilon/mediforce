@@ -68,18 +68,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const userRecords = await Promise.all(
       uids.map((uid) => adminAuth.getUser(uid).catch(() => null)),
     );
-    const authDataMap = new Map<string, { email: string | null; lastSignInTime: string | null }>();
+    const authDataMap = new Map<string, { email: string | null; lastSignInTime: string | null; photoURL: string | null }>();
     for (const record of userRecords) {
       if (record !== null) {
         authDataMap.set(record.uid, {
           email: record.email ?? null,
           lastSignInTime: record.metadata.lastSignInTime ?? null,
+          photoURL: record.photoURL ?? null,
         });
       }
     }
 
     const members: MemberResponse[] = memberDocs.map((memberDoc) => ({
       ...memberDoc,
+      avatarUrl: memberDoc.avatarUrl ?? authDataMap.get(memberDoc.uid)?.photoURL ?? undefined,
       email: authDataMap.get(memberDoc.uid)?.email ?? null,
       lastSignInTime: authDataMap.get(memberDoc.uid)?.lastSignInTime ?? null,
     }));
