@@ -290,6 +290,16 @@ export const MonitoringSummarySchema = z.object({
   `cron_triggers_due` in follow-ups without breaking change).
 - Replaces direct Firestore reads + in-browser aggregation in
   `use-monitoring.ts`.
+- **PR3 follow-up (carried from PR2 self-review #4):** the PR2 handler
+  loads `scope.runs.list({})` and filters by `r.namespace === handle`
+  in-app. PR3 owns the processes domain — please extend
+  `ListInstancesOptions` with `namespace?: string`, push the filter
+  into `ProcessInstanceRepository.listAll` /
+  `listInNamespaces` (and the wrapper), and update the monitoring
+  handler to pass `{ namespace: handle }` so the dashboard endpoint
+  stops over-fetching for system actors. Same cost optimisation matters
+  twice as much on Postgres — system actor today hits an unfiltered
+  scan.
 
 #### Extension: `ListTasksInputSchema` gains optional `instanceId` + `stepId`
 
