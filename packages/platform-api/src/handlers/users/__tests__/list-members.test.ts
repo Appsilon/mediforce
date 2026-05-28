@@ -33,6 +33,9 @@ function namespaceRepoWith(members: ReadonlyMap<string, NamespaceMember[]>): Nam
     async createNamespace() {
       /* no-op */
     },
+    async createNamespaceWithOwner() {
+      /* no-op */
+    },
     async updateNamespace() {
       /* no-op */
     },

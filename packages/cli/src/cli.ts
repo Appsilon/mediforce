@@ -49,6 +49,9 @@ import { taskClaimCommand } from './commands/task-claim.js';
 import { coworkGetCommand } from './commands/cowork-get.js';
 import { coworkGetByInstanceCommand } from './commands/cowork-get-by-instance.js';
 import { coworkChatCommand } from './commands/cowork-chat.js';
+import { usersMeCommand } from './commands/users-me.js';
+import { namespaceGetCommand } from './commands/namespace-get.js';
+import { namespaceCreateCommand } from './commands/namespace-create.js';
 import { type CommandFn } from './define-command.js';
 import { consoleOutput, type OutputSink } from './output.js';
 
@@ -136,6 +139,19 @@ export const TREE: Record<string, BranchEntry> = {
       set: { description: 'Set a secret', fn: secretSetCommand },
       list: { description: 'List secret keys', fn: secretListCommand },
       delete: { description: 'Delete a secret', fn: secretDeleteCommand },
+    },
+  },
+  users: {
+    description: 'User identity + workspace memberships',
+    leaves: {
+      me: { description: 'Show the signed-in user + their workspaces', fn: usersMeCommand },
+    },
+  },
+  namespace: {
+    description: 'Workspaces (get, create)',
+    leaves: {
+      get: { description: 'Fetch a namespace + member list', fn: namespaceGetCommand },
+      create: { description: 'Create an organization namespace', fn: namespaceCreateCommand },
     },
   },
   system: {

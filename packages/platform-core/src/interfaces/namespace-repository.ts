@@ -3,6 +3,18 @@ import type { Namespace, NamespaceMember, NamespaceMembership } from '../schemas
 export interface NamespaceRepository {
   getNamespace(handle: string): Promise<Namespace | null>;
   createNamespace(namespace: Namespace): Promise<void>;
+  /**
+   * Atomic create: writes the namespace doc, its `ownerMember` member doc,
+   * and the denormalised `users/{uid}.organizations` entry in one
+   * transaction (Firestore: `WriteBatch`; Postgres: SQL transaction). All-or-
+   * nothing — if any leg fails the others must not land. Used by
+   * `POST /api/namespaces` so a half-created workspace cannot leak into the
+   * UI between the namespace doc and its owner member.
+   */
+  createNamespaceWithOwner(input: {
+    namespace: Namespace;
+    ownerMember: NamespaceMember;
+  }): Promise<void>;
   updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void>;
   getNamespacesByUser(uid: string): Promise<Namespace[]>;
   addMember(handle: string, member: NamespaceMember): Promise<void>;

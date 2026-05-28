@@ -4,11 +4,18 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { arrayUnion, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/auth-context';
-
-const HANDLE_REGEX = /^[a-z0-9][a-z0-9-]{0,38}$/;
+import { ApiError, mediforce } from '@/lib/mediforce';
+import { queryKeys } from '@/lib/query-keys';
+import { snapshotCache } from '@/lib/optimistic';
+import { HANDLE_MAX_LENGTH, HANDLE_REGEX } from '@mediforce/platform-core';
+import type {
+  CreateNamespaceInput,
+  CreateNamespaceOutput,
+  GetMeOutput,
+  MeNamespace,
+} from '@mediforce/platform-api/contract';
 
 type FormErrors = {
   handle?: string;
@@ -18,14 +25,63 @@ type FormErrors = {
 
 export default function NewWorkspacePage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { firebaseUser, loading: authLoading } = useAuth();
 
   const [handle, setHandle] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
-  const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // List-affecting optimistic update per ADR-0006 §6: prepend an optimistic
+  // namespace entry to the cached `['users','me']` so the sidebar shows the
+  // new workspace immediately. On success the server-echoed entity replaces
+  // the placeholder; on failure the snapshot rolls back.
+  const create = useMutation<
+    CreateNamespaceOutput,
+    Error,
+    CreateNamespaceInput,
+    { restore: () => void }
+  >({
+    mutationFn: (input) => mediforce.namespaces.create(input),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: queryKeys.users.me() });
+      const { restore } = snapshotCache(qc, [queryKeys.users.me()]);
+
+      qc.setQueryData<GetMeOutput | undefined>(queryKeys.users.me(), (prev) => {
+        if (prev === undefined) return prev;
+        const placeholder: MeNamespace = {
+          handle: input.handle,
+          type: 'organization',
+          displayName: input.displayName,
+          role: 'owner',
+        };
+        return { ...prev, namespaces: [placeholder, ...prev.namespaces] };
+      });
+
+      return { restore };
+    },
+    onError: (_err, _input, ctx) => {
+      ctx?.restore();
+    },
+    onSuccess: (data) => {
+      qc.setQueryData<GetMeOutput | undefined>(queryKeys.users.me(), (prev) => {
+        if (prev === undefined) return prev;
+        const echo: MeNamespace = {
+          handle: data.namespace.handle,
+          type: data.namespace.type,
+          displayName: data.namespace.displayName,
+          role: 'owner',
+          ...(data.namespace.avatarUrl !== undefined ? { avatarUrl: data.namespace.avatarUrl } : {}),
+          ...(data.namespace.icon !== undefined ? { icon: data.namespace.icon } : {}),
+        };
+        const others = prev.namespaces.filter((n) => n.handle !== data.namespace.handle);
+        return { ...prev, namespaces: [echo, ...others] };
+      });
+      router.push(`/${data.namespace.handle}`);
+    },
+  });
 
   if (authLoading) {
     return (
@@ -48,9 +104,9 @@ export default function NewWorkspacePage() {
 
     if (handle.trim() === '') {
       nextErrors.handle = 'Handle is required.';
-    } else if (!HANDLE_REGEX.test(handle)) {
+    } else if (!HANDLE_REGEX.test(handle) || handle.length > HANDLE_MAX_LENGTH) {
       nextErrors.handle =
-        'Handle must start with a letter or number and contain only lowercase letters, numbers, or hyphens (max 39 characters).';
+        `Handle must be lowercase alphanumeric with internal hyphens (max ${HANDLE_MAX_LENGTH} characters).`;
     }
 
     if (displayName.trim() === '') {
@@ -76,50 +132,24 @@ export default function NewWorkspacePage() {
       return;
     }
 
-    if (firebaseUser === null) return;
-
     setErrors({});
-    setSubmitting(true);
 
     try {
-      const namespaceRef = doc(db, 'namespaces', handle);
-      const existing = await getDoc(namespaceRef);
-
-      if (existing.exists()) {
-        setErrors({ handle: 'This handle is already taken.' });
-        setSubmitting(false);
-        return;
-      }
-
-      const now = new Date().toISOString();
-      const currentUid = firebaseUser.uid;
-
-      await setDoc(namespaceRef, {
+      await create.mutateAsync({
         handle,
         displayName,
         ...(bio.trim() !== '' ? { bio: bio.trim() } : {}),
-        type: 'organization',
-        createdAt: now,
       });
-
-      await setDoc(doc(db, 'namespaces', handle, 'members', currentUid), {
-        uid: currentUid,
-        role: 'owner',
-        ...(firebaseUser.displayName !== null ? { displayName: firebaseUser.displayName } : {}),
-        ...(firebaseUser.photoURL !== null ? { avatarUrl: firebaseUser.photoURL } : {}),
-        joinedAt: now,
-      });
-
-      await updateDoc(doc(db, 'users', currentUid), {
-        organizations: arrayUnion(handle),
-      });
-
-      router.push(`/${handle}`);
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 409) {
+        setErrors({ handle: 'This handle is already taken.' });
+        return;
+      }
       setSubmitError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
-      setSubmitting(false);
     }
   }
+
+  const submitting = create.isPending;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-3xl">
@@ -147,7 +177,7 @@ export default function NewWorkspacePage() {
             type="text"
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
-            maxLength={39}
+            maxLength={HANDLE_MAX_LENGTH}
             placeholder="my-workspace"
             className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             disabled={submitting}

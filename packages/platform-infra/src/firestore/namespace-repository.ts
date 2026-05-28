@@ -30,6 +30,30 @@ export class FirestoreNamespaceRepository implements NamespaceRepository {
       .set(namespace);
   }
 
+  async createNamespaceWithOwner(input: {
+    namespace: Namespace;
+    ownerMember: NamespaceMember;
+  }): Promise<void> {
+    const { namespace, ownerMember } = input;
+    const batch = this.db.batch();
+    const namespaceRef = this.db
+      .collection(this.namespacesCollection)
+      .doc(namespace.handle);
+    const memberRef = namespaceRef
+      .collection(this.membersSubcollection)
+      .doc(ownerMember.uid);
+    const userRef = this.db.collection('users').doc(ownerMember.uid);
+
+    batch.set(namespaceRef, namespace);
+    batch.set(memberRef, ownerMember);
+    batch.set(
+      userRef,
+      { organizations: FieldValue.arrayUnion(namespace.handle) },
+      { merge: true },
+    );
+    await batch.commit();
+  }
+
   async updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void> {
     await this.db
       .collection(this.namespacesCollection)

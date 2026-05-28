@@ -132,12 +132,24 @@ import {
   InviteUserOutputSchema,
   ResendInviteInputSchema,
   ResendInviteOutputSchema,
+  GetMeInputSchema,
+  GetMeOutputSchema,
+  GetNamespaceInputSchema,
+  GetNamespaceOutputSchema,
+  CreateNamespaceInputSchema,
+  CreateNamespaceOutputSchema,
   type ListNamespaceMembersInput,
   type ListNamespaceMembersOutput,
   type InviteUserInput,
   type InviteUserOutput,
   type ResendInviteInput,
   type ResendInviteOutput,
+  type GetMeInput,
+  type GetMeOutput,
+  type GetNamespaceInput,
+  type GetNamespaceOutput,
+  type CreateNamespaceInput,
+  type CreateNamespaceOutput,
   DeleteDockerImageInputSchema,
   DeleteDockerImageOutputSchema,
   type DeleteDockerImageInput,
@@ -496,6 +508,12 @@ export class Mediforce {
     listMembers: (input: ListNamespaceMembersInput) => Promise<ListNamespaceMembersOutput>;
     invite: (input: InviteUserInput) => Promise<InviteUserOutput>;
     resendInvite: (input: ResendInviteInput) => Promise<ResendInviteOutput>;
+    me: (input?: GetMeInput) => Promise<GetMeOutput>;
+  };
+
+  readonly namespaces: {
+    get: (input: GetNamespaceInput) => Promise<GetNamespaceOutput>;
+    create: (input: CreateNamespaceInput) => Promise<CreateNamespaceOutput>;
   };
 
   constructor(private readonly config: ClientConfig) {
@@ -1287,6 +1305,35 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.users.resendInvite');
         return ResendInviteOutputSchema.parse(body);
+      },
+      me: async (input) => {
+        const qs = input?.uid !== undefined && input.uid !== ''
+          ? toSearchParams({ uid: input.uid })
+          : '';
+        const res = await this.request(`/api/users/me${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.users.me');
+        return GetMeOutputSchema.parse(body);
+      },
+    };
+
+    this.namespaces = {
+      get: async (input) => {
+        const validated = GetNamespaceInputSchema.parse(input);
+        const res = await this.request(
+          `/api/namespaces/${encodeURIComponent(validated.handle)}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.namespaces.get');
+        return GetNamespaceOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const validated = CreateNamespaceInputSchema.parse(input);
+        const res = await this.request('/api/namespaces', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.namespaces.create');
+        return CreateNamespaceOutputSchema.parse(body);
       },
     };
   }
