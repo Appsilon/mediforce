@@ -35,11 +35,11 @@ describe('ListTasksInputSchema — filter exclusivity refine (instanceId XOR rol
   });
 });
 
-describe('ListTasksInputSchema — stepId narrowing (Phase 4 PR1 consumers)', () => {
-  // The Phase 4 PRD §3 proposed a refine "stepId requires instanceId" but the
-  // schema already allowed `role + stepId`. Per the PRD amendment recorded in
-  // Phase 4 PR1: leave the schema permissive — no consumer needs the constraint
-  // and `role + stepId` is a semantically valid cross-instance bottleneck view.
+describe('ListTasksInputSchema — stepId narrowing', () => {
+  // The Phase 4 PRD proposed a refine "stepId requires instanceId" but the
+  // schema already allowed `role + stepId`. Decision recorded: leave the
+  // schema permissive — no consumer needs the constraint and `role + stepId`
+  // is a semantically valid cross-instance bottleneck view.
 
   it('accepts instanceId + stepId (next-step-card pattern)', () => {
     expect(

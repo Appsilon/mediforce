@@ -82,12 +82,13 @@ export function useCompletedTasksByRole(
 }
 
 /**
- * @deprecated PR3 — Firestore `onSnapshot` fallback. The `role === null`
- * caller pattern (workspace home / workflow detail / runs list) needs an
- * "all tasks visible to me" axis on `mediforce.tasks.list` before it can
- * migrate to react-query; that endpoint extension lands with PR3. PR1
- * keeps this hook intact so PR3 pages keep working without regression.
- * For the role-provided path, use `useMyActionableTasksByRole` instead.
+ * @deprecated Firestore `onSnapshot` fallback retained only for the
+ * `role === null` caller pattern (cross-role aggregation on workspace home,
+ * workflow detail, runs list). Those call sites need an "all tasks visible
+ * to me" axis on `mediforce.tasks.list` before they can migrate to
+ * react-query — until that endpoint extension lands they keep working
+ * against this hook unchanged. For the role-provided path, use
+ * `useMyActionableTasksByRole` instead.
  */
 export function useMyTasks(assignedRole: string | null, currentUserId?: string | null) {
   const constraints = useMemo(
@@ -127,8 +128,9 @@ export function useMyTasks(assignedRole: string | null, currentUserId?: string |
 }
 
 /**
- * @deprecated PR3 — Firestore fallback for the `role === null` branch.
- * For the role-provided path, use `useCompletedTasksByRole` instead.
+ * @deprecated Firestore fallback retained only for the `role === null` branch
+ * — see `useMyTasks` for the rationale. For the role-provided path, use
+ * `useCompletedTasksByRole` instead.
  */
 export function useCompletedTasks(assignedRole: string | null) {
   const constraints = useMemo(

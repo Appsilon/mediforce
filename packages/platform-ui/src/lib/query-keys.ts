@@ -8,8 +8,9 @@ import type { HumanTaskStatus } from '@mediforce/platform-core';
  * every variant under the prefix. Plain values for top-level filters; object
  * literal at the tail when the filter set has multiple fields.
  *
- * PR1 adds the `tasks` domain. Future PRs extend with `runs`, `workflows`,
- * `agent-runs`, `cowork`, `audit`, `namespace`, `users`, `monitoring`.
+ * Currently covers the `tasks` domain. Future work extends with `runs`,
+ * `workflows`, `agent-runs`, `cowork`, `audit`, `namespace`, `users`,
+ * `monitoring`.
  */
 export const queryKeys = {
   tasks: {

@@ -18,8 +18,9 @@ const { mediforce } = await import('@/lib/mediforce');
 /**
  * Mirrors the state-transition wiring in `components/tasks/claim-button.tsx`
  * so the test exercises the canonical optimistic template, not a parallel
- * implementation. PR2-5 mutations are expected to follow the same shape;
- * this test is the contract for "optimistic update behaves correctly".
+ * implementation. Future mutations on other domains are expected to follow
+ * the same shape; this test is the contract for "optimistic update behaves
+ * correctly".
  */
 function useClaimMutation(qc: import('@tanstack/react-query').QueryClient, taskId: string) {
   return useMutation({
