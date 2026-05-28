@@ -7,7 +7,7 @@ import { User } from 'lucide-react';
 import { getWorkspaceIcon, WORKSPACE_DEFAULT_KEY } from '@/lib/workspace-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
-import type { Namespace } from '@mediforce/platform-core';
+import type { MeNamespace } from '@mediforce/platform-api/contract';
 
 const ALWAYS_KEY = WORKSPACE_DEFAULT_KEY;
 
@@ -17,7 +17,7 @@ function OrgCard({
   onSelect,
   onAlwaysChange,
 }: {
-  namespace: Namespace;
+  namespace: MeNamespace;
   alwaysHandle: string | null;
   onSelect: (handle: string) => void;
   onAlwaysChange: (handle: string, checked: boolean) => void;
